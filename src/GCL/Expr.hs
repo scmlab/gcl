@@ -1,6 +1,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 
-module Expr where
+module GCL.Expr where
 
 import Data.Char(isAlpha)
 

@@ -7,8 +7,8 @@ import Control.Monad
 
 import Control.Monad.Gensym
 
-import Expr
-import Pred
+import GCL.Expr
+import GCL.Pred
 
 type OIdx = Int
 -- newtype OIdx = OIdx {unOIdx :: Int}

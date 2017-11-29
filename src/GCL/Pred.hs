@@ -1,10 +1,10 @@
 {-# LANGUAGE FlexibleContexts #-}
 
-module Pred where
+module GCL.Pred where
 
 import Control.Monad
 import Control.Monad.Gensym
-import Expr
+import GCL.Expr
 
 data BinRel = Eq | LEq | GEq | LTh | GTh
   deriving Show
