@@ -1,0 +1,25 @@
+
+con X, Y : int
+var x, y : int
+
+{X > 0 && Y > 0}
+x, y := X, Y
+{ gcd (x,y) = gcd (X,Y) && x>0 && y>0, bnd: x+y }
+do | x > y -> x := x - y
+   | x < y -> { gcd (x,y) = gcd (X,Y) && x>0 && y>0 && x < y }
+                a := a + 1
+                b := b + 1
+                { gcd (x,y) = gcd (X,Y) && x>0 && y>0 }
+od
+{ x = gcd (X,Y) }
+
+----
+
+{ ?0 }
+do P -> {?0 && P} ?1 {?0}
+od
+
+
+---
+
+keywords: con var do od bnd if fi
