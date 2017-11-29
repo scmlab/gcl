@@ -1,18 +1,18 @@
 # gcl
 
-## Develop
+To develop `gcl`:
 
 ```
 stack repl
 ```
 
-## Build
+To build `gcl`:
 
 ```
 stack build
 ```
 
-## Install
+To build and install the binary `gcl` somewhere in your `$PATH`:
 
 ```
 stack install
