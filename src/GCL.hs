@@ -22,6 +22,7 @@ data Stmt = Skip
           | Do Pred Expr [(Pred, Stmt)]
   deriving Show
 
+-- indexing holes in the predicates
 enumStmt :: MonadSymGen EIdx m => Stmt -> m Stmt
 enumStmt Skip = return Skip
 enumStmt (Assign xs es) =
@@ -37,12 +38,11 @@ enumStmt (Do inv bnd branches) =
             (enumHoles bnd)
             (mapM enumBranch branches)
 
-enumBranch ::MonadSymGen EIdx m => (Pred, Stmt) -> m (Pred, Stmt)
+enumBranch :: MonadSymGen EIdx m => (Pred, Stmt) -> m (Pred, Stmt)
 enumBranch (guard, body) =
   liftM2 (,) (enumHolesP guard) (enumStmt body)
 
-precond :: (MonadSymGen Idx m) =>
-           Stmt -> Pred -> m ([(Idx, Pred)], Pred)
+precond :: (MonadSymGen Idx m) => Stmt -> Pred -> m ([(Idx, Pred)], Pred)
 precond Skip post =
    return ([], post)
 precond (Assign xs es) post =
@@ -94,7 +94,7 @@ enumWithIdx (p:ps) = do i <- gensym
                         return ((i,p):ps')
 ---
 
-gcd = Assign ["x"] [Var "X"] `Seq`
+gcdExample = Assign ["x"] [Var "X"] `Seq`
       Assign ["y"] [Var "Y"] `Seq`
       Do (Term Eq (Op "gcd" [Var "x", Var "y"])
                   (Op "gcd" [Var "X", Var "Y"]))
@@ -108,9 +108,9 @@ post = (Term Eq (Var "x")
                 (Op "gcd" [Var "X", Var "Y"]))
 
 
-tst = runSymbolGen
-       (do gcd' <- enumStmt GCL.gcd
-           precond gcd' post)
+tst = runSymbolGen $ do
+  gcd' <- enumStmt gcdExample
+  precond gcd' post
 
 --
 
@@ -137,13 +137,3 @@ Seq (Seq (Assign ["x"] [Var "X"])
 (4,"(((((gcd x y) = (gcd X Y)) && (x < y)) && ([0] = 100)) => ([0] < 100))")]
 
 -}
-
--- instance Gensym OIdx where
---   genzero = OIdx 0
---   nextsym (OIdx n) = (OIdx (succ n))
-
---
-
-fork3 (f, g, h) (x, y, z) = (f x, g y, h z)
-
-type GCLM a = SymbolGen Idx a

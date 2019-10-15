@@ -1,6 +1,6 @@
 module Main where
 
-import GCL
+-- import GCL
 
 main :: IO ()
 main = do

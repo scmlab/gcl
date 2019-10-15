@@ -1,0 +1,48 @@
+name:                gcl
+version:             0.1.0.0
+#synopsis:
+#description:
+homepage:            https://github.com/scmlab/gcl
+license:             BSD3
+author:              Author name here
+maintainer:          banacorn@gmail.com
+copyright:           something
+category:            language
+extra-source-files:
+- README.md
+
+dependencies:
+  - array
+  - base >= 4.7 && < 5
+  - bytestring
+  - containers
+  - lexer-applicative
+  - mtl
+  - regex-applicative
+  - srcloc
+  - text
+
+build-tools:
+- happy
+
+executables:
+  cp:
+    source-dirs:      src
+    main:             Main.hs
+    ghc-options:
+    - -Wall
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    - -fno-warn-orphans
+#
+# tests:
+#   cp-test:
+#     main: Test.hs
+#     source-dirs:
+#       - test
+#       - src
+#     dependencies:
+#       - tasty
+#       - tasty-hunit
+#       - tasty-quickcheck

@@ -1,35 +1,45 @@
-name:               gcl
-version:            0.0.1
-synopsis:           Guarded Command Language
-homepage:           https://github.com/scmlab/gcl
-license:            somelicense
-license-file:       LICENSE
-author:             Author name here
-maintainer:         example@example.com
-copyright:          2017 Author name here
-category:           Language
-build-type:         Simple
-extra-source-files: README.md
-cabal-version:      >=1.10
+cabal-version: 1.12
 
--- To avoid duplicated efforts in documentation and dealing with the
--- complications of embedding Haddock markup inside cabal files, it is
--- common to point users to the README.md file.
-description:        Please see the README on Github at <https://github.com/scmlab/gcl#readme>
+-- This file has been generated from package.yaml by hpack version 0.31.2.
+--
+-- see: https://github.com/sol/hpack
+--
+-- hash: 713157e80be669622f6ba6041a8b6478b40dd256ea7170fb6902365176cb7ab6
 
-executable gcl
-    hs-source-dirs:     src
-    main-is:            Main.hs
-    ghc-options:        -threaded -rtsopts -with-rtsopts=-N
-    build-depends:      base
-                    ,   mtl
-    default-language:   Haskell2010
-    other-modules:
-                        Control.Monad.Gensym
-                    ,   GCL
-                    ,   Expr
-                    ,   Pred
+name:           gcl
+version:        0.1.0.0
+category:       language
+homepage:       https://github.com/scmlab/gcl
+author:         Author name here
+maintainer:     banacorn@gmail.com
+copyright:      something
+license:        BSD3
+license-file:   LICENSE
+build-type:     Simple
+extra-source-files:
+    README.md
 
-source-repository head
-    type:       git
-    location:   https://github.com/scmlab/gcl
+executable cp
+  main-is: Main.hs
+  other-modules:
+      Control.Monad.Gensym
+      GCL
+      GCL.Expr
+      GCL.Pred
+      Paths_gcl
+  hs-source-dirs:
+      src
+  ghc-options: -Wall -threaded -rtsopts -with-rtsopts=-N -fno-warn-orphans
+  build-tools:
+      happy
+  build-depends:
+      array
+    , base >=4.7 && <5
+    , bytestring
+    , containers
+    , lexer-applicative
+    , mtl
+    , regex-applicative
+    , srcloc
+    , text
+  default-language: Haskell2010
