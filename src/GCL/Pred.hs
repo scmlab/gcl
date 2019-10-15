@@ -3,8 +3,9 @@
 module GCL.Pred where
 
 import GCL.Expr
+import GCL.EnumHole
 
-import qualified Data.Map as Map
+import Control.Monad (liftM2)
 import Data.Map (Map)
 
 data BinRel = Eq | LEq | GEq | LTh | GTh
@@ -17,6 +18,18 @@ data Pred = Term BinRel Expr Expr
           | Neg Pred
           | HoleP (Maybe EIdx)
   deriving Show
+
+instance EnumHole Pred where
+  enumHole (Term rel e1 e2) =
+    liftM2 (Term rel) (enumHole e1) (enumHole e2)
+  enumHole (Implies p q) =
+    liftM2 Implies (enumHole p) (enumHole q)
+  enumHole (Conj p q) =
+    liftM2 Conj (enumHole p) (enumHole q)
+  enumHole (Disj p q) =
+    liftM2 Disj (enumHole p) (enumHole q)
+  enumHole (Neg p) = Neg <$> enumHole p
+  enumHole (HoleP _)  = HoleP . Just <$> fresh
 
 substP :: Map VName Expr -> Pred -> Pred
 substP env (Term rel e1 e2) =

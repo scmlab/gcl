@@ -1,6 +1,9 @@
+{-# LANGUAGE TypeSynonymInstances, FlexibleInstances #-}
 {-# LANGUAGE FlexibleContexts #-}
 
 module GCL.Expr where
+
+import GCL.EnumHole
 
 import Control.Monad.Gensym
 import Data.Char(isAlpha)
@@ -24,7 +27,21 @@ data Expr = Var VName
           | HoleE (Maybe EIdx) [Subst]
   deriving Show
 
+instance EnumHole Expr where
+  enumHole (Var x)    = return $ Var x
+  enumHole (Lit n)    = return $ Lit n
+  enumHole (Op op es) = Op op <$> mapM enumHole es
+  enumHole (HoleE Nothing subs) = do
+    subs' <- mapM enumHole subs
+    i <- fresh
+    return (HoleE (Just i) subs')
+  enumHole (HoleE (Just i) subs) = HoleE (Just i) <$> mapM enumHole subs
+
 type Subst = Map VName Expr
+
+instance EnumHole Subst where
+  -- `const` for throwing away the key, we don't need it anyway
+  enumHole = Map.traverseWithKey (const enumHole)
 
 substE :: Subst -> Expr -> Expr
 substE env (Var x) =
