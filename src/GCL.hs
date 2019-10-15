@@ -3,7 +3,8 @@
 module GCL where
 
 import Control.Arrow ((***))
-import Control.Monad.Gensym
+import Control.Monad.State
+
 import qualified Data.Map as Map
 -- import Data.Map (Map)
 
@@ -12,7 +13,20 @@ import GCL.Pred
 import GCL.Stmt
 import GCL.EnumHole
 
-precond :: (MonadSymGen Idx m) => Stmt -> Pred -> m ([(Idx, Pred)], Pred)
+type M = State Int
+
+runM :: M a -> a
+runM p = evalState p 0
+
+gensym :: M Idx
+gensym = do
+  i <- get
+  put (succ i)
+  return i
+
+
+precond :: Stmt -> Pred -> M ([(Idx, Pred)], Pred)
+-- precond :: (MonadSymGen Idx m) => Stmt -> Pred -> m ([(Idx, Pred)], Pred)
 precond Skip _post =
    return ([], _post)
 precond (Assign xs es) _post =
@@ -44,8 +58,7 @@ precond (Do inv bnd branches) _post =
   where (guards, _bodies) = unzip $ map (\(Branch x y) -> (x, y)) branches
         baseCond = (inv `Conj` (foldr1 Conj (map Neg guards)))
                       `Implies` post -- empty branches?
-        branchCond :: (MonadSymGen Idx m) =>
-                      Branch -> m ([(Idx, Pred)], Pred)
+        branchCond :: Branch -> M ([(Idx, Pred)], Pred)
         branchCond (Branch guard body) =
           (id *** Implies (inv `Conj` guard)) <$>
               precond body inv
@@ -58,11 +71,12 @@ precond (Do inv bnd branches) _post =
                (inv `Conj` guard `Conj` (Term Eq bnd (Lit (Num 100))))
                  `Implies` pre)
 
-enumWithIdx :: (MonadSymGen i m) => [a] -> m [(i,a)]
+enumWithIdx :: [a] -> M [(Idx,a)]
 enumWithIdx [] = return []
-enumWithIdx (p:ps) = do i <- gensym
-                        ps' <- enumWithIdx ps
-                        return ((i,p):ps')
+enumWithIdx (p:ps) = do
+  i <- gensym
+  ps' <- enumWithIdx ps
+  return ((i,p):ps')
 ---
 
 gcdExample :: Stmt
@@ -84,7 +98,7 @@ post = (Term Eq (Var "x")
                 (Op "gcd" [Var "X", Var "Y"]))
 
 test :: ([(Idx, Pred)], Pred)
-test = runSymbolGen $ do
+test = runM $ do
   let gcd' = runEnumHole gcdExample
   precond gcd' post
 

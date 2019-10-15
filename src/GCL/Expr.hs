@@ -5,7 +5,6 @@ module GCL.Expr where
 
 import GCL.EnumHole
 
-import Control.Monad.Gensym
 import Data.Char(isAlpha)
 import qualified Data.Map as Map
 import Data.Map (Map)
@@ -33,7 +32,7 @@ instance EnumHole Expr where
   enumHole (Op op es) = Op op <$> mapM enumHole es
   enumHole (HoleE Nothing subs) = do
     subs' <- mapM enumHole subs
-    i <- fresh
+    i <- freshHole
     return (HoleE (Just i) subs')
   enumHole (HoleE (Just i) subs) = HoleE (Just i) <$> mapM enumHole subs
 
@@ -51,14 +50,6 @@ substE env (Var x) =
 substE _   (Lit n)     = Lit n
 substE env (Op op es)  = Op op (map (substE env) es)
 substE env (HoleE idx subs) = HoleE idx (env:subs)
-
-instance Gensym Int where
-  genzero = 0
-  nextsym = succ
-
--- instance Gensym EIdx where
---   genzero = EIdx 0
---   nextsym (EIdx n) = (EIdx (succ n))
 
 showLitS :: Lit -> ShowS
 showLitS (Num n) = showsPrec 0 n

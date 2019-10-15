@@ -15,8 +15,8 @@ class EnumHole p where
 runEnumHole :: EnumHole p => p -> p
 runEnumHole x = evalState (enumHole x) 0
 
-fresh :: EnumHoleM HoleIndex
-fresh = do
+freshHole :: EnumHoleM HoleIndex
+freshHole = do
   i <- get
   put (succ i)
   return i

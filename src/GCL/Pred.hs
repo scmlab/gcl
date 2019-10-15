@@ -29,7 +29,7 @@ instance EnumHole Pred where
   enumHole (Disj p q) =
     liftM2 Disj (enumHole p) (enumHole q)
   enumHole (Neg p) = Neg <$> enumHole p
-  enumHole (HoleP _)  = HoleP . Just <$> fresh
+  enumHole (HoleP _)  = HoleP . Just <$> freshHole
 
 substP :: Map VName Expr -> Pred -> Pred
 substP env (Term rel e1 e2) =
