@@ -4,6 +4,9 @@ module GCL.Pred where
 
 import GCL.Expr
 
+import qualified Data.Map as Map
+import Data.Map (Map)
+
 data BinRel = Eq | LEq | GEq | LTh | GTh
   deriving Show
 
@@ -15,7 +18,7 @@ data Pred = Term BinRel Expr Expr
           | HoleP (Maybe EIdx)
   deriving Show
 
-substP :: [(VName, Expr)] -> Pred -> Pred
+substP :: Map VName Expr -> Pred -> Pred
 substP env (Term rel e1 e2) =
   Term rel (substE env e1) (substE env e2)
 substP env (Implies p q) = Implies (substP env p) (substP env q)

@@ -2,9 +2,11 @@
 
 module GCL.Expr where
 
-import Data.Char(isAlpha)
-
 import Control.Monad.Gensym
+import Data.Char(isAlpha)
+import qualified Data.Map as Map
+import Data.Map (Map)
+
 
 type Idx = Int
 type EIdx = Int
@@ -22,11 +24,11 @@ data Expr = Var VName
           | HoleE (Maybe EIdx) [Subst]
   deriving Show
 
-type Subst = [(VName, Expr)]
+type Subst = Map VName Expr
 
 substE :: Subst -> Expr -> Expr
 substE env (Var x) =
-  case lookup x env of
+  case Map.lookup x env of
     Just e -> e
     Nothing -> Var x
 substE _   (Lit n)     = Lit n

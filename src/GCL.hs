@@ -3,8 +3,9 @@
 module GCL where
 
 import Control.Arrow ((***))
-
 import Control.Monad.Gensym
+import qualified Data.Map as Map
+-- import Data.Map (Map)
 
 import GCL.Expr
 import GCL.Pred
@@ -15,7 +16,7 @@ precond :: (MonadSymGen Idx m) => Stmt -> Pred -> m ([(Idx, Pred)], Pred)
 precond Skip _post =
    return ([], _post)
 precond (Assign xs es) _post =
-   return ([], substP (zip xs es) post)
+   return ([], substP (Map.fromList (zip xs es)) post)
 precond (Seq c1 c2) _post =
    do (obs2, pre ) <- precond c2 post
       (obs1, pre') <- precond c1 pre

@@ -6,6 +6,7 @@ import GCL.Expr
 import GCL.Pred
 
 import Control.Monad.State
+import qualified Data.Map as Map
 
 --------------------------------------------------------------------------------
 -- | Enumerate and index Holes
@@ -26,11 +27,8 @@ fresh = do
   return i
 
 instance EnumHole Subst where
-  enumHole [] = return []
-  enumHole ((v,e):env) = do
-    e' <- enumHole e
-    env' <- enumHole env
-    return ((v,e'):env')
+  -- `const` for throwing away the key, we don't need it anyway
+  enumHole = Map.traverseWithKey (const enumHole)
 
 instance EnumHole Expr where
   enumHole (Var x)    = return $ Var x
