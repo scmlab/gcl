@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: a38e15d754241bdc9c88193b0b944cf5139d69c4e02a6b9719ef6245cf781498
+-- hash: 1dcbc507f64d2c1e4af4084395b1963027ef88f2c59716f9eedb31bde4cb646b
 
 name:           gcl
 version:        0.1.0.0
@@ -27,6 +27,7 @@ executable cp
       GCL.EnumHole
       GCL.Expr
       GCL.Pred
+      GCL.Stmt
       Paths_gcl
   hs-source-dirs:
       src

@@ -29,11 +29,11 @@ module Control.Monad.Gensym (
     , MonadSymGen(..)
     ) where
 
-import Control.Applicative
+-- import Control.Applicative
 import Control.Monad
 import Control.Monad.Identity
 import Control.Monad.State.Strict
-import Control.Monad.Trans
+-- import Control.Monad.Trans
 -- import Control.Monad.Trans.Either
 -- import Data.Ref (new, newLifted)
 -- import qualified Data.Ref as Ref

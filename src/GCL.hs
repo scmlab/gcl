@@ -1,65 +1,34 @@
-{-# LANGUAGE TypeSynonymInstances, FlexibleInstances #-}
 {-# LANGUAGE FlexibleContexts #-}
 
 module GCL where
 
 import Control.Arrow ((***))
-import Control.Monad
 
 import Control.Monad.Gensym
 
 import GCL.Expr
 import GCL.Pred
+import GCL.Stmt
 import GCL.EnumHole
 
-type OIdx = Int
--- newtype OIdx = OIdx {unOIdx :: Int}
---    deriving Show
-type Branch = (Pred, Stmt)
-data Stmt = Skip
-          | Assign [VName] [Expr]
-          | Seq Stmt Stmt
-          | Assert Pred
-          | If [Branch]
-          | Do Pred Expr [Branch]
-  deriving Show
-
-instance EnumHole Stmt where
-  enumHole Skip = return Skip
-  enumHole (Assign xs es) =
-    Assign xs <$> mapM enumHole es
-  enumHole (Seq c1 c2) =
-    liftM2 Seq (enumHole c1) (enumHole c2)
-  enumHole (Assert p) =
-    Assert <$> enumHole p
-  enumHole (If branches) =
-    If <$> mapM enumHole branches
-  enumHole (Do inv bnd branches) =
-    liftM3 Do (enumHole inv)
-              (enumHole bnd)
-              (mapM enumHole branches)
-
-instance EnumHole Branch where
-  enumHole (guard, body) = liftM2 (,) (enumHole guard) (enumHole body)
-
 precond :: (MonadSymGen Idx m) => Stmt -> Pred -> m ([(Idx, Pred)], Pred)
-precond Skip post =
-   return ([], post)
-precond (Assign xs es) post =
+precond Skip _post =
+   return ([], _post)
+precond (Assign xs es) _post =
    return ([], substP (zip xs es) post)
-precond (Seq c1 c2) post =
+precond (Seq c1 c2) _post =
    do (obs2, pre ) <- precond c2 post
       (obs1, pre') <- precond c1 pre
       return (obs1 ++ obs2, pre')
-precond (Assert p) post =
+precond (Assert p) _post =
   do i <- gensym
      return ([(i, p `Implies` post)], p)
-precond (If branches) post =
+precond (If _branches) _post =
    undefined
  {-  where guards = map fst branches
         bodies = map snd branches
         conds = map (flip precond post) bodies -}
-precond (Do inv bnd branches) post =
+precond (Do inv bnd branches) _post =
    do (obs, brConds) <-
           (concat *** id) . unzip <$> mapM branchCond branches
       (obsT, termConds2) <-
@@ -71,7 +40,7 @@ precond (Do inv bnd branches) post =
       return ((i1, baseCond) : (i2, termCond1) :
               brConds' ++ termConds2' ++ obs ++ obsT
              , inv)
-  where (guards, bodies) = unzip branches
+  where (guards, _bodies) = unzip branches
         baseCond = (inv `Conj` (foldr1 Conj (map Neg guards)))
                       `Implies` post -- empty branches?
         branchCond :: (MonadSymGen Idx m) =>
@@ -94,6 +63,7 @@ enumWithIdx (p:ps) = do i <- gensym
                         return ((i,p):ps')
 ---
 
+gcdExample :: Stmt
 gcdExample = Assign ["x"] [Var "X"] `Seq`
       Assign ["y"] [Var "Y"] `Seq`
       Do (Term Eq (Op "gcd" [Var "x", Var "y"])
@@ -104,11 +74,13 @@ gcdExample = Assign ["x"] [Var "X"] `Seq`
           (Term LTh (Var "x") (Var "y"),
            Assign ["y"] [Op "-" [Var "y", Var "x"]])
           ]
+
+post :: Pred
 post = (Term Eq (Var "x")
                 (Op "gcd" [Var "X", Var "Y"]))
 
-
-tst = runSymbolGen $ do
+test :: ([(Idx, Pred)], Pred)
+test = runSymbolGen $ do
   let gcd' = runEnumHole gcdExample
   precond gcd' post
 

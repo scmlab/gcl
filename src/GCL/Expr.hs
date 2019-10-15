@@ -9,9 +9,6 @@ import Control.Monad.Gensym
 type Idx = Int
 type EIdx = Int
 
--- newtype EIdx = EIdx {unEIdx :: Int}
---    deriving Show
-
 type VName = String
 
 type OpName = String
@@ -32,7 +29,7 @@ substE env (Var x) =
   case lookup x env of
     Just e -> e
     Nothing -> Var x
-substE env (Lit n)     = Lit n
+substE _   (Lit n)     = Lit n
 substE env (Op op es)  = Op op (map (substE env) es)
 substE env (HoleE idx subs) = HoleE idx (env:subs)
 
@@ -55,8 +52,8 @@ showExprS (Op op [x,y]) | not (isAlpha (head op)) =
     ('(':) . showExprS x . (' ':) . (op ++) . (' ':) . showExprS y . (')':)
 showExprS (Op op es) =
   ('(':) . (op ++) . (' ':) . showArgs es . (')':)
-showExprS (HoleE Nothing subs) = ("[_]" ++)
-showExprS (HoleE (Just i) subs) =
+showExprS (HoleE Nothing _subs) = ("[_]" ++)
+showExprS (HoleE (Just i) _subs) =
   ('[':) . showsPrec 0 i . (']':)
 
 showArgs :: [Expr] -> ShowS
