@@ -41,17 +41,18 @@ precond (Do inv bnd branches) _post =
       return ((i1, baseCond) : (i2, termCond1) :
               brConds' ++ termConds2' ++ obs ++ obsT
              , inv)
-  where (guards, _bodies) = unzip branches
+  where (guards, _bodies) = unzip $ map (\(Branch x y) -> (x, y)) branches
         baseCond = (inv `Conj` (foldr1 Conj (map Neg guards)))
                       `Implies` post -- empty branches?
         branchCond :: (MonadSymGen Idx m) =>
-                      (Pred, Stmt) -> m ([(Idx, Pred)], Pred)
-        branchCond (guard, body) =
+                      Branch -> m ([(Idx, Pred)], Pred)
+        branchCond (Branch guard body) =
           (id *** Implies (inv `Conj` guard)) <$>
               precond body inv
+
         termCond1 = (inv `Conj` foldr1 Disj guards) `Implies`
                       (Term GEq bnd (Lit (Num 0)))
-        termCond2 (guard, body) =
+        termCond2 (Branch guard body) =
           do (obs, pre) <- precond body (Term LTh bnd (Lit (Num 100)))
              return (obs,
                (inv `Conj` guard `Conj` (Term Eq bnd (Lit (Num 100))))
@@ -70,11 +71,13 @@ gcdExample = Assign ["x"] [Var "X"] `Seq`
       Do (Term Eq (Op "gcd" [Var "x", Var "y"])
                   (Op "gcd" [Var "X", Var "Y"]))
          (HoleE Nothing [])
-         [(Term GTh (Var "x") (Var "y"),
-           Assign ["x"] [Op "-" [Var "x", Var "y"]]),
-          (Term LTh (Var "x") (Var "y"),
-           Assign ["y"] [Op "-" [Var "y", Var "x"]])
-          ]
+  [ Branch
+      (Term GTh (Var "x") (Var "y"))
+      (Assign ["x"] [Op "-" [Var "x", Var "y"]])
+  , Branch
+      (Term LTh (Var "x") (Var "y"))
+      (Assign ["y"] [Op "-" [Var "y", Var "x"]])
+  ]
 
 post :: Pred
 post = (Term Eq (Var "x")
