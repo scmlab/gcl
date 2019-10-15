@@ -25,18 +25,6 @@ substP env (Conj p q) = Conj (substP env p) (substP env q)
 substP env (Disj p q) = Disj (substP env p) (substP env q)
 substP env (Neg p) = Neg (substP env p)
 
-enumHolesP :: MonadSymGen EIdx m => Pred -> m Pred
-enumHolesP (Term rel e1 e2) =
-  liftM2 (Term rel) (enumHoles e1) (enumHoles e2)
-enumHolesP (Implies p q) =
-  liftM2 Implies (enumHolesP p) (enumHolesP q)
-enumHolesP (Conj p q) =
-  liftM2 Conj (enumHolesP p) (enumHolesP q)
-enumHolesP (Disj p q) =
-    liftM2 Disj (enumHolesP p) (enumHolesP q)
-enumHolesP (Neg p) = Neg <$> enumHolesP p
-enumHolesP (HoleP _)  = HoleP . Just <$> gensym
-
 showBinRel :: BinRel -> ShowS
 showBinRel Eq  = ('=':)
 showBinRel LEq = ("<="++)

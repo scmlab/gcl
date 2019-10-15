@@ -1,3 +1,4 @@
+{-# LANGUAGE TypeSynonymInstances, FlexibleInstances #-}
 {-# LANGUAGE FlexibleContexts #-}
 
 module GCL where
@@ -9,38 +10,37 @@ import Control.Monad.Gensym
 
 import GCL.Expr
 import GCL.Pred
+import GCL.EnumHole
 
 type OIdx = Int
 -- newtype OIdx = OIdx {unOIdx :: Int}
 --    deriving Show
-
+type Branch = (Pred, Stmt)
 data Stmt = Skip
           | Assign [VName] [Expr]
           | Seq Stmt Stmt
           | Assert Pred
-          | If [(Pred, Stmt)]
-          | Do Pred Expr [(Pred, Stmt)]
+          | If [Branch]
+          | Do Pred Expr [Branch]
   deriving Show
 
--- indexing holes in the predicates
-enumStmt :: MonadSymGen EIdx m => Stmt -> m Stmt
-enumStmt Skip = return Skip
-enumStmt (Assign xs es) =
-  Assign xs <$> mapM enumHoles es
-enumStmt (Seq c1 c2) =
-  liftM2 Seq (enumStmt c1) (enumStmt c2)
-enumStmt (Assert p) =
-  Assert <$> enumHolesP p
-enumStmt (If branches) =
-  If <$> mapM enumBranch branches
-enumStmt (Do inv bnd branches) =
-  liftM3 Do (enumHolesP inv)
-            (enumHoles bnd)
-            (mapM enumBranch branches)
+instance EnumHole Stmt where
+  enumHole Skip = return Skip
+  enumHole (Assign xs es) =
+    Assign xs <$> mapM enumHole es
+  enumHole (Seq c1 c2) =
+    liftM2 Seq (enumHole c1) (enumHole c2)
+  enumHole (Assert p) =
+    Assert <$> enumHole p
+  enumHole (If branches) =
+    If <$> mapM enumHole branches
+  enumHole (Do inv bnd branches) =
+    liftM3 Do (enumHole inv)
+              (enumHole bnd)
+              (mapM enumHole branches)
 
-enumBranch :: MonadSymGen EIdx m => (Pred, Stmt) -> m (Pred, Stmt)
-enumBranch (guard, body) =
-  liftM2 (,) (enumHolesP guard) (enumStmt body)
+instance EnumHole Branch where
+  enumHole (guard, body) = liftM2 (,) (enumHole guard) (enumHole body)
 
 precond :: (MonadSymGen Idx m) => Stmt -> Pred -> m ([(Idx, Pred)], Pred)
 precond Skip post =
@@ -109,7 +109,7 @@ post = (Term Eq (Var "x")
 
 
 tst = runSymbolGen $ do
-  gcd' <- enumStmt gcdExample
+  let gcd' = runEnumHole gcdExample
   precond gcd' post
 
 --

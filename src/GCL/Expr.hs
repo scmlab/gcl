@@ -36,24 +36,6 @@ substE env (Lit n)     = Lit n
 substE env (Op op es)  = Op op (map (substE env) es)
 substE env (HoleE idx subs) = HoleE idx (env:subs)
 
-enumHoles :: MonadSymGen EIdx m => Expr -> m Expr
-enumHoles (Var x)    = return $ Var x
-enumHoles (Lit n)    = return $ Lit n
-enumHoles (Op op es) = Op op <$> mapM enumHoles es
-enumHoles (HoleE Nothing subs)  =
-  do subs' <- mapM enumHolesSub subs
-     i <- gensym
-     return (HoleE (Just i) subs')
-enumHoles (HoleE (Just i) subs)  =
-  HoleE (Just i) <$> mapM enumHolesSub subs
-
-enumHolesSub :: MonadSymGen EIdx m => Subst -> m Subst
-enumHolesSub [] = return []
-enumHolesSub ((v,e):env) =
-   do e' <- enumHoles e
-      env' <- enumHolesSub env
-      return ((v,e'):env')
-
 instance Gensym Int where
   genzero = 0
   nextsym = succ
