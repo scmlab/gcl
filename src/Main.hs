@@ -1,7 +1,9 @@
 module Main where
 
--- import GCL
+import Syntax.Parser
 
 main :: IO ()
 main = do
-    putStrLn "hi"
+  let filepath = "examples/a.gcl"
+  raw <- readFile filepath
+  print $ parseProgram filepath raw

@@ -17,8 +17,9 @@ dependencies:
   - bytestring
   - containers
   - lexer-applicative
-  - mtl
   - regex-applicative
+  - megaparsec
+  - mtl
   - srcloc
   - text
 
