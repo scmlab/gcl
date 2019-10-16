@@ -2,105 +2,91 @@
 
 module GCL where
 
-import Control.Arrow ((***))
-import Control.Monad.State
+import Control.Monad.State hiding (guard)
+import Control.Monad.Writer hiding (guard)
 
 import qualified Data.Map as Map
 -- import Data.Map (Map)
+import Data.Tuple (swap)
 
 import GCL.Expr
 import GCL.Pred
 import GCL.Stmt
 import GCL.EnumHole
 
-type M = State Int
+data Obligation = Obligation Idx Pred deriving (Show)
 
-runM :: M a -> a
-runM p = evalState p 0
+type M = WriterT [Obligation] (State Int)
 
-gensym :: M Idx
-gensym = do
+runM :: M Pred -> ([Obligation], Pred)
+runM p = evalState (swap <$> runWriterT p) 0
+
+-- creates a proof obligation
+shouldProof :: Pred -> M ()
+shouldProof p = do
   i <- get
   put (succ i)
-  return i
+  tell [Obligation i p]
 
-
-precond :: Stmt -> Pred -> M ([(Idx, Pred)], Pred)
+precond :: Stmt -> Pred -> M Pred
 -- precond :: (MonadSymGen Idx m) => Stmt -> Pred -> m ([(Idx, Pred)], Pred)
-precond Skip _post =
-   return ([], _post)
-precond (Assign xs es) _post =
-   return ([], substP (Map.fromList (zip xs es)) post)
-precond (Seq c1 c2) _post =
-   do (obs2, pre ) <- precond c2 post
-      (obs1, pre') <- precond c1 pre
-      return (obs1 ++ obs2, pre')
-precond (Assert p) _post =
-  do i <- gensym
-     return ([(i, p `Implies` post)], p)
-precond (If _branches) _post =
-   undefined
+precond Skip post = return post
+precond (Assign xs es) post = return $ substP (Map.fromList (zip xs es)) post
+precond (Seq c1 c2) post = precond c2 post >>= precond c1
+precond (Assert p) post = do
+  shouldProof $ p `Implies` post
+  return p
+precond (If _branches) _post = undefined
  {-  where guards = map fst branches
         bodies = map snd branches
         conds = map (flip precond post) bodies -}
-precond (Do inv bnd branches) _post =
-   do (obs, brConds) <-
-          (concat *** id) . unzip <$> mapM branchCond branches
-      (obsT, termConds2) <-
-          (concat *** id) . unzip <$> mapM termCond2 branches
-      brConds'    <- enumWithIdx brConds
-      termConds2' <- enumWithIdx termConds2
-      i1 <- gensym
-      i2 <- gensym
-      return ((i1, baseCond) : (i2, termCond1) :
-              brConds' ++ termConds2' ++ obs ++ obsT
-             , inv)
-  where (guards, _bodies) = unzip $ map (\(Branch x y) -> (x, y)) branches
-        baseCond = (inv `Conj` (foldr1 Conj (map Neg guards)))
-                      `Implies` post -- empty branches?
-        branchCond :: Branch -> M ([(Idx, Pred)], Pred)
-        branchCond (Branch guard body) =
-          (id *** Implies (inv `Conj` guard)) <$>
-              precond body inv
+precond (Do inv bnd branches) post = do
 
-        termCond1 = (inv `Conj` foldr1 Disj guards) `Implies`
-                      (Term GEq bnd (Lit (Num 0)))
-        termCond2 (Branch guard body) =
-          do (obs, pre) <- precond body (Term LTh bnd (Lit (Num 100)))
-             return (obs,
-               (inv `Conj` guard `Conj` (Term Eq bnd (Lit (Num 100))))
-                 `Implies` pre)
+  mapM_ (shouldProof <=< branchCond) branches
+  mapM_ (shouldProof <=< termCond) branches
 
-enumWithIdx :: [a] -> M [(Idx,a)]
-enumWithIdx [] = return []
-enumWithIdx (p:ps) = do
-  i <- gensym
-  ps' <- enumWithIdx ps
-  return ((i,p):ps')
----
+  let (guards, _bodies) = unzipBranches branches
+
+  shouldProof $ (inv `Conj` (foldr1 Conj (map Neg guards)))
+                  `Implies` post -- empty branches?
+  shouldProof $ (inv `Conj` foldr1 Disj guards) `Implies` (Term GEq bnd (Lit (Num 0)))
+
+  return inv
+
+  where
+    unzipBranches :: [Branch] -> ([Pred], [Stmt])
+    unzipBranches = unzip . map (\(Branch x y) -> (x, y))
+
+    branchCond :: Branch -> M Pred
+    branchCond (Branch guard body) = Implies (inv `Conj` guard) <$> precond body inv
+
+    termCond :: Branch -> M Pred
+    termCond (Branch guard body) = do
+      pre <- precond body (Term LTh bnd (Lit (Num 100)))
+      return $ inv `Conj` guard `Conj` (Term Eq bnd (Lit (Num 100))) `Implies` pre
 
 gcdExample :: Stmt
-gcdExample = Assign ["x"] [Var "X"] `Seq`
-      Assign ["y"] [Var "Y"] `Seq`
-      Do (Term Eq (Op "gcd" [Var "x", Var "y"])
-                  (Op "gcd" [Var "X", Var "Y"]))
-         (HoleE Nothing [])
-  [ Branch
-      (Term GTh (Var "x") (Var "y"))
-      (Assign ["x"] [Op "-" [Var "x", Var "y"]])
-  , Branch
-      (Term LTh (Var "x") (Var "y"))
-      (Assign ["y"] [Op "-" [Var "y", Var "x"]])
-  ]
+gcdExample =
+  Assign ["x"] [Var "X"] `Seq`
+  Assign ["y"] [Var "Y"] `Seq`
+  Do
+    (Term Eq (Op "gcd" [Var "x", Var "y"]) (Op "gcd" [Var "X", Var "Y"]))
+    (HoleE Nothing [])
+    [ Branch
+        (Term GTh (Var "x") (Var "y"))
+        (Assign ["x"] [Op "-" [Var "x", Var "y"]])
+    , Branch
+        (Term LTh (Var "x") (Var "y"))
+        (Assign ["y"] [Op "-" [Var "y", Var "x"]])
+    ]
 
-post :: Pred
-post = (Term Eq (Var "x")
-                (Op "gcd" [Var "X", Var "Y"]))
+postCond :: Pred
+postCond = Term Eq (Var "x") (Op "gcd" [Var "X", Var "Y"])
 
-test :: ([(Idx, Pred)], Pred)
+test :: ([Obligation], Pred)
 test = runM $ do
   let gcd' = runEnumHole gcdExample
-  precond gcd' post
+  precond gcd' postCond
 
 --
 
