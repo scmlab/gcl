@@ -1,18 +1,15 @@
--- {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Syntax.Parser where
 
--- import qualified Text.Megaparsec.Char.Lexer as L
--- import qualified Text.Megaparsec.Char as C
+import Data.Text
 import Data.Loc
 import Text.Megaparsec hiding (Pos)
 
 import Syntax.Concrete
 import Syntax.Lexer
---
-type Parser = Parsec () String
 
-parseProgram :: FilePath -> String -> Either (ParseErrorBundle String ()) [Statement]
+parseProgram :: FilePath -> Text -> Either (ParseErrorBundle Text ()) [Statement]
 parseProgram = runParser $ do
   many statement
 
