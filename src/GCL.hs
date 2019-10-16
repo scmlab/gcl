@@ -25,8 +25,10 @@ gensym = do
   return i
 
 
+-- compute precondition and proof obligations,
+--   given a postcondition.
+
 precond :: Stmt -> Pred -> M ([(Idx, Pred)], Pred)
--- precond :: (MonadSymGen Idx m) => Stmt -> Pred -> m ([(Idx, Pred)], Pred)
 precond Skip _post =
    return ([], _post)
 precond (Assign xs es) _post =
@@ -39,18 +41,26 @@ precond (Assert p) _post
   | predEq p _post = return ([], _post)
   | otherwise = do i <- gensym
                    return ([(i, p `Implies` post)], p)
-precond (If pre branches) _post =
+precond (If (Just pre) branches) _post =
    do (obs, brConds) <-
         (concat *** id) . unzip <$>
-           mapM (guardCond pre _post) branches
+           mapM (obliGuard pre _post) branches
       brConds' <- enumWithIdx brConds
       i <- gensym
       return (obs ++ brConds' ++ [(i, termCond)], pre)
   where (guards, _) = unzip $ map unGdCmd branches
         termCond = pre `Implies` foldr1 Disj guards
+precond (If Nothing branches) _post =
+   do (obs, brConds) <-
+        (concat *** id) . unzip <$>
+           mapM (precondGuard _post) branches
+      i <- gensym
+      return (obs, (foldr1 Conj brConds) `Conj` termCond)
+  where (guards, _) = unzip $ map unGdCmd branches
+        termCond = foldr1 Disj guards
 precond (Do inv bnd branches) _post =
    do (obs, brConds) <-
-          (concat *** id) . unzip <$> mapM (guardCond inv inv) branches
+          (concat *** id) . unzip <$> mapM (obliGuard inv inv) branches
       (obsT, termConds2) <-
           (concat *** id) . unzip <$> mapM termCond2 branches
       brConds'    <- enumWithIdx brConds
@@ -71,9 +81,13 @@ precond (Do inv bnd branches) _post =
                (inv `Conj` guard `Conj` (Term Eq bnd (Lit (Num 100))))
                  `Implies` pre)
 
-guardCond :: Pred -> Pred -> GdCmd -> M ([(Idx, Pred)], Pred)
-guardCond pre post (GdCmd guard body) =
- (id *** Implies (pre `Conj` guard)) <$> precond body post
+precondGuard :: Pred -> GdCmd -> M ([(Idx, Pred)], Pred)
+precondGuard post (GdCmd guard body) =
+ (id *** Implies guard) <$> precond body post
+
+obliGuard :: Pred -> Pred -> GdCmd -> M ([(Idx, Pred)], Pred)
+obliGuard pre post (GdCmd guard body) =
+  (id *** Implies (pre `Conj` guard)) <$> precond body post
 
 enumWithIdx :: [a] -> M [(Idx,a)]
 enumWithIdx [] = return []

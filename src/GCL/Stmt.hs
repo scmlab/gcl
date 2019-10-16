@@ -8,7 +8,7 @@ data Stmt = Skip
           | Assign [VName] [Expr]
           | Seq Stmt Stmt
           | Assert Pred
-          | If Pred [GdCmd]
+          | If (Maybe Pred) [GdCmd]
           | Do Pred Expr [GdCmd]
   deriving (Show, Eq)
 
