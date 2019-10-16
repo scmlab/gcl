@@ -35,17 +35,22 @@ precond (Seq c1 c2) _post =
    do (obs2, pre ) <- precond c2 post
       (obs1, pre') <- precond c1 pre
       return (obs1 ++ obs2, pre')
-precond (Assert p) _post =
-  do i <- gensym
-     return ([(i, p `Implies` post)], p)
-precond (If _branches) _post =
-   undefined
- {-  where guards = map fst branches
-        bodies = map snd branches
-        conds = map (flip precond post) bodies -}
+precond (Assert p) _post
+  | predEq p _post = return ([], _post)
+  | otherwise = do i <- gensym
+                   return ([(i, p `Implies` post)], p)
+precond (If pre branches) _post =
+   do (obs, brConds) <-
+        (concat *** id) . unzip <$>
+           mapM (guardCond pre _post) branches
+      brConds' <- enumWithIdx brConds
+      i <- gensym
+      return (obs ++ brConds' ++ [(i, termCond)], pre)
+  where (guards, _) = unzip $ map unGdCmd branches
+        termCond = pre `Implies` foldr1 Disj guards
 precond (Do inv bnd branches) _post =
    do (obs, brConds) <-
-          (concat *** id) . unzip <$> mapM branchCond branches
+          (concat *** id) . unzip <$> mapM (guardCond inv inv) branches
       (obsT, termConds2) <-
           (concat *** id) . unzip <$> mapM termCond2 branches
       brConds'    <- enumWithIdx brConds
@@ -55,21 +60,20 @@ precond (Do inv bnd branches) _post =
       return ((i1, baseCond) : (i2, termCond1) :
               brConds' ++ termConds2' ++ obs ++ obsT
              , inv)
-  where (guards, _bodies) = unzip $ map (\(Branch x y) -> (x, y)) branches
+  where (guards, _bodies) = unzip $ map unGdCmd branches
         baseCond = (inv `Conj` (foldr1 Conj (map Neg guards)))
                       `Implies` post -- empty branches?
-        branchCond :: Branch -> M ([(Idx, Pred)], Pred)
-        branchCond (Branch guard body) =
-          (id *** Implies (inv `Conj` guard)) <$>
-              precond body inv
-
         termCond1 = (inv `Conj` foldr1 Disj guards) `Implies`
                       (Term GEq bnd (Lit (Num 0)))
-        termCond2 (Branch guard body) =
+        termCond2 (GdCmd guard body) =
           do (obs, pre) <- precond body (Term LTh bnd (Lit (Num 100)))
              return (obs,
                (inv `Conj` guard `Conj` (Term Eq bnd (Lit (Num 100))))
                  `Implies` pre)
+
+guardCond :: Pred -> Pred -> GdCmd -> M ([(Idx, Pred)], Pred)
+guardCond pre post (GdCmd guard body) =
+ (id *** Implies (pre `Conj` guard)) <$> precond body post
 
 enumWithIdx :: [a] -> M [(Idx,a)]
 enumWithIdx [] = return []
@@ -77,6 +81,7 @@ enumWithIdx (p:ps) = do
   i <- gensym
   ps' <- enumWithIdx ps
   return ((i,p):ps')
+
 ---
 
 gcdExample :: Stmt
@@ -85,10 +90,10 @@ gcdExample = Assign ["x"] [Var "X"] `Seq`
       Do (Term Eq (Op "gcd" [Var "x", Var "y"])
                   (Op "gcd" [Var "X", Var "Y"]))
          (HoleE Nothing [])
-  [ Branch
+  [ GdCmd
       (Term GTh (Var "x") (Var "y"))
       (Assign ["x"] [Op "-" [Var "x", Var "y"]])
-  , Branch
+  , GdCmd
       (Term LTh (Var "x") (Var "y"))
       (Assign ["y"] [Op "-" [Var "y", Var "x"]])
   ]
