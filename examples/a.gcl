@@ -1,5 +1,2 @@
-skip
-skip
-abort
-skip
-skip
+cond X, Y : Int
+var x, y : Int
