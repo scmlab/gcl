@@ -1,2 +1,3 @@
 cond X, Y : Int
 var x, y : Int
+{ X > 0 }

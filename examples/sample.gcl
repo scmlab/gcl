@@ -1,5 +1,5 @@
 
-cond X, Y : int
+con X, Y : int
 var x, y : int
 
 {X > 0 && Y > 0}
@@ -22,4 +22,4 @@ od
 
 ---
 
-keywords: cond var do od bnd if fi
+keywords: con var do od bnd if fi

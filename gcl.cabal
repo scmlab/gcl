@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 70bce34ba0b9886331203f584589fed4013772c574362065df5fb399b44e22da
+-- hash: c6f07fd39670760b5ddbf40d5cecd354cdc53784707cebb598a123adbdcc5630
 
 name:           gcl
 version:        0.1.0.0
@@ -28,6 +28,8 @@ executable cp
       GCL.Expr
       GCL.Pred
       GCL.Stmt
+      Syntax.Concrete
+      Syntax.Lexer
       Syntax.Parser
       Paths_gcl
   hs-source-dirs:

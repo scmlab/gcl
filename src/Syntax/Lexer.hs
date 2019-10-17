@@ -28,6 +28,13 @@ lexeme = L.lexeme spaceConsumer
 symbol :: Text -> Parser ()
 symbol = void . L.symbol spaceConsumer
 
+integer :: Parser Int
+integer = lexeme L.decimal
+
+-- starts with lowercase alphabets, proceed with alphaNums, underscores and single quotes
+opName :: Parser Text
+opName = termName
+
 -- starts with lowercase alphabets, proceed with alphaNums, underscores and single quotes
 termName :: Parser Text
 termName = lexeme $ do
