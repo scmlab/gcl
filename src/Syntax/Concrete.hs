@@ -7,7 +7,7 @@ data Program = Program [Declaration] [Statement] Loc
   deriving (Show)
 
 data Declaration
-  = CondDecl [Condition] Type Loc
+  = ConstDecl [Constant] Type Loc
   | VarDecl [Variable] Type Loc
   deriving (Show)
 
@@ -32,6 +32,14 @@ data Pred = Term    Expr BinRel Expr  Loc
           | Hole                      Loc
           deriving (Show)
 
+instance Located Pred where
+  locOf (Term _ _ _ l)  = l
+  locOf (Implies _ _ l) = l
+  locOf (Conj _ _ l)    = l
+  locOf (Disj _ _ l)    = l
+  locOf (Neg _ l)       = l
+  locOf (Hole l)        = l
+
 --------------------------------------------------------------------------------
 -- | Expressions
 
@@ -41,6 +49,7 @@ data Lit  = Num Int
 
 type OpName = Text
 data Expr = Var Variable              Loc
+          | Const Constant            Loc
           | Lit Lit                   Loc
           | Op  OpName [Expr]         Loc
           | HoleE                     Loc
@@ -49,7 +58,7 @@ data Expr = Var Variable              Loc
 --------------------------------------------------------------------------------
 -- | Variables and stuff
 
-data Condition = Condition Text Loc
+data Constant = Constant Text Loc
   deriving (Show)
 
 data Variable = Variable Text Loc

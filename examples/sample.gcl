@@ -1,6 +1,6 @@
 
-con X, Y : int
-var x, y : int
+con X, Y : Int
+var x, y : Int
 
 {X > 0 && Y > 0}
 x, y := X, Y

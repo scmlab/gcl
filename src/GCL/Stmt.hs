@@ -6,7 +6,7 @@ import GCL.EnumHole
 
 data Branch = Branch Pred Stmt deriving (Show)
 data Stmt = Skip
-          | Assign [VName] [Expr]
+          | Assign [String] [Expr]
           | Seq Stmt Stmt
           | Assert Pred
           | If [Branch]

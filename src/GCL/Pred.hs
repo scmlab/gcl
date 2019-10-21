@@ -26,7 +26,7 @@ instance EnumHole Pred where
   enumHole (Neg p)          = Neg <$> enumHole p
   enumHole (HoleP _)        = HoleP . Just <$> freshHole
 
-substP :: Map VName Expr -> Pred -> Pred
+substP :: Map String Expr -> Pred -> Pred
 substP env (Term rel e1 e2) = Term rel (substE env e1) (substE env e2)
 substP env (Implies p q)    = Implies (substP env p) (substP env q)
 substP env (Conj p q)       = Conj (substP env p) (substP env q)

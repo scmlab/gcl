@@ -2,12 +2,15 @@
 
 module Syntax.Parser where
 
+-- import Syntax.ParseExpr
+import Control.Monad.Combinators.Expr
 import Data.Text
 import Data.Loc
 import Text.Megaparsec hiding (Pos)
 
 import Syntax.Concrete
 import Syntax.Lexer
+
 
 parseProgram :: FilePath -> Text -> Either (ParseErrorBundle Text ()) Program
 parseProgram = runParser $ withLoc $ do
@@ -39,43 +42,41 @@ assert = withLoc $ Assert <$ symbol "{" <*> predicate <* symbol "}"
 -- | Predicates
 
 predicate :: Parser Pred
-predicate = choice
-  [ predicate1
-  , withLoc (Implies <$> predicate1 <* symbol "=>" <*> predicate1 <?> "implication")
-  ]
+predicate = makeExprParser term table <?> "predicate"
 
-predicate1 :: Parser Pred
-predicate1 = choice
-  [ predicate2
-  , withLoc $ Disj <$> predicate2 <*  symbol "||" <*> predicate2
-  ]
+negation :: Parser (Pred -> Pred)
+negation = do
+  start <- getPos
+  symbol "not"
+  return $ \result -> Neg result (start <--> result)
 
-predicate2 :: Parser Pred
-predicate2 = choice
-  [ predicate3
-  , withLoc $ Conj <$> predicate3 <*  symbol "&&" <*> predicate3
-  ]
+conjunction :: Parser (Pred -> Pred -> Pred)
+conjunction = do
+  symbol "&&"
+  return $ \x y -> Conj x y (x <--> y)
 
-predicate3 :: Parser Pred
-predicate3 = choice
-  [ predicate4
-  , withLoc $ Neg <$  symbol "not" <*> predicate4
-  ]
+disjunction :: Parser (Pred -> Pred -> Pred)
+disjunction = do
+  symbol "||"
+  return $ \x y -> Disj x y (x <--> y)
 
-predicate4 :: Parser Pred
-predicate4 = choice
-  [ withLoc $ Hole <$  symbol "?"
-  , withLoc $ Term <$> expression <*> binaryRelation <*> expression
-  ]
+implication :: Parser (Pred -> Pred -> Pred)
+implication = do
+  symbol "=>"
+  return $ \x y -> Implies x y (x <--> y)
 
---
--- predicate5 :: Parser Pred
--- predicate5 = choice
---   [ withLoc $ Term <$> binaryRelation <*> expression <*> expression
---   ]
---   , Hole    <$  symbol "?"
---   ]
+table :: [[Operator Parser Pred]]
+table = [ [ Prefix negation ]
+        , [ InfixL conjunction ]
+        , [ InfixL disjunction ]
+        , [ InfixR implication ]
+        ]
 
+term :: Parser Pred
+term = parens predicate
+  <|> (withLoc $ Hole <$  symbol "?")
+  <|> (withLoc $ Term <$> expression <*> binaryRelation <*> expression)
+  -- <?> "term"
 
 binaryRelation :: Parser BinRel
 binaryRelation = withLoc $ choice
@@ -92,6 +93,7 @@ binaryRelation = withLoc $ choice
 expression :: Parser Expr
 expression = withLoc $ choice
   [ Var   <$> variable
+  , Const <$> constant
   , Lit   <$> literal
   , Op    <$> opName <*> many expression
   , HoleE <$  symbol "?"
@@ -113,17 +115,17 @@ literal = choice
 
 declaration :: Parser Declaration
 declaration = choice
-  [ conditionDecl
+  [ constantDecl
   , variableDecl
   ]
 
-conditionDecl :: Parser Declaration
-conditionDecl = withLoc $ do
-  symbol "cond"
-  types <- condList
+constantDecl :: Parser Declaration
+constantDecl = withLoc $ do
+  symbol "con"
+  types <- constList
   symbol ":"
   t <- type'
-  return $ CondDecl types t
+  return $ ConstDecl types t
 
 variableDecl :: Parser Declaration
 variableDecl = withLoc $ do
@@ -134,32 +136,14 @@ variableDecl = withLoc $ do
   return $ VarDecl vars t
 
 --------------------------------------------------------------------------------
--- | Helper functions
-
-withLoc :: Parser (Loc -> a) -> Parser a
-withLoc parser = do
-  start <- getPos
-  result <- parser
-  end <- getPos
-  return $ result (Loc start end)
-
-  where
-    getPos :: Parser Pos
-    getPos = do
-      offset <- getOffset
-      SourcePos filepath line column <- getSourcePos
-      return $ Pos filepath (unPos line) (unPos column) offset
-
-
---------------------------------------------------------------------------------
 -- | Variables and stuff
 
-condition :: Parser Condition
-condition = withLoc $ Condition <$> typeName
+constant :: Parser Constant
+constant = withLoc $ Constant <$> typeName
 
 -- seperated by commas
-condList :: Parser [Condition]
-condList = sepBy1 condition (symbol ",")
+constList :: Parser [Constant]
+constList = sepBy1 constant (symbol ",")
 
 variable :: Parser Variable
 variable = withLoc $ Variable <$> termName
@@ -174,3 +158,23 @@ type' = withLoc $ Type <$> typeName
 -- seperated by commas
 typeList :: Parser [Type]
 typeList = sepBy1 type' (symbol ",")
+
+
+--------------------------------------------------------------------------------
+-- | Helper functions
+
+getPos :: Parser Pos
+getPos = do
+  offset <- getOffset
+  SourcePos filepath line column <- getSourcePos
+  return $ Pos filepath (unPos line) (unPos column) offset
+
+withLoc :: Parser (Loc -> a) -> Parser a
+withLoc parser = do
+  start <- getPos
+  result <- parser
+  end <- getPos
+  return $ result (Loc start end)
+
+parens :: Parser a -> Parser a
+parens = between (symbol "(") (symbol ")")

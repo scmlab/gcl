@@ -13,14 +13,13 @@ import Data.Map (Map)
 type Idx = Int
 type EIdx = Int
 
-type VName = String
-
 type OpName = String
 
 data Lit = Num Int | Bol Bool
   deriving Show
 
-data Expr = Var VName
+data Expr = Var String
+          | Const String
           | Lit Lit
           | Op OpName [Expr]
           | HoleE (Maybe EIdx) [Subst]
@@ -28,6 +27,7 @@ data Expr = Var VName
 
 instance EnumHole Expr where
   enumHole (Var x)    = return $ Var x
+  enumHole (Const x)    = return $ Const x
   enumHole (Lit n)    = return $ Lit n
   enumHole (Op op es) = Op op <$> mapM enumHole es
   enumHole (HoleE Nothing subs) = do
@@ -36,7 +36,7 @@ instance EnumHole Expr where
     return (HoleE (Just i) subs')
   enumHole (HoleE (Just i) subs) = HoleE (Just i) <$> mapM enumHole subs
 
-type Subst = Map VName Expr
+type Subst = Map String Expr
 
 instance EnumHole Subst where
   -- `const` for throwing away the key, we don't need it anyway
@@ -47,6 +47,10 @@ substE env (Var x) =
   case Map.lookup x env of
     Just e -> e
     Nothing -> Var x
+substE env (Const x) =
+  case Map.lookup x env of
+    Just e -> e
+    Nothing -> Const x
 substE _   (Lit n)     = Lit n
 substE env (Op op es)  = Op op (map (substE env) es)
 substE env (HoleE idx subs) = HoleE idx (env:subs)
@@ -57,6 +61,7 @@ showLitS (Bol b) = showsPrec 0 b
 
 showExprS :: Expr -> ShowS
 showExprS (Var x) = (x ++)
+showExprS (Const x) = (x ++)
 showExprS (Lit n) = showLitS n
 showExprS (Op op [x,y]) | not (isAlpha (head op)) =
     ('(':) . showExprS x . (' ':) . (op ++) . (' ':) . showExprS y . (')':)
