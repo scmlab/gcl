@@ -33,13 +33,25 @@ precond :: Stmt -> Pred -> M Pred
 precond Skip post = return post
 precond (Assign xs es) post = return $ substP (Map.fromList (zip xs es)) post
 precond (Seq c1 c2) post = precond c2 post >>= precond c1
-precond (Assert p) post = do
-  shouldProof $ p `Implies` post
-  return p
-precond (If _branches) _post = undefined
- {-  where guards = map fst branches
-        bodies = map snd branches
-        conds = map (flip precond post) bodies -}
+precond (Assert p) post
+  | predEq p post = return post
+  | otherwise = do
+      shouldProof $ p `Implies` post
+      return p
+precond (If (Just pre) branches) post = do
+  mapM_ (shouldProof <=< obliGuard pre post) branches
+  shouldProof $ pre `Implies` foldr1 Disj guards
+  return pre
+  where
+    (guards, _) = unzip $ map unGdCmd branches
+
+precond (If Nothing branches) post = do
+  brConds <- mapM (precondGuard post) branches
+  return ((foldr1 Conj brConds) `Conj` termCond)
+  where
+    (guards, _) = unzip $ map unGdCmd branches
+    termCond :: Pred
+    termCond = foldr1 Disj guards
 precond (Do inv bnd branches) post = do
 
   mapM_ (shouldProof <=< branchCond) branches
@@ -54,16 +66,22 @@ precond (Do inv bnd branches) post = do
   return inv
 
   where
-    unzipBranches :: [Branch] -> ([Pred], [Stmt])
-    unzipBranches = unzip . map (\(Branch x y) -> (x, y))
+    unzipBranches :: [GdCmd] -> ([Pred], [Stmt])
+    unzipBranches = unzip . map (\(GdCmd x y) -> (x, y))
 
-    branchCond :: Branch -> M Pred
-    branchCond (Branch guard body) = Implies (inv `Conj` guard) <$> precond body inv
+    branchCond :: GdCmd -> M Pred
+    branchCond (GdCmd guard body) = Implies (inv `Conj` guard) <$> precond body inv
 
-    termCond :: Branch -> M Pred
-    termCond (Branch guard body) = do
+    termCond :: GdCmd -> M Pred
+    termCond (GdCmd guard body) = do
       pre <- precond body (Term LTh bnd (Lit (Num 100)))
       return $ inv `Conj` guard `Conj` (Term Eq bnd (Lit (Num 100))) `Implies` pre
+
+precondGuard :: Pred -> GdCmd -> M Pred
+precondGuard post (GdCmd guard body) = Implies guard <$> precond body post
+
+obliGuard :: Pred -> Pred -> GdCmd -> M Pred
+obliGuard pre post (GdCmd guard body) = Implies (pre `Conj` guard) <$> precond body post
 
 gcdExample :: Stmt
 gcdExample =
@@ -72,10 +90,10 @@ gcdExample =
   Do
     (Term Eq (Op "gcd" [Var "x", Var "y"]) (Op "gcd" [Var "X", Var "Y"]))
     (HoleE Nothing [])
-    [ Branch
+    [ GdCmd
         (Term GTh (Var "x") (Var "y"))
         (Assign ["x"] [Op "-" [Var "x", Var "y"]])
-    , Branch
+    , GdCmd
         (Term LTh (Var "x") (Var "y"))
         (Assign ["y"] [Op "-" [Var "y", Var "x"]])
     ]

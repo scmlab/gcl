@@ -8,7 +8,7 @@ import GCL.EnumHole
 import Data.Map (Map)
 
 data BinRel = Eq | LEq | GEq | LTh | GTh
-  deriving Show
+  deriving Eq
 
 data Pred = Term BinRel Expr Expr
           | Implies Pred Pred
@@ -16,7 +16,10 @@ data Pred = Term BinRel Expr Expr
           | Disj Pred Pred
           | Neg Pred
           | HoleP (Maybe EIdx)
-  deriving Show
+  deriving Eq
+
+predEq :: Pred -> Pred -> Bool
+predEq = (==)
 
 instance EnumHole Pred where
   enumHole (Term rel e1 e2) = Term rel <$> enumHole e1 <*> enumHole e2
@@ -55,3 +58,6 @@ showPredS (Neg p) =
 showPredS (HoleP Nothing) = ("[_]" ++)
 showPredS (HoleP (Just i)) =
     ('[':) . showsPrec 0 i . (']':)
+
+instance Show Pred where
+  showsPrec _ = showPredS
