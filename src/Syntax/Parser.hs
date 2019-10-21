@@ -27,7 +27,7 @@ statement = withLoc $ choice
   [ Skip    <$ symbol "skip"
   , Abort   <$ symbol "abort"
   , Assert  <$ symbol "{" <*> predicate <* symbol "}"
-  -- , Assign  <$> variableList <* symbol ":=" <*> expressionList
+  , Assign  <$> variableList <* symbol ":=" <*> expressionList
   ]
 
 skip :: Parser Statement
@@ -93,10 +93,10 @@ binaryRelation = withLoc $ choice
 
 expression :: Parser Expr
 expression = withLoc $ choice
-  [ Var   <$> variable
+  [ try (Op <$> opName <*> some expression)
+  , Var   <$> variable
   , Const <$> constant
   , Lit   <$> literal
-  , Op    <$> opName <*> many expression
   , HoleE <$  symbol "?"
   ]
 
