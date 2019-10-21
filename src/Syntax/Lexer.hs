@@ -4,13 +4,14 @@ module Syntax.Lexer where
 
 import Control.Monad (void)
 import Data.Text (Text)
+import Data.Void
 import qualified Data.Text as Text
 
 import qualified Text.Megaparsec.Char.Lexer as L
 import qualified Text.Megaparsec.Char as C
 import Text.Megaparsec
 
-type Parser = Parsec () Text
+type Parser = Parsec Void Text
 
 
 skipLineComment :: Parser ()

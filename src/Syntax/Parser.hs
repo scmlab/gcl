@@ -2,20 +2,21 @@
 
 module Syntax.Parser where
 
--- import Syntax.ParseExpr
 import Control.Monad.Combinators.Expr
 import Data.Text
 import Data.Loc
+import Data.Void
 import Text.Megaparsec hiding (Pos)
 
 import Syntax.Concrete
 import Syntax.Lexer
 
 
-parseProgram :: FilePath -> Text -> Either (ParseErrorBundle Text ()) Program
-parseProgram = runParser $ withLoc $ do
+parseProgram :: FilePath -> Text -> Either (ParseErrorBundle Text Void) Program
+parseProgram = parse $ withLoc $ do
   declarations <- many declaration
   statements <- many statement
+  eof
   return $ Program declarations statements
 
 --------------------------------------------------------------------------------

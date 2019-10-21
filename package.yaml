@@ -19,6 +19,7 @@ dependencies:
   - lexer-applicative
   - regex-applicative
   - megaparsec
+  - parser-combinators
   - mtl
   - srcloc
   - text
