@@ -46,6 +46,7 @@ data Pred = Term    BinRel Expr Expr
           | Conj    Pred Pred
           | Disj    Pred Pred
           | Neg     Pred
+          | Lit     Bool
           | Hole    Index
           deriving (Show, Eq)
 
@@ -156,6 +157,7 @@ instance FromConcrete C.Pred Pred where
   fromConcrete (C.Disj p q    _) = Disj     <$> fromConcrete p
                                             <*> fromConcrete q
   fromConcrete (C.Neg p       _) = Neg      <$> fromConcrete p
+  fromConcrete (C.Lit p       _) = Lit      <$> pure p
   fromConcrete (C.Hole        _) = Hole     <$> index
 
 instance FromConcrete C.GdCmd GdCmd where

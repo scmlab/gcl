@@ -33,6 +33,7 @@ data Pred = Term    Expr BinRel Expr  Loc
           | Conj    Pred Pred         Loc
           | Disj    Pred Pred         Loc
           | Neg     Pred              Loc
+          | Lit     Bool              Loc
           | Hole                      Loc
           deriving (Show)
 

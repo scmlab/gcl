@@ -115,9 +115,13 @@ implication = do
 
 
 predTerm :: Parser Pred
-predTerm = parens predicate
-  <|> (withLoc $ Hole <$  symbol "?")
-  <|> (withLoc $ Term <$> expression <*> binaryRelation <*> expression)
+predTerm =  parens predicate
+        <|> (withLoc $ choice
+              [ Hole <$  symbol "?"
+              , Lit True <$ symbol "true"
+              , Lit False <$ symbol "false"
+              , Term <$> expression <*> binaryRelation <*> expression
+              ])
 
 binaryRelation :: Parser BinRel
 binaryRelation = withLoc $ choice
@@ -149,38 +153,6 @@ term = withLoc $ choice
   where
     op :: Parser Expr
     op = withLoc $ VarE <$> variable
-
---
--- expression :: Parser Expr
--- expression = makeExprParser term table <?> "expression"
---   where
---     table :: [[Operator Parser Expr]]
---     table = [ [ Prefix op ]
---             ]
---
--- op :: Parser (Expr -> Expr)
--- op = do
---   start <- getPos
---   name <- opName
---   return $ \result -> Op name result (start <--> result)
---
--- term :: Parser Pred
--- term = parens expression
---   <|> (withLoc $ Hole <$  symbol "?")
---   <|> [ VarE    <$> variable
---       , ConstE  <$> constant
---       , LitE    <$> literal
---       , HoleE   <$  symbol "?"
---       ]
--- --
--- expression :: Parser Expr
--- expression = withLoc $ choice
---   [ try (OpE <$> opName <*> some expression)
---   , VarE    <$> variable
---   , ConstE  <$> constant
---   , LitE    <$> literal
---   , HoleE   <$  symbol "?"
---   ]
 
 literal :: Parser Lit
 literal = choice

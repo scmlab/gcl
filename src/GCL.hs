@@ -27,6 +27,11 @@ shouldProof p = do
   put (succ i)
   tell [Obligation i p]
 
+conjunct :: [Pred] -> Pred
+conjunct = foldr Conj (Lit False)
+
+disjunct :: [Pred] -> Pred
+disjunct = foldr Disj (Lit True)
 
 -- calculating the weakest precondition
 precond :: Stmt -> Pred -> M Pred
@@ -42,16 +47,17 @@ precond (Assert p) post
 precond (If (Just pre) branches) post = do
   mapM_ (shouldProof <=< obliGuard pre post) branches
   let (guards, _) = unzipGdCmds branches
-  shouldProof $ pre `Implies` foldr1 Disj guards
+  shouldProof $ pre `Implies` disjunct guards
   return pre
+  where
+    obliGuard :: Pred -> Pred -> GdCmd -> M Pred
+    obliGuard pre' post' (GdCmd guard body) = Implies (pre' `Conj` guard) <$> precond body post'
 
 precond (If Nothing branches) post = do
   brConds <- mapM (precondGuard post) branches
-
   let (guards, _) = unzipGdCmds branches
-  let termCond = foldr1 Disj guards
 
-  return ((foldr1 Conj brConds) `Conj` termCond)
+  return (conjunct brConds `Conj` disjunct guards)
 
 precond (Do Nothing _ _) _ = undefined
 precond (Do (Just inv) bnd branches) post = do
@@ -59,11 +65,11 @@ precond (Do (Just inv) bnd branches) post = do
   mapM_ (shouldProof <=< branchCond) branches
   mapM_ (shouldProof <=< termCond) branches
 
-  let (guards, _bodies) = unzipGdCmds branches
+  let (guards, _) = unzipGdCmds branches
 
-  shouldProof $ (inv `Conj` (foldr1 Conj (map Neg guards)))
+  shouldProof $ (inv `Conj` (conjunct (map Neg guards)))
                   `Implies` post -- empty branches?
-  shouldProof $ (inv `Conj` foldr1 Disj guards) `Implies` (Term GEq bnd (LitE (Num 0)))
+  shouldProof $ (inv `Conj` disjunct guards) `Implies` (Term GEq bnd (LitE (Num 0)))
 
   return inv
 
@@ -78,9 +84,6 @@ precond (Do (Just inv) bnd branches) post = do
 
 precondGuard :: Pred -> GdCmd -> M Pred
 precondGuard post (GdCmd guard body) = Implies guard <$> precond body post
-
-obliGuard :: Pred -> Pred -> GdCmd -> M Pred
-obliGuard pre post (GdCmd guard body) = Implies (pre `Conj` guard) <$> precond body post
 
 gcdExample :: Program
 gcdExample = abstract $ fromRight $ parseProgram "<test>" "\
