@@ -16,14 +16,14 @@ type EIdx = Int
 type OpName = String
 
 data Lit = Num Int | Bol Bool
-  deriving Show
+  deriving Eq
 
 data Expr = Var String
           | Const String
           | Lit Lit
           | Op OpName [Expr]
           | HoleE (Maybe EIdx) [Subst]
-  deriving Show
+  deriving Eq
 
 instance EnumHole Expr where
   enumHole (Var x)    = return $ Var x
@@ -75,3 +75,6 @@ showArgs :: [Expr] -> ShowS
 showArgs [] = id
 showArgs [x] = showExprS x
 showArgs (x:xs) = showExprS x . (' ':) . showArgs xs
+
+instance Show Expr where
+  showsPrec _ = showExprS

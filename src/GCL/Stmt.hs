@@ -4,14 +4,17 @@ import GCL.Expr
 import GCL.Pred
 import GCL.EnumHole
 
-data Branch = Branch Pred Stmt deriving (Show)
 data Stmt = Skip
           | Assign [String] [Expr]
           | Seq Stmt Stmt
           | Assert Pred
-          | If [Branch]
-          | Do Pred Expr [Branch]
-  deriving Show
+          | If (Maybe Pred) [GdCmd]
+          | Do Pred Expr [GdCmd]
+  deriving (Show, Eq)
+
+data GdCmd = GdCmd Pred Stmt deriving (Show, Eq)
+
+unGdCmd (GdCmd guard stmt) = (guard, stmt)
 
 instance EnumHole Stmt where
   enumHole Skip = return Skip
@@ -21,12 +24,12 @@ instance EnumHole Stmt where
     Seq <$> enumHole c1 <*> enumHole c2
   enumHole (Assert p) =
     Assert <$> enumHole p
-  enumHole (If branches) =
-    If <$> mapM enumHole branches
+  enumHole (If pre branches) =
+    If pre <$> mapM enumHole branches
   enumHole (Do inv bnd branches) =
     Do  <$> enumHole inv
         <*> enumHole bnd
         <*> mapM enumHole branches
 
-instance EnumHole Branch where
-  enumHole (Branch guard body) = Branch <$> enumHole guard <*> enumHole body
+instance EnumHole GdCmd where
+  enumHole (GdCmd guard body) = GdCmd <$> enumHole guard <*> enumHole body
