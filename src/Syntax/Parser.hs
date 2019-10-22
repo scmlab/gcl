@@ -23,11 +23,12 @@ parseProgram = parse $ withLoc $ do
 -- | Statements
 
 statement :: Parser Statement
-statement = withLoc $ choice
-  [ Skip    <$ symbol "skip"
-  , Abort   <$ symbol "abort"
-  , Assert  <$ symbol "{" <*> predicate <* symbol "}"
-  , Assign  <$> variableList <* symbol ":=" <*> expressionList
+statement = choice
+  [ try assign
+  , abort
+  , assert
+  , skip
+  , do'
   ]
 
 skip :: Parser Statement
@@ -37,7 +38,22 @@ abort :: Parser Statement
 abort = withLoc $ Abort <$ symbol "abort"
 
 assert :: Parser Statement
-assert = withLoc $ Assert <$ symbol "{" <*> predicate <* symbol "}"
+assert = withLoc $ Assert <$> braces predicate
+
+assign :: Parser Statement
+assign = withLoc $ Assign <$> variableList <* symbol ":=" <*> expressionList
+
+do' :: Parser Statement
+do' = withLoc $ Do  <$  symbol "do"
+                    <*> braces expression
+                    <*> some guardedCommand
+                    <*  symbol "od"
+
+guardedCommand :: Parser Branch
+guardedCommand = withLoc $ Branch <$  symbol "|"
+                                  <*> predicate
+                                  <*  symbol "->"
+                                  <*> some statement
 
 --------------------------------------------------------------------------------
 -- | Predicates
@@ -140,21 +156,21 @@ variableDecl = withLoc $ do
 -- | Variables and stuff
 
 constant :: Parser Constant
-constant = withLoc $ Constant <$> typeName
+constant = withLoc $ Constant <$> identifierUpper
 
 -- seperated by commas
 constList :: Parser [Constant]
 constList = sepBy1 constant (symbol ",")
 
 variable :: Parser Variable
-variable = withLoc $ Variable <$> termName
+variable = withLoc $ Variable <$> identifier
 
 -- seperated by commas
 variableList :: Parser [Variable]
 variableList = sepBy1 variable (symbol ",")
 
 type' :: Parser Type
-type' = withLoc $ Type <$> typeName
+type' = withLoc $ Type <$> identifierUpper
 
 -- seperated by commas
 typeList :: Parser [Type]
@@ -179,3 +195,6 @@ withLoc parser = do
 
 parens :: Parser a -> Parser a
 parens = between (symbol "(") (symbol ")")
+
+braces :: Parser a -> Parser a
+braces = between (symbol "{") (symbol "}")

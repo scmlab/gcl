@@ -1,8 +1,8 @@
-con X, Y : Int
-var x, y : Int
-
-{X > 0 && Y > 0}
-
-x, y := X, Y
-
-{ gcd x y = gcd X Y && x>0 && y>0 }
+do { x }
+  | x > y -> x := x
+  | x < y ->
+      { ? }
+      skipa := 3
+      { ? }
+od
+skip

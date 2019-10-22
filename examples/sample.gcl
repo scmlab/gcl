@@ -4,9 +4,11 @@ var x, y : Int
 
 {X > 0 && Y > 0}
 x, y := X, Y
-{ gcd (x,y) = gcd (X,Y) && x>0 && y>0, bnd: x+y }
-do | x > y -> x := x - y
-   | x < y -> { gcd (x,y) = gcd (X,Y) && x>0 && y>0 && x < y }
+
+{ gcd x y = gcd X Y && x>0 && y>0 }
+do {x+y}
+  | x > y -> x := x - y
+  | x < y -> { gcd (x,y) = gcd (X,Y) && x>0 && y>0 && x < y }
                 a := a + 1
                 b := b + 1
                 { gcd (x,y) = gcd (X,Y) && x>0 && y>0 }
