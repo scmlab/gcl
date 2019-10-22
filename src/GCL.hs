@@ -11,6 +11,7 @@ import qualified Data.Map as Map
 import Data.Tuple (swap)
 
 import Syntax.Abstract
+import Syntax.Parser
 
 data Obligation = Obligation Index Pred deriving (Show)
 
@@ -81,8 +82,28 @@ precondGuard post (GdCmd guard body) = Implies guard <$> precond body post
 obliGuard :: Pred -> Pred -> GdCmd -> M Pred
 obliGuard pre post (GdCmd guard body) = Implies (pre `Conj` guard) <$> precond body post
 
-gcdExample :: Stmt
-gcdExample =
+gcdExample :: Program
+gcdExample = abstract $ fromRight $ parseProgram "<test>" "\
+  \x := X\n\
+  \y := Y\n\
+  \{ gcd x y = gcd X Y }\n\
+  \do { ? } \n\
+  \  | x > y -> x := minus x y  \n\
+  \  | x < y -> y := minus y x  \n\
+  \od\n\
+  \"
+
+postCond :: Pred
+postCond = abstract $ fromRight $ parsePred "gcd X Y = x"
+
+test :: ([Obligation], Pred)
+test = runM $ do
+  let Program _ statements = gcdExample
+  precond statements postCond
+
+
+gcdExample2 :: Stmt
+gcdExample2 =
   Assign ["x"] [VarE "X"] `Seq`
   Assign ["y"] [VarE "Y"] `Seq`
   Do
@@ -96,12 +117,13 @@ gcdExample =
         (Assign ["y"] [OpE "-" [VarE "y", VarE "x"]])
     ]
 
-postCond :: Pred
-postCond = Term Eq (VarE "x") (OpE "gcd" [VarE "X", VarE "Y"])
+postCond2 :: Pred
+postCond2 = Term Eq (VarE "x") (OpE "gcd" [VarE "X", VarE "Y"])
 
-test :: ([Obligation], Pred)
-test = runM $ do
-  precond gcdExample postCond
+test2 :: ([Obligation], Pred)
+test2 = runM $ do
+  precond gcdExample2 postCond2
+
 
 --
 

@@ -101,8 +101,8 @@ type Type = Text
 
 type AbstractM = State Index
 
-abstractProgram :: C.Program -> Program
-abstractProgram = runAbstractM . fromConcrete
+abstract :: FromConcrete a b => a -> b
+abstract = runAbstractM . fromConcrete
 
 runAbstractM :: AbstractM a -> a
 runAbstractM f = evalState f 0

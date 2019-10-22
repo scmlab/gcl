@@ -1,19 +1,37 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Syntax.Parser where
+module Syntax.Parser
+  ( fromRight
+  , parseProgram
+  , parsePred
+  , parseStmt
+  ) where
 
 import Control.Monad.Combinators.Expr
 import Data.Text
 import Data.Loc
 import Data.Void
 import Text.Megaparsec hiding (Pos)
+import Text.Megaparsec.Error (errorBundlePretty)
 
 import Syntax.Concrete
 import Syntax.Lexer
 
+fromRight :: Either (ParseErrorBundle Text Void) b -> b
+fromRight (Left e) = error $ errorBundlePretty e
+fromRight (Right x) = x
 
 parseProgram :: FilePath -> Text -> Either (ParseErrorBundle Text Void) Program
-parseProgram = parse $ withLoc $ do
+parseProgram = parse program
+
+parsePred :: Text -> Either (ParseErrorBundle Text Void) Pred
+parsePred = parse predicate "<predicate>"
+
+parseStmt :: Text -> Either (ParseErrorBundle Text Void) Stmt
+parseStmt = parse statement "<statement>"
+
+program :: Parser Program
+program = withLoc $ do
   declarations <- many declaration
   statements <- many statement
   eof
