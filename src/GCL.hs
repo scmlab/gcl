@@ -98,8 +98,8 @@ postCond = abstract $ fromRight $ parsePred "gcd X Y = x"
 
 test :: ([Obligation], Pred)
 test = runM $ do
-  let Program _ statements = gcdExample
-  precond statements postCond
+  let Program _ statement = gcdExample
+  precond statement postCond
 
 
 gcdExample2 :: Stmt

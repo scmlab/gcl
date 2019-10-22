@@ -33,7 +33,10 @@ lexeme :: Parser a -> Parser a
 lexeme = L.lexeme spaceConsumer
 
 symbol :: Text -> Parser ()
-symbol s = void $ lexeme (C.string s <* notFollowedBy identifierProceedingChar)
+symbol s = void $ lexeme (C.string s)
+
+keyword :: Text -> Parser ()
+keyword s = void $ lexeme (C.string s <* notFollowedBy identifierProceedingChar)
 
 integer :: Parser Int
 integer = lexeme L.decimal

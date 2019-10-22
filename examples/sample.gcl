@@ -25,3 +25,19 @@ od
 ---
 
 keywords: con var do od bnd if fi
+
+---
+
+con X, Y : Int
+var x, y : Int
+
+{X > 0 && Y > 0}
+
+x := X
+y := Y
+
+{ gcd x y = gcd X Y }
+do { ? }
+  | x > y -> x := minus x y
+  | x < y -> y := minus y x
+od
