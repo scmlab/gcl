@@ -6,6 +6,7 @@ module Syntax.Abstract where
 import Control.Monad.State
 import Data.Text (Text)
 import Data.Map (Map)
+import qualified Data.Map as Map
 
 import qualified Syntax.Concrete as C
 
@@ -29,7 +30,10 @@ data Stmt
   | If      (Maybe Pred)      [GdCmd]
   deriving (Show)
 
-data GdCmd = GdCmd Pred [Stmt] deriving (Show)
+data GdCmd = GdCmd Pred Stmt deriving (Show)
+
+unzipGdCmds :: [GdCmd] -> ([Pred], [Stmt])
+unzipGdCmds = unzip . map (\(GdCmd x y) -> (x, y))
 
 --------------------------------------------------------------------------------
 -- | Predicates
@@ -37,20 +41,30 @@ data GdCmd = GdCmd Pred [Stmt] deriving (Show)
 data BinRel = Eq | LEq | GEq | LTh | GTh
   deriving (Show, Eq)
 
-data Pred = Term    Expr BinRel Expr
+data Pred = Term    BinRel Expr Expr
           | Implies Pred Pred
           | Conj    Pred Pred
           | Disj    Pred Pred
           | Neg     Pred
           | Hole    Index
-          deriving (Show)
+          deriving (Show, Eq)
+
+predEq :: Pred -> Pred -> Bool
+predEq = (==)
+
+substP :: Map Text Expr -> Pred -> Pred
+substP env (Term rel e1 e2) = Term rel (substE env e1) (substE env e2)
+substP env (Implies p q)    = Implies (substP env p) (substP env q)
+substP env (Conj p q)       = Conj (substP env p) (substP env q)
+substP env (Disj p q)       = Disj (substP env p) (substP env q)
+substP env (Neg p)          = Neg (substP env p)
 
 --------------------------------------------------------------------------------
 -- | Expressions
 
 data Lit  = Num Int
           | Bol Bool
-          deriving Show
+          deriving (Show, Eq)
 
 type OpName = Text
 data Expr = VarE    Var
@@ -58,9 +72,22 @@ data Expr = VarE    Var
           | LitE    Lit
           | OpE     OpName [Expr]
           | HoleE   Index  [Subst]
-          deriving Show
+          deriving (Show, Eq)
 
-type Subst = Map String Expr
+type Subst = Map Text Expr
+
+substE :: Subst -> Expr -> Expr
+substE env (VarE x) =
+  case Map.lookup x env of
+    Just e -> e
+    Nothing -> VarE x
+substE env (ConstE x) =
+  case Map.lookup x env of
+    Just e -> e
+    Nothing -> ConstE x
+substE _   (LitE n)     = LitE n
+substE env (OpE op es)  = OpE op (map (substE env) es)
+substE env (HoleE idx subs) = HoleE idx (env:subs)
 
 --------------------------------------------------------------------------------
 -- | Variables and stuff
@@ -119,8 +146,8 @@ instance FromConcrete C.BinRel BinRel where
   fromConcrete (C.GTh _) = pure GTh
 
 instance FromConcrete C.Pred Pred where
-  fromConcrete (C.Term p r q  _) = Term     <$> fromConcrete p
-                                            <*> fromConcrete r
+  fromConcrete (C.Term p r q  _) = Term     <$> fromConcrete r
+                                            <*> fromConcrete p
                                             <*> fromConcrete q
   fromConcrete (C.Implies p q _) = Implies  <$> fromConcrete p
                                             <*> fromConcrete q
@@ -133,7 +160,7 @@ instance FromConcrete C.Pred Pred where
 
 instance FromConcrete C.GdCmd GdCmd where
   fromConcrete (C.GdCmd p q _) = GdCmd  <$> fromConcrete p
-                                        <*> mapM fromConcrete q
+                                        <*> (seqAll <$> mapM fromConcrete q)
 
 instance FromConcrete C.Stmt Stmt where
   fromConcrete (C.Skip       _) = pure Skip
@@ -156,7 +183,6 @@ instance FromConcrete C.Declaration Declaration where
 instance FromConcrete C.Program Program where
   fromConcrete (C.Program p q _) = Program  <$> mapM fromConcrete p
                                             <*> (seqAll <$> mapM fromConcrete q)
-    where
-      seqAll :: [Stmt] -> Stmt
-      seqAll [] = Skip
-      seqAll (x:xs) = foldl Seq x xs
+seqAll :: [Stmt] -> Stmt
+seqAll [] = Skip
+seqAll (x:xs) = foldl Seq x xs

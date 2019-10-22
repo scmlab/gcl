@@ -6,8 +6,6 @@ import Prelude hiding (readFile)
 import Data.Text.IO (readFile)
 import Text.Megaparsec.Error (errorBundlePretty)
 
-import qualified Syntax.Abstract as A
-
 main :: IO ()
 main = do
   let filepath = "examples/a.gcl"

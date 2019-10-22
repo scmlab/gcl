@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleContexts #-}
 
 module GCL where
@@ -9,15 +10,9 @@ import qualified Data.Map as Map
 -- import Data.Map (Map)
 import Data.Tuple (swap)
 
--- import Syntax.Abstract
+import Syntax.Abstract
 
-
-import GCL.Expr
-import GCL.Pred
-import GCL.Stmt
-import GCL.EnumHole
-
-data Obligation = Obligation Idx Pred deriving (Show)
+data Obligation = Obligation Index Pred deriving (Show)
 
 type M = WriterT [Obligation] (State Int)
 
@@ -34,7 +29,7 @@ shouldProof p = do
 
 -- calculating the weakest precondition
 precond :: Stmt -> Pred -> M Pred
--- precond :: (MonadSymGen Idx m) => Stmt -> Pred -> m ([(Idx, Pred)], Pred)
+precond Abort _ = undefined
 precond Skip post = return post
 precond (Assign xs es) post = return $ substP (Map.fromList (zip xs es)) post
 precond (Seq c1 c2) post = precond c2 post >>= precond c1
@@ -45,42 +40,40 @@ precond (Assert p) post
       return p
 precond (If (Just pre) branches) post = do
   mapM_ (shouldProof <=< obliGuard pre post) branches
+  let (guards, _) = unzipGdCmds branches
   shouldProof $ pre `Implies` foldr1 Disj guards
   return pre
-  where
-    (guards, _) = unzip $ map unGdCmd branches
 
 precond (If Nothing branches) post = do
   brConds <- mapM (precondGuard post) branches
+
+  let (guards, _) = unzipGdCmds branches
+  let termCond = foldr1 Disj guards
+
   return ((foldr1 Conj brConds) `Conj` termCond)
-  where
-    (guards, _) = unzip $ map unGdCmd branches
-    termCond :: Pred
-    termCond = foldr1 Disj guards
-precond (Do inv bnd branches) post = do
+
+precond (Do Nothing _ _) _ = undefined
+precond (Do (Just inv) bnd branches) post = do
 
   mapM_ (shouldProof <=< branchCond) branches
   mapM_ (shouldProof <=< termCond) branches
 
-  let (guards, _bodies) = unzipBranches branches
+  let (guards, _bodies) = unzipGdCmds branches
 
   shouldProof $ (inv `Conj` (foldr1 Conj (map Neg guards)))
                   `Implies` post -- empty branches?
-  shouldProof $ (inv `Conj` foldr1 Disj guards) `Implies` (Term GEq bnd (Lit (Num 0)))
+  shouldProof $ (inv `Conj` foldr1 Disj guards) `Implies` (Term GEq bnd (LitE (Num 0)))
 
   return inv
 
   where
-    unzipBranches :: [GdCmd] -> ([Pred], [Stmt])
-    unzipBranches = unzip . map (\(GdCmd x y) -> (x, y))
-
     branchCond :: GdCmd -> M Pred
     branchCond (GdCmd guard body) = Implies (inv `Conj` guard) <$> precond body inv
 
     termCond :: GdCmd -> M Pred
     termCond (GdCmd guard body) = do
-      pre <- precond body (Term LTh bnd (Lit (Num 100)))
-      return $ inv `Conj` guard `Conj` (Term Eq bnd (Lit (Num 100))) `Implies` pre
+      pre <- precond body (Term LTh bnd (LitE (Num 100)))
+      return $ inv `Conj` guard `Conj` (Term Eq bnd (LitE (Num 100))) `Implies` pre
 
 precondGuard :: Pred -> GdCmd -> M Pred
 precondGuard post (GdCmd guard body) = Implies guard <$> precond body post
@@ -90,26 +83,25 @@ obliGuard pre post (GdCmd guard body) = Implies (pre `Conj` guard) <$> precond b
 
 gcdExample :: Stmt
 gcdExample =
-  Assign ["x"] [Var "X"] `Seq`
-  Assign ["y"] [Var "Y"] `Seq`
+  Assign ["x"] [VarE "X"] `Seq`
+  Assign ["y"] [VarE "Y"] `Seq`
   Do
-    (Term Eq (Op "gcd" [Var "x", Var "y"]) (Op "gcd" [Var "X", Var "Y"]))
-    (HoleE Nothing [])
+    (Just $ Term Eq (OpE "gcd" [VarE "x", VarE "y"]) (OpE "gcd" [VarE "X", VarE "Y"]))
+    (HoleE 0 [])
     [ GdCmd
-        (Term GTh (Var "x") (Var "y"))
-        (Assign ["x"] [Op "-" [Var "x", Var "y"]])
+        (Term GTh (VarE "x") (VarE "y"))
+        (Assign ["x"] [OpE "-" [VarE "x", VarE "y"]])
     , GdCmd
-        (Term LTh (Var "x") (Var "y"))
-        (Assign ["y"] [Op "-" [Var "y", Var "x"]])
+        (Term LTh (VarE "x") (VarE "y"))
+        (Assign ["y"] [OpE "-" [VarE "y", VarE "x"]])
     ]
 
 postCond :: Pred
-postCond = Term Eq (Var "x") (Op "gcd" [Var "X", Var "Y"])
+postCond = Term Eq (VarE "x") (OpE "gcd" [VarE "X", VarE "Y"])
 
 test :: ([Obligation], Pred)
 test = runM $ do
-  let gcd' = runEnumHole gcdExample
-  precond gcd' postCond
+  precond gcdExample postCond
 
 --
 
