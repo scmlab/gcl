@@ -1,8 +1,8 @@
-do { x }
+if
   | x > y -> x := x
   | x < y ->
       { ? }
       skipa := 3
       { ? }
-od
+fi
 skip

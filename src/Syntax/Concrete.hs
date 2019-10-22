@@ -17,6 +17,7 @@ data Statement
   | Assign [Variable] [Expr] Loc
   | Assert Pred Loc
   | Do Expr [Branch] Loc
+  | If [Branch] Loc
   deriving (Show)
 
 data Branch = Branch Pred [Statement] Loc deriving (Show)

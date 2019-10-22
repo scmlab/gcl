@@ -28,7 +28,8 @@ statement = choice
   , abort
   , assert
   , skip
-  , do'
+  , repetition
+  , selection
   ]
 
 skip :: Parser Statement
@@ -43,11 +44,16 @@ assert = withLoc $ Assert <$> braces predicate
 assign :: Parser Statement
 assign = withLoc $ Assign <$> variableList <* symbol ":=" <*> expressionList
 
-do' :: Parser Statement
-do' = withLoc $ Do  <$  symbol "do"
-                    <*> braces expression
-                    <*> some guardedCommand
-                    <*  symbol "od"
+repetition :: Parser Statement
+repetition = withLoc $ Do <$  symbol "do"
+                          <*> braces expression
+                          <*> some guardedCommand
+                          <*  symbol "od"
+
+selection :: Parser Statement
+selection = withLoc $ If  <$  symbol "if"
+                          <*> some guardedCommand
+                          <*  symbol "fi"
 
 guardedCommand :: Parser Branch
 guardedCommand = withLoc $ Branch <$  symbol "|"
