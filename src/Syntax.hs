@@ -1,26 +1,26 @@
-module Syntax.Concrete where
+module Syntax where
 
 import Data.Loc
 import Data.Text (Text)
 
-data Program = Program [Declaration] [Statement] Loc
+data Program = Program [Declaration] [Stmt] Loc
   deriving (Show)
 
 data Declaration
-  = ConstDecl [Constant] Type Loc
-  | VarDecl [Variable] Type Loc
+  = ConstDecl [Const] Type Loc
+  | VarDecl [Var] Type Loc
   deriving (Show)
 
-data Statement
-  = Skip Loc
-  | Abort Loc
-  | Assign [Variable] [Expr] Loc
-  | Assert Pred Loc
-  | Do Expr [Branch] Loc
-  | If [Branch] Loc
+data Stmt
+  = Skip                    Loc
+  | Abort                   Loc
+  | Assign  [Var] [Expr]    Loc
+  | Assert  Pred            Loc
+  | Do      Expr  [GdCmd]   Loc
+  | If            [GdCmd]   Loc
   deriving (Show)
 
-data Branch = Branch Pred [Statement] Loc deriving (Show)
+data GdCmd = GdCmd Pred [Stmt] Loc deriving (Show)
 
 --------------------------------------------------------------------------------
 -- | Predicates
@@ -52,20 +52,20 @@ data Lit  = Num Int
           deriving Show
 
 type OpName = Text
-data Expr = Var Variable              Loc
-          | Const Constant            Loc
-          | Lit Lit                   Loc
-          | Op  OpName [Expr]         Loc
-          | HoleE                     Loc
+data Expr = VarE    Var           Loc
+          | ConstE  Const         Loc
+          | LitE    Lit           Loc
+          | OpE     OpName [Expr] Loc
+          | HoleE                 Loc
           deriving Show
 
 --------------------------------------------------------------------------------
 -- | Variables and stuff
 
-data Constant = Constant Text Loc
+data Const = Const Text Loc
   deriving (Show)
 
-data Variable = Variable Text Loc
+data Var = Var Text Loc
   deriving (Show)
 
 data Type = Type Text Loc

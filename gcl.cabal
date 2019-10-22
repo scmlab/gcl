@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 790b1e35ff25a8bd47a2bc6b01300397764171dc0114495edf9c572693b80178
+-- hash: 18380e2428197bcfff25ae722697e41bc8295b4372100b151ad1f751679b8ebb
 
 name:           gcl
 version:        0.1.0.0
@@ -28,7 +28,7 @@ executable cp
       GCL.Expr
       GCL.Pred
       GCL.Stmt
-      Syntax.Concrete
+      Syntax
       Syntax.Lexer
       Syntax.Parser
       Paths_gcl
@@ -42,11 +42,9 @@ executable cp
     , base >=4.7 && <5
     , bytestring
     , containers
-    , lexer-applicative
     , megaparsec
     , mtl
     , parser-combinators
-    , regex-applicative
     , srcloc
     , text
   default-language: Haskell2010

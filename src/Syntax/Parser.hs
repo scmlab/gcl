@@ -8,7 +8,7 @@ import Data.Loc
 import Data.Void
 import Text.Megaparsec hiding (Pos)
 
-import Syntax.Concrete
+import Syntax
 import Syntax.Lexer
 
 
@@ -20,9 +20,9 @@ parseProgram = parse $ withLoc $ do
   return $ Program declarations statements
 
 --------------------------------------------------------------------------------
--- | Statements
+-- | Stmts
 
-statement :: Parser Statement
+statement :: Parser Stmt
 statement = choice
   [ try assign
   , abort
@@ -32,31 +32,31 @@ statement = choice
   , selection
   ]
 
-skip :: Parser Statement
+skip :: Parser Stmt
 skip = withLoc $ Skip <$ symbol "skip"
 
-abort :: Parser Statement
+abort :: Parser Stmt
 abort = withLoc $ Abort <$ symbol "abort"
 
-assert :: Parser Statement
+assert :: Parser Stmt
 assert = withLoc $ Assert <$> braces predicate
 
-assign :: Parser Statement
+assign :: Parser Stmt
 assign = withLoc $ Assign <$> variableList <* symbol ":=" <*> expressionList
 
-repetition :: Parser Statement
+repetition :: Parser Stmt
 repetition = withLoc $ Do <$  symbol "do"
                           <*> braces expression
                           <*> some guardedCommand
                           <*  symbol "od"
 
-selection :: Parser Statement
+selection :: Parser Stmt
 selection = withLoc $ If  <$  symbol "if"
                           <*> some guardedCommand
                           <*  symbol "fi"
 
-guardedCommand :: Parser Branch
-guardedCommand = withLoc $ Branch <$  symbol "|"
+guardedCommand :: Parser GdCmd
+guardedCommand = withLoc $ GdCmd  <$  symbol "|"
                                   <*> predicate
                                   <*  symbol "->"
                                   <*> some statement
@@ -115,11 +115,11 @@ binaryRelation = withLoc $ choice
 
 expression :: Parser Expr
 expression = withLoc $ choice
-  [ try (Op <$> opName <*> some expression)
-  , Var   <$> variable
-  , Const <$> constant
-  , Lit   <$> literal
-  , HoleE <$  symbol "?"
+  [ try (OpE <$> opName <*> some expression)
+  , VarE    <$> variable
+  , ConstE  <$> constant
+  , LitE    <$> literal
+  , HoleE   <$  symbol "?"
   ]
 
 expressionList :: Parser [Expr]
@@ -161,18 +161,18 @@ variableDecl = withLoc $ do
 --------------------------------------------------------------------------------
 -- | Variables and stuff
 
-constant :: Parser Constant
-constant = withLoc $ Constant <$> identifierUpper
+constant :: Parser Const
+constant = withLoc $ Const <$> identifierUpper
 
 -- seperated by commas
-constList :: Parser [Constant]
+constList :: Parser [Const]
 constList = sepBy1 constant (symbol ",")
 
-variable :: Parser Variable
-variable = withLoc $ Variable <$> identifier
+variable :: Parser Var
+variable = withLoc $ Var <$> identifier
 
 -- seperated by commas
-variableList :: Parser [Variable]
+variableList :: Parser [Var]
 variableList = sepBy1 variable (symbol ",")
 
 type' :: Parser Type
