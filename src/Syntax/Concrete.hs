@@ -1,4 +1,4 @@
-module Syntax where
+module Syntax.Concrete where
 
 import Data.Loc
 import Data.Text (Text)

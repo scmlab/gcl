@@ -8,7 +8,7 @@ import Data.Loc
 import Data.Void
 import Text.Megaparsec hiding (Pos)
 
-import Syntax
+import Syntax.Concrete
 import Syntax.Lexer
 
 
