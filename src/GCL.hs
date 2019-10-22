@@ -9,6 +9,9 @@ import qualified Data.Map as Map
 -- import Data.Map (Map)
 import Data.Tuple (swap)
 
+-- import Syntax.Abstract
+
+
 import GCL.Expr
 import GCL.Pred
 import GCL.Stmt
@@ -28,6 +31,8 @@ shouldProof p = do
   put (succ i)
   tell [Obligation i p]
 
+
+-- calculating the weakest precondition
 precond :: Stmt -> Pred -> M Pred
 -- precond :: (MonadSymGen Idx m) => Stmt -> Pred -> m ([(Idx, Pred)], Pred)
 precond Skip post = return post

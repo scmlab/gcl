@@ -11,7 +11,7 @@ import qualified Syntax.Concrete as C
 
 type Index = Int
 
-data Program = Program [Declaration] [Stmt]
+data Program = Program [Declaration] Stmt
   deriving (Show)
 
 data Declaration
@@ -22,6 +22,7 @@ data Declaration
 data Stmt
   = Skip
   | Abort
+  | Seq     Stmt Stmt
   | Assign  [Var] [Expr]
   | Assert  Pred
   | Do      (Maybe Pred) Expr [GdCmd]
@@ -154,4 +155,8 @@ instance FromConcrete C.Declaration Declaration where
 
 instance FromConcrete C.Program Program where
   fromConcrete (C.Program p q _) = Program  <$> mapM fromConcrete p
-                                            <*> mapM fromConcrete q
+                                            <*> (seqAll <$> mapM fromConcrete q)
+    where
+      seqAll :: [Stmt] -> Stmt
+      seqAll [] = Skip
+      seqAll (x:xs) = foldl Seq x xs
