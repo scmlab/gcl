@@ -1,8 +1,11 @@
-if
-  | x > y -> x := x
-  | x < y ->
-      { ? }
-      skipa := 3
-      { ? }
-fi
-skip
+con X, Y : Int
+var x, y : Int
+
+x := X
+y := Y
+
+{ gcd x y = gcd X Y }
+do { ? }
+  | x > y -> x := minus x y
+  | x < y -> y := minus y x
+od

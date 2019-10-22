@@ -51,11 +51,10 @@ data Lit  = Num Int
           | Bol Bool
           deriving Show
 
-type OpName = Text
 data Expr = VarE    Var           Loc
           | ConstE  Const         Loc
           | LitE    Lit           Loc
-          | OpE     OpName [Expr] Loc
+          | OpE     Expr   [Expr] Loc
           | HoleE                 Loc
           deriving Show
 

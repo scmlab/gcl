@@ -107,18 +107,18 @@ gcdExample2 =
   Assign ["x"] [VarE "X"] `Seq`
   Assign ["y"] [VarE "Y"] `Seq`
   Do
-    (Just $ Term Eq (OpE "gcd" [VarE "x", VarE "y"]) (OpE "gcd" [VarE "X", VarE "Y"]))
+    (Just $ Term Eq (OpE (VarE "gcd") [VarE "x", VarE "y"]) (OpE (VarE "gcd") [VarE "X", VarE "Y"]))
     (HoleE 0 [])
     [ GdCmd
         (Term GTh (VarE "x") (VarE "y"))
-        (Assign ["x"] [OpE "-" [VarE "x", VarE "y"]])
+        (Assign ["x"] [OpE (VarE "-") [VarE "x", VarE "y"]])
     , GdCmd
         (Term LTh (VarE "x") (VarE "y"))
-        (Assign ["y"] [OpE "-" [VarE "y", VarE "x"]])
+        (Assign ["y"] [OpE (VarE "-") [VarE "y", VarE "x"]])
     ]
 
 postCond2 :: Pred
-postCond2 = Term Eq (VarE "x") (OpE "gcd" [VarE "X", VarE "Y"])
+postCond2 = Term Eq (VarE "x") (OpE (VarE "gcd") [VarE "X", VarE "Y"])
 
 test2 :: ([Obligation], Pred)
 test2 = runM $ do

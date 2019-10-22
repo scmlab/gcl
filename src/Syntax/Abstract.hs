@@ -70,7 +70,7 @@ type OpName = Text
 data Expr = VarE    Var
           | ConstE  Const
           | LitE    Lit
-          | OpE     OpName [Expr]
+          | OpE     Expr   [Expr]
           | HoleE   Index  [Subst]
           deriving (Show, Eq)
 
@@ -135,7 +135,7 @@ instance FromConcrete C.Expr Expr where
   fromConcrete (C.VarE x    _) = VarE   <$> fromConcrete x
   fromConcrete (C.ConstE x  _) = ConstE <$> fromConcrete x
   fromConcrete (C.LitE x    _) = LitE   <$> fromConcrete x
-  fromConcrete (C.OpE x xs  _) = OpE    <$> pure x <*> mapM fromConcrete xs
+  fromConcrete (C.OpE x xs  _) = OpE    <$> fromConcrete x <*> mapM fromConcrete xs
   fromConcrete (C.HoleE     _) = HoleE  <$> index <*> pure []
 
 instance FromConcrete C.BinRel BinRel where

@@ -83,7 +83,14 @@ guardedCommand = withLoc $ GdCmd  <$  symbol "|"
 -- | Predicates
 
 predicate :: Parser Pred
-predicate = makeExprParser term table <?> "predicate"
+predicate = makeExprParser predTerm table <?> "predicate"
+  where
+    table :: [[Operator Parser Pred]]
+    table = [ [ Prefix negation ]
+            , [ InfixL conjunction ]
+            , [ InfixL disjunction ]
+            , [ InfixR implication ]
+            ]
 
 negation :: Parser (Pred -> Pred)
 negation = do
@@ -106,18 +113,11 @@ implication = do
   symbol "=>"
   return $ \x y -> Implies x y (x <--> y)
 
-table :: [[Operator Parser Pred]]
-table = [ [ Prefix negation ]
-        , [ InfixL conjunction ]
-        , [ InfixL disjunction ]
-        , [ InfixR implication ]
-        ]
 
-term :: Parser Pred
-term = parens predicate
+predTerm :: Parser Pred
+predTerm = parens predicate
   <|> (withLoc $ Hole <$  symbol "?")
   <|> (withLoc $ Term <$> expression <*> binaryRelation <*> expression)
-  -- <?> "term"
 
 binaryRelation :: Parser BinRel
 binaryRelation = withLoc $ choice
@@ -131,17 +131,56 @@ binaryRelation = withLoc $ choice
 --------------------------------------------------------------------------------
 -- | Expressions
 
+expressionList :: Parser [Expr]
+expressionList = sepBy1 expression (symbol ",")
+
+
 expression :: Parser Expr
-expression = withLoc $ choice
-  [ try (OpE <$> opName <*> some expression)
-  , VarE    <$> variable
+expression = parens expression
+    <|> term
+
+term :: Parser Expr
+term = withLoc $ choice
+  [ try (OpE <$> op <*> many expression)
   , ConstE  <$> constant
   , LitE    <$> literal
   , HoleE   <$  symbol "?"
   ]
+  where
+    op :: Parser Expr
+    op = withLoc $ VarE <$> variable
 
-expressionList :: Parser [Expr]
-expressionList = sepBy1 expression (symbol ",")
+--
+-- expression :: Parser Expr
+-- expression = makeExprParser term table <?> "expression"
+--   where
+--     table :: [[Operator Parser Expr]]
+--     table = [ [ Prefix op ]
+--             ]
+--
+-- op :: Parser (Expr -> Expr)
+-- op = do
+--   start <- getPos
+--   name <- opName
+--   return $ \result -> Op name result (start <--> result)
+--
+-- term :: Parser Pred
+-- term = parens expression
+--   <|> (withLoc $ Hole <$  symbol "?")
+--   <|> [ VarE    <$> variable
+--       , ConstE  <$> constant
+--       , LitE    <$> literal
+--       , HoleE   <$  symbol "?"
+--       ]
+-- --
+-- expression :: Parser Expr
+-- expression = withLoc $ choice
+--   [ try (OpE <$> opName <*> some expression)
+--   , VarE    <$> variable
+--   , ConstE  <$> constant
+--   , LitE    <$> literal
+--   , HoleE   <$  symbol "?"
+--   ]
 
 literal :: Parser Lit
 literal = choice
@@ -195,11 +234,6 @@ variableList = sepBy1 variable (symbol ",")
 
 type' :: Parser Type
 type' = withLoc $ Type <$> identifierUpper
-
--- seperated by commas
-typeList :: Parser [Type]
-typeList = sepBy1 type' (symbol ",")
-
 
 --------------------------------------------------------------------------------
 -- | Helper functions
