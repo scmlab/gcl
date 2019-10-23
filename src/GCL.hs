@@ -35,15 +35,21 @@ disjunct = foldr Disj (Lit True)
 
 -- calculating the weakest precondition
 precond :: Stmt -> Pred -> M Pred
+
 precond Abort _ = undefined
+
 precond Skip post = return post
+
 precond (Assign xs es) post = return $ substP (Map.fromList (zip xs es)) post
+
 precond (Seq c1 c2) post = precond c2 post >>= precond c1
+
 precond (Assert p) post
   | predEq p post = return post
   | otherwise = do
       shouldProof $ p `Implies` post
       return p
+
 precond (If (Just pre) branches) post = do
   mapM_ (shouldProof <=< obliGuard pre post) branches
   let (guards, _) = unzipGdCmds branches
@@ -52,7 +58,6 @@ precond (If (Just pre) branches) post = do
   where
     obliGuard :: Pred -> Pred -> GdCmd -> M Pred
     obliGuard pre' post' (GdCmd guard body) = Implies (pre' `Conj` guard) <$> precond body post'
-
 precond (If Nothing branches) post = do
   brConds <- mapM (precondGuard post) branches
   let (guards, _) = unzipGdCmds branches
@@ -81,6 +86,12 @@ precond (Do (Just inv) bnd branches) post = do
     termCond (GdCmd guard body) = do
       pre <- precond body (Term LTh bnd (LitE (Num 100)))
       return $ inv `Conj` guard `Conj` (Term Eq bnd (LitE (Num 100))) `Implies` pre
+
+precond (Spec pre pos) post
+  | predEq pos post = return pre
+  | otherwise = do
+       shouldProof (pos `Implies` post)
+       return pre
 
 precondGuard :: Pred -> GdCmd -> M Pred
 precondGuard post (GdCmd guard body) = Implies guard <$> precond body post

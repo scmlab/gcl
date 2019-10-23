@@ -28,6 +28,7 @@ data Stmt
   | Assert  Pred
   | Do      (Maybe Pred) Expr [GdCmd]
   | If      (Maybe Pred)      [GdCmd]
+  | Spec    Pred Pred
   deriving (Show)
 
 data GdCmd = GdCmd Pred Stmt deriving (Show)
@@ -59,6 +60,8 @@ substP env (Implies p q)    = Implies (substP env p) (substP env q)
 substP env (Conj p q)       = Conj (substP env p) (substP env q)
 substP env (Disj p q)       = Disj (substP env p) (substP env q)
 substP env (Neg p)          = Neg (substP env p)
+substP _   (Lit b)          = Lit b
+substP _   (Hole _)         = undefined -- do we need it?
 
 --------------------------------------------------------------------------------
 -- | Expressions
