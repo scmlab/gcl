@@ -33,6 +33,9 @@ conjunct = foldr Conj (Lit False)
 disjunct :: [Pred] -> Pred
 disjunct = foldr Disj (Lit True)
 
+precondStmts :: Stmts -> Pred -> M Pred
+precondStmts = undefined
+
 -- calculating the weakest precondition
 precond :: Stmt -> Pred -> M Pred
 
@@ -42,7 +45,7 @@ precond Skip post = return post
 
 precond (Assign xs es) post = return $ substP (Map.fromList (zip xs es)) post
 
-precond (Seq c1 c2) post = precond c2 post >>= precond c1
+-- precond (Seq c1 c2) post = precond c2 post >>= precond c1
 
 precond (Assert p) post
   | predEq p post = return post
@@ -57,7 +60,7 @@ precond (If (Just pre) branches) post = do
   return pre
   where
     obliGuard :: Pred -> Pred -> GdCmd -> M Pred
-    obliGuard pre' post' (GdCmd guard body) = Implies (pre' `Conj` guard) <$> precond body post'
+    obliGuard pre' post' (GdCmd guard body) = Implies (pre' `Conj` guard) <$> precondStmts body post'
 precond (If Nothing branches) post = do
   brConds <- mapM (precondGuard post) branches
   let (guards, _) = unzipGdCmds branches
@@ -80,11 +83,11 @@ precond (Do (Just inv) bnd branches) post = do
 
   where
     branchCond :: GdCmd -> M Pred
-    branchCond (GdCmd guard body) = Implies (inv `Conj` guard) <$> precond body inv
+    branchCond (GdCmd guard body) = Implies (inv `Conj` guard) <$> precondStmts body inv
 
     termCond :: GdCmd -> M Pred
     termCond (GdCmd guard body) = do
-      pre <- precond body (Term LTh bnd (LitE (Num 100)))
+      pre <- precondStmts body (Term LTh bnd (LitE (Num 100)))
       return $ inv `Conj` guard `Conj` (Term Eq bnd (LitE (Num 100))) `Implies` pre
 
 precond (Spec pre pos) post
@@ -94,7 +97,7 @@ precond (Spec pre pos) post
        return pre
 
 precondGuard :: Pred -> GdCmd -> M Pred
-precondGuard post (GdCmd guard body) = Implies guard <$> precond body post
+precondGuard post (GdCmd guard body) = Implies guard <$> precondStmts body post
 
 gcdExample :: Program
 gcdExample = abstract $ fromRight $ parseProgram "<test>" "\
@@ -112,31 +115,31 @@ postCond = abstract $ fromRight $ parsePred "gcd X Y = x"
 
 test :: ([Obligation], Pred)
 test = runM $ do
-  let Program _ statement = gcdExample
-  precond statement postCond
+  let Program _ statements = gcdExample
+  precondStmts statements postCond
 
 
-gcdExample2 :: Stmt
-gcdExample2 =
-  Assign ["x"] [VarE "X"] `Seq`
-  Assign ["y"] [VarE "Y"] `Seq`
-  Do
-    (Just $ Term Eq (OpE (VarE "gcd") [VarE "x", VarE "y"]) (OpE (VarE "gcd") [VarE "X", VarE "Y"]))
-    (HoleE 0 [])
-    [ GdCmd
-        (Term GTh (VarE "x") (VarE "y"))
-        (Assign ["x"] [OpE (VarE "-") [VarE "x", VarE "y"]])
-    , GdCmd
-        (Term LTh (VarE "x") (VarE "y"))
-        (Assign ["y"] [OpE (VarE "-") [VarE "y", VarE "x"]])
-    ]
-
-postCond2 :: Pred
-postCond2 = Term Eq (VarE "x") (OpE (VarE "gcd") [VarE "X", VarE "Y"])
-
-test2 :: ([Obligation], Pred)
-test2 = runM $ do
-  precond gcdExample2 postCond2
+-- gcdExample2 :: Stmt
+-- gcdExample2 =
+--   Assign ["x"] [VarE "X"] `Seq`
+--   Assign ["y"] [VarE "Y"] `Seq`
+--   Do
+--     (Just $ Term Eq (OpE (VarE "gcd") [VarE "x", VarE "y"]) (OpE (VarE "gcd") [VarE "X", VarE "Y"]))
+--     (HoleE 0 [])
+--     [ GdCmd
+--         (Term GTh (VarE "x") (VarE "y"))
+--         (Assign ["x"] [OpE (VarE "-") [VarE "x", VarE "y"]])
+--     , GdCmd
+--         (Term LTh (VarE "x") (VarE "y"))
+--         (Assign ["y"] [OpE (VarE "-") [VarE "y", VarE "x"]])
+--     ]
+--
+-- postCond2 :: Pred
+-- postCond2 = Term Eq (VarE "x") (OpE (VarE "gcd") [VarE "X", VarE "Y"])
+--
+-- test2 :: ([Obligation], Pred)
+-- test2 = runM $ do
+--   precond gcdExample2 postCond2
 
 
 --

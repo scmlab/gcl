@@ -12,7 +12,7 @@ import qualified Syntax.Concrete as C
 
 type Index = Int
 
-data Program = Program [Declaration] Stmt
+data Program = Program [Declaration] Stmts
   deriving (Show)
 
 data Declaration
@@ -23,7 +23,7 @@ data Declaration
 data Stmt
   = Skip
   | Abort
-  | Seq     Stmt Stmt
+  -- | Seq     Stmt Stmt
   | Assign  [Var] [Expr]
   | Assert  Pred
   | Do      (Maybe Pred) Expr [GdCmd]
@@ -31,10 +31,17 @@ data Stmt
   | Spec    Pred Pred
   deriving (Show)
 
-data GdCmd = GdCmd Pred Stmt deriving (Show)
+data GdCmd = GdCmd Pred Stmts deriving (Show)
 
-unzipGdCmds :: [GdCmd] -> ([Pred], [Stmt])
+unzipGdCmds :: [GdCmd] -> ([Pred], [Stmts])
 unzipGdCmds = unzip . map (\(GdCmd x y) -> (x, y))
+
+--------------------------------------------------------------------------------
+-- | Sequenced Statments
+
+data Stmts  = Seq (Maybe Pred) Stmt Stmts   -- cons
+            | Postcondition Pred            -- nil
+            deriving (Show)
 
 --------------------------------------------------------------------------------
 -- | Predicates
@@ -108,6 +115,10 @@ type AbstractM = State Index
 abstract :: FromConcrete a b => a -> b
 abstract = runAbstractM . fromConcrete
 
+
+sequenceStmts :: [C.Stmt] -> AbstractM Stmts
+sequenceStmts = undefined
+
 runAbstractM :: AbstractM a -> a
 runAbstractM f = evalState f 0
 
@@ -165,7 +176,7 @@ instance FromConcrete C.Pred Pred where
 
 instance FromConcrete C.GdCmd GdCmd where
   fromConcrete (C.GdCmd p q _) = GdCmd  <$> fromConcrete p
-                                        <*> (seqAll <$> mapM fromConcrete q)
+                                        <*> sequenceStmts q
 
 instance FromConcrete C.Stmt Stmt where
   fromConcrete (C.Skip       _) = pure Skip
@@ -187,7 +198,8 @@ instance FromConcrete C.Declaration Declaration where
 
 instance FromConcrete C.Program Program where
   fromConcrete (C.Program p q _) = Program  <$> mapM fromConcrete p
-                                            <*> (seqAll <$> mapM fromConcrete q)
-seqAll :: [Stmt] -> Stmt
-seqAll [] = Skip
-seqAll (x:xs) = foldl Seq x xs
+                                            <*> sequenceStmts q
+                                             -- (seqAll <$> mapM fromConcrete q)
+-- seqAll :: [Stmt] -> Stmt
+-- seqAll [] = Skip
+-- seqAll (x:xs) = foldl Seq x xs
