@@ -34,8 +34,20 @@ disjunct :: [Pred] -> Pred
 disjunct = foldr Disj (Lit True)
 
 precondStmts :: Stmts -> Pred -> M Pred
-precondStmts (Seq pre stmt q) post = precond stmt pre post >>= precondStmts q
 precondStmts (Postcondition _) post = return post
+precondStmts (Seq Nothing stmt q) post = do
+  -- no precondition asserted, return the computed one
+  precondStmts q post >>= precond stmt Nothing
+precondStmts (Seq (Just pre) stmt q) post = do
+  -- conpute the precondition of (stmt; q)
+  post' <- precondStmts q post >>= precond stmt (Just pre)
+
+  -- generate a proof obligation,
+  -- if the precondition doesn't coincides with the postcondition
+  unless (predEq pre post') $ do
+    shouldProof $ pre `Implies` post'
+
+  return pre
 
 -- calculating the weakest precondition
 precond :: Stmt -> Maybe Pred -> Pred -> M Pred
@@ -45,14 +57,6 @@ precond Abort _ _ = undefined
 precond Skip _ post = return post
 
 precond (Assign xs es) _ post = return $ substP (Map.fromList (zip xs es)) post
-
--- precond (Seq c1 c2) post = precond c2 post >>= precond c1
-
-precond (Assert p) _ post
-  | predEq p post = return post
-  | otherwise = do
-      shouldProof $ p `Implies` post
-      return p
 
 precond (If branches) (Just pre) post = do
   mapM_ (shouldProof <=< obliGuard pre post) branches

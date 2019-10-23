@@ -25,7 +25,7 @@ data Stmt
   | Abort
   -- | Seq     Stmt Stmt
   | Assign  [Var] [Expr]
-  | Assert  Pred
+  -- | Assert  Pred
   | Do      Expr [GdCmd]
   | If      [GdCmd]
   | Spec    Pred Pred
@@ -118,6 +118,8 @@ abstract = runAbstractM . fromConcrete
 
 sequenceStmts :: [C.Stmt] -> AbstractM Stmts
 sequenceStmts = undefined
+  -- where
+  --   fromStatement
 
 runAbstractM :: AbstractM a -> a
 runAbstractM f = evalState f 0
@@ -183,7 +185,8 @@ instance FromConcrete C.Stmt Stmt where
   fromConcrete (C.Abort      _) = pure Abort
   fromConcrete (C.Assign p q _) = Assign  <$> mapM fromConcrete p
                                           <*> mapM fromConcrete q
-  fromConcrete (C.Assert p   _) = Assert  <$> fromConcrete p
+  fromConcrete (C.Assert p   _) = undefined
+      -- Assert  <$> fromConcrete p
   fromConcrete (C.Do     p q _) = Do      <$> fromConcrete p
                                           <*> mapM fromConcrete q
   fromConcrete (C.If     p   _) = If      <$> mapM fromConcrete p
