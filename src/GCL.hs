@@ -34,26 +34,27 @@ disjunct :: [Pred] -> Pred
 disjunct = foldr Disj (Lit True)
 
 precondStmts :: Stmts -> Pred -> M Pred
-precondStmts = undefined
+precondStmts (Seq pre stmt q) post = precond stmt pre post >>= precondStmts q
+precondStmts (Postcondition _) post = return post
 
 -- calculating the weakest precondition
-precond :: Stmt -> Pred -> M Pred
+precond :: Stmt -> Maybe Pred -> Pred -> M Pred
 
-precond Abort _ = undefined
+precond Abort _ _ = undefined
 
-precond Skip post = return post
+precond Skip _ post = return post
 
-precond (Assign xs es) post = return $ substP (Map.fromList (zip xs es)) post
+precond (Assign xs es) _ post = return $ substP (Map.fromList (zip xs es)) post
 
 -- precond (Seq c1 c2) post = precond c2 post >>= precond c1
 
-precond (Assert p) post
+precond (Assert p) _ post
   | predEq p post = return post
   | otherwise = do
       shouldProof $ p `Implies` post
       return p
 
-precond (If (Just pre) branches) post = do
+precond (If branches) (Just pre) post = do
   mapM_ (shouldProof <=< obliGuard pre post) branches
   let (guards, _) = unzipGdCmds branches
   shouldProof $ pre `Implies` disjunct guards
@@ -61,14 +62,14 @@ precond (If (Just pre) branches) post = do
   where
     obliGuard :: Pred -> Pred -> GdCmd -> M Pred
     obliGuard pre' post' (GdCmd guard body) = Implies (pre' `Conj` guard) <$> precondStmts body post'
-precond (If Nothing branches) post = do
+precond (If branches) Nothing post = do
   brConds <- mapM (precondGuard post) branches
   let (guards, _) = unzipGdCmds branches
 
   return (conjunct brConds `Conj` disjunct guards)
 
-precond (Do Nothing _ _) _ = undefined
-precond (Do (Just inv) bnd branches) post = do
+precond (Do _ _) Nothing _ = undefined
+precond (Do bnd branches) (Just inv)  post = do
 
   mapM_ (shouldProof <=< branchCond) branches
   mapM_ (shouldProof <=< termCond) branches
@@ -90,7 +91,7 @@ precond (Do (Just inv) bnd branches) post = do
       pre <- precondStmts body (Term LTh bnd (LitE (Num 100)))
       return $ inv `Conj` guard `Conj` (Term Eq bnd (LitE (Num 100))) `Implies` pre
 
-precond (Spec pre pos) post
+precond (Spec pre pos) _ post
   | predEq pos post = return pre
   | otherwise = do
        shouldProof (pos `Implies` post)

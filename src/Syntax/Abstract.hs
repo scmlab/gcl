@@ -26,8 +26,8 @@ data Stmt
   -- | Seq     Stmt Stmt
   | Assign  [Var] [Expr]
   | Assert  Pred
-  | Do      (Maybe Pred) Expr [GdCmd]
-  | If      (Maybe Pred)      [GdCmd]
+  | Do      Expr [GdCmd]
+  | If      [GdCmd]
   | Spec    Pred Pred
   deriving (Show)
 
@@ -184,11 +184,9 @@ instance FromConcrete C.Stmt Stmt where
   fromConcrete (C.Assign p q _) = Assign  <$> mapM fromConcrete p
                                           <*> mapM fromConcrete q
   fromConcrete (C.Assert p   _) = Assert  <$> fromConcrete p
-  fromConcrete (C.Do     p q _) = Do      <$> pure Nothing
-                                          <*> fromConcrete p
+  fromConcrete (C.Do     p q _) = Do      <$> fromConcrete p
                                           <*> mapM fromConcrete q
-  fromConcrete (C.If     p   _) = If      <$> pure Nothing
-                                          <*> mapM fromConcrete p
+  fromConcrete (C.If     p   _) = If      <$> mapM fromConcrete p
 
 instance FromConcrete C.Declaration Declaration where
   fromConcrete (C.ConstDecl p q _) = ConstDecl  <$> mapM fromConcrete p
