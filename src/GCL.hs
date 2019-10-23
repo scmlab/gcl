@@ -12,6 +12,7 @@ import Data.Tuple (swap)
 
 import Syntax.Abstract
 import Syntax.Parser
+import qualified Syntax.Concrete as C
 
 data Obligation = Obligation Index Pred deriving (Show)
 
@@ -104,8 +105,7 @@ precond (Spec pre pos) _ post
 precondGuard :: Pred -> GdCmd -> M Pred
 precondGuard post (GdCmd guard body) = Implies guard <$> precondStmts body post
 
-gcdExample :: Program
-gcdExample = abstract $ fromRight $ parseProgram "<test>" "\
+C.Program a b _ = fromRight $ parseProgram "<test>" "\
   \x := X\n\
   \y := Y\n\
   \{ gcd x y = gcd X Y }\n\
@@ -113,10 +113,25 @@ gcdExample = abstract $ fromRight $ parseProgram "<test>" "\
   \  | x > y -> x := minus x y  \n\
   \  | x < y -> y := minus y x  \n\
   \od\n\
+  \{ gcd X Y = x }\n\
   \"
 
+gcdExample :: Program
+gcdExample = let Right result = abstract $ fromRight $ parseProgram "<test>" "\
+  \x := X\n\
+  \y := Y\n\
+  \{ gcd x y = gcd X Y }\n\
+  \do { ? } \n\
+  \  | x > y -> x := minus x y  \n\
+  \  | x < y -> y := minus y x  \n\
+  \od\n\
+  \{ gcd X Y = x }\n\
+  \"
+  in result
+
 postCond :: Pred
-postCond = abstract $ fromRight $ parsePred "gcd X Y = x"
+postCond = let Right result = abstract $ fromRight $ parsePred "gcd X Y = x"
+            in result
 
 test :: ([Obligation], Pred)
 test = runM $ do

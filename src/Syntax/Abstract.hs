@@ -3,6 +3,7 @@
 
 module Syntax.Abstract where
 
+import Control.Monad.Except
 import Control.Monad.State
 import Data.Text (Text)
 import Data.Map (Map)
@@ -110,19 +111,48 @@ type Type = Text
 --------------------------------------------------------------------------------
 -- Converting from Concrete Syntax Tree
 
-type AbstractM = State Index
+-- NOTE: dunno whether this error should be semantical or syntatical
+data SyntaxError
+  = PostConditionMissing
+  | TwoConsecutiveAssertion Pred Pred
+  deriving (Show)
 
-abstract :: FromConcrete a b => a -> b
+type AbstractM = ExceptT SyntaxError (State Index)
+
+abstract :: FromConcrete a b => a -> Either SyntaxError b
 abstract = runAbstractM . fromConcrete
 
+convertStmt :: C.Stmt -> AbstractM (Either Pred Stmt)
+convertStmt (C.Assert p   _) = Left  <$> fromConcrete p
+convertStmt (C.Skip       _) = Right <$> pure Skip
+convertStmt (C.Abort      _) = Right <$> pure Abort
+convertStmt (C.Assign p q _) = Right <$> (Assign  <$> mapM fromConcrete p
+                                                  <*> mapM fromConcrete q)
+convertStmt (C.Do     p q _) = Right <$> (Do      <$> fromConcrete p
+                                                  <*> mapM fromConcrete q)
+convertStmt (C.If     p   _) = Right <$> (If      <$> mapM fromConcrete p)
 
 sequenceStmts :: [C.Stmt] -> AbstractM Stmts
-sequenceStmts = undefined
-  -- where
-  --   fromStatement
+sequenceStmts [] = throwError PostConditionMissing
+sequenceStmts (x:[]) = do
+  result <- convertStmt x
+  case result of
+    Left p  -> return $ Postcondition p
+    Right p -> error $ show p -- throwError PostConditionMissing
+sequenceStmts (x:y:xs) = do
+  result1 <- convertStmt x
+  case result1 of
+    Left p -> do
+      result2 <- convertStmt y
+      case result2 of
+        -- two consecutive assertions
+        Left q -> throwError $ TwoConsecutiveAssertion p q
+        -- an assertion followed by an ordinary statement
+        Right s -> Seq (Just p) s <$> sequenceStmts xs
+    Right s -> Seq Nothing s <$> sequenceStmts (y:xs)
 
-runAbstractM :: AbstractM a -> a
-runAbstractM f = evalState f 0
+runAbstractM :: AbstractM a -> Either SyntaxError a
+runAbstractM f = evalState (runExceptT f) 0
 
 -- returns the current index and increment it in the state
 index :: AbstractM Index
@@ -179,17 +209,6 @@ instance FromConcrete C.Pred Pred where
 instance FromConcrete C.GdCmd GdCmd where
   fromConcrete (C.GdCmd p q _) = GdCmd  <$> fromConcrete p
                                         <*> sequenceStmts q
-
-instance FromConcrete C.Stmt Stmt where
-  fromConcrete (C.Skip       _) = pure Skip
-  fromConcrete (C.Abort      _) = pure Abort
-  fromConcrete (C.Assign p q _) = Assign  <$> mapM fromConcrete p
-                                          <*> mapM fromConcrete q
-  fromConcrete (C.Assert p   _) = undefined
-      -- Assert  <$> fromConcrete p
-  fromConcrete (C.Do     p q _) = Do      <$> fromConcrete p
-                                          <*> mapM fromConcrete q
-  fromConcrete (C.If     p   _) = If      <$> mapM fromConcrete p
 
 instance FromConcrete C.Declaration Declaration where
   fromConcrete (C.ConstDecl p q _) = ConstDecl  <$> mapM fromConcrete p
