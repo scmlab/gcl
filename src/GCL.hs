@@ -105,7 +105,7 @@ precondGuard :: Pred -> GdCmd -> M Pred
 precondGuard post (GdCmd guard body) = Implies guard <$> precondStmts body post
 
 gcdExample :: Program
-gcdExample = let Right result = abstract $ fromRight $ parseProgram "<test>" "\
+gcdExample = abstract $ fromRight $ parseProgram "<test>" "\
   \x := X\n\
   \y := Y\n\
   \{ gcd x y = gcd X Y }\n\
@@ -115,11 +115,9 @@ gcdExample = let Right result = abstract $ fromRight $ parseProgram "<test>" "\
   \od\n\
   \{ gcd X Y = x }\n\
   \"
-  in result
 
 postCond :: Pred
-postCond = let Right result = abstract $ fromRight $ parsePred "gcd X Y = x"
-            in result
+postCond = abstract $ fromRight $ parsePred "gcd X Y = x"
 
 test :: ([Obligation], Pred)
 test = runM $ do

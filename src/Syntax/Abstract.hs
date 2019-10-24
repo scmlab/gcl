@@ -3,7 +3,6 @@
 
 module Syntax.Abstract where
 
-import Control.Monad.Except
 import Control.Monad.State
 import Data.Text (Text)
 import Data.Map (Map)
@@ -49,6 +48,36 @@ data Stmts  = Seq
             | Postcondition
                 (Maybe Pred)  -- Nothing if the last statement is not an assertion
             deriving (Show)
+
+convertStmt :: C.Stmt -> AbstractM (Either Pred Stmt)
+convertStmt (C.Assert p   _) = Left  <$> fromConcrete p
+convertStmt (C.Skip       _) = Right <$> pure Skip
+convertStmt (C.Abort      _) = Right <$> pure Abort
+convertStmt (C.Assign p q _) = Right <$> (Assign  <$> mapM fromConcrete p
+                                                  <*> mapM fromConcrete q)
+convertStmt (C.Do     p q _) = Right <$> (Do      <$> fromConcrete p
+                                                  <*> mapM fromConcrete q)
+convertStmt (C.If     p   _) = Right <$> (If      <$> mapM fromConcrete p)
+
+sequenceStmts :: [C.Stmt] -> AbstractM Stmts
+sequenceStmts [] = return $ Postcondition Nothing
+sequenceStmts (x:[]) = do
+  result <- convertStmt x
+  case result of
+    Left p  -> return $ Postcondition (Just p)
+    Right s -> return $ Seq Nothing s (Postcondition Nothing)
+sequenceStmts (x:y:xs) = do
+  result1 <- convertStmt x
+  case result1 of
+    Left p -> do
+      result2 <- convertStmt y
+      traceShow result2 (return ())
+      case result2 of
+        -- insert a Skip between two consecutive assertions
+        Left _ -> Seq (Just p) Skip <$> sequenceStmts (y:xs)
+        -- an assertion followed by an ordinary statement
+        Right s -> Seq (Just p) s <$> sequenceStmts xs
+    Right s -> Seq Nothing s <$> sequenceStmts (y:xs)
 
 --------------------------------------------------------------------------------
 -- | Predicates
@@ -117,49 +146,13 @@ type Type = Text
 --------------------------------------------------------------------------------
 -- Converting from Concrete Syntax Tree
 
--- NOTE: dunno whether this error should be semantical or syntatical
-data SyntaxError
-  = PostConditionMissing
-  | TwoConsecutiveAssertion Pred Pred
-  deriving (Show)
+type AbstractM = State Index
 
-type AbstractM = ExceptT SyntaxError (State Index)
-
-abstract :: FromConcrete a b => a -> Either SyntaxError b
+abstract :: FromConcrete a b => a -> b
 abstract = runAbstractM . fromConcrete
 
-convertStmt :: C.Stmt -> AbstractM (Either Pred Stmt)
-convertStmt (C.Assert p   _) = Left  <$> fromConcrete p
-convertStmt (C.Skip       _) = Right <$> pure Skip
-convertStmt (C.Abort      _) = Right <$> pure Abort
-convertStmt (C.Assign p q _) = Right <$> (Assign  <$> mapM fromConcrete p
-                                                  <*> mapM fromConcrete q)
-convertStmt (C.Do     p q _) = Right <$> (Do      <$> fromConcrete p
-                                                  <*> mapM fromConcrete q)
-convertStmt (C.If     p   _) = Right <$> (If      <$> mapM fromConcrete p)
-
-sequenceStmts :: [C.Stmt] -> AbstractM Stmts
-sequenceStmts [] = throwError PostConditionMissing
-sequenceStmts (x:[]) = do
-  result <- convertStmt x
-  case result of
-    Left p  -> return $ Postcondition (Just p)
-    Right s -> return $ Seq Nothing s (Postcondition Nothing)
-sequenceStmts (x:y:xs) = do
-  result1 <- convertStmt x
-  case result1 of
-    Left p -> do
-      result2 <- convertStmt y
-      traceShow result2 (return ())
-      case result2 of
-        -- two consecutive assertions
-        Left q -> throwError $ TwoConsecutiveAssertion p q
-        -- an assertion followed by an ordinary statement
-        Right s -> Seq (Just p) s <$> sequenceStmts xs
-    Right s -> Seq Nothing s <$> sequenceStmts (y:xs)
-
-runAbstractM :: AbstractM a -> Either SyntaxError a
-runAbstractM f = evalState (runExceptT f) 0
+runAbstractM :: AbstractM a -> a
+runAbstractM f = evalState f 0
 
 -- returns the current index and increment it in the state
 index :: AbstractM Index
