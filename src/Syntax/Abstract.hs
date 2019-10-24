@@ -9,6 +9,8 @@ import Data.Text (Text)
 import Data.Map (Map)
 import qualified Data.Map as Map
 
+import Debug.Trace
+
 import qualified Syntax.Concrete as C
 
 type Index = Int
@@ -40,8 +42,12 @@ unzipGdCmds = unzip . map (\(GdCmd x y) -> (x, y))
 --------------------------------------------------------------------------------
 -- | Sequenced Statments
 
-data Stmts  = Seq (Maybe Pred) Stmt Stmts   -- cons
-            | Postcondition Pred            -- nil
+data Stmts  = Seq
+                (Maybe Pred)  -- precondition
+                Stmt          -- command
+                Stmts
+            | Postcondition
+                (Maybe Pred)  -- Nothing if the last statement is not an assertion
             deriving (Show)
 
 --------------------------------------------------------------------------------
@@ -137,13 +143,14 @@ sequenceStmts [] = throwError PostConditionMissing
 sequenceStmts (x:[]) = do
   result <- convertStmt x
   case result of
-    Left p  -> return $ Postcondition p
-    Right p -> error $ show p -- throwError PostConditionMissing
+    Left p  -> return $ Postcondition (Just p)
+    Right s -> return $ Seq Nothing s (Postcondition Nothing)
 sequenceStmts (x:y:xs) = do
   result1 <- convertStmt x
   case result1 of
     Left p -> do
       result2 <- convertStmt y
+      traceShow result2 (return ())
       case result2 of
         -- two consecutive assertions
         Left q -> throwError $ TwoConsecutiveAssertion p q
