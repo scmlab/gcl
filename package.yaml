@@ -12,12 +12,10 @@ extra-source-files:
 - README.md
 
 dependencies:
-  - array
   - base >= 4.7 && < 5
+  - aeson
   - bytestring
   - containers
-  - lexer-applicative
-  - regex-applicative
   - megaparsec
   - parser-combinators
   - mtl
@@ -28,7 +26,7 @@ build-tools:
 - happy
 
 executables:
-  cp:
+  gcl:
     source-dirs:      src
     main:             Main.hs
     ghc-options:

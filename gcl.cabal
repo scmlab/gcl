@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 18380e2428197bcfff25ae722697e41bc8295b4372100b151ad1f751679b8ebb
+-- hash: ea29a814075f9b8dcaddfa2744dab9b2d922ae1b61fe50b86021f7818f1e87c4
 
 name:           gcl
 version:        0.1.0.0
@@ -19,16 +19,13 @@ build-type:     Simple
 extra-source-files:
     README.md
 
-executable cp
+executable gcl
   main-is: Main.hs
   other-modules:
       Control.Monad.Gensym
       GCL
-      GCL.EnumHole
-      GCL.Expr
-      GCL.Pred
-      GCL.Stmt
-      Syntax
+      Syntax.Abstract
+      Syntax.Concrete
       Syntax.Lexer
       Syntax.Parser
       Paths_gcl
@@ -38,7 +35,7 @@ executable cp
   build-tools:
       happy
   build-depends:
-      array
+      aeson
     , base >=4.7 && <5
     , bytestring
     , containers
