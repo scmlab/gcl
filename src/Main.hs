@@ -29,7 +29,7 @@ main = do
     loop = do
       request <- recv
       case request of
-        Just (Check filepath) -> do
+        Just (Load filepath) -> do
           raw <- Text.readFile filepath
           case parseProgram filepath raw of
             Right _syntax -> send Ok
@@ -37,7 +37,7 @@ main = do
           loop
         Just Quit -> return ()
         _ -> do
-          send $ JSONError
+          send $ Load "filepath"
           loop
 
       -- if request == "quit"

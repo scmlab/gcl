@@ -9,10 +9,11 @@ import Data.Aeson
 import GHC.Generics
 import System.IO
 
-data Request = Check FilePath | Quit
+data Request = Load FilePath | Quit
   deriving (Generic)
 
 instance FromJSON Request where
+instance ToJSON Request where
 
 data Response = Hi | Ok | JSONError | ParseError String
   deriving (Generic)
