@@ -8,13 +8,13 @@ import Data.Text (Text)
 import Data.Map (Map)
 import qualified Data.Map as Map
 
-import Debug.Trace
+-- import Debug.Trace
 
 import qualified Syntax.Concrete as C
 
 type Index = Int
 
-data Program = Program [Declaration] Stmts
+data Program = Program [Declaration] [Stmt]
   deriving (Show)
 
 data Declaration
@@ -25,59 +25,46 @@ data Declaration
 data Stmt
   = Skip
   | Abort
-  -- | Seq     Stmt Stmt
   | Assign  [Var] [Expr]
-  -- | Assert  Pred
-  | Do      Expr [GdCmd]
-  | If      [GdCmd]
+  | Assert  Pred
+  | Do      (Maybe Pred) Expr [GdCmd]
+  | If      (Maybe Pred) [GdCmd]
   | Spec    Pred Pred
   deriving (Show)
 
-data GdCmd = GdCmd Pred Stmts deriving (Show)
+data GdCmd = GdCmd Pred [Stmt] deriving (Show)
 
-unzipGdCmds :: [GdCmd] -> ([Pred], [Stmts])
+unzipGdCmds :: [GdCmd] -> ([Pred], [[Stmt]])
 unzipGdCmds = unzip . map (\(GdCmd x y) -> (x, y))
 
 --------------------------------------------------------------------------------
--- | Sequenced Statments
+-- | Affixing assertions to DO or IF constructs.
 
-data Stmts  = Seq
-                (Maybe Pred)  -- precondition
-                Stmt          -- command
-                Stmts
-            | Postcondition
-                (Maybe Pred)  -- Nothing if the last statement is not an assertion
-            deriving (Show)
+infixr 7 <:>
+(<:>) :: Monad m => a -> m [a] -> m [a]
+x <:> xs = do
+  xs' <- xs
+  return (x:xs')
 
-convertStmt :: C.Stmt -> AbstractM (Either Pred Stmt)
-convertStmt (C.Assert p   _) = Left  <$> fromConcrete p
-convertStmt (C.Skip       _) = Right <$> pure Skip
-convertStmt (C.Abort      _) = Right <$> pure Abort
-convertStmt (C.Assign p q _) = Right <$> (Assign  <$> mapM fromConcrete p
-                                                  <*> mapM fromConcrete q)
-convertStmt (C.Do     p q _) = Right <$> (Do      <$> fromConcrete p
-                                                  <*> mapM fromConcrete q)
-convertStmt (C.If     p   _) = Right <$> (If      <$> mapM fromConcrete p)
+affixAssertions :: [Stmt] -> AbstractM [Stmt]
+affixAssertions      []  = return []
+affixAssertions (  x:[]) = return [x]
+affixAssertions (x:y:xs) = case (x, y) of
+  -- affixing assertions
+  (Assert p, Do Nothing  r s) -> Do (Just p) r s <:> affixAssertions xs
+  (Assert p, If Nothing  r  ) -> If (Just p) r   <:> affixAssertions xs
 
-sequenceStmts :: [C.Stmt] -> AbstractM Stmts
-sequenceStmts [] = return $ Postcondition Nothing
-sequenceStmts (x:[]) = do
-  result <- convertStmt x
-  case result of
-    Left p  -> return $ Postcondition (Just p)
-    Right s -> return $ Seq Nothing s (Postcondition Nothing)
-sequenceStmts (x:y:xs) = do
-  result1 <- convertStmt x
-  case result1 of
-    Left p -> do
-      result2 <- convertStmt y
-      traceShow result2 (return ())
-      case result2 of
-        -- insert a Skip between two consecutive assertions
-        Left _ -> Seq (Just p) Skip <$> sequenceStmts (y:xs)
-        -- an assertion followed by an ordinary statement
-        Right s -> Seq (Just p) s <$> sequenceStmts xs
-    Right s -> Seq Nothing s <$> sequenceStmts (y:xs)
+  -- no need of affixing assertions
+  (Assert _, Do (Just _) _ _) -> x <:> y <:> affixAssertions xs
+  (Assert _, If (Just _) _  ) -> x <:> y <:> affixAssertions xs
+
+  -- for DO constructs, affix a new hole
+  (_, Do Nothing  r s) -> do
+    hole <- index
+    Do (Just (Hole hole)) r s <:> affixAssertions xs
+
+  -- other cases
+  _                           -> x <:> affixAssertions (y:xs)
 
 --------------------------------------------------------------------------------
 -- | Predicates
@@ -206,9 +193,21 @@ instance FromConcrete C.Pred Pred where
   fromConcrete (C.Lit p       _) = Lit      <$> pure p
   fromConcrete (C.Hole        _) = Hole     <$> index
 
+instance FromConcrete C.Stmt Stmt where
+  fromConcrete (C.Assert p   _) = Assert <$> fromConcrete p
+  fromConcrete (C.Skip       _) = pure Skip
+  fromConcrete (C.Abort      _) = pure Abort
+  fromConcrete (C.Assign p q _) = Assign <$> mapM fromConcrete p
+                                         <*> mapM fromConcrete q
+  fromConcrete (C.Do     p q _) = Do     <$> pure Nothing
+                                         <*> fromConcrete p
+                                         <*> mapM fromConcrete q
+  fromConcrete (C.If     p   _) = If     <$> pure Nothing
+                                         <*> mapM fromConcrete p
+
 instance FromConcrete C.GdCmd GdCmd where
   fromConcrete (C.GdCmd p q _) = GdCmd  <$> fromConcrete p
-                                        <*> sequenceStmts q
+                                        <*> (mapM fromConcrete q >>= affixAssertions)
 
 instance FromConcrete C.Declaration Declaration where
   fromConcrete (C.ConstDecl p q _) = ConstDecl  <$> mapM fromConcrete p
@@ -218,7 +217,7 @@ instance FromConcrete C.Declaration Declaration where
 
 instance FromConcrete C.Program Program where
   fromConcrete (C.Program p q _) = Program  <$> mapM fromConcrete p
-                                            <*> sequenceStmts q
+                                            <*> (mapM fromConcrete q >>= affixAssertions)
                                              -- (seqAll <$> mapM fromConcrete q)
 -- seqAll :: [Stmt] -> Stmt
 -- seqAll [] = Skip

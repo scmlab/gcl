@@ -33,32 +33,29 @@ conjunct = foldr Conj (Lit False)
 disjunct :: [Pred] -> Pred
 disjunct = foldr Disj (Lit True)
 
-precondStmts :: Stmts -> Pred -> M Pred
-precondStmts (Postcondition _) post = return post
-precondStmts (Seq Nothing stmt q) post = do
-  -- no precondition asserted, return the computed one
-  precondStmts q post >>= precond stmt Nothing
-precondStmts (Seq (Just pre) stmt q) post = do
-  -- conpute the precondition of (stmt; q)
-  post' <- precondStmts q post >>= precond stmt (Just pre)
+precondStmts :: [Stmt] -> Pred -> M Pred
+precondStmts [] post = return post
+precondStmts (x:xs) post =
+  precondStmts xs post >>= precond x
 
+-- calculating the weakest precondition
+precond :: Stmt -> Pred -> M Pred
+
+precond Abort _ = return (Lit False)
+
+precond Skip post = return post
+
+precond (Assert pre) post = do
   -- generate a proof obligation,
   -- if the precondition doesn't coincides with the postcondition
-  unless (predEq pre post') $ do
-    shouldProof $ pre `Implies` post'
+  unless (predEq pre post) $ do
+    shouldProof $ pre `Implies` post
 
   return pre
 
--- calculating the weakest precondition
-precond :: Stmt -> Maybe Pred -> Pred -> M Pred
+precond (Assign xs es) post = return $ substP (Map.fromList (zip xs es)) post
 
-precond Abort _ _ = undefined
-
-precond Skip _ post = return post
-
-precond (Assign xs es) _ post = return $ substP (Map.fromList (zip xs es)) post
-
-precond (If branches) (Just pre) post = do
+precond (If (Just pre) branches) post = do
   mapM_ (shouldProof <=< obliGuard pre post) branches
   let (guards, _) = unzipGdCmds branches
   shouldProof $ pre `Implies` disjunct guards
@@ -66,14 +63,14 @@ precond (If branches) (Just pre) post = do
   where
     obliGuard :: Pred -> Pred -> GdCmd -> M Pred
     obliGuard pre' post' (GdCmd guard body) = Implies (pre' `Conj` guard) <$> precondStmts body post'
-precond (If branches) Nothing post = do
+precond (If Nothing branches) post = do
   brConds <- mapM (precondGuard post) branches
   let (guards, _) = unzipGdCmds branches
 
   return (conjunct brConds `Conj` disjunct guards)
 
-precond (Do _ _) Nothing _ = undefined
-precond (Do bnd branches) (Just inv)  post = do
+precond (Do Nothing _ _) _ = undefined
+precond (Do (Just inv) bnd branches) post = do
 
   mapM_ (shouldProof <=< branchCond) branches
   mapM_ (shouldProof <=< termCond) branches
@@ -95,14 +92,54 @@ precond (Do bnd branches) (Just inv)  post = do
       pre <- precondStmts body (Term LTh bnd (LitE (Num 100)))
       return $ inv `Conj` guard `Conj` (Term Eq bnd (LitE (Num 100))) `Implies` pre
 
-precond (Spec pre pos) _ post
-  | predEq pos post = return pre
-  | otherwise = do
-       shouldProof (pos `Implies` post)
-       return pre
+precond (Spec pre _) _ = return pre
 
 precondGuard :: Pred -> GdCmd -> M Pred
 precondGuard post (GdCmd guard body) = Implies guard <$> precondStmts body post
+--
+-- --
+--
+--  -- splitting the `first` statement and the rest, if any.
+--
+-- leading :: Stmt -> (Stmt, Maybe Stmt)
+-- leading (Seq s1 s2) =
+--     (e, maybe (Just s2) (\s -> Just (Seq s s2)) s1')
+--   where (e, s1') = leading s1
+-- leading stmt = (stmt, Nothing)
+--
+--  -- affixing assertions to DO or IF constructs.
+--
+-- affixAsrt :: Stmt -> M Stmt
+-- affixAsrt stmt
+--     | Nothing <- tl    = return hd
+--     | Just stmt' <- tl = affixAux (hd, stmt')
+--   where (hd, tl) = leading stmt
+--
+-- affixGC :: GdCmd -> M GdCmd
+-- affixGC (GdCmd g stmt) = GdCmd g <$> affixAsrt stmt
+--
+-- affixAux :: (Stmt, Stmt) -> M Stmt
+-- affixAux (s, Seq s1 s2) = do
+--   s1' <- affixAux (s, s1)
+--   affixAux (s1', s2)
+--
+-- -- Assert ; Do
+-- affixAux (s `Seq` Assert inv,  Do Nothing bnd body) = do
+--   body' <- mapM affixGC body
+--   return (s `Seq` Do (Just inv) bnd body')
+--
+-- affixAux (s, Do Nothing bnd body) = do
+--   i <- get
+--   put (succ i)
+--   body' <- mapM affixGC body
+--   return (s `Seq` Do (Just (Hole i)) bnd body')
+-- affixAux (s `Seq` Assert pre, If Nothing branches) = do
+--   branches' <- mapM affixGC branches
+--   return (s `Seq` If (Just pre) branches')
+-- affixAux (s, If Nothing branches) = do
+--   branches' <- mapM affixGC branches
+--   return (s `Seq` If Nothing branches')
+-- affixAux (s, e) = return (s `Seq` e)
 
 gcdExample :: Program
 gcdExample = abstract $ fromRight $ parseProgram "<test>" "\
