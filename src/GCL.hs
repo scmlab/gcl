@@ -36,7 +36,7 @@ disjunct = foldr Disj (Lit True)
 -- calculating the weakest precondition
 precond :: Stmt -> Pred -> M Pred
 
-precond Abort _ = undefined
+precond Abort _ = return (Lit False)
 
 precond Skip post = return post
 
@@ -87,14 +87,53 @@ precond (Do (Just inv) bnd branches) post = do
       pre <- precond body (Term LTh bnd (LitE (Num 100)))
       return $ inv `Conj` guard `Conj` (Term Eq bnd (LitE (Num 100))) `Implies` pre
 
-precond (Spec pre pos) post
-  | predEq pos post = return pre
-  | otherwise = do
-       shouldProof (pos `Implies` post)
-       return pre
+precond (Spec pre _) _ = return pre
 
 precondGuard :: Pred -> GdCmd -> M Pred
 precondGuard post (GdCmd guard body) = Implies guard <$> precond body post
+
+--
+
+ -- splitting the `first` statement and the rest, if any.
+
+leading :: Stmt -> (Stmt, Maybe Stmt)
+leading (Seq s1 s2) =
+    (e, maybe (Just s2) (\s -> Just (Seq s s2)) s1')
+  where (e, s1') = leading s1
+leading stmt = (stmt, Nothing)
+
+ -- affixing assertions to DO or IF constructs.
+
+affixAsrt :: Stmt -> M Stmt
+affixAsrt stmt
+    | Nothing <- tl    = return hd
+    | Just stmt' <- tl = affixAux (hd, stmt')
+  where (hd, tl) = leading stmt
+
+affixGC :: GdCmd -> M GdCmd
+affixGC (GdCmd g stmt) = GdCmd g <$> affixAsrt stmt
+
+affixAux :: (Stmt, Stmt) -> M Stmt
+affixAux (s, Seq s1 s2) = do
+  s1' <- affixAux (s, s1)
+  affixAux (s1', s2)
+affixAux (s `Seq` Assert inv,
+          Do Nothing bnd body) = do
+  body' <- mapM affixGC body
+  return (s `Seq` Do (Just inv) bnd body')
+affixAux (s, Do Nothing bnd body) = do
+  i <- get
+  put (succ i)
+  body' <- mapM affixGC body
+  return (s `Seq` Do (Just (Hole i)) bnd body')
+affixAux (s `Seq` Assert pre,
+          If Nothing branches) = do
+  branches' <- mapM affixGC branches
+  return (s `Seq` If (Just pre) branches')
+affixAux (s, If Nothing branches) = do
+  branches' <- mapM affixGC branches
+  return (s `Seq` If Nothing branches')
+affixAux (s, e) = return (s `Seq` e)
 
 gcdExample :: Program
 gcdExample = abstract $ fromRight $ parseProgram "<test>" "\
