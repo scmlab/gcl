@@ -1,50 +1,44 @@
-{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Main where
 
 import Syntax.Parser
+import REPL
 
-import Prelude hiding (getContents, putStrLn)
+import Prelude
 import qualified Data.Text.IO as Text
-import Data.Aeson
-import qualified Data.ByteString as Strict
-import Data.ByteString.Lazy hiding (putStrLn)
-import Data.ByteString.Lazy.Char8 (putStrLn)
--- import Data.ByteString (getLine)
 
 import Text.Megaparsec.Error (errorBundlePretty)
-import GHC.Generics
 
--- import System.Environment
-
-data Request = Check FilePath | Quit
-  deriving (Generic)
-
-instance FromJSON Request where
-
-data Response = Ok | JSONError | ParseError String
-  deriving (Generic)
-
-instance ToJSON Response where
+import System.Console.GetOpt
+import System.Environment
 
 main :: IO ()
-main = loop
+main = do
+  (opts, _) <- getArgs >>= parseOpts
+  case optMode opts of
+    ModeHelp -> putStrLn $ usageInfo usage options
+    ModeREPL -> loop
+    ModeDev -> return ()
+      -- void $ runREPL settings $ do
+      -- _ <- handleCommandREPL $ parseCommand ":l test/source/a.clp"
+      -- loop
 
   where
     loop :: IO ()
     loop = do
-      request <- fromStrict <$> Strict.getLine
-
-      case decode request of
+      request <- recv
+      case request of
         Just (Check filepath) -> do
           raw <- Text.readFile filepath
           case parseProgram filepath raw of
-            Right syntax -> putStrLn $ encode $ Ok
-            Left err -> putStrLn $ encode $ ParseError $ errorBundlePretty err
+            Right _syntax -> send Ok
+            Left err -> send $ ParseError $ errorBundlePretty err
           loop
         Just Quit -> return ()
-        _ -> putStrLn $ encode $ JSONError
+        _ -> do
+          send $ JSONError
+          loop
 
       -- if request == "quit"
       --   then return ()
@@ -57,3 +51,32 @@ main = loop
   -- case parseProgram filepath raw of
   --   Right syntax -> print syntax
   --   Left err -> putStrLn $ errorBundlePretty err
+
+--------------------------------------------------------------------------------
+-- | Command-line arguments
+
+data Mode = ModeREPL | ModeHelp | ModeDev
+
+data Options = Options
+  { optMode :: Mode
+  }
+
+defaultOptions :: Options
+defaultOptions = Options
+  { optMode = ModeREPL
+  }
+
+options :: [OptDescr (Options -> Options)]
+options =
+  [ Option ['h']  ["help"]  (NoArg (\opts -> opts { optMode = ModeHelp }))  "print this help message"
+  , Option ['d']  ["dev"]  (NoArg (\opts -> opts { optMode = ModeDev }))   "for testing"
+  ]
+
+usage :: String
+usage =  "GCL v0.0.1 \nUsage: gcl [Options...]\n"
+
+parseOpts :: [String] -> IO (Options, [String])
+parseOpts argv =
+  case getOpt Permute options argv of
+    (o,n,[]  ) -> return (foldl (flip id) defaultOptions o, n)
+    (_,_,errs) -> ioError $ userError $ concat errs ++ usageInfo usage options
