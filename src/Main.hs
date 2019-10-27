@@ -8,7 +8,7 @@ import REPL
 import Prelude
 import qualified Data.Text.IO as Text
 
-import Text.Megaparsec.Error (errorBundlePretty)
+import Text.Megaparsec.Error (bundlePosState, errorBundlePretty)
 
 import System.Console.GetOpt
 import System.Environment
@@ -33,7 +33,7 @@ main = do
           raw <- Text.readFile filepath
           case parseProgram filepath raw of
             Right _syntax -> send Ok
-            Left err -> send $ ParseError $ errorBundlePretty err
+            Left err -> send $ ParseError (toPos $ bundlePosState err) (errorBundlePretty err)
           loop
         Just Quit -> return ()
         _ -> do

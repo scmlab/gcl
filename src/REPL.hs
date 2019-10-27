@@ -6,8 +6,25 @@ module REPL where
 import qualified Data.ByteString.Lazy.Char8 as BS
 import qualified Data.ByteString.Char8 as Strict
 import Data.Aeson
+import Data.Loc
 import GHC.Generics
 import System.IO
+
+instance ToJSON Pos where
+  toJSON (Pos filepath line column offset) = object
+    [ "filepath"  .= filepath
+    , "line"      .= line
+    , "column"    .= column
+    , "offset"    .= offset
+    ]
+
+  toEncoding (Pos filepath line column offset) = pairs
+      $   "filepath"  .= filepath
+      <>  "line"      .= line
+      <>  "column"    .= column
+      <>  "offset"    .= offset
+
+
 
 data Request = Load FilePath | Quit
   deriving (Generic)
@@ -15,7 +32,7 @@ data Request = Load FilePath | Quit
 instance FromJSON Request where
 instance ToJSON Request where
 
-data Response = Hi | Ok | JSONError | ParseError String
+data Response = Hi | Ok | JSONError | ParseError Pos String
   deriving (Generic)
 
 instance ToJSON Response where

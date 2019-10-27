@@ -5,6 +5,7 @@ module Syntax.Parser
   , parseProgram
   , parsePred
   , parseStmt
+  , toPos
   ) where
 
 import Control.Monad.Combinators.Expr
@@ -210,11 +211,13 @@ type' = withLoc $ Type <$> identifierUpper
 --------------------------------------------------------------------------------
 -- | Helper functions
 
+toPos :: PosState Text -> Pos
+toPos (PosState _ offset (SourcePos filepath line column) _ _) = Pos filepath (unPos line) (unPos column) offset
+
+
+
 getPos :: Parser Pos
-getPos = do
-  offset <- getOffset
-  SourcePos filepath line column <- getSourcePos
-  return $ Pos filepath (unPos line) (unPos column) offset
+getPos = toPos . statePosState <$> getParserState
 
 withLoc :: Parser (Loc -> a) -> Parser a
 withLoc parser = do
