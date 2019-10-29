@@ -32,7 +32,7 @@ data Request = Load FilePath | Quit
 instance FromJSON Request where
 instance ToJSON Request where
 
-data Response = Hi | Ok | JSONError | ParseError Pos String
+data Response = Hi | Ok | JSONError | ParseError [(Pos, String)]
   deriving (Generic)
 
 instance ToJSON Response where

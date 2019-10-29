@@ -4,7 +4,7 @@ var x, y : Int
 {X > 0 && Y > 0}
 
 x := X
-y := Y*
+y := Y
 
 { gcd x y = gcd X Y && x > 0 && y > 0 }
 do { plus x y }

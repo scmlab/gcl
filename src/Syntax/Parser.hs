@@ -211,10 +211,8 @@ type' = withLoc $ Type <$> identifierUpper
 --------------------------------------------------------------------------------
 -- | Helper functions
 
-toPos :: PosState Text -> Pos
+toPos :: Stream s => PosState s -> Pos
 toPos (PosState _ offset (SourcePos filepath line column) _ _) = Pos filepath (unPos line) (unPos column) offset
-
-
 
 getPos :: Parser Pos
 getPos = toPos . statePosState <$> getParserState

@@ -7,11 +7,28 @@ import REPL
 
 import Prelude
 import qualified Data.Text.IO as Text
+import Data.Loc (Pos(..))
 
-import Text.Megaparsec.Error (bundlePosState, errorBundlePretty)
+import Text.Megaparsec.Error
 
 import System.Console.GetOpt
 import System.Environment
+import Text.Megaparsec (PosState)
+import Text.Megaparsec.Stream (Stream(..))
+
+collectParseErrors :: Stream s
+                   => ParseErrorBundle s e
+                   -> [(Pos, ParseError s e)]
+collectParseErrors (ParseErrorBundle errors posState)
+  = snd $ foldr f (posState, []) errors
+  where
+    f :: Stream s
+      => ParseError s e
+      -> (PosState s, [(Pos, ParseError s e)])
+      -> (PosState s, [(Pos, ParseError s e)])
+    f err (initial, accum) =
+        let (_, _, next) = reachOffset (errorOffset err) initial
+        in (next, (toPos next, err):accum)
 
 main :: IO ()
 main = do
@@ -19,10 +36,13 @@ main = do
   case optMode opts of
     ModeHelp -> putStrLn $ usageInfo usage options
     ModeREPL -> loop
-    ModeDev -> return ()
-      -- void $ runREPL settings $ do
-      -- _ <- handleCommandREPL $ parseCommand ":l test/source/a.clp"
-      -- loop
+    ModeDev -> do
+      let filepath = "examples/a.gcl"
+      raw <- Text.readFile filepath
+      case parseProgram filepath raw of
+        Right syntax -> print syntax
+        Left errorBundle -> do
+          print (collectParseErrors errorBundle)
 
   where
     loop :: IO ()
@@ -33,7 +53,9 @@ main = do
           raw <- Text.readFile filepath
           case parseProgram filepath raw of
             Right _syntax -> send Ok
-            Left err -> send $ ParseError (toPos $ bundlePosState err) (errorBundlePretty err)
+            Left err -> do
+              let pairs = map (\(p, e) -> (p, parseErrorTextPretty e)) $ collectParseErrors err
+              send $ ParseError pairs
           loop
         Just Quit -> return ()
         _ -> do
