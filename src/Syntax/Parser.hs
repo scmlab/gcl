@@ -45,6 +45,7 @@ statement :: Parser Stmt
 statement = choice
   [ try assign
   , abort
+  , try assertWithBnd
   , assert
   , skip
   , repetition
@@ -60,12 +61,21 @@ abort = withLoc $ Abort <$ symbol "abort"
 assert :: Parser Stmt
 assert = withLoc $ Assert <$> braces predicate
 
+assertWithBnd :: Parser Stmt
+assertWithBnd = withLoc $ AssertWithBnd
+  <$  symbol "{"
+  <*> predicate
+  <*  symbol ","
+  <*  symbol "bnd"
+  <*  symbol ":"
+  <*> expression
+  <*  symbol "}"
+
 assign :: Parser Stmt
 assign = withLoc $ Assign <$> variableList <* symbol ":=" <*> expressionList
 
 repetition :: Parser Stmt
 repetition = withLoc $ Do <$  symbol "do"
-                          <*> braces expression
                           <*> some guardedCommand
                           <*  symbol "od"
 
@@ -92,6 +102,7 @@ predicate = makeExprParser predTerm table <?> "predicate"
             , [ InfixL disjunction ]
             , [ InfixR implication ]
             ]
+
 
 negation :: Parser (Pred -> Pred)
 negation = do

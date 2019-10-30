@@ -19,10 +19,13 @@ main = do
   case optMode opts of
     ModeHelp -> putStrLn $ usageInfo usage options
     ModeREPL -> loop
-    ModeDev -> return ()
-      -- void $ runREPL settings $ do
-      -- _ <- handleCommandREPL $ parseCommand ":l test/source/a.clp"
-      -- loop
+    ModeDev -> do
+      let filepath = "examples/a.gcl"
+      raw <- Text.readFile filepath
+      case parseProgram filepath raw of
+        Right syntax -> print syntax
+        Left err -> putStrLn $ errorBundlePretty err
+
 
   where
     loop :: IO ()

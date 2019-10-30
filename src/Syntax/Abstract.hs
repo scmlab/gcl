@@ -226,8 +226,8 @@ instance FromConcrete C.Stmt Stmt where
 instance FromConcrete [C.Stmt] [Stmt] where
   fromConcrete      []  = return []
   fromConcrete (x : []) = case x of
-    C.Do _ p loc -> throwError $ MissingAssertion loc
-    _            -> (:) <$> fromConcrete x <*> pure []
+    C.Do p loc -> throwError $ MissingAssertion loc
+    _          -> (:) <$> fromConcrete x <*> pure []
   fromConcrete (x:y:xs) = affixAssertions (x:y:xs)
 
     where

@@ -50,6 +50,7 @@ keywords =
   , "abort"
   , "do", "od"
   , "if", "fi"
+  , "bnd"
   ]
 
 -- can be either a alphanumeric, underscore or a single quote

@@ -12,12 +12,13 @@ data Declaration
   deriving (Show)
 
 data Stmt
-  = Skip                    Loc
-  | Abort                   Loc
-  | Assign  [Var] [Expr]    Loc
-  | Assert  Pred            Loc
-  | Do      Expr  [GdCmd]   Loc
-  | If            [GdCmd]   Loc
+  = Skip                      Loc
+  | Abort                     Loc
+  | Assign  [Var] [Expr]      Loc
+  | Assert  Pred              Loc
+  | AssertWithBnd  Pred Expr  Loc
+  | Do            [GdCmd]     Loc
+  | If            [GdCmd]     Loc
   deriving (Show)
 
 data GdCmd = GdCmd Pred [Stmt] Loc deriving (Show)
@@ -43,6 +44,7 @@ instance Located Pred where
   locOf (Conj _ _ l)    = l
   locOf (Disj _ _ l)    = l
   locOf (Neg _ l)       = l
+  locOf (Lit _ l)       = l
   locOf (Hole l)        = l
 
 --------------------------------------------------------------------------------
