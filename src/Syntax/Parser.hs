@@ -18,6 +18,8 @@ import Text.Megaparsec.Error (errorBundlePretty)
 import Syntax.Concrete
 import Syntax.Lexer
 
+-- import Debug.Trace
+
 fromRight :: Either (ParseErrorBundle Text Void) b -> b
 fromRight (Left e) = error $ errorBundlePretty e
 fromRight (Right x) = x
@@ -228,7 +230,10 @@ toPos :: Stream s => PosState s -> Pos
 toPos (PosState _ offset (SourcePos filepath line column) _ _) = Pos filepath (unPos line) (unPos column) offset
 
 getPos :: Parser Pos
-getPos = toPos . statePosState <$> getParserState
+getPos = do
+  offset <- getOffset
+  SourcePos filepath line column <- getSourcePos
+  return $ Pos filepath (unPos line) (unPos column) offset
 
 withLoc :: Parser (Loc -> a) -> Parser a
 withLoc parser = do

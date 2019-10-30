@@ -7,7 +7,7 @@ x := X
 y := Y
 
 { gcd x y = gcd X Y && x > 0 && y > 0 }
-do { plus x y }
-  | x > y -> x := minus x y
+do
+   x > y -> x := minus x y
   | x < y -> y := minus y x
 od

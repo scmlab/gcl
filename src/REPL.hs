@@ -5,6 +5,8 @@ module REPL where
 
 import qualified Data.ByteString.Lazy.Char8 as BS
 import qualified Data.ByteString.Char8 as Strict
+
+import qualified Syntax.Abstract as A
 import Data.Aeson
 import Data.Loc
 import GHC.Generics
@@ -24,7 +26,11 @@ send payload = do
 --------------------------------------------------------------------------------
 -- | Request
 
-data Response = ProofObligations [Obligation] | JSONError | ParseError [(Pos, String)]
+data Response
+  = ProofObligations [Obligation]
+  | JSONError
+  | SyntaxError A.SyntaxError
+  | ParseError [(Pos, String)]
   deriving (Generic)
 
 instance ToJSON Response where
@@ -41,19 +47,5 @@ instance ToJSON Request where
 
 --------------------------------------------------------------------------------
 -- | Instances of ToJSON
-
-instance ToJSON Pos where
-  toJSON (Pos filepath line column offset) = object
-    [ "filepath"  .= filepath
-    , "line"      .= line
-    , "column"    .= column
-    , "offset"    .= offset
-    ]
-
-  toEncoding (Pos filepath line column offset) = pairs
-      $   "filepath"  .= filepath
-      <>  "line"      .= line
-      <>  "column"    .= column
-      <>  "offset"    .= offset
 
 instance ToJSON Obligation where

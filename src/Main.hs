@@ -41,6 +41,7 @@ main = do
       let filepath = "examples/a.gcl"
       raw <- Text.readFile filepath
       case parseProgram filepath raw of
+        -- Right syntax -> print syntax
         Right syntax -> case A.abstract syntax of
           Left err -> print err
           Right result -> print result
@@ -54,10 +55,9 @@ main = do
         Just (Load filepath) -> do
           raw <- Text.readFile filepath
           case parseProgram filepath raw of
-            Right _syntax ->
-              -- let
-              -- let Program _ statements = abstract syntax
-              send $ ProofObligations []
+            Right syntax -> case A.abstract syntax of
+              Left err -> send $ SyntaxError err
+              Right _result -> send $ ProofObligations []
             Left err -> do
               let pairs = map (\(p, e) -> (p, parseErrorTextPretty e)) $ collectParseErrors err
               send $ ParseError pairs

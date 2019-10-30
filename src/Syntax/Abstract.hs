@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -11,7 +12,7 @@ import Control.Monad.Except
 import Data.Aeson
 import Data.Text (Text)
 import Data.Map (Map)
-import Data.Loc (Loc)
+import Data.Loc
 import qualified Data.Map as Map
 import GHC.Generics
 
@@ -160,7 +161,10 @@ data SyntaxError = MissingAssertion Loc
                  | MissingBound     Loc
                  | ExcessBound      Loc
                  | Panic
-                 deriving (Show)
+                 deriving (Show, Generic)
+
+
+instance ToJSON SyntaxError where
 
 type AbstractM = ExceptT SyntaxError (State Index)
 
@@ -257,3 +261,33 @@ instance FromConcrete C.Declaration Declaration where
 instance FromConcrete C.Program Program where
   fromConcrete (C.Program p q _) = Program  <$> mapM fromConcrete p
                                             <*> fromConcrete q
+
+
+--------------------------------------------------------------------------------
+-- | Instances of ToJSON
+
+instance ToJSON Pos where
+  toJSON (Pos filepath line column offset) = object
+    [ "filepath"  .= filepath
+    , "line"      .= line
+    , "column"    .= column
+    , "offset"    .= offset
+    ]
+
+  toEncoding (Pos filepath line column offset) = pairs
+      $   "filepath"  .= filepath
+      <>  "line"      .= line
+      <>  "column"    .= column
+      <>  "offset"    .= offset
+
+instance ToJSON Loc where
+  toJSON NoLoc = object
+    [ "tag"    .= ("NoLoc" :: String)
+    ]
+  toJSON (Loc start end) = object
+    [ "tag"       .= ("Loc" :: String)
+    , "contents"  .= object
+      [ "start"    .= start
+      , "end"      .= end
+      ]
+    ]
