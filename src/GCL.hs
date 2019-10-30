@@ -69,8 +69,7 @@ precond (If Nothing branches) post = do
 
   return (conjunct brConds `Conj` disjunct guards)
 
-precond (Do Nothing _) _ = undefined
-precond (Do (Just (inv, bnd)) branches) post = do
+precond (Do inv bnd branches) post = do
 
   mapM_ (shouldProof <=< branchCond) branches
   mapM_ (shouldProof <=< termCond) branches

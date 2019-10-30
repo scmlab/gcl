@@ -30,7 +30,7 @@ data Stmt
   | Abort
   | Assign  [Var] [Expr]
   | Assert  Pred
-  | Do      (Maybe (Pred, Expr)) [GdCmd]
+  | Do      Pred Expr [GdCmd]
   | If      (Maybe Pred) [GdCmd]
   | Spec    Pred Pred
   deriving (Show)
@@ -49,28 +49,28 @@ x <:> xs = do
   xs' <- xs
   return (x:xs')
 
-affixAssertions :: [Stmt] -> AbstractM [Stmt]
-affixAssertions      []  = return []
-affixAssertions (  x:[]) = return [x]
-affixAssertions (x:y:xs) = case (x, y) of
-  -- affixing assertions
-  (Assert p, Do Nothing s) -> do
-       pb <- extractBnd p
-       Do (Just pb) s <:> affixAssertions xs
-  (Assert p, If Nothing r) -> If (Just p) r   <:> affixAssertions xs
-
-  -- no need of affixing assertions
-  (Assert _, Do (Just _) _) -> x <:> y <:> affixAssertions xs
-  (Assert _, If (Just _) _  ) -> x <:> y <:> affixAssertions xs
-
-  -- for DO constructs, affix a new hole
-  (_, Do Nothing s) -> do
-    i <- index
-    b <- index
-    Do (Just (Hole i, HoleE b [])) s <:> affixAssertions xs
-
-  -- other cases
-  _                           -> x <:> affixAssertions (y:xs)
+-- affixAssertions :: [Stmt] -> AbstractM [Stmt]
+-- affixAssertions      []  = return []
+-- affixAssertions (  x:[]) = return [x]
+-- affixAssertions (x:y:xs) = case (x, y) of
+--   -- affixing assertions
+--   (Assert p, Do Nothing s) -> do
+--        pb <- extractBnd p
+--        Do (Just pb) s <:> affixAssertions xs
+--   (Assert p, If Nothing r) -> If (Just p) r   <:> affixAssertions xs
+--
+--   -- no need of affixing assertions
+--   (Assert _, Do (Just _) _) -> x <:> y <:> affixAssertions xs
+--   (Assert _, If (Just _) _  ) -> x <:> y <:> affixAssertions xs
+--
+--   -- for DO constructs, affix a new hole
+--   (_, Do Nothing s) -> do
+--     i <- index
+--     b <- index
+--     Do (Just (Hole i, HoleE b [])) s <:> affixAssertions xs
+--
+--   -- other cases
+--   _                           -> x <:> affixAssertions (y:xs)
 
 --------------------------------------------------------------------------------
 -- | Predicates
@@ -85,7 +85,6 @@ data Pred = Term    BinRel Expr Expr
           | Neg     Pred
           | Lit     Bool
           | Hole    Index
-          | Bnd     Expr          -- bound for loop. a hack.
           deriving (Show, Eq)
 
 predEq :: Pred -> Pred -> Bool
@@ -98,12 +97,11 @@ substP env (Conj p q)       = Conj (substP env p) (substP env q)
 substP env (Disj p q)       = Disj (substP env p) (substP env q)
 substP env (Neg p)          = Neg (substP env p)
 substP _   (Lit b)          = Lit b
-substP env (Bnd e)          = Bnd (substE env e)
 substP _   (Hole _)         = undefined -- do we need it?
 
-extractBnd :: Pred -> AbstractM (Pred, Expr)
-extractBnd (Conj p (Bnd e)) = return (p,e)
-extractBnd p = do {i <- index; return (p, HoleE i [])}
+-- extractBnd :: Pred -> AbstractM (Pred, Expr)
+-- extractBnd (Conj p (Bnd e)) = return (p,e)
+-- extractBnd p = do {i <- index; return (p, HoleE i [])}
 
 --------------------------------------------------------------------------------
 -- | Expressions
@@ -233,28 +231,32 @@ instance FromConcrete [C.Stmt] [Stmt] where
     where
       affixAssertions :: [C.Stmt] -> AbstractM [Stmt]
       affixAssertions = undefined
-
       -- affixAssertions      []  = return []
       -- affixAssertions (  x:[]) = return [x]
       -- affixAssertions (x:y:xs) = case (x, y) of
-      --   -- affixing assertions
-      --   (Assert p, Do Nothing s) -> do
-      --        pb <- extractBnd p
-      --        Do (Just pb) s <:> affixAssertions xs
-      --   (Assert p, If Nothing r) -> If (Just p) r   <:> affixAssertions xs
-      --
-      --   -- no need of affixing assertions
-      --   (Assert _, Do (Just _) _) -> x <:> y <:> affixAssertions xs
-      --   (Assert _, If (Just _) _  ) -> x <:> y <:> affixAssertions xs
-      --
-      --   (_, C.Do _ s) -> throwError $ MissingAssertion
-      --   do
-      --     i <- index
-      --     b <- index
-      --     Do (Just (Hole i, HoleE b [])) s <:> affixAssertions xs
-      --
-      --   -- other cases
-      --   _                           -> (:) <$> fromConcrete x <*> affixAssertions (y:xs)
+      --   -- affixing assertion & bound
+      --   (C.AssertWithBnd p e _, C.Do q _) -> Do
+
+
+
+        -- affixing assertions
+        -- (Assert p, Do Nothing s) -> do
+        --      pb <- extractBnd p
+        --      Do (Just pb) s <:> affixAssertions xs
+        -- (Assert p, If Nothing r) -> If (Just p) r   <:> affixAssertions xs
+        --
+        -- -- no need of affixing assertions
+        -- (Assert _, Do (Just _) _) -> x <:> y <:> affixAssertions xs
+        -- (Assert _, If (Just _) _  ) -> x <:> y <:> affixAssertions xs
+        --
+        -- (_, C.Do _ s) -> throwError $ MissingAssertion
+        -- do
+        --   i <- index
+        --   b <- index
+        --   Do (Just (Hole i, HoleE b [])) s <:> affixAssertions xs
+
+        -- other cases
+        -- _                           -> (:) <$> fromConcrete x <*> affixAssertions (y:xs)
 
 
 
