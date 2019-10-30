@@ -71,8 +71,7 @@ precond (If Nothing branches) post = do
 
   return (conjunct brConds `Conj` disjunct guards)
 
-precond (Do Nothing _ _) _ = undefined
-precond (Do (Just inv) bnd branches) post = do
+precond (Do inv bnd branches) post = do
 
   mapM_ (shouldProof <=< branchCond) branches
   mapM_ (shouldProof <=< termCond) branches
@@ -144,19 +143,20 @@ precondGuard post (GdCmd guard body) = Implies guard <$> precondStmts body post
 -- affixAux (s, e) = return (s `Seq` e)
 
 gcdExample :: Program
-gcdExample = abstract $ fromRight $ parseProgram "<test>" "\
+gcdExample = let Right result = abstract $ fromRight $ parseProgram "<test>" "\
   \x := X\n\
   \y := Y\n\
-  \{ gcd x y = gcd X Y }\n\
-  \do { ? } \n\
-  \  | x > y -> x := minus x y  \n\
-  \  | x < y -> y := minus y x  \n\
+  \{ gcd x y = gcd X Y, bnd: ? }\n\
+  \do x > y -> x := minus x y  \n\
+  \ | x < y -> y := minus y x  \n\
   \od\n\
   \{ gcd X Y = x }\n\
   \"
+  in result
 
 postCond :: Pred
-postCond = abstract $ fromRight $ parsePred "gcd X Y = x"
+postCond = let Right result =  abstract $ fromRight $ parsePred "gcd X Y = x"
+  in result
 
 test :: ([Obligation], Pred)
 test = runM $ do

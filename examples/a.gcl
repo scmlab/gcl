@@ -11,4 +11,3 @@ do { plus x y }
   | x > y -> x := minus x y
   | x < y -> y := minus y x
 od
-{ x = gcd X Y }
