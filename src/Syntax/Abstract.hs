@@ -27,7 +27,7 @@ data Stmt
   | Abort
   | Assign  [Var] [Expr]
   | Assert  Pred
-  | Do      (Maybe Pred) Expr [GdCmd]
+  | Do      (Maybe (Pred, Expr)) [GdCmd]
   | If      (Maybe Pred) [GdCmd]
   | Spec    Pred Pred
   deriving (Show)
@@ -51,17 +51,20 @@ affixAssertions      []  = return []
 affixAssertions (  x:[]) = return [x]
 affixAssertions (x:y:xs) = case (x, y) of
   -- affixing assertions
-  (Assert p, Do Nothing  r s) -> Do (Just p) r s <:> affixAssertions xs
-  (Assert p, If Nothing  r  ) -> If (Just p) r   <:> affixAssertions xs
+  (Assert p, Do Nothing s) -> do
+       pb <- extractBnd p
+       Do (Just pb) s <:> affixAssertions xs
+  (Assert p, If Nothing r) -> If (Just p) r   <:> affixAssertions xs
 
   -- no need of affixing assertions
-  (Assert _, Do (Just _) _ _) -> x <:> y <:> affixAssertions xs
+  (Assert _, Do (Just _) _) -> x <:> y <:> affixAssertions xs
   (Assert _, If (Just _) _  ) -> x <:> y <:> affixAssertions xs
 
   -- for DO constructs, affix a new hole
-  (_, Do Nothing  r s) -> do
-    hole <- index
-    Do (Just (Hole hole)) r s <:> affixAssertions xs
+  (_, Do Nothing s) -> do
+    i <- index
+    b <- index
+    Do (Just (Hole i, HoleE b [])) s <:> affixAssertions xs
 
   -- other cases
   _                           -> x <:> affixAssertions (y:xs)
@@ -79,6 +82,7 @@ data Pred = Term    BinRel Expr Expr
           | Neg     Pred
           | Lit     Bool
           | Hole    Index
+          | Bnd     Expr          -- bound for loop. a hack.
           deriving (Show, Eq)
 
 predEq :: Pred -> Pred -> Bool
@@ -91,7 +95,12 @@ substP env (Conj p q)       = Conj (substP env p) (substP env q)
 substP env (Disj p q)       = Disj (substP env p) (substP env q)
 substP env (Neg p)          = Neg (substP env p)
 substP _   (Lit b)          = Lit b
+substP env (Bnd e)          = Bnd (substE env e)
 substP _   (Hole _)         = undefined -- do we need it?
+
+extractBnd :: Pred -> AbstractM (Pred, Expr)
+extractBnd (Conj p (Bnd e)) = return (p,e)
+extractBnd p = do {i <- index; return (p, HoleE i [])}
 
 --------------------------------------------------------------------------------
 -- | Expressions
@@ -199,9 +208,10 @@ instance FromConcrete C.Stmt Stmt where
   fromConcrete (C.Abort      _) = pure Abort
   fromConcrete (C.Assign p q _) = Assign <$> mapM fromConcrete p
                                          <*> mapM fromConcrete q
-  fromConcrete (C.Do     p q _) = Do     <$> pure Nothing
-                                         <*> fromConcrete p
-                                         <*> mapM fromConcrete q
+  -- SCM: to be fixed!
+  -- fromConcrete (C.Do     p q _) = Do     <$> pure Nothing
+  --                                        <*> fromConcrete p
+  --                                        <*> mapM fromConcrete q
   fromConcrete (C.If     p   _) = If     <$> pure Nothing
                                          <*> mapM fromConcrete p
 
