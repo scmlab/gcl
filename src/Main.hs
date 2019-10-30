@@ -3,6 +3,7 @@
 module Main where
 
 import Syntax.Parser
+import qualified Syntax.Abstract as A
 import REPL
 
 import Prelude
@@ -23,7 +24,9 @@ main = do
       let filepath = "examples/a.gcl"
       raw <- Text.readFile filepath
       case parseProgram filepath raw of
-        Right syntax -> print syntax
+        Right syntax -> case A.abstract syntax of
+          Left err -> print err
+          Right result -> print result
         Left err -> putStrLn $ errorBundlePretty err
 
 
