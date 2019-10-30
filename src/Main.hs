@@ -52,7 +52,10 @@ main = do
         Just (Load filepath) -> do
           raw <- Text.readFile filepath
           case parseProgram filepath raw of
-            Right _syntax -> send Ok
+            Right _syntax ->
+              -- let
+              -- let Program _ statements = abstract syntax
+              send $ ProofObligations []
             Left err -> do
               let pairs = map (\(p, e) -> (p, parseErrorTextPretty e)) $ collectParseErrors err
               send $ ParseError pairs

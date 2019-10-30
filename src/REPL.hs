@@ -9,6 +9,38 @@ import Data.Aeson
 import Data.Loc
 import GHC.Generics
 import System.IO
+import GCL
+
+
+recv :: FromJSON a => IO (Maybe a)
+recv = decode . BS.fromStrict <$> Strict.getLine
+
+
+send :: ToJSON a => a -> IO ()
+send payload = do
+  Strict.putStrLn $ BS.toStrict $ encode $ payload
+  hFlush stdout
+
+--------------------------------------------------------------------------------
+-- | Request
+
+data Response = ProofObligations [Obligation] | JSONError | ParseError [(Pos, String)]
+  deriving (Generic)
+
+instance ToJSON Response where
+
+--------------------------------------------------------------------------------
+-- | Response
+
+
+data Request = Load FilePath | Quit
+  deriving (Generic)
+
+instance FromJSON Request where
+instance ToJSON Request where
+
+--------------------------------------------------------------------------------
+-- | Instances of ToJSON
 
 instance ToJSON Pos where
   toJSON (Pos filepath line column offset) = object
@@ -24,24 +56,4 @@ instance ToJSON Pos where
       <>  "column"    .= column
       <>  "offset"    .= offset
 
-
-
-data Request = Load FilePath | Quit
-  deriving (Generic)
-
-instance FromJSON Request where
-instance ToJSON Request where
-
-data Response = Hi | Ok | JSONError | ParseError [(Pos, String)]
-  deriving (Generic)
-
-instance ToJSON Response where
-
-recv :: FromJSON a => IO (Maybe a)
-recv = decode . BS.fromStrict <$> Strict.getLine
-
-
-send :: ToJSON a => a -> IO ()
-send payload = do
-  Strict.putStrLn $ BS.toStrict $ encode $ payload
-  hFlush stdout
+instance ToJSON Obligation where

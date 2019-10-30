@@ -1,12 +1,15 @@
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies #-}
 
 module Syntax.Abstract where
 
 import Control.Monad.State
+import Data.Aeson
 import Data.Text (Text)
 import Data.Map (Map)
 import qualified Data.Map as Map
+import GHC.Generics
 
 -- import Debug.Trace
 
@@ -70,7 +73,7 @@ affixAssertions (x:y:xs) = case (x, y) of
 -- | Predicates
 
 data BinRel = Eq | LEq | GEq | LTh | GTh
-  deriving (Show, Eq)
+  deriving (Show, Eq, Generic)
 
 data Pred = Term    BinRel Expr Expr
           | Implies Pred Pred
@@ -79,7 +82,10 @@ data Pred = Term    BinRel Expr Expr
           | Neg     Pred
           | Lit     Bool
           | Hole    Index
-          deriving (Show, Eq)
+          deriving (Show, Eq, Generic)
+
+instance ToJSON BinRel where
+instance ToJSON Pred where
 
 predEq :: Pred -> Pred -> Bool
 predEq = (==)
@@ -98,7 +104,7 @@ substP _   (Hole _)         = undefined -- do we need it?
 
 data Lit  = Num Int
           | Bol Bool
-          deriving (Show, Eq)
+          deriving (Show, Eq, Generic)
 
 type OpName = Text
 data Expr = VarE    Var
@@ -106,7 +112,10 @@ data Expr = VarE    Var
           | LitE    Lit
           | OpE     Expr   [Expr]
           | HoleE   Index  [Subst]
-          deriving (Show, Eq)
+          deriving (Show, Eq, Generic)
+
+instance ToJSON Lit where
+instance ToJSON Expr where
 
 type Subst = Map Text Expr
 

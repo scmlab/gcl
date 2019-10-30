@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE DeriveGeneric #-}
 
 module GCL where
 
@@ -9,11 +10,12 @@ import Control.Monad.Writer hiding (guard)
 import qualified Data.Map as Map
 -- import Data.Map (Map)
 import Data.Tuple (swap)
+import GHC.Generics
 
 import Syntax.Abstract
 import Syntax.Parser
 
-data Obligation = Obligation Index Pred deriving (Show)
+data Obligation = Obligation Index Pred deriving (Show, Generic)
 
 type M = WriterT [Obligation] (State Int)
 
