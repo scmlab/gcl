@@ -76,17 +76,19 @@ assign = withLoc $ Assign <$> variableList <* symbol ":=" <*> expressionList
 
 repetition :: Parser Stmt
 repetition = withLoc $ Do <$  symbol "do"
-                          <*> some guardedCommand
+                          <*> guardedCommands
                           <*  symbol "od"
 
 selection :: Parser Stmt
 selection = withLoc $ If  <$  symbol "if"
-                          <*> some guardedCommand
+                          <*> guardedCommands
                           <*  symbol "fi"
 
+guardedCommands :: Parser [GdCmd]
+guardedCommands = sepBy1 guardedCommand (symbol "|")
+
 guardedCommand :: Parser GdCmd
-guardedCommand = withLoc $ GdCmd  <$  symbol "|"
-                                  <*> predicate
+guardedCommand = withLoc $ GdCmd  <$> predicate
                                   <*  symbol "->"
                                   <*> some statement
 

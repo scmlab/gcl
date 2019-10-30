@@ -1,4 +1,4 @@
 { ?, bnd : ? }
-do
-  | x > y -> skip
+do x > y -> skip
+ | x > y -> skip
 od
