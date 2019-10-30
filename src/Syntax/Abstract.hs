@@ -1,11 +1,14 @@
 {-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies #-}
 
 module Syntax.Abstract where
 
 import Control.Monad.State
+import Control.Monad.Except
 import Data.Text (Text)
 import Data.Map (Map)
+import Data.Loc (Loc)
 import qualified Data.Map as Map
 
 -- import Debug.Trace
@@ -142,13 +145,17 @@ type Type = Text
 --------------------------------------------------------------------------------
 -- Converting from Concrete Syntax Tree
 
-type AbstractM = State Index
+data SyntaxError = MissingAssertion Loc
+                 | MissingBound     Loc
+                 deriving (Show)
 
-abstract :: FromConcrete a b => a -> b
+type AbstractM = ExceptT SyntaxError (State Index)
+
+abstract :: FromConcrete a b => a -> Either SyntaxError b
 abstract = runAbstractM . fromConcrete
 
-runAbstractM :: AbstractM a -> a
-runAbstractM f = evalState f 0
+runAbstractM :: AbstractM a -> Either SyntaxError a
+runAbstractM f = evalState (runExceptT f) 0
 
 -- returns the current index and increment it in the state
 index :: AbstractM Index
@@ -215,9 +222,45 @@ instance FromConcrete C.Stmt Stmt where
   fromConcrete (C.If     p   _) = If     <$> pure Nothing
                                          <*> mapM fromConcrete p
 
+-- deals with missing Assertions and Bounds
+instance FromConcrete [C.Stmt] [Stmt] where
+  fromConcrete      []  = return []
+  fromConcrete (x : []) = case x of
+    C.Do _ p loc -> throwError $ MissingAssertion loc
+    _            -> (:) <$> fromConcrete x <*> pure []
+  fromConcrete (x:y:xs) = affixAssertions (x:y:xs)
+
+    where
+      affixAssertions :: [C.Stmt] -> AbstractM [Stmt]
+      affixAssertions = undefined
+
+      -- affixAssertions      []  = return []
+      -- affixAssertions (  x:[]) = return [x]
+      -- affixAssertions (x:y:xs) = case (x, y) of
+      --   -- affixing assertions
+      --   (Assert p, Do Nothing s) -> do
+      --        pb <- extractBnd p
+      --        Do (Just pb) s <:> affixAssertions xs
+      --   (Assert p, If Nothing r) -> If (Just p) r   <:> affixAssertions xs
+      --
+      --   -- no need of affixing assertions
+      --   (Assert _, Do (Just _) _) -> x <:> y <:> affixAssertions xs
+      --   (Assert _, If (Just _) _  ) -> x <:> y <:> affixAssertions xs
+      --
+      --   (_, C.Do _ s) -> throwError $ MissingAssertion
+      --   do
+      --     i <- index
+      --     b <- index
+      --     Do (Just (Hole i, HoleE b [])) s <:> affixAssertions xs
+      --
+      --   -- other cases
+      --   _                           -> (:) <$> fromConcrete x <*> affixAssertions (y:xs)
+
+
+
 instance FromConcrete C.GdCmd GdCmd where
   fromConcrete (C.GdCmd p q _) = GdCmd  <$> fromConcrete p
-                                        <*> (mapM fromConcrete q >>= affixAssertions)
+                                        <*> fromConcrete q
 
 instance FromConcrete C.Declaration Declaration where
   fromConcrete (C.ConstDecl p q _) = ConstDecl  <$> mapM fromConcrete p
@@ -227,7 +270,7 @@ instance FromConcrete C.Declaration Declaration where
 
 instance FromConcrete C.Program Program where
   fromConcrete (C.Program p q _) = Program  <$> mapM fromConcrete p
-                                            <*> (mapM fromConcrete q >>= affixAssertions)
+                                            <*> fromConcrete q
                                              -- (seqAll <$> mapM fromConcrete q)
 -- seqAll :: [Stmt] -> Stmt
 -- seqAll [] = Skip
