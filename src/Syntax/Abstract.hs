@@ -22,8 +22,10 @@ import qualified Syntax.Concrete as C
 
 type Index = Int
 
-data Program = Program [Declaration] [Stmt]
-  deriving (Show)
+data Program = Program
+                [Declaration]           -- declarations
+                (Maybe ([Stmt], Pred))  -- statements + postcondition
+              deriving (Show)
 
 data Declaration
   = ConstDecl [Const] Type
@@ -264,10 +266,10 @@ instance FromConcrete C.Program Program where
                                             <*> (fromConcrete q >>= checkStatements)
     where
       -- check if the postcondition of the whole program is missing
-      checkStatements :: [Stmt] -> AbstractM [Stmt]
-      checkStatements [] = return []
+      checkStatements :: [Stmt] -> AbstractM (Maybe ([Stmt], Pred))
+      checkStatements [] = return Nothing
       checkStatements xs = case last xs of
-        Assert _ -> return xs
+        Assert p -> return (Just (init xs, p))
         _        -> throwError MissingPostcondition
 
 

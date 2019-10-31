@@ -97,50 +97,6 @@ precond (Spec pre _) _ = return pre
 
 precondGuard :: Pred -> GdCmd -> M Pred
 precondGuard post (GdCmd guard body) = Implies guard <$> precondStmts body post
---
--- --
---
---  -- splitting the `first` statement and the rest, if any.
---
--- leading :: Stmt -> (Stmt, Maybe Stmt)
--- leading (Seq s1 s2) =
---     (e, maybe (Just s2) (\s -> Just (Seq s s2)) s1')
---   where (e, s1') = leading s1
--- leading stmt = (stmt, Nothing)
---
---  -- affixing assertions to DO or IF constructs.
---
--- affixAsrt :: Stmt -> M Stmt
--- affixAsrt stmt
---     | Nothing <- tl    = return hd
---     | Just stmt' <- tl = affixAux (hd, stmt')
---   where (hd, tl) = leading stmt
---
--- affixGC :: GdCmd -> M GdCmd
--- affixGC (GdCmd g stmt) = GdCmd g <$> affixAsrt stmt
---
--- affixAux :: (Stmt, Stmt) -> M Stmt
--- affixAux (s, Seq s1 s2) = do
---   s1' <- affixAux (s, s1)
---   affixAux (s1', s2)
---
--- -- Assert ; Do
--- affixAux (s `Seq` Assert inv,  Do Nothing bnd body) = do
---   body' <- mapM affixGC body
---   return (s `Seq` Do (Just inv) bnd body')
---
--- affixAux (s, Do Nothing bnd body) = do
---   i <- get
---   put (succ i)
---   body' <- mapM affixGC body
---   return (s `Seq` Do (Just (Hole i)) bnd body')
--- affixAux (s `Seq` Assert pre, If Nothing branches) = do
---   branches' <- mapM affixGC branches
---   return (s `Seq` If (Just pre) branches')
--- affixAux (s, If Nothing branches) = do
---   branches' <- mapM affixGC branches
---   return (s `Seq` If Nothing branches')
--- affixAux (s, e) = return (s `Seq` e)
 
 gcdExample :: Program
 gcdExample = let Right result = abstract $ fromRight $ parseProgram "<test>" "\
@@ -154,14 +110,12 @@ gcdExample = let Right result = abstract $ fromRight $ parseProgram "<test>" "\
   \"
   in result
 
-postCond :: Pred
-postCond = let Right result =  abstract $ fromRight $ parsePred "gcd X Y = x"
-  in result
-
 test :: ([Obligation], Pred)
-test = runM $ do
-  let Program _ statements = gcdExample
-  precondStmts statements postCond
+test = runM $ case gcdExample of
+  Program _ Nothing -> undefined
+  Program _ (Just (statements, postcondition))
+    -> precondStmts statements postcondition
+
 
 
 -- gcdExample2 :: Stmt

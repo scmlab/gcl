@@ -3,8 +3,9 @@
 module Main where
 
 import Syntax.Parser
-import qualified Syntax.Abstract as A
+import Syntax.Abstract
 import REPL
+import GCL
 
 import Prelude
 import qualified Data.Text.IO as Text
@@ -42,7 +43,7 @@ main = do
       raw <- Text.readFile filepath
       case parseProgram filepath raw of
         -- Right syntax -> print syntax
-        Right syntax -> case A.abstract syntax of
+        Right syntax -> case abstract syntax of
           Left err -> print err
           Right result -> print result
         Left err -> print (collectParseErrors err)
@@ -55,9 +56,12 @@ main = do
         Just (Load filepath) -> do
           raw <- Text.readFile filepath
           case parseProgram filepath raw of
-            Right syntax -> case A.abstract syntax of
+            Right syntax -> case abstract syntax of
               Left err -> send $ SyntaxError err
-              Right obligations -> send $ ProofObligations []
+              Right (Program _ Nothing) -> send $ ProofObligations []
+              Right (Program _ (Just (statements, postcondition))) -> do
+                let (obligations, _) = runM $ precondStmts statements postcondition
+                send $ ProofObligations obligations
             Left err -> do
               let pairs = map (\(p, e) -> (p, parseErrorTextPretty e)) $ collectParseErrors err
               send $ ParseError pairs
