@@ -57,7 +57,7 @@ main = do
           case parseProgram filepath raw of
             Right syntax -> case A.abstract syntax of
               Left err -> send $ SyntaxError err
-              Right _result -> send $ ProofObligations []
+              Right obligations -> send $ ProofObligations []
             Left err -> do
               let pairs = map (\(p, e) -> (p, parseErrorTextPretty e)) $ collectParseErrors err
               send $ ParseError pairs

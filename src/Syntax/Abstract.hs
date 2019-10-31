@@ -160,6 +160,7 @@ type Type = Text
 data SyntaxError = MissingAssertion Loc
                  | MissingBound     Loc
                  | ExcessBound      Loc
+                 | MissingPostcondition
                  | Panic
                  deriving (Show, Generic)
 
@@ -260,7 +261,14 @@ instance FromConcrete C.Declaration Declaration where
 
 instance FromConcrete C.Program Program where
   fromConcrete (C.Program p q _) = Program  <$> mapM fromConcrete p
-                                            <*> fromConcrete q
+                                            <*> (fromConcrete q >>= checkStatements)
+    where
+      -- check if the postcondition of the whole program is missing
+      checkStatements :: [Stmt] -> AbstractM [Stmt]
+      checkStatements [] = return []
+      checkStatements xs = case last xs of
+        Assert _ -> return xs
+        _        -> throwError MissingPostcondition
 
 
 --------------------------------------------------------------------------------
