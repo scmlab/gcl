@@ -6,8 +6,8 @@ var x, y : Int
 x := X
 y := Y
 
-{ gcd x y = gcd X Y && x > 0 && y > 0 }
-do
-   x > y -> x := minus x y
-  | x < y -> y := minus y x
+{ gcd x y = gcd X Y && x > 0 && y > 0, bnd : plus x y }
+do x > y -> x := minus x y
+ | x < y -> y := minus y x
 od
+{ x = gcd X Y }
