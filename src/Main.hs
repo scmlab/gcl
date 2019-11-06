@@ -5,7 +5,7 @@ module Main where
 import Syntax.Parser
 import Syntax.Abstract
 import REPL
-import GCL
+import GCL.PreCond
 
 import Prelude
 import qualified Data.Text.IO as Text
