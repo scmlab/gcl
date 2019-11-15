@@ -11,7 +11,7 @@ import Data.Aeson
 import Data.Loc
 import GHC.Generics
 import System.IO
-import GCL
+import GCL.PreCond
 
 
 recv :: FromJSON a => IO (Maybe a)

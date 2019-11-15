@@ -46,7 +46,7 @@ main = do
           Left err -> send $ SyntaxError err
           Right (Program _ Nothing) -> send $ ProofObligations []
           Right (Program _ (Just (statements, postcondition))) -> do
-            let (obligations, _) = runM $ precondStmts statements postcondition
+            let (_, obligations) = runM $ precondStmts statements postcondition
             send $ ProofObligations obligations
         Left err -> do
           let pairs = map (\(p, e) -> (p, parseErrorTextPretty e)) $ collectParseErrors err
@@ -64,7 +64,7 @@ main = do
               Left err -> send $ SyntaxError err
               Right (Program _ Nothing) -> send $ ProofObligations []
               Right (Program _ (Just (statements, postcondition))) -> do
-                let (obligations, _) = runM $ precondStmts statements postcondition
+                let (_, obligations) = runM $ precondStmts statements postcondition
                 send $ ProofObligations obligations
             Left err -> do
               let pairs = map (\(p, e) -> (p, parseErrorTextPretty e)) $ collectParseErrors err
