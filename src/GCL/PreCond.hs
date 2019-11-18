@@ -194,11 +194,11 @@ gcdExample :: Program
 gcdExample = let Right result = abstract $ fromRight $ parseProgram "<test>" "\
   \x := X\n\
   \y := Y\n\
-  \{ gcd x y = gcd X Y, bnd: ? }\n\
-  \do x > y -> x := minus x y  \n\
-  \ | x < y -> y := minus y x  \n\
+  \{ gcd(x, y) = gcd(X, Y), bnd: ? }\n\
+  \do x > y -> x := minus(x, y)  \n\
+  \ | x < y -> y := minus(y, x)  \n\
   \od\n\
-  \{ gcd X Y = x }\n\
+  \{ gcd(X, Y) = x }\n\
   \"
   in result
 

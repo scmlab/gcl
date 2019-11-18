@@ -111,7 +111,7 @@ predicate = makeExprParser predTerm table <?> "predicate"
 negation :: Parser (Pred -> Pred)
 negation = do
   start <- getPos
-  symbol "not"
+  symbol "^"
   return $ \result -> Neg result (start <--> result)
 
 conjunction :: Parser (Pred -> Pred -> Pred)
@@ -154,14 +154,14 @@ binaryRelation = withLoc $ choice
 expressionList :: Parser [Expr]
 expressionList = sepBy1 expression (symbol ",")
 
-
 expression :: Parser Expr
 expression = parens expression
     <|> term
 
 term :: Parser Expr
 term = withLoc $ choice
-  [ try (OpE <$> op <*> many expression)
+  [ try (OpE <$> op <*> parens expressionList)
+  , VarE    <$> variable
   , ConstE  <$> constant
   , LitE    <$> literal
   , HoleE   <$  symbol "?"

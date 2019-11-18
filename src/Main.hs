@@ -49,6 +49,7 @@ main = do
             let (_, obligations) = runM $ precondStmts statements postcondition
             send $ ProofObligations obligations
         Left err -> do
+          putStrLn $ errorBundlePretty err
           let pairs = map (\(p, e) -> (p, parseErrorTextPretty e)) $ collectParseErrors err
           send $ ParseError pairs
 
