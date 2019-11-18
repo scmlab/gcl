@@ -19,6 +19,8 @@ data Stmt
   | AssertWithBnd  Pred Expr  Loc
   | Do            [GdCmd]     Loc
   | If            [GdCmd]     Loc
+  | Hole                      Loc -- ?      to be rewritten as {!!} by the frontend
+  | Spec                      Loc -- {!  !} expanded hole
   deriving (Show)
 
 data GdCmd = GdCmd Pred [Stmt] Loc deriving (Show)
@@ -35,7 +37,7 @@ data Pred = Term    Expr BinRel Expr  Loc
           | Disj    Pred Pred         Loc
           | Neg     Pred              Loc
           | Lit     Bool              Loc
-          | Hole                      Loc
+          | HoleP                     Loc
           deriving (Show)
 
 instance Located Pred where
@@ -45,7 +47,7 @@ instance Located Pred where
   locOf (Disj _ _ l)    = l
   locOf (Neg _ l)       = l
   locOf (Lit _ l)       = l
-  locOf (Hole l)        = l
+  locOf (HoleP l)       = l
 
 --------------------------------------------------------------------------------
 -- | Expressions

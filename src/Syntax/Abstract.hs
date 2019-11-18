@@ -163,7 +163,7 @@ data SyntaxError = MissingAssertion Loc
                  | MissingBound     Loc
                  | ExcessBound      Loc
                  | MissingPostcondition
-                 | Panic
+                 | Panic String
                  deriving (Show, Generic)
 
 
@@ -227,7 +227,7 @@ instance FromConcrete C.Pred Pred where
                                             <*> fromConcrete q
   fromConcrete (C.Neg p       _) = Neg      <$> fromConcrete p
   fromConcrete (C.Lit p       _) = Lit      <$> pure p
-  fromConcrete (C.Hole        _) = Hole     <$> index
+  fromConcrete (C.HoleP       _) = Hole     <$> index
 
 instance FromConcrete C.Stmt Stmt where
   fromConcrete (C.Assert p   _) = Assert <$> fromConcrete p
@@ -239,9 +239,12 @@ instance FromConcrete C.Stmt Stmt where
 
   fromConcrete (C.If     p   _) = If     <$> pure Nothing
                                          <*> mapM fromConcrete p
-  -- Panic because these cases should've been handled `affixAssertions`
-  fromConcrete (C.AssertWithBnd _ _ _) = throwError $ Panic
-  fromConcrete (C.Do     _ _) = throwError $ Panic
+  -- Panic because these cases should've been handled by `affixAssertions`
+  fromConcrete (C.AssertWithBnd _ _ _) = throwError $ Panic "AssertWithBnd"
+  fromConcrete (C.Do     _ _) = throwError $ Panic "Do"
+  -- Dig hole
+  fromConcrete (C.Hole loc) = throwError $ Panic "Hole"
+  fromConcrete (C.Spec _) = throwError $ Panic "Spec"
 
 -- deals with missing Assertions and Bounds
 instance FromConcrete [C.Stmt] [Stmt] where

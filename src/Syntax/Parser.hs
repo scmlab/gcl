@@ -52,6 +52,8 @@ statement = choice
   , skip
   , repetition
   , selection
+  , hole
+  , spec
   ]
 
 skip :: Parser Stmt
@@ -94,6 +96,12 @@ guardedCommand = withLoc $ GdCmd  <$> predicate
                                   <*  symbol "->"
                                   <*> some statement
 
+hole :: Parser Stmt
+hole = withLoc $ Hole <$ symbol "?"
+
+spec :: Parser Stmt
+spec = withLoc $ Spec <$ symbol "{!" <* "!}"
+
 --------------------------------------------------------------------------------
 -- | Predicates
 
@@ -133,7 +141,7 @@ implication = do
 predTerm :: Parser Pred
 predTerm =  parens predicate
         <|> (withLoc $ choice
-              [ Hole <$  symbol "?"
+              [ HoleP <$  symbol "?"
               , Lit True <$ symbol "true"
               , Lit False <$ symbol "false"
               , Term <$> expression <*> binaryRelation <*> expression
