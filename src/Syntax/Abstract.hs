@@ -163,6 +163,7 @@ data SyntaxError = MissingAssertion Loc
                  | MissingBound     Loc
                  | ExcessBound      Loc
                  | MissingPostcondition
+                 | DigHole Loc
                  | Panic String
                  deriving (Show, Generic)
 
@@ -243,7 +244,7 @@ instance FromConcrete C.Stmt Stmt where
   fromConcrete (C.AssertWithBnd _ _ _) = throwError $ Panic "AssertWithBnd"
   fromConcrete (C.Do     _ _) = throwError $ Panic "Do"
   -- Dig hole
-  fromConcrete (C.Hole loc) = throwError $ Panic "Hole"
+  fromConcrete (C.Hole loc) = throwError $ DigHole loc
   fromConcrete (C.Spec _) = throwError $ Panic "Spec"
 
 -- deals with missing Assertions and Bounds

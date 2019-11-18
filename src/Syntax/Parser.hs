@@ -48,12 +48,12 @@ statement = choice
   [ try assign
   , abort
   , try assertWithBnd
+  , spec
   , assert
   , skip
   , repetition
   , selection
   , hole
-  , spec
   ]
 
 skip :: Parser Stmt
@@ -100,7 +100,7 @@ hole :: Parser Stmt
 hole = withLoc $ Hole <$ symbol "?"
 
 spec :: Parser Stmt
-spec = withLoc $ Spec <$ symbol "{!" <* "!}"
+spec = withLoc $ Spec <$ symbol "{!" <* symbol "!}"
 
 --------------------------------------------------------------------------------
 -- | Predicates
