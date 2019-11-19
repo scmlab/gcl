@@ -110,7 +110,7 @@ substP env (Conj p q)       = Conj (substP env p) (substP env q)
 substP env (Disj p q)       = Disj (substP env p) (substP env q)
 substP env (Neg p)          = Neg (substP env p)
 substP _   (Lit b)          = Lit b
-substP _   (Hole _)         = undefined -- do we need it?
+substP _   (Hole i)         = Hole i -- undefined -- do we need it?
 
 -- extractBnd :: Pred -> AbstractM (Pred, Expr)
 -- extractBnd (Conj p (Bnd e)) = return (p,e)

@@ -27,7 +27,7 @@ send payload = do
 -- | Request
 
 data Response
-  = Ok [Obligation] [Specification]
+  = OK [Obligation] [Specification]
   | JSONError
   | SyntaxError A.SyntaxError
   | ParseError [(Pos, String)]

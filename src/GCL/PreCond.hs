@@ -16,7 +16,7 @@ import Syntax.Abstract
 import Syntax.Parser
 
 data Obligation = Obligation Index Pred deriving (Show, Generic)
-data Specification = Specification Pred Pred Loc deriving (Show, Generic)
+data Specification = Specification (Maybe Pred) Pred Loc deriving (Show, Generic)
 
 type M = WriterT [Obligation] (WriterT [Specification] (State Int))
 
@@ -29,6 +29,10 @@ obligate p = do
   i <- get
   put (succ i)
   tell [Obligation i p]
+
+tellSpec :: Maybe Pred -> Pred -> Loc -> M ()
+tellSpec p q loc = do
+  lift $ tell [Specification p q loc]
 
 conjunct :: [Pred] -> Pred
 conjunct = foldr Conj (Lit False)
@@ -159,9 +163,11 @@ sweepStmts [] post = return ([],post)
 
 sweepStmts (Spec p (Hole _) loc : xs) post = do
   (xs', post') <- sweepStmts xs post
+  tellSpec (Just p) post' loc
   return (Spec p post' loc : xs', p)
 sweepStmts (Spec p q loc : xs) post = do
   (xs', post') <- sweepStmts xs post
+  tellSpec Nothing post' loc
   obligate (q `Implies` post')
   return (Spec p q loc : xs', p)
 
@@ -169,7 +175,8 @@ sweepStmts (Assert p : xs@(_:_)) post = do
   (xs', post') <- sweepStmts xs post
   case xs' of
      [] -> error "shouldn't happen"
-     Spec (Hole _) q loc : xs'' ->
+     Spec (Hole _) q loc : xs'' -> do
+       tellSpec (Just p) q loc
        return (Assert p : Spec p q loc : xs'', p)
      x : xs'' -> do
        unless (predEq p post') (obligate $ p `Implies` post')
