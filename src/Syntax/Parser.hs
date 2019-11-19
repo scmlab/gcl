@@ -48,7 +48,8 @@ statement = choice
   [ try assign
   , abort
   , try assertWithBnd
-  , spec
+  , specStart
+  , specEnd
   , assert
   , skip
   , repetition
@@ -99,8 +100,11 @@ guardedCommand = withLoc $ GdCmd  <$> predicate
 hole :: Parser Stmt
 hole = withLoc $ Hole <$ symbol "?"
 
-spec :: Parser Stmt
-spec = withLoc $ Spec <$ symbol "{!" <* symbol "!}"
+specStart :: Parser Stmt
+specStart = withLoc $ SpecStart <$ symbol "{!"
+
+specEnd :: Parser Stmt
+specEnd = withLoc $ SpecEnd <$ symbol "!}"
 
 --------------------------------------------------------------------------------
 -- | Predicates

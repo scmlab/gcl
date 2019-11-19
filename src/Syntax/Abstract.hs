@@ -161,6 +161,8 @@ type Type = Text
 
 data SyntaxError = MissingAssertion Loc
                  | MissingBound     Loc
+                 | MissingSpecStart Loc
+                 | MissingSpecEnd   Loc
                  | ExcessBound      Loc
                  | MissingPostcondition
                  | DigHole Loc
@@ -245,7 +247,7 @@ instance FromConcrete C.Stmt Stmt where
   fromConcrete (C.Do     _ _) = throwError $ Panic "Do"
   -- Holes and specs
   fromConcrete (C.Hole loc) = throwError $ DigHole loc
-  fromConcrete (C.Spec loc) = Spec <$> pure (Hole 0)
+  fromConcrete (C.SpecStart loc) = Spec <$> pure (Hole 0)
                                  <*> pure (Hole 0)
                                  <*> pure loc
 
@@ -254,6 +256,8 @@ instance FromConcrete [C.Stmt] [Stmt] where
   fromConcrete      []  = return []
   fromConcrete (x : []) = case x of
     C.Do _ loc -> throwError $ MissingAssertion loc
+    C.SpecStart loc -> throwError $ MissingSpecEnd loc
+    C.SpecEnd loc -> throwError $ MissingSpecStart loc
     _          -> fromConcrete x <:> pure []
   fromConcrete (x:y:xs) = affixAssertions (x:y:xs)
 
