@@ -29,7 +29,7 @@ collectParseErrors (ParseErrorBundle errors posState)
       -> (PosState s, [(Pos, ParseError s e)])
       -> (PosState s, [(Pos, ParseError s e)])
     f err (initial, accum) =
-        let (_, _, next) = reachOffset (errorOffset err) initial
+        let (_, next) = reachOffset (errorOffset err) initial
         in (next, (toPos next, err):accum)
 
 main :: IO ()

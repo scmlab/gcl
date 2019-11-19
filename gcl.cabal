@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: f9d78de68f5349e89bf7fdf1950b802f204bc4fe419a18ed28463b79416abb9d
+-- hash: 27c3bc73277893e5e019aca5061dfc2ad3a159b215d745a733ef075ea03b970d
 
 name:           gcl
 version:        0.1.0.0
@@ -40,7 +40,7 @@ executable gcl
     , base >=4.7 && <5
     , bytestring
     , containers
-    , megaparsec
+    , megaparsec >=8.0
     , mtl
     , parser-combinators
     , srcloc

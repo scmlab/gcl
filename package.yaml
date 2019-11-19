@@ -16,7 +16,7 @@ dependencies:
   - aeson
   - bytestring
   - containers
-  - megaparsec
+  - megaparsec >= 8.0
   - parser-combinators
   - mtl
   - srcloc
