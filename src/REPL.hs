@@ -27,7 +27,7 @@ send payload = do
 -- | Request
 
 data Response
-  = ProofObligations [Obligation]
+  = Ok [Obligation] [Specification]
   | JSONError
   | SyntaxError A.SyntaxError
   | ParseError [(Pos, String)]
@@ -49,3 +49,4 @@ instance ToJSON Request where
 -- | Instances of ToJSON
 
 instance ToJSON Obligation where
+instance ToJSON Specification where

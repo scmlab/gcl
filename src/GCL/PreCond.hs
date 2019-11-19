@@ -9,18 +9,19 @@ import Control.Monad.Writer hiding (guard)
 
 import qualified Data.Map as Map
 -- import Data.Map (Map)
-import Data.Tuple (swap)
+import Data.Loc (Loc)
 import GHC.Generics
 
 import Syntax.Abstract
 import Syntax.Parser
 
 data Obligation = Obligation Index Pred deriving (Show, Generic)
+data Specification = Specification Pred Pred Loc deriving (Show, Generic)
 
-type M = WriterT [Obligation] (State Int)
+type M = WriterT [Obligation] (WriterT [Specification] (State Int))
 
-runM :: M a -> (a, [Obligation])
-runM p = evalState (runWriterT p) 0
+runM :: M a -> ((a, [Obligation]), [Specification])
+runM p = evalState (runWriterT (runWriterT p)) 0
 
 -- creates a proof obligation
 obligate :: Pred -> M ()
@@ -202,8 +203,8 @@ gcdExample = let Right result = abstract $ fromRight $ parseProgram "<test>" "\
   \"
   in result
 
-test :: ([Obligation], Pred)
-test = swap . runM $ case gcdExample of
+test :: ((Pred, [Obligation]), [Specification])
+test = runM $ case gcdExample of
   Program _ Nothing -> undefined
   Program _ (Just (statements, postcondition))
     -> precondStmts statements postcondition
