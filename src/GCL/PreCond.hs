@@ -16,7 +16,8 @@ import Syntax.Abstract
 import Syntax.Parser
 
 data Obligation = Obligation Index Pred deriving (Show, Generic)
-data Specification = Specification (Maybe Pred) Pred Loc deriving (Show, Generic)
+data Hardness = Hard | Soft deriving (Show, Generic)
+data Specification = Specification Hardness Pred Pred Loc deriving (Show, Generic)
 
 type M = WriterT [Obligation] (WriterT [Specification] (State Int))
 
@@ -30,9 +31,9 @@ obligate p = do
   put (succ i)
   tell [Obligation i p]
 
-tellSpec :: Maybe Pred -> Pred -> Loc -> M ()
-tellSpec p q loc = do
-  lift $ tell [Specification p q loc]
+tellSpec :: Hardness -> Pred -> Pred -> Loc -> M ()
+tellSpec harsness p q loc = do
+  lift $ tell [Specification harsness p q loc]
 
 conjunct :: [Pred] -> Pred
 conjunct = foldr Conj (Lit False)
@@ -42,8 +43,35 @@ disjunct = foldr Disj (Lit True)
 
 precondStmts :: [Stmt] -> Pred -> M Pred
 precondStmts [] post = return post
-precondStmts (x:xs) post =
-  precondStmts xs post >>= precond x
+precondStmts (x:[]) post = case x of
+  -- SOFT
+  Spec stmts _ _ loc -> do
+    pre <- precondStmts stmts post
+    tellSpec Soft pre post loc
+    return pre
+  _ -> do
+    precond x post
+
+precondStmts (x:(y:xs)) post = case (x, y) of
+  -- HARD
+  (Assert asserted, Spec stmts _ _ loc) -> do
+    -- calculate the precondition of xs
+    post' <- precondStmts xs post
+
+    tellSpec Hard asserted post' loc
+
+    post'' <- precondStmts stmts post'
+    obligate (asserted `Implies` post'')
+
+    return asserted
+  -- SOFT
+  (Spec stmts _ _ loc, _) -> do
+    pre <- precondStmts (y:xs) post >>= precondStmts stmts
+    tellSpec Soft pre post loc
+    return pre
+  _ -> do
+    precondStmts (y:xs) post >>= precond x
+
 
 -- calculating the weakest precondition
 precond :: Stmt -> Pred -> M Pred
@@ -163,11 +191,11 @@ sweepStmts [] post = return ([],post)
 
 sweepStmts (Spec stmts p (Hole _) loc : xs) post = do
   (xs', post') <- sweepStmts xs post
-  tellSpec (Just p) post' loc
+  -- tellSpec (Just p) post' loc
   return (Spec stmts p post' loc : xs', p)
 sweepStmts (Spec stmts p q loc : xs) post = do
   (xs', post') <- sweepStmts xs post
-  tellSpec Nothing post' loc
+  -- tellSpec Nothing post' loc
   obligate (q `Implies` post')
   return (Spec stmts p q loc : xs', p)
 
@@ -176,7 +204,7 @@ sweepStmts (Assert p : xs@(_:_)) post = do
   case xs' of
      [] -> error "shouldn't happen"
      Spec stmts (Hole _) q loc : xs'' -> do
-       tellSpec (Just p) q loc
+       -- tellSpec (Just p) q loc
        return (Assert p : Spec stmts p q loc : xs'', p)
      x : xs'' -> do
        unless (predEq p post') (obligate $ p `Implies` post')

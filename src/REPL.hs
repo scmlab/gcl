@@ -49,4 +49,5 @@ instance ToJSON Request where
 -- | Instances of ToJSON
 
 instance ToJSON Obligation where
+instance ToJSON Hardness where
 instance ToJSON Specification where

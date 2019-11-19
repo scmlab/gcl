@@ -39,14 +39,14 @@ main = do
     ModeHelp -> putStrLn $ usageInfo usage options
     ModeREPL -> loop
     ModeDev -> do
-      let filepath = "examples/a.gcl"
+      let filepath = "examples/b.gcl"
       raw <- Text.readFile filepath
       case parseProgram filepath raw of
         Right syntax -> case abstract syntax of
           Left err -> send $ SyntaxError err
           Right (Program _ Nothing) -> send $ OK [] []
           Right (Program _ (Just (statements, postcondition))) -> do
-            let ((_, obligations), specifications) = runM $ sweepStmts statements postcondition
+            let ((_, _obligations), specifications) = runM $ precondStmts statements postcondition
             print $ specifications
             -- send $ OK obligations specifications
         Left err -> do
@@ -66,7 +66,7 @@ main = do
               Left err -> send $ SyntaxError err
               Right (Program _ Nothing) -> send $ OK [] []
               Right (Program _ (Just (statements, postcondition))) -> do
-                let ((_, obligations), specifications) = runM $ sweepStmts statements postcondition
+                let ((_, obligations), specifications) = runM $ precondStmts statements postcondition
                 send $ OK obligations specifications
             Left err -> do
               let pairs = map (\(p, e) -> (p, parseErrorTextPretty e)) $ collectParseErrors err
