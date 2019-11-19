@@ -39,7 +39,7 @@ data Stmt
   | Assert  Pred
   | Do      Pred Expr [GdCmd]
   | If      (Maybe Pred) [GdCmd]
-  | Spec    Pred Pred
+  | Spec    Pred Pred Loc
   deriving (Show)
 
 data GdCmd = GdCmd Pred [Stmt] deriving (Show)
@@ -243,9 +243,11 @@ instance FromConcrete C.Stmt Stmt where
   -- Panic because these cases should've been handled by `affixAssertions`
   fromConcrete (C.AssertWithBnd _ _ _) = throwError $ Panic "AssertWithBnd"
   fromConcrete (C.Do     _ _) = throwError $ Panic "Do"
-  -- Dig hole
+  -- Holes and specs
   fromConcrete (C.Hole loc) = throwError $ DigHole loc
-  fromConcrete (C.Spec _) = throwError $ Panic "Spec"
+  fromConcrete (C.Spec loc) = Spec <$> pure (Hole 0)
+                                 <*> pure (Hole 0)
+                                 <*> pure loc
 
 -- deals with missing Assertions and Bounds
 instance FromConcrete [C.Stmt] [Stmt] where

@@ -93,7 +93,7 @@ precond (Do inv bnd branches) post = do
       pre <- precondStmts body (Term LTh bnd (LitE (Num 100)))
       return $ inv `Conj` guard `Conj` (Term Eq bnd (LitE (Num 100))) `Implies` pre
 
-precond (Spec pre _) _ = return pre
+precond (Spec pre _ _) _ = return pre
 
 precondGuard :: Pred -> GdCmd -> M Pred
 precondGuard post (GdCmd guard body) = Implies guard <$> precondStmts body post
@@ -145,31 +145,31 @@ sweep (Do inv bnd branches) post = do
       pre <- precondStmts body (Term LTh bnd (LitE (Num 100)))
       return $ inv `Conj` guard `Conj` (Term Eq bnd (LitE (Num 100))) `Implies` pre
 
-sweep (Spec p (Hole _)) post = return (Spec p post, p)
-sweep (Spec p q) post = do
+sweep (Spec p (Hole _) loc) post = return (Spec p post loc, p)
+sweep (Spec p q loc) post = do
   unless (predEq q post) $ do
     obligate $ q `Implies` post
-  return (Spec p q, p)
+  return (Spec p q loc, p)
 
 
 sweepStmts :: [Stmt] -> Pred -> M ([Stmt], Pred)
 
 sweepStmts [] post = return ([],post)
 
-sweepStmts (Spec p (Hole _) : xs) post = do
+sweepStmts (Spec p (Hole _) loc : xs) post = do
   (xs', post') <- sweepStmts xs post
-  return (Spec p post' : xs', p)
-sweepStmts (Spec p q : xs) post = do
+  return (Spec p post' loc : xs', p)
+sweepStmts (Spec p q loc : xs) post = do
   (xs', post') <- sweepStmts xs post
   obligate (q `Implies` post')
-  return (Spec p q : xs', p)
+  return (Spec p q loc : xs', p)
 
 sweepStmts (Assert p : xs@(_:_)) post = do
   (xs', post') <- sweepStmts xs post
   case xs' of
      [] -> error "shouldn't happen"
-     Spec (Hole _) q : xs'' ->
-       return (Assert p : Spec p q : xs'', p)
+     Spec (Hole _) q loc : xs'' ->
+       return (Assert p : Spec p q loc : xs'', p)
      x : xs'' -> do
        unless (predEq p post') (obligate $ p `Implies` post')
        return (Assert p : x : xs'', p)
