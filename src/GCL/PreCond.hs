@@ -98,7 +98,7 @@ precond (Do inv bnd branches) post = do
       pre <- precondStmts body (Term LTh bnd (LitE (Num 100)))
       return $ inv `Conj` guard `Conj` (Term Eq bnd (LitE (Num 100))) `Implies` pre
 
-precond (Spec pre _ _) _ = return pre
+precond (Spec stmts pre _ _) _ = precondStmts stmts pre
 
 precondGuard :: Pred -> GdCmd -> M Pred
 precondGuard post (GdCmd guard body) = Implies guard <$> precondStmts body post
@@ -150,34 +150,34 @@ sweep (Do inv bnd branches) post = do
       pre <- precondStmts body (Term LTh bnd (LitE (Num 100)))
       return $ inv `Conj` guard `Conj` (Term Eq bnd (LitE (Num 100))) `Implies` pre
 
-sweep (Spec p (Hole _) loc) post = return (Spec p post loc, p)
-sweep (Spec p q loc) post = do
+sweep (Spec stmts p (Hole _) loc) post = return (Spec stmts p post loc, p)
+sweep (Spec stmts p q loc) post = do
   unless (predEq q post) $ do
     obligate $ q `Implies` post
-  return (Spec p q loc, p)
+  return (Spec stmts p q loc, p)
 
 
 sweepStmts :: [Stmt] -> Pred -> M ([Stmt], Pred)
 
 sweepStmts [] post = return ([],post)
 
-sweepStmts (Spec p (Hole _) loc : xs) post = do
+sweepStmts (Spec stmts p (Hole _) loc : xs) post = do
   (xs', post') <- sweepStmts xs post
   tellSpec (Just p) post' loc
-  return (Spec p post' loc : xs', p)
-sweepStmts (Spec p q loc : xs) post = do
+  return (Spec stmts p post' loc : xs', p)
+sweepStmts (Spec stmts p q loc : xs) post = do
   (xs', post') <- sweepStmts xs post
   tellSpec Nothing post' loc
   obligate (q `Implies` post')
-  return (Spec p q loc : xs', p)
+  return (Spec stmts p q loc : xs', p)
 
 sweepStmts (Assert p : xs@(_:_)) post = do
   (xs', post') <- sweepStmts xs post
   case xs' of
      [] -> error "shouldn't happen"
-     Spec (Hole _) q loc : xs'' -> do
+     Spec stmts (Hole _) q loc : xs'' -> do
        tellSpec (Just p) q loc
-       return (Assert p : Spec p q loc : xs'', p)
+       return (Assert p : Spec stmts p q loc : xs'', p)
      x : xs'' -> do
        unless (predEq p post') (obligate $ p `Implies` post')
        return (Assert p : x : xs'', p)

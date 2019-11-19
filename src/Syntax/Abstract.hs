@@ -39,7 +39,7 @@ data Stmt
   | Assert  Pred
   | Do      Pred Expr [GdCmd]
   | If      (Maybe Pred) [GdCmd]
-  | Spec    Pred Pred Loc
+  | Spec   [Stmt] Pred Pred Loc
   deriving (Show)
 
 data GdCmd = GdCmd Pred [Stmt] deriving (Show)
@@ -112,10 +112,6 @@ substP env (Neg p)          = Neg (substP env p)
 substP _   (Lit b)          = Lit b
 substP _   (Hole i)         = Hole i -- undefined -- do we need it?
 
--- extractBnd :: Pred -> AbstractM (Pred, Expr)
--- extractBnd (Conj p (Bnd e)) = return (p,e)
--- extractBnd p = do {i <- index; return (p, HoleE i [])}
-
 --------------------------------------------------------------------------------
 -- | Expressions
 
@@ -161,8 +157,6 @@ type Type = Text
 
 data SyntaxError = MissingAssertion Loc
                  | MissingBound     Loc
-                 | MissingSpecStart Loc
-                 | MissingSpecEnd   Loc
                  | ExcessBound      Loc
                  | MissingPostcondition
                  | DigHole Loc
@@ -247,17 +241,16 @@ instance FromConcrete C.Stmt Stmt where
   fromConcrete (C.Do     _ _) = throwError $ Panic "Do"
   -- Holes and specs
   fromConcrete (C.Hole loc) = throwError $ DigHole loc
-  fromConcrete (C.SpecStart loc) = Spec <$> pure (Hole 0)
-                                 <*> pure (Hole 0)
-                                 <*> pure loc
+  fromConcrete (C.Spec p loc) = Spec <$> mapM fromConcrete p
+                                     <*> pure (Hole 0)
+                                     <*> pure (Hole 0)
+                                     <*> pure loc
 
 -- deals with missing Assertions and Bounds
 instance FromConcrete [C.Stmt] [Stmt] where
   fromConcrete      []  = return []
   fromConcrete (x : []) = case x of
     C.Do _ loc -> throwError $ MissingAssertion loc
-    C.SpecStart loc -> throwError $ MissingSpecEnd loc
-    C.SpecEnd loc -> throwError $ MissingSpecStart loc
     _          -> fromConcrete x <:> pure []
   fromConcrete (x:y:xs) = affixAssertions (x:y:xs)
 
@@ -279,7 +272,7 @@ instance FromConcrete C.Program Program where
       checkStatements :: [Stmt] -> AbstractM (Maybe ([Stmt], Pred))
       checkStatements [] = return Nothing
       checkStatements xs = case last xs of
-        Assert p -> return (Just (init xs, p))
+        Assert r -> return (Just (init xs, r))
         _        -> throwError MissingPostcondition
 
 
