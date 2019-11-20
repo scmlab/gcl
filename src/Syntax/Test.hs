@@ -20,7 +20,7 @@ instance Ord tok => Ord (TokenStream (L tok)) where
 
 instance Ord tok => Stream (TokenStream (L tok)) where
   type Token (TokenStream (L tok)) = L tok
-  type Tokens (TokenStream (L tok)) = TokenStream (L tok)
+  type Tokens (TokenStream (L tok)) = [L tok]
   tokenToChunk Proxy = tokenToChunk'
   tokensToChunk Proxy = tokensToChunk'
   chunkToTokens Proxy = chunkToTokens'
@@ -28,13 +28,7 @@ instance Ord tok => Stream (TokenStream (L tok)) where
   chunkEmpty Proxy = chunkEmpty'
   take1_ = take1_'
   takeN_ = takeN_'
-  --
-  -- takeN_ n s
-  --   | n <= 0    = Just ([], s)
-  --   | null s    = Nothing
-  --   | otherwise = Just (splitAt n s)
-  --
-  -- takeWhile_ = span
+  -- takeWhile_ = takeWhile_'
   -- showTokens Proxy = stringPretty
   --
   -- reachOffset o pst =
@@ -42,43 +36,69 @@ instance Ord tok => Stream (TokenStream (L tok)) where
   -- reachOffsetNoLine o pst =
   --   reachOffsetNoLine' splitAt foldl' ('\n', '\t') o pst
 
-tokenToChunk' :: L tok -> TokenStream (L tok)
-tokenToChunk' tok =  TsToken tok TsEof
+tokenToChunk' :: L tok -> [L tok]
+tokenToChunk' tok = [tok]
 
-tokensToChunk' :: [L tok] -> TokenStream (L tok)
-tokensToChunk' = foldl (flip TsToken) TsEof
+tokensToChunk' :: [L tok] -> [L tok]
+tokensToChunk' = id
 
-chunkToTokens' :: TokenStream (L tok) -> [L tok]
-chunkToTokens' = streamToList
+chunkToTokens' :: [L tok] -> [L tok]
+chunkToTokens' = id
 
+chunkLength' :: [L tok] -> Int
+chunkLength' []     = 0
+chunkLength' (x:[]) = tokenEndingOffset x
+chunkLength' (_:xs) = chunkLength' xs
+
+chunkEmpty' :: [L tok] -> Bool
+chunkEmpty' = (==) 0 . chunkLength'
+
+streamEmpty :: TokenStream (L tok) -> Bool
+streamEmpty TsEof                     = True
+streamEmpty (TsError _)               = True
+streamEmpty (TsToken tok TsEof)       = tokenEndingOffset tok == 0
+streamEmpty (TsToken tok (TsError _)) = tokenEndingOffset tok == 0
+streamEmpty (TsToken tok rest)        =
+    if tokenEndingOffset tok == 0
+      then streamEmpty rest
+      else False
+
+take1_' :: TokenStream (L tok) -> Maybe (L tok, TokenStream (L tok))
+take1_' (TsToken tok rest) = Just (tok, rest)
+take1_' _                  = Nothing
+
+takeN_' :: Int -> TokenStream (L tok) -> Maybe ([L tok], TokenStream (L tok))
+takeN_' n s
+  | n <= 0        = Just ([], s)
+  | streamEmpty s = Nothing
+  | otherwise     =
+      let len = nextOffset s in
+      if n < len then Just ([], s)      -- not enough to cover the first token
+                 else case take1_' s of
+                        Nothing        -> error "impossible"
+                        Just (x, rest) -> case takeN_' (n - len) rest of
+                          Just (xs, rest') -> Just (x:xs, rest')
+                          Nothing          -> Just ([x], TsEof)
+
+-- takeWhile_' :: (L tok -> Bool) -> TokenStream (L tok) -> (TokenStream (L tok), TokenStream (L tok))
+
+--------------------------------------------------------------------------------
+-- Helpers
+
+
+-- | Get the offset of the ending position of a Loc
 locOffset :: Loc -> Int
 locOffset NoLoc = 0
 locOffset (Loc _ end) = posCoff end
 
-chunkLength' :: TokenStream (L tok) -> Int
-chunkLength' (TsToken (L loc _) TsEof)        = locOffset loc
-chunkLength' (TsToken (L loc _) (TsError _))  = locOffset loc
-chunkLength' (TsToken _         rest)         = chunkLength' rest
-chunkLength' _                                = 0
+tokenEndingOffset :: L tok -> Int
+tokenEndingOffset (L loc _) = locOffset loc
 
-chunkEmpty' :: TokenStream (L tok) -> Bool
-chunkEmpty' (TsToken _ _) = False
-chunkEmpty' _ = False
+-- | Get the offset of the next token
+nextOffset :: TokenStream (L tok) -> Int
+nextOffset (TsToken tok _) = tokenEndingOffset tok
+nextOffset _               = 0
 
-take1_' :: TokenStream (L tok) -> Maybe (L tok, TokenStream (L tok))
-take1_' s = case s of
-  TsToken tok rest -> Just (tok, rest)
-  _ -> Nothing
-
-takeN_' = undefined
--- takeN_' :: HasWidth tok => Int -> TokenStream (L tok) -> Maybe (TokenStream (L tok), TokenStream (L tok))
--- takeN_' n s
---   | n <= 0        = Just (TsEof, s)
---   | chunkEmpty' s = Nothing
---   | otherwise     = case take1_' s of
---       Just (tok, rest) ->
---       Nothing -> Nothing
---
 -- ----------------------------------------------------------------------------
 -- -- Helpers
 --
