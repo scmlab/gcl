@@ -21,6 +21,8 @@ dependencies:
   - mtl
   - srcloc
   - text
+  - lexer-applicative
+  - regex-applicative
 
 build-tools:
 - happy
