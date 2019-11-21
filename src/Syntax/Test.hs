@@ -93,30 +93,23 @@ take1_' _                  = Nothing
 
 takeN_' :: Int -> TokenStream (L tok) -> Maybe ([L tok], TokenStream (L tok))
 takeN_' n s
-  | n <= 0        = Just ([], s)
+  | n <= 0   = Just ([], s)
   | streamEmpty s = Nothing
-  | otherwise     =
-      let end = nextTokenEndingOffset s in
-      traceShow ("next token end", end) $
-      traceShow ("taking", n) $
-      if n < end then Just ([], s) -- not enough to cover the first token
-                   else case take1_' s of
-                          Nothing        -> error "impossible"
-                          Just (x, rest) -> case takeN_' n rest of
-                            Just (xs, rest') -> Just (x:xs, rest')
-                            Nothing          -> Just ([x], TsEof)
-  -- where
-  --   go :: Int -> Int -> TokenStream (L tok) -> Maybe ([L tok], TokenStream (L tok))
-  --   go offset len s
-  --     | n <  len = Just ([], s)      -- not enough to cover the first token
-  --     | n == len = case take1_' s of
-  --                    Nothing        -> error "impossible"
-  --                    Just (x, rest) -> Just ([x], rest)
-  --     | otherwise = case take1_' s of
-  --                      Nothing        -> error "impossible"
-  --                      Just (x, rest) -> case takeN_' (n - len) rest of
-  --                        Just (xs, rest') -> Just (x:xs, rest')
-  --                        Nothing          -> Just ([x], TsEof)
+  | otherwise     = go n s
+  where
+    go :: Int -> TokenStream (L tok) -> Maybe ([L tok], TokenStream (L tok))
+    go target TsEof                   = Nothing
+    go target (TsError _)             = Nothing
+    go target (TsToken (L NoLoc _) _) = error "token missing source location"
+    go target (TsToken x rest) =
+      let next = tokenEndingOffset x in
+      traceShow ("next token end", next) $
+      traceShow ("taking", target) $
+      if target < next
+        then Just ([], TsToken x rest) -- not enough to cover the first token
+        else case go target rest of
+                Just (xs, rest') -> Just (x:xs, rest')
+                Nothing          -> Just ([x], TsEof)
 
 takeWhile_' :: (L tok -> Bool) -> TokenStream (L tok) -> ([L tok], TokenStream (L tok))
 takeWhile_' p stream = case take1_' stream of
@@ -140,18 +133,18 @@ reachOffset' n posState =
     -- the stream is kaput
     Just (L NoLoc _, _) -> ("<missing source location>", posState)
     Just (L (Loc _ end) _tok, input') ->
-      if n > tokenWidth
+      if n > width
         then (resultLine, resultPosState)
         else ("<not yet implemented>", posState)
       where
-        (resultLine, resultPosState) = reachOffset' (n - tokenWidth) posState'
+        (resultLine, resultPosState) = reachOffset' (n - width) posState'
 
-        tokenWidth = posCoff end
+        width = posCoff end
 
         -- updated 'PosState'
         posState' = PosState
             { pstateInput = input'
-            , pstateOffset = pstateOffset posState + tokenWidth
+            , pstateOffset = pstateOffset posState + width
             , pstateSourcePos = toSourcePos end
             , pstateTabWidth = pstateTabWidth posState
             , pstateLinePrefix = pstateLinePrefix posState
@@ -170,23 +163,27 @@ reachOffset' n posState =
 -- Helpers
 
 -- | Get the offset of the ending position of a Loc
-locOffset :: Loc -> Int
-locOffset NoLoc = 0
-locOffset (Loc _ end) = posCoff end
+-- locOffset :: Loc -> Int
+-- locOffset NoLoc = 0
+-- locOffset (Loc _ end) = posCoff end + 1
 
 tokenWidth :: L tok -> Int
 tokenWidth (L NoLoc _) = 0
 tokenWidth (L (Loc start end) _) = posCoff end - posCoff start + 1
+
+tokenEndingOffset :: L tok -> Int
+tokenEndingOffset (L NoLoc _) = 0
+tokenEndingOffset (L (Loc _ end) _) = posCoff end + 1
 
 -- | Get the "width" of the next token
 nextTokenWidth :: TokenStream (L tok) -> Int
 nextTokenWidth (TsToken tok _) = tokenWidth tok
 nextTokenWidth _               = 0
 
--- | Get the ending offset of the next token
-nextTokenEndingOffset :: TokenStream (L tok) -> Int
-nextTokenEndingOffset (TsToken (L (Loc _ end) _) _) = posCoff end + 1
-nextTokenEndingOffset _               = 0
+-- -- | Get the ending offset of the next token
+-- nextTokenEndingOffset :: TokenStream (L tok) -> Int
+-- nextTokenEndingOffset (TsToken (L (Loc _ end) _) _) = posCoff end + 1
+-- nextTokenEndingOffset _               = 0
 
 toSourcePos :: Pos -> SourcePos
 toSourcePos (Pos filename line column _) =
