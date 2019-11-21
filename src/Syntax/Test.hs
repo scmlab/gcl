@@ -8,17 +8,32 @@
 
 module Syntax.Test where
 
-import Text.Megaparsec
+import Text.Megaparsec hiding (Pos)
+import qualified Text.Megaparsec as Mega
 import Data.Proxy
 import Data.Loc
+import Data.Char (isSpace)
 
--- import Data.List.NonEmpty (NonEmpty (..))
+import Data.List.NonEmpty (NonEmpty (..))
 import Language.Lexer.Applicative
+
+import Syntax.LexerTest
+import Debug.Trace
+
+instance Streamable Tok where
+  showNonEmptyTokens (L _ x :| xs) = showToken x ++ concat (map (showToken . unLoc) xs)
+
+
+class Ord tok => Streamable tok where
+  showNonEmptyTokens :: NonEmpty (L tok) -> String
+  -- newlineToken :: Maybe tok
+  -- tabToken :: Maybe tok
+
 
 instance Ord tok => Ord (TokenStream (L tok)) where
   compare _ _ = EQ
 
-instance Ord tok => Stream (TokenStream (L tok)) where
+instance Streamable tok => Stream (TokenStream (L tok)) where
   type Token (TokenStream (L tok)) = L tok
   type Tokens (TokenStream (L tok)) = [L tok]
   tokenToChunk Proxy = tokenToChunk'
@@ -28,11 +43,20 @@ instance Ord tok => Stream (TokenStream (L tok)) where
   chunkEmpty Proxy = chunkEmpty'
   take1_ = take1_'
   takeN_ = takeN_'
-  -- takeWhile_ = takeWhile_'
-  -- showTokens Proxy = stringPretty
-  --
+  takeWhile_ = takeWhile_'
+  showTokens Proxy = showTokens'
+  reachOffset = reachOffset'
   -- reachOffset o pst =
-  --   reachOffset' splitAt foldl' show tokToChar (TokNewline, TokTab) o pst
+  --   reachOffset'
+  --     splitAt
+  --     foldl'
+  --     fromToks
+  --     fromTok
+  --     (newlineToken, tabToken)
+  --     o
+  --     pst
+
+
   -- reachOffsetNoLine o pst =
   --   reachOffsetNoLine' splitAt foldl' ('\n', '\t') o pst
 
@@ -47,7 +71,7 @@ chunkToTokens' = id
 
 chunkLength' :: [L tok] -> Int
 chunkLength' []     = 0
-chunkLength' (x:[]) = tokenEndingOffset x
+chunkLength' (x:[]) = tokenWidth x
 chunkLength' (_:xs) = chunkLength' xs
 
 chunkEmpty' :: [L tok] -> Bool
@@ -56,10 +80,10 @@ chunkEmpty' = (==) 0 . chunkLength'
 streamEmpty :: TokenStream (L tok) -> Bool
 streamEmpty TsEof                     = True
 streamEmpty (TsError _)               = True
-streamEmpty (TsToken tok TsEof)       = tokenEndingOffset tok == 0
-streamEmpty (TsToken tok (TsError _)) = tokenEndingOffset tok == 0
+streamEmpty (TsToken tok TsEof)       = tokenWidth tok == 0
+streamEmpty (TsToken tok (TsError _)) = tokenWidth tok == 0
 streamEmpty (TsToken tok rest)        =
-    if tokenEndingOffset tok == 0
+    if tokenWidth tok == 0
       then streamEmpty rest
       else False
 
@@ -72,32 +96,101 @@ takeN_' n s
   | n <= 0        = Just ([], s)
   | streamEmpty s = Nothing
   | otherwise     =
-      let len = nextOffset s in
-      if n < len then Just ([], s)      -- not enough to cover the first token
-                 else case take1_' s of
-                        Nothing        -> error "impossible"
-                        Just (x, rest) -> case takeN_' (n - len) rest of
-                          Just (xs, rest') -> Just (x:xs, rest')
-                          Nothing          -> Just ([x], TsEof)
+      let end = nextTokenEndingOffset s in
+      traceShow ("next token end", end) $
+      traceShow ("taking", n) $
+      if n < end then Just ([], s) -- not enough to cover the first token
+                   else case take1_' s of
+                          Nothing        -> error "impossible"
+                          Just (x, rest) -> case takeN_' n rest of
+                            Just (xs, rest') -> Just (x:xs, rest')
+                            Nothing          -> Just ([x], TsEof)
+  -- where
+  --   go :: Int -> Int -> TokenStream (L tok) -> Maybe ([L tok], TokenStream (L tok))
+  --   go offset len s
+  --     | n <  len = Just ([], s)      -- not enough to cover the first token
+  --     | n == len = case take1_' s of
+  --                    Nothing        -> error "impossible"
+  --                    Just (x, rest) -> Just ([x], rest)
+  --     | otherwise = case take1_' s of
+  --                      Nothing        -> error "impossible"
+  --                      Just (x, rest) -> case takeN_' (n - len) rest of
+  --                        Just (xs, rest') -> Just (x:xs, rest')
+  --                        Nothing          -> Just ([x], TsEof)
 
--- takeWhile_' :: (L tok -> Bool) -> TokenStream (L tok) -> (TokenStream (L tok), TokenStream (L tok))
+takeWhile_' :: (L tok -> Bool) -> TokenStream (L tok) -> ([L tok], TokenStream (L tok))
+takeWhile_' p stream = case take1_' stream of
+  Nothing        -> ([], stream)
+  Just (x, rest) ->
+    if p x
+      then let (xs, rest') = takeWhile_' p rest in (x:xs, rest')
+      else ([], stream)
+
+showTokens' :: Streamable tok => NonEmpty (L tok) -> String
+showTokens' = showNonEmptyTokens
+
+reachOffset' :: Int
+             -> PosState (TokenStream (L tok))
+             -> (String, PosState (TokenStream (L tok)))
+reachOffset' n posState =
+-- reachOffset' n posState@(PosState input offset sourcePos tabWidth linePrefix) =
+  case take1_' (pstateInput posState) of
+    -- the stream is empty
+    Nothing -> ("<empty line>", posState)
+    -- the stream is kaput
+    Just (L NoLoc _, _) -> ("<missing source location>", posState)
+    Just (L (Loc _ end) _tok, input') ->
+      if n > tokenWidth
+        then (resultLine, resultPosState)
+        else ("<not yet implemented>", posState)
+      where
+        (resultLine, resultPosState) = reachOffset' (n - tokenWidth) posState'
+
+        tokenWidth = posCoff end
+
+        -- updated 'PosState'
+        posState' = PosState
+            { pstateInput = input'
+            , pstateOffset = pstateOffset posState + tokenWidth
+            , pstateSourcePos = toSourcePos end
+            , pstateTabWidth = pstateTabWidth posState
+            , pstateLinePrefix = pstateLinePrefix posState
+            }
+
+        -- currentRow = posLine end
+        -- nextRow    = posLine end
+
+
+
+  -- case takeN_' n input of
+  --   Nothing -> ("<empty line>", posState)
+  --   Just (xs, input')
 
 --------------------------------------------------------------------------------
 -- Helpers
-
 
 -- | Get the offset of the ending position of a Loc
 locOffset :: Loc -> Int
 locOffset NoLoc = 0
 locOffset (Loc _ end) = posCoff end
 
-tokenEndingOffset :: L tok -> Int
-tokenEndingOffset (L loc _) = locOffset loc
+tokenWidth :: L tok -> Int
+tokenWidth (L NoLoc _) = 0
+tokenWidth (L (Loc start end) _) = posCoff end - posCoff start + 1
 
--- | Get the offset of the next token
-nextOffset :: TokenStream (L tok) -> Int
-nextOffset (TsToken tok _) = tokenEndingOffset tok
-nextOffset _               = 0
+-- | Get the "width" of the next token
+nextTokenWidth :: TokenStream (L tok) -> Int
+nextTokenWidth (TsToken tok _) = tokenWidth tok
+nextTokenWidth _               = 0
+
+-- | Get the ending offset of the next token
+nextTokenEndingOffset :: TokenStream (L tok) -> Int
+nextTokenEndingOffset (TsToken (L (Loc _ end) _) _) = posCoff end + 1
+nextTokenEndingOffset _               = 0
+
+toSourcePos :: Pos -> SourcePos
+toSourcePos (Pos filename line column _) =
+    SourcePos filename (mkPos line) (mkPos column)
 
 -- ----------------------------------------------------------------------------
 -- -- Helpers
@@ -120,7 +213,7 @@ nextOffset _               = 0
 --      -- ^ How to convert chunk of input stream into a 'String'
 --   -> (Token s -> Char)
 --      -- ^ How to convert a token into a 'Char'
---   -> (Token s, Token s)
+--   -> (Maybe (Token s), Maybe (Token s))
 --      -- ^ Newline token and tab token
 --   -> Int
 --      -- ^ Offset to reach
@@ -142,7 +235,7 @@ nextOffset _               = 0
 --              . f
 --              . fromToks
 --              . fst
---              $ takeWhile_ (/= newlineTok) post
+--              $ takeWhile_ (\c -> Just c /= newlineTok) post
 --     locatedLine' = case locatedLine of
 --       "" -> "<empty line>"
 --       xs -> xs
@@ -170,10 +263,10 @@ nextOffset _               = 0
 --       let SourcePos n l c = apos
 --           c' = unPos c
 --           w  = unPos pstateTabWidth
---       in if | ch == newlineTok ->
+--       in if | Just ch == newlineTok ->
 --                 St (SourcePos n (l <> pos1) pos1)
 --                    id
---             | ch == tabTok ->
+--             | Just ch == tabTok ->
 --                 St (SourcePos n l (mkPos $ c' + w - ((c' - 1) `rem` w)))
 --                    (g . (fromTok ch :))
 --             | otherwise ->
@@ -182,16 +275,10 @@ nextOffset _               = 0
 -- {-# INLINE reachOffset' #-}
 --
 --
--- -- | @stringPretty s@ returns pretty representation of string @s@. This is
--- -- used when printing string tokens in error messages.
---
--- stringPretty :: NonEmpty Tok -> String
--- stringPretty = show
---
 -- -- | Replace tab characters with given number of spaces.
 --
 -- expandTab
---   :: Pos
+--   :: Mega.Pos
 --   -> String
 --   -> String
 -- expandTab w' = go 0
