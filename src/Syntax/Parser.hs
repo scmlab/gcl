@@ -246,19 +246,9 @@ getPos = do
 
 withLoc :: Parser (Loc -> a) -> Parser a
 withLoc parser = do
-  -- offset <- stateOffset <$> getParserState
-  -- traceShow offset (return ())
-
   start <- getPos
-
-
   result <- parser
-
   end <- getPos
-
-  -- traceShow ("sdtart") (return ())
-  -- traceShow (start) (return ())
-  -- traceShow (end) (return ())
   return $ result (Loc start end)
 
 parens :: Parser a -> Parser a
