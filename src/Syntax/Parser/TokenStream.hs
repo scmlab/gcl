@@ -13,27 +13,7 @@ import Data.List.NonEmpty (NonEmpty (..))
 import Data.Proxy
 import Language.Lexer.Applicative
 import Text.Megaparsec hiding (Pos)
-
--- import Syntax.LexerTest
--- import Debug.Trace
---
--- data Expr = End | E String Loc Expr deriving (Show, Eq)
---
--- type Parser = Parsec Void TStream
---
--- expr :: Parser Expr
--- expr = do
---   p <- atEnd
---   if p
---     then
---       return End
---     else do
---       L loc tok <- anySingle
---       xs <- expr
---       return (E (show tok) loc xs)
-
--- instance Streamable Tok where
---   showNonEmptyTokens (L _ x :| xs) = showToken x ++ concat (map (showToken . unLoc) xs)
+import Debug.Trace
 
 class Ord tok => Streamable tok where
   showNonEmptyTokens :: NonEmpty (L tok) -> String
@@ -41,7 +21,7 @@ class Ord tok => Streamable tok where
 instance Ord tok => Ord (TokenStream (L tok)) where
   compare _ _ = EQ
 
-instance Streamable tok => Stream (TokenStream (L tok)) where
+instance (Show tok, Streamable tok) => Stream (TokenStream (L tok)) where
   type Token (TokenStream (L tok)) = L tok
   type Tokens (TokenStream (L tok)) = [L tok]
   tokenToChunk Proxy = tokenToChunk'

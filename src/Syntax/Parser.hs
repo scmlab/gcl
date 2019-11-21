@@ -16,12 +16,10 @@ import Text.Megaparsec hiding (Pos)
 import Text.Megaparsec.Error (errorBundlePretty)
 
 import Syntax.Concrete
-import Syntax.Lexer
-import Syntax.Parser.TokenStream
-
+import Syntax.Parser.Lexer
+import Debug.Trace
 
 type Parser = Parsec Void TStream
--- import Debug.Trace
 
 fromRight :: Either (ParseErrorBundle TStream Void) b -> b
 fromRight (Left e) = error $ errorBundlePretty e
@@ -248,9 +246,19 @@ getPos = do
 
 withLoc :: Parser (Loc -> a) -> Parser a
 withLoc parser = do
+  -- offset <- stateOffset <$> getParserState
+  -- traceShow offset (return ())
+
   start <- getPos
+
+
   result <- parser
+
   end <- getPos
+
+  -- traceShow ("sdtart") (return ())
+  -- traceShow (start) (return ())
+  -- traceShow (end) (return ())
   return $ result (Loc start end)
 
 parens :: Parser a -> Parser a
@@ -262,8 +270,10 @@ braces = between (symbol TokBraceStart) (symbol TokBraceEnd)
 --------------------------------------------------------------------------------
 -- | Combinators
 
-symbol :: Tok -> Parser (L Tok)
-symbol t = single (L NoLoc t)
+symbol :: Tok -> Parser ()
+symbol t = do
+  _ <- single (L NoLoc t)
+  return ()
 
 upperName :: Parser Text
 upperName = do

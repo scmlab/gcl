@@ -39,20 +39,30 @@ main = do
     ModeHelp -> putStrLn $ usageInfo usage options
     ModeREPL -> loop
     ModeDev -> do
-      let filepath = "examples/b.gcl"
-      raw <- Text.readFile filepath
-      case parseProgram filepath raw of
-        Right syntax -> case abstract syntax of
-          Left err -> send $ SyntaxError err
-          Right (Program _ Nothing) -> send $ OK [] []
-          Right (Program _ (Just (statements, postcondition))) -> do
-            let ((_, _obligations), specifications) = runM $ precondStmts statements postcondition
-            print $ specifications
-            -- send $ OK obligations specifications
-        Left err -> do
-          putStrLn $ errorBundlePretty err
-          let pairs = map (\(p, e) -> (p, parseErrorTextPretty e)) $ collectParseErrors err
-          send $ ParseError pairs
+      testParsing
+      -- let filepath = "examples/b.gcl"
+      -- raw <- Text.readFile filepath
+      -- case parseProgram filepath raw of
+      --   Right syntax -> case abstract syntax of
+      --     Left err -> send $ SyntaxError err
+      --     Right (Program _ Nothing) -> send $ OK [] []
+      --     Right (Program _ (Just (statements, postcondition))) -> do
+      --       let ((_, _obligations), specifications) = runM $ precondStmts statements postcondition
+      --       print $ specifications
+      --       -- send $ OK obligations specifications
+      --   Left err -> do
+      --     putStrLn $ errorBundlePretty err
+      --     let pairs = map (\(p, e) -> (p, parseErrorTextPretty e)) $ collectParseErrors err
+      --     send $ ParseError pairs
+
+      where
+        testParsing :: IO ()
+        testParsing = do
+          let filepath = "examples/b.gcl"
+          raw <- Text.readFile filepath
+          case parseProgram filepath raw of
+            Right syntax -> print syntax
+            Left err -> putStrLn $ errorBundlePretty err
 
   where
     loop :: IO ()
