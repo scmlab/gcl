@@ -225,7 +225,6 @@ precondGuard post (GdCmd guard body) = Implies guard <$> precondStmts body post
 --   (body', pre) <- sweepStmts body post
 --   return (GdCmd guard body', guard `Implies` pre)
 
----
 gcdExample :: Program
 gcdExample = let Right result = abstract $ fromRight $ parseProgram "<test>" "\
   \x := X\n\

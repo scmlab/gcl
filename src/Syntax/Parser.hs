@@ -17,21 +17,24 @@ import Text.Megaparsec.Error (errorBundlePretty)
 
 import Syntax.Concrete
 import Syntax.Lexer
+import Syntax.Parser.TokenStream
 
+
+type Parser = Parsec Void TStream
 -- import Debug.Trace
 
-fromRight :: Either (ParseErrorBundle Text Void) b -> b
+fromRight :: Either (ParseErrorBundle TStream Void) b -> b
 fromRight (Left e) = error $ errorBundlePretty e
 fromRight (Right x) = x
 
-parseProgram :: FilePath -> Text -> Either (ParseErrorBundle Text Void) Program
-parseProgram = parse program
+parseProgram :: FilePath -> Text -> Either (ParseErrorBundle TStream Void) Program
+parseProgram filepath raw = parse program filepath (scan filepath raw)
 
-parsePred :: Text -> Either (ParseErrorBundle Text Void) Pred
-parsePred = parse predicate "<predicate>"
+parsePred :: Text -> Either (ParseErrorBundle TStream Void) Pred
+parsePred = parse predicate "<predicate>" . scan "<predicate>"
 
-parseStmt :: Text -> Either (ParseErrorBundle Text Void) Stmt
-parseStmt = parse statement "<statement>"
+parseStmt :: Text -> Either (ParseErrorBundle TStream Void) Stmt
+parseStmt = parse statement "<statement>" . scan "<statement>"
 
 program :: Parser Program
 program = withLoc $ do
@@ -57,52 +60,50 @@ statement = choice
   ]
 
 skip :: Parser Stmt
-skip = withLoc $ Skip <$ symbol "skip"
+skip = withLoc $ Skip <$ symbol TokSkip
 
 abort :: Parser Stmt
-abort = withLoc $ Abort <$ symbol "abort"
+abort = withLoc $ Abort <$ symbol TokAbort
 
 assert :: Parser Stmt
 assert = withLoc $ Assert <$> braces predicate
 
 assertWithBnd :: Parser Stmt
-assertWithBnd = withLoc $ AssertWithBnd
-  <$  symbol "{"
-  <*> predicate
-  <*  symbol ","
-  <*  symbol "bnd"
-  <*  symbol ":"
+assertWithBnd = withLoc $ braces $ AssertWithBnd
+  <$> predicate
+  <*  symbol TokComma
+  <*  symbol TokBnd
+  <*  symbol TokSemi
   <*> expression
-  <*  symbol "}"
 
 assign :: Parser Stmt
-assign = withLoc $ Assign <$> variableList <* symbol ":=" <*> expressionList
+assign = withLoc $ Assign <$> variableList <* symbol TokAssign <*> expressionList
 
 repetition :: Parser Stmt
-repetition = withLoc $ Do <$  symbol "do"
+repetition = withLoc $ Do <$  symbol TokDo
                           <*> guardedCommands
-                          <*  symbol "od"
+                          <*  symbol TokOd
 
 selection :: Parser Stmt
-selection = withLoc $ If  <$  symbol "if"
+selection = withLoc $ If  <$  symbol TokIf
                           <*> guardedCommands
-                          <*  symbol "fi"
+                          <*  symbol TokFi
 
 guardedCommands :: Parser [GdCmd]
-guardedCommands = sepBy1 guardedCommand (symbol "|")
+guardedCommands = sepBy1 guardedCommand (symbol TokGuardBar)
 
 guardedCommand :: Parser GdCmd
 guardedCommand = withLoc $ GdCmd  <$> predicate
-                                  <*  symbol "->"
+                                  <*  symbol TokGuardArr
                                   <*> some statement
 
 hole :: Parser Stmt
-hole = withLoc $ Hole <$ symbol "?"
+hole = withLoc $ Hole <$ symbol TokQM
 
 spec :: Parser Stmt
-spec = withLoc $ Spec <$  symbol "{!"
+spec = withLoc $ Spec <$  symbol TokSpecStart
                       <*> many statement
-                      <*  symbol "!}"
+                      <*  symbol TokSpecEnd
 
 --------------------------------------------------------------------------------
 -- | Predicates
@@ -121,48 +122,48 @@ predicate = makeExprParser predTerm table <?> "predicate"
 negation :: Parser (Pred -> Pred)
 negation = do
   start <- getPos
-  symbol "^"
+  symbol TokNeg
   return $ \result -> Neg result (start <--> result)
 
 conjunction :: Parser (Pred -> Pred -> Pred)
 conjunction = do
-  symbol "&&"
+  symbol TokConj
   return $ \x y -> Conj x y (x <--> y)
 
 disjunction :: Parser (Pred -> Pred -> Pred)
 disjunction = do
-  symbol "||"
+  symbol TokDisj
   return $ \x y -> Disj x y (x <--> y)
 
 implication :: Parser (Pred -> Pred -> Pred)
 implication = do
-  symbol "=>"
+  symbol TokImpl
   return $ \x y -> Implies x y (x <--> y)
 
 
 predTerm :: Parser Pred
 predTerm =  parens predicate
         <|> (withLoc $ choice
-              [ HoleP <$  symbol "?"
-              , Lit True <$ symbol "true"
-              , Lit False <$ symbol "false"
+              [ HoleP <$  symbol TokQM
+              , Lit True <$ symbol TokTrue
+              , Lit False <$ symbol TokFalse
               , Term <$> expression <*> binaryRelation <*> expression
               ])
 
 binaryRelation :: Parser BinRel
 binaryRelation = withLoc $ choice
-  [ Eq  <$ symbol "="
-  , LEq <$ symbol "<="
-  , GEq <$ symbol ">="
-  , LTh <$ symbol "<"
-  , GTh <$ symbol ">"
+  [ Eq  <$ symbol TokEQ
+  , LEq <$ symbol TokLTE
+  , GEq <$ symbol TokGTE
+  , LTh <$ symbol TokLT
+  , GTh <$ symbol TokGT
   ]
 
 --------------------------------------------------------------------------------
 -- | Expressions
 
 expressionList :: Parser [Expr]
-expressionList = sepBy1 expression (symbol ",")
+expressionList = sepBy1 expression (symbol TokComma)
 
 expression :: Parser Expr
 expression = parens expression
@@ -174,7 +175,7 @@ term = withLoc $ choice
   , VarE    <$> variable
   , ConstE  <$> constant
   , LitE    <$> literal
-  , HoleE   <$  symbol "?"
+  , HoleE   <$  symbol TokQM
   ]
   where
     op :: Parser Expr
@@ -182,8 +183,8 @@ term = withLoc $ choice
 
 literal :: Parser Lit
 literal = choice
-  [ Bol True  <$  symbol "true"
-  , Bol False <$  symbol "false"
+  [ Bol True  <$  symbol TokTrue
+  , Bol False <$  symbol TokFalse
   , Num       <$> integer
   ]
 
@@ -199,17 +200,17 @@ declaration = choice
 
 constantDecl :: Parser Declaration
 constantDecl = withLoc $ do
-  symbol "con"
+  symbol TokCon
   types <- constList
-  symbol ":"
+  symbol TokSemi
   t <- type'
   return $ ConstDecl types t
 
 variableDecl :: Parser Declaration
 variableDecl = withLoc $ do
-  symbol "var"
+  symbol TokVar
   vars <- variableList
-  symbol ":"
+  symbol TokSemi
   t <- type'
   return $ VarDecl vars t
 
@@ -217,21 +218,21 @@ variableDecl = withLoc $ do
 -- | Variables and stuff
 
 constant :: Parser Const
-constant = withLoc $ Const <$> identifierUpper
+constant = withLoc $ Const <$> upperName
 
 -- seperated by commas
 constList :: Parser [Const]
-constList = sepBy1 constant (symbol ",")
+constList = sepBy1 constant (symbol TokComma)
 
 variable :: Parser Var
-variable = withLoc $ Var <$> identifier
+variable = withLoc $ Var <$> lowerName
 
 -- seperated by commas
 variableList :: Parser [Var]
-variableList = sepBy1 variable (symbol ",")
+variableList = sepBy1 variable (symbol TokComma)
 
 type' :: Parser Type
-type' = withLoc $ Type <$> identifierUpper
+type' = withLoc $ Type <$> upperName
 
 --------------------------------------------------------------------------------
 -- | Helper functions
@@ -253,7 +254,37 @@ withLoc parser = do
   return $ result (Loc start end)
 
 parens :: Parser a -> Parser a
-parens = between (symbol "(") (symbol ")")
+parens = between (symbol TokParenStart) (symbol TokParenEnd)
 
 braces :: Parser a -> Parser a
-braces = between (symbol "{") (symbol "}")
+braces = between (symbol TokBraceStart) (symbol TokBraceEnd)
+
+--------------------------------------------------------------------------------
+-- | Combinators
+
+symbol :: Tok -> Parser (L Tok)
+symbol t = single (L NoLoc t)
+
+upperName :: Parser Text
+upperName = do
+  L _ (TokUpperName s) <- satisfy p
+  return s
+  where
+    p (L _ (TokUpperName _)) = True
+    p _ = False
+
+lowerName :: Parser Text
+lowerName = do
+  L _ (TokLowerName s) <- satisfy p
+  return s
+  where
+    p (L _ (TokLowerName _)) = True
+    p _ = False
+
+integer :: Parser Int
+integer = do
+  L _ (TokInt s) <- satisfy p
+  return s
+  where
+    p (L _ (TokInt _)) = True
+    p _ = False
