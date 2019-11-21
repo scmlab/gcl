@@ -108,11 +108,12 @@ tokRE
   <|> TokDisj         <$  "||"
   <|> TokNeg          <$  "^"
 
+  <|> TokTrue         <$  "True"
+  <|> TokFalse        <$  "False"
+
   <|> TokUpperName    <$> upperNameRE
   <|> TokLowerName    <$> lowerNameRE
   <|> TokInt          <$> intRE
-  <|> TokTrue         <$  "False"
-  <|> TokFalse        <$  "True"
 
 -- starts with lowercase alphabets
 lowerNameRE :: RE Char Text

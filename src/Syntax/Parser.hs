@@ -9,30 +9,89 @@ module Syntax.Parser
   ) where
 
 import Control.Monad.Combinators.Expr
-import Data.Text
+import Control.Monad.State
+import Data.Text (Text)
 import Data.Loc
 import Data.Void
-import Text.Megaparsec hiding (Pos)
+import Data.Set (Set)
+import qualified Data.Set as Set
+import Data.Map (Map)
+import qualified Data.Map as Map
+import Text.Megaparsec hiding (Pos, State)
 import Text.Megaparsec.Error (errorBundlePretty)
 
 import Syntax.Concrete
 import Syntax.Parser.Lexer
 import Debug.Trace
 
-type Parser = Parsec Void TStream
+--------------------------------------------------------------------------------
+-- | Source location bookkeeping
+
+type PosLog = State LocState
+
+type ID = Int
+data LocState = LocState
+  { latest :: Loc
+  , opened :: Set ID      -- waiting to be moved to the "logged" map
+                          -- when the starting position of the next token is determined
+  , logged :: Map ID Loc  -- waiting to be removed when the ending position is determined
+  , index  :: Int         -- for generating fresh ID
+  }
+
+runPosLog :: State LocState a -> a
+runPosLog f = evalState f (LocState NoLoc Set.empty Map.empty 0)
+
+markStart :: PosLog ID
+markStart = do
+  -- get a fresh ID and put it in the "opened" set
+  i <- gets index
+  modify $ \st -> st
+    { index  = succ i
+    , opened = Set.insert i (opened st)
+    }
+  return i
+
+updateLoc :: Loc -> PosLog ()
+updateLoc loc = do
+  set <- gets opened
+  let addedLoc = Map.fromSet (const loc) set
+  modify $ \st -> st
+    { latest = loc
+    , opened = Set.empty
+    , logged = Map.union (logged st) addedLoc
+    }
+
+markEnd :: ID -> PosLog Loc
+markEnd i = do
+  end <- gets latest
+  loggedPos <- gets logged
+  let loc = case Map.lookup i loggedPos of
+              Nothing  -> NoLoc
+              Just start -> start <--> end
+  -- remove it from the "logged" map
+  modify $ \st -> st
+    { logged = Map.delete i loggedPos
+    }
+  return loc
+
+--------------------------------------------------------------------------------
+-- | States for source location bookkeeping
+
+
+type Parser = ParsecT Void TStream PosLog
 
 fromRight :: Either (ParseErrorBundle TStream Void) b -> b
 fromRight (Left e) = error $ errorBundlePretty e
 fromRight (Right x) = x
 
 parseProgram :: FilePath -> Text -> Either (ParseErrorBundle TStream Void) Program
-parseProgram filepath raw = parse program filepath (scan filepath raw)
+parseProgram filepath raw = runPosLog (runParserT program filepath (scan filepath raw))
 
 parsePred :: Text -> Either (ParseErrorBundle TStream Void) Pred
-parsePred = parse predicate "<predicate>" . scan "<predicate>"
+parsePred raw = runPosLog (runParserT predicate "<predicate>" $ scan "<predicate>" raw)
 
 parseStmt :: Text -> Either (ParseErrorBundle TStream Void) Stmt
-parseStmt = parse statement "<statement>" . scan "<statement>"
+parseStmt raw = runPosLog (runParserT statement "<statement>" $ scan "<statement>" raw)
 
 program :: Parser Program
 program = withLoc $ do
@@ -116,11 +175,10 @@ predicate = makeExprParser predTerm table <?> "predicate"
             , [ InfixR implication ]
             ]
 
-
 negation :: Parser (Pred -> Pred)
 negation = do
-  start <- getPos
-  symbol TokNeg
+  ((), start) <- getLoc $ do
+    symbol TokNeg
   return $ \result -> Neg result (start <--> result)
 
 conjunction :: Parser (Pred -> Pred -> Pred)
@@ -238,18 +296,20 @@ type' = withLoc $ Type <$> upperName
 toPos :: Stream s => PosState s -> Pos
 toPos (PosState _ offset (SourcePos filepath line column) _ _) = Pos filepath (unPos line) (unPos column) offset
 
-getPos :: Parser Pos
-getPos = do
-  offset <- getOffset
-  SourcePos filepath line column <- getSourcePos
-  return $ Pos filepath (unPos line) (unPos column) offset
+getLoc :: Parser a -> Parser (a, Loc)
+getLoc parser = do
+  i <- lift markStart
+  result <- parser
+  loc <- lift (markEnd i)
+  return (result, loc)
 
 withLoc :: Parser (Loc -> a) -> Parser a
 withLoc parser = do
-  start <- getPos
-  result <- parser
-  end <- getPos
-  return $ result (Loc start end)
+  (result, loc) <- getLoc parser
+  return $ result loc
+
+--------------------------------------------------------------------------------
+-- | Combinators
 
 parens :: Parser a -> Parser a
 parens = between (symbol TokParenStart) (symbol TokParenEnd)
@@ -257,17 +317,16 @@ parens = between (symbol TokParenStart) (symbol TokParenEnd)
 braces :: Parser a -> Parser a
 braces = between (symbol TokBraceStart) (symbol TokBraceEnd)
 
---------------------------------------------------------------------------------
--- | Combinators
-
 symbol :: Tok -> Parser ()
 symbol t = do
-  _ <- single (L NoLoc t)
+  L loc _ <- satisfy (\(L _ t') -> t == t')
+  lift $ updateLoc loc
   return ()
 
 upperName :: Parser Text
 upperName = do
-  L _ (TokUpperName s) <- satisfy p
+  L loc (TokUpperName s) <- satisfy p
+  lift $ updateLoc loc
   return s
   where
     p (L _ (TokUpperName _)) = True
@@ -275,7 +334,8 @@ upperName = do
 
 lowerName :: Parser Text
 lowerName = do
-  L _ (TokLowerName s) <- satisfy p
+  L loc (TokLowerName s) <- satisfy p
+  lift $ updateLoc loc
   return s
   where
     p (L _ (TokLowerName _)) = True
@@ -283,7 +343,8 @@ lowerName = do
 
 integer :: Parser Int
 integer = do
-  L _ (TokInt s) <- satisfy p
+  L loc (TokInt s) <- satisfy p
+  lift $ updateLoc loc
   return s
   where
     p (L _ (TokInt _)) = True
