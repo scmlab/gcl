@@ -84,7 +84,7 @@ tokRE
 
   -- delimiters
   <|> TokComma        <$ ","
-  <|> TokSemi      <$ ":"
+  <|> TokSemi         <$ ":"
   <|> TokAssign       <$ ":="
   <|> TokSpecStart    <$ "{!"
   <|> TokSpecEnd      <$ "!}"
