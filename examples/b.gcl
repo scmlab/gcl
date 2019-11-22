@@ -1,10 +1,18 @@
 skip
 
 skip
+skip
+
 
 skip
 
-do True -> 
-od
+abort
+
+if True => False -> skip
+fi
 
 skip
+
+skip
+
+{ True }

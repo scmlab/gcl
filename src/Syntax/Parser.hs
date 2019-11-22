@@ -20,7 +20,8 @@ import Text.Megaparsec.Error (errorBundlePretty)
 
 import Syntax.Concrete
 import Syntax.Parser.Lexer
-import Syntax.Parser.Util
+import Syntax.Parser.Util hiding (withLoc)
+import qualified Syntax.Parser.Util as Util
 
 --------------------------------------------------------------------------------
 -- | States for source location bookkeeping
@@ -64,17 +65,18 @@ statement = choice
   , hole
   ]
 
+
 skip :: Parser Stmt
-skip = withLoc $ Skip <$ symbol TokSkip
+skip = withLoc' $ Skip <$ symbol TokSkip
 
 abort :: Parser Stmt
-abort = withLoc $ Abort <$ symbol TokAbort
+abort = withLoc' $ Abort <$ symbol TokAbort
 
 assert :: Parser Stmt
-assert = withLoc $ Assert <$> braces predicate
+assert = withLoc' $ Assert <$> braces predicate
 
 assertWithBnd :: Parser Stmt
-assertWithBnd = withLoc $ braces $ AssertWithBnd
+assertWithBnd = withLoc' $ braces $ AssertWithBnd
   <$> predicate
   <*  symbol TokComma
   <*  symbol TokBnd
@@ -82,15 +84,15 @@ assertWithBnd = withLoc $ braces $ AssertWithBnd
   <*> expression
 
 assign :: Parser Stmt
-assign = withLoc $ Assign <$> variableList <* symbol TokAssign <*> expressionList
+assign = withLoc' $ Assign <$> variableList <* symbol TokAssign <*> expressionList
 
 repetition :: Parser Stmt
-repetition = withLoc $ Do <$  symbol TokDo
+repetition = withLoc' $ Do <$  symbol TokDo
                           <*> guardedCommands
                           <*  symbol TokOd
 
 selection :: Parser Stmt
-selection = withLoc $ If  <$  symbol TokIf
+selection = withLoc' $ If  <$  symbol TokIf
                           <*> guardedCommands
                           <*  symbol TokFi
 
@@ -103,10 +105,10 @@ guardedCommand = withLoc $ GdCmd  <$> predicate
                                   <*> some statement
 
 hole :: Parser Stmt
-hole = withLoc $ Hole <$ symbol TokQM
+hole = withLoc' $ Hole <$ symbol TokQM
 
 spec :: Parser Stmt
-spec = withLoc $ Spec <$  symbol TokSpecStart
+spec = withLoc' $ Spec <$  symbol TokSpecStart
                       <*> many statement
                       <*  symbol TokSpecEnd
 
@@ -127,21 +129,25 @@ negation :: Parser (Pred -> Pred)
 negation = do
   ((), start) <- getLoc $ do
     symbol TokNeg
+  ignoreNewlines
   return $ \result -> Neg result (start <--> result)
 
 conjunction :: Parser (Pred -> Pred -> Pred)
 conjunction = do
   symbol TokConj
+  ignoreNewlines
   return $ \x y -> Conj x y (x <--> y)
 
 disjunction :: Parser (Pred -> Pred -> Pred)
 disjunction = do
   symbol TokDisj
+  ignoreNewlines
   return $ \x y -> Disj x y (x <--> y)
 
 implication :: Parser (Pred -> Pred -> Pred)
 implication = do
   symbol TokImpl
+  ignoreNewlines
   return $ \x y -> Implies x y (x <--> y)
 
 
@@ -240,6 +246,26 @@ type' = withLoc $ Type <$> upperName
 
 --------------------------------------------------------------------------------
 -- | Combinators
+
+ignoreNewlines :: Parser ()
+ignoreNewlines = do
+  _ <- many (symbol TokNewline)
+  return ()
+
+-- ignores suffixing newlines
+withLoc :: Parser (Loc -> a) -> Parser a
+withLoc p = do
+  result <- Util.withLoc p
+  ignoreNewlines
+  return result
+
+
+-- followed by at least 1 newline
+withLoc' :: Parser (Loc -> a) -> Parser a
+withLoc' p = do
+  result <- Util.withLoc p
+  _ <- some (symbol TokNewline)
+  return result
 
 parens :: Parser a -> Parser a
 parens = between (symbol TokParenStart) (symbol TokParenEnd)

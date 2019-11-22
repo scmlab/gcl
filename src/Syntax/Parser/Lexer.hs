@@ -111,7 +111,10 @@ instance Show Tok where
 
 tokRE :: RE Char Tok
 tokRE
-   =  TokSkip       <$ "skip"
+   =
+      TokNewline    <$ "\n"
+
+  <|> TokSkip       <$ "skip"
   <|> TokAbort      <$ "abort"
   <|> TokDo         <$ "do"
   <|> TokOd         <$ "od"
@@ -167,9 +170,9 @@ upperNameRE = fmap pack $ (:) <$> psym isUpper <*> many (psym (\c -> isAlphaNum 
 intRE :: RE Char Int
 intRE = read <$> some (psym isDigit)
 
-whitespaceRE :: RE Char Tok
-whitespaceRE = matchWhen isSpace TokWhitespace
--- whitespaceRE = matchWhen (\c -> c != '\n' && c != '\r') TokenWhitespace
+whitespaceButNewlineRE :: RE Char Tok
+-- whitespaceRE = matchWhen isSpace TokWhitespace
+whitespaceButNewlineRE = matchWhen (\c -> isSpace c && c /= '\n' && c /= '\r') TokWhitespace
   where
     matchWhen :: (s -> Bool) -> a -> RE s a
     matchWhen p symbol = msym (\t -> if p t then Just symbol else Nothing)
@@ -187,7 +190,7 @@ commentEndRE pref = TokComment <$> fmap pack (pure pref +++ many anySym +++ stri
 lexer :: Lexer Tok
 lexer = mconcat
   [ token       (longest tokRE)
-  , whitespace  (longest whitespaceRE)
+  , whitespace  (longest whitespaceButNewlineRE)
   , whitespace  (longestShortest commentStartRE commentEndRE)
   ]
 

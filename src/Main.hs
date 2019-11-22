@@ -40,8 +40,8 @@ main = do
     ModeHelp -> putStrLn $ usageInfo usage options
     ModeREPL -> loop
     ModeDev -> do
-      -- testLexing
-      testParsing
+      testLexing
+      -- testParsing
       -- let filepath = "examples/b.gcl"
       -- raw <- Text.readFile filepath
       -- case parseProgram filepath raw of
@@ -64,13 +64,17 @@ main = do
           raw <- Text.readFile filepath
           putStrLn "=== raw ==="
           Text.putStrLn raw
-          putStrLn "=== processed ==="
-          let lexemes = testStream $ scan "<test>" raw
-          putStrLn lexemes
+          putStrLn "=== tokens ==="
+          let lexemes = scan "<test>" raw
+          -- let lexemes = testStream $ scan "<test>" raw
+          print lexemes
 
-          -- case parseProgram filepath raw of
-          --   Right syntax -> print syntax
-          --   Left err -> putStrLn $ errorBundlePretty err
+          putStrLn "=== AST ==="
+          case parseProgram filepath raw of
+            Right syntax -> print $ abstract syntax
+            Left err -> do
+              putStrLn $ errorBundlePretty err
+
         testParsing :: IO ()
         testParsing = do
           let filepath = "examples/b.gcl"
