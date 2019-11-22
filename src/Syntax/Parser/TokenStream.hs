@@ -13,7 +13,6 @@ import Data.List.NonEmpty (NonEmpty (..))
 import Data.Proxy
 import Language.Lexer.Applicative
 import Text.Megaparsec hiding (Pos)
--- import Debug.Trace
 
 class Ord tok => Streamable tok where
   showNonEmptyTokens :: NonEmpty (L tok) -> String
@@ -21,34 +20,22 @@ class Ord tok => Streamable tok where
 instance Ord tok => Ord (TokenStream (L tok)) where
   compare _ _ = EQ
 
-instance (Show tok, Streamable tok) => Stream (TokenStream (L tok)) where
+instance (Streamable tok) => Stream (TokenStream (L tok)) where
   type Token (TokenStream (L tok)) = L tok
   type Tokens (TokenStream (L tok)) = [L tok]
-  tokenToChunk Proxy = tokenToChunk'
-  tokensToChunk Proxy = tokensToChunk'
-  chunkToTokens Proxy = chunkToTokens'
+  tokenToChunk Proxy tok = [tok]
+  tokensToChunk Proxy = id
+  chunkToTokens Proxy = id
   chunkLength Proxy = chunkLength'
   chunkEmpty Proxy = chunkEmpty'
   take1_ = take1_'
   takeN_ = takeN_'
   takeWhile_ = takeWhile_'
-  showTokens Proxy = showTokens'
+  showTokens Proxy = showNonEmptyTokens
   reachOffset = reachOffset'
-
-tokenToChunk' :: L tok -> [L tok]
-tokenToChunk' tok = [tok]
-
-tokensToChunk' :: [L tok] -> [L tok]
-tokensToChunk' = id
-
-chunkToTokens' :: [L tok] -> [L tok]
-chunkToTokens' = id
 
 chunkLength' :: [L tok] -> Int
 chunkLength' = length
--- chunkLength' []     = 0
--- chunkLength' (x:[]) = tokenWidth x
--- chunkLength' (_:xs) = chunkLength' xs
 
 chunkEmpty' :: [L tok] -> Bool
 chunkEmpty' = (==) 0 . chunkLength'
@@ -82,10 +69,7 @@ takeWhile_' p stream = case take1_' stream of
       then let (xs, rest') = takeWhile_' p rest in (x:xs, rest')
       else ([], stream)
 
-showTokens' :: Streamable tok => NonEmpty (L tok) -> String
-showTokens' = showNonEmptyTokens
-
-reachOffset' :: Show tok => Int
+reachOffset' :: Int
              -> PosState (TokenStream (L tok))
              -> (String, PosState (TokenStream (L tok)))
 reachOffset' n posState = case takeN_' (n - pstateOffset posState) (pstateInput posState) of
@@ -111,26 +95,6 @@ reachOffset' n posState = case takeN_' (n - pstateOffset posState) (pstateInput 
 
 --------------------------------------------------------------------------------
 -- Helpers
---
--- -- | Get the offset of the ending position of a Loc
--- -- locOffset :: Loc -> Int
--- -- locOffset NoLoc = 0
--- -- locOffset (Loc _ end) = posCoff end + 1
---
--- tokenWidth :: L tok -> Int
--- tokenWidth (L NoLoc _) = 0
--- tokenWidth (L (Loc start end) _) = posCoff end - posCoff start + 1
---
--- -- | Get the ending offset of the next token
--- tokenEndingOffset :: L tok -> Int
--- tokenEndingOffset (L NoLoc _) = 0
--- tokenEndingOffset (L (Loc _ end) _) = posCoff end + 1
---
--- -- | Get the "width" of the next token
--- nextTokenWidth :: TokenStream (L tok) -> Int
--- nextTokenWidth (TsToken tok _) = tokenWidth tok
--- nextTokenWidth _               = 0
-
 
 toSourcePos :: Pos -> SourcePos
 toSourcePos (Pos filename line column _) =

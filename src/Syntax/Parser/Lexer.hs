@@ -150,10 +150,10 @@ lexer = mconcat
   , whitespace  (longestShortest commentStartRE commentEndRE)
   ]
 
-scan :: FilePath -> Text -> TStream
+scan :: FilePath -> Text -> TokStream
 scan filepath raw = runLexer lexer filepath (unpack raw)
 
-type TStream = TokenStream (L Tok)
+type TokStream = TokenStream (L Tok)
 
 instance Streamable Tok where
   showNonEmptyTokens (L _ x :| xs) = show x ++ concat (map (show . unLoc) xs)

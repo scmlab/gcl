@@ -5,92 +5,38 @@ module Syntax.Parser
   , parseProgram
   , parsePred
   , parseStmt
+
   , toPos
   ) where
 
 import Control.Monad.Combinators.Expr
-import Control.Monad.State
 import Data.Text (Text)
 import Data.Loc
 import Data.Void
-import Data.Set (Set)
-import qualified Data.Set as Set
-import Data.Map (Map)
-import qualified Data.Map as Map
 import Text.Megaparsec hiding (Pos, State)
 import Text.Megaparsec.Error (errorBundlePretty)
 
 import Syntax.Concrete
 import Syntax.Parser.Lexer
-import Debug.Trace
-
---------------------------------------------------------------------------------
--- | Source location bookkeeping
-
-type PosLog = State LocState
-
-type ID = Int
-data LocState = LocState
-  { latest :: Loc
-  , opened :: Set ID      -- waiting to be moved to the "logged" map
-                          -- when the starting position of the next token is determined
-  , logged :: Map ID Loc  -- waiting to be removed when the ending position is determined
-  , index  :: Int         -- for generating fresh ID
-  }
-
-runPosLog :: State LocState a -> a
-runPosLog f = evalState f (LocState NoLoc Set.empty Map.empty 0)
-
-markStart :: PosLog ID
-markStart = do
-  -- get a fresh ID and put it in the "opened" set
-  i <- gets index
-  modify $ \st -> st
-    { index  = succ i
-    , opened = Set.insert i (opened st)
-    }
-  return i
-
-updateLoc :: Loc -> PosLog ()
-updateLoc loc = do
-  set <- gets opened
-  let addedLoc = Map.fromSet (const loc) set
-  modify $ \st -> st
-    { latest = loc
-    , opened = Set.empty
-    , logged = Map.union (logged st) addedLoc
-    }
-
-markEnd :: ID -> PosLog Loc
-markEnd i = do
-  end <- gets latest
-  loggedPos <- gets logged
-  let loc = case Map.lookup i loggedPos of
-              Nothing  -> NoLoc
-              Just start -> start <--> end
-  -- remove it from the "logged" map
-  modify $ \st -> st
-    { logged = Map.delete i loggedPos
-    }
-  return loc
+import Syntax.Parser.Util
 
 --------------------------------------------------------------------------------
 -- | States for source location bookkeeping
 
+type Parser = ParsecT Void TokStream PosLog
+type ParseErr = ParseErrorBundle TokStream Void
 
-type Parser = ParsecT Void TStream PosLog
-
-fromRight :: Either (ParseErrorBundle TStream Void) b -> b
+fromRight :: Either ParseErr b -> b
 fromRight (Left e) = error $ errorBundlePretty e
 fromRight (Right x) = x
 
-parseProgram :: FilePath -> Text -> Either (ParseErrorBundle TStream Void) Program
+parseProgram :: FilePath -> Text -> Either ParseErr Program
 parseProgram filepath raw = runPosLog (runParserT program filepath (scan filepath raw))
 
-parsePred :: Text -> Either (ParseErrorBundle TStream Void) Pred
+parsePred :: Text -> Either ParseErr Pred
 parsePred raw = runPosLog (runParserT predicate "<predicate>" $ scan "<predicate>" raw)
 
-parseStmt :: Text -> Either (ParseErrorBundle TStream Void) Stmt
+parseStmt :: Text -> Either ParseErr Stmt
 parseStmt raw = runPosLog (runParserT statement "<statement>" $ scan "<statement>" raw)
 
 program :: Parser Program
@@ -291,24 +237,6 @@ type' :: Parser Type
 type' = withLoc $ Type <$> upperName
 
 --------------------------------------------------------------------------------
--- | Helper functions
-
-toPos :: Stream s => PosState s -> Pos
-toPos (PosState _ offset (SourcePos filepath line column) _ _) = Pos filepath (unPos line) (unPos column) offset
-
-getLoc :: Parser a -> Parser (a, Loc)
-getLoc parser = do
-  i <- lift markStart
-  result <- parser
-  loc <- lift (markEnd i)
-  return (result, loc)
-
-withLoc :: Parser (Loc -> a) -> Parser a
-withLoc parser = do
-  (result, loc) <- getLoc parser
-  return $ result loc
-
---------------------------------------------------------------------------------
 -- | Combinators
 
 parens :: Parser a -> Parser a
@@ -317,35 +245,20 @@ parens = between (symbol TokParenStart) (symbol TokParenEnd)
 braces :: Parser a -> Parser a
 braces = between (symbol TokBraceStart) (symbol TokBraceEnd)
 
-symbol :: Tok -> Parser ()
-symbol t = do
-  L loc _ <- satisfy (\(L _ t') -> t == t')
-  lift $ updateLoc loc
-  return ()
-
 upperName :: Parser Text
-upperName = do
-  L loc (TokUpperName s) <- satisfy p
-  lift $ updateLoc loc
-  return s
+upperName = extract p
   where
-    p (L _ (TokUpperName _)) = True
-    p _ = False
+    p (TokUpperName s) = Just s
+    p _ = Nothing
 
 lowerName :: Parser Text
-lowerName = do
-  L loc (TokLowerName s) <- satisfy p
-  lift $ updateLoc loc
-  return s
+lowerName = extract p
   where
-    p (L _ (TokLowerName _)) = True
-    p _ = False
+    p (TokLowerName s) = Just s
+    p _ = Nothing
 
 integer :: Parser Int
-integer = do
-  L loc (TokInt s) <- satisfy p
-  lift $ updateLoc loc
-  return s
+integer = extract p
   where
-    p (L _ (TokInt _)) = True
-    p _ = False
+    p (TokInt s) = Just s
+    p _ = Nothing
