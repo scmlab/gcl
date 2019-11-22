@@ -3,6 +3,7 @@
 module Main where
 
 import Syntax.Parser
+import Syntax.Parser.TokenStream
 import Syntax.Abstract
 import REPL
 import GCL.PreCond
@@ -39,7 +40,8 @@ main = do
     ModeHelp -> putStrLn $ usageInfo usage options
     ModeREPL -> loop
     ModeDev -> do
-      testParsing
+      testLexing
+      -- testParsing
       -- let filepath = "examples/b.gcl"
       -- raw <- Text.readFile filepath
       -- case parseProgram filepath raw of
@@ -56,6 +58,19 @@ main = do
       --     send $ ParseError pairs
 
       where
+        testLexing :: IO ()
+        testLexing = do
+          let filepath = "examples/b.gcl"
+          raw <- Text.readFile filepath
+          putStrLn "=== raw ==="
+          Text.putStrLn raw
+          putStrLn "=== processed ==="
+          let lexemes = testStream $ scan "<test>" raw
+          putStrLn lexemes
+
+          -- case parseProgram filepath raw of
+          --   Right syntax -> print syntax
+          --   Left err -> putStrLn $ errorBundlePretty err
         testParsing :: IO ()
         testParsing = do
           let filepath = "examples/b.gcl"

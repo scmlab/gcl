@@ -6,6 +6,8 @@ module Syntax.Parser
   , parsePred
   , parseStmt
 
+  , scan
+
   , toPos
   ) where
 

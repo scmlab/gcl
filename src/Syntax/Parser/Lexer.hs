@@ -14,7 +14,6 @@ import Data.Loc
 
 data Tok
     = TokNewline
-    | TokTab
     | TokWhitespace
     | TokEOF
     | TokComment Text
@@ -66,7 +65,49 @@ data Tok
     | TokTrue
     | TokFalse
 
-    deriving (Eq, Ord, Show)
+    deriving (Eq, Ord)
+
+instance Show Tok where
+  show tok = case tok of
+    TokNewline -> "\n"
+    TokWhitespace -> " "
+    TokEOF -> ""
+    TokComment s -> "-- " ++ unpack s
+    TokSkip -> "skip"
+    TokAbort -> "abort"
+    TokDo -> "do"
+    TokOd -> "od"
+    TokIf -> "if"
+    TokFi -> "fi"
+    TokBnd -> "bnd"
+    TokQM -> "?"
+    TokVar -> "var"
+    TokCon -> "con"
+    TokGuardBar -> "|"
+    TokGuardArr -> "->"
+    TokComma -> ","
+    TokSemi -> ";"
+    TokAssign -> ":="
+    TokSpecStart -> "{!"
+    TokSpecEnd -> "!}"
+    TokParenStart -> "("
+    TokParenEnd -> ")"
+    TokBraceStart -> "{"
+    TokBraceEnd -> "}"
+    TokEQ -> "="
+    TokGT -> ">"
+    TokGTE -> ">="
+    TokLT -> "<"
+    TokLTE -> "<="
+    TokImpl -> "=>"
+    TokConj -> "&&"
+    TokDisj -> "||"
+    TokNeg -> "^"
+    TokUpperName s -> unpack s
+    TokLowerName s -> unpack s
+    TokInt i -> show i
+    TokTrue -> "True"
+    TokFalse -> "False"
 
 tokRE :: RE Char Tok
 tokRE
@@ -155,5 +196,10 @@ scan filepath raw = runLexer lexer filepath (unpack raw)
 
 type TokStream = TokenStream (L Tok)
 
-instance Streamable Tok where
-  showNonEmptyTokens (L _ x :| xs) = show x ++ concat (map (show . unLoc) xs)
+-- instance Streamable Tok where
+--   showNonEmptyTokens (x :| xs) = show x ++ concat (map (show . unLoc) xs)
+--     where
+--       front :: String
+--       front = case lines (show x) of
+--                 [] -> ""
+--                 xs -> last xs

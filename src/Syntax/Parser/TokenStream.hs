@@ -9,18 +9,18 @@
 module Syntax.Parser.TokenStream where
 
 import Data.Loc
-import Data.List.NonEmpty (NonEmpty, nonEmpty)
+import Data.List.NonEmpty (NonEmpty(..), nonEmpty)
+import qualified Data.List.NonEmpty as NE
 import Data.Proxy
 import Language.Lexer.Applicative
 import Text.Megaparsec hiding (Pos)
 
-class Ord tok => Streamable tok where
-  showNonEmptyTokens :: NonEmpty (L tok) -> String
+import Debug.Trace
 
 instance Ord tok => Ord (TokenStream (L tok)) where
   compare _ _ = EQ
 
-instance (Streamable tok) => Stream (TokenStream (L tok)) where
+instance (Ord tok, Show tok) => Stream (TokenStream (L tok)) where
   type Token (TokenStream (L tok)) = L tok
   type Tokens (TokenStream (L tok)) = [L tok]
   tokenToChunk Proxy tok = [tok]
@@ -31,7 +31,7 @@ instance (Streamable tok) => Stream (TokenStream (L tok)) where
   take1_ = take1_'
   takeN_ = takeN_'
   takeWhile_ = takeWhile_'
-  showTokens Proxy = showNonEmptyTokens
+  showTokens Proxy = showTokens'
   reachOffset = reachOffset'
 
 chunkLength' :: [L tok] -> Int
@@ -69,7 +69,7 @@ takeWhile_' p stream = case take1_' stream of
       then let (xs, rest') = takeWhile_' p rest in (x:xs, rest')
       else ([], stream)
 
-reachOffset' :: Streamable tok => Int
+reachOffset' :: Show tok => Int
              -> PosState (TokenStream (L tok))
              -> (String, PosState (TokenStream (L tok)))
 reachOffset' n posState = case takeN_' (n - pstateOffset posState) (pstateInput posState) of
@@ -101,13 +101,13 @@ reachOffset' n posState = case takeN_' (n - pstateOffset posState) (pstateInput 
       sameLineInPre :: String
       sameLineInPre = case nonEmpty (dropWhile (not . isSameLineAsCurrentPos) pre) of
         Nothing -> ""
-        Just xs -> showNonEmptyTokens xs
+        Just xs -> showTokens' xs
 
 
       sameLineInPost :: String
       sameLineInPost = case nonEmpty (fst $ takeWhile_' isSameLineAsCurrentPos post) of
         Nothing -> ""
-        Just xs -> showNonEmptyTokens xs
+        Just xs -> showTokens' xs
 
       resultLine :: String
       resultLine = sameLineInPre ++ sameLineInPost
@@ -120,6 +120,15 @@ reachOffset' n posState = case takeN_' (n - pstateOffset posState) (pstateInput 
         , pstateTabWidth = pstateTabWidth posState
         , pstateLinePrefix = pstateLinePrefix posState
         }
+
+
+testStream :: Show tok => TokenStream (L tok) -> String
+testStream = showTokens' . NE.fromList . streamToList
+-- testStream = show . map toChunk . streamToList
+    -- showTokens' . NE.fromList . streamToList
+
+showTokens' :: Show tok => NonEmpty (L tok) -> String
+showTokens' = unlines . map snd . showTokenLinesWithPrefix
 
 reachOffsetNoLine' :: Int
              -> PosState (TokenStream (L tok))
@@ -156,3 +165,91 @@ reachOffsetNoLine' n posState = case takeN_' (n - pstateOffset posState) (pstate
 toSourcePos :: Pos -> SourcePos
 toSourcePos (Pos filename line column _) =
     SourcePos filename (mkPos line) (mkPos column)
+
+
+
+-- returns lines + line numbers of the string representation of tokens
+showTokenLinesWithPrefix :: Show tok => NonEmpty (L tok) -> [(Int, String)]
+showTokenLinesWithPrefix (x :| xs) = zipWith (,) lineNumbers (NE.toList body)
+  where
+    glued :: Chunk
+    glued = foldl glue (toChunk x) (map toChunk xs)
+
+    Chunk start body _ = glued
+
+    lineNumbers :: [Int]
+    lineNumbers = [fst start + 1 ..]
+
+-- returns lines + line numbers of the string representation of tokens
+showTokenLines :: Show tok => NonEmpty (L tok) -> [(Int, String)]
+showTokenLines xs = zipWith (,) lineNumbers (NE.toList body)
+  where
+    -- for prefixing spaces at the front of the first chunk
+    fakeFirstChunk :: Chunk
+    fakeFirstChunk = Chunk (0, 0) ("" :| []) (0, 0)
+
+    chunks :: [Chunk]
+    chunks = NE.toList (NE.map toChunk xs)
+
+    glued :: Chunk
+    glued = foldl glue fakeFirstChunk chunks
+
+    Chunk start body _ = glued
+
+    lineNumbers :: [Int]
+    lineNumbers = [fst start + 1 ..]
+
+data Chunk = Chunk
+                (Int, Int)        -- ^ start, counting from 0
+                (NonEmpty String) -- ^ payload
+                (Int, Int)        -- ^ end, counting from 0
+                deriving (Show)
+
+
+toChunk :: Show tok => L tok -> Chunk
+toChunk (L NoLoc tok) = Chunk start strings end
+  where
+    strings = case nonEmpty (lines (show tok)) of
+                Nothing -> "" :| []
+                Just xs -> xs
+    start = (0, 0)
+    end = (NE.length strings - 1, length (NE.last strings))
+
+toChunk (L (Loc from to) tok) = Chunk start strings end
+  where
+    strings = case nonEmpty (lines (show tok)) of
+                Nothing -> "" :| []
+                Just xs -> xs
+    start = (posLine from - 1, posCol from - 1)
+    end = (posLine to - 1, posCol to)
+
+glue :: Chunk -> Chunk -> Chunk
+glue (Chunk start1 body1 end1) (Chunk start2 body2 end2) =
+  Chunk start1 body end2
+  where
+    lineGap :: Int
+    lineGap = fst start2 - fst end1
+
+    body :: NonEmpty String
+    body = case lineGap of
+
+      -- two chunk meet at the same line
+      0 ->  let (line :| body2') = body2
+                colGap  = snd start2 - snd end1
+                line'    = NE.last body1 ++ replicate colGap ' ' ++ line
+            in  case nonEmpty (NE.init body1) of
+                  Nothing -> line' :| body2'
+                  Just body1' -> body1' <> (line' :| body2')
+
+      -- two chunk differs by one line
+      1 ->  let (line :| body2') = body2
+                colGap = snd start2
+                line' = replicate colGap ' ' ++ line
+            in  body1 <> (line' :| body2')
+
+      -- two chunk differs by more than one line
+      n ->  let (line :| body2') = body2
+                colGap = snd start2
+                line' = replicate colGap ' ' ++ line
+                emptyLines = NE.fromList (replicate (n - 1) "")
+            in  body1 <> emptyLines <> (line' :| body2')
