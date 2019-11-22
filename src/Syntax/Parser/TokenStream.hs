@@ -15,7 +15,7 @@ import Data.Proxy
 import Language.Lexer.Applicative
 import Text.Megaparsec hiding (Pos)
 
-import Debug.Trace
+-- import Debug.Trace
 
 instance Ord tok => Ord (TokenStream (L tok)) where
   compare _ _ = EQ
@@ -98,19 +98,29 @@ reachOffset' n posState = case takeN_' (n - pstateOffset posState) (pstateInput 
         Nothing     -> False
         Just (x, y) -> x <= posLine currentPos && y >= posLine currentPos
 
-      sameLineInPre :: String
-      sameLineInPre = case nonEmpty (dropWhile (not . isSameLineAsCurrentPos) pre) of
-        Nothing -> ""
-        Just xs -> showTokens' xs
+      -- focuedTokens :: [L tok]
+      focusedTokens =
+        dropWhile (not . isSameLineAsCurrentPos) pre ++
+          fst (takeWhile_' isSameLineAsCurrentPos post)
 
-
-      sameLineInPost :: String
-      sameLineInPost = case nonEmpty (fst $ takeWhile_' isSameLineAsCurrentPos post) of
-        Nothing -> ""
-        Just xs -> showTokens' xs
+      focusedLines :: [(Int, String)]
+      focusedLines = showTokenLines (NE.fromList focusedTokens)
+      --
+      -- sameLineInPre :: String
+      -- sameLineInPre = case nonEmpty (dropWhile (not . isSameLineAsCurrentPos) pre) of
+      --   Nothing -> ""
+      --   Just xs -> showTokens' xs
+      --
+      --
+      -- sameLineInPost :: String
+      -- sameLineInPost = case nonEmpty (fst $ takeWhile_' isSameLineAsCurrentPos post) of
+      --   Nothing -> ""
+      --   Just xs -> showTokens' xs
 
       resultLine :: String
-      resultLine = sameLineInPre ++ sameLineInPost
+      resultLine = case lookup (posLine currentPos) focusedLines of
+        Nothing -> "<line not found>"
+        Just s -> s
 
       -- updated 'PosState'
       posState' = PosState
@@ -128,7 +138,7 @@ testStream = showTokens' . NE.fromList . streamToList
     -- showTokens' . NE.fromList . streamToList
 
 showTokens' :: Show tok => NonEmpty (L tok) -> String
-showTokens' = unlines . map snd . showTokenLinesWithPrefix
+showTokens' = init . unlines . map snd . showTokenLines
 
 reachOffsetNoLine' :: Int
              -> PosState (TokenStream (L tok))
@@ -169,8 +179,8 @@ toSourcePos (Pos filename line column _) =
 
 
 -- returns lines + line numbers of the string representation of tokens
-showTokenLinesWithPrefix :: Show tok => NonEmpty (L tok) -> [(Int, String)]
-showTokenLinesWithPrefix (x :| xs) = zipWith (,) lineNumbers (NE.toList body)
+showTokenLines :: Show tok => NonEmpty (L tok) -> [(Int, String)]
+showTokenLines (x :| xs) = zipWith (,) lineNumbers (NE.toList body)
   where
     glued :: Chunk
     glued = foldl glue (toChunk x) (map toChunk xs)
@@ -181,8 +191,8 @@ showTokenLinesWithPrefix (x :| xs) = zipWith (,) lineNumbers (NE.toList body)
     lineNumbers = [fst start + 1 ..]
 
 -- returns lines + line numbers of the string representation of tokens
-showTokenLines :: Show tok => NonEmpty (L tok) -> [(Int, String)]
-showTokenLines xs = zipWith (,) lineNumbers (NE.toList body)
+showTokenLinesWithPrefix :: Show tok => NonEmpty (L tok) -> [(Int, String)]
+showTokenLinesWithPrefix xs = zipWith (,) lineNumbers (NE.toList body)
   where
     -- for prefixing spaces at the front of the first chunk
     fakeFirstChunk :: Chunk

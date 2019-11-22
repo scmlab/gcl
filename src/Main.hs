@@ -40,8 +40,8 @@ main = do
     ModeHelp -> putStrLn $ usageInfo usage options
     ModeREPL -> loop
     ModeDev -> do
-      testLexing
-      -- testParsing
+      -- testLexing
+      testParsing
       -- let filepath = "examples/b.gcl"
       -- raw <- Text.readFile filepath
       -- case parseProgram filepath raw of
@@ -77,7 +77,11 @@ main = do
           raw <- Text.readFile filepath
           case parseProgram filepath raw of
             Right syntax -> print syntax
-            Left err -> putStrLn $ errorBundlePretty err
+            Left err -> do
+              putStrLn $ errorBundlePretty err
+              -- print (bundleErrors err)
+              -- print (bundlePosState err)
+            -- Left err -> putStrLn $ errorBundlePretty err
 
   where
     loop :: IO ()
