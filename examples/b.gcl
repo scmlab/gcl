@@ -1,18 +1,12 @@
 skip
 
-skip
-skip
-
+{!
 
 skip
 
-abort
-
-if True => False -> skip
-fi
+!}
 
 skip
 
-skip
 
 { True }

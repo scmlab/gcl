@@ -12,6 +12,7 @@ module Syntax.Parser
   ) where
 
 import Control.Monad.Combinators.Expr
+import Control.Monad (void)
 import Data.Text (Text)
 import Data.Loc
 import Data.Void
@@ -108,9 +109,14 @@ hole :: Parser Stmt
 hole = withLoc' $ Hole <$ symbol TokQM
 
 spec :: Parser Stmt
-spec = withLoc' $ Spec <$  symbol TokSpecStart
-                      <*> many statement
-                      <*  symbol TokSpecEnd
+spec = do
+  ((), start) <- getLoc $ symbol TokSpecStart
+  ignoreNewlines
+  stmts <- many statement
+  ((), end)   <- getLoc $ symbol TokSpecEnd
+  expectNewline
+
+  return $ Spec stmts start end
 
 --------------------------------------------------------------------------------
 -- | Predicates
@@ -248,9 +254,10 @@ type' = withLoc $ Type <$> upperName
 -- | Combinators
 
 ignoreNewlines :: Parser ()
-ignoreNewlines = do
-  _ <- many (symbol TokNewline)
-  return ()
+ignoreNewlines = void $ many (symbol TokNewline)
+
+expectNewline :: Parser ()
+expectNewline = void $ some (symbol TokNewline)
 
 -- ignores suffixing newlines
 withLoc :: Parser (Loc -> a) -> Parser a
@@ -259,12 +266,11 @@ withLoc p = do
   ignoreNewlines
   return result
 
-
 -- followed by at least 1 newline
 withLoc' :: Parser (Loc -> a) -> Parser a
 withLoc' p = do
   result <- Util.withLoc p
-  _ <- some (symbol TokNewline)
+  expectNewline
   return result
 
 parens :: Parser a -> Parser a

@@ -3,7 +3,7 @@
 module Main where
 
 import Syntax.Parser
-import Syntax.Parser.TokenStream
+import Syntax.Parser.TokenStream ()
 import Syntax.Abstract
 import REPL
 import GCL.PreCond

@@ -17,7 +17,13 @@ import Syntax.Parser
 
 data Obligation = Obligation Index Pred deriving (Show, Generic)
 data Hardness = Hard | Soft deriving (Show, Generic)
-data Specification = Specification Hardness Pred Pred Loc deriving (Show, Generic)
+data Specification = Specification
+  { specHardness :: Hardness
+  , specPreCond  :: Pred
+  , specPostCond :: Pred
+  , specStartLoc :: Loc
+  , specEndLoc   :: Loc
+  } deriving (Show, Generic)
 
 type M = WriterT [Obligation] (WriterT [Specification] (State Int))
 
@@ -31,9 +37,9 @@ obligate p = do
   put (succ i)
   tell [Obligation i p]
 
-tellSpec :: Hardness -> Pred -> Pred -> Loc -> M ()
-tellSpec harsness p q loc = do
-  lift $ tell [Specification harsness p q loc]
+tellSpec :: Hardness -> Pred -> Pred -> Loc -> Loc -> M ()
+tellSpec harsness p q start end  = do
+  lift $ tell [Specification harsness p q start end]
 
 conjunct :: [Pred] -> Pred
 conjunct = foldr Conj (Lit False)
@@ -45,29 +51,29 @@ precondStmts :: [Stmt] -> Pred -> M Pred
 precondStmts [] post = return post
 precondStmts (x:[]) post = case x of
   -- SOFT
-  Spec stmts loc -> do
+  Spec stmts start end -> do
     pre <- precondStmts stmts post
-    tellSpec Soft pre post loc
+    tellSpec Soft pre post start end
     return pre
   _ -> do
     precond x post
 
 precondStmts (x:(y:xs)) post = case (x, y) of
   -- HARD
-  (Assert asserted, Spec stmts loc) -> do
+  (Assert asserted, Spec stmts start end) -> do
     -- calculate the precondition of xs
     post' <- precondStmts xs post
 
-    tellSpec Hard asserted post' loc
+    tellSpec Hard asserted post' start end
 
     post'' <- precondStmts stmts post'
     obligate (asserted `Implies` post'')
 
     return asserted
   -- SOFT
-  (Spec stmts loc, _) -> do
+  (Spec stmts start end, _) -> do
     pre <- precondStmts (y:xs) post >>= precondStmts stmts
-    tellSpec Soft pre post loc
+    tellSpec Soft pre post start end
     return pre
   _ -> do
     precondStmts (y:xs) post >>= precond x
@@ -126,7 +132,7 @@ precond (Do inv bnd branches) post = do
       pre <- precondStmts body (Term LTh bnd (LitE (Num 100)))
       return $ inv `Conj` guard `Conj` (Term Eq bnd (LitE (Num 100))) `Implies` pre
 
-precond (Spec stmts _) post = precondStmts stmts post
+precond (Spec stmts _ _) post = precondStmts stmts post
 
 precondGuard :: Pred -> GdCmd -> M Pred
 precondGuard post (GdCmd guard body) = Implies guard <$> precondStmts body post
