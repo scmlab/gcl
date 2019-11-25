@@ -12,6 +12,7 @@ module Syntax.Parser
   ) where
 
 import Control.Monad.Combinators.Expr
+import Control.Monad.State (lift)
 import Control.Monad (void)
 import Data.Text (Text)
 import Data.Loc
@@ -24,10 +25,13 @@ import Syntax.Parser.Lexer
 import Syntax.Parser.Util hiding (withLoc)
 import qualified Syntax.Parser.Util as Util
 
+
+
+
 --------------------------------------------------------------------------------
 -- | States for source location bookkeeping
 
-type Parser = ParsecT Void TokStream PosLog
+type Parser = ParsecT Void TokStream (PosLog Tok)
 type ParseErr = ParseErrorBundle TokStream Void
 
 fromRight :: Either ParseErr b -> b
@@ -257,7 +261,12 @@ ignoreNewlines :: Parser ()
 ignoreNewlines = void $ many (symbol TokNewline)
 
 expectNewline :: Parser ()
-expectNewline = void $ some (symbol TokNewline)
+expectNewline = do
+  -- see if the latest accepcted token is TokNewline
+  t <- lift Util.getLatestToken
+  case t of
+    Just TokNewline -> return ()
+    _ -> void $ some (symbol TokNewline)
 
 -- ignores suffixing newlines
 withLoc :: Parser (Loc -> a) -> Parser a

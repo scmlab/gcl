@@ -3,7 +3,7 @@
 module Syntax.Parser.Util
   ( PosLog
   , runPosLog
-  , markStart, markEnd, updateLoc
+  , markStart, markEnd, update, getLatestToken
 
   , toPos
   , getLoc, withLoc
@@ -25,21 +25,21 @@ import Syntax.Parser.TokenStream ()
 --------------------------------------------------------------------------------
 -- | Source location bookkeeping
 
-type PosLog = State LocState
+type PosLog token = State (LocState token)
 
 type ID = Int
-data LocState = LocState
-  { latest :: Loc
+data LocState token = LocState
+  { latest :: (Loc, Maybe token)
   , opened :: Set ID      -- waiting to be moved to the "logged" map
                           -- when the starting position of the next token is determined
   , logged :: Map ID Loc  -- waiting to be removed when the ending position is determined
   , index  :: Int         -- for generating fresh IDs
   }
 
-runPosLog :: State LocState a -> a
-runPosLog f = evalState f (LocState NoLoc Set.empty Map.empty 0)
+runPosLog :: State (LocState token) a -> a
+runPosLog f = evalState f (LocState (NoLoc, Nothing) Set.empty Map.empty 0)
 
-markStart :: PosLog ID
+markStart :: PosLog token ID
 markStart = do
   -- get a fresh ID and put it in the "opened" set
   i <- gets index
@@ -49,19 +49,19 @@ markStart = do
     }
   return i
 
-updateLoc :: Loc -> PosLog ()
-updateLoc loc = do
+update :: Loc -> token -> PosLog token ()
+update loc tok = do
   set <- gets opened
   let addedLoc = Map.fromSet (const loc) set
   modify $ \st -> st
-    { latest = loc
+    { latest = (loc, Just tok)
     , opened = Set.empty
     , logged = Map.union (logged st) addedLoc
     }
 
-markEnd :: ID -> PosLog Loc
+markEnd :: ID -> PosLog token Loc
 markEnd i = do
-  end <- gets latest
+  (end, _) <- gets latest
   loggedPos <- gets logged
   let loc = case Map.lookup i loggedPos of
               Nothing  -> NoLoc
@@ -72,10 +72,13 @@ markEnd i = do
     }
   return loc
 
+getLatestToken :: PosLog token (Maybe token)
+getLatestToken = snd <$> gets latest
+
 --------------------------------------------------------------------------------
 -- | Helper functions
 
-type P tok = ParsecT Void (TokenStream (L tok)) PosLog
+type P token = ParsecT Void (TokenStream (L token)) (PosLog token)
 
 toPos :: Stream s => PosState s -> Pos
 toPos (PosState _ offset (SourcePos filepath line column) _ _) = Pos filepath (unPos line) (unPos column) offset
@@ -97,16 +100,16 @@ withLoc parser = do
 
 symbol :: (Eq tok, Ord tok, Show tok) => tok -> P tok ()
 symbol t = do
-  L loc _ <- satisfy (\(L _ t') -> t == t')
-  lift $ updateLoc loc
+  L loc tok <- satisfy (\(L _ t') -> t == t')
+  lift $ update loc tok
   return ()
 
 extract :: (Ord tok, Show tok) => (tok -> Maybe a) -> P tok a
 extract f = do
-  (s, loc) <- token p Set.empty
-  lift $ updateLoc loc
-  return s
+  (result, tok, loc) <- token p Set.empty
+  lift $ update loc tok
+  return result
   where
-    p (L loc tok) = case f tok of
-      Just s  -> Just (s, loc)
+    p (L loc tok') = case f tok' of
+      Just result -> Just (result, tok', loc)
       Nothing -> Nothing
