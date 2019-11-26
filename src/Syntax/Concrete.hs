@@ -1,7 +1,7 @@
 module Syntax.Concrete where
 
 import Data.Loc
-import Data.Text (Text)
+import Data.Text.Lazy (Text)
 
 data Program = Program [Declaration] [Stmt] Loc
   deriving (Show)

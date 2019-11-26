@@ -41,7 +41,9 @@ packages:
 #
 extra-deps:
   - megaparsec-8.0.0
-  - lexer-applicative-2.1.0.2
+  - git: https://github.com/banacorn/lexer-applicative.git
+    commit: 37f0e9366bcac19f3396a5fdb4d8fed2b37ce844
+
 
 # Override default flag values for local packages and extra-deps
 # flags: {}

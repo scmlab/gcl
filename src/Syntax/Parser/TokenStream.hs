@@ -12,7 +12,7 @@ import Data.Loc
 import Data.List.NonEmpty (NonEmpty(..), nonEmpty)
 import qualified Data.List.NonEmpty as NE
 import Data.Proxy
-import Language.Lexer.Applicative
+import Language.Lexer.Applicative.Text
 import Text.Megaparsec hiding (Pos)
 
 -- import Debug.Trace
@@ -190,24 +190,24 @@ showTokenLines (x :| xs) = zipWith (,) lineNumbers (NE.toList body)
     lineNumbers :: [Int]
     lineNumbers = [fst start + 1 ..]
 
--- returns lines + line numbers of the string representation of tokens
-showTokenLinesWithPrefix :: Show tok => NonEmpty (L tok) -> [(Int, String)]
-showTokenLinesWithPrefix xs = zipWith (,) lineNumbers (NE.toList body)
-  where
-    -- for prefixing spaces at the front of the first chunk
-    fakeFirstChunk :: Chunk
-    fakeFirstChunk = Chunk (0, 0) ("" :| []) (0, 0)
-
-    chunks :: [Chunk]
-    chunks = NE.toList (NE.map toChunk xs)
-
-    glued :: Chunk
-    glued = foldl glue fakeFirstChunk chunks
-
-    Chunk start body _ = glued
-
-    lineNumbers :: [Int]
-    lineNumbers = [fst start + 1 ..]
+-- -- returns lines + line numbers of the string representation of tokens
+-- showTokenLinesWithPrefix :: Show tok => NonEmpty (L tok) -> [(Int, String)]
+-- showTokenLinesWithPrefix xs = zipWith (,) lineNumbers (NE.toList body)
+--   where
+--     -- for prefixing spaces at the front of the first chunk
+--     fakeFirstChunk :: Chunk
+--     fakeFirstChunk = Chunk (0, 0) ("" :| []) (0, 0)
+--
+--     chunks :: [Chunk]
+--     chunks = NE.toList (NE.map toChunk xs)
+--
+--     glued :: Chunk
+--     glued = foldl glue fakeFirstChunk chunks
+--
+--     Chunk start body _ = glued
+--
+--     lineNumbers :: [Int]
+--     lineNumbers = [fst start + 1 ..]
 
 data Chunk = Chunk
                 (Int, Int)        -- ^ start, counting from 0

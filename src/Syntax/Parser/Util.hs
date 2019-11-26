@@ -19,7 +19,7 @@ import qualified Data.Set as Set
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Text.Megaparsec hiding (Pos, State)
-import Language.Lexer.Applicative (TokenStream)
+import Language.Lexer.Applicative.Text (TokenStream)
 import Syntax.Parser.TokenStream ()
 
 --------------------------------------------------------------------------------

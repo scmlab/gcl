@@ -14,7 +14,7 @@ module Syntax.Parser
 import Control.Monad.Combinators.Expr
 import Control.Monad.State (lift)
 import Control.Monad (void)
-import Data.Text (Text)
+import Data.Text.Lazy (Text)
 import Data.Loc
 import Data.Void
 import Text.Megaparsec hiding (Pos, State)

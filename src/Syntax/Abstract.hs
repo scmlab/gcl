@@ -10,7 +10,7 @@ import Control.Monad.State
 import Control.Monad.Except
 
 import Data.Aeson
-import Data.Text (Text)
+import Data.Text.Lazy (Text)
 import Data.Map (Map)
 import Data.Loc
 import qualified Data.Map as Map

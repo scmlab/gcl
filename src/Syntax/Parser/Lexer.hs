@@ -2,14 +2,12 @@
 
 module Syntax.Parser.Lexer where
 
-import Syntax.Parser.TokenStream
-
-import Data.List.NonEmpty (NonEmpty(..))
-
-import Language.Lexer.Applicative
+import Language.Lexer.Applicative.Text
 import Text.Regex.Applicative
-import Data.Char hiding (Space)
-import Data.Text (Text, pack, unpack)
+import Data.Char
+-- import Data.Text hiding (Space)
+import Data.Text.Lazy (Text)
+import qualified Data.Text.Lazy as Text
 import Data.Loc
 
 data Tok
@@ -72,7 +70,7 @@ instance Show Tok where
     TokNewline -> "\n"
     TokWhitespace -> " "
     TokEOF -> ""
-    TokComment s -> "-- " ++ unpack s
+    TokComment s -> "-- " ++ Text.unpack s
     TokSkip -> "skip"
     TokAbort -> "abort"
     TokDo -> "do"
@@ -103,89 +101,107 @@ instance Show Tok where
     TokConj -> "&&"
     TokDisj -> "||"
     TokNeg -> "^"
-    TokUpperName s -> unpack s
-    TokLowerName s -> unpack s
+    TokUpperName s -> Text.unpack s
+    TokLowerName s -> Text.unpack s
     TokInt i -> show i
     TokTrue -> "True"
     TokFalse -> "False"
 
-tokRE :: RE Char Tok
+-- foldl :: (RE Text Text -> Char -> RE Text Text) -> RE Text Text -> Text -> RE Text Text
+
+text :: Text -> RE Text Text
+text raw = Text.foldr f (pure "") raw
+  where
+    f :: Char -> RE Text Text -> RE Text Text
+    f c p = Text.cons <$ sym (Text.singleton c) <*> pure c <*> p
+
+
+
+tokRE :: RE Text Tok
 tokRE
    =
-      TokNewline    <$ "\n"
+      TokNewline    <$ text "\n"
 
-  <|> TokSkip       <$ "skip"
-  <|> TokAbort      <$ "abort"
-  <|> TokDo         <$ "do"
-  <|> TokOd         <$ "od"
-  <|> TokIf         <$ "if"
-  <|> TokFi         <$ "fi"
-  <|> TokBnd        <$ "bnd"
+  <|> TokSkip       <$ text "skip"
+  <|> TokAbort      <$ text "abort"
+  <|> TokDo         <$ text "do"
+  <|> TokOd         <$ text "od"
+  <|> TokIf         <$ text "if"
+  <|> TokFi         <$ text "fi"
+  <|> TokBnd        <$ text "bnd"
 
-  <|> TokQM         <$ "?"
+  <|> TokQM         <$ text "?"
 
-  <|> TokCon        <$ "con"
-  <|> TokVar        <$ "var"
+  <|> TokCon        <$ text "con"
+  <|> TokVar        <$ text "var"
 
-  <|> TokGuardBar   <$ "|"
-  <|> TokGuardArr   <$ "->"
+  <|> TokGuardBar   <$ text "|"
+  <|> TokGuardArr   <$ text "->"
 
   -- delimiters
-  <|> TokComma        <$ ","
-  <|> TokSemi         <$ ":"
-  <|> TokAssign       <$ ":="
-  <|> TokSpecStart    <$ "{!"
-  <|> TokSpecEnd      <$ "!}"
-  <|> TokParenStart   <$ "("
-  <|> TokParenEnd     <$ ")"
-  <|> TokBraceStart   <$ "{"
-  <|> TokBraceEnd     <$ "}"
+  <|> TokComma        <$ text ","
+  <|> TokSemi         <$ text ":"
+  <|> TokAssign       <$ text ":="
+  <|> TokSpecStart    <$ text "{!"
+  <|> TokSpecEnd      <$ text "!}"
+  <|> TokParenStart   <$ text "("
+  <|> TokParenEnd     <$ text ")"
+  <|> TokBraceStart   <$ text "{"
+  <|> TokBraceEnd     <$ text "}"
 
   -- literals
-  <|> TokEQ           <$  "="
-  <|> TokGT           <$  ">"
-  <|> TokGTE          <$  ">="
-  <|> TokLT           <$  "<"
-  <|> TokLTE          <$  "<="
-  <|> TokImpl         <$  "=>"
-  <|> TokConj         <$  "&&"
-  <|> TokDisj         <$  "||"
-  <|> TokNeg          <$  "^"
+  <|> TokEQ           <$ text "="
+  <|> TokGT           <$ text ">"
+  <|> TokGTE          <$ text ">="
+  <|> TokLT           <$ text "<"
+  <|> TokLTE          <$ text "<="
+  <|> TokImpl         <$ text "=>"
+  <|> TokConj         <$ text "&&"
+  <|> TokDisj         <$ text "||"
+  <|> TokNeg          <$ text "^"
 
-  <|> TokTrue         <$  "True"
-  <|> TokFalse        <$  "False"
+  <|> TokTrue         <$ text "True"
+  <|> TokFalse        <$ text "False"
 
   <|> TokUpperName    <$> upperNameRE
   <|> TokLowerName    <$> lowerNameRE
   <|> TokInt          <$> intRE
 
+adapt :: (Char -> Bool) -> Text -> Bool
+adapt f xs
+  | Text.null xs = False
+  | otherwise    = f (Text.head xs)
+
 -- starts with lowercase alphabets
-lowerNameRE :: RE Char Text
-lowerNameRE = fmap pack $ (:) <$> psym isLower <*> many (psym (\c -> isAlphaNum c || c == '_' || c == '\''))
+lowerNameRE :: RE Text Text
+lowerNameRE = Text.append
+  <$> psym (adapt isLower)
+  <*> (Text.concat <$> many (psym (adapt (\c -> isAlphaNum c || c == '_' || c == '\''))))
 
 -- starts with uppercase alphabets
-upperNameRE :: RE Char Text
-upperNameRE = fmap pack $ (:) <$> psym isUpper <*> many (psym (\c -> isAlphaNum c || c == '_' || c == '\''))
+upperNameRE :: RE Text Text
+upperNameRE = Text.append
+  <$> psym (adapt isUpper)
+  <*> (Text.concat <$> many (psym $ adapt (\c -> isAlphaNum c || c == '_' || c == '\'')))
 
-intRE :: RE Char Int
-intRE = read <$> some (psym isDigit)
+intRE :: RE Text Int
+intRE = read <$> (Text.unpack . Text.concat <$> some (psym (adapt isDigit)))
 
-whitespaceButNewlineRE :: RE Char Tok
+whitespaceButNewlineRE :: RE Text Tok
 -- whitespaceRE = matchWhen isSpace TokWhitespace
-whitespaceButNewlineRE = matchWhen (\c -> isSpace c && c /= '\n' && c /= '\r') TokWhitespace
+whitespaceButNewlineRE = matchWhen (adapt (\c -> isSpace c && c /= '\n' && c /= '\r')) TokWhitespace
   where
-    matchWhen :: (s -> Bool) -> a -> RE s a
+    matchWhen :: (Text -> Bool) -> Tok -> RE Text Tok
     matchWhen p symbol = msym (\t -> if p t then Just symbol else Nothing)
 
 
-commentStartRE :: RE Char String
-commentStartRE = string "--"
+commentStartRE :: RE Text Text
+commentStartRE = text "--"
 
-commentEndRE :: String -> RE Char Tok
-commentEndRE pref = TokComment <$> fmap pack (pure pref +++ many anySym +++ string "\n")
+commentEndRE :: Text -> RE Text Tok
+commentEndRE prefix = TokComment <$> (pure prefix +++ (Text.concat <$> many anySym) +++ text "\n")
   where
-    (+++) :: RE Char String -> RE Char String -> RE Char String
-    (+++) = liftA2 (++)
+    (+++) = liftA2 (<>)
 
 lexer :: Lexer Tok
 lexer = mconcat
@@ -195,14 +211,6 @@ lexer = mconcat
   ]
 
 scan :: FilePath -> Text -> TokStream
-scan filepath raw = runLexer lexer filepath (unpack raw)
+scan = runLexer lexer
 
 type TokStream = TokenStream (L Tok)
-
--- instance Streamable Tok where
---   showNonEmptyTokens (x :| xs) = show x ++ concat (map (show . unLoc) xs)
---     where
---       front :: String
---       front = case lines (show x) of
---                 [] -> ""
---                 xs -> last xs

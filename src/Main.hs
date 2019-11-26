@@ -9,7 +9,7 @@ import REPL
 import GCL.PreCond
 
 import Prelude
-import qualified Data.Text.IO as Text
+import qualified Data.Text.Lazy.IO as Text
 import Data.Loc (Pos(..))
 
 import Text.Megaparsec.Error
