@@ -6,9 +6,8 @@ module REPL where
 import qualified Data.ByteString.Lazy.Char8 as BS
 import qualified Data.ByteString.Char8 as Strict
 
-import qualified Syntax.Abstract as A
+import Syntax.Type (SyntaxError)
 import Data.Aeson
-import Data.Loc
 import GHC.Generics
 import System.IO
 import GCL.PreCond
@@ -29,8 +28,8 @@ send payload = do
 data Response
   = OK [Obligation] [Specification]
   | JSONError
-  | SyntaxError A.SyntaxError
-  | ParseError [(Pos, String)]
+  | SyntaxError SyntaxError
+  -- | ParseError [(Pos, String)]
   deriving (Generic)
 
 instance ToJSON Response where

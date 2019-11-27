@@ -16,9 +16,8 @@ import Data.Loc
 import qualified Data.Map as Map
 import GHC.Generics
 
--- import Debug.Trace
-
 import qualified Syntax.Concrete as C
+import Syntax.Type
 
 type Index = Int
 
@@ -65,10 +64,10 @@ affixAssertions (x:y:xs) = case (x, y) of
         <:> affixAssertions xs
 
   -- AssertWithBnd + _
-  (C.AssertWithBnd _ _ loc, _) -> throwError $ ExcessBound loc
+  (C.AssertWithBnd _ _ loc, _) -> throwError $ TransformError $ ExcessBound loc
 
   -- Assert + DO
-  (C.Assert _ loc, C.Do _ _) -> throwError $ MissingBound loc
+  (C.Assert _ loc, C.Do _ _) -> throwError $ TransformError $ MissingBound loc
 
   -- Assert + If : affix!
   (C.Assert p _, C.If q _) ->
@@ -77,7 +76,7 @@ affixAssertions (x:y:xs) = case (x, y) of
         <:> affixAssertions xs
 
   -- _ + Do
-  (_, C.Do _ loc) -> throwError $ MissingAssertion loc
+  (_, C.Do _ loc) -> throwError $ TransformError $ MissingAssertion loc
 
   -- otherwise
   _  -> fromConcrete x <:> affixAssertions (y:xs)
@@ -155,16 +154,6 @@ type Type = Text
 --------------------------------------------------------------------------------
 -- Converting from Concrete Syntax Tree
 
-data SyntaxError = MissingAssertion Loc
-                 | MissingBound     Loc
-                 | ExcessBound      Loc
-                 | MissingPostcondition
-                 | DigHole Loc
-                 | Panic String
-                 deriving (Show, Generic)
-
-instance ToJSON SyntaxError where
-
 type AbstractM = ExceptT SyntaxError (State Index)
 
 abstract :: FromConcrete a b => a -> Either SyntaxError b
@@ -236,10 +225,10 @@ instance FromConcrete C.Stmt Stmt where
   fromConcrete (C.If     p   _) = If     <$> pure Nothing
                                          <*> mapM fromConcrete p
   -- Panic because these cases should've been handled by `affixAssertions`
-  fromConcrete (C.AssertWithBnd _ _ _) = throwError $ Panic "AssertWithBnd"
-  fromConcrete (C.Do     _ _) = throwError $ Panic "Do"
+  fromConcrete (C.AssertWithBnd _ _ _) = throwError $ TransformError $ Panic "AssertWithBnd"
+  fromConcrete (C.Do     _ _) = throwError $ TransformError $ Panic "Do"
   -- Holes and specs
-  fromConcrete (C.Hole loc) = throwError $ DigHole loc
+  fromConcrete (C.Hole loc) = throwError $ TransformError $ DigHole loc
   fromConcrete (C.Spec p startLoc endLoc) = Spec <$> mapM fromConcrete p
                                                  <*> pure startLoc
                                                  <*> pure endLoc
@@ -248,7 +237,7 @@ instance FromConcrete C.Stmt Stmt where
 instance FromConcrete [C.Stmt] [Stmt] where
   fromConcrete      []  = return []
   fromConcrete (x : []) = case x of
-    C.Do _ loc -> throwError $ MissingAssertion loc
+    C.Do _ loc -> throwError $ TransformError $ MissingAssertion loc
     _          -> fromConcrete x <:> pure []
   fromConcrete (x:y:xs) = affixAssertions (x:y:xs)
 
@@ -271,34 +260,4 @@ instance FromConcrete C.Program Program where
       checkStatements [] = return Nothing
       checkStatements xs = case last xs of
         Assert r -> return (Just (init xs, r))
-        _        -> throwError MissingPostcondition
-
-
---------------------------------------------------------------------------------
--- | Instances of ToJSON
-
-instance ToJSON Pos where
-  toJSON (Pos filepath line column offset) = object
-    [ "filepath"  .= filepath
-    , "line"      .= line
-    , "column"    .= column
-    , "offset"    .= offset
-    ]
-
-  toEncoding (Pos filepath line column offset) = pairs
-      $   "filepath"  .= filepath
-      <>  "line"      .= line
-      <>  "column"    .= column
-      <>  "offset"    .= offset
-
-instance ToJSON Loc where
-  toJSON NoLoc = object
-    [ "tag"    .= ("NoLoc" :: String)
-    ]
-  toJSON (Loc start end) = object
-    [ "tag"       .= ("Loc" :: String)
-    , "contents"  .= object
-      [ "start"    .= start
-      , "end"      .= end
-      ]
-    ]
+        _        -> throwError $ TransformError MissingPostcondition

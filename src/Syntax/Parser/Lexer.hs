@@ -9,7 +9,6 @@ import Data.Char
 import Data.Text.Lazy (Text)
 import qualified Data.Text.Lazy as Text
 import Data.Loc
-import Data.List (find)
 
 data Tok
     = TokNewline
@@ -217,6 +216,6 @@ scan = runLexer lexer
 filterError :: TokStream -> Maybe Pos
 filterError TsEof = Nothing
 filterError (TsError (LexicalError pos)) = Just pos
-filterError (TsToken x xs) = filterError xs
+filterError (TsToken _ xs) = filterError xs
 
 type TokStream = TokenStream (L Tok)

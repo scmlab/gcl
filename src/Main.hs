@@ -10,14 +10,10 @@ import GCL.PreCond
 
 import Prelude
 import qualified Data.Text.Lazy.IO as Text
-import Data.Loc (Pos(..))
 
-import Text.Megaparsec.Error
 
 import System.Console.GetOpt
 import System.Environment
-import Text.Megaparsec (PosState)
-import Text.Megaparsec.Stream (Stream(..))
 
 main :: IO ()
 main = do
@@ -60,8 +56,8 @@ main = do
             Right syntax -> print $ abstract syntax
             Left err -> print err
 
-        testParsing :: IO ()
-        testParsing = do
+        _testParsing :: IO ()
+        _testParsing = do
           let filepath = "examples/b.gcl"
           raw <- Text.readFile filepath
           case parseProgram filepath raw of
@@ -85,7 +81,7 @@ main = do
               Right (Program _ (Just (statements, postcondition))) -> do
                 let ((_, obligations), specifications) = runM $ precondStmts statements postcondition
                 send $ OK obligations specifications
-            Left (SyntacticError pairs) -> send $ ParseError pairs
+            Left err -> send $ SyntaxError err
           loop
         Just Quit -> return ()
         _ -> do

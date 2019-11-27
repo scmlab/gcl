@@ -4,10 +4,11 @@ module Syntax.Parser
   ( parseProgram
   , parsePred
   , parseStmt
-  , ParseError(..)
   , scan
 
   , toPos
+
+  , module Syntax.Type
   ) where
 
 import Control.Monad.Combinators.Expr
@@ -18,13 +19,13 @@ import Data.Loc
 import Data.Void
 import Text.Megaparsec hiding (Pos, State, ParseError, parse)
 import qualified Text.Megaparsec as Mega
-import Text.Megaparsec.Error (errorBundlePretty, parseErrorTextPretty)
+import Text.Megaparsec.Error (parseErrorTextPretty)
 
 import Syntax.Concrete
 import Syntax.Parser.Lexer
 import Syntax.Parser.Util hiding (withLoc)
 import qualified Syntax.Parser.Util as Util
-
+import Syntax.Type
 
 
 
@@ -33,10 +34,7 @@ import qualified Syntax.Parser.Util as Util
 
 type Parser = ParsecT Void TokStream (PosLog Tok)
 
-data ParseError = LexicalError Pos | SyntacticError [(Pos, String)]
-  deriving (Show)
-
-parse :: Parser a -> FilePath -> Text -> Either ParseError a
+parse :: Parser a -> FilePath -> Text -> Either SyntaxError a
 parse parser filepath raw = do
   let tokenStream = scan filepath raw
   case filterError tokenStream of
@@ -61,13 +59,13 @@ parse parser filepath raw = do
             in (next, (toPos next, parseErrorTextPretty err):accum)
 
 
-parseProgram :: FilePath -> Text -> Either ParseError Program
+parseProgram :: FilePath -> Text -> Either SyntaxError Program
 parseProgram = parse program
 
-parsePred :: Text -> Either ParseError Pred
+parsePred :: Text -> Either SyntaxError Pred
 parsePred = parse predicate "<predicate>"
 
-parseStmt :: Text -> Either ParseError Stmt
+parseStmt :: Text -> Either SyntaxError Stmt
 parseStmt = parse statement "<statement>"
 
 program :: Parser Program
