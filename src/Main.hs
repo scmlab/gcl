@@ -76,12 +76,12 @@ main = do
           raw <- Text.readFile filepath
           case parseProgram filepath raw of
             Right syntax -> case abstract syntax of
-              Left err -> send $ SyntaxError err
+              Left err -> send $ Error err
               Right (Program _ Nothing) -> send $ OK [] []
               Right (Program _ (Just (statements, postcondition))) -> do
                 let ((_, obligations), specifications) = runM $ precondStmts statements postcondition
                 send $ OK obligations specifications
-            Left err -> send $ SyntaxError err
+            Left err -> send $ Error err
           loop
         Just Quit -> return ()
         _ -> do

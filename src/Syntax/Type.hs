@@ -11,7 +11,15 @@ data SyntaxError
   = LexicalError    Pos
   | SyntacticError [(Pos, String)]
   | TransformError TransformError
-  deriving (Show, Generic)
+  deriving (Generic)
+
+instance Show SyntaxError where
+  show (LexicalError pos) = "LexicalError " ++ show pos
+  show (SyntacticError xs) = "SyntacticError\n" ++ unlines (map showPair xs)
+    where
+      showPair :: (Pos, String) -> String
+      showPair (pos, msg) = msg ++ " at " ++ show pos
+  show (TransformError e) = "TransformError " ++ show e
 
 data TransformError
   = MissingAssertion Loc

@@ -1,4 +1,5 @@
-con x :/ Int 
+con x : Int
+var x : A
 
 {!
 

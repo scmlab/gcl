@@ -27,8 +27,7 @@ send payload = do
 
 data Response
   = OK [Obligation] [Specification]
-  | JSONError
-  | SyntaxError SyntaxError
+  | Error SyntaxError
   -- | ParseError [(Pos, String)]
   deriving (Generic)
 
