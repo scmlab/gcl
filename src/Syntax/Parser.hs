@@ -18,8 +18,6 @@ import Data.Text.Lazy (Text)
 import Data.Loc
 import Data.Void
 import Text.Megaparsec hiding (Pos, State, ParseError, parse)
-import qualified Text.Megaparsec as Mega
-import Text.Megaparsec.Error (parseErrorTextPretty)
 
 import Syntax.Concrete
 import Syntax.Parser.Lexer
@@ -40,24 +38,8 @@ parse parser filepath raw = do
   case filterError tokenStream of
     Just e  -> Left (LexicalError e)
     Nothing -> case runPosLog (runParserT parser filepath tokenStream) of
-      Left e -> Left (SyntacticError $ collectParseErrors e)
+      Left e -> Left (SyntacticError $ fromParseErrorBundle e)
       Right x -> Right x
-
-  where
-    collectParseErrors :: (Stream s, ShowErrorComponent e)
-                       => ParseErrorBundle s e
-                       -> [(Pos, String)]
-    collectParseErrors (ParseErrorBundle errors posState)
-      = snd $ foldr f (posState, []) errors
-      where
-        f :: (Stream s, ShowErrorComponent e)
-          => Mega.ParseError s e
-          -> (PosState s, [(Pos, String)])
-          -> (PosState s, [(Pos, String)])
-        f err (initial, accum) =
-            let (_, next) = reachOffset (errorOffset err) initial
-            in (next, (toPos next, parseErrorTextPretty err):accum)
-
 
 parseProgram :: FilePath -> Text -> Either SyntaxError Program
 parseProgram = parse program
