@@ -9,6 +9,7 @@ import Data.Char
 import Data.Text.Lazy (Text)
 import qualified Data.Text.Lazy as Text
 import Data.Loc
+import Data.List (find)
 
 data Tok
     = TokNewline
@@ -212,5 +213,10 @@ lexer = mconcat
 
 scan :: FilePath -> Text -> TokStream
 scan = runLexer lexer
+
+filterError :: TokStream -> Maybe Pos
+filterError TsEof = Nothing
+filterError (TsError (LexicalError pos)) = Just pos
+filterError (TsToken x xs) = filterError xs
 
 type TokStream = TokenStream (L Tok)

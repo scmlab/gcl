@@ -1,11 +1,10 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Syntax.Parser
-  ( fromRight
-  , parseProgram
+  ( parseProgram
   , parsePred
   , parseStmt
-
+  , ParseError(..)
   , scan
 
   , toPos
@@ -17,8 +16,9 @@ import Control.Monad (void)
 import Data.Text.Lazy (Text)
 import Data.Loc
 import Data.Void
-import Text.Megaparsec hiding (Pos, State)
-import Text.Megaparsec.Error (errorBundlePretty)
+import Text.Megaparsec hiding (Pos, State, ParseError, parse)
+import qualified Text.Megaparsec as Mega
+import Text.Megaparsec.Error (errorBundlePretty, parseErrorTextPretty)
 
 import Syntax.Concrete
 import Syntax.Parser.Lexer
@@ -32,20 +32,43 @@ import qualified Syntax.Parser.Util as Util
 -- | States for source location bookkeeping
 
 type Parser = ParsecT Void TokStream (PosLog Tok)
-type ParseErr = ParseErrorBundle TokStream Void
 
-fromRight :: Either ParseErr b -> b
-fromRight (Left e) = error $ errorBundlePretty e
-fromRight (Right x) = x
+data ParseError = LexicalError Pos | SyntacticError [(Pos, String)]
+  deriving (Show)
 
-parseProgram :: FilePath -> Text -> Either ParseErr Program
-parseProgram filepath raw = runPosLog (runParserT program filepath (scan filepath raw))
+parse :: Parser a -> FilePath -> Text -> Either ParseError a
+parse parser filepath raw = do
+  let tokenStream = scan filepath raw
+  case filterError tokenStream of
+    Just e  -> Left (LexicalError e)
+    Nothing -> case runPosLog (runParserT parser filepath tokenStream) of
+      Left e -> Left (SyntacticError $ collectParseErrors e)
+      Right x -> Right x
 
-parsePred :: Text -> Either ParseErr Pred
-parsePred raw = runPosLog (runParserT predicate "<predicate>" $ scan "<predicate>" raw)
+  where
+    collectParseErrors :: (Stream s, ShowErrorComponent e)
+                       => ParseErrorBundle s e
+                       -> [(Pos, String)]
+    collectParseErrors (ParseErrorBundle errors posState)
+      = snd $ foldr f (posState, []) errors
+      where
+        f :: (Stream s, ShowErrorComponent e)
+          => Mega.ParseError s e
+          -> (PosState s, [(Pos, String)])
+          -> (PosState s, [(Pos, String)])
+        f err (initial, accum) =
+            let (_, next) = reachOffset (errorOffset err) initial
+            in (next, (toPos next, parseErrorTextPretty err):accum)
 
-parseStmt :: Text -> Either ParseErr Stmt
-parseStmt raw = runPosLog (runParserT statement "<statement>" $ scan "<statement>" raw)
+
+parseProgram :: FilePath -> Text -> Either ParseError Program
+parseProgram = parse program
+
+parsePred :: Text -> Either ParseError Pred
+parsePred = parse predicate "<predicate>"
+
+parseStmt :: Text -> Either ParseError Stmt
+parseStmt = parse statement "<statement>"
 
 program :: Parser Program
 program = withLoc $ do

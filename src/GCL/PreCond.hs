@@ -231,20 +231,21 @@ precondGuard post (GdCmd guard body) = Implies guard <$> precondStmts body post
 --   (body', pre) <- sweepStmts body post
 --   return (GdCmd guard body', guard `Implies` pre)
 
-gcdExample :: Program
-gcdExample = let Right result = abstract $ fromRight $ parseProgram "<test>" "\
-  \x := X\n\
-  \y := Y\n\
-  \{ gcd(x, y) = gcd(X, Y), bnd: ? }\n\
-  \do x > y -> x := minus(x, y)  \n\
-  \ | x < y -> y := minus(y, x)  \n\
-  \od\n\
-  \{ gcd(X, Y) = x }\n\
-  \"
-  in result
+gcdExample :: Either ParseError (Either SyntaxError Program)
+gcdExample = do
+  result <- parseProgram "<test>" "\
+    \x := X\n\
+    \y := Y\n\
+    \{ gcd(x, y) = gcd(X, Y), bnd: ? }\n\
+    \do x > y -> x := minus(x, y)  \n\
+    \ | x < y -> y := minus(y, x)  \n\
+    \od\n\
+    \{ gcd(X, Y) = x }\n\
+    \"
+  return $ abstract result
 
 test :: ((Pred, [Obligation]), [Specification])
 test = runM $ case gcdExample of
-  Program _ Nothing -> undefined
-  Program _ (Just (statements, postcondition))
+  Right (Right (Program _ (Just (statements, postcondition))))
     -> precondStmts statements postcondition
+  _ -> undefined

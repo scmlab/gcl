@@ -163,7 +163,6 @@ data SyntaxError = MissingAssertion Loc
                  | Panic String
                  deriving (Show, Generic)
 
-
 instance ToJSON SyntaxError where
 
 type AbstractM = ExceptT SyntaxError (State Index)

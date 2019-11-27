@@ -19,20 +19,6 @@ import System.Environment
 import Text.Megaparsec (PosState)
 import Text.Megaparsec.Stream (Stream(..))
 
-collectParseErrors :: Stream s
-                   => ParseErrorBundle s e
-                   -> [(Pos, ParseError s e)]
-collectParseErrors (ParseErrorBundle errors posState)
-  = snd $ foldr f (posState, []) errors
-  where
-    f :: Stream s
-      => ParseError s e
-      -> (PosState s, [(Pos, ParseError s e)])
-      -> (PosState s, [(Pos, ParseError s e)])
-    f err (initial, accum) =
-        let (_, next) = reachOffset (errorOffset err) initial
-        in (next, (toPos next, err):accum)
-
 main :: IO ()
 main = do
   (opts, _) <- getArgs >>= parseOpts
@@ -72,8 +58,7 @@ main = do
           putStrLn "=== AST ==="
           case parseProgram filepath raw of
             Right syntax -> print $ abstract syntax
-            Left err -> do
-              putStrLn $ errorBundlePretty err
+            Left err -> print err
 
         testParsing :: IO ()
         testParsing = do
@@ -81,8 +66,7 @@ main = do
           raw <- Text.readFile filepath
           case parseProgram filepath raw of
             Right syntax -> print syntax
-            Left err -> do
-              putStrLn $ errorBundlePretty err
+            Left err -> print err
               -- print (bundleErrors err)
               -- print (bundlePosState err)
             -- Left err -> putStrLn $ errorBundlePretty err
@@ -101,9 +85,7 @@ main = do
               Right (Program _ (Just (statements, postcondition))) -> do
                 let ((_, obligations), specifications) = runM $ precondStmts statements postcondition
                 send $ OK obligations specifications
-            Left err -> do
-              let pairs = map (\(p, e) -> (p, parseErrorTextPretty e)) $ collectParseErrors err
-              send $ ParseError pairs
+            Left (SyntacticError pairs) -> send $ ParseError pairs
           loop
         Just Quit -> return ()
         _ -> do
