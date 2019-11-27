@@ -52,6 +52,7 @@ parseStmt = parse statement "<statement>"
 
 program :: Parser Program
 program = withLoc $ do
+  ignoreNewlines
   declarations <- many declaration
   statements <- many statement
   eof
