@@ -1,5 +1,7 @@
-con x : Int
+con X : Int
 var x : A
+
+
 
 {!
 

@@ -4,6 +4,7 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE DefaultSignatures #-}
 
 
 module Syntax.Parser.TokenStream where
@@ -15,12 +16,24 @@ import Data.Proxy
 import Language.Lexer.Applicative.Text
 import Text.Megaparsec hiding (Pos)
 
--- import Debug.Trace
+
+-- | How to print tokens
+class PrettyToken tok where
+  prettyTokens :: NonEmpty (L tok) -> String
+  default prettyTokens :: Show tok => NonEmpty (L tok) -> String
+  prettyTokens = init . unlines . map snd . showTokenLines
+
+  -- convert it back to its original string representation (inverse of lexing)
+  -- defaulted to `show`
+  restoreToken :: tok -> String
+  default restoreToken :: Show tok => tok -> String
+  restoreToken = show
+
 
 instance Ord tok => Ord (TokenStream (L tok)) where
   compare _ _ = EQ
 
-instance (Ord tok, Show tok) => Stream (TokenStream (L tok)) where
+instance (Ord tok, PrettyToken tok) => Stream (TokenStream (L tok)) where
   type Token (TokenStream (L tok)) = L tok
   type Tokens (TokenStream (L tok)) = [L tok]
   tokenToChunk Proxy tok = [tok]
@@ -31,7 +44,7 @@ instance (Ord tok, Show tok) => Stream (TokenStream (L tok)) where
   take1_ = take1_'
   takeN_ = takeN_'
   takeWhile_ = takeWhile_'
-  showTokens Proxy = showTokens'
+  showTokens Proxy = prettyTokens
   reachOffset = reachOffset'
 
 chunkLength' :: [L tok] -> Int
@@ -69,7 +82,8 @@ takeWhile_' p stream = case take1_' stream of
       then let (xs, rest') = takeWhile_' p rest in (x:xs, rest')
       else ([], stream)
 
-reachOffset' :: Show tok => Int
+reachOffset' :: PrettyToken tok
+             => Int
              -> PosState (TokenStream (L tok))
              -> (String, PosState (TokenStream (L tok)))
 reachOffset' n posState = case takeN_' (n - pstateOffset posState) (pstateInput posState) of
@@ -131,14 +145,11 @@ reachOffset' n posState = case takeN_' (n - pstateOffset posState) (pstateInput 
         , pstateLinePrefix = pstateLinePrefix posState
         }
 
-
-testStream :: Show tok => TokenStream (L tok) -> String
-testStream = showTokens' . NE.fromList . streamToList
--- testStream = show . map toChunk . streamToList
-    -- showTokens' . NE.fromList . streamToList
-
-showTokens' :: Show tok => NonEmpty (L tok) -> String
-showTokens' = init . unlines . map snd . showTokenLines
+showTokens' :: PrettyToken tok => NonEmpty (L tok) -> String
+showTokens' = quote . init . unlines . map snd . showTokenLines
+  where
+    quote :: String -> String
+    quote s = "\"" <> s <> "\""
 
 reachOffsetNoLine' :: Int
              -> PosState (TokenStream (L tok))
@@ -179,7 +190,7 @@ toSourcePos (Pos filename line column _) =
 
 
 -- returns lines + line numbers of the string representation of tokens
-showTokenLines :: Show tok => NonEmpty (L tok) -> [(Int, String)]
+showTokenLines :: PrettyToken tok => NonEmpty (L tok) -> [(Int, String)]
 showTokenLines (x :| xs) = zipWith (,) lineNumbers (NE.toList body)
   where
     glued :: Chunk
@@ -190,25 +201,6 @@ showTokenLines (x :| xs) = zipWith (,) lineNumbers (NE.toList body)
     lineNumbers :: [Int]
     lineNumbers = [fst start + 1 ..]
 
--- -- returns lines + line numbers of the string representation of tokens
--- showTokenLinesWithPrefix :: Show tok => NonEmpty (L tok) -> [(Int, String)]
--- showTokenLinesWithPrefix xs = zipWith (,) lineNumbers (NE.toList body)
---   where
---     -- for prefixing spaces at the front of the first chunk
---     fakeFirstChunk :: Chunk
---     fakeFirstChunk = Chunk (0, 0) ("" :| []) (0, 0)
---
---     chunks :: [Chunk]
---     chunks = NE.toList (NE.map toChunk xs)
---
---     glued :: Chunk
---     glued = foldl glue fakeFirstChunk chunks
---
---     Chunk start body _ = glued
---
---     lineNumbers :: [Int]
---     lineNumbers = [fst start + 1 ..]
-
 data Chunk = Chunk
                 (Int, Int)        -- ^ start, counting from 0
                 (NonEmpty String) -- ^ payload
@@ -216,10 +208,10 @@ data Chunk = Chunk
                 deriving (Show)
 
 
-toChunk :: Show tok => L tok -> Chunk
+toChunk :: PrettyToken tok => L tok -> Chunk
 toChunk (L NoLoc tok) = Chunk start strings end
   where
-    strings = case nonEmpty (lines (show tok)) of
+    strings = case nonEmpty (lines (restoreToken tok)) of
                 Nothing -> "" :| []
                 Just xs -> xs
     start = (0, 0)
@@ -227,7 +219,7 @@ toChunk (L NoLoc tok) = Chunk start strings end
 
 toChunk (L (Loc from to) tok) = Chunk start strings end
   where
-    strings = case nonEmpty (lines (show tok)) of
+    strings = case nonEmpty (lines (restoreToken tok)) of
                 Nothing -> "" :| []
                 Just xs -> xs
     start = (posLine from - 1, posCol from - 1)

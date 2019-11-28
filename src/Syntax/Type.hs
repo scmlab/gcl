@@ -3,16 +3,38 @@
 
 module Syntax.Type where
 
+import Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NE
 import Data.Aeson
+import Data.Maybe (fromMaybe)
 import Data.Loc
 import GHC.Generics
 
 import Text.Megaparsec hiding (Pos, State, ParseError, parse)
 import qualified Text.Megaparsec as Mega
 
+import Syntax.Parser.TokenStream (PrettyToken(..))
 import Syntax.Parser.Util ()
-import Syntax.Parser.Lexer (TokStream)
+import Syntax.Parser.Lexer (TokStream, Tok(..))
+
+instance PrettyToken Tok where
+  prettyTokens (x:|[])  = fromMaybe ("'" <> show (unLoc x) <> "'") (prettyToken' (unLoc x))
+  prettyTokens xs       = "\"" <> concatMap (f . unLoc) (NE.toList xs) <> "\""
+    where
+      f tok =
+        case prettyToken' tok of
+          Nothing     -> show tok
+          Just pretty -> "<" <> pretty <> ">"
+
+-- | If the given character has a pretty representation, return that,
+-- otherwise 'Nothing'. This is an internal helper.
+
+prettyToken' :: Tok -> Maybe String
+prettyToken' tok = case tok of
+  TokNewline -> Just "newline"
+  TokWhitespace -> Just "space"
+  TokEOF -> Just "end of file"
+  _      -> Nothing
 
 fromParseErrorBundle :: ShowErrorComponent e
                    => ParseErrorBundle TokStream e

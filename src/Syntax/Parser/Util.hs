@@ -20,7 +20,7 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 import Text.Megaparsec hiding (Pos, State)
 import Language.Lexer.Applicative.Text (TokenStream)
-import Syntax.Parser.TokenStream ()
+import Syntax.Parser.TokenStream (PrettyToken)
 
 --------------------------------------------------------------------------------
 -- | Source location bookkeeping
@@ -83,14 +83,14 @@ type P token = ParsecT Void (TokenStream (L token)) (PosLog token)
 toPos :: Stream s => PosState s -> Pos
 toPos (PosState _ offset (SourcePos filepath line column) _ _) = Pos filepath (unPos line) (unPos column) offset
 
-getLoc :: (Ord tok, Show tok) => P tok a -> P tok (a, Loc)
+getLoc :: (Ord tok, Show tok, PrettyToken tok) => P tok a -> P tok (a, Loc)
 getLoc parser = do
   i <- lift markStart
   result <- parser
   loc <- lift (markEnd i)
   return (result, loc)
 
-withLoc :: (Ord tok, Show tok) => P tok (Loc -> a) -> P tok a
+withLoc :: (Ord tok, Show tok, PrettyToken tok) => P tok (Loc -> a) -> P tok a
 withLoc parser = do
   (result, loc) <- getLoc parser
   return $ result loc
@@ -98,13 +98,13 @@ withLoc parser = do
 --------------------------------------------------------------------------------
 -- | Combinators
 
-symbol :: (Eq tok, Ord tok, Show tok) => tok -> P tok ()
+symbol :: (Eq tok, Ord tok, Show tok, PrettyToken tok) => tok -> P tok ()
 symbol t = do
   L loc tok <- satisfy (\(L _ t') -> t == t')
   lift $ update loc tok
   return ()
 
-extract :: (Ord tok, Show tok) => (tok -> Maybe a) -> P tok a
+extract :: (Ord tok, Show tok, PrettyToken tok) => (tok -> Maybe a) -> P tok a
 extract f = do
   (result, tok, loc) <- token p Set.empty
   lift $ update loc tok

@@ -76,16 +76,16 @@ statement = choice
 
 
 skip :: Parser Stmt
-skip = withLoc' $ Skip <$ symbol TokSkip
+skip = withStmt $ Skip <$ symbol TokSkip
 
 abort :: Parser Stmt
-abort = withLoc' $ Abort <$ symbol TokAbort
+abort = withStmt $ Abort <$ symbol TokAbort
 
 assert :: Parser Stmt
-assert = withLoc' $ Assert <$> braces predicate
+assert = withStmt $ Assert <$> braces predicate
 
 assertWithBnd :: Parser Stmt
-assertWithBnd = withLoc' $ braces $ AssertWithBnd
+assertWithBnd = withStmt $ braces $ AssertWithBnd
   <$> predicate
   <*  symbol TokComma
   <*  symbol TokBnd
@@ -93,15 +93,15 @@ assertWithBnd = withLoc' $ braces $ AssertWithBnd
   <*> expression
 
 assign :: Parser Stmt
-assign = withLoc' $ Assign <$> variableList <* symbol TokAssign <*> expressionList
+assign = withStmt $ Assign <$> variableList <* symbol TokAssign <*> expressionList
 
 repetition :: Parser Stmt
-repetition = withLoc' $ Do <$  symbol TokDo
+repetition = withStmt $ Do <$  symbol TokDo
                           <*> guardedCommands
                           <*  symbol TokOd
 
 selection :: Parser Stmt
-selection = withLoc' $ If  <$  symbol TokIf
+selection = withStmt $ If  <$  symbol TokIf
                           <*> guardedCommands
                           <*  symbol TokFi
 
@@ -114,7 +114,7 @@ guardedCommand = withLoc $ GdCmd  <$> predicate
                                   <*> some statement
 
 hole :: Parser Stmt
-hole = withLoc' $ Hole <$ symbol TokQM
+hole = withStmt $ Hole <$ symbol TokQM
 
 spec :: Parser Stmt
 spec = do
@@ -280,10 +280,10 @@ withLoc p = do
   return result
 
 -- followed by at least 1 newline
-withLoc' :: Parser (Loc -> a) -> Parser a
-withLoc' p = do
+withStmt :: Parser (Loc -> a) -> Parser a
+withStmt p = do
   result <- Util.withLoc p
-  expectNewline
+  expectNewline <?> "<newline> after a statement"
   return result
 
 parens :: Parser a -> Parser a
