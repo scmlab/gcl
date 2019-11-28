@@ -53,8 +53,8 @@ parseStmt = parse statement "<statement>"
 program :: Parser Program
 program = withLoc $ do
   ignoreNewlines
-  declarations <- many declaration
-  statements <- many statement
+  declarations <- many declaration <?> "declarations"
+  statements <- many statement <?> "statements"
   eof
   return $ Program declarations statements
 
@@ -76,53 +76,56 @@ statement = choice
 
 
 skip :: Parser Stmt
-skip = withStmt $ Skip <$ symbol TokSkip
+skip = withLocStmt $ Skip <$ symbol TokSkip
 
 abort :: Parser Stmt
-abort = withStmt $ Abort <$ symbol TokAbort
+abort = withLocStmt $ Abort <$ symbol TokAbort
 
 assert :: Parser Stmt
-assert = withStmt $ Assert <$> braces predicate
+assert = withLocStmt $ Assert <$> braces predicate
 
 assertWithBnd :: Parser Stmt
-assertWithBnd = withStmt $ braces $ AssertWithBnd
+assertWithBnd = withLocStmt $ braces $ AssertWithBnd
   <$> predicate
-  <*  symbol TokComma
-  <*  symbol TokBnd
-  <*  symbol TokSemi
+  <*  (symbol TokComma <?> "comma")
+  <*  (symbol TokBnd <?> "bnd")
+  <*  (symbol TokSemi <?> "semicolon")
   <*> expression
 
 assign :: Parser Stmt
-assign = withStmt $ Assign <$> variableList <* symbol TokAssign <*> expressionList
+assign = withLocStmt $ Assign <$> variableList <* symbol TokAssign <*> expressionList
 
 repetition :: Parser Stmt
-repetition = withStmt $ Do <$  symbol TokDo
-                          <*> guardedCommands
-                          <*  symbol TokOd
+repetition = withLocStmt $
+  Do  <$  (symbol TokDo <?> "do")
+      <*> guardedCommands
+      <*  (symbol TokOd <?> "od")
 
 selection :: Parser Stmt
-selection = withStmt $ If  <$  symbol TokIf
-                          <*> guardedCommands
-                          <*  symbol TokFi
+selection = withLocStmt $
+  If  <$  (symbol TokIf <?> "if")
+      <*> guardedCommands
+      <*  (symbol TokFi <?> "fi")
 
 guardedCommands :: Parser [GdCmd]
-guardedCommands = sepBy1 guardedCommand (symbol TokGuardBar)
+guardedCommands = sepBy1 guardedCommand (symbol TokGuardBar <?> "|")
 
 guardedCommand :: Parser GdCmd
 guardedCommand = withLoc $ GdCmd  <$> predicate
-                                  <*  symbol TokGuardArr
+                                  <*  (symbol TokGuardArr <?> "->")
                                   <*> some statement
 
 hole :: Parser Stmt
-hole = withStmt $ Hole <$ symbol TokQM
+hole = withLocStmt $ Hole <$ (symbol TokQM <?> "?")
 
 spec :: Parser Stmt
 spec = do
-  ((), start) <- getLoc $ symbol TokSpecStart
+  ((), start) <- getLoc (symbol TokSpecStart <?> "{!")
+  expectNewline <?> "<newline> after a the start of a Spec"
   ignoreNewlines
-  stmts <- many statement
-  ((), end)   <- getLoc $ symbol TokSpecEnd
-  expectNewline
+  stmts <- many statement <?> "statements"
+  ((), end)   <- getLoc (symbol TokSpecEnd <?> "!}")
+  expectNewline <?> "<newline> after a the end of a Spec"
 
   return $ Spec stmts start end
 
@@ -175,42 +178,41 @@ predTerm =  parens predicate
               ])
 
 binaryRelation :: Parser BinRel
-binaryRelation = withLoc $ choice
+binaryRelation = withLoc (choice
   [ Eq  <$ symbol TokEQ
   , LEq <$ symbol TokLTE
   , GEq <$ symbol TokGTE
   , LTh <$ symbol TokLT
   , GTh <$ symbol TokGT
-  ]
+  ]) <?> "binary relation"
 
 --------------------------------------------------------------------------------
 -- | Expressions
 
 expressionList :: Parser [Expr]
-expressionList = sepBy1 expression (symbol TokComma)
+expressionList = sepBy1 expression (symbol TokComma) <?> "a list of expressions separated by commas"
 
 expression :: Parser Expr
-expression = parens expression
-    <|> term
+expression = (parens expression <|> term) <?> "expression"
 
 term :: Parser Expr
-term = withLoc $ choice
+term = withLoc (choice
   [ try (OpE <$> op <*> parens expressionList)
   , VarE    <$> variable
   , ConstE  <$> constant
   , LitE    <$> literal
   , HoleE   <$  symbol TokQM
-  ]
+  ]) <?> "term"
   where
     op :: Parser Expr
-    op = withLoc $ VarE <$> variable
+    op = withLoc (VarE <$> variable) <?> "operator"
 
 literal :: Parser Lit
 literal = choice
   [ Bol True  <$  symbol TokTrue
   , Bol False <$  symbol TokFalse
   , Num       <$> integer
-  ]
+  ] <?> "literal"
 
 
 --------------------------------------------------------------------------------
@@ -223,18 +225,18 @@ declaration = choice
   ]
 
 constantDecl :: Parser Declaration
-constantDecl = withLoc $ do
+constantDecl = withLocStmt $ do
   symbol TokCon
   types <- constList
-  symbol TokSemi
+  symbol TokSemi <?> "semicolon"
   t <- type'
   return $ ConstDecl types t
 
 variableDecl :: Parser Declaration
-variableDecl = withLoc $ do
+variableDecl = withLocStmt $ do
   symbol TokVar
   vars <- variableList
-  symbol TokSemi
+  symbol TokSemi <?> "semicolon"
   t <- type'
   return $ VarDecl vars t
 
@@ -242,21 +244,21 @@ variableDecl = withLoc $ do
 -- | Variables and stuff
 
 constant :: Parser Const
-constant = withLoc $ Const <$> upperName
+constant = withLoc (Const <$> upperName) <?> "constant"
 
--- seperated by commas
+-- separated by commas
 constList :: Parser [Const]
-constList = sepBy1 constant (symbol TokComma)
+constList = sepBy1 constant (symbol TokComma <?> "comma") <?> "a list of constants separated by commas"
 
 variable :: Parser Var
-variable = withLoc $ Var <$> lowerName
+variable = withLoc (Var <$> lowerName) <?> "variable"
 
--- seperated by commas
+-- separated by commas
 variableList :: Parser [Var]
-variableList = sepBy1 variable (symbol TokComma)
+variableList = sepBy1 variable (symbol TokComma <?> "comma") <?> "a list of variables separated by commas"
 
 type' :: Parser Type
-type' = withLoc $ Type <$> upperName
+type' = withLoc (Type <$> upperName) <?> "type"
 
 --------------------------------------------------------------------------------
 -- | Combinators
@@ -280,17 +282,21 @@ withLoc p = do
   return result
 
 -- followed by at least 1 newline
-withStmt :: Parser (Loc -> a) -> Parser a
-withStmt p = do
+withLocStmt :: Parser (Loc -> a) -> Parser a
+withLocStmt p = do
   result <- Util.withLoc p
   expectNewline <?> "<newline> after a statement"
   return result
 
 parens :: Parser a -> Parser a
-parens = between (symbol TokParenStart) (symbol TokParenEnd)
+parens = between
+  (symbol TokParenStart <?> "left parenthesis")
+  (symbol TokParenEnd <?> "right parenthesis")
 
 braces :: Parser a -> Parser a
-braces = between (symbol TokBraceStart) (symbol TokBraceEnd)
+braces = between
+  (symbol TokBraceStart <?> "left brace")
+  (symbol TokBraceEnd <?> "right brace")
 
 upperName :: Parser Text
 upperName = extract p
@@ -305,7 +311,7 @@ lowerName = extract p
     p _ = Nothing
 
 integer :: Parser Int
-integer = extract p
+integer = extract p <?> "integer"
   where
     p (TokInt s) = Just s
     p _ = Nothing

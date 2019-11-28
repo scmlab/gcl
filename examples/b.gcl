@@ -1,15 +1,15 @@
-con X : Int
 var x : A
 
-
+con X, Y : Int
 
 {!
 
 skip
 
-!}
 
 skip
 
+!}
 
+!}
 { True }

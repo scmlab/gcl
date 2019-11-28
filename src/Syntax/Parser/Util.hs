@@ -5,6 +5,8 @@ module Syntax.Parser.Util
   , runPosLog
   , markStart, markEnd, update, getLatestToken
 
+  , (<??>)
+
   , toPos
   , getLoc, withLoc
 
@@ -21,6 +23,15 @@ import qualified Data.Map as Map
 import Text.Megaparsec hiding (Pos, State)
 import Language.Lexer.Applicative.Text (TokenStream)
 import Syntax.Parser.TokenStream (PrettyToken)
+
+-- | A synonym for 'label' in the form of an operator.
+
+infix 1 <??>
+
+(<??>) :: MonadParsec e s m => m a -> String -> m a
+(<??>) = (<??>)
+{-# INLINE (<??>) #-}
+
 
 --------------------------------------------------------------------------------
 -- | Source location bookkeeping

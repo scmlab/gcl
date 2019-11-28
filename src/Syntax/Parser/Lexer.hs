@@ -84,7 +84,7 @@ instance Show Tok where
     TokGuardBar -> "|"
     TokGuardArr -> "->"
     TokComma -> ","
-    TokSemi -> ";"
+    TokSemi -> ":"
     TokAssign -> ":="
     TokSpecStart -> "{!"
     TokSpecEnd -> "!}"
