@@ -72,7 +72,7 @@ statement = choice
   , repetition
   , selection
   , hole
-  ]
+  ] <?> "statement"
 
 
 skip :: Parser Stmt
@@ -93,7 +93,10 @@ assertWithBnd = withLocStmt $ braces $ AssertWithBnd
   <*> expression
 
 assign :: Parser Stmt
-assign = withLocStmt $ Assign <$> variableList <* symbol TokAssign <*> expressionList
+assign = withLocStmt $
+  Assign  <$> variableList
+          <*  (symbol TokAssign <?> ":=")
+          <*> expressionList
 
 repetition :: Parser Stmt
 repetition = withLocStmt $
@@ -141,6 +144,7 @@ predicate = makeExprParser predTerm table <?> "predicate"
             , [ InfixL disjunction ]
             , [ InfixR implication ]
             ]
+
 
 negation :: Parser (Pred -> Pred)
 negation = do
@@ -222,7 +226,7 @@ declaration :: Parser Declaration
 declaration = choice
   [ constantDecl
   , variableDecl
-  ]
+  ] <?> "declaration"
 
 constantDecl :: Parser Declaration
 constantDecl = withLocStmt $ do
