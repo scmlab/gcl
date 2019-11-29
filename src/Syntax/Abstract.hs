@@ -43,6 +43,9 @@ data Stmt
 
 data GdCmd = GdCmd Pred [Stmt] deriving (Show)
 
+getGuards :: [GdCmd] -> [Pred]
+getGuards = fst . unzipGdCmds
+
 unzipGdCmds :: [GdCmd] -> ([Pred], [[Stmt]])
 unzipGdCmds = unzip . map (\(GdCmd x y) -> (x, y))
 

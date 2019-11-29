@@ -44,16 +44,31 @@ main = do
         testLexing = do
           let filepath = "examples/b.gcl"
           raw <- Text.readFile filepath
+
           putStrLn "=== raw ==="
           Text.putStrLn raw
-          putStrLn "=== tokens ==="
-          let lexemes = scan "<test>" raw
-          -- let lexemes = testStream $ scan "<test>" raw
-          print lexemes
 
-          putStrLn "=== AST ==="
+          putStrLn "\n=== tokens ==="
+          print $ scan "<test>" raw
+
+          putStrLn "\n=== AST ==="
           case parseProgram filepath raw of
-            Right syntax -> print $ abstract syntax
+            Right syntax -> case abstract syntax of
+              Left err -> print err
+              Right (Program _ Nothing) -> putStrLn "<empty>"
+              Right (Program _ (Just (statements, postcondition))) -> do
+
+                putStrLn "\n=== statements ==="
+                print $ statements
+
+                let ((_, obligations), specifications) = runM $ precondStmts statements postcondition
+
+                putStrLn "\n=== proof obligations ==="
+                print $ obligations
+
+                putStrLn "\n=== specifications ==="
+                print $ specifications
+
             Left err -> print err
 
         _testParsing :: IO ()

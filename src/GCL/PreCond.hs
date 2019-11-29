@@ -15,7 +15,7 @@ import GHC.Generics
 import Syntax.Abstract
 import Syntax.Parser
 
-data Obligation = Obligation Index Pred deriving (Show, Generic)
+data Obligation = Obligation Index Pred Pred deriving (Show, Generic)
 data Hardness = Hard | Soft deriving (Show, Generic)
 data Specification = Specification
   { specHardness :: Hardness
@@ -31,11 +31,16 @@ runM :: M a -> ((a, [Obligation]), [Specification])
 runM p = evalState (runWriterT (runWriterT p)) 0
 
 -- creates a proof obligation
-obligate :: Pred -> M ()
-obligate p = do
-  i <- get
-  put (succ i)
-  tell [Obligation i p]
+obligate :: Pred -> Pred -> M ()
+obligate p q = do
+
+  -- NOTE: this could use some love
+  let samePredicate = predEq p q
+
+  unless samePredicate $ do
+    i <- get
+    put (succ i)
+    tell [Obligation i p q]
 
 tellSpec :: Hardness -> Pred -> Pred -> Loc -> Loc -> M ()
 tellSpec harsness p q start end  = do
@@ -67,7 +72,7 @@ precondStmts (x:(y:xs)) post = case (x, y) of
     tellSpec Hard asserted post' start end
 
     post'' <- precondStmts stmts post'
-    obligate (asserted `Implies` post'')
+    obligate asserted post''
 
     return asserted
   -- SOFT
@@ -88,50 +93,64 @@ precond Abort _ = return (Lit False)
 precond Skip post = return post
 
 precond (Assert pre) post = do
-  -- generate a proof obligation,
-  -- if the precondition doesn't coincides with the postcondition
-  unless (predEq pre post) $ do
-    obligate $ pre `Implies` post
-
+  obligate pre post
   return pre
 
 precond (Assign xs es) post = return $ substP (Map.fromList (zip xs es)) post
 
 precond (If (Just pre) branches) post = do
-  mapM_ (obligate <=< obliGuard pre post) branches
-  let (guards, _) = unzipGdCmds branches
-  obligate $ pre `Implies` disjunct guards
+
+
+  forM_ branches $ \(GdCmd guard body) -> do
+    p <- precondStmts body post
+    obligate
+      (pre `Conj` guard)    -- HARD precondition AND the guard
+      p                     -- precondition of the statements
+
+
+  let guards = getGuards branches
+  obligate
+    pre
+    (disjunct guards)
+
   return pre
-  where
-    obliGuard :: Pred -> Pred -> GdCmd -> M Pred
-    obliGuard pre' post' (GdCmd guard body) = Implies (pre' `Conj` guard) <$> precondStmts body post'
+
 precond (If Nothing branches) post = do
   brConds <- mapM (precondGuard post) branches
-  let (guards, _) = unzipGdCmds branches
+  let guards = getGuards branches
 
   return (conjunct brConds `Conj` disjunct guards)
 
 precond (Do inv bnd branches) post = do
 
-  mapM_ (obligate <=< branchCond) branches
-  mapM_ (obligate <=< termCond) branches
+  forM_ branches $ \(GdCmd guard body) -> do
+    p <- precondStmts body inv
+    obligate
+      (inv `Conj` guard)    -- invariant AND the guard
+      p                     -- precondition of the statements
 
-  let (guards, _) = unzipGdCmds branches
+  -- termination of each branches
+  forM_ branches $ \(GdCmd guard body) -> do
+    p <- precondStmts body (Term LTh bnd (LitE (Num 100)))
+    obligate
+      -- invariant AND the guard AND some hard limit
+      (inv `Conj` guard `Conj` (Term Eq bnd (LitE (Num 100))))
+      -- precondition of the statements
+      p
 
-  obligate $ (inv `Conj` (conjunct (map Neg guards)))
-                  `Implies` post -- empty branches?
-  obligate $ (inv `Conj` disjunct guards) `Implies` (Term GEq bnd (LitE (Num 0)))
+  let guards = getGuards branches
+
+  -- after the loop, the invariant should still hold and all guards should fail
+  obligate
+    (inv `Conj` (conjunct (map Neg guards)))
+    post -- empty branches?
+
+  -- termination of the whole statement
+  obligate
+    (inv `Conj` disjunct guards)
+    (Term GEq bnd (LitE (Num 0)))
 
   return inv
-
-  where
-    branchCond :: GdCmd -> M Pred
-    branchCond (GdCmd guard body) = Implies (inv `Conj` guard) <$> precondStmts body inv
-
-    termCond :: GdCmd -> M Pred
-    termCond (GdCmd guard body) = do
-      pre <- precondStmts body (Term LTh bnd (LitE (Num 100)))
-      return $ inv `Conj` guard `Conj` (Term Eq bnd (LitE (Num 100))) `Implies` pre
 
 precond (Spec stmts _ _) post = precondStmts stmts post
 
@@ -156,13 +175,13 @@ precondGuard post (GdCmd guard body) = Implies guard <$> precondStmts body post
 --
 -- sweep (If (Just pre) branches) post = do
 --   branches' <- mapM (sweepGdCmdHard (pre `Conj`) post) branches
---   let (guards, _) = unzipGdCmds branches
+--   let guards = getGuards branches
 --   obligate $ pre `Implies` disjunct guards
 --   return (If (Just pre) branches', pre)
 -- sweep (If Nothing branches) post = do
 --   (branches', brConds) <-
 --       (unzip <$> mapM (sweepGdCmdSoft post) branches)
---   let (guards, _) = unzipGdCmds branches
+--   let guards = getGuards branches
 --   return (If Nothing branches', conjunct brConds `Conj` disjunct guards)
 --
 -- sweep (Do inv bnd branches) post = do
@@ -170,7 +189,7 @@ precondGuard post (GdCmd guard body) = Implies guard <$> precondStmts body post
 --   branches' <- mapM (sweepGdCmdHard (inv `Conj`) inv) branches
 --   mapM_ (obligate <=< termCond) branches'
 --
---   let (guards, _) = unzipGdCmds branches'
+--   let guards = getGuards branches'
 --
 --   obligate $ (inv `Conj` (conjunct (map Neg guards)))
 --                   `Implies` post -- empty branches?

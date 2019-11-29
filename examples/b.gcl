@@ -1,14 +1,9 @@
-var x : A
+con X : Int
 
-con X, Y : Int
+{ X = 0 }
 
-{!
+if True -> skip
+ | False -> skip
+fi
 
-跳
-
-跳
-
-!}
-
-
-{ True }
+{ False }
