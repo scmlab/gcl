@@ -72,8 +72,9 @@ precondStmts (x:(y:xs)) post = case (x, y) of
     return asserted
   -- SOFT
   (Spec stmts start end, _) -> do
-    pre <- precondStmts (y:xs) post >>= precondStmts stmts
-    tellSpec Soft pre post start end
+    post' <- precondStmts (y:xs) post
+    pre <- precondStmts stmts post'
+    tellSpec Soft pre post' start end
     return pre
   _ -> do
     precondStmts (y:xs) post >>= precond x

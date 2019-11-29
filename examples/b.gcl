@@ -4,12 +4,11 @@ con X, Y : Int
 
 {!
 
-skip
+跳
 
-
-skip
-
-!}
+跳
 
 !}
+
+
 { True }

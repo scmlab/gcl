@@ -2,7 +2,7 @@
 
 module Syntax.Parser.Lexer where
 
-import Language.Lexer.Applicative.Text
+import Language.Lexer.Applicative
 import Text.Regex.Applicative
 import Data.Char
 -- import Data.Text hiding (Space)
@@ -203,15 +203,18 @@ commentEndRE prefix = TokComment <$> (pure prefix +++ (Text.concat <$> many anyS
   where
     (+++) = liftA2 (<>)
 
+contra :: RE Text a -> RE Char a
+contra = comap Text.singleton
+
 lexer :: Lexer Tok
 lexer = mconcat
-  [ token       (longest tokRE)
-  , whitespace  (longest whitespaceButNewlineRE)
-  , whitespace  (longestShortest commentStartRE commentEndRE)
+  [ token       (longest $ contra tokRE)
+  , whitespace  (longest $ contra whitespaceButNewlineRE)
+  , whitespace  (longestShortest (contra commentStartRE) (contra . commentEndRE))
   ]
 
 scan :: FilePath -> Text -> TokStream
-scan = runLexer lexer
+scan filepath = runLexer lexer filepath . Text.unpack
 
 filterError :: TokStream -> Maybe Pos
 filterError TsEof = Nothing

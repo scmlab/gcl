@@ -21,7 +21,7 @@ import qualified Data.Set as Set
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Text.Megaparsec hiding (Pos, State)
-import Language.Lexer.Applicative.Text (TokenStream)
+import Language.Lexer.Applicative (TokenStream)
 import Syntax.Parser.TokenStream (PrettyToken)
 
 -- | A synonym for 'label' in the form of an operator.

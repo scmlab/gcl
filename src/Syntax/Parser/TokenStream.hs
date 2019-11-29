@@ -13,7 +13,7 @@ import Data.Loc
 import Data.List.NonEmpty (NonEmpty(..), nonEmpty)
 import qualified Data.List.NonEmpty as NE
 import Data.Proxy
-import Language.Lexer.Applicative.Text
+import Language.Lexer.Applicative
 import Text.Megaparsec hiding (Pos)
 
 

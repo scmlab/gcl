@@ -12,19 +12,12 @@ packages:
   original:
     hackage: megaparsec-8.0.0
 - completed:
-    cabal-file:
-      size: 1461
-      sha256: 2167ffb255abbdcd1c104d872ff585eaba7496c2537355e898b32ef48ab6d510
-    name: lexer-applicative
-    version: 2.1.0.2
-    git: https://github.com/banacorn/lexer-applicative.git
+    hackage: lexer-applicative-2.1.0.2@sha256:44f71ecb10a50838a5cfd254bc0ede46bb9dcd32897da378c54c43e513229663,1427
     pantry-tree:
-      size: 619
-      sha256: 35d606140335b91392f871beb62a5594ba0800e393629e40e9f9ea7c967082ac
-    commit: 37f0e9366bcac19f3396a5fdb4d8fed2b37ce844
+      size: 389
+      sha256: a880d699c16aac75ce5db249f03aeee1aa6a61adcf290efc51166c19b932cd3e
   original:
-    git: https://github.com/banacorn/lexer-applicative.git
-    commit: 37f0e9366bcac19f3396a5fdb4d8fed2b37ce844
+    hackage: lexer-applicative-2.1.0.2
 snapshots:
 - completed:
     size: 524789
