@@ -22,55 +22,35 @@ main = do
     ModeHelp -> putStrLn $ usageInfo usage options
     ModeREPL -> loop
     ModeDev -> do
-      testLexing
-      -- testParsing
-      -- let filepath = "examples/b.gcl"
-      -- raw <- Text.readFile filepath
-      -- case parseProgram filepath raw of
-      --   Right syntax -> case abstract syntax of
-      --     Left err -> send $ SyntaxError err
-      --     Right (Program _ Nothing) -> send $ OK [] []
-      --     Right (Program _ (Just (statements, postcondition))) -> do
-      --       let ((_, _obligations), specifications) = runM $ precondStmts statements postcondition
-      --       print $ specifications
-      --       -- send $ OK obligations specifications
-      --   Left err -> do
-      --     putStrLn $ errorBundlePretty err
-      --     let pairs = map (\(p, e) -> (p, parseErrorTextPretty e)) $ collectParseErrors err
-      --     send $ ParseError pairs
+      let filepath = "examples/b.gcl"
+      raw <- Text.readFile filepath
 
+      putStrLn "=== raw ==="
+      Text.putStrLn raw
+
+      putStrLn "\n=== tokens ==="
+      print $ scan "<test>" raw
+
+      putStrLn "\n=== AST ==="
+      case parseProgram filepath raw of
+        Right syntax -> case abstract syntax of
+          Left err -> print err
+          Right (Program _ Nothing) -> putStrLn "<empty>"
+          Right (Program _ (Just (statements, postcondition))) -> do
+
+            putStrLn "\n=== statements ==="
+            print $ statements
+
+            let ((_, obligations), specifications) = runM $ precondStmts statements postcondition
+
+            putStrLn "\n=== proof obligations ==="
+            print $ obligations
+
+            putStrLn "\n=== specifications ==="
+            print $ specifications
+
+        Left err -> print err
       where
-        testLexing :: IO ()
-        testLexing = do
-          let filepath = "examples/b.gcl"
-          raw <- Text.readFile filepath
-
-          putStrLn "=== raw ==="
-          Text.putStrLn raw
-
-          putStrLn "\n=== tokens ==="
-          print $ scan "<test>" raw
-
-          putStrLn "\n=== AST ==="
-          case parseProgram filepath raw of
-            Right syntax -> case abstract syntax of
-              Left err -> print err
-              Right (Program _ Nothing) -> putStrLn "<empty>"
-              Right (Program _ (Just (statements, postcondition))) -> do
-
-                putStrLn "\n=== statements ==="
-                print $ statements
-
-                let ((_, obligations), specifications) = runM $ precondStmts statements postcondition
-
-                putStrLn "\n=== proof obligations ==="
-                print $ obligations
-
-                putStrLn "\n=== specifications ==="
-                print $ specifications
-
-            Left err -> print err
-
         _testParsing :: IO ()
         _testParsing = do
           let filepath = "examples/b.gcl"

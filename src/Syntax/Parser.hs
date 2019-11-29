@@ -6,8 +6,6 @@ module Syntax.Parser
   , parseStmt
   , scan
 
-  , toPos
-
   , module Syntax.Type
   ) where
 
@@ -21,7 +19,8 @@ import Text.Megaparsec hiding (Pos, State, ParseError, parse)
 
 import Syntax.Concrete
 import Syntax.Parser.Lexer
-import Syntax.Parser.Util hiding (withLoc)
+-- import Syntax.Parser.Util hiding (withLoc)
+import Syntax.Parser.Util (PosLog, extract)
 import qualified Syntax.Parser.Util as Util
 import Syntax.Type
 
@@ -37,7 +36,7 @@ parse parser filepath raw = do
   let tokenStream = scan filepath raw
   case filterError tokenStream of
     Just e  -> Left (LexicalError e)
-    Nothing -> case runPosLog (runParserT parser filepath tokenStream) of
+    Nothing -> case Util.runPosLog (runParserT parser filepath tokenStream) of
       Left e -> Left (SyntacticError $ fromParseErrorBundle e)
       Right x -> Right x
 
@@ -114,20 +113,21 @@ guardedCommands :: Parser [GdCmd]
 guardedCommands = sepBy1 guardedCommand (symbol TokGuardBar <?> "|")
 
 guardedCommand :: Parser GdCmd
-guardedCommand = withLoc $ GdCmd  <$> predicate
-                                  <*  (symbol TokGuardArr <?> "->")
-                                  <*> some statement
+guardedCommand = withLocStmt $
+  GdCmd <$> predicate
+        <*  (symbol TokGuardArr <?> "->")
+        <*> some statement
 
 hole :: Parser Stmt
 hole = withLocStmt $ Hole <$ (symbol TokQM <?> "?")
 
 spec :: Parser Stmt
 spec = do
-  ((), start) <- getLoc (symbol TokSpecStart <?> "{!")
+  ((), start) <- Util.getLoc (symbol TokSpecStart <?> "{!")
   expectNewline <?> "<newline> after a the start of a Spec"
   ignoreNewlines
   stmts <- many statement <?> "statements"
-  ((), end)   <- getLoc (symbol TokSpecEnd <?> "!}")
+  ((), end)   <- Util.getLoc (symbol TokSpecEnd <?> "!}")
   expectNewline <?> "<newline> after a the end of a Spec"
 
   return $ Spec stmts start end
@@ -148,27 +148,23 @@ predicate = makeExprParser predTerm table <?> "predicate"
 
 negation :: Parser (Pred -> Pred)
 negation = do
-  ((), start) <- getLoc $ do
+  ((), start) <- Util.getLoc $ do
     symbol TokNeg
-  ignoreNewlines
   return $ \result -> Neg result (start <--> result)
 
 conjunction :: Parser (Pred -> Pred -> Pred)
 conjunction = do
   symbol TokConj
-  ignoreNewlines
   return $ \x y -> Conj x y (x <--> y)
 
 disjunction :: Parser (Pred -> Pred -> Pred)
 disjunction = do
   symbol TokDisj
-  ignoreNewlines
   return $ \x y -> Disj x y (x <--> y)
 
 implication :: Parser (Pred -> Pred -> Pred)
 implication = do
   symbol TokImpl
-  ignoreNewlines
   return $ \x y -> Implies x y (x <--> y)
 
 
@@ -229,19 +225,21 @@ declaration = choice
   ] <?> "declaration"
 
 constantDecl :: Parser Declaration
-constantDecl = withLocStmt $ do
+constantDecl = withLoc $ do
   symbol TokCon
   types <- constList
   symbol TokSemi <?> "semicolon"
   t <- type'
+  expectNewline <?> "<newline> after a declaration"
   return $ ConstDecl types t
 
 variableDecl :: Parser Declaration
-variableDecl = withLocStmt $ do
+variableDecl = withLoc $ do
   symbol TokVar
   vars <- variableList
   symbol TokSemi <?> "semicolon"
   t <- type'
+  expectNewline <?> "<newline> after a declaration"
   return $ VarDecl vars t
 
 --------------------------------------------------------------------------------
@@ -252,14 +250,20 @@ constant = withLoc (Const <$> upperName) <?> "constant"
 
 -- separated by commas
 constList :: Parser [Const]
-constList = sepBy1 constant (symbol TokComma <?> "comma") <?> "a list of constants separated by commas"
+constList =
+  (sepBy1 constant (symbol TokComma <?> "comma")
+    <?> "a list of constants separated by commas")
+      <*  ignoreNewlines
 
 variable :: Parser Var
 variable = withLoc (Var <$> lowerName) <?> "variable"
 
 -- separated by commas
 variableList :: Parser [Var]
-variableList = sepBy1 variable (symbol TokComma <?> "comma") <?> "a list of variables separated by commas"
+variableList =
+    (sepBy1 variable (symbol TokComma <?> "comma")
+      <?> "a list of variables separated by commas")
+        <*  ignoreNewlines
 
 type' :: Parser Type
 type' = withLoc (Type <$> upperName) <?> "type"
@@ -278,12 +282,19 @@ expectNewline = do
     Just TokNewline -> return ()
     _ -> void $ some (symbol TokNewline)
 
+
+symbol :: Tok -> Parser ()
+symbol t = do
+  Util.symbol t
+  ignoreNewlines
+
+
 -- ignores suffixing newlines
 withLoc :: Parser (Loc -> a) -> Parser a
 withLoc p = do
   result <- Util.withLoc p
-  ignoreNewlines
   return result
+
 
 -- followed by at least 1 newline
 withLocStmt :: Parser (Loc -> a) -> Parser a

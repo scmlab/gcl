@@ -5,9 +5,6 @@ module Syntax.Parser.Util
   , runPosLog
   , markStart, markEnd, update, getLatestToken
 
-  , (<??>)
-
-  , toPos
   , getLoc, withLoc
 
   , symbol, extract
@@ -23,15 +20,6 @@ import qualified Data.Map as Map
 import Text.Megaparsec hiding (Pos, State)
 import Language.Lexer.Applicative (TokenStream)
 import Syntax.Parser.TokenStream (PrettyToken)
-
--- | A synonym for 'label' in the form of an operator.
-
-infix 1 <??>
-
-(<??>) :: MonadParsec e s m => m a -> String -> m a
-(<??>) = (<??>)
-{-# INLINE (<??>) #-}
-
 
 --------------------------------------------------------------------------------
 -- | Source location bookkeeping
@@ -90,9 +78,6 @@ getLatestToken = snd <$> gets latest
 -- | Helper functions
 
 type P token = ParsecT Void (TokenStream (L token)) (PosLog token)
-
-toPos :: Stream s => PosState s -> Pos
-toPos (PosState _ offset (SourcePos filepath line column) _ _) = Pos filepath (unPos line) (unPos column) offset
 
 getLoc :: (Ord tok, Show tok, PrettyToken tok) => P tok a -> P tok (a, Loc)
 getLoc parser = do
