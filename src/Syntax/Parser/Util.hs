@@ -7,7 +7,6 @@ module Syntax.Parser.Util
   , getCurrentLoc, getLastToken
 
   , getLoc, withLoc
-
   , symbol, ignore, extract
   ) where
 

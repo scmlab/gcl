@@ -9,7 +9,7 @@ import Control.Monad.Writer hiding (guard)
 
 import qualified Data.Map as Map
 -- import Data.Map (Map)
-import Data.Loc (Loc)
+import Data.Loc (Loc, locOf)
 import GHC.Generics
 
 import Syntax.Abstract
@@ -21,6 +21,7 @@ data Specification = Specification
   { specHardness :: Hardness
   , specPreCond  :: Pred
   , specPostCond :: Pred
+  , specLastStmt :: Maybe Loc
   , specLoc      :: Loc
   } deriving (Show, Generic)
 
@@ -41,9 +42,12 @@ obligate p q = do
     put (succ i)
     tell [Obligation i p q]
 
-tellSpec :: Hardness -> Pred -> Pred -> Loc -> M ()
-tellSpec harsness p q loc = do
-  lift $ tell [Specification harsness p q loc]
+tellSpec :: Hardness -> Pred -> Pred -> [Stmt] -> Loc -> M ()
+tellSpec harsness p q [] loc = do
+  lift $ tell [Specification harsness p q Nothing loc]
+tellSpec harsness p q stmts loc = do
+  let lastLoc = locOf $ last stmts
+  lift $ tell [Specification harsness p q (Just lastLoc) loc]
 
 conjunct :: [Pred] -> Pred
 conjunct = foldr Conj (Lit False)
@@ -57,18 +61,18 @@ precondStmts (x:[]) post = case x of
   -- SOFT
   Spec stmts loc -> do
     pre <- precondStmts stmts post
-    tellSpec Soft pre post loc
+    tellSpec Soft pre post stmts loc
     return pre
   _ -> do
     precond x post
 
 precondStmts (x:(y:xs)) post = case (x, y) of
   -- HARD
-  (Assert asserted, Spec stmts loc) -> do
+  (Assert asserted _, Spec stmts loc) -> do
     -- calculate the precondition of xs
     post' <- precondStmts xs post
 
-    tellSpec Hard asserted post' loc
+    tellSpec Hard asserted post' stmts loc
 
     post'' <- precondStmts stmts post'
     obligate asserted post''
@@ -78,7 +82,7 @@ precondStmts (x:(y:xs)) post = case (x, y) of
   (Spec stmts loc, _) -> do
     post' <- precondStmts (y:xs) post
     pre <- precondStmts stmts post'
-    tellSpec Soft pre post' loc
+    tellSpec Soft pre post' stmts loc
     return pre
   _ -> do
     precondStmts (y:xs) post >>= precond x
@@ -87,17 +91,17 @@ precondStmts (x:(y:xs)) post = case (x, y) of
 -- calculating the weakest precondition
 precond :: Stmt -> Pred -> M Pred
 
-precond Abort _ = return (Lit False)
+precond (Abort _) _ = return (Lit False)
 
-precond Skip post = return post
+precond (Skip _) post = return post
 
-precond (Assert pre) post = do
+precond (Assert pre _) post = do
   obligate pre post
   return pre
 
-precond (Assign xs es) post = return $ substP (Map.fromList (zip xs es)) post
+precond (Assign xs es _) post = return $ substP (Map.fromList (zip xs es)) post
 
-precond (If (Just pre) branches) post = do
+precond (If (Just pre) branches _) post = do
 
 
   forM_ branches $ \(GdCmd guard body) -> do
@@ -114,13 +118,13 @@ precond (If (Just pre) branches) post = do
 
   return pre
 
-precond (If Nothing branches) post = do
+precond (If Nothing branches _) post = do
   brConds <- mapM (precondGuard post) branches
   let guards = getGuards branches
 
   return (conjunct brConds `Conj` disjunct guards)
 
-precond (Do inv bnd branches) post = do
+precond (Do inv bnd branches _) post = do
 
   forM_ branches $ \(GdCmd guard body) -> do
     p <- precondStmts body inv

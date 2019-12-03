@@ -32,14 +32,23 @@ data Declaration
   deriving (Show)
 
 data Stmt
-  = Skip
-  | Abort
-  | Assign  [Var] [Expr]
-  | Assert  Pred
-  | Do      Pred Expr [GdCmd]
-  | If      (Maybe Pred) [GdCmd]
-  | Spec   [Stmt] Loc
+  = Skip                          Loc
+  | Abort                         Loc
+  | Assign  [Var] [Expr]          Loc
+  | Assert  Pred                  Loc
+  | Do      Pred Expr [GdCmd]     Loc
+  | If      (Maybe Pred) [GdCmd]  Loc
+  | Spec   [Stmt]                 Loc
   deriving (Show)
+
+instance Located Stmt where
+  locOf (Skip l)        = l
+  locOf (Abort l)       = l
+  locOf (Assign _ _ l)  = l
+  locOf (Assert _ l)    = l
+  locOf (Do _ _ _ l)    = l
+  locOf (If _ _ l)      = l
+  locOf (Spec _ l)      = l
 
 data GdCmd = GdCmd Pred [Stmt] deriving (Show)
 
@@ -62,8 +71,8 @@ affixAssertions      []  = return []
 affixAssertions (  x:[]) = (:) <$> fromConcrete x <*> pure []
 affixAssertions (x:y:xs) = case (x, y) of
   -- AssertWithBnd + DO : affix!
-  (C.AssertWithBnd p e _, C.Do q _) ->
-    Do  <$> fromConcrete p <*> fromConcrete e <*> mapM fromConcrete q
+  (C.AssertWithBnd p e _, C.Do q loc) ->
+    Do  <$> fromConcrete p <*> fromConcrete e <*> mapM fromConcrete q <*> pure loc
         <:> affixAssertions xs
 
   -- AssertWithBnd + _
@@ -73,9 +82,10 @@ affixAssertions (x:y:xs) = case (x, y) of
   (C.Assert _ loc, C.Do _ _) -> throwError $ TransformError $ MissingBound loc
 
   -- Assert + If : affix!
-  (C.Assert p _, C.If q _) ->
+  (C.Assert p _, C.If q loc) ->
     If  <$> fmap Just (fromConcrete p)
         <*> mapM fromConcrete q
+        <*> pure loc
         <:> affixAssertions xs
 
   -- _ + Do
@@ -218,15 +228,16 @@ instance FromConcrete C.Pred Pred where
   fromConcrete (C.HoleP       _) = Hole     <$> index
 
 instance FromConcrete C.Stmt Stmt where
-  fromConcrete (C.Assert p   _) = Assert <$> fromConcrete p
-  fromConcrete (C.Skip       _) = pure Skip
-  fromConcrete (C.Abort      _) = pure Abort
-  fromConcrete (C.Assign p q _) = Assign <$> mapM fromConcrete p
-                                         <*> mapM fromConcrete q
+  fromConcrete (C.Assert p   loc) = Assert  <$> fromConcrete p <*> pure loc
+  fromConcrete (C.Skip       loc) = Skip    <$> pure loc
+  fromConcrete (C.Abort      loc) = Abort   <$> pure loc
+  fromConcrete (C.Assign p q loc) = Assign  <$> mapM fromConcrete p
+                                            <*> mapM fromConcrete q
+                                            <*> pure loc
+  fromConcrete (C.If     p   loc) = If      <$> pure Nothing
+                                            <*> mapM fromConcrete p
+                                            <*> pure loc
 
-
-  fromConcrete (C.If     p   _) = If     <$> pure Nothing
-                                         <*> mapM fromConcrete p
   -- Panic because these cases should've been handled by `affixAssertions`
   fromConcrete (C.AssertWithBnd _ _ _) = throwError $ TransformError $ Panic "AssertWithBnd"
   fromConcrete (C.Do     _ _) = throwError $ TransformError $ Panic "Do"
@@ -261,5 +272,5 @@ instance FromConcrete C.Program Program where
       checkStatements :: [Stmt] -> AbstractM (Maybe ([Stmt], Pred))
       checkStatements [] = return Nothing
       checkStatements xs = case last xs of
-        Assert r -> return (Just (init xs, r))
-        _        -> throwError $ TransformError MissingPostcondition
+        Assert r _ -> return (Just (init xs, r))
+        _          -> throwError $ TransformError MissingPostcondition
