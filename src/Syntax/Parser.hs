@@ -122,15 +122,14 @@ hole :: Parser Stmt
 hole = withLocStmt $ Hole <$ (symbol TokQM <?> "?")
 
 spec :: Parser Stmt
-spec = do
-  ((), start) <- Util.getLoc (symbol TokSpecStart <?> "{!")
+spec = withLocStmt $ do
+  symbol TokSpecStart <?> "{!"
   expectNewline <?> "<newline> after a the start of a Spec"
-  ignoreNewlines
   stmts <- many statement <?> "statements"
-  ((), end)   <- Util.getLoc (symbol TokSpecEnd <?> "!}")
-  expectNewline <?> "<newline> after a the end of a Spec"
+  symbol TokSpecEnd <?> "!}"
+  -- expectNewline <?> "<newline> after a the end of a Spec"
 
-  return $ Spec stmts start end
+  return $ Spec stmts
 
 --------------------------------------------------------------------------------
 -- | Predicates

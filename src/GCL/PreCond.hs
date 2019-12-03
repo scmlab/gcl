@@ -21,8 +21,7 @@ data Specification = Specification
   { specHardness :: Hardness
   , specPreCond  :: Pred
   , specPostCond :: Pred
-  , specStartLoc :: Loc
-  , specEndLoc   :: Loc
+  , specLoc      :: Loc
   } deriving (Show, Generic)
 
 type M = WriterT [Obligation] (WriterT [Specification] (State Int))
@@ -42,9 +41,9 @@ obligate p q = do
     put (succ i)
     tell [Obligation i p q]
 
-tellSpec :: Hardness -> Pred -> Pred -> Loc -> Loc -> M ()
-tellSpec harsness p q start end  = do
-  lift $ tell [Specification harsness p q start end]
+tellSpec :: Hardness -> Pred -> Pred -> Loc -> M ()
+tellSpec harsness p q loc = do
+  lift $ tell [Specification harsness p q loc]
 
 conjunct :: [Pred] -> Pred
 conjunct = foldr Conj (Lit False)
@@ -56,30 +55,30 @@ precondStmts :: [Stmt] -> Pred -> M Pred
 precondStmts [] post = return post
 precondStmts (x:[]) post = case x of
   -- SOFT
-  Spec stmts start end -> do
+  Spec stmts loc -> do
     pre <- precondStmts stmts post
-    tellSpec Soft pre post start end
+    tellSpec Soft pre post loc
     return pre
   _ -> do
     precond x post
 
 precondStmts (x:(y:xs)) post = case (x, y) of
   -- HARD
-  (Assert asserted, Spec stmts start end) -> do
+  (Assert asserted, Spec stmts loc) -> do
     -- calculate the precondition of xs
     post' <- precondStmts xs post
 
-    tellSpec Hard asserted post' start end
+    tellSpec Hard asserted post' loc
 
     post'' <- precondStmts stmts post'
     obligate asserted post''
 
     return asserted
   -- SOFT
-  (Spec stmts start end, _) -> do
+  (Spec stmts loc, _) -> do
     post' <- precondStmts (y:xs) post
     pre <- precondStmts stmts post'
-    tellSpec Soft pre post' start end
+    tellSpec Soft pre post' loc
     return pre
   _ -> do
     precondStmts (y:xs) post >>= precond x
@@ -152,7 +151,7 @@ precond (Do inv bnd branches) post = do
 
   return inv
 
-precond (Spec stmts _ _) post = precondStmts stmts post
+precond (Spec stmts _) post = precondStmts stmts post
 
 precondGuard :: Pred -> GdCmd -> M Pred
 precondGuard post (GdCmd guard body) = Implies guard <$> precondStmts body post

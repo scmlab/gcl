@@ -38,7 +38,7 @@ data Stmt
   | Assert  Pred
   | Do      Pred Expr [GdCmd]
   | If      (Maybe Pred) [GdCmd]
-  | Spec   [Stmt] Loc Loc
+  | Spec   [Stmt] Loc
   deriving (Show)
 
 data GdCmd = GdCmd Pred [Stmt] deriving (Show)
@@ -232,9 +232,8 @@ instance FromConcrete C.Stmt Stmt where
   fromConcrete (C.Do     _ _) = throwError $ TransformError $ Panic "Do"
   -- Holes and specs
   fromConcrete (C.Hole loc) = throwError $ TransformError $ DigHole loc
-  fromConcrete (C.Spec p startLoc endLoc) = Spec <$> mapM fromConcrete p
-                                                 <*> pure startLoc
-                                                 <*> pure endLoc
+  fromConcrete (C.Spec p loc) = Spec <$> mapM fromConcrete p
+                                     <*> pure loc
 
 -- deals with missing Assertions and Bounds
 instance FromConcrete [C.Stmt] [Stmt] where
