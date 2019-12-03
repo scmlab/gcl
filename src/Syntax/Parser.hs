@@ -272,29 +272,23 @@ type' = withLoc (Type <$> upperName) <?> "type"
 -- | Combinators
 
 ignoreNewlines :: Parser ()
-ignoreNewlines = void $ many (symbol TokNewline)
+ignoreNewlines = void $ many (Util.ignore TokNewline)
 
 expectNewline :: Parser ()
 expectNewline = do
   -- see if the latest accepcted token is TokNewline
-  t <- lift Util.getLatestToken
+  t <- lift Util.getLastToken
   case t of
     Just TokNewline -> return ()
-    _ -> void $ some (symbol TokNewline)
-
+    _ -> void $ some (Util.ignore TokNewline)
 
 symbol :: Tok -> Parser ()
 symbol t = do
   Util.symbol t
   ignoreNewlines
 
-
--- ignores suffixing newlines
 withLoc :: Parser (Loc -> a) -> Parser a
-withLoc p = do
-  result <- Util.withLoc p
-  return result
-
+withLoc = Util.withLoc
 
 -- followed by at least 1 newline
 withLocStmt :: Parser (Loc -> a) -> Parser a

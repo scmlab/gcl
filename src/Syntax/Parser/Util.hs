@@ -3,11 +3,12 @@
 module Syntax.Parser.Util
   ( PosLog
   , runPosLog
-  , markStart, markEnd, update, getLatestToken
+  , markStart, markEnd, updateLoc, updateToken
+  , getCurrentLoc, getLastToken
 
   , getLoc, withLoc
 
-  , symbol, extract
+  , symbol, ignore, extract
   ) where
 
 import Control.Monad.State
@@ -24,23 +25,31 @@ import Syntax.Parser.TokenStream (PrettyToken)
 --------------------------------------------------------------------------------
 -- | Source location bookkeeping
 
+
 type PosLog token = State (LocState token)
 
 type ID = Int
 data LocState token = LocState
-  { latest :: (Loc, Maybe token)
-  , opened :: Set ID      -- waiting to be moved to the "logged" map
-                          -- when the starting position of the next token is determined
-  , logged :: Map ID Loc  -- waiting to be removed when the ending position is determined
-  , index  :: Int         -- for generating fresh IDs
+  { currentLoc :: Loc         -- current Loc mark
+  , lastToken :: Maybe token  -- the last accepcted token
+  , opened :: Set ID        -- waiting to be moved to the "logged" map
+                            -- when the starting position of the next token is determined
+  , logged :: Map ID Loc    -- waiting to be removed when the ending position is determined
+  , index  :: Int           -- for generating fresh IDs
   }
 
 runPosLog :: State (LocState token) a -> a
-runPosLog f = evalState f (LocState (NoLoc, Nothing) Set.empty Map.empty 0)
+runPosLog f = evalState f (LocState NoLoc Nothing Set.empty Map.empty 0)
 
+getCurrentLoc :: PosLog token Loc
+getCurrentLoc = gets currentLoc
+
+getLastToken :: PosLog token (Maybe token)
+getLastToken = gets lastToken
+
+-- | Returns an ID (marking the start of the range of some source location)
 markStart :: PosLog token ID
 markStart = do
-  -- get a fresh ID and put it in the "opened" set
   i <- gets index
   modify $ \st -> st
     { index  = succ i
@@ -48,31 +57,37 @@ markStart = do
     }
   return i
 
-update :: Loc -> token -> PosLog token ()
-update loc tok = do
-  set <- gets opened
-  let addedLoc = Map.fromSet (const loc) set
-  modify $ \st -> st
-    { latest = (loc, Just tok)
-    , opened = Set.empty
-    , logged = Map.union (logged st) addedLoc
-    }
-
+-- | Returns the range of some source location.
+--   The range starts from where the ID is retreived, and ends from here
 markEnd :: ID -> PosLog token Loc
 markEnd i = do
-  (end, _) <- gets latest
+  end <- getCurrentLoc
   loggedPos <- gets logged
   let loc = case Map.lookup i loggedPos of
               Nothing  -> NoLoc
               Just start -> start <--> end
-  -- remove it from the "logged" map
   modify $ \st -> st
     { logged = Map.delete i loggedPos
     }
   return loc
 
-getLatestToken :: PosLog token (Maybe token)
-getLatestToken = snd <$> gets latest
+-- | Updates the current source location
+updateLoc :: Loc -> PosLog token ()
+updateLoc loc = do
+  set <- gets opened
+  let addedLoc = Map.fromSet (const loc) set
+  modify $ \st -> st
+    { currentLoc = loc
+    , opened = Set.empty
+    , logged = Map.union (logged st) addedLoc
+    }
+
+-- | Updates the latest scanned token
+updateToken :: token -> PosLog token ()
+updateToken tok = do
+  modify $ \st -> st
+    { lastToken = Just tok
+    }
 
 --------------------------------------------------------------------------------
 -- | Helper functions
@@ -94,16 +109,31 @@ withLoc parser = do
 --------------------------------------------------------------------------------
 -- | Combinators
 
+
+-- parses with some parser, and updates the source location
 symbol :: (Eq tok, Ord tok, Show tok, PrettyToken tok) => tok -> P tok ()
 symbol t = do
   L loc tok <- satisfy (\(L _ t') -> t == t')
-  lift $ update loc tok
+  lift $ do
+    updateLoc loc
+    updateToken tok
+  return ()
+
+-- parses with some parser, but don't update the source location
+-- effectively excluding it from source location tracking
+ignore :: (Eq tok, Ord tok, Show tok, PrettyToken tok) => tok -> P tok ()
+ignore t = do
+  L loc tok <- satisfy (\(L _ t') -> t == t')
+  lift $ updateToken tok
   return ()
 
 extract :: (Ord tok, Show tok, PrettyToken tok) => (tok -> Maybe a) -> P tok a
 extract f = do
   (result, tok, loc) <- token p Set.empty
-  lift $ update loc tok
+  lift $ do
+    updateLoc loc
+    updateToken tok
+
   return result
   where
     p (L loc tok') = case f tok' of
