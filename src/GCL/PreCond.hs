@@ -50,10 +50,14 @@ tellSpec harsness p q stmts loc = do
   lift $ tell [Specification harsness p q (Just lastLoc) loc]
 
 conjunct :: [Pred] -> Pred
-conjunct = foldr Conj (Lit False)
+conjunct []     = Lit True
+conjunct [p]    = p
+conjunct (p:ps) = p `Conj` conjunct ps
 
 disjunct :: [Pred] -> Pred
-disjunct = foldr Disj (Lit True)
+disjunct []     = Lit False
+disjunct [p]    = p
+disjunct (p:ps) = p `Disj` disjunct ps
 
 precondStmts :: [Stmt] -> Pred -> M Pred
 precondStmts [] post = return post
