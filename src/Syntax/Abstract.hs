@@ -135,7 +135,7 @@ type OpName = Text
 data Expr = VarE    Var
           | ConstE  Const
           | LitE    Lit
-          | OpE     Expr   [Expr]
+          | ApE     Expr   Expr
           | HoleE   Index  [Subst]
           deriving (Show, Eq, Generic)
 
@@ -154,7 +154,7 @@ substE env (ConstE x) =
     Just e -> e
     Nothing -> ConstE x
 substE _   (LitE n)     = LitE n
-substE env (OpE op es)  = OpE op (map (substE env) es)
+substE env (ApE e1 e2)  = ApE (substE env e1) (substE env e2)
 substE env (HoleE idx subs) = HoleE idx (env:subs)
 
 --------------------------------------------------------------------------------
@@ -162,7 +162,9 @@ substE env (HoleE idx subs) = HoleE idx (env:subs)
 
 type Const = Text
 type Var = Text
-type Type = Text
+data Type = TInt | TBool | TArray Type
+          | TFun Type Type
+      deriving (Show, Eq)
 
 --------------------------------------------------------------------------------
 -- Converting from Concrete Syntax Tree
@@ -197,13 +199,15 @@ instance FromConcrete C.Var Var where
   fromConcrete (C.Var x _) = pure x
 
 instance FromConcrete C.Type Type where
-  fromConcrete (C.Type x _) = pure x
+  fromConcrete (C.Type x _) = undefined -- pure x
+   -- To Banacorn: help~
 
 instance FromConcrete C.Expr Expr where
   fromConcrete (C.VarE x    _) = VarE   <$> fromConcrete x
   fromConcrete (C.ConstE x  _) = ConstE <$> fromConcrete x
   fromConcrete (C.LitE x    _) = LitE   <$> fromConcrete x
-  fromConcrete (C.OpE x xs  _) = OpE    <$> fromConcrete x <*> mapM fromConcrete xs
+  -- fromConcrete (C.OpE x xs  _) = OpE    <$> fromConcrete x <*> mapM fromConcrete xs
+  -- To Banacorn: Help. :)
   fromConcrete (C.HoleE     _) = HoleE  <$> index <*> pure []
 
 instance FromConcrete C.BinRel BinRel where
