@@ -9,7 +9,7 @@ import Control.Monad.Writer hiding (guard)
 
 import qualified Data.Map as Map
 -- import Data.Map (Map)
-import Data.Loc (Loc, locOf)
+import Data.Loc (Loc)
 import GHC.Generics
 
 import Syntax.Abstract
@@ -21,7 +21,6 @@ data Specification = Specification
   { specHardness :: Hardness
   , specPreCond  :: Pred
   , specPostCond :: Pred
-  , specLastStmt :: Maybe Loc
   , specLoc      :: Loc
   } deriving (Show, Generic)
 
@@ -42,12 +41,12 @@ obligate p q = do
     put (succ i)
     tell [Obligation i p q]
 
-tellSpec :: Hardness -> Pred -> Pred -> [Stmt] -> Loc -> M ()
-tellSpec harsness p q [] loc = do
-  lift $ tell [Specification harsness p q Nothing loc]
-tellSpec harsness p q stmts loc = do
-  let lastLoc = locOf $ last stmts
-  lift $ tell [Specification harsness p q (Just lastLoc) loc]
+tellSpec :: Hardness -> Pred -> Pred -> Loc -> M ()
+tellSpec harsness p q loc = do
+  lift $ tell [Specification harsness p q loc]
+-- tellSpec harsness p q stmts loc = do
+--   let lastLoc = locOf $ last stmts
+--   lift $ tell [Specification harsness p q (Just lastLoc) loc]
 
 conjunct :: [Pred] -> Pred
 conjunct []     = Lit True
@@ -64,7 +63,7 @@ precondStmts [] post = return post
 precondStmts (x:[]) post = case x of
   -- SOFT
   Spec loc -> do
-    tellSpec Soft post post [] loc
+    tellSpec Soft post post loc
     return post
   _ -> do
     precond x post
@@ -75,7 +74,7 @@ precondStmts (x:(y:xs)) post = case (x, y) of
     -- calculate the precondition of xs
     post' <- precondStmts xs post
 
-    tellSpec Hard asserted post' [] loc
+    tellSpec Hard asserted post' loc
 
     obligate asserted post'
 
@@ -84,7 +83,7 @@ precondStmts (x:(y:xs)) post = case (x, y) of
   (Spec loc, _) -> do
     pre <- precondStmts (y:xs) post
     -- pre <- precondStmts stmts post'
-    tellSpec Soft pre pre [] loc
+    tellSpec Soft pre pre loc
     return pre
   _ -> do
     precondStmts (y:xs) post >>= precond x
