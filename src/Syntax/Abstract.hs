@@ -71,9 +71,10 @@ affixAssertions      []  = return []
 affixAssertions (  x:[]) = (:) <$> fromConcrete x <*> pure []
 affixAssertions (x:y:xs) = case (x, y) of
   -- AssertWithBnd + DO : affix!
-  (C.AssertWithBnd p e _, C.Do q loc) ->
-    Do  <$> fromConcrete p <*> fromConcrete e <*> mapM fromConcrete q <*> pure loc
-        <:> affixAssertions xs
+  (C.AssertWithBnd p e _, C.Do q loc) -> undefined
+   -- to banacorn: help!
+    -- Do  <$> fromConcrete p <*> fromConcrete e <*> mapM fromConcrete q <*> pure loc
+    --     <:> affixAssertions xs
 
   -- AssertWithBnd + _
   (C.AssertWithBnd _ _ loc, _) -> throwError $ TransformError $ ExcessBound loc
@@ -82,11 +83,12 @@ affixAssertions (x:y:xs) = case (x, y) of
   (C.Assert _ loc, C.Do _ _) -> throwError $ TransformError $ MissingBound loc
 
   -- Assert + If : affix!
-  (C.Assert p _, C.If q loc) ->
-    If  <$> fmap Just (fromConcrete p)
-        <*> mapM fromConcrete q
-        <*> pure loc
-        <:> affixAssertions xs
+  (C.Assert p _, C.If q loc) -> undefined
+    -- To banacorn: help!
+    -- If  <$> fmap Just (fromConcrete p)
+    --     <*> mapM fromConcrete q
+    --     <*> pure loc
+    --     <:> affixAssertions xs
 
   -- _ + Do
   (_, C.Do _ loc) -> throwError $ TransformError $ MissingAssertion loc
@@ -95,67 +97,63 @@ affixAssertions (x:y:xs) = case (x, y) of
   _  -> fromConcrete x <:> affixAssertions (y:xs)
 
 --------------------------------------------------------------------------------
--- | Predicates
+-- | Predicates and Expressions
 
-data BinRel = Eq | LEq | GEq | LTh | GTh
-  deriving (Show, Eq, Generic)
+type Pred = Expr  -- predicates are expressions of type Bool
 
-data Pred = Term    BinRel Expr Expr
-          | Implies Pred Pred
-          | Conj    Pred Pred
-          | Disj    Pred Pred
-          | Neg     Pred
-          | Lit     Bool
-          | Hole    Index
+data Lit  = Num Int
+          | Bol Bool
+          | Op Op      --- built-in operators
+          | Fn Text    --- user-defined functions
           deriving (Show, Eq, Generic)
 
-instance ToJSON BinRel where
-instance ToJSON Pred where
+data Expr = Var    Var
+          | Const  Const
+          | Lit    Lit
+          | App    Expr   Expr
+          | Hole   Index  [Subst]
+          deriving (Show, Eq, Generic)
+
+data Op = Eq | LEq | GEq | LTh | GTh   -- binary relations
+        | Implies | Conj | Disj | Neg  -- logic operators
+        | Plus | Minus | Mul | Div     -- arithmetics
+     deriving (Show, Eq, Generic)
+
+-- convenient constructors
+
+x `lth` y = App (App (Lit (Op LTh)) x) y
+x `geq` y = App (App (Lit (Op GEq)) x) y
+x `eqq` y = App (App (Lit (Op Eq )) x) y
+x `conj` y = App (App (Lit (Op Conj)) x) y
+x `disj` y = App (App (Lit (Op Disj)) x) y
+x `implies` y = App (App (Lit (Op Implies)) x) y
+neg x = App (Lit (Op Neg)) x
+
+instance ToJSON Op where
+instance ToJSON Lit where
+instance ToJSON Expr where
 
 predEq :: Pred -> Pred -> Bool
 predEq = (==)
 
-substP :: Map Text Expr -> Pred -> Pred
-substP env (Term rel e1 e2) = Term rel (substE env e1) (substE env e2)
-substP env (Implies p q)    = Implies (substP env p) (substP env q)
-substP env (Conj p q)       = Conj (substP env p) (substP env q)
-substP env (Disj p q)       = Disj (substP env p) (substP env q)
-substP env (Neg p)          = Neg (substP env p)
-substP _   (Lit b)          = Lit b
-substP _   (Hole i)         = Hole i -- undefined -- do we need it?
+type Subst = Map Text Expr
+
+subst :: Subst -> Expr -> Expr
+subst env (Var x) =
+  case Map.lookup x env of
+    Just e -> e
+    Nothing -> Var x
+subst env (Const x) =
+  case Map.lookup x env of
+    Just e -> e
+    Nothing -> Const x
+subst _   (Lit n)     = Lit n
+subst env (App e1 e2)  = App (subst env e1) (subst env e2)
+subst env (Hole idx subs) = Hole idx (env:subs)
 
 --------------------------------------------------------------------------------
 -- | Expressions
 
-data Lit  = Num Int
-          | Bol Bool
-          deriving (Show, Eq, Generic)
-
-type OpName = Text
-data Expr = VarE    Var
-          | ConstE  Const
-          | LitE    Lit
-          | ApE     Expr   Expr
-          | HoleE   Index  [Subst]
-          deriving (Show, Eq, Generic)
-
-instance ToJSON Lit where
-instance ToJSON Expr where
-
-type Subst = Map Text Expr
-
-substE :: Subst -> Expr -> Expr
-substE env (VarE x) =
-  case Map.lookup x env of
-    Just e -> e
-    Nothing -> VarE x
-substE env (ConstE x) =
-  case Map.lookup x env of
-    Just e -> e
-    Nothing -> ConstE x
-substE _   (LitE n)     = LitE n
-substE env (ApE e1 e2)  = ApE (substE env e1) (substE env e2)
-substE env (HoleE idx subs) = HoleE idx (env:subs)
 
 --------------------------------------------------------------------------------
 -- | Variables and stuff
@@ -184,7 +182,6 @@ index = do
   put (succ i)
   return i
 
-
 class FromConcrete a b | a -> b where
   fromConcrete :: a -> AbstractM b
 
@@ -203,36 +200,40 @@ instance FromConcrete C.Type Type where
    -- To Banacorn: help~
 
 instance FromConcrete C.Expr Expr where
-  fromConcrete (C.VarE x    _) = VarE   <$> fromConcrete x
-  fromConcrete (C.ConstE x  _) = ConstE <$> fromConcrete x
-  fromConcrete (C.LitE x    _) = LitE   <$> fromConcrete x
+  fromConcrete (C.VarE x    _) = Var   <$> fromConcrete x
+  fromConcrete (C.ConstE x  _) = Const <$> fromConcrete x
+  fromConcrete (C.LitE x    _) = Lit   <$> fromConcrete x
   -- fromConcrete (C.OpE x xs  _) = OpE    <$> fromConcrete x <*> mapM fromConcrete xs
   -- To Banacorn: Help. :)
-  fromConcrete (C.HoleE     _) = HoleE  <$> index <*> pure []
+  fromConcrete (C.HoleE     _) = Hole  <$> index <*> pure []
 
-instance FromConcrete C.BinRel BinRel where
-  fromConcrete (C.Eq  _) = pure Eq
-  fromConcrete (C.LEq _) = pure LEq
-  fromConcrete (C.GEq _) = pure GEq
-  fromConcrete (C.LTh _) = pure LTh
-  fromConcrete (C.GTh _) = pure GTh
+-- To banacorn: help!
+-- instance FromConcrete C.BinRel BinRel where
+--   fromConcrete (C.Eq  _) = pure Eq
+--   fromConcrete (C.LEq _) = pure LEq
+--   fromConcrete (C.GEq _) = pure GEq
+--   fromConcrete (C.LTh _) = pure LTh
+--   fromConcrete (C.GTh _) = pure GTh
 
-instance FromConcrete C.Pred Pred where
-  fromConcrete (C.Term p r q  _) = Term     <$> fromConcrete r
-                                            <*> fromConcrete p
-                                            <*> fromConcrete q
-  fromConcrete (C.Implies p q _) = Implies  <$> fromConcrete p
-                                            <*> fromConcrete q
-  fromConcrete (C.Conj p q    _) = Conj     <$> fromConcrete p
-                                            <*> fromConcrete q
-  fromConcrete (C.Disj p q    _) = Disj     <$> fromConcrete p
-                                            <*> fromConcrete q
-  fromConcrete (C.Neg p       _) = Neg      <$> fromConcrete p
-  fromConcrete (C.Lit p       _) = Lit      <$> pure p
-  fromConcrete (C.HoleP       _) = Hole     <$> index
+-- To banacorn: help!
+-- instance FromConcrete C.Pred Pred where
+--   fromConcrete (C.Term p r q  _) = Term     <$> fromConcrete r
+--                                             <*> fromConcrete p
+--                                             <*> fromConcrete q
+--   fromConcrete (C.Implies p q _) = Implies  <$> fromConcrete p
+--                                             <*> fromConcrete q
+--   fromConcrete (C.Conj p q    _) = Conj     <$> fromConcrete p
+--                                             <*> fromConcrete q
+--   fromConcrete (C.Disj p q    _) = Disj     <$> fromConcrete p
+--                                             <*> fromConcrete q
+--   fromConcrete (C.Neg p       _) = Neg      <$> fromConcrete p
+--   fromConcrete (C.Lit p       _) = Lit      <$> pure p
+--   fromConcrete (C.HoleP       _) = Hole     <$> index
 
 instance FromConcrete C.Stmt Stmt where
-  fromConcrete (C.Assert p   loc) = Assert  <$> fromConcrete p <*> pure loc
+  fromConcrete (C.Assert p   loc) = undefined
+     -- To banacorn: help!
+     -- Assert  <$> fromConcrete p <*> pure loc
   fromConcrete (C.Skip       loc) = Skip    <$> pure loc
   fromConcrete (C.Abort      loc) = Abort   <$> pure loc
   fromConcrete (C.Assign p q loc) = Assign  <$> mapM fromConcrete p
@@ -258,8 +259,10 @@ instance FromConcrete [C.Stmt] [Stmt] where
   fromConcrete (x:y:xs) = affixAssertions (x:y:xs)
 
 instance FromConcrete C.GdCmd GdCmd where
-  fromConcrete (C.GdCmd p q _) = GdCmd  <$> fromConcrete p
-                                        <*> fromConcrete q
+  fromConcrete (C.GdCmd p q _) = undefined
+      -- To banacorn: help!
+      -- GdCmd  <$> fromConcrete p
+      --        <*> fromConcrete q
 
 instance FromConcrete C.Declaration Declaration where
   fromConcrete (C.ConstDecl p q _) = ConstDecl  <$> mapM fromConcrete p
