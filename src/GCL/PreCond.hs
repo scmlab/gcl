@@ -63,30 +63,28 @@ precondStmts :: [Stmt] -> Pred -> M Pred
 precondStmts [] post = return post
 precondStmts (x:[]) post = case x of
   -- SOFT
-  Spec stmts loc -> do
-    pre <- precondStmts stmts post
-    tellSpec Soft pre post stmts loc
-    return pre
+  Spec loc -> do
+    tellSpec Soft post post [] loc
+    return post
   _ -> do
     precond x post
 
 precondStmts (x:(y:xs)) post = case (x, y) of
   -- HARD
-  (Assert asserted _, Spec stmts loc) -> do
+  (Assert asserted _, Spec loc) -> do
     -- calculate the precondition of xs
     post' <- precondStmts xs post
 
-    tellSpec Hard asserted post' stmts loc
+    tellSpec Hard asserted post' [] loc
 
-    post'' <- precondStmts stmts post'
-    obligate asserted post''
+    obligate asserted post'
 
     return asserted
   -- SOFT
-  (Spec stmts loc, _) -> do
-    post' <- precondStmts (y:xs) post
-    pre <- precondStmts stmts post'
-    tellSpec Soft pre post' stmts loc
+  (Spec loc, _) -> do
+    pre <- precondStmts (y:xs) post
+    -- pre <- precondStmts stmts post'
+    tellSpec Soft pre pre [] loc
     return pre
   _ -> do
     precondStmts (y:xs) post >>= precond x
@@ -159,7 +157,7 @@ precond (Do inv bnd branches _) post = do
 
   return inv
 
-precond (Spec stmts _) post = precondStmts stmts post
+precond (Spec _) post = return post
 
 precondGuard :: Pred -> GdCmd -> M Pred
 precondGuard post (GdCmd guard body) = Implies guard <$> precondStmts body post

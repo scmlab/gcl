@@ -2,6 +2,10 @@ con X : Int
 
 { X = 0 }
 
+{!
+
+!}
+
 if
   True ->
   x := 3

@@ -38,7 +38,7 @@ data Stmt
   | Assert  Pred                  Loc
   | Do      Pred Expr [GdCmd]     Loc
   | If      (Maybe Pred) [GdCmd]  Loc
-  | Spec   [Stmt]                 Loc
+  | Spec                          Loc
   deriving (Show)
 
 instance Located Stmt where
@@ -48,7 +48,7 @@ instance Located Stmt where
   locOf (Assert _ l)    = l
   locOf (Do _ _ _ l)    = l
   locOf (If _ _ l)      = l
-  locOf (Spec _ l)      = l
+  locOf (Spec l)        = l
 
 data GdCmd = GdCmd Pred [Stmt] deriving (Show)
 
@@ -243,8 +243,7 @@ instance FromConcrete C.Stmt Stmt where
   fromConcrete (C.Do     _ _) = throwError $ TransformError $ Panic "Do"
   -- Holes and specs
   fromConcrete (C.Hole loc) = throwError $ TransformError $ DigHole loc
-  fromConcrete (C.Spec p loc) = Spec <$> mapM fromConcrete p
-                                     <*> pure loc
+  fromConcrete (C.Spec loc) = Spec <$> pure loc
 
 -- deals with missing Assertions and Bounds
 instance FromConcrete [C.Stmt] [Stmt] where

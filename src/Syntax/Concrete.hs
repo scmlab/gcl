@@ -20,7 +20,7 @@ data Stmt
   | Do            [GdCmd]     Loc
   | If            [GdCmd]     Loc
   | Hole                      Loc -- ?      to be rewritten as {!!} by the frontend
-  | Spec [Stmt]               Loc
+  | Spec                      Loc
   deriving (Show)
 
 data GdCmd = GdCmd Pred [Stmt] Loc deriving (Show)
