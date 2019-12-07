@@ -103,13 +103,12 @@ type Pred = Expr  -- predicates are expressions of type Bool
 
 data Lit  = Num Int
           | Bol Bool
-          | Op Op      --- built-in operators
-          | Fn Text    --- user-defined functions
           deriving (Show, Eq, Generic)
 
 data Expr = Var    Var
           | Const  Const
           | Lit    Lit
+          | Op Op      --- built-in operators
           | App    Expr   Expr
           | Hole   Index  [Subst]
           deriving (Show, Eq, Generic)
@@ -121,13 +120,16 @@ data Op = Eq | LEq | GEq | LTh | GTh   -- binary relations
 
 -- convenient constructors
 
-x `lth` y = App (App (Lit (Op LTh)) x) y
-x `geq` y = App (App (Lit (Op GEq)) x) y
-x `eqq` y = App (App (Lit (Op Eq )) x) y
-x `conj` y = App (App (Lit (Op Conj)) x) y
-x `disj` y = App (App (Lit (Op Disj)) x) y
-x `implies` y = App (App (Lit (Op Implies)) x) y
-neg x = App (Lit (Op Neg)) x
+lth, geq, eqq, conj, disj, implies :: Expr -> Expr -> Expr
+x `lth` y = App (App (Op LTh) x) y
+x `geq` y = App (App (Op GEq) x) y
+x `eqq` y = App (App (Op Eq ) x) y
+x `conj` y = App (App (Op Conj) x) y
+x `disj` y = App (App (Op Disj) x) y
+x `implies` y = App (App (Op Implies) x) y
+
+neg :: Expr -> Expr
+neg x = App (Op Neg) x
 
 instance ToJSON Op where
 instance ToJSON Lit where
@@ -147,6 +149,7 @@ subst env (Const x) =
   case Map.lookup x env of
     Just e -> e
     Nothing -> Const x
+subst _   (Op op) = Op op
 subst _   (Lit n)     = Lit n
 subst env (App e1 e2)  = App (subst env e1) (subst env e2)
 subst env (Hole idx subs) = Hole idx (env:subs)
