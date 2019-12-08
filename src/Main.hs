@@ -78,6 +78,9 @@ main = do
                 send $ OK obligations specifications
             Left err -> send $ Error err
           loop
+        -- Just (Refine i payload) -> do
+
+
         Just Quit -> return ()
         _ -> do
           send $ Load "filepath"

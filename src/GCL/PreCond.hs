@@ -18,16 +18,17 @@ import Syntax.Parser
 data Obligation = Obligation Index Pred Pred deriving (Show, Generic)
 data Hardness = Hard | Soft deriving (Show, Generic)
 data Specification = Specification
-  { specHardness :: Hardness
+  { specID       :: Int
+  , specHardness :: Hardness
   , specPreCond  :: Pred
   , specPostCond :: Pred
   , specLoc      :: Loc
   } deriving (Show, Generic)
 
-type M = WriterT [Obligation] (WriterT [Specification] (State Int))
+type M = WriterT [Obligation] (WriterT [Specification] (State (Int, Int)))
 
 runM :: M a -> ((a, [Obligation]), [Specification])
-runM p = evalState (runWriterT (runWriterT p)) 0
+runM p = evalState (runWriterT (runWriterT p)) (0, 0)
 
 -- creates a proof obligation
 obligate :: Pred -> Pred -> M ()
@@ -37,13 +38,15 @@ obligate p q = do
   let samePredicate = predEq p q
 
   unless samePredicate $ do
-    i <- get
-    put (succ i)
+    (i, j) <- get
+    put (succ i, j)
     tell [Obligation i p q]
 
 tellSpec :: Hardness -> Pred -> Pred -> Loc -> M ()
 tellSpec harsness p q loc = do
-  lift $ tell [Specification harsness p q loc]
+  (i, j) <- get
+  put (i, succ j)
+  lift $ tell [Specification j harsness p q loc]
 -- tellSpec harsness p q stmts loc = do
 --   let lastLoc = locOf $ last stmts
 --   lift $ tell [Specification harsness p q (Just lastLoc) loc]
