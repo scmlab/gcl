@@ -78,8 +78,13 @@ main = do
                 send $ OK obligations specifications
             Left err -> send $ Error err
           loop
-        -- Just (Refine i payload) -> do
-
+        Just (Refine i payload) -> do
+          case parseStmt payload of
+            Right syntax -> case abstract syntax of
+              Left err -> send $ Error err
+              Right _ -> send $ Resolve i
+            Left err -> send $ Error err
+          loop
 
         Just Quit -> return ()
         _ -> do

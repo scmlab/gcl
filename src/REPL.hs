@@ -8,6 +8,7 @@ import qualified Data.ByteString.Char8 as Strict
 
 import Syntax.Type (SyntaxError)
 import Data.Aeson
+import Data.Text.Lazy (Text)
 import GHC.Generics
 import System.IO
 import GCL.PreCond
@@ -28,7 +29,7 @@ send payload = do
 data Response
   = OK [Obligation] [Specification]
   | Error SyntaxError
-  -- | ParseError [(Pos, String)]
+  | Resolve Int -- resolves some Spec
   deriving (Generic)
 
 instance ToJSON Response where
@@ -37,7 +38,7 @@ instance ToJSON Response where
 -- | Response
 
 
-data Request = Load FilePath | Quit
+data Request = Load FilePath | Refine Int Text | Quit
   deriving (Generic)
 
 instance FromJSON Request where
