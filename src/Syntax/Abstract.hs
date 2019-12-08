@@ -131,7 +131,6 @@ data Lit  = Num Int
           | Bol Bool
           deriving (Show, Eq, Generic)
 
-type OpName = Text
 data Expr = VarE    Var
           | ConstE  Const
           | LitE    Lit
@@ -199,15 +198,15 @@ instance FromConcrete C.Var Var where
   fromConcrete (C.Var x _) = pure x
 
 instance FromConcrete C.Type Type where
-  fromConcrete (C.Type x _) = undefined -- pure x
-   -- To Banacorn: help~
+  fromConcrete (C.Type "Int" _) = return TInt
+  fromConcrete (C.Type "Bool" _) = return TBool
+  fromConcrete (C.Type _ _) = return TBool
 
 instance FromConcrete C.Expr Expr where
   fromConcrete (C.VarE x    _) = VarE   <$> fromConcrete x
   fromConcrete (C.ConstE x  _) = ConstE <$> fromConcrete x
   fromConcrete (C.LitE x    _) = LitE   <$> fromConcrete x
-  -- fromConcrete (C.OpE x xs  _) = OpE    <$> fromConcrete x <*> mapM fromConcrete xs
-  -- To Banacorn: Help. :)
+  fromConcrete (C.ApE x y   _) = ApE    <$> fromConcrete x <*> fromConcrete y
   fromConcrete (C.HoleE     _) = HoleE  <$> index <*> pure []
 
 instance FromConcrete C.BinRel BinRel where

@@ -59,9 +59,16 @@ data Lit  = Num Int
 data Expr = VarE    Var           Loc
           | ConstE  Const         Loc
           | LitE    Lit           Loc
-          | OpE     Expr   [Expr] Loc
+          | ApE     Expr Expr     Loc
           | HoleE                 Loc
           deriving Show
+
+instance Located Expr where
+  locOf (VarE _ l)   = l
+  locOf (ConstE _ l) = l
+  locOf (LitE _ l)   = l
+  locOf (ApE _ _ l)  = l
+  locOf (HoleE l)    = l
 
 --------------------------------------------------------------------------------
 -- | Variables and stuff

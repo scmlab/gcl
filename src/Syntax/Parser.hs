@@ -198,19 +198,26 @@ expressionList :: Parser [Expr]
 expressionList = sepBy1 expression (symbol TokComma) <?> "a list of expressions separated by commas"
 
 expression :: Parser Expr
-expression = (parens expression <|> term) <?> "expression"
-
-term :: Parser Expr
-term = withLoc (choice
-  [ try (OpE <$> op <*> parens expressionList)
-  , VarE    <$> variable
-  , ConstE  <$> constant
-  , LitE    <$> literal
-  , HoleE   <$  symbol TokQM
-  ]) <?> "term"
+expression = foldAp <$> expr <*> many expr <?> "expression"
   where
-    op :: Parser Expr
-    op = withLoc (VarE <$> variable) <?> "operator"
+    foldAp :: Expr -> [Expr] -> Expr
+    foldAp f [] = f
+    foldAp f (x:xs) =
+      foldAp (ApE f x (locOf f <--> locOf x)) xs
+
+    expr :: Parser Expr
+    expr = parens expression <|> term
+
+    term :: Parser Expr
+    term = withLoc (choice
+      [ VarE    <$> variable
+      , ConstE  <$> constant
+      , LitE    <$> literal
+      , HoleE   <$  symbol TokQM
+      ]) <?> "term"
+  -- where
+  --   op :: Parser Expr
+    -- op = withLoc (VarE <$> variable) <?> "operator"
 
 literal :: Parser Lit
 literal = choice
