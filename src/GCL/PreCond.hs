@@ -52,14 +52,14 @@ tellSpec harsness p q loc = do
 --   lift $ tell [Specification harsness p q (Just lastLoc) loc]
 
 conjunct :: [Pred] -> Pred
-conjunct []     = Lit True
+conjunct []     = Lit (Bol True)
 conjunct [p]    = p
-conjunct (p:ps) = p `Conj` conjunct ps
+conjunct (p:ps) = p `conj` conjunct ps
 
 disjunct :: [Pred] -> Pred
-disjunct []     = Lit False
+disjunct []     = Lit (Bol False)
 disjunct [p]    = p
-disjunct (p:ps) = p `Disj` disjunct ps
+disjunct (p:ps) = p `disj` disjunct ps
 
 precondStmts :: [Stmt] -> Pred -> M Pred
 precondStmts [] post = return post
@@ -95,7 +95,7 @@ precondStmts (x:(y:xs)) post = case (x, y) of
 -- calculating the weakest precondition
 precond :: Stmt -> Pred -> M Pred
 
-precond (Abort _) _ = return (Lit False)
+precond (Abort _) _ = return (Lit (Bol False))
 
 precond (Skip _) post = return post
 
@@ -103,7 +103,7 @@ precond (Assert pre _) post = do
   obligate pre post
   return pre
 
-precond (Assign xs es _) post = return $ substP (Map.fromList (zip xs es)) post
+precond (Assign xs es _) post = return $ subst (Map.fromList (zip xs es)) post
 
 precond (If (Just pre) branches _) post = do
 
@@ -111,7 +111,7 @@ precond (If (Just pre) branches _) post = do
   forM_ branches $ \(GdCmd guard body) -> do
     p <- precondStmts body post
     obligate
-      (pre `Conj` guard)    -- HARD precondition AND the guard
+      (pre `conj` guard)    -- HARD precondition AND the guard
       p                     -- precondition of the statements
 
 
@@ -126,22 +126,22 @@ precond (If Nothing branches _) post = do
   brConds <- mapM (precondGuard post) branches
   let guards = getGuards branches
 
-  return (conjunct brConds `Conj` disjunct guards)
+  return (conjunct brConds `conj` disjunct guards)
 
 precond (Do inv bnd branches _) post = do
 
   forM_ branches $ \(GdCmd guard body) -> do
     p <- precondStmts body inv
     obligate
-      (inv `Conj` guard)    -- invariant AND the guard
+      (inv `conj` guard)    -- invariant AND the guard
       p                     -- precondition of the statements
 
   -- termination of each branches
   forM_ branches $ \(GdCmd guard body) -> do
-    p <- precondStmts body (Term LTh bnd (LitE (Num 100)))
+    p <- precondStmts body (bnd `lth` (Lit (Num 100)))
     obligate
       -- invariant AND the guard AND some hard limit
-      (inv `Conj` guard `Conj` (Term Eq bnd (LitE (Num 100))))
+      (inv `conj` guard `conj` (bnd `eqq` (Lit (Num 100))))
       -- precondition of the statements
       p
 
@@ -149,20 +149,20 @@ precond (Do inv bnd branches _) post = do
 
   -- after the loop, the invariant should still hold and all guards should fail
   obligate
-    (inv `Conj` (conjunct (map Neg guards)))
+    (inv `conj` (conjunct (map neg guards)))
     post -- empty branches?
 
   -- termination of the whole statement
   obligate
-    (inv `Conj` disjunct guards)
-    (Term GEq bnd (LitE (Num 0)))
+    (inv `conj` disjunct guards)
+    (bnd `geq` (Lit (Num 0)))
 
   return inv
 
 precond (Spec _) post = return post
 
 precondGuard :: Pred -> GdCmd -> M Pred
-precondGuard post (GdCmd guard body) = Implies guard <$> precondStmts body post
+precondGuard post (GdCmd guard body) = implies guard <$> precondStmts body post
 
 --- calculating the weakest precondition, and update the syntax tree
 

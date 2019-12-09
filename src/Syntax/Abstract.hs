@@ -95,66 +95,63 @@ affixAssertions (x:y:xs) = case (x, y) of
   _  -> fromConcrete x <:> affixAssertions (y:xs)
 
 --------------------------------------------------------------------------------
--- | Predicates
+-- | Predicates and Expressions
 
-data BinRel = Eq | LEq | GEq | LTh | GTh
-  deriving (Show, Eq, Generic)
-
-data Pred = Term    BinRel Expr Expr
-          | Implies Pred Pred
-          | Conj    Pred Pred
-          | Disj    Pred Pred
-          | Neg     Pred
-          | Lit     Bool
-          | Hole    Index
-          deriving (Show, Eq, Generic)
-
-instance ToJSON BinRel where
-instance ToJSON Pred where
-
-predEq :: Pred -> Pred -> Bool
-predEq = (==)
-
-substP :: Map Text Expr -> Pred -> Pred
-substP env (Term rel e1 e2) = Term rel (substE env e1) (substE env e2)
-substP env (Implies p q)    = Implies (substP env p) (substP env q)
-substP env (Conj p q)       = Conj (substP env p) (substP env q)
-substP env (Disj p q)       = Disj (substP env p) (substP env q)
-substP env (Neg p)          = Neg (substP env p)
-substP _   (Lit b)          = Lit b
-substP _   (Hole i)         = Hole i -- undefined -- do we need it?
-
---------------------------------------------------------------------------------
--- | Expressions
+type Pred = Expr  -- predicates are expressions of type Bool
 
 data Lit  = Num Int
           | Bol Bool
           deriving (Show, Eq, Generic)
 
-data Expr = VarE    Var
-          | ConstE  Const
-          | LitE    Lit
-          | ApE     Expr   Expr
-          | HoleE   Index  [Subst]
+data Expr = Var    Var
+          | Const  Const
+          | Lit    Lit
+          | Op     Op      --- built-in operators
+          | App    Expr   Expr
+          | Hole   Index  [Subst]
           deriving (Show, Eq, Generic)
 
+data Op = Eq | LEq | GEq | LTh | GTh   -- binary relations
+        | Implies | Conj | Disj | Neg  -- logic operators
+        | Plus | Minus | Mul | Div     -- arithmetics
+     deriving (Show, Eq, Generic)
+
+-- convenient constructors
+
+lth, geq, eqq, conj, disj, implies :: Expr -> Expr -> Expr
+x `lth` y = App (App (Op LTh) x) y
+x `geq` y = App (App (Op GEq) x) y
+x `eqq` y = App (App (Op Eq ) x) y
+x `conj` y = App (App (Op Conj) x) y
+x `disj` y = App (App (Op Disj) x) y
+x `implies` y = App (App (Op Implies) x) y
+
+neg :: Expr -> Expr
+neg x = App (Op Neg) x
+
+instance ToJSON Op where
 instance ToJSON Lit where
 instance ToJSON Expr where
 
+predEq :: Pred -> Pred -> Bool
+predEq = (==)
+
 type Subst = Map Text Expr
 
-substE :: Subst -> Expr -> Expr
-substE env (VarE x) =
+subst :: Subst -> Expr -> Expr
+subst env (Var x) =
   case Map.lookup x env of
     Just e -> e
-    Nothing -> VarE x
-substE env (ConstE x) =
+    Nothing -> Var x
+subst env (Const x) =
   case Map.lookup x env of
     Just e -> e
-    Nothing -> ConstE x
-substE _   (LitE n)     = LitE n
-substE env (ApE e1 e2)  = ApE (substE env e1) (substE env e2)
-substE env (HoleE idx subs) = HoleE idx (env:subs)
+    Nothing -> Const x
+subst _   (Op op) = Op op
+subst _   (Lit n)     = Lit n
+subst env (App e1 e2)  = App (subst env e1) (subst env e2)
+subst env (Hole idx subs) = Hole idx (env:subs)
+
 
 --------------------------------------------------------------------------------
 -- | Variables and stuff
@@ -183,7 +180,6 @@ index = do
   put (succ i)
   return i
 
-
 class FromConcrete a b | a -> b where
   fromConcrete :: a -> AbstractM b
 
@@ -203,32 +199,36 @@ instance FromConcrete C.Type Type where
   fromConcrete (C.Type _ _) = return TBool
 
 instance FromConcrete C.Expr Expr where
-  fromConcrete (C.VarE x    _) = VarE   <$> fromConcrete x
-  fromConcrete (C.ConstE x  _) = ConstE <$> fromConcrete x
-  fromConcrete (C.LitE x    _) = LitE   <$> fromConcrete x
-  fromConcrete (C.ApE x y   _) = ApE    <$> fromConcrete x <*> fromConcrete y
-  fromConcrete (C.HoleE     _) = HoleE  <$> index <*> pure []
+  fromConcrete (C.VarE x    _) = Var   <$> fromConcrete x
+  fromConcrete (C.ConstE x  _) = Const <$> fromConcrete x
+  fromConcrete (C.LitE x    _) = Lit   <$> fromConcrete x
+  fromConcrete (C.ApE x y   _) = App   <$> fromConcrete x <*> fromConcrete y
+  fromConcrete (C.HoleE     _) = Hole  <$> index <*> pure []
 
-instance FromConcrete C.BinRel BinRel where
-  fromConcrete (C.Eq  _) = pure Eq
-  fromConcrete (C.LEq _) = pure LEq
-  fromConcrete (C.GEq _) = pure GEq
-  fromConcrete (C.LTh _) = pure LTh
-  fromConcrete (C.GTh _) = pure GTh
+instance FromConcrete C.BinRel Expr where
+  fromConcrete (C.Eq  _) = pure (Op Eq)
+  fromConcrete (C.LEq _) = pure (Op LEq)
+  fromConcrete (C.GEq _) = pure (Op GEq)
+  fromConcrete (C.LTh _) = pure (Op LTh)
+  fromConcrete (C.GTh _) = pure (Op GTh)
 
-instance FromConcrete C.Pred Pred where
-  fromConcrete (C.Term p r q  _) = Term     <$> fromConcrete r
+instance FromConcrete C.Pred Expr where
+  fromConcrete (C.Term p r q  _) = App      <$> (App <$> fromConcrete r
+                                                     <*> fromConcrete p)
+                                            <*> fromConcrete q
+  fromConcrete (C.Implies p q _) = App      <$> (App <$> pure (Op Implies)
+                                                     <*> fromConcrete p)
+                                            <*> fromConcrete q
+  fromConcrete (C.Conj p q    _) = App      <$> (App <$> pure (Op Conj)
+                                                     <*> fromConcrete p)
+                                            <*> fromConcrete q
+  fromConcrete (C.Disj p q    _) = App      <$> (App <$> pure (Op Disj)
+                                                     <*> fromConcrete p)
+                                            <*> fromConcrete q
+  fromConcrete (C.Neg p       _) = App      <$> pure (Op Neg)
                                             <*> fromConcrete p
-                                            <*> fromConcrete q
-  fromConcrete (C.Implies p q _) = Implies  <$> fromConcrete p
-                                            <*> fromConcrete q
-  fromConcrete (C.Conj p q    _) = Conj     <$> fromConcrete p
-                                            <*> fromConcrete q
-  fromConcrete (C.Disj p q    _) = Disj     <$> fromConcrete p
-                                            <*> fromConcrete q
-  fromConcrete (C.Neg p       _) = Neg      <$> fromConcrete p
-  fromConcrete (C.Lit p       _) = Lit      <$> pure p
-  fromConcrete (C.HoleP       _) = Hole     <$> index
+  fromConcrete (C.Lit p       _) = Lit      <$> pure (Bol p)
+  fromConcrete (C.HoleP       _) = Hole     <$> index <*> pure []
 
 instance FromConcrete C.Stmt Stmt where
   fromConcrete (C.Assert p   loc) = Assert  <$> fromConcrete p <*> pure loc

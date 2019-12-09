@@ -122,7 +122,7 @@ symbol t = do
 -- effectively excluding it from source location tracking
 ignore :: (Eq tok, Ord tok, Show tok, PrettyToken tok) => tok -> P tok ()
 ignore t = do
-  L loc tok <- satisfy (\(L _ t') -> t == t')
+  L _ tok <- satisfy (\(L _ t') -> t == t')
   lift $ updateToken tok
   return ()
 
