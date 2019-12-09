@@ -41,3 +41,48 @@ inferE cxt (App e1 e2) = do
                                    else mzero
      _ -> mzero
 inferE _ (Hole _ _) = undefined --- what to do here?
+
+checkE :: TCxt -> Expr -> Type -> Maybe ()
+checkE cxt e t = do
+   t' <- inferE cxt e
+   guard (t == t')
+
+checkS :: TCxt -> Stmt -> Maybe ()
+checkS _ (Skip _) = return ()
+checkS _ (Abort _) = return ()
+checkS cxt (Assign vs es _) =
+  mapM_ (checkAsgn cxt) (zip vs es)
+checkS cxt (Assert p _) =
+  checkE cxt p TBool
+checkS cxt (Do inv bnd gcmds _) = do
+  checkE cxt inv TBool
+  checkE cxt bnd TInt
+  mapM_ (checkGdCmd cxt) gcmds
+checkS cxt (If Nothing gcmds _) =
+  mapM_ (checkGdCmd cxt) gcmds
+checkS cxt (If (Just pre) gcmds _) = do
+  checkE cxt pre TBool
+  mapM_ (checkGdCmd cxt) gcmds
+checkS _ (Spec _) = return ()
+
+checkSs :: TCxt -> [Stmt] -> Maybe ()
+checkSs cxt = mapM_ (checkS cxt)
+
+checkAsgn :: TCxt -> (Var, Expr) -> Maybe ()
+checkAsgn cxt (v,e) = do
+  t <- Map.lookup v cxt
+  checkE cxt e t
+
+checkGdCmd :: TCxt -> GdCmd -> Maybe ()
+checkGdCmd cxt (GdCmd g cmds)= do
+  checkE cxt g TBool
+  checkSs cxt cmds
+
+checkProg :: Program -> Maybe ()
+checkProg (Program _ Nothing) = return ()
+checkProg (Program decls (Just (stmts, post))) = do
+  checkSs cxt stmts
+  checkE cxt post TBool
+ where cxt = Map.fromList (concat (map f decls))
+       f (ConstDecl cs t) = [(c,t) | c <- cs]
+       f (VarDecl   vs t) = [(v,t) | v <- vs]
