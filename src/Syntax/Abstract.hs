@@ -119,9 +119,9 @@ data Op = EQ | LTE | GTE | LT | GT   -- binary relations
 
 -- convenient constructors
 
-lth, geq, eqq, conj, disj, implies :: Expr -> Expr -> Expr
-x `lth` y = App (App (Op LT) x) y
-x `geq` y = App (App (Op GTE) x) y
+lt, gte, eqq, conj, disj, implies :: Expr -> Expr -> Expr
+x `lt` y = App (App (Op LT) x) y
+x `gte` y = App (App (Op GTE) x) y
 x `eqq` y = App (App (Op EQ) x) y
 x `conj` y = App (App (Op Conj) x) y
 x `disj` y = App (App (Op Disj) x) y

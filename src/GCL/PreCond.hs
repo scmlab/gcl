@@ -138,7 +138,7 @@ precond (Do inv bnd branches _) post = do
 
   -- termination of each branches
   forM_ branches $ \(GdCmd guard body) -> do
-    p <- precondStmts body (bnd `lth` (Lit (Num 100)))
+    p <- precondStmts body (bnd `lt` (Lit (Num 100)))
     obligate
       -- invariant AND the guard AND some hard limit
       (inv `conj` guard `conj` (bnd `eqq` (Lit (Num 100))))
@@ -155,7 +155,7 @@ precond (Do inv bnd branches _) post = do
   -- termination of the whole statement
   obligate
     (inv `conj` disjunct guards)
-    (bnd `geq` (Lit (Num 0)))
+    (bnd `gte` (Lit (Num 0)))
 
   return inv
 
@@ -200,7 +200,7 @@ precondGuard post (GdCmd guard body) = implies guard <$> precondStmts body post
 --
 --   obligate $ (inv `Conj` (conjunct (map Neg guards)))
 --                   `Implies` post -- empty branches?
---   obligate $ (inv `Conj` disjunct guards) `Implies` (Term GEq bnd (LitE (Num 0)))
+--   obligate $ (inv `Conj` disjunct guards) `Implies` (Term GTE bnd (LitE (Num 0)))
 --
 --   return (Do inv bnd branches', inv)
 --
@@ -208,7 +208,7 @@ precondGuard post (GdCmd guard body) = implies guard <$> precondStmts body post
 --
 --     termCond :: GdCmd -> M Pred
 --     termCond (GdCmd guard body) = do
---       pre <- precondStmts body (Term LTh bnd (LitE (Num 100)))
+--       pre <- precondStmts body (Term LT bnd (LitE (Num 100)))
 --       return $ inv `Conj` guard `Conj` (Term Eq bnd (LitE (Num 100))) `Implies` pre
 --
 -- sweep (Spec stmts p (Hole _) loc) post = return (Spec stmts p post loc, p)
