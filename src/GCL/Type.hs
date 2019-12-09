@@ -1,21 +1,21 @@
 module GCL.Type where
 
-import Prelude hiding (lookup)
-
 import Data.Text.Lazy (Text)
-import Data.Map (Map, lookup)
+import Data.Map (Map)
+import qualified Data.Map as Map
 import Control.Monad
 
+import Prelude hiding (Ordering(..))
 import Syntax.Abstract
 
 type TCxt = Map Text Type
 
 opTypes :: Op -> Type
-opTypes Eq  = TInt `TFun` (TInt `TFun` TBool)
-opTypes LEq = TInt `TFun` (TInt `TFun` TBool)
-opTypes GEq = TInt `TFun` (TInt `TFun` TBool)
-opTypes LTh = TInt `TFun` (TInt `TFun` TBool)
-opTypes GTh = TInt `TFun` (TInt `TFun` TBool)
+opTypes EQ  = TInt `TFun` (TInt `TFun` TBool)
+opTypes LTE = TInt `TFun` (TInt `TFun` TBool)
+opTypes GTE = TInt `TFun` (TInt `TFun` TBool)
+opTypes LT  = TInt `TFun` (TInt `TFun` TBool)
+opTypes GT  = TInt `TFun` (TInt `TFun` TBool)
 
 opTypes Plus  = TInt `TFun` (TInt `TFun` TInt)
 opTypes Minus = TInt `TFun` (TInt `TFun` TInt)
@@ -28,8 +28,8 @@ opTypes Disj    = TBool `TFun` (TBool `TFun` TBool)
 opTypes Neg     = TBool `TFun` TBool
 
 inferE :: TCxt -> Expr -> Maybe Type
-inferE cxt (Var x) = lookup x cxt
-inferE cxt (Const x) = lookup x cxt
+inferE cxt (Var x) = Map.lookup x cxt
+inferE cxt (Const x) = Map.lookup x cxt
 inferE _   (Lit (Num _)) = return TInt
 inferE _   (Lit (Bol _)) = return TBool
 inferE _   (Op op) = Just (opTypes op)

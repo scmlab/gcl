@@ -28,7 +28,7 @@ data GdCmd = GdCmd Pred [Stmt] Loc deriving (Show)
 --------------------------------------------------------------------------------
 -- | Predicates
 
-data BinRel = Eq Loc | LEq Loc | GEq Loc | LTh Loc | GTh Loc
+data BinRel = EQ Loc | LTE Loc | GTE Loc | LT Loc | GT Loc
   deriving Show
 
 data Pred = Term    Expr BinRel Expr  Loc

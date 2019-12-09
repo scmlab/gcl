@@ -18,6 +18,7 @@ import GHC.Generics
 
 import qualified Syntax.Concrete as C
 import Syntax.Type
+import Prelude hiding (Ordering(..))
 
 type Index = Int
 
@@ -111,7 +112,7 @@ data Expr = Var    Var
           | Hole   Index  [Subst]
           deriving (Show, Eq, Generic)
 
-data Op = Eq | LEq | GEq | LTh | GTh   -- binary relations
+data Op = EQ | LTE | GTE | LT | GT   -- binary relations
         | Implies | Conj | Disj | Neg  -- logic operators
         | Plus | Minus | Mul | Div     -- arithmetics
      deriving (Show, Eq, Generic)
@@ -119,9 +120,9 @@ data Op = Eq | LEq | GEq | LTh | GTh   -- binary relations
 -- convenient constructors
 
 lth, geq, eqq, conj, disj, implies :: Expr -> Expr -> Expr
-x `lth` y = App (App (Op LTh) x) y
-x `geq` y = App (App (Op GEq) x) y
-x `eqq` y = App (App (Op Eq ) x) y
+x `lth` y = App (App (Op LT) x) y
+x `geq` y = App (App (Op GTE) x) y
+x `eqq` y = App (App (Op EQ) x) y
 x `conj` y = App (App (Op Conj) x) y
 x `disj` y = App (App (Op Disj) x) y
 x `implies` y = App (App (Op Implies) x) y
@@ -147,9 +148,9 @@ subst env (Const x) =
   case Map.lookup x env of
     Just e -> e
     Nothing -> Const x
-subst _   (Op op) = Op op
-subst _   (Lit n)     = Lit n
-subst env (App e1 e2)  = App (subst env e1) (subst env e2)
+subst _   (Op op)         = Op op
+subst _   (Lit n)         = Lit n
+subst env (App e1 e2)     = App (subst env e1) (subst env e2)
 subst env (Hole idx subs) = Hole idx (env:subs)
 
 
@@ -206,11 +207,11 @@ instance FromConcrete C.Expr Expr where
   fromConcrete (C.HoleE     _) = Hole  <$> index <*> pure []
 
 instance FromConcrete C.BinRel Expr where
-  fromConcrete (C.Eq  _) = pure (Op Eq)
-  fromConcrete (C.LEq _) = pure (Op LEq)
-  fromConcrete (C.GEq _) = pure (Op GEq)
-  fromConcrete (C.LTh _) = pure (Op LTh)
-  fromConcrete (C.GTh _) = pure (Op GTh)
+  fromConcrete (C.EQ  _) = pure (Op EQ)
+  fromConcrete (C.LTE _) = pure (Op LTE)
+  fromConcrete (C.GTE _) = pure (Op GTE)
+  fromConcrete (C.LT  _) = pure (Op LT)
+  fromConcrete (C.GT  _) = pure (Op GT)
 
 instance FromConcrete C.Pred Expr where
   fromConcrete (C.Term p r q  _) = App      <$> (App <$> fromConcrete r

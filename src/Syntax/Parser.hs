@@ -23,6 +23,7 @@ import Syntax.Parser.Lexer
 import Syntax.Parser.Util (PosLog, extract)
 import qualified Syntax.Parser.Util as Util
 import Syntax.Type
+import Prelude hiding (Ordering(..))
 
 
 
@@ -184,11 +185,11 @@ predTerm =  parens predicate
 
 binaryRelation :: Parser BinRel
 binaryRelation = withLoc (choice
-  [ Eq  <$ symbol TokEQ
-  , LEq <$ symbol TokLTE
-  , GEq <$ symbol TokGTE
-  , LTh <$ symbol TokLT
-  , GTh <$ symbol TokGT
+  [ EQ  <$ symbol TokEQ
+  , LTE <$ symbol TokLTE
+  , GTE <$ symbol TokGTE
+  , LT  <$ symbol TokLT
+  , GT  <$ symbol TokGT
   ]) <?> "binary relation"
 
 --------------------------------------------------------------------------------
