@@ -159,8 +159,10 @@ subst env (Hole idx subs) = Hole idx (env:subs)
 
 type Const = Text
 type Var = Text
+type TVar = Int
 data Type = TInt | TBool | TArray Type
           | TFun Type Type
+          | TVar TVar
       deriving (Show, Eq)
 
 --------------------------------------------------------------------------------
