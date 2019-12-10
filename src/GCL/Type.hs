@@ -6,81 +6,91 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 import Control.Monad.State hiding (guard)
 import Control.Monad.Trans.Except
+import Data.Loc
 
 import Syntax.Abstract
 
 type TCxt = Map Text Type
 type SubstT = [(TVar, Type)]
 
-type M = ExceptT Err (State (SubstT, Int))
-type Err = () -- no information yet. to be extended later.
+type M = ExceptT TErr (State (SubstT, Int))
+data TErr = NotInScope Text Loc
+          | UnifyFailed Type Type Loc
+          | RecursiveType TVar Type Loc
+          | NotFunction Type Loc
+      deriving (Show, Eq)
 
 exceptM :: Monad m => Maybe a -> e -> ExceptT e m a
 exceptM (Just x) _ = return x
 exceptM Nothing e  = throwE e
 
-inferE :: TCxt -> Expr -> M Type
-inferE cxt (Var x)   =
-  exceptM (Map.lookup x cxt)
-          () --- undeclared var
-inferE cxt (Const x) =
-  exceptM (Map.lookup x cxt)
-          () --- undeclared constant
-inferE _   (Lit (Num _)) = return TInt
-inferE _   (Lit (Bol _)) = return TBool
-inferE _   (Op op) = return (opTypes op)
-inferE cxt (App e1 e2) = do
-  t <- inferE cxt e1
-  case t of
-     TFun t1 t2 -> do t1' <- inferE cxt e2
-                      _   <- unify t1 t1'
-                      substTM t2
-     _ -> throwE ()  -- err: not a function type
-inferE _ (Hole _ _) = TVar <$> freshTVar
+runM :: M a -> Either TErr a
+runM m = evalState (runExceptT m) ([],0)
 
-checkE :: TCxt -> Expr -> Type -> M ()
-checkE cxt e t = do
-   t' <- inferE cxt e
-   _  <- unify t t'
+--- type inference and checking
+
+inferE :: Loc -> TCxt -> Expr -> M Type
+inferE l cxt (Var x)   =
+  exceptM (Map.lookup x cxt)
+          (NotInScope x l)
+inferE l cxt (Const x) =
+  exceptM (Map.lookup x cxt)
+          (NotInScope x l)
+inferE _ _   (Lit (Num _)) = return TInt
+inferE _ _   (Lit (Bol _)) = return TBool
+inferE _ _   (Op op) = return (opTypes op)
+inferE l cxt (App e1 e2) = do
+  t <- inferE l cxt e1
+  case t of
+     TFun t1 t2 -> do t1' <- inferE l cxt e2
+                      _   <- unify l t1 t1'
+                      substTM t2
+     _ -> throwE (NotFunction t l)
+inferE _ _ (Hole _ _) = TVar <$> freshTVar
+
+checkE :: Loc -> TCxt -> Expr -> Type -> M ()
+checkE l cxt e t = do
+   t' <- inferE l cxt e
+   _  <- unify l t t'
    return ()
 
 checkS :: TCxt -> Stmt -> M ()
 checkS _ (Skip _)  = return ()
 checkS _ (Abort _) = return ()
-checkS cxt (Assign vs es _) =
-  mapM_ (checkAsgn cxt) (zip vs es)
-checkS cxt (Assert p _) =
-  checkE cxt p TBool
-checkS cxt (Do inv bnd gcmds _) = do
-  checkE cxt inv TBool
-  checkE cxt bnd TInt
-  mapM_ (checkGdCmd cxt) gcmds
-checkS cxt (If Nothing gcmds _) =
-  mapM_ (checkGdCmd cxt) gcmds
-checkS cxt (If (Just pre) gcmds _) = do
-  checkE cxt pre TBool
-  mapM_ (checkGdCmd cxt) gcmds
+checkS cxt (Assign vs es l) =
+  mapM_ (checkAsgn l cxt) (zip vs es)
+checkS cxt (Assert p l) =
+  checkE l cxt p TBool
+checkS cxt (Do inv bnd gcmds l) = do
+  checkE l cxt inv TBool
+  checkE l cxt bnd TInt
+  mapM_ (checkGdCmd l cxt) gcmds
+checkS cxt (If Nothing gcmds l) =
+  mapM_ (checkGdCmd l cxt) gcmds
+checkS cxt (If (Just pre) gcmds l) = do
+  checkE l cxt pre TBool
+  mapM_ (checkGdCmd l cxt) gcmds
 checkS _ (Spec _) = return ()
 
 checkSs :: TCxt -> [Stmt] -> M ()
 checkSs cxt = mapM_ (checkS cxt)
 
-checkAsgn :: TCxt -> (Var, Expr) -> M ()
-checkAsgn cxt (v,e) = do
+checkAsgn :: Loc -> TCxt -> (Var, Expr) -> M ()
+checkAsgn l cxt (v,e) = do
   t <- exceptM (Map.lookup v cxt)  -- should extend to other L-value
-               () -- err: variable undeclared
-  checkE cxt e t
+               (NotInScope v l)
+  checkE l cxt e t
 
-checkGdCmd :: TCxt -> GdCmd -> M ()
-checkGdCmd cxt (GdCmd g cmds)= do
-  checkE cxt g TBool
+checkGdCmd :: Loc -> TCxt -> GdCmd -> M ()
+checkGdCmd l cxt (GdCmd g cmds)= do
+  checkE l cxt g TBool
   checkSs cxt cmds
 
 checkProg :: Program -> M ()
 checkProg (Program _ Nothing) = return ()
 checkProg (Program decls (Just (stmts, post))) = do
   checkSs cxt stmts
-  checkE cxt post TBool
+  checkE NoLoc cxt post TBool  -- we need a location here!
  where cxt = Map.fromList (concat (map f decls))
        f (ConstDecl cs t) = [(c,t) | c <- cs]
        f (VarDecl   vs t) = [(v,t) | v <- vs]
@@ -107,20 +117,20 @@ occursT x (TVar y) = x == y
 
 -- unification
 
-unify :: Type -> Type -> M Type
-unify TInt TInt = return TInt
-unify TBool TBool = return TBool
-unify (TFun t1 t2) (TFun t3 t4) = do
-    t1' <- unify t1 t3
-    t2' <- unify t2 t4
+unify :: Loc -> Type -> Type -> M Type
+unify _ TInt TInt = return TInt
+unify _ TBool TBool = return TBool
+unify l (TFun t1 t2) (TFun t3 t4) = do
+    t1' <- unify l t1 t3
+    t2' <- unify l t2 t4
     return (TFun t1' t2')
-unify (TVar x) t = do
+unify l (TVar x) t = do
   t' <- substTM t
-  if occursT x t' then throwE () --- err: recursive type
-    else
-         return t'
-unify t (TVar x) = unify (TVar x) t
-unify _ _ = throwE () --- err: type mismatch
+  if occursT x t' then throwE (RecursiveType x t' l)
+    else do extSubstM x t'
+            return t'
+unify l t (TVar x) = unify l (TVar x) t
+unify l t1 t2 = throwE (UnifyFailed t1 t2 l)
 
 -- monad operations
 
