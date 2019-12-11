@@ -32,22 +32,22 @@ import Prelude hiding (Ordering(..))
 
 type Parser = ParsecT Void TokStream (PosLog Tok)
 
-parse :: Parser a -> FilePath -> Text -> Either SyntaxError a
+parse :: Parser a -> FilePath -> Text -> Either [SyntaxError] a
 parse parser filepath raw = do
   let tokenStream = scan filepath raw
   case filterError tokenStream of
-    Just e  -> Left (LexicalError e)
+    Just e  -> Left [LexicalError e]
     Nothing -> case Util.runPosLog (runParserT parser filepath tokenStream) of
-      Left e -> Left (SyntacticError $ fromParseErrorBundle e)
+      Left e -> Left (map SyntacticError $ fromParseErrorBundle e)
       Right x -> Right x
 
-parseProgram :: FilePath -> Text -> Either SyntaxError Program
+parseProgram :: FilePath -> Text -> Either [SyntaxError] Program
 parseProgram = parse program
 
-parsePred :: Text -> Either SyntaxError Pred
+parsePred :: Text -> Either [SyntaxError] Pred
 parsePred = parse predicate "<predicate>"
 
-parseStmt :: Text -> Either SyntaxError Stmt
+parseStmt :: Text -> Either [SyntaxError] Stmt
 parseStmt = parse statement "<statement>"
 
 program :: Parser Program

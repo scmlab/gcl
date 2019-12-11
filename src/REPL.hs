@@ -12,6 +12,7 @@ import Data.Text.Lazy (Text)
 import GHC.Generics
 import System.IO
 import GCL.PreCond
+import Type
 
 
 recv :: FromJSON a => IO (Maybe a)
@@ -28,7 +29,7 @@ send payload = do
 
 data Response
   = OK [Obligation] [Specification]
-  | Error SyntaxError
+  | Error [(Site, Error)]
   | Resolve Int -- resolves some Spec
   deriving (Generic)
 

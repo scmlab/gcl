@@ -9,6 +9,7 @@ import Data.Aeson
 import Data.Maybe (fromMaybe)
 import Data.Loc
 import GHC.Generics
+import Data.Foldable (fold)
 
 import Text.Megaparsec hiding (Pos, State, ParseError, parse)
 import qualified Text.Megaparsec as Mega
@@ -48,16 +49,17 @@ fromParseErrorBundle (ParseErrorBundle errors posState)
       -> (PosState TokStream, [SyntacticError])
     f err (initial, accum) =
         let (_, next) = reachOffset (errorOffset err) initial
-        in (next, (SynErr (getLocs err) (parseErrorTextPretty err)):accum)
+        in (next, (SynErr (getLoc err) (parseErrorTextPretty err)):accum)
 
-    getLocs :: ShowErrorComponent e
+    getLoc :: ShowErrorComponent e
       => Mega.ParseError TokStream e
-      -> [Loc]
-    getLocs (TrivialError _ (Just (Tokens xs)) _) = NE.toList $ fmap locOf xs
-    getLocs _ = []
+      -> Loc
+    -- get the Loc of all unexpected tokens
+    getLoc (TrivialError _ (Just (Tokens xs)) _) = fold $ fmap locOf xs
+    getLoc _ = mempty
 
 data SyntacticError = SynErr
-  { synErrLocations :: [Loc]
+  { synErrLocation :: Loc
   , synErrMessage :: String
   }
   deriving (Generic)
@@ -65,15 +67,23 @@ data SyntacticError = SynErr
 instance Show SyntacticError where
   show (SynErr _ msg) = msg
 
+instance Located SyntacticError where
+  locOf (SynErr loc _) = loc
+
 data SyntaxError
-  = LexicalError    Pos
-  | SyntacticError [SyntacticError]
+  = LexicalError   Pos
+  | SyntacticError SyntacticError
   | TransformError TransformError
   deriving (Generic)
 
+instance Located SyntaxError where
+  locOf (LexicalError pos) = Loc pos pos
+  locOf (SyntacticError x) = locOf x
+  locOf (TransformError e) = locOf e
+
 instance Show SyntaxError where
   show (LexicalError pos) = "LexicalError " ++ show pos
-  show (SyntacticError xs) = "SyntacticError\n" ++ unlines (map show xs)
+  show (SyntacticError x) = "SyntacticError " ++ show x
   show (TransformError e) = "TransformError " ++ show e
 
 data TransformError
@@ -84,6 +94,14 @@ data TransformError
   | DigHole Loc
   | Panic String
   deriving (Show, Generic)
+
+instance Located TransformError where
+  locOf (MissingAssertion loc) = loc
+  locOf (MissingBound loc) = loc
+  locOf (ExcessBound loc) = loc
+  locOf MissingPostcondition = NoLoc
+  locOf (DigHole loc) = loc
+  locOf (Panic _) = NoLoc
 
 instance ToJSON SyntacticError where
 instance ToJSON TransformError where

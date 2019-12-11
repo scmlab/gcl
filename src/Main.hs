@@ -7,6 +7,7 @@ import Syntax.Parser.TokenStream ()
 import Syntax.Abstract
 import REPL
 import GCL.PreCond
+import Type
 
 import Prelude
 import qualified Data.Text.Lazy.IO as Text
@@ -58,9 +59,6 @@ main = do
           case parseProgram filepath raw of
             Right syntax -> print syntax
             Left err -> print err
-              -- print (bundleErrors err)
-              -- print (bundlePosState err)
-            -- Left err -> putStrLn $ errorBundlePretty err
 
   where
     loop :: IO ()
@@ -71,25 +69,23 @@ main = do
           raw <- Text.readFile filepath
           case parseProgram filepath raw of
             Right syntax -> case abstract syntax of
-              Left err -> send $ Error err
+              Left err -> send $ Error [fromGlobalSyntaxError err]
               Right (Program _ Nothing) -> send $ OK [] []
               Right (Program _ (Just (statements, postcondition))) -> do
                 let ((_, obligations), specifications) = runM $ precondStmts statements postcondition
                 send $ OK obligations specifications
-            Left err -> send $ Error err
+            Left errs -> send $ Error $ map fromGlobalSyntaxError errs
           loop
         Just (Refine i payload) -> do
           case parseStmt payload of
             Right syntax -> case abstract syntax of
-              Left err -> send $ Error err
+              Left err -> send $ Error [fromLocalSyntaxError i err ]
               Right _ -> send $ Resolve i
-            Left err -> send $ Error err
+            Left errs -> send $ Error $ map (fromLocalSyntaxError i) errs
           loop
 
         Just Quit -> return ()
-        _ -> do
-          send $ Load "filepath"
-          loop
+        Nothing -> return ()
 
       -- if request == "quit"
       --   then return ()

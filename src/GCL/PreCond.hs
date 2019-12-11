@@ -258,7 +258,7 @@ precondGuard post (GdCmd guard body) = implies guard <$> precondStmts body post
 --   (body', pre) <- sweepStmts body post
 --   return (GdCmd guard body', guard `Implies` pre)
 
-gcdExample :: Either SyntaxError Program
+gcdExample :: Either [SyntaxError] Program
 gcdExample = do
   result <- parseProgram "<test>" "\
     \x := X\n\
@@ -269,7 +269,9 @@ gcdExample = do
     \od\n\
     \{ gcd(X, Y) = x }\n\
     \"
-  abstract result
+  case abstract result of
+    Left err -> Left [err]
+    Right val -> Right val
 
 test :: ((Pred, [Obligation]), [Specification])
 test = runM $ case gcdExample of
