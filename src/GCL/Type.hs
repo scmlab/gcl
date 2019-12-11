@@ -5,7 +5,7 @@ import Data.Text.Lazy (Text)
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Control.Monad.State hiding (guard)
-import Control.Monad.Trans.Except
+import Control.Monad.Except
 import Data.Loc
 
 import Syntax.Abstract
@@ -22,7 +22,7 @@ data TErr = NotInScope Text Loc
 
 exceptM :: Monad m => Maybe a -> e -> ExceptT e m a
 exceptM (Just x) _ = return x
-exceptM Nothing e  = throwE e
+exceptM Nothing e  = throwError e
 
 runM :: M a -> Either TErr a
 runM m = evalState (runExceptT m) ([],0)
@@ -45,7 +45,7 @@ inferE l cxt (App e1 e2) = do
      TFun t1 t2 -> do t1' <- inferE l cxt e2
                       _   <- unify l t1 t1'
                       substTM t2
-     _ -> throwE (NotFunction t l)
+     _ -> throwError (NotFunction t l)
 inferE _ _ (Hole _ _) = TVar <$> freshTVar
 
 checkE :: Loc -> TCxt -> Expr -> Type -> M ()
@@ -126,11 +126,11 @@ unify l (TFun t1 t2) (TFun t3 t4) = do
     return (TFun t1' t2')
 unify l (TVar x) t = do
   t' <- substTM t
-  if occursT x t' then throwE (RecursiveType x t' l)
+  if occursT x t' then throwError (RecursiveType x t' l)
     else do extSubstM x t'
             return t'
 unify l t (TVar x) = unify l (TVar x) t
-unify l t1 t2 = throwE (UnifyFailed t1 t2 l)
+unify l t1 t2 = throwError (UnifyFailed t1 t2 l)
 
 -- monad operations
 
