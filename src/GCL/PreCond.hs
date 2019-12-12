@@ -270,9 +270,7 @@ gcdExample = do
     \od\n\
     \{ gcd(X, Y) = x }\n\
     \"
-  case abstract result of
-    Left err -> Left [err]
-    Right val -> Right val
+  abstract result
 
 test :: ((Pred, [Obligation]), [Specification])
 test = runM $ case gcdExample of

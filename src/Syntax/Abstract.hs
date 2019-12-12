@@ -170,8 +170,10 @@ data Type = TInt | TBool | TArray Type
 
 type AbstractM = ExceptT Error (State Index)
 
-abstract :: FromConcrete a b => a -> Either Error b
-abstract = runAbstractM . fromConcrete
+abstract :: FromConcrete a b => a -> Either [Error] b
+abstract x = case runAbstractM (fromConcrete x) of
+  Left err -> Left [err]
+  Right val -> Right val
 
 runAbstractM :: AbstractM a -> Either Error a
 runAbstractM f = evalState (runExceptT f) 0

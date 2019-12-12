@@ -2,17 +2,14 @@
 
 module Main where
 
-import Syntax.Parser
-import Syntax.Parser.TokenStream ()
-import Syntax.Abstract
-import REPL
 import GCL.PreCond
-import Type
+import REPL
+import Syntax.Parser
+import Syntax.Abstract
 
-import Prelude
+import Control.Monad.Except (liftIO, liftEither)
 import qualified Data.Text.Lazy.IO as Text
-
-
+import Prelude
 import System.Console.GetOpt
 import System.Environment
 
@@ -21,83 +18,66 @@ main = do
   (opts, _) <- getArgs >>= parseOpts
   case optMode opts of
     ModeHelp -> putStrLn $ usageInfo usage options
-    ModeREPL -> loop
-    ModeDev -> do
+    ModeREPL -> runREPL loop
+    ModeDev -> runREPLTest $ do
       let filepath = "examples/b.gcl"
-      raw <- Text.readFile filepath
 
-      putStrLn "=== raw ==="
-      Text.putStrLn raw
+      raw <- liftIO $ do
+        raw <- Text.readFile filepath
 
-      putStrLn "\n=== tokens ==="
-      print $ scan "<test>" raw
+        putStrLn "=== raw ==="
+        Text.putStrLn raw
 
-      putStrLn "\n=== AST ==="
-      case parseProgram filepath raw of
-        Right syntax -> case abstract syntax of
-          Left err -> print err
-          Right (Program _ Nothing) -> putStrLn "<empty>"
-          Right (Program _ (Just (statements, postcondition))) -> do
+        putStrLn "\n=== tokens ==="
+        print $ scan "<test>" raw
 
-            putStrLn "\n=== statements ==="
-            print $ statements
+        putStrLn "\n=== AST ==="
+        return raw
 
-            let ((_, obligations), specifications) = runM $ precondStmts statements postcondition
+      syntax <- liftEither $ parseProgram filepath raw
+      program <- liftEither $ abstract syntax
+      case program of
+        Program _ Nothing -> liftIO $ putStrLn "<empty>"
+        Program _ (Just (statements, postcondition)) -> liftIO $ do
 
-            putStrLn "\n=== proof obligations ==="
-            print $ obligations
+          putStrLn "\n=== statements ==="
+          print $ statements
 
-            putStrLn "\n=== specifications ==="
-            print $ specifications
+          let ((_, obligations), specifications) = runM $ precondStmts statements postcondition
 
-        Left err -> print err
-      where
-        _testParsing :: IO ()
-        _testParsing = do
-          let filepath = "examples/b.gcl"
-          raw <- Text.readFile filepath
-          case parseProgram filepath raw of
-            Right syntax -> print syntax
-            Left err -> print err
+          putStrLn "\n=== proof obligations ==="
+          print $ obligations
+
+          putStrLn "\n=== specifications ==="
+          print $ specifications
 
   where
-    loop :: IO ()
+    loop :: REPL ()
     loop = do
       request <- recv
       case request of
-        Just (Load filepath) -> do
-          raw <- Text.readFile filepath
-          case parseProgram filepath raw of
-            Right syntax -> case abstract syntax of
-              Left err -> send $ Error [fromGlobalError err]
-              Right (Program _ Nothing) -> send $ OK [] []
-              Right (Program _ (Just (statements, postcondition))) -> do
-                let ((_, obligations), specifications) = runM $ precondStmts statements postcondition
-                send $ OK obligations specifications
-            Left errs -> send $ Error $ map fromGlobalError errs
+        Load filepath -> do
+          raw <- liftIO $ Text.readFile filepath
+
+          syntax <- liftEither $ parseProgram filepath raw
+          program <- liftEither $ abstract syntax
+
+          case program of
+            Program _ Nothing -> send $ OK [] []
+            Program _ (Just (statements, postcondition)) -> do
+              let ((_, obligations), specifications) = runM $ precondStmts statements postcondition
+              send $ OK obligations specifications
+
           loop
-        Just (Refine i payload) -> do
-          case parseStmt payload of
-            Right syntax -> case abstract syntax of
-              Left err -> send $ Error [fromLocalError i err ]
-              Right _ -> send $ Resolve i
-            Left errs -> send $ Error $ map (fromLocalError i) errs
+        Refine i payload -> local i $ do
+          syntax <- liftEither $ parseSpec payload
+          _program <- liftEither $ abstract syntax
+
+          send $ Resolve i
+
           loop
 
-        Just Quit -> return ()
-        Nothing -> return ()
-
-      -- if request == "quit"
-      --   then return ()
-      --   else loop
-
-
-
-  -- let filepath = "examples/a.gcl"
-  -- raw <- readFile filepath
-  -- case parseProgram filepath raw of
-  --   Right syntax -> print syntax
-  --   Left err -> putStrLn $ errorBundlePretty err
+        Quit -> return ()
 
 --------------------------------------------------------------------------------
 -- | Command-line arguments

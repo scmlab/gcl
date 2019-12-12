@@ -6,22 +6,56 @@ module REPL where
 import qualified Data.ByteString.Lazy.Char8 as BS
 import qualified Data.ByteString.Char8 as Strict
 
-import Data.Aeson
+import Control.Monad.Except
+import Control.Monad.Reader hiding (local)
+import qualified Control.Monad.Reader as Reader
+import Data.Aeson hiding (Error)
 import Data.Text.Lazy (Text)
 import GHC.Generics
 import System.IO
 import GCL.PreCond
 import Type
 
+--------------------------------------------------------------------------------
+-- | The REPL Monad
 
-recv :: FromJSON a => IO (Maybe a)
-recv = decode . BS.fromStrict <$> Strict.getLine
+type REPL = ExceptT [Error] (ReaderT (Maybe Int) IO)
 
+-- runREPL ::
 
-send :: ToJSON a => a -> IO ()
-send payload = do
+runREPL :: REPL a -> IO ()
+runREPL program = flip runReaderT Nothing $ do
+  result <- runExceptT program
+  case result of
+    Left errors -> do
+      env <- ask
+      case env of
+        Nothing -> send $ Error $ map fromGlobalError errors
+        Just i -> send $ Error $ map (fromLocalError i) errors
+    Right _ -> return ()
+
+-- print human readable error instead
+runREPLTest :: REPL a -> IO ()
+runREPLTest program = flip runReaderT Nothing $ do
+  result <- runExceptT program
+  case result of
+    Left errors -> mapM_ (liftIO . print) errors
+    Right _ -> return ()
+
+recv :: FromJSON a => REPL a
+recv = do
+  result <- liftIO (decode . BS.fromStrict <$> Strict.getLine)
+  case result of
+    Nothing -> throwError []
+    Just value -> return value
+
+send :: (ToJSON a, MonadIO m) => a -> m ()
+send payload = liftIO $ do
   Strict.putStrLn $ BS.toStrict $ encode $ payload
   hFlush stdout
+
+local :: Int -> REPL a -> REPL a
+local i = Reader.local (const (Just i))
 
 --------------------------------------------------------------------------------
 -- | Request

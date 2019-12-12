@@ -2,6 +2,7 @@
 
 module Syntax.Parser
   ( parseProgram
+  , parseSpec
   , parsePred
   , parseStmt
   , scan
@@ -67,6 +68,9 @@ parse parser filepath raw = do
 
 parseProgram :: FilePath -> Text -> Either [Error] Program
 parseProgram = parse program
+
+parseSpec :: Text -> Either [Error] [Stmt]
+parseSpec = parse (some statement) "<specification>"
 
 parsePred :: Text -> Either [Error] Pred
 parsePred = parse predicate "<predicate>"
