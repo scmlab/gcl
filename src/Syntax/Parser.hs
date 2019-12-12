@@ -13,7 +13,9 @@ import Control.Monad (void)
 import Data.Text.Lazy (Text)
 import Data.Loc
 import Data.Void
+import Data.Foldable (fold)
 import Text.Megaparsec hiding (Pos, State, ParseError, parse)
+import qualified Text.Megaparsec as Mega
 
 import Syntax.Concrete
 import Syntax.Parser.Lexer
@@ -37,8 +39,31 @@ parse parser filepath raw = do
   case filterError tokenStream of
     Just e  -> Left [LexicalError e]
     Nothing -> case Util.runPosLog (runParserT parser filepath tokenStream) of
-      Left e -> Left (map SyntacticError $ fromParseErrorBundle e)
+      Left e -> Left (fromParseErrorBundle e)
       Right x -> Right x
+
+  where
+    fromParseErrorBundle :: ShowErrorComponent e
+                       => ParseErrorBundle TokStream e
+                       -> [Error]
+    fromParseErrorBundle (ParseErrorBundle errors posState)
+      = snd $ foldr f (posState, []) errors
+      where
+        f :: ShowErrorComponent e
+          => Mega.ParseError TokStream e
+          -> (PosState TokStream, [Error])
+          -> (PosState TokStream, [Error])
+        f err (initial, accum) =
+            let (_, next) = reachOffset (errorOffset err) initial
+            in (next, (SyntacticError (getLoc err) (parseErrorTextPretty err)):accum)
+
+        getLoc :: ShowErrorComponent e
+          => Mega.ParseError TokStream e
+          -> Loc
+        -- get the Loc of all unexpected tokens
+        getLoc (TrivialError _ (Just (Tokens xs)) _) = fold $ fmap locOf xs
+        getLoc _ = mempty
+
 
 parseProgram :: FilePath -> Text -> Either [Error] Program
 parseProgram = parse program
