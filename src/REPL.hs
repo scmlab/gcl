@@ -6,7 +6,6 @@ module REPL where
 import qualified Data.ByteString.Lazy.Char8 as BS
 import qualified Data.ByteString.Char8 as Strict
 
-import Syntax.Type (SyntaxError)
 import Data.Aeson
 import Data.Text.Lazy (Text)
 import GHC.Generics

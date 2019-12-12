@@ -17,7 +17,7 @@ import qualified Data.Map as Map
 import GHC.Generics
 
 import qualified Syntax.Concrete as C
-import Syntax.Type
+import Type
 import Prelude hiding (Ordering(..))
 
 type Index = Int
@@ -77,10 +77,10 @@ affixAssertions (x:y:xs) = case (x, y) of
         <:> affixAssertions xs
 
   -- AssertWithBnd + _
-  (C.AssertWithBnd _ _ loc, _) -> throwError $ TransformError $ ExcessBound loc
+  (C.AssertWithBnd _ _ loc, _) -> throwError $ ConvertError $ ExcessBound loc
 
   -- Assert + DO
-  (C.Assert _ loc, C.Do _ _) -> throwError $ TransformError $ MissingBound loc
+  (C.Assert _ loc, C.Do _ _) -> throwError $ ConvertError $ MissingBound loc
 
   -- Assert + If : affix!
   (C.Assert p _, C.If q loc) ->
@@ -90,7 +90,7 @@ affixAssertions (x:y:xs) = case (x, y) of
         <:> affixAssertions xs
 
   -- _ + Do
-  (_, C.Do _ loc) -> throwError $ TransformError $ MissingAssertion loc
+  (_, C.Do _ loc) -> throwError $ ConvertError $ MissingAssertion loc
 
   -- otherwise
   _  -> fromConcrete x <:> affixAssertions (y:xs)
@@ -168,12 +168,12 @@ data Type = TInt | TBool | TArray Type
 --------------------------------------------------------------------------------
 -- Converting from Concrete Syntax Tree
 
-type AbstractM = ExceptT SyntaxError (State Index)
+type AbstractM = ExceptT Error (State Index)
 
-abstract :: FromConcrete a b => a -> Either SyntaxError b
+abstract :: FromConcrete a b => a -> Either Error b
 abstract = runAbstractM . fromConcrete
 
-runAbstractM :: AbstractM a -> Either SyntaxError a
+runAbstractM :: AbstractM a -> Either Error a
 runAbstractM f = evalState (runExceptT f) 0
 
 -- returns the current index and increment it in the state
@@ -245,17 +245,17 @@ instance FromConcrete C.Stmt Stmt where
                                             <*> pure loc
 
   -- Panic because these cases should've been handled by `affixAssertions`
-  fromConcrete (C.AssertWithBnd _ _ _) = throwError $ TransformError $ Panic "AssertWithBnd"
-  fromConcrete (C.Do     _ _) = throwError $ TransformError $ Panic "Do"
+  fromConcrete (C.AssertWithBnd _ _ _) = throwError $ ConvertError $ Panic "AssertWithBnd"
+  fromConcrete (C.Do     _ _) = throwError $ ConvertError $ Panic "Do"
   -- Holes and specs
-  fromConcrete (C.Hole loc) = throwError $ TransformError $ DigHole loc
+  fromConcrete (C.Hole loc) = throwError $ ConvertError $ DigHole loc
   fromConcrete (C.Spec loc) = Spec <$> pure loc
 
 -- deals with missing Assertions and Bounds
 instance FromConcrete [C.Stmt] [Stmt] where
   fromConcrete      []  = return []
   fromConcrete (x : []) = case x of
-    C.Do _ loc -> throwError $ TransformError $ MissingAssertion loc
+    C.Do _ loc -> throwError $ ConvertError $ MissingAssertion loc
     _          -> fromConcrete x <:> pure []
   fromConcrete (x:y:xs) = affixAssertions (x:y:xs)
 
@@ -278,4 +278,4 @@ instance FromConcrete C.Program Program where
       checkStatements [] = return Nothing
       checkStatements xs = case last xs of
         Assert r _ -> return (Just (init xs, r))
-        _          -> throwError $ TransformError MissingPostcondition
+        _          -> throwError $ ConvertError MissingPostcondition

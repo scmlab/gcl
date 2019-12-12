@@ -69,19 +69,19 @@ main = do
           raw <- Text.readFile filepath
           case parseProgram filepath raw of
             Right syntax -> case abstract syntax of
-              Left err -> send $ Error [fromGlobalSyntaxError err]
+              Left err -> send $ Error [fromGlobalError err]
               Right (Program _ Nothing) -> send $ OK [] []
               Right (Program _ (Just (statements, postcondition))) -> do
                 let ((_, obligations), specifications) = runM $ precondStmts statements postcondition
                 send $ OK obligations specifications
-            Left errs -> send $ Error $ map fromGlobalSyntaxError errs
+            Left errs -> send $ Error $ map fromGlobalError errs
           loop
         Just (Refine i payload) -> do
           case parseStmt payload of
             Right syntax -> case abstract syntax of
-              Left err -> send $ Error [fromLocalSyntaxError i err ]
+              Left err -> send $ Error [fromLocalError i err ]
               Right _ -> send $ Resolve i
-            Left errs -> send $ Error $ map (fromLocalSyntaxError i) errs
+            Left errs -> send $ Error $ map (fromLocalError i) errs
           loop
 
         Just Quit -> return ()

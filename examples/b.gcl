@@ -1,5 +1,5 @@
 con X : Int
 
-x := (f h) (x (g))
+{ True }
 
-{ False }
+{ False && True }

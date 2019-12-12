@@ -5,8 +5,6 @@ module Syntax.Parser
   , parsePred
   , parseStmt
   , scan
-
-  , module Syntax.Type
   ) where
 
 import Control.Monad.Combinators.Expr
@@ -22,7 +20,8 @@ import Syntax.Parser.Lexer
 -- import Syntax.Parser.Util hiding (withLoc)
 import Syntax.Parser.Util (PosLog, extract)
 import qualified Syntax.Parser.Util as Util
-import Syntax.Type
+import Type
+
 import Prelude hiding (Ordering(..))
 
 
@@ -32,7 +31,7 @@ import Prelude hiding (Ordering(..))
 
 type Parser = ParsecT Void TokStream (PosLog Tok)
 
-parse :: Parser a -> FilePath -> Text -> Either [SyntaxError] a
+parse :: Parser a -> FilePath -> Text -> Either [Error] a
 parse parser filepath raw = do
   let tokenStream = scan filepath raw
   case filterError tokenStream of
@@ -41,13 +40,13 @@ parse parser filepath raw = do
       Left e -> Left (map SyntacticError $ fromParseErrorBundle e)
       Right x -> Right x
 
-parseProgram :: FilePath -> Text -> Either [SyntaxError] Program
+parseProgram :: FilePath -> Text -> Either [Error] Program
 parseProgram = parse program
 
-parsePred :: Text -> Either [SyntaxError] Pred
+parsePred :: Text -> Either [Error] Pred
 parsePred = parse predicate "<predicate>"
 
-parseStmt :: Text -> Either [SyntaxError] Stmt
+parseStmt :: Text -> Either [Error] Stmt
 parseStmt = parse statement "<statement>"
 
 program :: Parser Program

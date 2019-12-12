@@ -14,6 +14,7 @@ import GHC.Generics
 
 import Syntax.Abstract
 import Syntax.Parser
+import Type
 
 data Obligation = Obligation Index Pred Pred deriving (Show, Generic)
 data Hardness = Hard | Soft deriving (Show, Generic)
@@ -258,7 +259,7 @@ precondGuard post (GdCmd guard body) = implies guard <$> precondStmts body post
 --   (body', pre) <- sweepStmts body post
 --   return (GdCmd guard body', guard `Implies` pre)
 
-gcdExample :: Either [SyntaxError] Program
+gcdExample :: Either [Error] Program
 gcdExample = do
   result <- parseProgram "<test>" "\
     \x := X\n\
