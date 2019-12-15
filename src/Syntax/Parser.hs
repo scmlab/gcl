@@ -3,8 +3,8 @@
 module Syntax.Parser
   ( parseProgram
   , parseSpec
-  , parsePred
-  , parseStmt
+  -- , parsePred
+  -- , parseStmt
   , scan
   ) where
 
@@ -70,13 +70,13 @@ parseProgram :: FilePath -> Text -> Either [Error] Program
 parseProgram = parse program
 
 parseSpec :: Text -> Either [Error] [Stmt]
-parseSpec = parse (some statement) "<specification>"
+parseSpec = parse specContent "<specification>"
 
-parsePred :: Text -> Either [Error] Pred
-parsePred = parse predicate "<predicate>"
+-- parsePred :: Text -> Either [Error] Pred
+-- parsePred = parse predicate "<predicate>"
 
-parseStmt :: Text -> Either [Error] Stmt
-parseStmt = parse statement "<statement>"
+-- parseStmt :: Text -> Either [Error] Stmt
+-- parseStmt = parse statement "<statement>"
 
 program :: Parser Program
 program = withLoc $ do
@@ -85,6 +85,11 @@ program = withLoc $ do
   statements <- many statement <?> "statements"
   eof
   return $ Program declarations statements
+
+specContent :: Parser [Stmt]
+specContent = do
+  ignoreNewlines
+  many statement <?> "statements"
 
 --------------------------------------------------------------------------------
 -- | Stmts
@@ -154,7 +159,7 @@ spec :: Parser Stmt
 spec = withLocStmt $ do
   symbol TokSpecStart <?> "{!"
   expectNewline <?> "<newline> after a the start of a Spec"
-  _ <- many statement <?> "statements"
+  _ <- specContent
   _ <- takeWhileP (Just "anything other than '!}'") isTokSpecEnd
   symbol TokSpecEnd <?> "!}"
   expectNewline <?> "<newline> after a the end of a Spec"
