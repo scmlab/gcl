@@ -1,5 +1,9 @@
 con X : Int
 
 { True }
+{!
+{!
+!}
+!}
 
 { False && True }

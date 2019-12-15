@@ -154,7 +154,7 @@ spec :: Parser Stmt
 spec = withLocStmt $ do
   symbol TokSpecStart <?> "{!"
   expectNewline <?> "<newline> after a the start of a Spec"
-  -- stmts <- many statement <?> "statements"
+  _ <- many statement <?> "statements"
   _ <- takeWhileP (Just "anything other than '!}'") isTokSpecEnd
   symbol TokSpecEnd <?> "!}"
   expectNewline <?> "<newline> after a the end of a Spec"
