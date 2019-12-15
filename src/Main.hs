@@ -56,9 +56,8 @@ main = do
     loop = do
       request <- recv
       case request of
-        Load filepath -> do
+        Load filepath -> liftIO $ runREPL $ do
           raw <- liftIO $ Text.readFile filepath
-
           syntax <- liftEither $ parseProgram filepath raw
           program <- liftEither $ abstract syntax
 
@@ -69,12 +68,11 @@ main = do
               send $ OK obligations specifications
 
           loop
-        Refine i payload -> local i $ do
+        Refine i payload -> liftIO $ runREPLLocal i $ do
           syntax <- liftEither $ parseSpec payload
           _program <- liftEither $ abstract syntax
 
           send $ Resolve i
-
           loop
 
         Quit -> return ()
