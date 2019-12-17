@@ -6,8 +6,8 @@ import GCL.PreCond
 import REPL
 import Syntax.Parser
 import Syntax.Abstract
+import Type
 
-import Control.Monad.Except (liftIO, liftEither)
 import qualified Data.Text.Lazy.IO as Text
 import Prelude
 import System.Console.GetOpt
@@ -18,27 +18,27 @@ main = do
   (opts, _) <- getArgs >>= parseOpts
   case optMode opts of
     ModeHelp -> putStrLn $ usageInfo usage options
-    ModeREPL -> runREPL loop
-    ModeDev -> runREPLTest $ do
+    ModeREPL -> loop
+    ModeDev -> do
       let filepath = "examples/b.gcl"
 
-      raw <- liftIO $ do
-        raw <- Text.readFile filepath
+      raw <- Text.readFile filepath
 
-        putStrLn "=== raw ==="
-        Text.putStrLn raw
+      putStrLn "=== raw ==="
+      Text.putStrLn raw
 
-        putStrLn "\n=== tokens ==="
-        print $ scan "<test>" raw
+      putStrLn "\n=== tokens ==="
+      print $ scan "<test>" raw
 
-        putStrLn "\n=== AST ==="
-        return raw
+      putStrLn "\n=== AST ==="
 
-      syntax <- liftEither $ parseProgram filepath raw
-      program <- liftEither $ abstract syntax
-      case program of
-        Program _ Nothing -> liftIO $ putStrLn "<empty>"
-        Program _ (Just (statements, postcondition)) -> liftIO $ do
+      let parse = do
+            syntax <- parseProgram filepath raw
+            abstract syntax
+
+      case parse of
+        Right (Program _ Nothing) -> putStrLn "<empty>"
+        Right (Program _ (Just (statements, postcondition))) -> do
 
           putStrLn "\n=== statements ==="
           print $ statements
@@ -50,32 +50,43 @@ main = do
 
           putStrLn "\n=== specifications ==="
           print $ specifications
+        Left errors -> print errors
 
   where
-    loop :: REPL ()
+    loop :: IO ()
     loop = do
       request <- recv
       case request of
-        Load filepath -> liftIO $ runREPL $ do
-          raw <- liftIO $ Text.readFile filepath
-          syntax <- liftEither $ parseProgram filepath raw
-          program <- liftEither $ abstract syntax
+        Just (Load filepath) -> do
+          raw <- Text.readFile filepath
 
-          case program of
-            Program _ Nothing -> send $ OK [] []
-            Program _ (Just (statements, postcondition)) -> do
-              let ((_, obligations), specifications) = runM $ precondStmts statements postcondition
-              send $ OK obligations specifications
+          let parse = do
+                syntax <- parseProgram filepath raw
+                program <- abstract syntax
+                case program of
+                  Program _ Nothing -> return $ OK [] []
+                  Program _ (Just (statements, postcondition)) -> do
+                    let ((_, obligations), specifications) = runM $ precondStmts statements postcondition
+                    return $ OK obligations specifications
+
+          case parse of
+            Left errors -> send $ Error $ map fromGlobalError errors
+            Right response -> send response
 
           loop
-        Refine i payload -> liftIO $ runREPLLocal i $ do
-          syntax <- liftEither $ parseSpec payload
-          _program <- liftEither $ abstract syntax
+        Just (Refine i payload) -> do
 
-          send $ Resolve i
+          let parse = parseSpec payload >>= abstract
+          case parse of
+            Left errors -> send $ Error $ map (fromLocalError i) errors
+            Right _ -> send $ Resolve i
+
+
           loop
 
-        Quit -> return ()
+        Just Quit -> return ()
+        Nothing -> return ()
+
 
 --------------------------------------------------------------------------------
 -- | Command-line arguments

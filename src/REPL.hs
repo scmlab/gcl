@@ -19,41 +19,35 @@ import Type
 --------------------------------------------------------------------------------
 -- | The REPL Monad
 
-type REPL = ExceptT [Error] IO
+-- -- runREPL ::
+--
+-- runREPL :: REPL a -> IO ()
+-- runREPL program = do
+--   result <- runExceptT program
+--   case result of
+--     Left errors -> send $ Error $ map fromGlobalError errors
+--     Right _ -> return ()
+--
+-- runREPLLocal :: Int -> REPL a -> IO ()
+-- runREPLLocal i program = do
+--   result <- runExceptT program
+--   case result of
+--     Left errors -> send $ Error $ map (fromLocalError i) errors
+--     Right _ -> return ()
+--
+-- -- print human readable error instead
+-- runREPLTest :: REPL a -> IO ()
+-- runREPLTest program = do
+--   result <- runExceptT program
+--   case result of
+--     Left errors -> mapM_ (liftIO . print) errors
+--     Right _ -> return ()
 
--- runREPL ::
+recv :: FromJSON a => IO (Maybe a)
+recv = decode . BS.fromStrict <$> Strict.getLine
 
-runREPL :: REPL a -> IO ()
-runREPL program = do
-  result <- runExceptT program
-  case result of
-    Left errors -> send $ Error $ map fromGlobalError errors
-    Right _ -> return ()
-
-runREPLLocal :: Int -> REPL a -> IO ()
-runREPLLocal i program = do
-  result <- runExceptT program
-  case result of
-    Left errors -> send $ Error $ map (fromLocalError i) errors
-    Right _ -> return ()
-
--- print human readable error instead
-runREPLTest :: REPL a -> IO ()
-runREPLTest program = do
-  result <- runExceptT program
-  case result of
-    Left errors -> mapM_ (liftIO . print) errors
-    Right _ -> return ()
-
-recv :: FromJSON a => REPL a
-recv = do
-  result <- liftIO (decode . BS.fromStrict <$> Strict.getLine)
-  case result of
-    Nothing -> throwError []
-    Just value -> return value
-
-send :: (ToJSON a, MonadIO m) => a -> m ()
-send payload = liftIO $ do
+send :: ToJSON a => a -> IO ()
+send payload = do
   Strict.putStrLn $ BS.toStrict $ encode $ payload
   hFlush stdout
 
