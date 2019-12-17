@@ -24,8 +24,8 @@ exceptM :: Monad m => Maybe a -> e -> ExceptT e m a
 exceptM (Just x) _ = return x
 exceptM Nothing e  = throwError e
 
-runM :: M a -> Either TErr a
-runM m = evalState (runExceptT m) ([],0)
+runTM :: M a -> Either TErr a
+runTM m = evalState (runExceptT m) ([],0)
 
 --- type inference and checking
 
@@ -167,3 +167,11 @@ opTypes Implies = TBool `TFun` (TBool `TFun` TBool)
 opTypes Conj    = TBool `TFun` (TBool `TFun` TBool)
 opTypes Disj    = TBool `TFun` (TBool `TFun` TBool)
 opTypes Neg     = TBool `TFun` TBool
+
+--
+
+instance Located TErr where
+  locOf (NotInScope _ loc)      = loc
+  locOf (UnifyFailed _ _ loc)   = loc
+  locOf (RecursiveType _ _ loc) = loc
+  locOf (NotFunction _ loc)     = loc

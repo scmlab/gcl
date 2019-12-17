@@ -3,12 +3,14 @@
 module Main where
 
 import GCL.PreCond
+import GCL.Type
 import REPL
 import Syntax.Parser
 import Syntax.Abstract
 import Type
 
 import qualified Data.Text.Lazy.IO as Text
+import Data.Loc -- for reporting type error
 import Prelude
 import System.Console.GetOpt
 import System.Environment
@@ -60,14 +62,17 @@ main = do
         Just (Load filepath) -> do
           raw <- Text.readFile filepath
 
-          let parse = do
+          let parse = do 
                 syntax <- parseProgram filepath raw
                 program <- abstract syntax
                 case program of
                   Program _ Nothing -> return $ OK [] []
-                  Program _ (Just (statements, postcondition)) -> do
-                    let ((_, obligations), specifications) = runM $ precondStmts statements postcondition
-                    return $ OK obligations specifications
+                  prog@(Program _ (Just (statements, postcondition))) ->
+                    case runTM (checkProg prog) of
+                      Right () -> do
+                       let ((_, obligations), specifications) = runM $  precondStmts statements postcondition
+                       return $ OK obligations specifications
+                      Left terr -> Left [TypeError (locOf terr) (show terr)]
 
           case parse of
             Left errors -> send $ Error $ map fromGlobalError errors

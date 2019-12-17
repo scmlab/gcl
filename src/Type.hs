@@ -30,6 +30,7 @@ instance ToJSON Site where
 data Error
   = LexicalError    Pos
   | SyntacticError  Loc String
+  | TypeError       Loc String
   | ConvertError    ConvertError
   deriving (Show, Generic)
 
