@@ -3,21 +3,15 @@
 
 module Syntax.Lasagne where
 
--- import Control.Monad.State
--- import Control.Monad.Except
---
--- import Data.Aeson
--- import Data.Text.Lazy (Text)
--- import Data.Map (Map)
 import Data.Loc
 import Control.Monad.Free
 import qualified Data.Map as Map
--- import GHC.Generics (Generic)
--- import Prelude hiding (Ordering(..))
 
 import Syntax.Abstract hiding (Stmt(..), GdCmd(..), Program(..), getGuards)
 import qualified Syntax.Abstract as A
 
+--------------------------------------------------------------------------------
+-- | The Stmt functor
 
 data Stmt f
   = Skip                          f
@@ -29,88 +23,105 @@ data Stmt f
   | Spec                          f
   deriving (Show, Functor)
 
+-- applying Pred & Loc on top of `Stmt`
+data Lasagne f = Sauce Pred Loc (Stmt f)
+
+-- a program is like a Lasagne
+-- data Free f a = Pure a	| Free (f (Free f a))
+type Program = Free
+                  Lasagne -- Pred & Loc & Stmt
+                  Pred    -- the post condition of a program
+
 data GdCmd f = GdCmd Pred f deriving (Show, Functor)
+
+--------------------------------------------------------------------------------
 
 getGuards :: [GdCmd f] -> [Pred]
 getGuards = map (\(GdCmd p _) -> p)
 
--- applying Pred & Loc
-data Lasagne f = Sauce Pred Loc (Stmt f)
-type Program = Free Lasagne Pred
-
-
+-- extracting the calculated precondition from a program
 precond :: Program -> Pred
 precond (Pure p) = p
 precond (Free (Sauce p _ _)) = p
 
-makeLasagne :: [A.Stmt] -> Pred -> Program
-makeLasagne []     post = Pure post
-makeLasagne (x:xs) post = case x of
-
-  A.Skip loc -> Free
-    $ Sauce post loc
-    $ Skip
-    $ makeLasagne xs post
-
-  A.Abort loc -> Free
-    $ Sauce post loc
-    $ Abort
-    $ makeLasagne xs post
-
-  A.Assign vs es loc -> Free
-    $ Sauce post loc
-    $ Assign vs es
-    $ makeLasagne xs $ subst (Map.fromList (zip vs es)) post
-
-  A.Assert pre loc -> Free
-    $ Sauce post loc
-    $ Assert pre
-    $ makeLasagne xs pre
-
-  A.Do inv bnd branches loc -> Free
-    $ Sauce post loc
-    $ Do inv bnd (map (makeLasagneGdCmd post) branches)
-    $ makeLasagne xs inv
-
-  A.If (Just pre) branches loc -> Free
-    $ Sauce post loc
-    $ If (Just pre) (map (makeLasagneGdCmd post) branches)
-    $ makeLasagne xs pre
-
-  A.If Nothing branches loc -> Free
-    $ Sauce post loc
-    $ If Nothing branches'
-    $ makeLasagne xs (conjunct brConds `conj` disjunct guards)
-
+-- calculate the precondition with a different postcondition
+recalculatePrecond :: Program -> Pred -> Pred
+recalculatePrecond (Pure _) post = post
+recalculatePrecond (Free (Sauce _ _ stmt)) post = case stmt of
+  Skip xs -> recalculatePrecond xs post
+  Abort xs -> recalculatePrecond xs post
+  Assign vs es xs -> subst (Map.fromList (zip vs es)) $ recalculatePrecond xs post
+  Assert pre _ -> pre
+  Do inv _ _ _ -> inv
+  If (Just pre) _ _ -> pre
+  If Nothing branches xs -> (conjunct brConds `conj` disjunct guards)
     where
-      branches' = map (makeLasagneGdCmd post) branches
-      brConds = map precondGuard branches'
-      guards = getGuards branches'
+      post' = recalculatePrecond xs post
+      brConds = map precondGuard branches
+      guards = getGuards branches
 
       precondGuard :: GdCmd Program -> Pred
       precondGuard (GdCmd guard body)
-        = implies guard $ precond body
+        = implies guard $ recalculatePrecond body post'
+  Spec xs -> recalculatePrecond xs post
 
-  A.Spec loc -> Free
-    $ Sauce post loc
-    $ Spec
-    $ makeLasagne xs post
+-- converting from `[A.Stmt]` to `Program`
+makeLasagne :: [A.Stmt] -> Pred -> Program
+makeLasagne []     post = Pure post
+makeLasagne (x:xs) post =
+  let rest = makeLasagne xs post
+      post' = precond rest
+  in case x of
+
+    A.Skip loc -> Free
+      $ Sauce post' loc
+      $ Skip
+      $ rest
+
+    A.Abort loc -> Free
+      $ Sauce post' loc
+      $ Abort
+      $ rest
+
+    A.Assign vs es loc -> Free
+      $ Sauce (subst (Map.fromList (zip vs es)) post') loc
+      $ Assign vs es
+      $ rest
+
+    A.Assert pre loc -> Free
+      $ Sauce pre loc
+      $ Assert pre
+      $ rest
+
+    A.Do inv bnd branches loc -> Free
+      $ Sauce inv loc
+      $ Do inv bnd (map (makeLasagneGdCmd post') branches)
+      $ rest
+
+    A.If (Just pre) branches loc -> Free
+      $ Sauce pre loc
+      $ If (Just pre) (map (makeLasagneGdCmd post') branches)
+      $ rest
+
+    A.If Nothing branches loc -> Free
+      $ Sauce (conjunct brConds `conj` disjunct guards) loc
+      $ If Nothing branches'
+      $ rest
+
+      where
+        branches' = map (makeLasagneGdCmd post') branches
+        brConds = map precondGuard branches'
+        guards = getGuards branches'
+
+        precondGuard :: GdCmd Program -> Pred
+        precondGuard (GdCmd guard body)
+          = implies guard $ precond body
+
+    A.Spec loc -> Free
+      $ Sauce post' loc
+      $ Spec
+      $ rest
 
 makeLasagneGdCmd :: Pred -> A.GdCmd -> GdCmd Program
 makeLasagneGdCmd post (A.GdCmd guard body)
   = GdCmd guard (makeLasagne body post)
-
-
-
--- a :: Program ()
--- a = Free $ Saused NoLoc $ Skip _
-
--- data Stmt
---   = Skip                          Loc
---   | Abort                         Loc
---   | Assign  [Var] [Expr]          Loc
---   | Assert  Pred                  Loc
---   | Do      Pred Expr [GdCmd]     Loc
---   | If      (Maybe Pred) [GdCmd]  Loc
---   | Spec                          Loc
---   deriving (Show)
