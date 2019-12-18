@@ -17,6 +17,7 @@ dependencies:
   - bytestring
   - containers
   - megaparsec >= 8.0
+  - free
   - parser-combinators
   - mtl
   - srcloc

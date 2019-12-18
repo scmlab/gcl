@@ -127,6 +127,16 @@ x `conj` y = App (App (Op Conj) x) y
 x `disj` y = App (App (Op Disj) x) y
 x `implies` y = App (App (Op Implies) x) y
 
+conjunct :: [Pred] -> Pred
+conjunct []     = Lit (Bol True)
+conjunct [p]    = p
+conjunct (p:ps) = p `conj` conjunct ps
+
+disjunct :: [Pred] -> Pred
+disjunct []     = Lit (Bol False)
+disjunct [p]    = p
+disjunct (p:ps) = p `disj` disjunct ps
+
 neg :: Expr -> Expr
 neg x = App (Op Neg) x
 

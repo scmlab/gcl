@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: f060b522d81ec01bb9bbb7258a39623690b351754abddecc45f3e06244550fc7
+-- hash: 46410026903a3f72911c718a1b840abefb5629ae1fe959e403a556814cffd1fe
 
 name:           gcl
 version:        0.1.0.0
@@ -29,6 +29,7 @@ executable gcl
       REPL
       Syntax.Abstract
       Syntax.Concrete
+      Syntax.Lasagne
       Syntax.Parser
       Syntax.Parser.Lexer
       Syntax.Parser.TokenStream
@@ -45,6 +46,7 @@ executable gcl
     , base >=4.7 && <5
     , bytestring
     , containers
+    , free
     , lexer-applicative
     , megaparsec >=8.0
     , mtl
