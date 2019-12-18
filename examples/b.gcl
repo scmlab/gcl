@@ -1,9 +1,6 @@
 con X : Int
+var x : Bool
 
-{ True }
-{!
-{!
-!}
-!}
+x := X
 
-{ False && True }
+{ False }

@@ -14,7 +14,7 @@ import GHC.Generics
 
 import Syntax.Abstract
 import Syntax.Parser
-import Type
+import Error
 
 data Obligation = Obligation Index Pred Pred deriving (Show, Generic)
 data Hardness = Hard | Soft deriving (Show, Generic)

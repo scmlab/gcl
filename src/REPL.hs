@@ -6,15 +6,12 @@ module REPL where
 import qualified Data.ByteString.Lazy.Char8 as BS
 import qualified Data.ByteString.Char8 as Strict
 
-import Control.Monad.Except
--- import Control.Monad.Reader hiding (local)
--- import qualified Control.Monad.Reader as Reader
 import Data.Aeson hiding (Error)
 import Data.Text.Lazy (Text)
 import GHC.Generics
 import System.IO
 import GCL.PreCond
-import Type
+import Error
 
 --------------------------------------------------------------------------------
 -- | The REPL Monad

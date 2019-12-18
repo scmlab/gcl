@@ -7,7 +7,7 @@ import GCL.Type
 import REPL
 import Syntax.Parser
 import Syntax.Abstract
-import Type
+import Error
 
 import qualified Data.Text.Lazy.IO as Text
 import Data.Loc -- for reporting type error
@@ -40,18 +40,28 @@ main = do
 
       case parse of
         Right (Program _ Nothing) -> putStrLn "<empty>"
-        Right (Program _ (Just (statements, postcondition))) -> do
+        Right prog@(Program _ (Just (statements, postcondition))) -> do
 
           putStrLn "\n=== statements ==="
           print $ statements
 
-          let ((_, obligations), specifications) = runM $ precondStmts statements postcondition
+          case runTM (checkProg prog) of
+            Right () -> do
+              let ((_, obligations), specifications) = runM $ precondStmts statements postcondition
 
-          putStrLn "\n=== proof obligations ==="
-          print $ obligations
+              putStrLn "\n=== proof obligations ==="
+              print $ obligations
 
-          putStrLn "\n=== specifications ==="
-          print $ specifications
+              putStrLn "\n=== specifications ==="
+              print $ specifications
+
+            Left err -> do
+              putStrLn "\n=== type error ==="
+              print err
+
+
+
+
         Left errors -> print errors
 
   where
@@ -62,7 +72,7 @@ main = do
         Just (Load filepath) -> do
           raw <- Text.readFile filepath
 
-          let parse = do 
+          let parse = do
                 syntax <- parseProgram filepath raw
                 program <- abstract syntax
                 case program of

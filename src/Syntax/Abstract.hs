@@ -15,10 +15,10 @@ import Data.Map (Map)
 import Data.Loc
 import qualified Data.Map as Map
 import GHC.Generics
-
-import qualified Syntax.Concrete as C
-import Type
 import Prelude hiding (Ordering(..))
+
+import Error
+import qualified Syntax.Concrete as C
 
 type Index = Int
 

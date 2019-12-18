@@ -23,7 +23,7 @@ import Syntax.Parser.Lexer
 -- import Syntax.Parser.Util hiding (withLoc)
 import Syntax.Parser.Util (PosLog, extract)
 import qualified Syntax.Parser.Util as Util
-import Type
+import Error
 
 import Prelude hiding (Ordering(..))
 

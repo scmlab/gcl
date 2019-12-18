@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 4e9cba5ce320a03bfa75386313bb2b23307c16da610f233bc1f69c11e915d4da
+-- hash: f060b522d81ec01bb9bbb7258a39623690b351754abddecc45f3e06244550fc7
 
 name:           gcl
 version:        0.1.0.0
@@ -23,6 +23,7 @@ executable gcl
   main-is: Main.hs
   other-modules:
       Control.Monad.Gensym
+      Error
       GCL.PreCond
       GCL.Type
       REPL
