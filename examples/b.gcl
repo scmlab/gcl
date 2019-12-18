@@ -1,6 +1,10 @@
 con X : Int
-var x : Bool
+var x : Int
 
-x := X
+{ X > 0 }
+if True -> {!
 
-{ False }
+           !}
+fi
+
+{ x = X }

@@ -13,8 +13,6 @@ import Data.Loc (Loc)
 import GHC.Generics
 
 import Syntax.Abstract
-import Syntax.Parser
-import Error
 
 data Obligation = Obligation Index Pred Pred deriving (Show, Generic)
 data Hardness = Hard | Soft deriving (Show, Generic)
@@ -107,7 +105,6 @@ precond (Assert pre _) post = do
 precond (Assign xs es _) post = return $ subst (Map.fromList (zip xs es)) post
 
 precond (If (Just pre) branches _) post = do
-
 
   forM_ branches $ \(GdCmd guard body) -> do
     p <- precondStmts body post

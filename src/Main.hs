@@ -43,17 +43,17 @@ main = do
         Right prog@(Program _ (Just (statements, postcondition))) -> do
 
           putStrLn "\n=== statements ==="
-          print $ statements
+          mapM_ print statements
 
           case runTM (checkProg prog) of
             Right () -> do
               let ((_, obligations), specifications) = runM $ precondStmts statements postcondition
 
               putStrLn "\n=== proof obligations ==="
-              print $ obligations
+              mapM_ print obligations
 
               putStrLn "\n=== specifications ==="
-              print $ specifications
+              mapM_ print specifications
 
             Left err -> do
               putStrLn "\n=== type error ==="

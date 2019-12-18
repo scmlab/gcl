@@ -3,14 +3,9 @@
 
 module Type where
 
-import Data.List.NonEmpty (NonEmpty(..))
-import qualified Data.List.NonEmpty as NE
 import Data.Aeson
-import Data.Maybe (fromMaybe)
 import Data.Loc
-import GHC.Generics
 
-import Syntax.Parser.TokenStream (PrettyToken(..))
 import Syntax.Parser.Util ()
 
 --------------------------------------------------------------------------------

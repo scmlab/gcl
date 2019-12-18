@@ -18,7 +18,7 @@ import GHC.Generics (Generic)
 import Prelude hiding (Ordering(..))
 
 import qualified Syntax.Concrete as C
-import Type
+import Type ()
 
 type Index = Int
 
