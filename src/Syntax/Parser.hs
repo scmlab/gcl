@@ -3,9 +3,7 @@
 module Syntax.Parser
   ( parseProgram
   , parseSpec
-  -- , parsePred
-  -- , parseStmt
-  , scan
+  , SyntacticError
   ) where
 
 import Control.Monad.Combinators.Expr
@@ -23,7 +21,6 @@ import Syntax.Parser.Lexer
 -- import Syntax.Parser.Util hiding (withLoc)
 import Syntax.Parser.Util (PosLog, extract)
 import qualified Syntax.Parser.Util as Util
-import Error
 
 import Prelude hiding (Ordering(..))
 
@@ -33,8 +30,9 @@ import Prelude hiding (Ordering(..))
 -- | States for source location bookkeeping
 
 type Parser = ParsecT Void TokStream (PosLog Tok)
+type SyntacticError = (Loc, String)
 
-parse :: Parser a -> FilePath -> TokStream -> Either [Error] a
+parse :: Parser a -> FilePath -> TokStream -> Either [SyntacticError] a
 parse parser filepath tokenStream = do
   -- let tokenStream = scan filepath raw
   -- case filterError tokenStream of
@@ -47,17 +45,17 @@ parse parser filepath tokenStream = do
   where
     fromParseErrorBundle :: ShowErrorComponent e
                        => ParseErrorBundle TokStream e
-                       -> [Error]
+                       -> [SyntacticError]
     fromParseErrorBundle (ParseErrorBundle errors posState)
       = snd $ foldr f (posState, []) errors
       where
         f :: ShowErrorComponent e
           => Mega.ParseError TokStream e
-          -> (PosState TokStream, [Error])
-          -> (PosState TokStream, [Error])
+          -> (PosState TokStream, [SyntacticError])
+          -> (PosState TokStream, [SyntacticError])
         f err (initial, accum) =
             let (_, next) = reachOffset (errorOffset err) initial
-            in (next, (SyntacticError (getLoc err) (parseErrorTextPretty err)):accum)
+            in (next, (getLoc err, parseErrorTextPretty err):accum)
 
         getLoc :: ShowErrorComponent e
           => Mega.ParseError TokStream e
@@ -67,10 +65,10 @@ parse parser filepath tokenStream = do
         getLoc _ = mempty
 
 
-parseProgram :: FilePath -> TokStream -> Either [Error] Program
+parseProgram :: FilePath -> TokStream -> Either [SyntacticError] Program
 parseProgram = parse program
 
-parseSpec :: TokStream -> Either [Error] [Stmt]
+parseSpec :: TokStream -> Either [SyntacticError] [Stmt]
 parseSpec = parse specContent "<specification>"
 
 -- parsePred :: Text -> Either [Error] Pred

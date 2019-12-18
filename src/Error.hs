@@ -9,6 +9,10 @@ import GHC.Generics
 
 import Syntax.Parser.Util ()
 import Type ()
+import Syntax.Parser.Lexer (LexicalError)
+import Syntax.Parser (SyntacticError)
+import Syntax.Abstract (ConvertError)
+import GCL.Type (TypeError)
 
 --------------------------------------------------------------------------------
 -- | Site of Error
@@ -24,16 +28,16 @@ instance ToJSON Site where
 -- | Error
 
 data Error
-  = LexicalError    Pos
-  | SyntacticError  Loc String
-  | TypeError       Loc String
+  = LexicalError    LexicalError
+  | SyntacticError  SyntacticError
+  | TypeError       TypeError
   | ConvertError    ConvertError
   deriving (Show, Generic)
 
 instance Located Error where
   locOf (LexicalError pos) = Loc pos pos
-  locOf (SyntacticError loc _) = loc
-  locOf (TypeError loc _) = loc
+  locOf (SyntacticError (loc, _)) = loc
+  locOf (TypeError e) = locOf e
   locOf (ConvertError e) = locOf e
 
 fromLocalError :: Int -> Error -> (Site, Error)
@@ -44,28 +48,6 @@ fromGlobalError e = (Global (locOf e), e)
 
 instance ToJSON Error where
 
-
---------------------------------------------------------------------------------
--- | Convert Error
-
-data ConvertError
-  = MissingAssertion Loc
-  | MissingBound     Loc
-  | ExcessBound      Loc
-  | MissingPostcondition
-  | DigHole Loc
-  | Panic String
-  deriving (Show, Generic)
-
-instance Located ConvertError where
-  locOf (MissingAssertion loc) = loc
-  locOf (MissingBound loc) = loc
-  locOf (ExcessBound loc) = loc
-  locOf MissingPostcondition = NoLoc
-  locOf (DigHole loc) = loc
-  locOf (Panic _) = NoLoc
-
-instance ToJSON ConvertError where
 
 -- --------------------------------------------------------------------------------
 -- -- | Type Error

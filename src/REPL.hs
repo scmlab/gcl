@@ -3,42 +3,32 @@
 
 module REPL where
 
+import Data.Aeson hiding (Error)
+import Data.Bifunctor (first)
 import qualified Data.ByteString.Lazy.Char8 as BS
 import qualified Data.ByteString.Char8 as Strict
-
-import Data.Aeson hiding (Error)
 import Data.Text.Lazy (Text)
 import GHC.Generics
 import System.IO
-import GCL.PreCond
+
 import Error
+import GCL.PreCond
+import Syntax.Parser.Lexer as Lexer
+import Syntax.Parser as Parser
+import Syntax.Concrete as Concrete
+import Syntax.Abstract as Abstract
 
---------------------------------------------------------------------------------
--- | The REPL Monad
+scan :: FilePath -> Text -> Either [Error] TokStream
+scan filepath = first (\x -> [LexicalError x]) . Lexer.scan filepath
 
--- -- runREPL ::
---
--- runREPL :: REPL a -> IO ()
--- runREPL program = do
---   result <- runExceptT program
---   case result of
---     Left errors -> send $ Error $ map fromGlobalError errors
---     Right _ -> return ()
---
--- runREPLLocal :: Int -> REPL a -> IO ()
--- runREPLLocal i program = do
---   result <- runExceptT program
---   case result of
---     Left errors -> send $ Error $ map (fromLocalError i) errors
---     Right _ -> return ()
---
--- -- print human readable error instead
--- runREPLTest :: REPL a -> IO ()
--- runREPLTest program = do
---   result <- runExceptT program
---   case result of
---     Left errors -> mapM_ (liftIO . print) errors
---     Right _ -> return ()
+parseProgram :: FilePath -> TokStream -> Either [Error] Concrete.Program
+parseProgram filepath = first (map SyntacticError) . Parser.parseProgram filepath
+
+parseSpec :: TokStream -> Either [Error] [Concrete.Stmt]
+parseSpec = first (map SyntacticError) . Parser.parseSpec
+
+abstract :: Abstract.FromConcrete a b => a -> Either [Error] b
+abstract = first (\x -> [ConvertError x]) . Abstract.abstract
 
 recv :: FromJSON a => IO (Maybe a)
 recv = decode . BS.fromStrict <$> Strict.getLine

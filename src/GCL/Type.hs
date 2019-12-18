@@ -1,30 +1,38 @@
+{-# LANGUAGE DeriveGeneric #-}
+
 module GCL.Type where
 
-import Prelude hiding (Ordering(..))
+import Control.Monad.State hiding (guard)
+import Control.Monad.Except
+import Data.Aeson (ToJSON)
 import Data.Text.Lazy (Text)
 import Data.Map (Map)
 import qualified Data.Map as Map
-import Control.Monad.State hiding (guard)
-import Control.Monad.Except
 import Data.Loc
+import Prelude hiding (Ordering(..))
+import GHC.Generics (Generic)
+
 
 import Syntax.Abstract
 
 type TCxt = Map Text Type
 type SubstT = [(TVar, Type)]
 
-type M = ExceptT TErr (State (SubstT, Int))
-data TErr = NotInScope Text Loc
-          | UnifyFailed Type Type Loc
-          | RecursiveType TVar Type Loc
-          | NotFunction Type Loc
-      deriving (Show, Eq)
+type M = ExceptT TypeError (State (SubstT, Int))
+data TypeError
+  = NotInScope Text Loc
+  | UnifyFailed Type Type Loc
+  | RecursiveType TVar Type Loc
+  | NotFunction Type Loc
+  deriving (Show, Eq, Generic)
+instance ToJSON TypeError where
+
 
 exceptM :: Monad m => Maybe a -> e -> ExceptT e m a
 exceptM (Just x) _ = return x
 exceptM Nothing e  = throwError e
 
-runTM :: M a -> Either TErr a
+runTM :: M a -> Either TypeError a
 runTM m = evalState (runExceptT m) ([],0)
 
 --- type inference and checking
@@ -170,7 +178,7 @@ opTypes Neg     = TBool `TFun` TBool
 
 --
 
-instance Located TErr where
+instance Located TypeError where
   locOf (NotInScope _ loc)      = loc
   locOf (UnifyFailed _ _ loc)   = loc
   locOf (RecursiveType _ _ loc) = loc

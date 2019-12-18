@@ -1,22 +1,19 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Syntax.Parser.Lexer (scan, Tok(..), TokStream) where
+module Syntax.Parser.Lexer (scan, LexicalError, Tok(..), TokStream) where
 
 import Syntax.Parser.TokenStream (PrettyToken(..))
-import Error (Error)
-import qualified Error as Error
 
+import Data.Char
 import Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NE
+import Data.Loc
 import Data.Maybe (fromMaybe)
-
-import Language.Lexer.Applicative
-import Text.Regex.Applicative
-import Data.Char
--- import Data.Text hiding (Space)
 import Data.Text.Lazy (Text)
 import qualified Data.Text.Lazy as Text
-import Data.Loc
+import Language.Lexer.Applicative hiding (LexicalError)
+import qualified Language.Lexer.Applicative as Lex
+import Text.Regex.Applicative
 
 --------------------------------------------------------------------------------
 -- | Tok & TokStream
@@ -230,12 +227,14 @@ lexer = mconcat
 --------------------------------------------------------------------------------
 -- | scan
 
-scan :: FilePath -> Text -> Either [Error] TokStream
+type LexicalError = Pos
+
+scan :: FilePath -> Text -> Either LexicalError TokStream
 scan filepath = filterError . runLexer lexer filepath . Text.unpack
   where
-    filterError :: TokStream -> Either [Error] TokStream
+    filterError :: TokStream -> Either LexicalError TokStream
     filterError TsEof = Right TsEof
-    filterError (TsError (LexicalError pos)) = Left [Error.LexicalError pos]
+    filterError (TsError (Lex.LexicalError pos)) = Left pos
     filterError (TsToken l xs) = TsToken l <$> filterError xs
 
 

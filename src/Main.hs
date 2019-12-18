@@ -5,12 +5,11 @@ module Main where
 import GCL.PreCond
 import GCL.Type
 import REPL
-import Syntax.Parser
-import Syntax.Abstract
+
+import Syntax.Abstract (Program(..))
 import Error
 
 import qualified Data.Text.Lazy.IO as Text
-import Data.Loc -- for reporting type error
 import Prelude
 import System.Console.GetOpt
 import System.Environment
@@ -84,7 +83,7 @@ main = do
                       Right () -> do
                        let ((_, obligations), specifications) = runM $  precondStmts statements postcondition
                        return $ OK obligations specifications
-                      Left terr -> Left [TypeError (locOf terr) (show terr)]
+                      Left terr -> Left [TypeError terr]
 
           case parse of
             Left errors -> send $ Error $ map fromGlobalError errors
