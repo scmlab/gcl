@@ -35,7 +35,8 @@ main = do
       putStrLn "\n=== AST ==="
 
       let parse = do
-            syntax <- parseProgram filepath raw
+            tokens <- scan filepath raw
+            syntax <- parseProgram filepath tokens
             abstract syntax
 
       case parse of
@@ -73,7 +74,8 @@ main = do
           raw <- Text.readFile filepath
 
           let parse = do
-                syntax <- parseProgram filepath raw
+                tokens <- scan filepath raw
+                syntax <- parseProgram filepath tokens
                 program <- abstract syntax
                 case program of
                   Program _ Nothing -> return $ OK [] []
@@ -91,7 +93,7 @@ main = do
           loop
         Just (Refine i payload) -> do
 
-          let parse = parseSpec payload >>= abstract
+          let parse = scan "<spec>" payload >>= parseSpec >>= abstract
           case parse of
             Left errors -> send $ Error $ map (fromLocalError i) errors
             Right _ -> send $ Resolve i

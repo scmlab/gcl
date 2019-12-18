@@ -258,22 +258,33 @@ precondGuard post (GdCmd guard body) = implies guard <$> precondStmts body post
 -- sweepGdCmdSoft post (GdCmd guard body) = do
 --   (body', pre) <- sweepStmts body post
 --   return (GdCmd guard body', guard `Implies` pre)
-
-gcdExample :: Either [Error] Program
-gcdExample = do
-  result <- parseProgram "<test>" "\
-    \x := X\n\
-    \y := Y\n\
-    \{ gcd(x, y) = gcd(X, Y), bnd: ? }\n\
-    \do x > y -> x := minus(x, y)  \n\
-    \ | x < y -> y := minus(y, x)  \n\
-    \od\n\
-    \{ gcd(X, Y) = x }\n\
-    \"
-  abstract result
-
-test :: ((Pred, [Obligation]), [Specification])
-test = runM $ case gcdExample of
-  Right (Program _ (Just (statements, postcondition)))
-    -> precondStmts statements postcondition
-  _ -> undefined
+--
+-- gcdExample :: Either [Error] Program
+-- gcdExample = do
+--   let filepath = "<test>"
+--
+--   case scan "<test>" "\
+--     \x := X\n\
+--     \y := Y\n\
+--     \{ gcd(x, y) = gcd(X, Y), bnd: ? }\n\
+--     \do x > y -> x := minus(x, y)  \n\
+--     \ | x < y -> y := minus(y, x)  \n\
+--     \od\n\
+--     \{ gcd(X, Y) = x }\n\
+--     \"
+--   result <- parseProgram "<test>" "\
+--     \x := X\n\
+--     \y := Y\n\
+--     \{ gcd(x, y) = gcd(X, Y), bnd: ? }\n\
+--     \do x > y -> x := minus(x, y)  \n\
+--     \ | x < y -> y := minus(y, x)  \n\
+--     \od\n\
+--     \{ gcd(X, Y) = x }\n\
+--     \"
+--   abstract result
+--
+-- test :: ((Pred, [Obligation]), [Specification])
+-- test = runM $ case gcdExample of
+--   Right (Program _ (Just (statements, postcondition)))
+--     -> precondStmts statements postcondition
+--   _ -> undefined

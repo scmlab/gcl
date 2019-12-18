@@ -34,14 +34,15 @@ import Prelude hiding (Ordering(..))
 
 type Parser = ParsecT Void TokStream (PosLog Tok)
 
-parse :: Parser a -> FilePath -> Text -> Either [Error] a
-parse parser filepath raw = do
-  let tokenStream = scan filepath raw
-  case filterError tokenStream of
-    Just e  -> Left [LexicalError e]
-    Nothing -> case Util.runPosLog (runParserT parser filepath tokenStream) of
-      Left e -> Left (fromParseErrorBundle e)
-      Right x -> Right x
+parse :: Parser a -> FilePath -> TokStream -> Either [Error] a
+parse parser filepath tokenStream = do
+  -- let tokenStream = scan filepath raw
+  -- case filterError tokenStream of
+  --   Just e  -> Left [LexicalError e]
+  --   Nothing ->
+  case Util.runPosLog (runParserT parser filepath tokenStream) of
+    Left e -> Left (fromParseErrorBundle e)
+    Right x -> Right x
 
   where
     fromParseErrorBundle :: ShowErrorComponent e
@@ -66,10 +67,10 @@ parse parser filepath raw = do
         getLoc _ = mempty
 
 
-parseProgram :: FilePath -> Text -> Either [Error] Program
+parseProgram :: FilePath -> TokStream -> Either [Error] Program
 parseProgram = parse program
 
-parseSpec :: Text -> Either [Error] [Stmt]
+parseSpec :: TokStream -> Either [Error] [Stmt]
 parseSpec = parse specContent "<specification>"
 
 -- parsePred :: Text -> Either [Error] Pred

@@ -1,6 +1,14 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Syntax.Parser.Lexer where
+module Syntax.Parser.Lexer (scan, Tok(..), TokStream) where
+
+import Syntax.Parser.TokenStream (PrettyToken(..))
+import Error (Error)
+import qualified Error as Error
+
+import Data.List.NonEmpty (NonEmpty(..))
+import qualified Data.List.NonEmpty as NE
+import Data.Maybe (fromMaybe)
 
 import Language.Lexer.Applicative
 import Text.Regex.Applicative
@@ -9,6 +17,9 @@ import Data.Char
 import Data.Text.Lazy (Text)
 import qualified Data.Text.Lazy as Text
 import Data.Loc
+
+--------------------------------------------------------------------------------
+-- | Tok & TokStream
 
 data Tok
     = TokNewline
@@ -107,7 +118,10 @@ instance Show Tok where
     TokTrue -> "True"
     TokFalse -> "False"
 
--- foldl :: (RE Text Text -> Char -> RE Text Text) -> RE Text Text -> Text -> RE Text Text
+type TokStream = TokenStream (L Tok)
+
+--------------------------------------------------------------------------------
+-- | Regular expressions & the lexer
 
 text :: Text -> RE Text Text
 text raw = Text.foldr f (pure "") raw
@@ -213,12 +227,36 @@ lexer = mconcat
   , whitespace  (longestShortest (contra commentStartRE) (contra . commentEndRE))
   ]
 
-scan :: FilePath -> Text -> TokStream
-scan filepath = runLexer lexer filepath . Text.unpack
+--------------------------------------------------------------------------------
+-- | scan
 
-filterError :: TokStream -> Maybe Pos
-filterError TsEof = Nothing
-filterError (TsError (LexicalError pos)) = Just pos
-filterError (TsToken _ xs) = filterError xs
+scan :: FilePath -> Text -> Either [Error] TokStream
+scan filepath = filterError . runLexer lexer filepath . Text.unpack
+  where
+    filterError :: TokStream -> Either [Error] TokStream
+    filterError TsEof = Right TsEof
+    filterError (TsError (LexicalError pos)) = Left [Error.LexicalError pos]
+    filterError (TsToken l xs) = TsToken l <$> filterError xs
 
-type TokStream = TokenStream (L Tok)
+
+--------------------------------------------------------------------------------
+-- | Instances of PrettyToken
+
+instance PrettyToken Tok where
+  prettyTokens (x:|[])  = fromMaybe ("'" <> show (unLoc x) <> "'") (prettyToken' (unLoc x))
+  prettyTokens xs       = "\"" <> concatMap (f . unLoc) (NE.toList xs) <> "\""
+    where
+      f tok =
+        case prettyToken' tok of
+          Nothing     -> show tok
+          Just pretty -> "<" <> pretty <> ">"
+
+-- | If the given character has a pretty representation, return that,
+-- otherwise 'Nothing'. This is an internal helper.
+
+prettyToken' :: Tok -> Maybe String
+prettyToken' tok = case tok of
+  TokNewline -> Just "newline"
+  TokWhitespace -> Just "space"
+  TokEOF -> Just "end of file"
+  _      -> Nothing
