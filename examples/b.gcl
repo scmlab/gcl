@@ -1,6 +1,17 @@
 con X : Int
 var x : Int
 
+skip
+abort
+
+a := b
+
+{ True , bnd : x }
+do x > y -> x := minus x y
+ | x < y -> y := minus y x
+od
+
+
 { X > 0 }
 if True -> {!
 

@@ -7,21 +7,16 @@ module GCL.PreCond2 where
 import Control.Monad.Free
 import Control.Monad.State hiding (guard)
 import Control.Monad.Writer hiding (guard)
-
+import Data.Loc
 import GHC.Generics
 
 import Syntax.Abstract hiding (Stmt(..), GdCmd(..), Program(..), getGuards)
-
 import Syntax.Lasagne
 
+--------------------------------------------------------------------------------
+-- | Proof Obligation
+
 data Obligation = Obligation Index Pred Pred deriving (Show, Generic)
--- data Specification = Specification
---   { specID       :: Int
---   , specHardness :: Hardness
---   , specPreCond  :: Pred
---   , specPostCond :: Pred
---   , specLoc      :: Loc
---   } deriving (Show, Generic)
 
 -- marks a proof obligation
 markPO :: Pred -> Pred -> POM ()
@@ -39,8 +34,6 @@ type POM = WriterT [Obligation] (State Int)
 
 runPOM :: POM a -> (a, [Obligation])
 runPOM p = evalState (runWriterT p) 0
-
-
 
 -- generates proof obligations
 sweepPOs :: Program -> POM ()
@@ -100,3 +93,35 @@ sweepPOs (Free (Sauce post _ stmt)) = case stmt of
     sweepPOs xs
 
   Spec xs -> sweepPOs xs
+
+-- --------------------------------------------------------------------------------
+-- -- | Specifications
+--
+-- data Specification = Specification
+--   { specID       :: Int
+--   , specHardness :: Hardness
+--   , specPreCond  :: Pred
+--   , specPostCond :: Pred
+--   , specLoc      :: Loc
+--   } deriving (Show, Generic)
+-- data Hardness = Hard | Soft deriving (Show, Generic)
+--
+-- -- marks a proof specification
+-- markSpec :: Hardness -> Pred -> Pred -> Loc -> SpecM ()
+-- markSpec harsness p q loc = do
+--   i <- get
+--   put (succ i)
+--   tell [Specification i harsness p q loc]
+--
+-- type SpecM = WriterT [Specification] (State Int)
+--
+-- runSpecM :: SpecM a -> (a, [Specification])
+-- runSpecM p = evalState (runWriterT p) 0
+--
+-- -- generates specifications
+-- sweepSpecs :: Program -> POM ()
+-- sweepSpecs (Pure _) = return ()
+-- sweepSpecs (Free (Sauce post _ stmt)) = case stmt of
+--   Skip xs -> sweepPOs xs
+--   Abort xs -> sweepPOs xs
+--   Assign _ _ xs -> sweepPOs xs

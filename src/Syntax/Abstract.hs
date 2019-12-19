@@ -16,6 +16,7 @@ import Data.Loc
 import qualified Data.Map as Map
 import GHC.Generics (Generic)
 import Prelude hiding (Ordering(..))
+-- import Data.Text.Prettyprint.Doc
 
 import qualified Syntax.Concrete as C
 import Type ()
@@ -116,6 +117,7 @@ data Op = EQ | LTE | GTE | LT | GT   -- binary relations
         | Implies | Conj | Disj | Neg  -- logic operators
         | Plus | Minus | Mul | Div     -- arithmetics
      deriving (Show, Eq, Generic)
+
 
 -- convenient constructors
 

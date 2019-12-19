@@ -13,6 +13,7 @@ import qualified Data.Text.Lazy.IO as Text
 import Prelude
 import System.Console.GetOpt
 import System.Environment
+import Data.Text.Prettyprint.Doc
 
 main :: IO ()
 main = do
@@ -34,35 +35,56 @@ main = do
       putStrLn "\n=== AST ==="
 
       let parse = do
-            tokens <- scan filepath raw
-            syntax <- parseProgram filepath tokens
-            abstract syntax
+            scan filepath raw
+              >>= parseProgram filepath
+              >>= abstract
+              >>= makeLasagne
+            -- syntax <- parseProgram filepath tokens
+            --  <- abstract syntax
 
       case parse of
-        Right (Program _ Nothing) -> putStrLn "<empty>"
-        Right prog@(Program _ (Just (statements, postcondition))) -> do
+        Right program -> do
 
-          putStrLn "\n=== statements ==="
-          mapM_ print statements
+          putStrLn "\n=== program ==="
+          print $ pretty program
 
-          case runTM (checkProg prog) of
-            Right () -> do
-              let ((_, obligations), specifications) = runM $ precondStmts statements postcondition
-
-              putStrLn "\n=== proof obligations ==="
-              mapM_ print obligations
-
-              putStrLn "\n=== specifications ==="
-              mapM_ print specifications
-
-            Left err -> do
-              putStrLn "\n=== type error ==="
-              print err
-
-
-
+          -- case runTM (checkProg prog) of
+          --   Right () -> do
+          --     let ((_, obligations), specifications) = runM $ precondStmts statements postcondition
+          --
+          --     putStrLn "\n=== proof obligations ==="
+          --     mapM_ print obligations
+          --
+          --     putStrLn "\n=== specifications ==="
+          --     mapM_ print specifications
+          --
+          --   Left err -> do
+          --     putStrLn "\n=== type error ==="
+          --     print err
 
         Left errors -> print errors
+      -- case parse of
+      --   Right (Program _ Nothing) -> putStrLn "<empty>"
+      --   Right prog@(Program _ (Just (statements, postcondition))) -> do
+      --
+      --     putStrLn "\n=== statements ==="
+      --     mapM_ print statements
+      --
+      --     case runTM (checkProg prog) of
+      --       Right () -> do
+      --         let ((_, obligations), specifications) = runM $ precondStmts statements postcondition
+      --
+      --         putStrLn "\n=== proof obligations ==="
+      --         mapM_ print obligations
+      --
+      --         putStrLn "\n=== specifications ==="
+      --         mapM_ print specifications
+      --
+      --       Left err -> do
+      --         putStrLn "\n=== type error ==="
+      --         print err
+      --
+      --   Left errors -> print errors
 
   where
     loop :: IO ()

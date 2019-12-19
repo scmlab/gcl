@@ -19,6 +19,7 @@ dependencies:
   - megaparsec >= 8.0
   - free
   - parser-combinators
+  - prettyprinter
   - mtl
   - srcloc
   - text
