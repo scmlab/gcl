@@ -1,21 +1,11 @@
-con X : Int
+con A, B : Int
 var x : Int
 
-skip
-abort
 
-a := b
-
-{ True , bnd : x }
-do x > y -> x := minus x y
- | x < y -> y := minus y x
-od
-
-
-{ X > 0 }
-if True -> {!
-
-           !}
+if A >= B -> x := A
+ | A <  B -> x := B
 fi
 
-{ x = X }
+
+
+{ x >= A && x >= B }

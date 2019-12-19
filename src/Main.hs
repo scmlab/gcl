@@ -14,6 +14,7 @@ import Prelude
 import System.Console.GetOpt
 import System.Environment
 import Data.Text.Prettyprint.Doc
+import Pretty ()
 
 main :: IO ()
 main = do
