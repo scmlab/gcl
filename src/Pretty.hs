@@ -12,6 +12,7 @@ import Prelude hiding (Ordering(..))
 
 import Syntax.Abstract (Expr(..), Lit(..), Op(..))
 import Syntax.Lasagne
+import GCL.PreCond (Obligation(..))
 
 
 --------------------------------------------------------------------------------
@@ -130,6 +131,13 @@ instance Pretty Op where
   pretty Mul = "*"
   pretty Div = "/"
 
+--------------------------------------------------------------------------------
+-- | Obligation
+
+instance Pretty Obligation where
+  pretty (Obligation i p q) = lbracket <> pretty i <> rbracket <+> line <>
+    indent 2 (pretty p) <> line <>
+    indent 2 (pretty q) <> line
 
 --------------------------------------------------------------------------------
 -- | Lasagne

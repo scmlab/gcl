@@ -7,6 +7,7 @@ import GCL.Type
 import REPL
 
 import Syntax.Abstract (Program(..))
+import GCL.PreCond2
 import Error
 
 import qualified Data.Text.Lazy.IO as Text
@@ -39,17 +40,37 @@ main = do
             scan filepath raw
               >>= parseProgram filepath
               >>= abstract
-              >>= makeLasagne
+              -- >>= makeLasagne
             -- syntax <- parseProgram filepath tokens
             --  <- abstract syntax
 
       case parse of
-        Right program -> do
+        Right (Program _ Nothing) -> putStrLn "<empty>"
+        Right syntax@(Program _ (Just (statements, postcondition))) -> do
 
-          putStrLn "\n=== program ==="
-          print $ pretty program
+          case makeLasagne syntax of
+            Right program -> do
 
-          -- case runTM (checkProg prog) of
+              putStrLn "\n=== program ==="
+              print $ pretty program
+
+              let obligations = runPOM $ sweepPOs program
+
+              putStrLn "\n=== proof obligations (Lasagne) ==="
+              mapM_ (print . pretty) obligations
+
+            Left errors -> print errors
+
+
+          let ((_, obligations), specifications) = runM $ precondStmts statements postcondition
+
+          putStrLn "\n=== proof obligations ==="
+          mapM_ (print . pretty) obligations
+
+          putStrLn "\n=== specifications ==="
+          mapM_ print specifications
+          --
+          -- case runTM (checkProg syntax) of
           --   Right () -> do
           --     let ((_, obligations), specifications) = runM $ precondStmts statements postcondition
           --

@@ -12,11 +12,12 @@ import GHC.Generics
 
 import Syntax.Abstract hiding (Stmt(..), GdCmd(..), Program(..), getGuards)
 import Syntax.Lasagne
+import GCL.PreCond (Obligation(..))
 
 --------------------------------------------------------------------------------
 -- | Proof Obligation
 
-data Obligation = Obligation Index Pred Pred deriving (Show, Generic)
+-- data Obligation = Obligation Index Pred Pred deriving (Show, Generic)
 
 -- marks a proof obligation
 markPO :: Pred -> Pred -> POM ()
@@ -32,8 +33,8 @@ markPO p q = do
 
 type POM = WriterT [Obligation] (State Int)
 
-runPOM :: POM a -> (a, [Obligation])
-runPOM p = evalState (runWriterT p) 0
+runPOM :: POM a -> [Obligation]
+runPOM p = snd $ evalState (runWriterT p) 0
 
 -- generates proof obligations
 sweepPOs :: Program -> POM ()
