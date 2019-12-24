@@ -96,9 +96,9 @@ checkGdCmd l cxt (GdCmd g cmds)= do
 
 checkProg :: Program -> M ()
 checkProg (Program _ Nothing) = return ()
-checkProg (Program decls (Just (stmts, post))) = do
+checkProg (Program decls (Just (stmts, post, loc))) = do
   checkSs cxt stmts
-  checkE NoLoc cxt post TBool  -- we need a location here!
+  checkE loc cxt post TBool  -- we need a location here!
  where cxt = Map.fromList (concat (map f decls))
        f (ConstDecl cs t) = [(c,t) | c <- cs]
        f (VarDecl   vs t) = [(v,t) | v <- vs]

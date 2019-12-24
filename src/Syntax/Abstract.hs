@@ -24,8 +24,8 @@ import Type ()
 type Index = Int
 
 data Program = Program
-                [Declaration]           -- declarations
-                (Maybe ([Stmt], Pred))  -- statements + postcondition
+                [Declaration]               -- declarations
+                (Maybe ([Stmt], Pred, Loc)) -- statements + postcondition
               deriving (Show)
 
 data Declaration
@@ -288,10 +288,10 @@ instance FromConcrete C.Program Program where
                                             <*> (fromConcrete q >>= checkStatements)
     where
       -- check if the postcondition of the whole program is missing
-      checkStatements :: [Stmt] -> AbstractM (Maybe ([Stmt], Pred))
+      checkStatements :: [Stmt] -> AbstractM (Maybe ([Stmt], Pred, Loc))
       checkStatements [] = return Nothing
       checkStatements xs = case last xs of
-        Assert r _ -> return (Just (init xs, r))
+        Assert r l -> return (Just (init xs, r, l))
         _          -> throwError MissingPostcondition
 
 

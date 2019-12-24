@@ -38,13 +38,13 @@ typeCheck = first (\x -> [TypeError x]) . Type.runTM . Type.checkProg
 
 sweep :: Abstract.Program -> Either [Error] ([Obligation], [Specification])
 sweep (Abstract.Program _ Nothing) = return ([], [])
-sweep (Abstract.Program _ (Just (statements, postcondition))) =
+sweep (Abstract.Program _ (Just (statements, postcondition, _))) =
     let ((_, obligations), specifications) = runM $ precondStmts statements postcondition
     in return (obligations, specifications)
 
 makeLasagne :: Abstract.Program -> Either [Error] Lasagne.Program
 makeLasagne (Abstract.Program _ Nothing) = Left []
-makeLasagne (Abstract.Program _ (Just (stmts, post))) = Right $ Lasagne.makeLasagne stmts post
+makeLasagne (Abstract.Program _ (Just (stmts, post, _))) = Right $ Lasagne.makeLasagne stmts post
 
 
 recv :: FromJSON a => IO (Maybe a)
