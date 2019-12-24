@@ -7,6 +7,10 @@ if A >= B -> x := A
  | A <  B -> x := B
 fi
 
+{!
+
+!}
+
 { gcd x y = gcd X Y && x > 0 && y > 0, bnd : plus x y }
 do x > y -> x := minus x y
  | x < y -> y := minus y x

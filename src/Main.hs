@@ -54,11 +54,11 @@ main = do
               putStrLn "\n=== program ==="
               print $ pretty program
 
-              let obligations = runPOM $ sweepPOs program
-
               putStrLn "\n=== proof obligations (Lasagne) ==="
-              mapM_ (print . pretty) obligations
+              mapM_ (print . pretty) (getPOs program)
 
+              putStrLn "\n=== specifications ==="
+              mapM_ (print . pretty) (getSpecs program)
             Left errors -> print errors
 
 
@@ -68,7 +68,7 @@ main = do
           mapM_ (print . pretty) obligations
 
           putStrLn "\n=== specifications ==="
-          mapM_ print specifications
+          mapM_ (print . pretty) specifications
           --
           -- case runTM (checkProg syntax) of
           --   Right () -> do

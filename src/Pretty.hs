@@ -12,7 +12,7 @@ import Prelude hiding (Ordering(..))
 
 import Syntax.Abstract (Expr(..), Lit(..), Op(..))
 import Syntax.Lasagne
-import GCL.PreCond (Obligation(..))
+import GCL.PreCond (Obligation(..), Specification(..))
 
 
 --------------------------------------------------------------------------------
@@ -132,10 +132,15 @@ instance Pretty Op where
   pretty Div = "/"
 
 --------------------------------------------------------------------------------
--- | Obligation
+-- | Obligation & Specification
 
 instance Pretty Obligation where
   pretty (Obligation i p q) = lbracket <> pretty i <> rbracket <+> line <>
+    indent 2 (pretty p) <> line <>
+    indent 2 (pretty q) <> line
+
+instance Pretty Specification where
+  pretty (Specification i hardness p q _) = lbracket <> pretty i <> rbracket <+> pretty (show hardness) <> line <>
     indent 2 (pretty p) <> line <>
     indent 2 (pretty q) <> line
 

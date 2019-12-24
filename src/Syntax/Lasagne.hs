@@ -47,6 +47,16 @@ precond :: Program -> Pred
 precond (Pure p) = p
 precond (Free (Sauce p _ _)) = p
 
+skipToNext :: Program -> Maybe Program
+skipToNext (Pure _) = Nothing
+skipToNext (Free (Sauce _ _ (Skip next))) = Just next
+skipToNext (Free (Sauce _ _ (Abort next))) = Just next
+skipToNext (Free (Sauce _ _ (Assign _ _ next))) = Just next
+skipToNext (Free (Sauce _ _ (Assert _ next))) = Just next
+skipToNext (Free (Sauce _ _ (Do _ _ _ next))) = Just next
+skipToNext (Free (Sauce _ _ (If _ _ next))) = Just next
+skipToNext (Free (Sauce _ _ (Spec next))) = Just next
+
 -- calculate the precondition with a different postcondition
 recalculatePrecond :: Program -> Pred -> Pred
 recalculatePrecond (Pure _) post = post

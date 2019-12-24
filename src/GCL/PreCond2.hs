@@ -8,11 +8,11 @@ import Control.Monad.Free
 import Control.Monad.State hiding (guard)
 import Control.Monad.Writer hiding (guard)
 import Data.Loc
-import GHC.Generics
+-- import GHC.Generics
 
 import Syntax.Abstract hiding (Stmt(..), GdCmd(..), Program(..), getGuards)
 import Syntax.Lasagne
-import GCL.PreCond (Obligation(..))
+import GCL.PreCond (Obligation(..), Specification(..), Hardness(..))
 
 --------------------------------------------------------------------------------
 -- | Proof Obligation
@@ -35,6 +35,9 @@ type POM = WriterT [Obligation] (State Int)
 
 runPOM :: POM a -> [Obligation]
 runPOM p = snd $ evalState (runWriterT p) 0
+
+getPOs :: Program -> [Obligation]
+getPOs = runPOM . sweepPOs
 
 -- generates proof obligations
 sweepPOs :: Program -> POM ()
@@ -95,34 +98,56 @@ sweepPOs (Free (Sauce post _ stmt)) = case stmt of
 
   Spec xs -> sweepPOs xs
 
--- --------------------------------------------------------------------------------
--- -- | Specifications
---
--- data Specification = Specification
---   { specID       :: Int
---   , specHardness :: Hardness
---   , specPreCond  :: Pred
---   , specPostCond :: Pred
---   , specLoc      :: Loc
---   } deriving (Show, Generic)
--- data Hardness = Hard | Soft deriving (Show, Generic)
---
--- -- marks a proof specification
--- markSpec :: Hardness -> Pred -> Pred -> Loc -> SpecM ()
--- markSpec harsness p q loc = do
---   i <- get
---   put (succ i)
---   tell [Specification i harsness p q loc]
---
--- type SpecM = WriterT [Specification] (State Int)
---
--- runSpecM :: SpecM a -> (a, [Specification])
--- runSpecM p = evalState (runWriterT p) 0
---
--- -- generates specifications
--- sweepSpecs :: Program -> POM ()
--- sweepSpecs (Pure _) = return ()
--- sweepSpecs (Free (Sauce post _ stmt)) = case stmt of
---   Skip xs -> sweepPOs xs
---   Abort xs -> sweepPOs xs
---   Assign _ _ xs -> sweepPOs xs
+--------------------------------------------------------------------------------
+-- | Specifications
+
+type SpecM = WriterT [Specification]
+  (State
+    (Int,         -- Spec IDs
+    Maybe Pred))  -- previous assertion
+
+-- marks a proof specification
+markSpec :: Hardness -> Pred -> Pred -> Loc -> SpecM ()
+markSpec harsness p q loc = do
+  (i, e) <- get
+  put (succ i, e)
+  tell [Specification i harsness p q loc]
+
+runSpecM :: SpecM a -> [Specification]
+runSpecM p = snd $ evalState (runWriterT p) (0, Nothing)
+
+getSpecs :: Program -> [Specification]
+getSpecs = runSpecM . sweepSpecs
+
+-- generates specifications
+sweepSpecs :: Program -> SpecM ()
+sweepSpecs program = do
+
+  case program of
+    -- remember the current assertion
+    Free (Sauce _ _ (Assert asserted _)) -> do
+      -- replace the previous assertion with the current one
+      (i, _) <- get
+      put (i, Just asserted)
+
+    -- see if the previous statement is an assertion
+    Free (Sauce _ loc (Spec next)) -> do
+      (i, previous) <- get
+
+      case previous of
+        -- SOFT, the previous statement is not an assertion
+        Nothing -> markSpec Soft (precond next) (precond next) loc
+        -- HARD, the previous statement is an assertion
+        Just asserted -> markSpec Hard asserted (precond next) loc
+
+      put (i, Nothing)
+
+    -- erase the previous remembered assertion if there's any
+    _ -> do
+      (i, _) <- get
+      put (i, Nothing)
+
+  -- keep sweeping down
+  case skipToNext program of
+    Nothing -> return ()
+    Just next -> sweepSpecs next
