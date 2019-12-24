@@ -2,20 +2,18 @@
 
 module Main where
 
-import GCL.PreCond
-import GCL.Type
 import REPL
 
-import Syntax.Abstract (Program(..))
-import GCL.PreCond2
 import Error
+import GCL.PreCond2
 
+import Control.Monad (when)
+import Data.Text.Prettyprint.Doc
 import qualified Data.Text.Lazy.IO as Text
 import Prelude
+import Pretty ()
 import System.Console.GetOpt
 import System.Environment
-import Data.Text.Prettyprint.Doc
-import Pretty ()
 
 main :: IO ()
 main = do
@@ -28,125 +26,82 @@ main = do
 
       raw <- Text.readFile filepath
 
-      putStrLn "=== raw ==="
-      Text.putStrLn raw
-
-      putStrLn "\n=== tokens ==="
-      print $ scan "<test>" raw
-
-      putStrLn "\n=== AST ==="
-
       let parse = do
-            scan filepath raw
-              >>= parseProgram filepath
-              >>= abstract
-              -- >>= makeLasagne
-            -- syntax <- parseProgram filepath tokens
-            --  <- abstract syntax
+            tokens <- scan filepath raw
+            syntax <- parseProgram filepath tokens
+            program <- abstract syntax
+            lasagna <- makeLasagne program
+            typeCheck program
+            (obligations, specifications) <- sweep program
+            return (tokens, program, lasagna, obligations, specifications)
 
       case parse of
-        Right (Program _ Nothing) -> putStrLn "<empty>"
-        Right syntax@(Program _ (Just (statements, postcondition))) -> do
+        Right (tokens, program, lasagna, obligations, specifications) -> do
 
-          case makeLasagne syntax of
-            Right program -> do
+          putStrLn "=== raw ==="
+          Text.putStrLn raw
 
-              putStrLn "\n=== program ==="
-              print $ pretty program
+          putStrLn "\n=== tokens ==="
+          print tokens
 
-              putStrLn "\n=== proof obligations (Lasagne) ==="
-              mapM_ (print . pretty) (getPOs program)
+          putStrLn "\n=== AST ==="
+          print program
 
-              putStrLn "\n=== specifications ==="
-              mapM_ (print . pretty) (getSpecs program)
-            Left errors -> print errors
+          putStrLn "\n=== Lasagne ==="
+          print $ pretty lasagna
 
-
-          let ((_, obligations), specifications) = runM $ precondStmts statements postcondition
+          putStrLn "\n=== proof obligations (Lasagne) ==="
+          mapM_ (print . pretty) (getPOs lasagna)
 
           putStrLn "\n=== proof obligations ==="
           mapM_ (print . pretty) obligations
 
+          putStrLn "\n=== specifications (Lasagne) ==="
+          mapM_ (print . pretty) (getSpecs lasagna)
+
           putStrLn "\n=== specifications ==="
           mapM_ (print . pretty) specifications
-          --
-          -- case runTM (checkProg syntax) of
-          --   Right () -> do
-          --     let ((_, obligations), specifications) = runM $ precondStmts statements postcondition
-          --
-          --     putStrLn "\n=== proof obligations ==="
-          --     mapM_ print obligations
-          --
-          --     putStrLn "\n=== specifications ==="
-          --     mapM_ print specifications
-          --
-          --   Left err -> do
-          --     putStrLn "\n=== type error ==="
-          --     print err
 
         Left errors -> print errors
-      -- case parse of
-      --   Right (Program _ Nothing) -> putStrLn "<empty>"
-      --   Right prog@(Program _ (Just (statements, postcondition))) -> do
-      --
-      --     putStrLn "\n=== statements ==="
-      --     mapM_ print statements
-      --
-      --     case runTM (checkProg prog) of
-      --       Right () -> do
-      --         let ((_, obligations), specifications) = runM $ precondStmts statements postcondition
-      --
-      --         putStrLn "\n=== proof obligations ==="
-      --         mapM_ print obligations
-      --
-      --         putStrLn "\n=== specifications ==="
-      --         mapM_ print specifications
-      --
-      --       Left err -> do
-      --         putStrLn "\n=== type error ==="
-      --         print err
-      --
-      --   Left errors -> print errors
 
   where
     loop :: IO ()
     loop = do
       request <- recv
       case request of
-        Just (Load filepath) -> do
-          raw <- Text.readFile filepath
-
-          let parse = do
-                tokens <- scan filepath raw
-                syntax <- parseProgram filepath tokens
-                program <- abstract syntax
-                case program of
-                  Program _ Nothing -> return $ OK [] []
-                  prog@(Program _ (Just (statements, postcondition))) ->
-                    case runTM (checkProg prog) of
-                      Right () -> do
-                       let ((_, obligations), specifications) = runM $  precondStmts statements postcondition
-                       return $ OK obligations specifications
-                      Left terr -> Left [TypeError terr]
-
-          case parse of
-            Left errors -> send $ Error $ map fromGlobalError errors
-            Right response -> send response
-
-          loop
-        Just (Refine i payload) -> do
-
-          let parse = scan "<spec>" payload >>= parseSpec >>= abstract
-          case parse of
-            Left errors -> send $ Error $ map (fromLocalError i) errors
-            Right _ -> send $ Resolve i
-
-
-          loop
-
-        Just Quit -> return ()
+        Just req -> do
+          keepGoing <- handleRequest req
+          when keepGoing loop
         Nothing -> return ()
 
+handleRequest :: Request -> IO Bool
+handleRequest (Load filepath) = do
+  raw <- Text.readFile filepath
+
+  let parse = do
+        tokens <- scan filepath raw
+        syntax <- parseProgram filepath tokens
+        program <- abstract syntax
+        typeCheck program
+        sweep program
+
+  case parse of
+    Left errors -> send $ Error $ map fromGlobalError errors
+    Right (obligations, specifications) -> send $ OK obligations specifications
+
+  return True
+
+handleRequest (Refine i payload) = do
+
+  let parse = scan "<spec>" payload >>= parseSpec >>= abstract
+  case parse of
+    Left errors -> send $ Error $ map (fromLocalError i) errors
+    Right _ -> send $ Resolve i
+
+  return True
+
+handleRequest Quit = do
+  return False
 
 --------------------------------------------------------------------------------
 -- | Command-line arguments
