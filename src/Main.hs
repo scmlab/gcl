@@ -31,15 +31,15 @@ main = do
             syntax <- parseProgram filepath tokens
             program <- abstract syntax
             lasagna <- makeLasagne program
-            typeCheck program
+            -- typeCheck program
             (obligations, specifications) <- sweep program
             return (tokens, program, lasagna, obligations, specifications)
 
       case parse of
         Right (tokens, program, lasagna, obligations, specifications) -> do
 
-          putStrLn "=== raw ==="
-          Text.putStrLn raw
+          -- putStrLn "=== raw ==="
+          -- Text.putStrLn raw
 
           putStrLn "\n=== tokens ==="
           print tokens
@@ -47,20 +47,20 @@ main = do
           putStrLn "\n=== AST ==="
           print program
 
-          putStrLn "\n=== Lasagne ==="
-          print $ pretty lasagna
-
-          putStrLn "\n=== proof obligations (Lasagne) ==="
-          mapM_ (print . pretty) (getPOs lasagna)
-
-          putStrLn "\n=== proof obligations ==="
-          mapM_ (print . pretty) obligations
-
-          putStrLn "\n=== specifications (Lasagne) ==="
-          mapM_ (print . pretty) (getSpecs lasagna)
-
-          putStrLn "\n=== specifications ==="
-          mapM_ (print . pretty) specifications
+          -- putStrLn "\n=== Lasagne ==="
+          -- print $ pretty lasagna
+          --
+          -- putStrLn "\n=== proof obligations (Lasagne) ==="
+          -- mapM_ (print . pretty) (getPOs lasagna)
+          --
+          -- putStrLn "\n=== proof obligations ==="
+          -- mapM_ (print . pretty) obligations
+          --
+          -- putStrLn "\n=== specifications (Lasagne) ==="
+          -- mapM_ (print . pretty) (getSpecs lasagna)
+          --
+          -- putStrLn "\n=== specifications ==="
+          -- mapM_ (print . pretty) specifications
 
         Left errors -> print errors
 

@@ -2,6 +2,7 @@ module Syntax.Concrete where
 
 import Data.Loc
 import Data.Text.Lazy (Text)
+import Prelude hiding (Ordering(..))
 
 data Program = Program [Declaration] [Stmt] Loc
   deriving (Show)
@@ -52,7 +53,11 @@ data GdCmd = GdCmd Expr [Stmt] Loc deriving (Show)
 --------------------------------------------------------------------------------
 -- | Expressions
 
+data Fixity = Infix Int | InfixR Int | InfixL Int | Prefix Int | Postfix Int
+  deriving (Show, Eq)
+
 data Op = EQ Loc | LTE Loc | GTE Loc | LT Loc | GT Loc
+        | Implies Loc | Conj Loc | Disj Loc | Neg Loc
   deriving (Show)
 
 data Lit  = Num Int
@@ -67,11 +72,38 @@ data Expr = Lit   Lit       Loc
           | Hole            Loc
           deriving Show
 
+instance Located Op where
+  locOf (EQ l)  = l
+  locOf (LTE l)  = l
+  locOf (GTE l)  = l
+  locOf (LT l)  = l
+  locOf (GT l)  = l
+  locOf (Implies l) = l
+  locOf (Conj l)    = l
+  locOf (Disj l)    = l
+  locOf (Neg l)       = l
+
 instance Located Expr where
   locOf (Lit _ l)   = l
   locOf (Op _ l)    = l
   locOf (App _ _ l) = l
   locOf (Hole l)    = l
+
+
+classify :: Op -> Fixity
+classify (Implies _ ) = InfixR 1
+classify (Disj _) = InfixL 2
+classify (Conj _) = InfixL 3
+classify (Neg _) = Prefix 4
+classify (EQ _) = Infix 5
+classify (LTE _) = Infix 5
+classify (GTE _) = Infix 5
+classify (LT _) = Infix 5
+classify (GT _) = Infix 5
+-- classify Mul = InfixL 1
+-- classify Div = InfixL 1
+-- classify Add = InfixL 2
+-- classify Sub = InfixL 2
 
 --------------------------------------------------------------------------------
 -- | Variables and stuff

@@ -18,6 +18,7 @@ import GHC.Generics (Generic)
 import Prelude hiding (Ordering(..))
 -- import Data.Text.Prettyprint.Doc
 
+import Syntax.Concrete (Fixity(..))
 import qualified Syntax.Concrete as C
 import Type ()
 
@@ -118,6 +119,21 @@ data Op = EQ | LTE | GTE | LT | GT   -- binary relations
         | Add | Sub | Mul | Div     -- arithmetics
      deriving (Show, Eq, Generic)
 
+
+classify :: Op -> Fixity
+classify Implies = InfixR 1
+classify Disj = InfixL 2
+classify Conj = InfixL 3
+classify Neg = Prefix 4
+classify EQ = Infix 5
+classify LTE = Infix 5
+classify GTE = Infix 5
+classify LT = Infix 5
+classify GT = Infix 5
+classify Mul = InfixL 1
+classify Div = InfixL 1
+classify Add = InfixL 2
+classify Sub = InfixL 2
 
 -- convenient constructors
 
@@ -229,6 +245,10 @@ instance FromConcrete C.Op Op where
   fromConcrete (C.GTE _) = pure GTE
   fromConcrete (C.LT  _) = pure LT
   fromConcrete (C.GT  _) = pure GT
+  fromConcrete (C.Implies _) = pure Implies
+  fromConcrete (C.Conj  _) = pure Conj
+  fromConcrete (C.Disj  _) = pure Disj
+  fromConcrete (C.Neg   _) = pure Neg
 
 -- instance FromConcrete C.Pred Expr where
 --   fromConcrete (C.Term p r q  _) = App      <$> (App <$> fromConcrete r

@@ -16,15 +16,13 @@ import Data.Foldable (fold)
 import Text.Megaparsec hiding (Pos, State, ParseError, parse)
 import qualified Text.Megaparsec as Mega
 
-import Syntax.Concrete
+import Syntax.Concrete hiding (Fixity(..))
 import Syntax.Parser.Lexer
 -- import Syntax.Parser.Util hiding (withLoc)
 import Syntax.Parser.Util (PosLog, extract)
 import qualified Syntax.Parser.Util as Util
 
 import Prelude hiding (Ordering(..))
-
-
 
 --------------------------------------------------------------------------------
 -- | States for source location bookkeeping
@@ -175,57 +173,85 @@ spec = withLocStmt $ do
 
 predicate :: Parser Expr
 predicate = expression <?> "predicate"
---
--- predicate :: Parser Expr
--- predicate = makeExprParser predTerm table <?> "predicate"
---   where
---     table :: [[Operator Parser Expr]]
---     table = [ [ Prefix negation ]
---             , [ InfixL conjunction ]
---             , [ InfixL disjunction ]
---             , [ InfixR implication ]
---             ]
---
---
--- negation :: Parser (Expr -> Expr)
--- negation = do
---   ((), start) <- Util.getLoc $ do
---     symbol TokNeg
---   return $ \result -> Neg result (start <--> result)
---
--- conjunction :: Parser (Expr -> Expr -> Expr)
--- conjunction = do
---   symbol TokConj
---   return $ \x y -> Conj x y (x <--> y)
---
--- disjunction :: Parser (Expr -> Expr -> Expr)
--- disjunction = do
---   symbol TokDisj
---   return $ \x y -> Disj x y (x <--> y)
---
--- implication :: Parser (Expr -> Expr -> Expr)
--- implication = do
---   symbol TokImpl
---   return $ \x y -> Implies x y (x <--> y)
---
---
--- predTerm :: Parser Expr
--- predTerm =  parens predicate
---         <|> (withLoc $ choice
---               [ HoleP <$  symbol TokQM
---               , Lit True <$ symbol TokTrue
---               , Lit False <$ symbol TokFalse
---               , Term <$> expression <*> operator <*> expression
---               ])
---
--- operator :: Parser Op
--- operator = withLoc (choice
---   [ EQ  <$ symbol TokEQ
---   , LTE <$ symbol TokLTE
---   , GTE <$ symbol TokGTE
---   , LT  <$ symbol TokLT
---   , GT  <$ symbol TokGT
---   ]) <?> "binary relation"
+
+predicate' :: Parser Expr
+predicate' = makeExprParser term table <?> "predicate"
+  where
+    table :: [[Operator Parser Expr]]
+    table = [ [ Prefix application ]
+            , [ InfixN compareEQ ]
+            , [ Prefix negation ]
+            , [ InfixL conjunction ]
+            , [ InfixL disjunction ]
+            , [ InfixR implication ]
+            ]
+
+    application :: Parser (Expr -> Expr)
+    application = do
+      -- next <- optional term
+      -- case next of
+      --   Nothing -> return id
+      --   Just f  -> return (\x -> App f x (f <--> x))
+
+      choice
+        [
+          do
+            f <- term
+            return (\x -> App f x (f <--> x))
+        ,
+          return $ \x -> x
+        ]
+
+    negation :: Parser (Expr -> Expr)
+    negation = do
+      -- ((), start) <- Util.getLoc $ do
+      --   symbol TokNeg
+
+      op <- withLoc (Neg <$ symbol TokNeg)
+      return $ \result -> App (Op op (locOf op)) result (op <--> result)
+
+    conjunction :: Parser (Expr -> Expr -> Expr)
+    conjunction = do
+      op <- withLoc (Conj <$ symbol TokConj)
+      return $ \x y -> App (App (Op op (locOf op)) x (x <--> op)) y (x <--> y)
+
+    disjunction :: Parser (Expr -> Expr -> Expr)
+    disjunction = do
+      op <- withLoc (Disj <$ symbol TokDisj)
+      return $ \x y -> App (App (Op op (locOf op)) x (x <--> op)) y (x <--> y)
+
+    implication :: Parser (Expr -> Expr -> Expr)
+    implication = do
+      op <- withLoc (Implies <$ symbol TokImpl)
+      return $ \x y -> App (App (Op op (locOf op)) x (x <--> op)) y (x <--> y)
+
+    compareEQ :: Parser (Expr -> Expr -> Expr)
+    compareEQ = do
+      op <- withLoc (EQ <$ symbol TokEQ)
+      return $ \x y -> App (App (Op op (locOf op)) x (x <--> op)) y (x <--> y)
+
+    --
+    -- predTerm :: Parser Expr
+    -- predTerm =  parens predicate
+    --         <|> (withLoc $ choice
+    --               [ HoleP <$  symbol TokQM
+    --               , Lit True <$ symbol TokTrue
+    --               , Lit False <$ symbol TokFalse
+    --               , Term <$> expression <*> operator <*> expression
+    --               ])
+
+operator :: Parser Op
+operator = withLoc (choice
+  [ EQ  <$ symbol TokEQ
+  , LTE <$ symbol TokLTE
+  , GTE <$ symbol TokGTE
+  , LT  <$ symbol TokLT
+  , GT  <$ symbol TokGT
+
+  , Conj <$ symbol TokConj
+  ]) <?> "operators"
+
+
 
 --------------------------------------------------------------------------------
 -- | Expressions
@@ -234,22 +260,37 @@ expressionList :: Parser [Expr]
 expressionList = sepBy1 expression (symbol TokComma) <?> "a list of expressions separated by commas"
 
 expression :: Parser Expr
-expression = foldAp <$> expr <*> many expr <?> "expression"
+expression = predicate'
+  --   choice
+  -- [ foldAp' <?> "expression"
+  -- , foldAp <$> expr <*> many expr <?> "expression"
+  -- ]
+
   where
-    foldAp :: Expr -> [Expr] -> Expr
-    foldAp f [] = f
-    foldAp f (x:xs) =
-      foldAp (App f x (locOf f <--> locOf x)) xs
+    -- foldAp :: Expr -> [Expr] -> Expr
+    -- foldAp f [] = f
+    -- foldAp f (x:xs) = foldAp (App f x (locOf f <--> locOf x)) xs
+    --
+    -- foldAp' :: Parser Expr
+    -- foldAp' = do
+    --   h <- expr
+    --   case h of
+    --     Op op _ -> return ()
+    --     others  -> return ()
+
+
+
 
     expr :: Parser Expr
     expr = parens expression <|> term
 
-    term :: Parser Expr
-    term = withLoc (choice
-      [ Var    <$> lower
-      , Const  <$> upper
-      , Lit    <$> literal
-      ]) <?> "term"
+term :: Parser Expr
+term = withLoc (choice
+  [ Var    <$> lower
+  , Const  <$> upper
+  , Lit    <$> literal
+  , Op     <$> operator
+  ]) <?> "term"
 
 literal :: Parser Lit
 literal = choice
