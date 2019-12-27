@@ -115,7 +115,7 @@ data Expr = Var    Var
 
 data Op = EQ | LTE | GTE | LT | GT   -- binary relations
         | Implies | Conj | Disj | Neg  -- logic operators
-        | Plus | Minus | Mul | Div     -- arithmetics
+        | Add | Sub | Mul | Div     -- arithmetics
      deriving (Show, Eq, Generic)
 
 

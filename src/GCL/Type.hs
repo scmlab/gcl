@@ -166,8 +166,8 @@ opTypes GTE = TInt `TFun` (TInt `TFun` TBool)
 opTypes LT  = TInt `TFun` (TInt `TFun` TBool)
 opTypes GT  = TInt `TFun` (TInt `TFun` TBool)
 
-opTypes Plus  = TInt `TFun` (TInt `TFun` TInt)
-opTypes Minus = TInt `TFun` (TInt `TFun` TInt)
+opTypes Add  = TInt `TFun` (TInt `TFun` TInt)
+opTypes Sub = TInt `TFun` (TInt `TFun` TInt)
 opTypes Mul   = TInt `TFun` (TInt `TFun` TInt)
 opTypes Div   = TInt `TFun` (TInt `TFun` TInt)
 

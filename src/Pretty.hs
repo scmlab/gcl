@@ -48,8 +48,8 @@ classify LT = Infix 5
 classify GT = Infix 5
 classify Mul = InfixL 1
 classify Div = InfixL 1
-classify Plus = InfixL 2
-classify Minus = InfixL 2
+classify Add = InfixL 2
+classify Sub = InfixL 2
 
 parensIf :: Int -> Int -> Doc ann -> Doc ann
 parensIf n m
@@ -126,8 +126,8 @@ instance Pretty Op where
   pretty Conj = "→"
   pretty Disj = "⋀"
   pretty Neg = "¬"
-  pretty Plus = "+"
-  pretty Minus = "-"
+  pretty Add = "+"
+  pretty Sub = "-"
   pretty Mul = "*"
   pretty Div = "/"
 
