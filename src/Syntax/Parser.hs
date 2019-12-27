@@ -71,8 +71,8 @@ parseProgram = parse program
 parseSpec :: TokStream -> Either [SyntacticError] [Stmt]
 parseSpec = parse specContent "<specification>"
 
--- parsePred :: Text -> Either [Error] Pred
--- parsePred = parse predicate "<predicate>"
+-- parseExpr :: Text -> Either [Error] Expr
+-- parseExpr = parse predicate "<predicate>"
 
 -- parseStmt :: Text -> Either [Error] Stmt
 -- parseStmt = parse statement "<statement>"
@@ -152,7 +152,7 @@ guardedCommand = withLocStmt $
         <*> some statement
 
 hole :: Parser Stmt
-hole = withLocStmt $ Hole <$ (symbol TokQM <?> "?")
+hole = withLocStmt $ SpecQM <$ (symbol TokQM <?> "?")
 
 spec :: Parser Stmt
 spec = withLocStmt $ do
@@ -173,56 +173,59 @@ spec = withLocStmt $ do
 --------------------------------------------------------------------------------
 -- | Predicates
 
-predicate :: Parser Pred
-predicate = makeExprParser predTerm table <?> "predicate"
-  where
-    table :: [[Operator Parser Pred]]
-    table = [ [ Prefix negation ]
-            , [ InfixL conjunction ]
-            , [ InfixL disjunction ]
-            , [ InfixR implication ]
-            ]
-
-
-negation :: Parser (Pred -> Pred)
-negation = do
-  ((), start) <- Util.getLoc $ do
-    symbol TokNeg
-  return $ \result -> Neg result (start <--> result)
-
-conjunction :: Parser (Pred -> Pred -> Pred)
-conjunction = do
-  symbol TokConj
-  return $ \x y -> Conj x y (x <--> y)
-
-disjunction :: Parser (Pred -> Pred -> Pred)
-disjunction = do
-  symbol TokDisj
-  return $ \x y -> Disj x y (x <--> y)
-
-implication :: Parser (Pred -> Pred -> Pred)
-implication = do
-  symbol TokImpl
-  return $ \x y -> Implies x y (x <--> y)
-
-
-predTerm :: Parser Pred
-predTerm =  parens predicate
-        <|> (withLoc $ choice
-              [ HoleP <$  symbol TokQM
-              , Lit True <$ symbol TokTrue
-              , Lit False <$ symbol TokFalse
-              , Term <$> expression <*> binaryRelation <*> expression
-              ])
-
-binaryRelation :: Parser BinRel
-binaryRelation = withLoc (choice
-  [ EQ  <$ symbol TokEQ
-  , LTE <$ symbol TokLTE
-  , GTE <$ symbol TokGTE
-  , LT  <$ symbol TokLT
-  , GT  <$ symbol TokGT
-  ]) <?> "binary relation"
+predicate :: Parser Expr
+predicate = expression <?> "predicate"
+--
+-- predicate :: Parser Expr
+-- predicate = makeExprParser predTerm table <?> "predicate"
+--   where
+--     table :: [[Operator Parser Expr]]
+--     table = [ [ Prefix negation ]
+--             , [ InfixL conjunction ]
+--             , [ InfixL disjunction ]
+--             , [ InfixR implication ]
+--             ]
+--
+--
+-- negation :: Parser (Expr -> Expr)
+-- negation = do
+--   ((), start) <- Util.getLoc $ do
+--     symbol TokNeg
+--   return $ \result -> Neg result (start <--> result)
+--
+-- conjunction :: Parser (Expr -> Expr -> Expr)
+-- conjunction = do
+--   symbol TokConj
+--   return $ \x y -> Conj x y (x <--> y)
+--
+-- disjunction :: Parser (Expr -> Expr -> Expr)
+-- disjunction = do
+--   symbol TokDisj
+--   return $ \x y -> Disj x y (x <--> y)
+--
+-- implication :: Parser (Expr -> Expr -> Expr)
+-- implication = do
+--   symbol TokImpl
+--   return $ \x y -> Implies x y (x <--> y)
+--
+--
+-- predTerm :: Parser Expr
+-- predTerm =  parens predicate
+--         <|> (withLoc $ choice
+--               [ HoleP <$  symbol TokQM
+--               , Lit True <$ symbol TokTrue
+--               , Lit False <$ symbol TokFalse
+--               , Term <$> expression <*> operator <*> expression
+--               ])
+--
+-- operator :: Parser Op
+-- operator = withLoc (choice
+--   [ EQ  <$ symbol TokEQ
+--   , LTE <$ symbol TokLTE
+--   , GTE <$ symbol TokGTE
+--   , LT  <$ symbol TokLT
+--   , GT  <$ symbol TokGT
+--   ]) <?> "binary relation"
 
 --------------------------------------------------------------------------------
 -- | Expressions
@@ -236,21 +239,17 @@ expression = foldAp <$> expr <*> many expr <?> "expression"
     foldAp :: Expr -> [Expr] -> Expr
     foldAp f [] = f
     foldAp f (x:xs) =
-      foldAp (ApE f x (locOf f <--> locOf x)) xs
+      foldAp (App f x (locOf f <--> locOf x)) xs
 
     expr :: Parser Expr
     expr = parens expression <|> term
 
     term :: Parser Expr
     term = withLoc (choice
-      [ VarE    <$> variable
-      , ConstE  <$> constant
-      , LitE    <$> literal
-      , HoleE   <$  symbol TokQM
+      [ Var    <$> lower
+      , Const  <$> upper
+      , Lit    <$> literal
       ]) <?> "term"
-  -- where
-  --   op :: Parser Expr
-    -- op = withLoc (VarE <$> variable) <?> "operator"
 
 literal :: Parser Lit
 literal = choice
@@ -290,23 +289,23 @@ variableDecl = withLoc $ do
 --------------------------------------------------------------------------------
 -- | Variables and stuff
 
-constant :: Parser Const
-constant = withLoc (Const <$> upperName) <?> "constant"
+-- constant :: Parser Expr
+-- constant = withLoc (Const <$> upper) <?> "constant"
 
 -- separated by commas
-constList :: Parser [Const]
+constList :: Parser [Upper]
 constList =
-  (sepBy1 constant (symbol TokComma <?> "comma")
+  (sepBy1 upper (symbol TokComma <?> "comma")
     <?> "a list of constants separated by commas")
       <*  ignoreNewlines
 
-variable :: Parser Var
-variable = withLoc (Var <$> lowerName) <?> "variable"
+-- variable :: Parser Expr
+-- variable = withLoc (Var <$> lower) <?> "variable"
 
 -- separated by commas
-variableList :: Parser [Var]
+variableList :: Parser [Lower]
 variableList =
-    (sepBy1 variable (symbol TokComma <?> "comma")
+    (sepBy1 lower (symbol TokComma <?> "comma")
       <?> "a list of variables separated by commas")
         <*  ignoreNewlines
 
@@ -358,11 +357,17 @@ upperName = extract p
     p (TokUpperName s) = Just s
     p _ = Nothing
 
+upper :: Parser Upper
+upper = withLoc (Upper <$> upperName) <?> "identifier that starts with a uppercase letter"
+
 lowerName :: Parser Text
 lowerName = extract p
   where
     p (TokLowerName s) = Just s
     p _ = Nothing
+
+lower :: Parser Lower
+lower = withLoc (Lower <$> lowerName) <?> "identifier that starts with a lowercase letter"
 
 integer :: Parser Int
 integer = extract p <?> "integer"
