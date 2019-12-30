@@ -171,14 +171,33 @@ spec = withLocStmt $ do
 --------------------------------------------------------------------------------
 -- | Predicates
 
+
+
+--------------------------------------------------------------------------------
+-- | Expressions
+
+expressionList :: Parser [Expr]
+expressionList = sepBy1 expression (symbol TokComma) <?> "a list of expressions separated by commas"
+
+-- operator :: Parser Op
+-- operator = withLoc (choice
+--   [ EQ  <$ symbol TokEQ
+--   , LTE <$ symbol TokLTE
+--   , GTE <$ symbol TokGTE
+--   , LT  <$ symbol TokLT
+--   , GT  <$ symbol TokGT
+--
+--   , Conj <$ symbol TokConj
+--   ]) <?> "operators"
+
 predicate :: Parser Expr
 predicate = expression <?> "predicate"
 
-predicate' :: Parser Expr
-predicate' = makeExprParser term table <?> "predicate"
+expression :: Parser Expr
+expression = makeExprParser termButOp table <?> "expression"
   where
     table :: [[Operator Parser Expr]]
-    table = [ [ Prefix application ]
+    table = [ [ Postfix application ]
             , [ InfixN compareEQ ]
             , [ Prefix negation ]
             , [ InfixL conjunction ]
@@ -187,26 +206,14 @@ predicate' = makeExprParser term table <?> "predicate"
             ]
 
     application :: Parser (Expr -> Expr)
-    application = do
-      -- next <- optional term
-      -- case next of
-      --   Nothing -> return id
-      --   Just f  -> return (\x -> App f x (f <--> x))
-
-      choice
-        [
-          do
-            f <- term
-            return (\x -> App f x (f <--> x))
-        ,
-          return $ \x -> x
-        ]
+    application =  do
+      terms <- many termButOp
+      return $ \func -> do
+        let app inner t = App inner t (func <--> t)
+        foldl app func terms
 
     negation :: Parser (Expr -> Expr)
     negation = do
-      -- ((), start) <- Util.getLoc $ do
-      --   symbol TokNeg
-
       op <- withLoc (Neg <$ symbol TokNeg)
       return $ \result -> App (Op op (locOf op)) result (op <--> result)
 
@@ -230,67 +237,20 @@ predicate' = makeExprParser term table <?> "predicate"
       op <- withLoc (EQ <$ symbol TokEQ)
       return $ \x y -> App (App (Op op (locOf op)) x (x <--> op)) y (x <--> y)
 
-    --
-    -- predTerm :: Parser Expr
-    -- predTerm =  parens predicate
-    --         <|> (withLoc $ choice
-    --               [ HoleP <$  symbol TokQM
-    --               , Lit True <$ symbol TokTrue
-    --               , Lit False <$ symbol TokFalse
-    --               , Term <$> expression <*> operator <*> expression
-    --               ])
+-- term :: Parser Expr
+-- term = parens expression <|> withLoc (choice
+--   [ Var    <$> lower
+--   , Const  <$> upper
+--   , Lit    <$> literal
+--   , Op     <$> operator
+--   ]) <?> "term"
 
-operator :: Parser Op
-operator = withLoc (choice
-  [ EQ  <$ symbol TokEQ
-  , LTE <$ symbol TokLTE
-  , GTE <$ symbol TokGTE
-  , LT  <$ symbol TokLT
-  , GT  <$ symbol TokGT
-
-  , Conj <$ symbol TokConj
-  ]) <?> "operators"
-
-
-
---------------------------------------------------------------------------------
--- | Expressions
-
-expressionList :: Parser [Expr]
-expressionList = sepBy1 expression (symbol TokComma) <?> "a list of expressions separated by commas"
-
-expression :: Parser Expr
-expression = predicate'
-  --   choice
-  -- [ foldAp' <?> "expression"
-  -- , foldAp <$> expr <*> many expr <?> "expression"
-  -- ]
-
-  where
-    -- foldAp :: Expr -> [Expr] -> Expr
-    -- foldAp f [] = f
-    -- foldAp f (x:xs) = foldAp (App f x (locOf f <--> locOf x)) xs
-    --
-    -- foldAp' :: Parser Expr
-    -- foldAp' = do
-    --   h <- expr
-    --   case h of
-    --     Op op _ -> return ()
-    --     others  -> return ()
-
-
-
-
-    expr :: Parser Expr
-    expr = parens expression <|> term
-
-term :: Parser Expr
-term = withLoc (choice
+termButOp :: Parser Expr
+termButOp = parens expression <|> withLoc (choice
   [ Var    <$> lower
   , Const  <$> upper
   , Lit    <$> literal
-  , Op     <$> operator
-  ]) <?> "term"
+  ]) <?> "term (excluding operators)"
 
 literal :: Parser Lit
 literal = choice
