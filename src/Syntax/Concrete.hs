@@ -27,28 +27,20 @@ data Stmt
 data GdCmd = GdCmd Expr [Stmt] Loc deriving (Show)
 
 --------------------------------------------------------------------------------
--- | Predicates
+-- | Types
 
--- data BinRel = EQ Loc | LTE Loc | GTE Loc | LT Loc | GT Loc
---   deriving Show
+data Type = TInt Loc | TBool Loc
+          | TArray Type Loc
+          | TFunc Type Type Loc
+          | TVar Int Loc
+          deriving (Show)
 
--- data Pred = Term    Expr BinRel Expr  Loc
---           | Implies Pred Pred         Loc
---           | Conj    Pred Pred         Loc
---           | Disj    Pred Pred         Loc
---           | Neg     Pred              Loc
---           | Lit     Bool              Loc
---           | HoleP                     Loc
-          -- deriving (Show)
-
--- instance Located Pred where
---   locOf (Term _ _ _ l)  = l
---   locOf (Implies _ _ l) = l
---   locOf (Conj _ _ l)    = l
---   locOf (Disj _ _ l)    = l
---   locOf (Neg _ l)       = l
---   locOf (Lit _ l)       = l
---   locOf (HoleP l)       = l
+instance Located Type where
+  locOf (TInt loc) = loc
+  locOf (TBool loc) = loc
+  locOf (TArray _ loc) = loc
+  locOf (TFunc _ _ loc) = loc
+  locOf (TVar _ loc) = loc
 
 --------------------------------------------------------------------------------
 -- | Expressions
@@ -116,9 +108,6 @@ classify (Sub _) = InfixL 2
 
 --------------------------------------------------------------------------------
 -- | Variables and stuff
-
-data Type = Type Text Loc
-  deriving (Show)
 
 data Upper = Upper Text Loc
   deriving (Show)

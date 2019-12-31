@@ -192,7 +192,7 @@ type Const = Text
 type Var = Text
 type TVar = Int
 data Type = TInt | TBool | TArray Type
-          | TFun Type Type
+          | TFunc Type Type
           | TVar TVar
       deriving (Show, Eq, Generic)
 
@@ -230,9 +230,11 @@ instance FromConcrete C.Lower Var where
   fromConcrete (C.Lower x _) = pure x
 
 instance FromConcrete C.Type Type where
-  fromConcrete (C.Type "Int" _) = return TInt
-  fromConcrete (C.Type "Bool" _) = return TBool
-  fromConcrete (C.Type _ _) = return TBool
+  fromConcrete (C.TInt _) = return TInt
+  fromConcrete (C.TBool _) = return TBool
+  fromConcrete (C.TArray s _) = TArray <$> fromConcrete s
+  fromConcrete (C.TFunc s t _) = TFunc <$> fromConcrete s <*> fromConcrete t
+  fromConcrete (C.TVar i _) = return $ TVar i
 
 instance FromConcrete C.Expr Expr where
   fromConcrete (C.Var x    _) = Var   <$> fromConcrete x

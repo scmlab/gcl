@@ -69,12 +69,6 @@ parseProgram = parse program
 parseSpec :: TokStream -> Either [SyntacticError] [Stmt]
 parseSpec = parse specContent "<specification>"
 
--- parseExpr :: Text -> Either [Error] Expr
--- parseExpr = parse predicate "<predicate>"
-
--- parseStmt :: Text -> Either [Error] Stmt
--- parseStmt = parse statement "<statement>"
-
 program :: Parser Program
 program = withLoc $ do
   ignoreNewlines
@@ -146,7 +140,7 @@ guardedCommands = sepBy1 guardedCommand (symbol TokGuardBar <?> "|")
 guardedCommand :: Parser GdCmd
 guardedCommand = withLocStmt $
   GdCmd <$> predicate
-        <*  (symbol TokGuardArr <?> "->")
+        <*  (symbol TokArrow <?> "->")
         <*> some statement
 
 hole :: Parser Stmt
@@ -183,7 +177,7 @@ predicate :: Parser Expr
 predicate = expression <?> "predicate"
 
 expression :: Parser Expr
-expression = makeExprParser termButOp table <?> "expression"
+expression = makeExprParser term table <?> "expression"
   where
     table :: [[Operator Parser Expr]]
     table = [ [ Postfix application ]
@@ -208,7 +202,7 @@ expression = makeExprParser termButOp table <?> "expression"
 
     application :: Parser (Expr -> Expr)
     application =  do
-      terms <- many termButOp
+      terms <- many term
       return $ \func -> do
         let app inner t = App inner t (func <--> t)
         foldl app func terms
@@ -223,19 +217,53 @@ expression = makeExprParser termButOp table <?> "expression"
       op <- withLoc (operator <$ symbol tok)
       return $ \x y -> App (App (Op op (locOf op)) x (x <--> op)) y (x <--> y)
 
-termButOp :: Parser Expr
-termButOp = parens expression <|> withLoc (choice
-  [ Var    <$> lower
-  , Const  <$> upper
-  , Lit    <$> literal
-  ]) <?> "term (excluding operators)"
+    term :: Parser Expr
+    term = parens expression <|> withLoc (choice
+      [ Var    <$> lower
+      , Const  <$> upper
+      , Lit    <$> literal
+      ]) <?> "term"
 
-literal :: Parser Lit
-literal = choice
-  [ Bol True  <$  symbol TokTrue
-  , Bol False <$  symbol TokFalse
-  , Num       <$> integer
-  ] <?> "literal"
+    literal :: Parser Lit
+    literal = choice
+      [ Bol True  <$  symbol TokTrue
+      , Bol False <$  symbol TokFalse
+      , Num       <$> integer
+      ] <?> "literal"
+
+--------------------------------------------------------------------------------
+-- | Type
+
+-- type' :: Parser Type
+-- type' = withLoc (Type <$> upperName) <?> "type"
+
+type' :: Parser Type
+type' = makeExprParser term table <?> "type"
+  where
+    table :: [[Operator Parser Type]]
+    table = [ [ InfixR function ]
+            ]
+
+    function :: Parser (Type -> Type -> Type)
+    function = do
+      symbol TokArrow <?> "->"
+      return $ \x y -> TFunc x y (x <--> y)
+
+    term :: Parser Type
+    term = parens type' <|> literal <?> "type term"
+
+    literal :: Parser Type
+    literal = withLoc (extract isInt <|> extract isBool) <?> "type literal"
+      where
+        isInt (TokUpperName "Int") = Just TInt
+        isInt _ = Nothing
+
+        isBool (TokUpperName "Bool") = Just TBool
+        isBool _ = Nothing
+
+    -- array :: Parser Type
+    -- array = do
+    --
 
 
 --------------------------------------------------------------------------------
@@ -287,9 +315,6 @@ variableList =
     (sepBy1 lower (symbol TokComma <?> "comma")
       <?> "a list of variables separated by commas")
         <*  ignoreNewlines
-
-type' :: Parser Type
-type' = withLoc (Type <$> upperName) <?> "type"
 
 --------------------------------------------------------------------------------
 -- | Combinators

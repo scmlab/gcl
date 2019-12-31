@@ -50,9 +50,9 @@ inferE _ _   (Op op) = return (opTypes op)
 inferE l cxt (App e1 e2) = do
   t <- inferE l cxt e1
   case t of
-     TFun t1 t2 -> do t1' <- inferE l cxt e2
-                      _   <- unify l t1 t1'
-                      substTM t2
+     TFunc t1 t2 -> do t1' <- inferE l cxt e2
+                       _   <- unify l t1 t1'
+                       substTM t2
      _ -> throwError (NotFunction t l)
 inferE _ _ (Hole _ _) = TVar <$> freshTVar
 
@@ -109,8 +109,8 @@ substT :: SubstT -> Type -> Type
 substT _ TInt  = TInt
 substT _ TBool = TBool
 substT theta (TArray t)   = TArray (substT theta t)
-substT theta (TFun t1 t2) =
-  TFun (substT theta t1) (substT theta t2)
+substT theta (TFunc t1 t2) =
+  TFunc (substT theta t1) (substT theta t2)
 substT theta (TVar x) =
   case lookup x theta of
     Just t  -> t
@@ -120,7 +120,7 @@ occursT :: TVar -> Type -> Bool
 occursT _ TInt  = False
 occursT _ TBool = False
 occursT x (TArray t) = occursT x t
-occursT x (TFun t1 t2) = occursT x t1 || occursT x t2
+occursT x (TFunc t1 t2) = occursT x t1 || occursT x t2
 occursT x (TVar y) = x == y
 
 -- unification
@@ -128,10 +128,10 @@ occursT x (TVar y) = x == y
 unify :: Loc -> Type -> Type -> M Type
 unify _ TInt TInt = return TInt
 unify _ TBool TBool = return TBool
-unify l (TFun t1 t2) (TFun t3 t4) = do
+unify l (TFunc t1 t2) (TFunc t3 t4) = do
     t1' <- unify l t1 t3
     t2' <- unify l t2 t4
-    return (TFun t1' t2')
+    return (TFunc t1' t2')
 unify l (TVar x) t = do
   t' <- substTM t
   if occursT x t' then throwError (RecursiveType x t' l)
@@ -160,22 +160,22 @@ freshTVar = do
 -- types of built-in operators
 
 opTypes :: Op -> Type
-opTypes EQ  = TInt `TFun` (TInt `TFun` TBool)
-opTypes NEQ = TInt `TFun` (TInt `TFun` TBool)
-opTypes LTE = TInt `TFun` (TInt `TFun` TBool)
-opTypes GTE = TInt `TFun` (TInt `TFun` TBool)
-opTypes LT  = TInt `TFun` (TInt `TFun` TBool)
-opTypes GT  = TInt `TFun` (TInt `TFun` TBool)
+opTypes EQ  = TInt `TFunc` (TInt `TFunc` TBool)
+opTypes NEQ = TInt `TFunc` (TInt `TFunc` TBool)
+opTypes LTE = TInt `TFunc` (TInt `TFunc` TBool)
+opTypes GTE = TInt `TFunc` (TInt `TFunc` TBool)
+opTypes LT  = TInt `TFunc` (TInt `TFunc` TBool)
+opTypes GT  = TInt `TFunc` (TInt `TFunc` TBool)
 
-opTypes Add  = TInt `TFun` (TInt `TFun` TInt)
-opTypes Sub = TInt `TFun` (TInt `TFun` TInt)
-opTypes Mul   = TInt `TFun` (TInt `TFun` TInt)
-opTypes Div   = TInt `TFun` (TInt `TFun` TInt)
+opTypes Add  = TInt `TFunc` (TInt `TFunc` TInt)
+opTypes Sub = TInt `TFunc` (TInt `TFunc` TInt)
+opTypes Mul   = TInt `TFunc` (TInt `TFunc` TInt)
+opTypes Div   = TInt `TFunc` (TInt `TFunc` TInt)
 
-opTypes Implies = TBool `TFun` (TBool `TFun` TBool)
-opTypes Conj    = TBool `TFun` (TBool `TFun` TBool)
-opTypes Disj    = TBool `TFun` (TBool `TFun` TBool)
-opTypes Neg     = TBool `TFun` TBool
+opTypes Implies = TBool `TFunc` (TBool `TFunc` TBool)
+opTypes Conj    = TBool `TFunc` (TBool `TFunc` TBool)
+opTypes Disj    = TBool `TFunc` (TBool `TFunc` TBool)
+opTypes Neg     = TBool `TFunc` TBool
 
 --
 

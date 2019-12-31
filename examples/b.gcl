@@ -1,5 +1,6 @@
 con A, B : Int
-var x : Int
+var x, y : Int
+var max : Int -> Int -> Int
 
 { False }
 
@@ -7,15 +8,4 @@ if A >= B -> x := A
  | A <  B -> x := B
 fi
 
-{!
-
-!}
-
-{ gcd x y = gcd X Y && x > 0 && y > 0, bnd : x + y }
-do x > y -> x := x - y
- | x < y -> y := y - x
-od
-
-
-
-{ x >= A && x >= B }
+{ max x y >= A && max x y >= B }

@@ -39,7 +39,7 @@ data Tok
     | TokCon
 
     | TokGuardBar
-    | TokGuardArr
+    | TokArrow
 
     -- delimiters
     | TokComma
@@ -97,7 +97,7 @@ instance Show Tok where
     TokVar -> "var"
     TokCon -> "con"
     TokGuardBar -> "|"
-    TokGuardArr -> "->"
+    TokArrow -> "->"
     TokComma -> ","
     TokSemi -> ":"
     TokAssign -> ":="
@@ -159,7 +159,7 @@ tokRE
   <|> TokVar        <$ text "var"
 
   <|> TokGuardBar   <$ text "|"
-  <|> TokGuardArr   <$ text "->"
+  <|> TokArrow   <$ text "->"
 
   -- delimiters
   <|> TokComma        <$ text ","
