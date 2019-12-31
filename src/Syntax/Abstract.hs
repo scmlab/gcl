@@ -253,6 +253,10 @@ instance FromConcrete C.Op Op where
   fromConcrete (C.Conj  _) = pure Conj
   fromConcrete (C.Disj  _) = pure Disj
   fromConcrete (C.Neg   _) = pure Neg
+  fromConcrete (C.Add   _) = pure Add
+  fromConcrete (C.Sub   _) = pure Sub
+  fromConcrete (C.Mul   _) = pure Mul
+  fromConcrete (C.Div   _) = pure Div
 
 -- instance FromConcrete C.Pred Expr where
 --   fromConcrete (C.Term p r q  _) = App      <$> (App <$> fromConcrete r

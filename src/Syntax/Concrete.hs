@@ -58,7 +58,8 @@ data Fixity = Infix Int | InfixR Int | InfixL Int | Prefix Int | Postfix Int
 
 data Op = EQ Loc | NEQ Loc | LTE Loc | GTE Loc | LT Loc | GT Loc
         | Implies Loc | Conj Loc | Disj Loc | Neg Loc
-  deriving (Show)
+        | Add Loc | Sub Loc | Mul Loc | Div Loc
+        deriving (Show)
 
 data Lit  = Num Int
           | Bol Bool
@@ -73,16 +74,20 @@ data Expr = Lit   Lit       Loc
           deriving Show
 
 instance Located Op where
-  locOf (EQ l)  = l
-  locOf (NEQ l)  = l
-  locOf (LTE l)  = l
-  locOf (GTE l)  = l
-  locOf (LT l)  = l
-  locOf (GT l)  = l
+  locOf (EQ l)      = l
+  locOf (NEQ l)     = l
+  locOf (LTE l)     = l
+  locOf (GTE l)     = l
+  locOf (LT l)      = l
+  locOf (GT l)      = l
   locOf (Implies l) = l
   locOf (Conj l)    = l
   locOf (Disj l)    = l
-  locOf (Neg l)       = l
+  locOf (Neg l)     = l
+  locOf (Add l)     = l
+  locOf (Sub l)     = l
+  locOf (Mul l)     = l
+  locOf (Div l)     = l
 
 instance Located Expr where
   locOf (Var _ l)   = l
@@ -104,10 +109,10 @@ classify (LTE _) = Infix 5
 classify (GTE _) = Infix 5
 classify (LT _) = Infix 5
 classify (GT _) = Infix 5
--- classify Mul = InfixL 1
--- classify Div = InfixL 1
--- classify Add = InfixL 2
--- classify Sub = InfixL 2
+classify (Mul _) = InfixL 1
+classify (Div _) = InfixL 1
+classify (Add _) = InfixL 2
+classify (Sub _) = InfixL 2
 
 --------------------------------------------------------------------------------
 -- | Variables and stuff
