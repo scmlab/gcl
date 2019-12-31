@@ -198,11 +198,16 @@ expression = makeExprParser termButOp table <?> "expression"
   where
     table :: [[Operator Parser Expr]]
     table = [ [ Postfix application ]
-            , [ InfixN compareEQ ]
-            , [ Prefix negation ]
-            , [ InfixL conjunction ]
-            , [ InfixL disjunction ]
-            , [ InfixR implication ]
+            , [ InfixN $ binary EQ  TokEQ
+              , InfixN $ binary LT  TokLT
+              , InfixN $ binary LTE TokLTE
+              , InfixN $ binary GT  TokGT
+              , InfixN $ binary GTE TokGTE
+              ]
+            , [ Prefix $ unary  Neg  TokNeg ]
+            , [ InfixL $ binary Conj TokConj ]
+            , [ InfixL $ binary Disj TokDisj ]
+            , [ InfixR $ binary Implies TokImpl ]
             ]
 
     application :: Parser (Expr -> Expr)
@@ -212,38 +217,15 @@ expression = makeExprParser termButOp table <?> "expression"
         let app inner t = App inner t (func <--> t)
         foldl app func terms
 
-    negation :: Parser (Expr -> Expr)
-    negation = do
-      op <- withLoc (Neg <$ symbol TokNeg)
+    unary :: (Loc -> Op) -> Tok -> Parser (Expr -> Expr)
+    unary operator tok = do
+      op <- withLoc (operator <$ symbol tok)
       return $ \result -> App (Op op (locOf op)) result (op <--> result)
 
-    conjunction :: Parser (Expr -> Expr -> Expr)
-    conjunction = do
-      op <- withLoc (Conj <$ symbol TokConj)
+    binary :: (Loc -> Op) -> Tok -> Parser (Expr -> Expr -> Expr)
+    binary operator tok = do
+      op <- withLoc (operator <$ symbol tok)
       return $ \x y -> App (App (Op op (locOf op)) x (x <--> op)) y (x <--> y)
-
-    disjunction :: Parser (Expr -> Expr -> Expr)
-    disjunction = do
-      op <- withLoc (Disj <$ symbol TokDisj)
-      return $ \x y -> App (App (Op op (locOf op)) x (x <--> op)) y (x <--> y)
-
-    implication :: Parser (Expr -> Expr -> Expr)
-    implication = do
-      op <- withLoc (Implies <$ symbol TokImpl)
-      return $ \x y -> App (App (Op op (locOf op)) x (x <--> op)) y (x <--> y)
-
-    compareEQ :: Parser (Expr -> Expr -> Expr)
-    compareEQ = do
-      op <- withLoc (EQ <$ symbol TokEQ)
-      return $ \x y -> App (App (Op op (locOf op)) x (x <--> op)) y (x <--> y)
-
--- term :: Parser Expr
--- term = parens expression <|> withLoc (choice
---   [ Var    <$> lower
---   , Const  <$> upper
---   , Lit    <$> literal
---   , Op     <$> operator
---   ]) <?> "term"
 
 termButOp :: Parser Expr
 termButOp = parens expression <|> withLoc (choice
