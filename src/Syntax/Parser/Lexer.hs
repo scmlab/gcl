@@ -118,7 +118,7 @@ instance Show Tok where
     TokBraceStart -> "{"
     TokBraceEnd -> "}"
     TokEQ -> "="
-    TokNEQ -> "!="
+    TokNEQ -> "/="
     TokGT -> ">"
     TokGTE -> ">="
     TokLT -> "<"
@@ -190,7 +190,7 @@ tokRE
 
   -- literals
   <|> TokEQ           <$ text "="
-  <|> TokNEQ          <$ text "!="
+  <|> TokNEQ          <$ text "/="
   <|> TokGT           <$ text ">"
   <|> TokGTE          <$ text ">="
   <|> TokLT           <$ text "<"
