@@ -179,17 +179,6 @@ spec = withLocStmt $ do
 expressionList :: Parser [Expr]
 expressionList = sepBy1 expression (symbol TokComma) <?> "a list of expressions separated by commas"
 
--- operator :: Parser Op
--- operator = withLoc (choice
---   [ EQ  <$ symbol TokEQ
---   , LTE <$ symbol TokLTE
---   , GTE <$ symbol TokGTE
---   , LT  <$ symbol TokLT
---   , GT  <$ symbol TokGT
---
---   , Conj <$ symbol TokConj
---   ]) <?> "operators"
-
 predicate :: Parser Expr
 predicate = expression <?> "predicate"
 
@@ -199,6 +188,7 @@ expression = makeExprParser termButOp table <?> "expression"
     table :: [[Operator Parser Expr]]
     table = [ [ Postfix application ]
             , [ InfixN $ binary EQ  TokEQ
+              , InfixN $ binary NEQ TokNEQ
               , InfixN $ binary LT  TokLT
               , InfixN $ binary LTE TokLTE
               , InfixN $ binary GT  TokGT

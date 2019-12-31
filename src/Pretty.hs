@@ -107,6 +107,7 @@ instance Pretty Lit where
 
 instance Pretty Op where
   pretty EQ = "="
+  pretty NEQ = "≠"
   pretty LTE = "≤"
   pretty GTE = "≥"
   pretty LT = "<"

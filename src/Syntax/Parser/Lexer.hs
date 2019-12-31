@@ -56,6 +56,7 @@ data Tok
 
     -- operators
     | TokEQ
+    | TokNEQ
     | TokGT
     | TokGTE
     | TokLT
@@ -107,6 +108,7 @@ instance Show Tok where
     TokBraceStart -> "{"
     TokBraceEnd -> "}"
     TokEQ -> "="
+    TokNEQ -> "!="
     TokGT -> ">"
     TokGTE -> ">="
     TokLT -> "<"
@@ -172,6 +174,7 @@ tokRE
 
   -- literals
   <|> TokEQ           <$ text "="
+  <|> TokNEQ          <$ text "!="
   <|> TokGT           <$ text ">"
   <|> TokGTE          <$ text ">="
   <|> TokLT           <$ text "<"

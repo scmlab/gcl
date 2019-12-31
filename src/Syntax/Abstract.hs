@@ -114,7 +114,7 @@ data Expr = Var    Var
           | Hole   Index  [Subst]
           deriving (Show, Eq, Generic)
 
-data Op = EQ | LTE | GTE | LT | GT   -- binary relations
+data Op = EQ | NEQ | LTE | GTE | LT | GT   -- binary relations
         | Implies | Conj | Disj | Neg  -- logic operators
         | Add | Sub | Mul | Div     -- arithmetics
      deriving (Show, Eq, Generic)
@@ -126,6 +126,7 @@ classify Disj = InfixL 2
 classify Conj = InfixL 3
 classify Neg = Prefix 4
 classify EQ = Infix 5
+classify NEQ = Infix 5
 classify LTE = Infix 5
 classify GTE = Infix 5
 classify LT = Infix 5
@@ -243,6 +244,7 @@ instance FromConcrete C.Expr Expr where
 
 instance FromConcrete C.Op Op where
   fromConcrete (C.EQ  _) = pure EQ
+  fromConcrete (C.NEQ  _) = pure NEQ
   fromConcrete (C.LTE _) = pure LTE
   fromConcrete (C.GTE _) = pure GTE
   fromConcrete (C.LT  _) = pure LT

@@ -1,7 +1,7 @@
 con A, B : Int
 var x : Int
 
-{ False }
+{ False && A != B }
 
 if A >= B -> x := A
  | A <  B -> x := B

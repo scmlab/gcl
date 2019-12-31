@@ -56,7 +56,7 @@ data GdCmd = GdCmd Expr [Stmt] Loc deriving (Show)
 data Fixity = Infix Int | InfixR Int | InfixL Int | Prefix Int | Postfix Int
   deriving (Show, Eq)
 
-data Op = EQ Loc | LTE Loc | GTE Loc | LT Loc | GT Loc
+data Op = EQ Loc | NEQ Loc | LTE Loc | GTE Loc | LT Loc | GT Loc
         | Implies Loc | Conj Loc | Disj Loc | Neg Loc
   deriving (Show)
 
@@ -74,6 +74,7 @@ data Expr = Lit   Lit       Loc
 
 instance Located Op where
   locOf (EQ l)  = l
+  locOf (NEQ l)  = l
   locOf (LTE l)  = l
   locOf (GTE l)  = l
   locOf (LT l)  = l
@@ -84,6 +85,8 @@ instance Located Op where
   locOf (Neg l)       = l
 
 instance Located Expr where
+  locOf (Var _ l)   = l
+  locOf (Const _ l)   = l
   locOf (Lit _ l)   = l
   locOf (Op _ l)    = l
   locOf (App _ _ l) = l
@@ -96,6 +99,7 @@ classify (Disj _) = InfixL 2
 classify (Conj _) = InfixL 3
 classify (Neg _) = Prefix 4
 classify (EQ _) = Infix 5
+classify (NEQ _) = Infix 5
 classify (LTE _) = Infix 5
 classify (GTE _) = Infix 5
 classify (LT _) = Infix 5

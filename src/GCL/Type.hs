@@ -161,6 +161,7 @@ freshTVar = do
 
 opTypes :: Op -> Type
 opTypes EQ  = TInt `TFun` (TInt `TFun` TBool)
+opTypes NEQ = TInt `TFun` (TInt `TFun` TBool)
 opTypes LTE = TInt `TFun` (TInt `TFun` TBool)
 opTypes GTE = TInt `TFun` (TInt `TFun` TBool)
 opTypes LT  = TInt `TFun` (TInt `TFun` TBool)
