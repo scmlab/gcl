@@ -38,8 +38,8 @@ main = do
       case parse of
         Right (tokens, program, lasagna, obligations, specifications) -> do
 
-          putStrLn "=== raw ==="
-          Text.putStrLn raw
+          -- putStrLn "=== raw ==="
+          -- Text.putStrLn raw
 
           putStrLn "\n=== tokens ==="
           print tokens

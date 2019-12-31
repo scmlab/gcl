@@ -18,6 +18,7 @@ import GHC.Generics (Generic)
 import Prelude hiding (Ordering(..))
 -- import Data.Text.Prettyprint.Doc
 
+import Syntax.Concrete (Fixity(..))
 import qualified Syntax.Concrete as C
 import Type ()
 
@@ -115,9 +116,24 @@ data Expr = Var    Var
 
 data Op = EQ | LTE | GTE | LT | GT   -- binary relations
         | Implies | Conj | Disj | Neg  -- logic operators
-        | Plus | Minus | Mul | Div     -- arithmetics
+        | Add | Sub | Mul | Div     -- arithmetics
      deriving (Show, Eq, Generic)
 
+
+classify :: Op -> Fixity
+classify Implies = InfixR 1
+classify Disj = InfixL 2
+classify Conj = InfixL 3
+classify Neg = Prefix 4
+classify EQ = Infix 5
+classify LTE = Infix 5
+classify GTE = Infix 5
+classify LT = Infix 5
+classify GT = Infix 5
+classify Mul = InfixL 1
+classify Div = InfixL 1
+classify Add = InfixL 2
+classify Sub = InfixL 2
 
 -- convenient constructors
 
@@ -206,11 +222,11 @@ instance FromConcrete C.Lit Lit where
   fromConcrete (C.Num x) = Num <$> pure x
   fromConcrete (C.Bol x) = Bol <$> pure x
 
-instance FromConcrete C.Const Const where
-  fromConcrete (C.Const x _) = pure x
+instance FromConcrete C.Upper Const where
+  fromConcrete (C.Upper x _) = pure x
 
-instance FromConcrete C.Var Var where
-  fromConcrete (C.Var x _) = pure x
+instance FromConcrete C.Lower Var where
+  fromConcrete (C.Lower x _) = pure x
 
 instance FromConcrete C.Type Type where
   fromConcrete (C.Type "Int" _) = return TInt
@@ -218,36 +234,41 @@ instance FromConcrete C.Type Type where
   fromConcrete (C.Type _ _) = return TBool
 
 instance FromConcrete C.Expr Expr where
-  fromConcrete (C.VarE x    _) = Var   <$> fromConcrete x
-  fromConcrete (C.ConstE x  _) = Const <$> fromConcrete x
-  fromConcrete (C.LitE x    _) = Lit   <$> fromConcrete x
-  fromConcrete (C.ApE x y   _) = App   <$> fromConcrete x <*> fromConcrete y
-  fromConcrete (C.HoleE     _) = Hole  <$> index <*> pure []
+  fromConcrete (C.Var x    _) = Var   <$> fromConcrete x
+  fromConcrete (C.Const x  _) = Const <$> fromConcrete x
+  fromConcrete (C.Lit x    _) = Lit   <$> fromConcrete x
+  fromConcrete (C.App x y  _) = App   <$> fromConcrete x <*> fromConcrete y
+  fromConcrete (C.Op  x    _) = Op    <$> fromConcrete x
+  fromConcrete (C.Hole     _) = Hole  <$> index <*> pure []
 
-instance FromConcrete C.BinRel Expr where
-  fromConcrete (C.EQ  _) = pure (Op EQ)
-  fromConcrete (C.LTE _) = pure (Op LTE)
-  fromConcrete (C.GTE _) = pure (Op GTE)
-  fromConcrete (C.LT  _) = pure (Op LT)
-  fromConcrete (C.GT  _) = pure (Op GT)
+instance FromConcrete C.Op Op where
+  fromConcrete (C.EQ  _) = pure EQ
+  fromConcrete (C.LTE _) = pure LTE
+  fromConcrete (C.GTE _) = pure GTE
+  fromConcrete (C.LT  _) = pure LT
+  fromConcrete (C.GT  _) = pure GT
+  fromConcrete (C.Implies _) = pure Implies
+  fromConcrete (C.Conj  _) = pure Conj
+  fromConcrete (C.Disj  _) = pure Disj
+  fromConcrete (C.Neg   _) = pure Neg
 
-instance FromConcrete C.Pred Expr where
-  fromConcrete (C.Term p r q  _) = App      <$> (App <$> fromConcrete r
-                                                     <*> fromConcrete p)
-                                            <*> fromConcrete q
-  fromConcrete (C.Implies p q _) = App      <$> (App <$> pure (Op Implies)
-                                                     <*> fromConcrete p)
-                                            <*> fromConcrete q
-  fromConcrete (C.Conj p q    _) = App      <$> (App <$> pure (Op Conj)
-                                                     <*> fromConcrete p)
-                                            <*> fromConcrete q
-  fromConcrete (C.Disj p q    _) = App      <$> (App <$> pure (Op Disj)
-                                                     <*> fromConcrete p)
-                                            <*> fromConcrete q
-  fromConcrete (C.Neg p       _) = App      <$> pure (Op Neg)
-                                            <*> fromConcrete p
-  fromConcrete (C.Lit p       _) = Lit      <$> pure (Bol p)
-  fromConcrete (C.HoleP       _) = Hole     <$> index <*> pure []
+-- instance FromConcrete C.Pred Expr where
+--   fromConcrete (C.Term p r q  _) = App      <$> (App <$> fromConcrete r
+--                                                      <*> fromConcrete p)
+--                                             <*> fromConcrete q
+--   fromConcrete (C.Implies p q _) = App      <$> (App <$> pure (Op Implies)
+--                                                      <*> fromConcrete p)
+--                                             <*> fromConcrete q
+--   fromConcrete (C.Conj p q    _) = App      <$> (App <$> pure (Op Conj)
+--                                                      <*> fromConcrete p)
+--                                             <*> fromConcrete q
+--   fromConcrete (C.Disj p q    _) = App      <$> (App <$> pure (Op Disj)
+--                                                      <*> fromConcrete p)
+--                                             <*> fromConcrete q
+--   fromConcrete (C.Neg p       _) = App      <$> pure (Op Neg)
+--                                             <*> fromConcrete p
+--   fromConcrete (C.Lit p       _) = Lit      <$> pure (Bol p)
+--   fromConcrete (C.HoleP       _) = Hole     <$> index <*> pure []
 
 instance FromConcrete C.Stmt Stmt where
   fromConcrete (C.Assert p   loc) = Assert  <$> fromConcrete p <*> pure loc
@@ -264,7 +285,7 @@ instance FromConcrete C.Stmt Stmt where
   fromConcrete (C.AssertWithBnd _ _ _) = throwError $ Panic "AssertWithBnd"
   fromConcrete (C.Do     _ _) = throwError $ Panic "Do"
   -- Holes and specs
-  fromConcrete (C.Hole loc) = throwError $ DigHole loc
+  fromConcrete (C.SpecQM loc) = throwError $ DigHole loc
   fromConcrete (C.Spec loc) = Spec <$> pure loc
 
 -- deals with missing Assertions and Bounds

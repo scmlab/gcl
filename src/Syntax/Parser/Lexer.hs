@@ -52,7 +52,9 @@ data Tok
     | TokBraceStart
     | TokBraceEnd
 
-    -- literals
+    -- expression
+
+    -- operators
     | TokEQ
     | TokGT
     | TokGTE
@@ -64,6 +66,10 @@ data Tok
     | TokDisj
     | TokNeg
 
+    | TokAdd
+    | TokSub
+    | TokMul
+    | TokDiv
 
     | TokUpperName Text
     | TokLowerName Text
@@ -109,6 +115,10 @@ instance Show Tok where
     TokConj -> "&&"
     TokDisj -> "||"
     TokNeg -> "^"
+    TokAdd -> "+"
+    TokSub -> "-"
+    TokMul -> "*"
+    TokDiv -> "/"
     TokUpperName s -> Text.unpack s
     TokLowerName s -> Text.unpack s
     TokInt i -> show i
@@ -170,6 +180,11 @@ tokRE
   <|> TokConj         <$ text "&&"
   <|> TokDisj         <$ text "||"
   <|> TokNeg          <$ text "^"
+
+  <|> TokAdd          <$ text "+"
+  <|> TokSub          <$ text "-"
+  <|> TokMul          <$ text "*"
+  <|> TokDiv          <$ text "/"
 
   <|> TokTrue         <$ text "True"
   <|> TokFalse        <$ text "False"

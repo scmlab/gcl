@@ -11,7 +11,7 @@ fi
 
 !}
 
-{ gcd ((x (f y)) z y) z = (gcd X) Y && x > 0 && y > 0, bnd : plus x y }
+{ gcd (x (f y) z yt) z = (gcd X) Y && x > 0 && y > 0, bnd : plus x y }
 do x > y -> x := minus x y
  | x < y -> y := minus y x
 od

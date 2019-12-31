@@ -10,10 +10,10 @@ import Control.Monad ((>=>))
 import Control.Monad.Free
 import Prelude hiding (Ordering(..))
 
-import Syntax.Abstract (Expr(..), Lit(..), Op(..))
+import Syntax.Abstract (Expr(..), Lit(..), Op(..), classify)
+import Syntax.Concrete (Fixity(..))
 import Syntax.Lasagne
 import GCL.PreCond (Obligation(..), Specification(..))
-
 
 --------------------------------------------------------------------------------
 -- | Expr
@@ -32,24 +32,6 @@ instance Monad VarArg where
   return = Complete
   Complete x >>= f = f x
   Expect   g >>= f = Expect (g >=> f)
-
-data Fixity = Infix Int | InfixR Int | InfixL Int | Prefix Int | Postfix Int
-  deriving (Show, Eq)
-
-classify :: Op -> Fixity
-classify Implies = InfixR 1
-classify Disj = InfixL 2
-classify Conj = InfixL 3
-classify Neg = Prefix 4
-classify EQ = Infix 5
-classify LTE = Infix 5
-classify GTE = Infix 5
-classify LT = Infix 5
-classify GT = Infix 5
-classify Mul = InfixL 1
-classify Div = InfixL 1
-classify Plus = InfixL 2
-classify Minus = InfixL 2
 
 parensIf :: Int -> Int -> Doc ann -> Doc ann
 parensIf n m
@@ -133,8 +115,8 @@ instance Pretty Op where
   pretty Conj = "→"
   pretty Disj = "⋀"
   pretty Neg = "¬"
-  pretty Plus = "+"
-  pretty Minus = "-"
+  pretty Add = "+"
+  pretty Sub = "-"
   pretty Mul = "*"
   pretty Div = "/"
 
