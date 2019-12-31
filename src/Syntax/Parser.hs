@@ -234,9 +234,6 @@ expression = makeExprParser term table <?> "expression"
 --------------------------------------------------------------------------------
 -- | Type
 
--- type' :: Parser Type
--- type' = withLoc (Type <$> upperName) <?> "type"
-
 type' :: Parser Type
 type' = makeExprParser term table <?> "type"
   where
@@ -250,7 +247,7 @@ type' = makeExprParser term table <?> "type"
       return $ \x y -> TFunc x y (x <--> y)
 
     term :: Parser Type
-    term = parens type' <|> literal <?> "type term"
+    term = parens type' <|> array <|> literal <?> "type term"
 
     literal :: Parser Type
     literal = withLoc (extract isInt <|> extract isBool) <?> "type literal"
@@ -261,10 +258,26 @@ type' = makeExprParser term table <?> "type"
         isBool (TokUpperName "Bool") = Just TBool
         isBool _ = Nothing
 
-    -- array :: Parser Type
-    -- array = do
-    --
+    array :: Parser Type
+    array = withLoc $ do
+      symbol TokArray
+      i <- interval
+      symbol TokOf
+      t <- type'
+      return $ TArray i t
 
+    interval :: Parser Interval
+    interval = withLoc $ do
+      start <- choice [ Excluding <$ symbol TokParenStart
+                      , Including <$ symbol TokBracketStart
+                      ]
+      i <- expression
+      symbol TokRange
+      j <- expression
+      end <- choice [ Excluding <$ symbol TokParenEnd
+                    , Including <$ symbol TokBracketEnd
+                    ]
+      return $ Interval (start i) (end j)
 
 --------------------------------------------------------------------------------
 -- | Declarations

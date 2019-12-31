@@ -232,7 +232,7 @@ instance FromConcrete C.Lower Var where
 instance FromConcrete C.Type Type where
   fromConcrete (C.TInt _) = return TInt
   fromConcrete (C.TBool _) = return TBool
-  fromConcrete (C.TArray s _) = TArray <$> fromConcrete s
+  fromConcrete (C.TArray _ s _) = TArray <$> fromConcrete s
   fromConcrete (C.TFunc s t _) = TFunc <$> fromConcrete s <*> fromConcrete t
   fromConcrete (C.TVar i _) = return $ TVar i
 

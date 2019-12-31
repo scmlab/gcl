@@ -1,6 +1,7 @@
 con A, B : Int
 var x, y : Int
 var max : Int -> Int -> Int
+con C : array (0 .. N] of Int
 
 { False }
 

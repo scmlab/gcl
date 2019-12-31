@@ -37,6 +37,9 @@ data Tok
 
     | TokVar
     | TokCon
+    | TokArray
+    | TokOf
+    | TokRange
 
     | TokGuardBar
     | TokArrow
@@ -49,6 +52,8 @@ data Tok
     | TokSpecEnd
     | TokParenStart
     | TokParenEnd
+    | TokBracketStart
+    | TokBracketEnd
     | TokBraceStart
     | TokBraceEnd
 
@@ -96,6 +101,9 @@ instance Show Tok where
     TokQM -> "?"
     TokVar -> "var"
     TokCon -> "con"
+    TokArray -> "array"
+    TokOf -> "of"
+    TokRange -> ".."
     TokGuardBar -> "|"
     TokArrow -> "->"
     TokComma -> ","
@@ -105,6 +113,8 @@ instance Show Tok where
     TokSpecEnd -> "!}"
     TokParenStart -> "("
     TokParenEnd -> ")"
+    TokBracketStart -> "["
+    TokBracketEnd -> "]"
     TokBraceStart -> "{"
     TokBraceEnd -> "}"
     TokEQ -> "="
@@ -157,9 +167,13 @@ tokRE
 
   <|> TokCon        <$ text "con"
   <|> TokVar        <$ text "var"
+  <|> TokArray      <$ text "array"
+  <|> TokOf         <$ text "of"
+  <|> TokRange      <$ text ".."
 
   <|> TokGuardBar   <$ text "|"
-  <|> TokArrow   <$ text "->"
+  <|> TokArrow      <$ text "->"
+
 
   -- delimiters
   <|> TokComma        <$ text ","
@@ -169,6 +183,8 @@ tokRE
   <|> TokSpecEnd      <$ text "!}"
   <|> TokParenStart   <$ text "("
   <|> TokParenEnd     <$ text ")"
+  <|> TokBracketStart <$ text "["
+  <|> TokBracketEnd   <$ text "]"
   <|> TokBraceStart   <$ text "{"
   <|> TokBraceEnd     <$ text "}"
 

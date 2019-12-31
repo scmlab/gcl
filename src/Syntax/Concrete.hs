@@ -29,8 +29,11 @@ data GdCmd = GdCmd Expr [Stmt] Loc deriving (Show)
 --------------------------------------------------------------------------------
 -- | Types
 
+data Endpoint = Including Expr | Excluding Expr deriving (Show)
+data Interval = Interval Endpoint Endpoint Loc deriving (Show)
+
 data Type = TInt Loc | TBool Loc
-          | TArray Type Loc
+          | TArray Interval Type Loc
           | TFunc Type Type Loc
           | TVar Int Loc
           deriving (Show)
@@ -38,7 +41,7 @@ data Type = TInt Loc | TBool Loc
 instance Located Type where
   locOf (TInt loc) = loc
   locOf (TBool loc) = loc
-  locOf (TArray _ loc) = loc
+  locOf (TArray _ _ loc) = loc
   locOf (TFunc _ _ loc) = loc
   locOf (TVar _ loc) = loc
 
