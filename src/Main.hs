@@ -31,7 +31,7 @@ main = do
             syntax <- parseProgram filepath tokens
             program <- abstract syntax
             lasagna <- makeLasagne program
-            typeCheck program
+            -- typeCheck program
             (obligations, specifications) <- sweep program
             return (tokens, program, lasagna, obligations, specifications)
 

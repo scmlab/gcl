@@ -100,7 +100,14 @@ handleExpr _ (Lit lit) = return $ pretty lit
 handleExpr n (Op op) = handleOp n op
 handleExpr n (App p q) = case handleExpr n p of
   Expect f -> f q
-  Complete s -> Complete s
+  Complete s -> do
+    t <- handleExpr n q
+    -- see if the second argument is an application, apply parenthesis when needed
+    case q of
+      App _ _ -> return $ s <+> parensIf n 0 t
+      _ ->       return $ s <+> t
+
+
 handleExpr _ (Hole i _) = return $ "[" <> pretty i <> "]"
 
 prettyPrec :: Int -> Expr -> Doc ann
