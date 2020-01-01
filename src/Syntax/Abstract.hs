@@ -101,8 +101,7 @@ affixAssertions (x:y:xs) = case (x, y) of
 
 type Pred = Expr  -- predicates are expressions of type Bool
 
-data Lit  = Num Int
-          | Bol Bool
+data Lit  = Num Int | Bol Bool | Chr Char
           deriving (Show, Eq, Generic)
 
 data Expr = Var    Var
@@ -147,6 +146,19 @@ x `eqq` y = App (App (Op EQ) x) y
 x `conj` y = App (App (Op Conj) x) y
 x `disj` y = App (App (Op Disj) x) y
 x `implies` y = App (App (Op Implies) x) y
+
+plus, minus :: Expr -> Expr -> Expr
+x `plus` y = App (App (Op Add) x) y
+x `minus` y = App (App (Op Sub) x) y
+
+litN :: Int -> Expr
+litN = Lit . Num
+
+litB :: Bool -> Expr
+litB = Lit . Bol
+
+litC :: Char -> Expr
+litC = Lit . Chr
 
 conjunct :: [Pred] -> Pred
 conjunct []     = Lit (Bol True)
@@ -227,16 +239,30 @@ freeSubst :: Subst -> [Var]
 freeSubst = concat . map (free . snd)
 
 --------------------------------------------------------------------------------
--- | Variables and stuff
+-- | Variables
 
 type Const = Text
 type Var = Text
 type TVar = Text
-data Type = TInt | TBool | TArray Type
+
+--------------------------------------------------------------------------------
+-- | Types
+
+data TBase = TInt | TBool | TChar
+      deriving (Show, Eq, Generic)
+
+data Type = TBase TBase
+          | TArray Type
           | TFunc Type Type
           | TVar TVar
       deriving (Show, Eq, Generic)
 
+tInt, tBool, tChar :: Type
+tInt  = TBase TInt
+tBool = TBase TBool
+tChar = TBase TChar
+
+instance ToJSON TBase where
 instance ToJSON Type where
 
 --------------------------------------------------------------------------------
@@ -271,8 +297,8 @@ instance FromConcrete C.Lower Var where
   fromConcrete (C.Lower x _) = pure x
 
 instance FromConcrete C.Type Type where
-  fromConcrete (C.TInt _) = return TInt
-  fromConcrete (C.TBool _) = return TBool
+  fromConcrete (C.TInt _) = return tInt
+  fromConcrete (C.TBool _) = return tBool
   fromConcrete (C.TArray _ s _) = TArray <$> fromConcrete s
   fromConcrete (C.TFunc s t _) = TFunc <$> fromConcrete s <*> fromConcrete t
   fromConcrete (C.TVar x _) = TVar <$> fromConcrete x
