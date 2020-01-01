@@ -203,6 +203,7 @@ instance Located TypeError where
 
 -- tests.
 -- try: runTM' $ inferE NoLoc cxt0 exp3
+--      runTM  $ subst subs0 exp3
 
 cxt0 :: TCxt
 cxt0 = map (\(x,t) -> (pack x,t))
@@ -224,3 +225,8 @@ exp3 :: Expr
 exp3 = Quant (Op Add) (map pack ["i"])
          ((litN 0 `lte` var "i") `conj` (var "i" `lte` var "x"))
          ((var "f" `App` var "i") `plus` litN 1)
+
+subs0 :: Subst
+subs0 = map (\(x,e) -> (pack x,e))
+          [("x", var "i" `plus` litN 1),
+           ("i", var "y" `plus` litN 1)]
