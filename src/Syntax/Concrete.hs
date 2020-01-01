@@ -35,7 +35,7 @@ data Interval = Interval Endpoint Endpoint Loc deriving (Show)
 data Type = TInt Loc | TBool Loc
           | TArray Interval Type Loc
           | TFunc Type Type Loc
-          | TVar Int Loc
+          | TVar Lower Loc
           deriving (Show)
 
 instance Located Type where

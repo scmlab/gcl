@@ -179,13 +179,17 @@ type Subst = [(Text,Expr)]
   -- SCM: substituion needs fresh names. However, I don't
   --      want to move M into this module. Therefore I am
   --      using a type class.
-  
+
 class Monad m => Fresh m where
   fresh :: m Int
   freshVar :: String -> m Var
+  freshVars :: String -> Int -> m [Var]
 
   freshVar prefix =
     (\i -> pack ("_" ++ prefix ++ show i)) <$> fresh
+
+  freshVars _  0 = return []
+  freshVars pf n = liftM2 (:) (freshVar pf) (freshVars pf (n-1))
 
 subst :: Fresh m => Subst -> Expr -> m Expr
 subst env (Var x)     = return $ maybe (Var x) id (lookup x env)
@@ -227,7 +231,7 @@ freeSubst = concat . map (free . snd)
 
 type Const = Text
 type Var = Text
-type TVar = Int
+type TVar = Text
 data Type = TInt | TBool | TArray Type
           | TFunc Type Type
           | TVar TVar
@@ -271,7 +275,7 @@ instance FromConcrete C.Type Type where
   fromConcrete (C.TBool _) = return TBool
   fromConcrete (C.TArray _ s _) = TArray <$> fromConcrete s
   fromConcrete (C.TFunc s t _) = TFunc <$> fromConcrete s <*> fromConcrete t
-  fromConcrete (C.TVar i _) = return $ TVar i
+  fromConcrete (C.TVar x _) = TVar <$> fromConcrete x
 
 instance FromConcrete C.Expr Expr where
   fromConcrete (C.Var x    _) = Var   <$> fromConcrete x

@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveGeneric, TypeSynonymInstances, FlexibleInstances #-}
 
 module GCL.Type where
 
@@ -6,8 +6,6 @@ import Control.Monad.State hiding (guard)
 import Control.Monad.Except
 import Data.Aeson (ToJSON)
 import Data.Text.Lazy (Text)
-import Data.Map (Map)
-import qualified Data.Map as Map
 import Data.Loc
 import Prelude hiding (Ordering(..))
 import GHC.Generics (Generic)
@@ -15,10 +13,10 @@ import GHC.Generics (Generic)
 
 import Syntax.Abstract
 
-type TCxt = Map Text Type
+type TCxt   = [(Text, Type)]
 type SubstT = [(TVar, Type)]
 
-type M = ExceptT TypeError (State (SubstT, Int))
+type TM = ExceptT TypeError (State (SubstT, Int))
 data TypeError
   = NotInScope Text Loc
   | UnifyFailed Type Type Loc
@@ -28,22 +26,21 @@ data TypeError
 instance ToJSON TypeError where
 
 
-exceptM :: Monad m => Maybe a -> e -> ExceptT e m a
-exceptM (Just x) _ = return x
-exceptM Nothing e  = throwError e
+exceptM :: Monad m => Maybe a -> e -> (a -> ExceptT e m b) -> ExceptT e m b
+exceptM (Just x) _ f = f x
+exceptM Nothing  e _ = throwError e
 
-runTM :: M a -> Either TypeError a
+lookupCxt :: Loc -> Var -> TCxt -> TM Type
+lookupCxt l v cxt = exceptM (lookup v cxt) (NotInScope v l) substTM
+
+runTM :: TM a -> Either TypeError a
 runTM m = evalState (runExceptT m) ([],0)
 
 --- type inference and checking
 
-inferE :: Loc -> TCxt -> Expr -> M Type
-inferE l cxt (Var x)   =
-  exceptM (Map.lookup x cxt)
-          (NotInScope x l)
-inferE l cxt (Const x) =
-  exceptM (Map.lookup x cxt)
-          (NotInScope x l)
+inferE :: Loc -> TCxt -> Expr -> TM Type
+inferE l cxt (Var x)   = lookupCxt l x cxt
+inferE l cxt (Const x) = lookupCxt l x cxt
 inferE _ _   (Lit (Num _)) = return TInt
 inferE _ _   (Lit (Bol _)) = return TBool
 inferE _ _   (Op op) = return (opTypes op)
@@ -51,18 +48,27 @@ inferE l cxt (App e1 e2) = do
   t <- inferE l cxt e1
   case t of
      TFunc t1 t2 -> do t1' <- inferE l cxt e2
-                       _   <- unify l t1 t1'
+                       unify_ l t1 t1'
                        substTM t2
      _ -> throwError (NotFunction t l)
-inferE _ _ (Hole _ _) = TVar <$> freshTVar
+inferE _ _ (Hole _ _) = TVar <$> freshVar "t"
+inferE l cxt (Quant op xs rng trm) = do
+  tOp <- inferE l cxt op
+  tR <- TVar <$> freshVar "t"
+  unify_ l tOp ((tR `TFunc` tR) `TFunc` tR)
+  tR' <- substTM tR
+  cxt' <- zip xs . map TVar <$> freshVars "t" (length xs)
+  checkE l (cxt' ++ cxt) rng TBool
+  checkE l (cxt' ++ cxt) trm tR'
+  return tR'
 
-checkE :: Loc -> TCxt -> Expr -> Type -> M ()
+checkE :: Loc -> TCxt -> Expr -> Type -> TM ()
 checkE l cxt e t = do
    t' <- inferE l cxt e
-   _  <- unify l t t'
+   unify_ l t t'
    return ()
 
-checkS :: TCxt -> Stmt -> M ()
+checkS :: TCxt -> Stmt -> TM ()
 checkS _ (Skip _)  = return ()
 checkS _ (Abort _) = return ()
 checkS cxt (Assign vs es l) =
@@ -80,26 +86,25 @@ checkS cxt (If (Just pre) gcmds l) = do
   mapM_ (checkGdCmd l cxt) gcmds
 checkS _ (Spec _) = return ()
 
-checkSs :: TCxt -> [Stmt] -> M ()
+checkSs :: TCxt -> [Stmt] -> TM ()
 checkSs cxt = mapM_ (checkS cxt)
 
-checkAsgn :: Loc -> TCxt -> (Var, Expr) -> M ()
+checkAsgn :: Loc -> TCxt -> (Var, Expr) -> TM ()
 checkAsgn l cxt (v,e) = do
-  t <- exceptM (Map.lookup v cxt)  -- should extend to other L-value
-               (NotInScope v l)
+  t <- lookupCxt l v cxt
   checkE l cxt e t
 
-checkGdCmd :: Loc -> TCxt -> GdCmd -> M ()
+checkGdCmd :: Loc -> TCxt -> GdCmd -> TM ()
 checkGdCmd l cxt (GdCmd g cmds)= do
   checkE l cxt g TBool
   checkSs cxt cmds
 
-checkProg :: Program -> M ()
+checkProg :: Program -> TM ()
 checkProg (Program _ Nothing) = return ()
 checkProg (Program decls (Just (stmts, post, loc))) = do
   checkSs cxt stmts
   checkE loc cxt post TBool  -- we need a location here!
- where cxt = Map.fromList (concat (map f decls))
+ where cxt = concat (map f decls)
        f (ConstDecl cs t) = [(c,t) | c <- cs]
        f (VarDecl   vs t) = [(v,t) | v <- vs]
 
@@ -125,8 +130,11 @@ occursT x (TVar y) = x == y
 
 -- unification
 
-unify :: Loc -> Type -> Type -> M Type
-unify _ TInt TInt = return TInt
+unify_ :: Loc -> Type -> Type -> TM ()
+unify_ l t1 t2 = unify l t1 t2 >> return ()
+
+unify :: Loc -> Type -> Type -> TM Type
+unify _ TInt  TInt  = return TInt
 unify _ TBool TBool = return TBool
 unify l (TFunc t1 t2) (TFunc t3 t4) = do
     t1' <- unify l t1 t3
@@ -142,20 +150,19 @@ unify l t1 t2 = throwError (UnifyFailed t1 t2 l)
 
 -- monad operations
 
-substTM :: Type -> M Type
+substTM :: Type -> TM Type
 substTM t = do (theta, _) <- get
                return (substT theta t)
 
-extSubstM :: TVar -> Type -> M ()
+extSubstM :: TVar -> Type -> TM ()
 extSubstM x t = do
    (theta, i) <- get
    put ((x,t):theta, i)
 
-freshTVar :: M TVar
-freshTVar = do
-  (theta, i) <- get
-  put (theta, 1+i)
-  return i
+instance Fresh TM where
+  fresh = do (theta, i) <- get
+             put (theta, 1+i)
+             return i
 
 -- types of built-in operators
 
