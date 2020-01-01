@@ -1,16 +1,12 @@
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE OverloadedStrings, FlexibleContexts, DeriveGeneric,
+             TypeSynonymInstances, FlexibleInstances #-}
 
 module GCL.PreCond where
 
 import Control.Monad.State hiding (guard)
 import Control.Monad.Writer hiding (guard)
 
-import qualified Data.Map as Map
--- import Data.Map (Map)
 import Data.Loc (Loc(..))
-import Data.Text.Lazy (pack)
 import GHC.Generics
 
 import Syntax.Abstract
@@ -26,6 +22,11 @@ data Specification = Specification
   } deriving (Show, Generic)
 
 type M = WriterT [Obligation] (WriterT [Specification] (State (Int, Int, Int)))
+
+instance Fresh M where
+  fresh = do (i, j, k) <- get
+             put (i, j, succ k)
+             return k
 
 runM :: M a -> ((a, [Obligation]), [Specification])
 runM p = evalState (runWriterT (runWriterT p)) (0, 0, 0)
@@ -64,12 +65,6 @@ tellSpec harsness p q loc = do
 --      I am assuming that we do not allow user defined variables
 --      to start with underline.
 --      We can specify a prefix for readability.
-
-freshInternal :: String -> M Var
-freshInternal prefix = do
-  (i, j, k) <- get
-  put (i, j, succ k)
-  return (pack ("_" ++ prefix ++ show k))
 
 precondStmts :: [Stmt] -> Pred -> M Pred
 precondStmts [] post = return post
@@ -115,7 +110,7 @@ precond (Assert pre _) post = do
   obligate pre post
   return pre
 
-precond (Assign xs es _) post = return $ subst (Map.fromList (zip xs es)) post
+precond (Assign xs es _) post = subst (zip xs es) post
 
 precond (If (Just pre) branches _) post = do
 
@@ -142,7 +137,7 @@ precond (If Nothing branches _) post = do
   return (conjunct brConds `conj` disjunct guards)
 
 precond (Do inv bnd branches _) post = do
-  oldbnd <- freshInternal "bnd"
+  oldbnd <- freshVar "bnd"
   let invB = inv `conj` (bnd `eqq` Var oldbnd)
   forM_ branches $ \(GdCmd guard body) -> do
     let body' = Assert (invB `conj` guard) NoLoc : body

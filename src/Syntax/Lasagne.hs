@@ -63,7 +63,9 @@ recalculatePrecond (Pure _) post = post
 recalculatePrecond (Free (Sauce _ _ stmt)) post = case stmt of
   Skip xs -> recalculatePrecond xs post
   Abort xs -> recalculatePrecond xs post
-  Assign vs es xs -> subst (Map.fromList (zip vs es)) $ recalculatePrecond xs post
+  {-  SCM: temporarily disabled due to use of subst
+  Assign vs es xs -> subst (zip vs es) $ recalculatePrecond xs post
+  -}
   Assert pre _ -> pre
   Do inv _ _ _ -> inv
   If (Just pre) _ _ -> pre
@@ -96,10 +98,12 @@ makeLasagne (x:xs) post =
       $ Abort
       $ rest
 
+  {-  SCM: temporarily disabled due to use of subst
     A.Assign vs es loc -> Free
-      $ Sauce (subst (Map.fromList (zip vs es)) post') loc
+      $ Sauce (subst (zip vs es) post') loc
       $ Assign vs es
       $ rest
+  -}
 
     A.Assert pre loc -> Free
       $ Sauce pre loc

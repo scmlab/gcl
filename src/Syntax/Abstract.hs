@@ -9,11 +9,10 @@ module Syntax.Abstract where
 import Control.Monad.State
 import Control.Monad.Except
 
+import Data.List ((\\))
 import Data.Aeson
-import Data.Text.Lazy (Text)
-import Data.Map (Map)
+import Data.Text.Lazy (Text, pack)
 import Data.Loc
-import qualified Data.Map as Map
 import GHC.Generics (Generic)
 import Prelude hiding (Ordering(..))
 -- import Data.Text.Prettyprint.Doc
@@ -111,6 +110,7 @@ data Expr = Var    Var
           | Lit    Lit
           | Op     Op      --- built-in operators
           | App    Expr   Expr
+          | Quant  Expr [Var] Expr Expr
           | Hole   Index  [Subst]
           deriving (Show, Eq, Generic)
 
@@ -168,22 +168,59 @@ instance ToJSON Expr where
 predEq :: Pred -> Pred -> Bool
 predEq = (==)
 
-type Subst = Map Text Expr
+--------------------------------------------------------------------------------
+-- | Substitution
 
-subst :: Subst -> Expr -> Expr
-subst env (Var x) =
-  case Map.lookup x env of
-    Just e -> e
-    Nothing -> Var x
-subst env (Const x) =
-  case Map.lookup x env of
-    Just e -> e
-    Nothing -> Const x
-subst _   (Op op)         = Op op
-subst _   (Lit n)         = Lit n
-subst env (App e1 e2)     = App (subst env e1) (subst env e2)
-subst env (Hole idx subs) = Hole idx (env:subs)
+  -- SCM: the substituion is generally not too large and
+  --      a list should be sufficient.
 
+type Subst = [(Text,Expr)]
+
+  -- SCM: substituion needs fresh names. However, I don't
+  --      want to move M into this module. Therefore I am
+  --      using a type class.
+  
+class Monad m => Fresh m where
+  fresh :: m Int
+  freshVar :: String -> m Var
+
+  freshVar prefix =
+    (\i -> pack ("_" ++ prefix ++ show i)) <$> fresh
+
+subst :: Fresh m => Subst -> Expr -> m Expr
+subst env (Var x)     = return $ maybe (Var x) id (lookup x env)
+subst env (Const x)   = return $ maybe (Const x) id (lookup x env)
+subst _   (Op op)     = return $ Op op
+subst _   (Lit n)     = return $ Lit n
+subst env (App e1 e2) = App <$> subst env e1 <*> subst env e2
+subst env (Hole idx subs) = return $ Hole idx (env:subs)
+subst env (Quant op xs range term) = do
+   op' <- subst env op
+   (xs', range', term') <- subLocal xs range term
+   let env' = filter (not . (`elem` xs') . fst) env
+   Quant op' xs' <$> subst env' range' <*> subst env' term'
+  where subLocal :: Fresh m => [Var] -> Expr -> Expr -> m ([Var], Expr, Expr)
+        subLocal []     r t = return ([],r,t)
+        subLocal (i:is) r t
+          | i `elem` fre = do j <- freshVar "dm"    -- "dummy" variable
+                              r' <- subst [(i,Var j)] r
+                              t' <- subst [(i,Var j)] t
+                              first3 (j:) <$> subLocal is r' t'
+          | otherwise = first3 (i:) <$> subLocal is r t
+        fre = freeSubst env
+        first3 f (x,y,z) = (f x, y, z)
+
+free :: Expr -> [Var]
+free (Var x)     = [x]
+free (Const x)   = [x]
+free (Op _)      = []
+free (Lit _)     = []
+free (App e1 e2) = free e1 ++ free e2  -- not worrying about duplication
+free (Quant op xs range term) = (free op ++ free range ++ free term) \\ xs
+free (Hole _ subs) = concat (map freeSubst subs) -- correct?
+
+freeSubst :: Subst -> [Var]
+freeSubst = concat . map (free . snd)
 
 --------------------------------------------------------------------------------
 -- | Variables and stuff
