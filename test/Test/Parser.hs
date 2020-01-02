@@ -54,20 +54,25 @@ expression = testGroup "Expressions" $ map (toTestTree Parser.expression)
       $ Const "X"
   , TestCase "numerical 1"
       "(1 + (1))"
-      $ App
-          (App
-            (Op Add)
-            (Lit (Num 1)))
-          (Lit (Num 1))
+      $ add (Lit (Num 1)) (Lit (Num 1))
   , TestCase "numerical 1"
       "A + X * Y"
-      $ App
-          (App
-            (Op Add)
-            (Const "A"))
-          (App
-            (App
-              (Op Mul)
-              (Const "X"))
-            (Const "Y"))
+      $ add
+          (Const "A")
+          (mul (Const "X") (Const "Y"))
   ]
+  where
+    binary :: Op -> Expr -> Expr -> Expr
+    binary op a b = App (App (Op op) a) b
+
+    add :: Expr -> Expr -> Expr
+    add = binary Add
+
+    sub :: Expr -> Expr -> Expr
+    sub = binary Sub
+
+    div :: Expr -> Expr -> Expr
+    div = binary Div
+
+    mul :: Expr -> Expr -> Expr
+    mul = binary Mul
