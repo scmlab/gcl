@@ -1,10 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Syntax.Parser
-  ( parseProgram
-  , parseSpec
-  , SyntacticError
-  ) where
+module Syntax.Parser where
 
 import Control.Monad.Combinators.Expr
 import Control.Monad.State (lift)

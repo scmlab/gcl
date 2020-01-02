@@ -39,14 +39,14 @@ executables:
     - -rtsopts
     - -with-rtsopts=-N
     - -fno-warn-orphans
-#
-# tests:
-#   cp-test:
-#     main: Test.hs
-#     source-dirs:
-#       - test
-#       - src
-#     dependencies:
-#       - tasty
-#       - tasty-hunit
-#       - tasty-quickcheck
+
+tests:
+  gcl-test:
+    main: Test.hs
+    source-dirs:
+      - test
+      - src
+    dependencies:
+      - tasty
+      - tasty-hunit
+      - tasty-quickcheck

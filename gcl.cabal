@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 3b01621bf6f19bf2806ca7a7f1c892d86984a381f38ffd2a679276c8c8b4e2c3
+-- hash: 1e9de1569e5097db709da6a71ffaa9e66234ec51dc70640e7697463373f83d6c
 
 name:           gcl
 version:        0.1.0.0
@@ -56,5 +56,52 @@ executable gcl
     , prettyprinter
     , regex-applicative
     , srcloc
+    , text
+  default-language: Haskell2010
+
+test-suite gcl-test
+  type: exitcode-stdio-1.0
+  main-is: Test.hs
+  other-modules:
+      Test.Parser
+      Test.Util
+      Control.Monad.Gensym
+      Error
+      GCL.PreCond
+      GCL.PreCond2
+      GCL.Type
+      Main
+      Pretty
+      REPL
+      Syntax.Abstract
+      Syntax.Concrete
+      Syntax.Lasagne
+      Syntax.Parser
+      Syntax.Parser.Lexer
+      Syntax.Parser.TokenStream
+      Syntax.Parser.Util
+      Type
+      Paths_gcl
+  hs-source-dirs:
+      test
+      src
+  build-tools:
+      happy
+  build-depends:
+      aeson
+    , base >=4.7 && <5
+    , bytestring
+    , containers
+    , free
+    , lexer-applicative
+    , megaparsec >=8.0
+    , mtl
+    , parser-combinators
+    , prettyprinter
+    , regex-applicative
+    , srcloc
+    , tasty
+    , tasty-hunit
+    , tasty-quickcheck
     , text
   default-language: Haskell2010
