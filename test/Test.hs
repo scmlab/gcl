@@ -1,5 +1,3 @@
-module Test where
-
 import Test.Tasty
 import Test.Tasty.HUnit
 
