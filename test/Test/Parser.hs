@@ -7,6 +7,7 @@ import qualified Data.ByteString.Lazy as B
 import Test.Tasty
 import Test.Tasty.HUnit
 import Data.Text.Lazy (Text)
+import Prelude hiding (Ordering(..))
 
 import Test.Util
 import Syntax.Parser.Lexer (scan)
@@ -37,13 +38,13 @@ toTestTree parser (TestCase name text expected) = testCase name $ do
 
 expression :: TestTree
 expression = testGroup "Expressions" $ map (toTestTree Parser.expression)
-  [ TestCase "literal 1"
+  [ TestCase "literal (numbers)"
       "1"
       $ Lit (Num 1)
-  ,  TestCase "literal 2"
+  ,  TestCase "literal (True)"
       "True"
       $ Lit (Bol True)
-  ,  TestCase "literal 3"
+  ,  TestCase "literal (False)"
       "False"
       $ Lit (Bol False)
   ,  TestCase "variable"
@@ -52,27 +53,83 @@ expression = testGroup "Expressions" $ map (toTestTree Parser.expression)
   ,  TestCase "constant"
       "X"
       $ Const "X"
-  , TestCase "numerical 1"
+  , TestCase "numeric 1"
       "(1 + (1))"
-      $ add (Lit (Num 1)) (Lit (Num 1))
-  , TestCase "numerical 1"
+      $ bin Add (Lit (Num 1)) (Lit (Num 1))
+  , TestCase "numeric 2"
       "A + X * Y"
-      $ add
+      $ bin Add
           (Const "A")
-          (mul (Const "X") (Const "Y"))
+          (bin Mul (Const "X") (Const "Y"))
+  , TestCase "numeric 3"
+      "(A + X) * Y"
+      $ bin Mul
+          (bin Add (Const "A") (Const "X"))
+          (Const "Y")
+  , TestCase "relation (EQ)"
+      "A = B"
+      $ bin EQ (Const "A") (Const "B")
+  , TestCase "relation (NEQ)"
+      "A /= B"
+      $ bin NEQ (Const "A") (Const "B")
+  , TestCase "relation (LT)"
+      "A < B"
+      $ bin LT (Const "A") (Const "B")
+  , TestCase "relation (LTE)"
+      "A <= B"
+      $ bin LTE (Const "A") (Const "B")
+  , TestCase "relation (GT)"
+      "A > B"
+      $ bin GT (Const "A") (Const "B")
+  , TestCase "relation (GTE)"
+      "A >= B"
+      $ bin GTE (Const "A") (Const "B")
+  , TestCase "boolean (Conj)"
+      "A && B"
+      $ bin Conj (Const "A") (Const "B")
+  , TestCase "boolean (Disj)"
+      "A || B"
+      $ bin Disj (Const "A") (Const "B")
+  , TestCase "boolean (Implies)"
+      "A => B"
+      $ bin Implies (Const "A") (Const "B")
+  , TestCase "boolean (Neg)"
+      "~ A"
+      $ un Neg (Const "A")
+  , TestCase "boolean 1"
+      "A || B => C"
+      $ bin Implies
+          (bin Disj (Const "A") (Const "B"))
+          (Const "C")
+  , TestCase "boolean 2"
+      "A || (B => C)"
+      $ bin Disj
+          (Const "A")
+          (bin Implies (Const "B") (Const "C"))
+  , TestCase "boolean 3"
+      "A || B && C"
+      $ bin Disj
+          (Const "A")
+          (bin Conj (Const "B") (Const "C"))
+  , TestCase "boolean 4"
+      "B && C || A"
+      $ bin Disj
+          (bin Conj (Const "B") (Const "C"))
+          (Const "A")
+  , TestCase "function application 1"
+      "(f (x)) y"
+      $ App
+          (App (Var "f") (Var "x"))
+          (Var "y")
+  , TestCase "function application 2"
+      "f (x y)"
+      $ App
+          (Var "f")
+          (App (Var "x") (Var "y"))
   ]
   where
-    binary :: Op -> Expr -> Expr -> Expr
-    binary op a b = App (App (Op op) a) b
+    bin :: Op -> Expr -> Expr -> Expr
+    bin op a b = App (App (Op op) a) b
 
-    add :: Expr -> Expr -> Expr
-    add = binary Add
-
-    sub :: Expr -> Expr -> Expr
-    sub = binary Sub
-
-    div :: Expr -> Expr -> Expr
-    div = binary Div
-
-    mul :: Expr -> Expr -> Expr
-    mul = binary Mul
+    un :: Op -> Expr -> Expr
+    un op a = App (Op op) a

@@ -188,8 +188,8 @@ expression = makeExprParser term table <?> "expression"
             , [ InfixL $ binary Conj TokConj ]
             , [ InfixL $ binary Disj TokDisj
               ]
-            , [ InfixR $ binary Implies TokImpl
-              , InfixL $ binary Mul  TokMul
+            , [ InfixR $ binary Implies TokImpl ]
+            , [ InfixL $ binary Mul  TokMul
               , InfixL $ binary Div  TokDiv
               ]
             , [ InfixL $ binary Add  TokAdd

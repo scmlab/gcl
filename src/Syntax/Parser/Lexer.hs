@@ -126,7 +126,7 @@ instance Show Tok where
     TokImpl -> "=>"
     TokConj -> "&&"
     TokDisj -> "||"
-    TokNeg -> "^"
+    TokNeg -> "~"
     TokAdd -> "+"
     TokSub -> "-"
     TokMul -> "*"
@@ -198,7 +198,7 @@ tokRE
   <|> TokImpl         <$ text "=>"
   <|> TokConj         <$ text "&&"
   <|> TokDisj         <$ text "||"
-  <|> TokNeg          <$ text "^"
+  <|> TokNeg          <$ text "~"
 
   <|> TokAdd          <$ text "+"
   <|> TokSub          <$ text "-"
