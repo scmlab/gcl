@@ -24,6 +24,7 @@ executable gcl
   other-modules:
       Control.Monad.Gensym
       Error
+      GCL.Exec
       GCL.PreCond
       GCL.PreCond2
       GCL.Type
