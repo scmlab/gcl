@@ -296,9 +296,13 @@ instance FromConcrete C.Upper Const where
 instance FromConcrete C.Lower Var where
   fromConcrete (C.Lower x _) = pure x
 
+instance FromConcrete C.Base TBase where
+  fromConcrete C.TInt = return TInt
+  fromConcrete C.TBool = return TBool
+  fromConcrete C.TChar = return TChar
+
 instance FromConcrete C.Type Type where
-  fromConcrete (C.TInt _) = return tInt
-  fromConcrete (C.TBool _) = return tBool
+  fromConcrete (C.TBase base _) = TBase <$> fromConcrete base
   fromConcrete (C.TArray _ s _) = TArray <$> fromConcrete s
   fromConcrete (C.TFunc s t _) = TFunc <$> fromConcrete s <*> fromConcrete t
   fromConcrete (C.TVar x _) = TVar <$> fromConcrete x

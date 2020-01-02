@@ -15,6 +15,22 @@ import qualified Syntax.Parser as Parser
 import Syntax.Parser (Parser)
 import Syntax.Abstract
 
+tests :: TestTree
+tests = testGroup "Parser"
+  [ expression
+  , type'
+  ]
+
+--------------------------------------------------------------------------------
+-- | Helpers
+
+data TestCase b = TestCase String Text b
+
+toTestTree :: (Eq b, Show b, FromConcrete a b) => Parser a -> TestCase b -> TestTree
+toTestTree parser (TestCase name text expected) = testCase name $ do
+  let actual = parse parser text
+  actual @?= Just expected
+
 parse :: FromConcrete a b => Parser a -> Text -> Maybe b
 parse parser text = case scan "<test>" text of
   Left _ -> Nothing
@@ -24,17 +40,8 @@ parse parser text = case scan "<test>" text of
       Left _ -> Nothing
       Right syntax -> Just syntax
 
-tests :: TestTree
-tests = testGroup "Parser"
-  [ expression
-  ]
-
-data TestCase b = TestCase String Text b
-
-toTestTree :: (Eq b, Show b, FromConcrete a b) => Parser a -> TestCase b -> TestTree
-toTestTree parser (TestCase name text expected) = testCase name $ do
-  let actual = parse parser text
-  actual @?= Just expected
+--------------------------------------------------------------------------------
+-- | Expression
 
 expression :: TestTree
 expression = testGroup "Expressions" $ map (toTestTree Parser.expression)
@@ -133,3 +140,19 @@ expression = testGroup "Expressions" $ map (toTestTree Parser.expression)
 
     un :: Op -> Expr -> Expr
     un op a = App (Op op) a
+
+--------------------------------------------------------------------------------
+-- | Type
+
+type' :: TestTree
+type' = testGroup "Types" $ map (toTestTree Parser.type')
+  [ TestCase "base types (Int)"
+      "Int"
+      $ TBase TInt
+  , TestCase "base types (Bool)"
+      "Bool"
+      $ TBase TBool
+  , TestCase "base types (Char)"
+      "Char"
+      $ TBase TChar
+  ]

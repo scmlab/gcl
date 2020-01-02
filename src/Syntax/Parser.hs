@@ -159,11 +159,6 @@ spec = withLocStmt $ do
     isTokSpecEnd _ = True
 
 --------------------------------------------------------------------------------
--- | Predicates
-
-
-
---------------------------------------------------------------------------------
 -- | Expressions
 
 expressionList :: Parser [Expr]
@@ -184,11 +179,11 @@ expression = makeExprParser term table <?> "expression"
               , InfixN $ binary GT  TokGT
               , InfixN $ binary GTE TokGTE
               ]
-            , [ Prefix $ unary  Neg  TokNeg ]
-            , [ InfixL $ binary Conj TokConj ]
-            , [ InfixL $ binary Disj TokDisj
-              ]
+            , [ Prefix $ unary  Neg  TokNeg     ]
+            , [ InfixL $ binary Conj TokConj    ]
+            , [ InfixL $ binary Disj TokDisj    ]
             , [ InfixR $ binary Implies TokImpl ]
+
             , [ InfixL $ binary Mul  TokMul
               , InfixL $ binary Div  TokDiv
               ]
@@ -244,16 +239,15 @@ type' = makeExprParser term table <?> "type"
       return $ \x y -> TFunc x y (x <--> y)
 
     term :: Parser Type
-    term = parens type' <|> array <|> literal <?> "type term"
+    term = parens type' <|> array <|> base <?> "type term"
 
-    literal :: Parser Type
-    literal = withLoc (extract isInt <|> extract isBool) <?> "type literal"
+    base :: Parser Type
+    base = withLoc (TBase <$> extract isBaseType) <?> "base type"
       where
-        isInt (TokUpperName "Int") = Just TInt
-        isInt _ = Nothing
-
-        isBool (TokUpperName "Bool") = Just TBool
-        isBool _ = Nothing
+        isBaseType (TokUpperName "Int") = Just TInt
+        isBaseType (TokUpperName "Bool") = Just TBool
+        isBaseType (TokUpperName "Char") = Just TChar
+        isBaseType _ = Nothing
 
     array :: Parser Type
     array = withLoc $ do
