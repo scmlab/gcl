@@ -155,4 +155,7 @@ type' = testGroup "Types" $ map (toTestTree Parser.type')
   , TestCase "base types (Char)"
       "Char"
       $ TBase TChar
+  , TestCase "function types"
+      "Char -> Int"
+      $ TFunc (TBase TChar) (TBase TInt)
   ]

@@ -11,6 +11,13 @@ category:            language
 extra-source-files:
 - README.md
 
+ghc-options:
+  - -Wall
+  - -threaded
+  - -rtsopts
+  - -with-rtsopts=-N
+  - -fno-warn-orphans
+
 dependencies:
   - base >= 4.7 && < 5
   - aeson
@@ -26,19 +33,15 @@ dependencies:
   - lexer-applicative
   - regex-applicative
 
-build-tools:
-- happy
+library:
+  source-dirs: src
 
 executables:
   gcl:
-    source-dirs:      src
-    main:             Main.hs
-    ghc-options:
-    - -Wall
-    - -threaded
-    - -rtsopts
-    - -with-rtsopts=-N
-    - -fno-warn-orphans
+    main: Main.hs
+    source-dirs: app
+    dependencies:
+      - gcl
 
 tests:
   gcl-test:
