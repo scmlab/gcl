@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: e39ed6deaba1416f354ed9627dddc6d5bd6ddac9d0b98b6fbebbce2464e98f2b
+-- hash: 876d39de57d7263815999b32c6cdc3951bb7b87efcfd947ac2176306bc6f2ed6
 
 name:           gcl
 version:        0.1.0.0
@@ -86,7 +86,6 @@ test-suite gcl-test
   main-is: Test.hs
   other-modules:
       Test.Parser
-      Test.Util
       Error
       GCL.Exec
       GCL.PreCond

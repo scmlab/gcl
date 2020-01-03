@@ -28,10 +28,6 @@ type SyntacticError = (Loc, String)
 
 parse :: Parser a -> FilePath -> TokStream -> Either [SyntacticError] a
 parse parser filepath tokenStream = do
-  -- let tokenStream = scan filepath raw
-  -- case filterError tokenStream of
-  --   Just e  -> Left [LexicalError e]
-  --   Nothing ->
   case Util.runPosLog (runParserT parser filepath tokenStream) of
     Left e -> Left (fromParseErrorBundle e)
     Right x -> Right x
@@ -57,13 +53,6 @@ parse parser filepath tokenStream = do
         -- get the Loc of all unexpected tokens
         getLoc (TrivialError _ (Just (Tokens xs)) _) = fold $ fmap locOf xs
         getLoc _ = mempty
-
-
-parseProgram :: FilePath -> TokStream -> Either [SyntacticError] Program
-parseProgram = parse program
-
-parseSpec :: TokStream -> Either [SyntacticError] [Stmt]
-parseSpec = parse specContent "<specification>"
 
 program :: Parser Program
 program = withLoc $ do
@@ -107,9 +96,9 @@ assert = withLocStmt $ Assert <$> braces predicate
 assertWithBnd :: Parser Stmt
 assertWithBnd = withLocStmt $ braces $ AssertWithBnd
   <$> predicate
-  <*  (symbol TokComma <?> "comma")
-  <*  (symbol TokBnd <?> "bnd")
-  <*  (symbol TokSemi <?> "semicolon")
+  <*  (symbol TokComma  <?> "comma")
+  <*  (symbol TokBnd    <?> "bnd")
+  <*  (symbol TokSemi   <?> "semicolon")
   <*> expression
 
 assign :: Parser Stmt

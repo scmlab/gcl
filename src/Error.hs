@@ -32,7 +32,7 @@ data Error
   | SyntacticError  SyntacticError
   | TypeError       TypeError
   | ConvertError    ConvertError
-  deriving (Show, Generic)
+  deriving (Eq, Show, Generic)
 
 instance Located Error where
   locOf (LexicalError pos) = Loc pos pos

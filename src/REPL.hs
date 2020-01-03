@@ -24,11 +24,14 @@ import qualified Syntax.Lasagne as Lasagne
 scan :: FilePath -> Text -> Either [Error] TokStream
 scan filepath = first (\x -> [LexicalError x]) . Lexer.scan filepath
 
+parse :: Parser.Parser a -> FilePath -> TokStream -> Either [Error] a
+parse parser filepath = first (map SyntacticError) . Parser.parse parser filepath
+
 parseProgram :: FilePath -> TokStream -> Either [Error] Concrete.Program
-parseProgram filepath = first (map SyntacticError) . Parser.parseProgram filepath
+parseProgram = parse Parser.program
 
 parseSpec :: TokStream -> Either [Error] [Concrete.Stmt]
-parseSpec = first (map SyntacticError) . Parser.parseSpec
+parseSpec = parse Parser.specContent "<specification>"
 
 abstract :: Abstract.FromConcrete a b => a -> Either [Error] b
 abstract = first (\x -> [ConvertError x]) . Abstract.abstract

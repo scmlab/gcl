@@ -26,12 +26,12 @@ type Index = Int
 data Program = Program
                 [Declaration]               -- declarations
                 (Maybe ([Stmt], Pred, Loc)) -- statements + postcondition
-              deriving (Show)
+              deriving (Eq, Show)
 
 data Declaration
   = ConstDecl [Const] Type
   | VarDecl [Var] Type
-  deriving (Show)
+  deriving (Eq, Show)
 
 data Stmt
   = Skip                          Loc
@@ -41,7 +41,7 @@ data Stmt
   | Do      Pred Expr [GdCmd]     Loc
   | If      (Maybe Pred) [GdCmd]  Loc
   | Spec                          Loc
-  deriving (Show)
+  deriving (Eq, Show)
 
 instance Located Stmt where
   locOf (Skip l)        = l
@@ -52,7 +52,7 @@ instance Located Stmt where
   locOf (If _ _ l)      = l
   locOf (Spec l)        = l
 
-data GdCmd = GdCmd Pred [Stmt] deriving (Show)
+data GdCmd = GdCmd Pred [Stmt] deriving (Eq, Show)
 
 getGuards :: [GdCmd] -> [Pred]
 getGuards = fst . unzipGdCmds
@@ -343,24 +343,6 @@ instance FromConcrete C.Op Op where
   fromConcrete (C.Mul   _) = pure Mul
   fromConcrete (C.Div   _) = pure Div
 
--- instance FromConcrete C.Pred Expr where
---   fromConcrete (C.Term p r q  _) = App      <$> (App <$> fromConcrete r
---                                                      <*> fromConcrete p)
---                                             <*> fromConcrete q
---   fromConcrete (C.Implies p q _) = App      <$> (App <$> pure (Op Implies)
---                                                      <*> fromConcrete p)
---                                             <*> fromConcrete q
---   fromConcrete (C.Conj p q    _) = App      <$> (App <$> pure (Op Conj)
---                                                      <*> fromConcrete p)
---                                             <*> fromConcrete q
---   fromConcrete (C.Disj p q    _) = App      <$> (App <$> pure (Op Disj)
---                                                      <*> fromConcrete p)
---                                             <*> fromConcrete q
---   fromConcrete (C.Neg p       _) = App      <$> pure (Op Neg)
---                                             <*> fromConcrete p
---   fromConcrete (C.Lit p       _) = Lit      <$> pure (Bol p)
---   fromConcrete (C.HoleP       _) = Hole     <$> index <*> pure []
-
 instance FromConcrete C.Stmt Stmt where
   fromConcrete (C.Assert p   loc) = Assert  <$> fromConcrete p <*> pure loc
   fromConcrete (C.Skip       loc) = Skip    <$> pure loc
@@ -419,7 +401,7 @@ data ConvertError
   | MissingPostcondition
   | DigHole Loc
   | Panic String
-  deriving (Show, Generic)
+  deriving (Eq, Show, Generic)
 
 instance Located ConvertError where
   locOf (MissingAssertion loc) = loc
