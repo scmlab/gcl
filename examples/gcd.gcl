@@ -1,0 +1,10 @@
+var x, y : Int
+
+x, y := 21, 49
+
+{ True, bnd: x + y }
+do x < y -> y := y - x
+ | x > y -> x := x - y
+od
+
+{ True }

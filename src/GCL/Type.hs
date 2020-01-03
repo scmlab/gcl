@@ -2,6 +2,7 @@
 
 module GCL.Type where
 
+import Control.Arrow ((***))
 import Control.Monad.State hiding (guard)
 import Control.Monad.Except
 import Data.Aeson (ToJSON)
@@ -207,14 +208,11 @@ instance Located TypeError where
 --      runTM  $ subst subs0 exp3
 
 cxt0 :: TCxt
-cxt0 = map (\(x,t) -> (pack x,t))
+cxt0 = map (pack *** id)
        [("x", tInt), ("y", tInt), ("p", tBool), ("q", tBool),
         ("a", tChar), ("b", tChar),
         ("shift", tChar `TFunc` (tInt `TFunc` tChar)),
         ("f", tInt `TFunc` tInt)]
-
-var :: String -> Expr
-var = Var . pack
 
 exp1 :: Expr
 exp1 = var "x" `plus` var "y"
@@ -228,6 +226,6 @@ exp3 = Quant (Op Add) (map pack ["i"])
          ((var "f" `App` var "i") `plus` litN 1)
 
 subs0 :: Subst
-subs0 = map (\(x,e) -> (pack x,e))
+subs0 = map (pack *** id)
           [("x", var "i" `plus` litN 1),
            ("i", var "y" `plus` litN 1)]
