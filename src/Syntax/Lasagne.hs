@@ -5,7 +5,7 @@ module Syntax.Lasagne where
 
 import Data.Loc
 import Control.Monad.Free
-import qualified Data.Map as Map
+-- import qualified Data.Map as Map
 
 import Syntax.Abstract hiding (Stmt(..), GdCmd(..), Program(..), getGuards)
 import qualified Syntax.Abstract as A

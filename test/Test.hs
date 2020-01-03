@@ -1,8 +1,6 @@
 import Test.Tasty
-import Test.Tasty.HUnit
 
 import qualified Test.Parser as Parser
--- import qualified Test.TypeChecking as TypeChecking
 
 main :: IO ()
 main = defaultMain tests

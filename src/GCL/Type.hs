@@ -124,7 +124,8 @@ checkProg (Program decls (Just (stmts, post, loc))) = do
 
 substT :: SubstT -> Type -> Type
 substT _ (TBase t)  = (TBase t)
-substT theta (TArray t)   = TArray (substT theta t)
+-- NOTE: banacorn: I've added `interval` to the AST
+substT theta (TArray interval t) = TArray interval (substT theta t)
 substT theta (TFunc t1 t2) =
   TFunc (substT theta t1) (substT theta t2)
 substT theta (TVar x) =
@@ -134,7 +135,7 @@ substT theta (TVar x) =
 
 occursT :: TVar -> Type -> Bool
 occursT _ (TBase _)  = False
-occursT x (TArray t) = occursT x t
+occursT x (TArray _ t) = occursT x t
 occursT x (TFunc t1 t2) = occursT x t1 || occursT x t2
 occursT x (TVar y) = x == y
 

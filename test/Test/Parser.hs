@@ -2,14 +2,11 @@
 
 module Test.Parser where
 
-import Data.ByteString.Lazy (ByteString)
-import qualified Data.ByteString.Lazy as B
 import Test.Tasty
 import Test.Tasty.HUnit
 import Data.Text.Lazy (Text)
 import Prelude hiding (Ordering(..))
 
-import Test.Util
 import Syntax.Parser.Lexer (scan)
 import qualified Syntax.Parser as Parser
 import Syntax.Parser (Parser)
@@ -155,7 +152,15 @@ type' = testGroup "Types" $ map (toTestTree Parser.type')
   , TestCase "base types (Char)"
       "Char"
       $ TBase TChar
-  , TestCase "function types"
-      "Char -> Int"
+  , TestCase "function types 1"
+      "(Char -> (Int))"
       $ TFunc (TBase TChar) (TBase TInt)
+  , TestCase "function types 2"
+      "(Char -> Int) -> Int"
+      $ TFunc (TFunc (TBase TChar) (TBase TInt)) (TBase TInt)
+  , TestCase "array"
+      "array [0 .. N) of Int"
+      $ TArray
+          (Interval (Including (Lit (Num 1))) (Excluding (Const "N")))
+          (TBase TInt)
   ]

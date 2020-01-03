@@ -248,11 +248,14 @@ type TVar = Text
 --------------------------------------------------------------------------------
 -- | Types
 
+data Endpoint = Including Expr | Excluding Expr deriving (Show, Eq, Generic)
+data Interval = Interval Endpoint Endpoint deriving (Show, Eq, Generic)
+
 data TBase = TInt | TBool | TChar
       deriving (Show, Eq, Generic)
 
 data Type = TBase TBase
-          | TArray Type
+          | TArray Interval Type
           | TFunc Type Type
           | TVar TVar
       deriving (Show, Eq, Generic)
@@ -262,6 +265,8 @@ tInt  = TBase TInt
 tBool = TBase TBool
 tChar = TBase TChar
 
+instance ToJSON Endpoint where
+instance ToJSON Interval where
 instance ToJSON TBase where
 instance ToJSON Type where
 
@@ -301,9 +306,16 @@ instance FromConcrete C.Base TBase where
   fromConcrete C.TBool = return TBool
   fromConcrete C.TChar = return TChar
 
+instance FromConcrete C.Endpoint Endpoint where
+  fromConcrete (C.Including x) = Including <$> fromConcrete x
+  fromConcrete (C.Excluding x) = Excluding <$> fromConcrete x
+
+instance FromConcrete C.Interval Interval where
+  fromConcrete (C.Interval a b _) = Interval <$> fromConcrete a <*> fromConcrete b
+
 instance FromConcrete C.Type Type where
   fromConcrete (C.TBase base _) = TBase <$> fromConcrete base
-  fromConcrete (C.TArray _ s _) = TArray <$> fromConcrete s
+  fromConcrete (C.TArray i s _) = TArray <$> fromConcrete i <*> fromConcrete s
   fromConcrete (C.TFunc s t _) = TFunc <$> fromConcrete s <*> fromConcrete t
   fromConcrete (C.TVar x _) = TVar <$> fromConcrete x
 
