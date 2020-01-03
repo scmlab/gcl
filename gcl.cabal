@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 1d9794e534731cb4a91bfa241ae331a525f7a253455762bff0ce7024d6512767
+-- hash: 189bd884a240960670163d830b9830e352d2dc5e49f84a5d735ec2343bfcd205
 
 name:           gcl
 version:        0.1.0.0
@@ -25,6 +25,7 @@ library
       GCL.Exec
       GCL.PreCond
       GCL.PreCond2
+      GCL.RandEx
       GCL.Type
       Pretty
       REPL
@@ -91,6 +92,7 @@ test-suite gcl-test
       GCL.Exec
       GCL.PreCond
       GCL.PreCond2
+      GCL.RandEx
       GCL.Type
       Pretty
       REPL

@@ -1,6 +1,6 @@
 var p, x, y, n : Int
 
-n := 6
+n := 72
 
 p,x,y := n-1, 1, 1
 
