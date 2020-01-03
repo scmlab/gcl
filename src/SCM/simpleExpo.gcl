@@ -3,7 +3,7 @@ var x, y, n : Int
 n := 5
 x,y := 0,1
 
-{True, bnd : n - x}
+{ True, bnd: n - x }
 do x /= n -> x, y := x + 1, y + y
 od
-{True}
+{ True }

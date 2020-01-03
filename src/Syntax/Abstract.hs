@@ -115,7 +115,7 @@ data Expr = Var    Var
 
 data Op = EQ | NEQ | LTE | GTE | LT | GT   -- binary relations
         | Implies | Conj | Disj | Neg  -- logic operators
-        | Add | Sub | Mul | Div | Mod    -- arithmetics
+        | Add | Sub | Mul | Div        -- arithmetics
      deriving (Show, Eq, Generic)
 
 
@@ -132,7 +132,6 @@ classify LT = Infix 5
 classify GT = Infix 5
 classify Mul = InfixL 1
 classify Div = InfixL 1
-classify Mod = InfixL 1
 classify Add = InfixL 2
 classify Sub = InfixL 2
 
@@ -148,12 +147,11 @@ x `conj` y = App (App (Op Conj) x) y
 x `disj` y = App (App (Op Disj) x) y
 x `implies` y = App (App (Op Implies) x) y
 
-plus, minus, mul, divi, modu :: Expr -> Expr -> Expr
+plus, minus, mul, divi :: Expr -> Expr -> Expr
 x `plus` y = App (App (Op Add) x) y
 x `minus` y = App (App (Op Sub) x) y
 x `mul` y = App (App (Op Mul) x) y
 x `divi` y = App (App (Op Div) x) y  -- to avoid name clash
-x `modu` y = App (App (Op Mod) x) y  -- with div and mod
 
 var :: String -> Expr
 var = Var . pack

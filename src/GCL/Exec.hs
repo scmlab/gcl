@@ -9,7 +9,7 @@ import Data.Text.Lazy (pack)
 import Control.Arrow ((***))
 import Control.Monad.Except
 import Control.Monad.State hiding (guard)
--- import Control.Monad.Trans.List  -- not always correct, but does't matter.
+import GHC.Base (Alternative(..))
 
 import Syntax.Abstract
 
@@ -20,9 +20,22 @@ data Val = VNum Int | VBol Bool | VChr Char
          | VArr Int [Val]
          | Undef
 
-class (MonadPlus m, MonadError ExecError m)=> ExecMonad m where
-  lookupStore :: Loc -> Var -> m Val
-  updateStore :: Loc -> Var -> Val -> m ()
+class (MonadPlus m, MonadError ExecError m, MonadState Store m)
+           => ExecMonad m where
+--  lookupStore :: Loc -> Var -> m Val
+--  updateStore :: Loc -> Var -> Val -> m ()
+
+lookupStore :: MonadState Store m => Loc -> Var -> m Val
+lookupStore l x =
+  (lookup x <$> get) >>= \case
+   Nothing -> error "shouldn't happen"
+   Just (VArr n xs) -> return (VFun (arrToFun l n xs))
+   Just v -> return v
+
+updateStore :: MonadState Store m => Loc -> Var -> Val -> m ()
+updateStore _ x v = do
+   store <- get
+   put ((x,v) : filter (not . (==x) . fst) store)
 
   -- make evalExpr monadic for now,
   --   since it may want to throw errors (e.g. div by zero).
@@ -79,7 +92,7 @@ execAsgn xs es l = do
 
 pickGCmds :: ExecMonad m =>
              Loc -> m () -> m () -> [GdCmd] -> m ()
-pickGCmds _ cont ex [] = ex
+pickGCmds _ _    ex [] = ex
 pickGCmds l cont ex (GdCmd g cmds : gs) =
   evalExpr l g >>= \case
     VBol False -> pickGCmds l cont ex gs
@@ -130,7 +143,10 @@ evalOp l Div = return $
                                    (VNum v2) -> Right (VNum (v1 `div` v2))
                                    _ -> error "type error, shouldn't happen")))
               _ -> error "type error, shouldn't happen" )
-evalOp l Mod = return $
+-- evalOp l Mod = return $ modVFun l
+
+modVFun :: Loc -> Val
+modVFun l =
   VFun (\case (VNum v1) ->
                (Right (VFun (\case (VNum 0)  -> Left (DivByZero l)
                                    (VNum v2) -> Right (VNum (v1 `mod` v2))
@@ -162,6 +178,12 @@ liftOp2IRel f =
                                    _ -> error "type error, shouldn't happen"))
               _ -> error "type error, shouldn't happen" )
 
+arrToFun :: Loc -> Int -> [a] -> Val -> Either ExecError a
+arrToFun l n xs (VNum i)
+  | i < n     = Right (xs !! i)
+  | otherwise = Left (ArrayOutOfBound i n l)
+arrToFun _ _ _ _ = error "type error, shouldn't hapen"
+
 -- misc.
 
 instance Show Val where
@@ -170,13 +192,80 @@ instance Show Val where
   showsPrec p (VChr c) = showsPrec p c
   showsPrec _ (VFun _) = ("<Fun>" ++)
   showsPrec p (VArr _ xs) = showsPrec p xs
+  showsPrec _ Undef = ("undef" ++)
 
 -- Some choices for ExecMonad
 
+prelude :: Store
+prelude = map (pack *** id)
+ [("mod", modVFun NoLoc)]
+
+-- tests
+--  try runExNondet (execStmts stmts) store0
+
+store0 :: Store
+store0 = map (pack *** id) [("x", VNum 24), ("y", VNum 56)]
+
+stmts0 :: [Stmt]
+stmts0 = [Assign [pack "y"] [var "y" `divi` litN 0] NoLoc,
+          Assign [pack "y"] [var "y" `minus` var "x"] NoLoc]
+
+-- My own monad
+
+newtype ExNondet e s a = ExNd {runExNondet :: s -> [(Either e a, s)]}
+
+instance Functor (ExNondet e s) where
+  fmap f (ExNd m) = ExNd (map (either Left (Right . f) *** id) . m)
+
+instance Applicative (ExNondet e s) where
+  pure = return
+  fs <*> xs = do {f <- fs; x <- xs; return (f x)}
+
+instance Monad (ExNondet e s) where
+  return x = ExNd (\s -> [(Right x, s)])
+  (ExNd m) >>= f = ExNd (concat . map (bindW f) . m)
+    where bindW _ (Left e,  s) = [(Left e, s)]
+          bindW g (Right x, s) = runExNondet (g x) s
+
+instance MonadState s (ExNondet e s) where
+  get   = ExNd (\s -> [(Right s,  s)])
+  put s = ExNd (\_ -> [(Right (), s)])
+
+instance MonadError e (ExNondet e s) where
+  throwError e = ExNd (\s -> [(Left e, s)])
+  catchError = undefined -- later?
+
+instance Alternative (ExNondet e s) where
+  empty = mzero
+  (<|>) = mplus
+
+instance MonadPlus (ExNondet e s) where
+  mzero = ExNd (const [])
+  m1 `mplus` m2 = ExNd (\s -> runExNondet m1 s ++ runExNondet m2 s)
+
+instance ExecMonad (ExNondet ExecError Store) where
+  
+{-
+instance MonadState Store m => ExecMonad m where
+-- instance ExecMonad (ExNondet ExecError Store) where
+  lookupStore l x =
+    (lookup x <$> get) >>= \case
+     Nothing -> error "shouldn't happen"
+     Just (VArr n xs) -> return (VFun (arrToFun l n xs))
+     Just v -> return v
+  updateStore _ x v = do
+     store <- get
+     put ((x,v) : filter (not . (==x) . fst) store)
+-}
+
+{-
+SCM : I tried using monad transformers but both combinations
+      turn out to behave awkward. So I defined my own.
+
 type ExNondet = ExceptT ExecError (StateT Store [])
 
--- StateT s (ExceptT e m) =  s -> m (Either e (s, a))
--- ExceptT e (StateT s m) =  s -> m (s, Either e a)
+-- StateT s (ExceptT e m) =  s -> m (Either e (a,s))
+-- ExceptT e (StateT s m) =  s -> m (Either e a, ss)
 --  which do we want?
 
   -- do we need these? why?
@@ -192,6 +281,17 @@ runExNondet m = runExNondetWith m []
 runExNondetWith :: ExNondet a -> Store -> [(Either ExecError a, Store)]
 runExNondetWith m = runStateT (runExceptT m)
 
+{- Neither seemed right.
+
+type ExNondet = StateT Store (ExceptT ExecError [])
+
+runExNondet :: ExNondet a -> [Either ExecError (a, Store)]
+runExNondet m = runExNondetWith m []
+
+runExNondetWith :: ExNondet a -> Store -> [Either ExecError (a, Store)]
+runExNondetWith m s = runExceptT (runStateT m s)
+-}
+
 instance ExecMonad ExNondet where
   lookupStore l x =
     (lookup x <$> get) >>= \case
@@ -201,19 +301,4 @@ instance ExecMonad ExNondet where
   updateStore _ x v = do
      store <- get
      put ((x,v) : filter (not . (==x) . fst) store)
-
-arrToFun :: Loc -> Int -> [a] -> Val -> Either ExecError a
-arrToFun l n xs (VNum i)
-  | i < n     = Right (xs !! i)
-  | otherwise = Left (ArrayOutOfBound i n l)
-arrToFun _ _ _ _ = error "type error, shouldn't hapen"
-
--- tests
---  try runExNondetWith (execStmts stmts) store0
-
-store0 :: Store
-store0 = map (pack *** id) [("x", VNum 24), ("y", VNum 56)]
-
-stmts :: [Stmt]
-stmts = [Assign [pack "y"] [var "y" `divi` litN 0] NoLoc,
-         Assign [pack "y"] [var "y" `minus` var "x"] NoLoc]
+-}

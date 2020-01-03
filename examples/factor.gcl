@@ -1,13 +1,13 @@
 var p, x, y, n : Int
 
-n := 72
+n := 6
 
 p,x,y := n-1, 1, 1
 
 { x * y + p = n, bnd: p }
-do p = 0 ->
-  if x = 0 -> y, p := y + 1, p - x
-   | y = 0 -> x, p := x + 1, p - y
+do p /= 0 ->
+  if mod p x = 0 -> y, p := y + 1, p - x
+   | mod p y = 0 -> x, p := x + 1, p - y
   fi
 od
 { x * y = n }
