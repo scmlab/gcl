@@ -8,6 +8,8 @@ import Data.Text.Lazy (Text)
 import Data.Loc
 import Prelude hiding (Ordering(..))
 
+import qualified Data.Text.Lazy.IO as Text
+
 import qualified Syntax.Parser as Parser
 import qualified REPL as REPL
 import Syntax.Parser (Parser)
@@ -18,14 +20,18 @@ tests :: TestTree
 tests = testGroup "Parser"
   [ expression
   , type'
+  , declaration
   , statement
+  , program
   ]
 
 --------------------------------------------------------------------------------
 -- | Helpers
 
-data TestCase b = RightCase String Text b
-                 | LeftCase String Text [Error]
+data TestCase b
+  = RightCase String Text b
+  | LeftCase String Text [Error]
+  | ReadFile String FilePath (Either [Error] Program)
 
 toTestTree :: (Eq b, Show b, FromConcrete a b) => Parser a -> TestCase b -> TestTree
 toTestTree parser (RightCase name text expected) = testCase name $ do
@@ -34,6 +40,10 @@ toTestTree parser (RightCase name text expected) = testCase name $ do
 toTestTree parser (LeftCase name text expected) = testCase name $ do
   let actual = parse parser text
   actual @?= Left expected
+toTestTree _ (ReadFile name filepath expected) = testCase name $ do
+  text <- Text.readFile filepath
+  let actual = parse Parser.program text
+  actual @?= expected
 
 parse :: FromConcrete a b => Parser a -> Text -> Either [Error] b
 parse parser text = REPL.scan "<test>" text
@@ -169,6 +179,19 @@ type' = testGroup "Types" $ map (toTestTree Parser.type')
   ]
 
 --------------------------------------------------------------------------------
+-- | Declaration
+
+declaration :: TestTree
+declaration = testGroup "Declarations" $ map (toTestTree Parser.declaration)
+  [ RightCase "variable"
+      "var x : Int\n"
+      $ VarDecl ["x"] (TBase TInt)
+  , RightCase "constant"
+      "con X, Y : Int\n"
+      $ ConstDecl ["X", "Y"] (TBase TInt)
+  ]
+
+--------------------------------------------------------------------------------
 -- | Statements
 
 statement :: TestTree
@@ -196,3 +219,12 @@ statement = testGroup "Statements" $ map (toTestTree Parser.statement)
   where
     loc :: Int -> Loc
     loc len = Loc (Pos "<test>" 1 1 0) (Pos "<test>" 1 len (len - 1))
+
+--------------------------------------------------------------------------------
+-- | Program
+
+program :: TestTree
+program = testGroup "Program" $ map (toTestTree Parser.program)
+  [ ReadFile "empty" "./test/source/empty.gcl"
+      $ Right $ Program [] Nothing
+  ]
