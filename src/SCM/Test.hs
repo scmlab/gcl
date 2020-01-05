@@ -23,5 +23,5 @@ runtst = do
       case parsed of
         Right program -> do
            print program
-           print (runExNondetWith (execProg program) prelude)
+           -- print (runExNondetWith (execProg program) prelude)
         Left errors -> print errors

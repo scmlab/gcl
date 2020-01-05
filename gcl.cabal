@@ -1,10 +1,10 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.31.2.
+-- This file has been generated from package.yaml by hpack version 0.31.1.
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 189bd884a240960670163d830b9830e352d2dc5e49f84a5d735ec2343bfcd205
+-- hash: 87ba589b6fc42d5eb0f9dd75509d889de4127be8a644ba2d0fbc59cb80467509
 
 name:           gcl
 version:        0.1.0.0
@@ -23,9 +23,11 @@ library
   exposed-modules:
       Error
       GCL.Exec
+      GCL.Exec.ExecMonad
+      GCL.Exec.ExNondet
+      GCL.Exec.ExRand
       GCL.PreCond
       GCL.PreCond2
-      GCL.RandEx
       GCL.Type
       Pretty
       REPL
@@ -54,6 +56,7 @@ library
     , mtl
     , parser-combinators
     , prettyprinter
+    , random
     , regex-applicative
     , srcloc
     , text
@@ -78,6 +81,7 @@ executable gcl
     , mtl
     , parser-combinators
     , prettyprinter
+    , random
     , regex-applicative
     , srcloc
     , text
@@ -90,9 +94,11 @@ test-suite gcl-test
       Test.Parser
       Error
       GCL.Exec
+      GCL.Exec.ExecMonad
+      GCL.Exec.ExNondet
+      GCL.Exec.ExRand
       GCL.PreCond
       GCL.PreCond2
-      GCL.RandEx
       GCL.Type
       Pretty
       REPL
@@ -121,6 +127,7 @@ test-suite gcl-test
     , mtl
     , parser-combinators
     , prettyprinter
+    , random
     , regex-applicative
     , srcloc
     , tasty
