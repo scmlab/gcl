@@ -149,14 +149,17 @@ expression = testGroup "Expressions" $ map (toTestTree Parser.expression)
           (bin Mul (Const "X") (Const "Y"))
           (Const "N")
   , RightCase "mixed 2"
-      "X * Y > 3 = P => Q"
-      $ bin EQ
-          (bin GT
-            (bin Mul (Const "X") (Const "Y"))
-            (Lit (Num 3)))
-          (bin Implies
+      "X * Y => P = Q"
+      $ bin Implies
+          (bin Mul (Const "X") (Const "Y"))
+          (bin EQ
             (Const "P")
             (Const "Q"))
+    , RightCase "mixed 3"
+        "X > Y && X > Y"
+        $ bin Conj
+            (bin GT (Const "X") (Const "Y"))
+            (bin GT (Const "X") (Const "Y"))
   ]
   where
     bin :: Op -> Expr -> Expr -> Expr

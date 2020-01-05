@@ -171,20 +171,22 @@ expression = makeExprParser term table <?> "expression"
               ]
 
 
-            , [ Prefix $ unary  Neg  TokNeg     ]
-            , [ InfixL $ binary Conj TokConj    ]
-            , [ InfixL $ binary Disj TokDisj    ]
-            , [ InfixR $ binary Implies TokImpl ]
-
             , [ InfixN $ binary NEQ TokNEQ
               , InfixN $ binary LT  TokLT
               , InfixN $ binary LTE TokLTE
               , InfixN $ binary GT  TokGT
               , InfixN $ binary GTE TokGTE
               ]
-
+              
             , [ InfixN $ binary EQ  TokEQ
               ]
+
+            , [ Prefix $ unary  Neg  TokNeg     ]
+            , [ InfixL $ binary Conj TokConj    ]
+            , [ InfixL $ binary Disj TokDisj    ]
+            , [ InfixR $ binary Implies TokImpl ]
+
+
             ]
 
     application :: Parser (Expr -> Expr)
