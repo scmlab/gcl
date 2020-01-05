@@ -161,23 +161,29 @@ expression = makeExprParser term table <?> "expression"
   where
     table :: [[Operator Parser Expr]]
     table = [ [ Postfix application ]
-            , [ InfixN $ binary EQ  TokEQ
-              , InfixN $ binary NEQ TokNEQ
-              , InfixN $ binary LT  TokLT
-              , InfixN $ binary LTE TokLTE
-              , InfixN $ binary GT  TokGT
-              , InfixN $ binary GTE TokGTE
-              ]
-            , [ Prefix $ unary  Neg  TokNeg     ]
-            , [ InfixL $ binary Conj TokConj    ]
-            , [ InfixL $ binary Disj TokDisj    ]
-            , [ InfixR $ binary Implies TokImpl ]
+
 
             , [ InfixL $ binary Mul  TokMul
               , InfixL $ binary Div  TokDiv
               ]
             , [ InfixL $ binary Add  TokAdd
               , InfixL $ binary Sub  TokSub
+              ]
+
+
+            , [ Prefix $ unary  Neg  TokNeg     ]
+            , [ InfixL $ binary Conj TokConj    ]
+            , [ InfixL $ binary Disj TokDisj    ]
+            , [ InfixR $ binary Implies TokImpl ]
+
+            , [ InfixN $ binary NEQ TokNEQ
+              , InfixN $ binary LT  TokLT
+              , InfixN $ binary LTE TokLTE
+              , InfixN $ binary GT  TokGT
+              , InfixN $ binary GTE TokGTE
+              ]
+
+            , [ InfixN $ binary EQ  TokEQ
               ]
             ]
 
