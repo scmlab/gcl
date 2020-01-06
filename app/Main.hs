@@ -51,7 +51,8 @@ main = do
           putStrLn "\n=== specifications ==="
           mapM_ (print . pretty) specifications
 
-        Left errors -> print errors
+        Left errors -> do
+          mapM_ (print . pretty) errors
 
   where
     loop :: IO ()

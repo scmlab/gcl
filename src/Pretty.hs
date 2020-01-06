@@ -8,10 +8,18 @@ module Pretty where
 import Data.Text.Prettyprint.Doc
 import Control.Monad ((>=>))
 import Prelude hiding (Ordering(..))
+import Data.Loc
+import Text.Megaparsec.Error (errorBundlePretty)
 
-import Syntax.Abstract (Expr(..), Lit(..), Op(..), classify)
+
+import Error
+import Syntax.Parser.Lexer (LexicalError)
+import Syntax.Parser (SyntacticError(..))
+import Syntax.Abstract hiding (var)
+-- import Syntax.Abstract (Expr(..), Lit(..), Op(..), classify, Type(..), TBase(..))
 import Syntax.Concrete (Fixity(..))
 import GCL.PreCond (Obligation(..), Specification(..))
+import GCL.Type (TypeError(..))
 
 --------------------------------------------------------------------------------
 -- | Expr
@@ -122,6 +130,30 @@ instance Pretty Op where
   pretty Mod = "%"
 
 --------------------------------------------------------------------------------
+-- | Type
+
+-- instance Pretty Endpoint where
+--   pretty (Including e) = ""
+instance Pretty Interval where
+  pretty (Interval (Including a) (Including b)) =
+      "[" <+> pretty a <+> ".." <+> pretty b <+> "]"
+  pretty (Interval (Including a) (Excluding b)) =
+      "[" <+> pretty a <+> ".." <+> pretty b <+> ")"
+  pretty (Interval (Excluding a) (Including b)) =
+      "(" <+> pretty a <+> ".." <+> pretty b <+> "]"
+  pretty (Interval (Excluding a) (Excluding b)) =
+      "(" <+> pretty a <+> ".." <+> pretty b <+> ")"
+
+instance Pretty Type where
+  pretty (TBase TInt) = "Int"
+  pretty (TBase TBool) = "Bool"
+  pretty (TBase TChar) = "Char"
+  pretty (TFunc a b) = pretty a <+> "->" <+> pretty b
+  pretty (TArray i b) = "array" <+> pretty i <+> "of" <+> pretty b
+  pretty (TVar i) = "TVar" <+> pretty i
+
+
+--------------------------------------------------------------------------------
 -- | Obligation & Specification
 
 instance Pretty Obligation where
@@ -133,3 +165,31 @@ instance Pretty Specification where
   pretty (Specification i hardness p q _) = lbracket <> pretty i <> rbracket <+> pretty (show hardness) <> line <>
     indent 2 (pretty p) <> line <>
     indent 2 (pretty q) <> line
+
+--------------------------------------------------------------------------------
+-- | Error
+
+instance Pretty Error where
+  pretty (LexicalError err) = "Lexical Error" <+> pretty err
+  pretty (SyntacticError (loc, err)) = "Syntactic Error" <+> pretty loc <> line
+    <> pretty err
+  pretty (TypeError err) = "Type Error" <+> pretty (locOf err) <> line <> pretty err
+  pretty (ConvertError err) = "AST Convert Error" <+> pretty (locOf err) <> line <> pretty err
+
+instance Pretty LexicalError where
+instance Pretty ConvertError where
+
+instance Pretty TypeError where
+  pretty (NotInScope name _) = "The definition" <+> pretty name <+> "is not in scope"
+  pretty (UnifyFailed a b _) = "Cannot unify:"
+    <+> pretty a <+> "with"
+    <+> pretty b
+  pretty (RecursiveType v a _) = "Recursive type variable: "
+    <+> pretty v <+> "in" <+> pretty a
+  pretty (NotFunction a _) = "The type" <+> pretty a <+> "is not a function type"
+
+--------------------------------------------------------------------------------
+-- | Misc
+
+instance Pretty Loc where
+  pretty = pretty . displayLoc
