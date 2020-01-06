@@ -10,7 +10,7 @@ import GHC.Base (Alternative(..))
 import GCL.Exec.ExecMonad
 
 -- run a program by
---    runExRand (execProg program) prelude (mkStdGen 813)
+--    runExNondet (execProg program) prelude
 
 newtype ExNondet e s a = ExNd {runExNondet :: s -> [(Either e a, s)]}
 
