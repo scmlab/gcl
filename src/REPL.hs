@@ -19,7 +19,6 @@ import qualified Syntax.Parser.Lexer as Lexer
 import qualified Syntax.Parser as Parser
 import qualified Syntax.Concrete as Concrete
 import qualified Syntax.Abstract as Abstract
-import qualified Syntax.Lasagne as Lasagne
 
 scan :: FilePath -> Text -> Either [Error] TokStream
 scan filepath = first (\x -> [LexicalError x]) . Lexer.scan filepath
@@ -44,11 +43,6 @@ sweep (Abstract.Program _ Nothing) = return ([], [])
 sweep (Abstract.Program _ (Just (statements, postcondition, _))) =
     let ((_, obligations), specifications) = runM $ precondStmts statements postcondition
     in return (obligations, specifications)
-
-makeLasagne :: Abstract.Program -> Either [Error] Lasagne.Program
-makeLasagne (Abstract.Program _ Nothing) = Left []
-makeLasagne (Abstract.Program _ (Just (stmts, post, _))) = Right $ Lasagne.makeLasagne stmts post
-
 
 recv :: FromJSON a => IO (Maybe a)
 recv = decode . BS.fromStrict <$> Strict.getLine

@@ -7,12 +7,10 @@ module Pretty where
 
 import Data.Text.Prettyprint.Doc
 import Control.Monad ((>=>))
-import Control.Monad.Free
 import Prelude hiding (Ordering(..))
 
 import Syntax.Abstract (Expr(..), Lit(..), Op(..), classify)
 import Syntax.Concrete (Fixity(..))
-import Syntax.Lasagne
 import GCL.PreCond (Obligation(..), Specification(..))
 
 --------------------------------------------------------------------------------
@@ -134,46 +132,3 @@ instance Pretty Specification where
   pretty (Specification i hardness p q _) = lbracket <> pretty i <> rbracket <+> pretty (show hardness) <> line <>
     indent 2 (pretty p) <> line <>
     indent 2 (pretty q) <> line
-
---------------------------------------------------------------------------------
--- | Lasagne
-
-instance Pretty (GdCmd Program) where
-  pretty (GdCmd p x) = "|" <+> pretty p <+> "->" <> line <> indent 2 (pretty x) <> line
-
-instance Pretty (Stmt Program) where
-  pretty (Skip x) = "skip" <> line <> pretty x
-  pretty (Abort x) = "abort" <> line <> pretty x
-  pretty (Assign vars exprs x)
-    = hcat (punctuate comma (map pretty vars))
-    <+> ":="
-    <+> hcat (punctuate comma (map pretty exprs))
-    <> line <> pretty x
-  pretty (Assert p x)
-    = lbrace <+> pretty p <+> rbrace
-    <> line <> pretty x
-  pretty (Do inv bnd branches x)
-    = lbrace <+> pretty inv <+> comma <+> "bnd: " <> pretty bnd <+> rbrace <> line
-    <> "  do" <> line
-    <> indent 2 (vsep (map pretty branches)) <> line
-    <> "  od" <> line
-    <> pretty x
-  pretty (If Nothing branches x)
-    = "  if" <> line
-    <> indent 2 (vsep (map pretty branches)) <> line
-    <> "  fi" <> line
-    <> pretty x
-  pretty (If (Just p) branches x)
-    = lbrace <+> pretty p <+> rbrace <> line
-    <> "  if" <> line
-    <> indent 2 (vsep (map pretty branches)) <> line
-    <> "  fi" <> line
-    <> pretty x
-  pretty (Spec x)
-    = "  {!" <> line
-    <> " !}" <> line
-    <> pretty x
-
-instance Pretty Program where
-  pretty (Pure p) = line <> "# " <> pretty p
-  pretty (Free (Sauce p _ x)) = line <> "# " <> pretty p <> line <> line <> "  " <> (pretty x)

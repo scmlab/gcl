@@ -5,7 +5,6 @@ module Main where
 import REPL
 
 import Error
-import GCL.PreCond2
 
 import Control.Monad (when)
 import Data.Text.Prettyprint.Doc
@@ -26,17 +25,16 @@ main = do
 
       raw <- Text.readFile filepath
 
-      let parse = do
+      let run = do
             tokens <- scan filepath raw
             syntax <- parseProgram filepath tokens
             program <- abstract syntax
-            lasagna <- makeLasagne program
             typeCheck program
             (obligations, specifications) <- sweep program
-            return (tokens, program, lasagna, obligations, specifications)
+            return (tokens, program, obligations, specifications)
 
-      case parse of
-        Right (tokens, program, lasagna, obligations, specifications) -> do
+      case run of
+        Right (tokens, program, obligations, specifications) -> do
 
           -- putStrLn "=== raw ==="
           -- Text.putStrLn raw
@@ -47,17 +45,8 @@ main = do
           putStrLn "\n=== AST ==="
           print program
 
-          putStrLn "\n=== Lasagne ==="
-          print $ pretty lasagna
-
-          putStrLn "\n=== proof obligations (Lasagne) ==="
-          mapM_ (print . pretty) (getPOs lasagna)
-
           putStrLn "\n=== proof obligations ==="
           mapM_ (print . pretty) obligations
-
-          putStrLn "\n=== specifications (Lasagne) ==="
-          mapM_ (print . pretty) (getSpecs lasagna)
 
           putStrLn "\n=== specifications ==="
           mapM_ (print . pretty) specifications
@@ -78,14 +67,14 @@ handleRequest :: Request -> IO Bool
 handleRequest (Load filepath) = do
   raw <- Text.readFile filepath
 
-  let parse = do
+  let run = do
         tokens <- scan filepath raw
         syntax <- parseProgram filepath tokens
         program <- abstract syntax
         typeCheck program
         sweep program
 
-  case parse of
+  case run of
     Left errors -> send $ Error $ map fromGlobalError errors
     Right (obligations, specifications) -> send $ OK obligations specifications
 
@@ -93,8 +82,8 @@ handleRequest (Load filepath) = do
 
 handleRequest (Refine i payload) = do
 
-  let parse = scan "<spec>" payload >>= parseSpec >>= abstract
-  case parse of
+  let run = scan "<spec>" payload >>= parseSpec >>= abstract
+  case run of
     Left errors -> send $ Error $ map (fromLocalError i) errors
     Right _ -> send $ Resolve i
 

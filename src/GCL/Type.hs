@@ -116,7 +116,7 @@ checkProg :: Program -> TM ()
 checkProg (Program _ Nothing) = return ()
 checkProg (Program decls (Just (stmts, post, loc))) = do
   checkSs cxt stmts
-  checkE loc cxt post tBool  -- we need a location here!
+  checkE loc cxt post tBool
  where cxt = concat (map f decls)
        f (ConstDecl cs t) = [(c,t) | c <- cs]
        f (VarDecl   vs t) = [(v,t) | v <- vs]

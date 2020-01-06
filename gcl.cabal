@@ -1,10 +1,10 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.31.1.
+-- This file has been generated from package.yaml by hpack version 0.31.2.
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 87ba589b6fc42d5eb0f9dd75509d889de4127be8a644ba2d0fbc59cb80467509
+-- hash: bdeab349ca00e9c2c43a846837700557f14f86089601bb89bf4b28d34f487931
 
 name:           gcl
 version:        0.1.0.0
@@ -27,14 +27,12 @@ library
       GCL.Exec.ExNondet
       GCL.Exec.ExRand
       GCL.PreCond
-      GCL.PreCond2
       GCL.Type
       Pretty
       REPL
       SCM.Test
       Syntax.Abstract
       Syntax.Concrete
-      Syntax.Lasagne
       Syntax.Parser
       Syntax.Parser.Lexer
       Syntax.Parser.TokenStream
@@ -98,14 +96,12 @@ test-suite gcl-test
       GCL.Exec.ExNondet
       GCL.Exec.ExRand
       GCL.PreCond
-      GCL.PreCond2
       GCL.Type
       Pretty
       REPL
       SCM.Test
       Syntax.Abstract
       Syntax.Concrete
-      Syntax.Lasagne
       Syntax.Parser
       Syntax.Parser.Lexer
       Syntax.Parser.TokenStream
