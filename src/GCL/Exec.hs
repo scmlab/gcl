@@ -113,7 +113,7 @@ evalOp l Div = return $
                                    (VNum v2) -> Right (VNum (v1 `div` v2))
                                    _ -> error "type error, shouldn't happen")))
               _ -> error "type error, shouldn't happen" )
--- evalOp l Mod = return $ modVFun l
+evalOp l Mod = return $ modVFun l
 
 modVFun :: Loc -> Val
 modVFun l =

@@ -163,6 +163,8 @@ expression = makeExprParser term table <?> "expression"
     table = [ [ Postfix application ]
 
 
+            , [ InfixL $ binary Mod  TokMod
+              ]
             , [ InfixL $ binary Mul  TokMul
               , InfixL $ binary Div  TokDiv
               ]
@@ -177,7 +179,7 @@ expression = makeExprParser term table <?> "expression"
               , InfixN $ binary GT  TokGT
               , InfixN $ binary GTE TokGTE
               ]
-              
+
             , [ InfixN $ binary EQ  TokEQ
               ]
 

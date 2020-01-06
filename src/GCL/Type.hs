@@ -92,7 +92,7 @@ checkS cxt (Do inv bnd gcmds l) = do
   checkE l cxt inv tBool
   checkE l cxt bnd tInt
   mapM_ (checkGdCmd cxt) gcmds
-checkS cxt (If Nothing gcmds l) =
+checkS cxt (If Nothing gcmds _) =
   mapM_ (checkGdCmd cxt) gcmds
 checkS cxt (If (Just pre) gcmds l) = do
   checkE l cxt pre tBool
@@ -189,6 +189,7 @@ opTypes Add  = tInt `TFunc` (tInt `TFunc` tInt)
 opTypes Sub = tInt `TFunc` (tInt `TFunc` tInt)
 opTypes Mul   = tInt `TFunc` (tInt `TFunc` tInt)
 opTypes Div   = tInt `TFunc` (tInt `TFunc` tInt)
+opTypes Mod   = tInt `TFunc` (tInt `TFunc` tInt)
 
 opTypes Implies = tBool `TFunc` (tBool `TFunc` tBool)
 opTypes Conj    = tBool `TFunc` (tBool `TFunc` tBool)

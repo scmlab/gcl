@@ -76,6 +76,7 @@ data Tok
     | TokSub
     | TokMul
     | TokDiv
+    | TokMod
 
     | TokUpperName Text
     | TokLowerName Text
@@ -131,6 +132,7 @@ instance Show Tok where
     TokSub -> "-"
     TokMul -> "*"
     TokDiv -> "/"
+    TokMod -> "%"
     TokUpperName s -> Text.unpack s
     TokLowerName s -> Text.unpack s
     TokInt i -> show i
@@ -204,6 +206,7 @@ tokRE
   <|> TokSub          <$ text "-"
   <|> TokMul          <$ text "*"
   <|> TokDiv          <$ text "/"
+  <|> TokMod          <$ text "%"
 
   <|> TokTrue         <$ text "True"
   <|> TokFalse        <$ text "False"

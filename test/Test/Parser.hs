@@ -79,10 +79,10 @@ expression = testGroup "Expressions" $ map (toTestTree Parser.expression)
           (Const "A")
           (bin Mul (Const "X") (Const "Y"))
   , RightCase "numeric 3"
-      "(A + X) * Y"
+      "(A + X) * Y % 2"
       $ bin Mul
           (bin Add (Const "A") (Const "X"))
-          (Const "Y")
+          (bin Mod (Const "Y") (Lit (Num 2)))
   , RightCase "relation (EQ)"
       "A = B"
       $ bin EQ (Const "A") (Const "B")

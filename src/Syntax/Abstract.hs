@@ -115,7 +115,7 @@ data Expr = Var    Var
 
 data Op = EQ | NEQ | LTE | GTE | LT | GT   -- binary relations
         | Implies | Conj | Disj | Neg  -- logic operators
-        | Add | Sub | Mul | Div        -- arithmetics
+        | Add | Sub | Mul | Div | Mod       -- arithmetics
      deriving (Show, Eq, Generic)
 
 
@@ -130,10 +130,11 @@ classify LTE = Infix 5
 classify GTE = Infix 5
 classify LT = Infix 5
 classify GT = Infix 5
-classify Mul = InfixL 1
-classify Div = InfixL 1
-classify Add = InfixL 2
-classify Sub = InfixL 2
+classify Mod = InfixL 1
+classify Mul = InfixL 2
+classify Div = InfixL 2
+classify Add = InfixL 3
+classify Sub = InfixL 3
 
 -- convenient constructors
 
@@ -347,6 +348,7 @@ instance FromConcrete C.Op Op where
   fromConcrete (C.Sub   _) = pure Sub
   fromConcrete (C.Mul   _) = pure Mul
   fromConcrete (C.Div   _) = pure Div
+  fromConcrete (C.Mod   _) = pure Mod
 
 instance FromConcrete C.Stmt Stmt where
   fromConcrete (C.Assert p   loc) = Assert  <$> fromConcrete p <*> pure loc

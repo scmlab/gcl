@@ -86,7 +86,7 @@ handleExpr n (App p q) = case handleExpr n p of
     case q of
       App _ _ -> return $ s <+> parensIf n 0 t
       _ ->       return $ s <+> t
-
+handleExpr _ (Quant a x b c) = return $ pretty a <+> pretty x <+> pretty b <+> pretty c
 
 handleExpr _ (Hole i _) = return $ "[" <> pretty i <> "]"
 
@@ -119,6 +119,7 @@ instance Pretty Op where
   pretty Sub = "-"
   pretty Mul = "*"
   pretty Div = "/"
+  pretty Mod = "%"
 
 --------------------------------------------------------------------------------
 -- | Obligation & Specification
