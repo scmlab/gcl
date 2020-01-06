@@ -52,13 +52,13 @@ instance Located Stmt where
   locOf (If _ _ l)      = l
   locOf (Spec l)        = l
 
-data GdCmd = GdCmd Pred [Stmt] deriving (Eq, Show)
+data GdCmd = GdCmd Pred [Stmt] Loc deriving (Eq, Show)
 
 getGuards :: [GdCmd] -> [Pred]
 getGuards = fst . unzipGdCmds
 
 unzipGdCmds :: [GdCmd] -> ([Pred], [[Stmt]])
-unzipGdCmds = unzip . map (\(GdCmd x y) -> (x, y))
+unzipGdCmds = unzip . map (\(GdCmd x y _) -> (x, y))
 
 --------------------------------------------------------------------------------
 -- | Affixing assertions to DO or IF constructs.
@@ -375,8 +375,9 @@ instance FromConcrete [C.Stmt] [Stmt] where
   fromConcrete (x:y:xs) = affixAssertions (x:y:xs)
 
 instance FromConcrete C.GdCmd GdCmd where
-  fromConcrete (C.GdCmd p q _) = GdCmd  <$> fromConcrete p
+  fromConcrete (C.GdCmd p q l) = GdCmd  <$> fromConcrete p
                                         <*> fromConcrete q
+                                        <*> pure l
 
 instance FromConcrete C.Declaration Declaration where
   fromConcrete (C.ConstDecl p q _) = ConstDecl  <$> mapM fromConcrete p

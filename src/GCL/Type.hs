@@ -91,12 +91,12 @@ checkS cxt (Assert p l) =
 checkS cxt (Do inv bnd gcmds l) = do
   checkE l cxt inv tBool
   checkE l cxt bnd tInt
-  mapM_ (checkGdCmd l cxt) gcmds
+  mapM_ (checkGdCmd cxt) gcmds
 checkS cxt (If Nothing gcmds l) =
-  mapM_ (checkGdCmd l cxt) gcmds
+  mapM_ (checkGdCmd cxt) gcmds
 checkS cxt (If (Just pre) gcmds l) = do
   checkE l cxt pre tBool
-  mapM_ (checkGdCmd l cxt) gcmds
+  mapM_ (checkGdCmd cxt) gcmds
 checkS _ (Spec _) = return ()
 
 checkSs :: TCxt -> [Stmt] -> TM ()
@@ -107,8 +107,8 @@ checkAsgn l cxt (v,e) = do
   t <- lookupCxt l v cxt
   checkE l cxt e t
 
-checkGdCmd :: Loc -> TCxt -> GdCmd -> TM ()
-checkGdCmd l cxt (GdCmd g cmds)= do
+checkGdCmd :: TCxt -> GdCmd -> TM ()
+checkGdCmd cxt (GdCmd g cmds l)= do
   checkE l cxt g tBool
   checkSs cxt cmds
 

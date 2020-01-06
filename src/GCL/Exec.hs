@@ -43,10 +43,10 @@ execStmt (Assert _ _) = return ()
 execStmt (Spec _) = error "spec cannot be executed"
 execStmt (If _ gcmds l) =
   shuffle gcmds >>=
-  pickGCmds l (return ()) (throwError (AllFailedInIf l))
+  pickGCmds (return ()) (throwError (AllFailedInIf l))
 execStmt (Do pre bnd gcmds l) =
   shuffle gcmds >>=
-  pickGCmds l (execStmt (Do pre bnd gcmds l)) (return ())
+  pickGCmds (execStmt (Do pre bnd gcmds l)) (return ())
 
 execStmts :: ExecMonad m => [Stmt] -> m ()
 execStmts [] = return ()
@@ -61,19 +61,18 @@ execAsgn xs es l = do
  --      but I need a way to distinguish between "all choices failed"
  --      and "end of choices after some succssful executions".
 
-pickGCmds :: ExecMonad m =>
-             Loc -> m () -> m () -> [GdCmd] -> m ()
-pickGCmds _ _    ex [] = ex -- no branch has succeeded
-pickGCmds l cont ex (GdCmd g cmds : gs) =
+pickGCmds :: ExecMonad m => m () -> m () -> [GdCmd] -> m ()
+pickGCmds _    ex [] = ex -- no branch has succeeded
+pickGCmds cont ex (GdCmd g cmds l : gs) =
   evalExpr l g >>= \case
-    VBol False -> pickGCmds l cont ex gs
+    VBol False -> pickGCmds cont ex gs
     VBol True ->  (execStmts cmds >> cont) `mplus`
                   pickGCmds' gs
     _ -> error "type error, shouldn't happen"
  where -- pickGCmds -- some branch has succeeded
        pickGCmds' [] = mzero
-       pickGCmds' (GdCmd g' cmds' : gs') =
-         evalExpr l g' >>= \case
+       pickGCmds' (GdCmd g' cmds' l' : gs') =
+         evalExpr l' g' >>= \case
            VBol False -> pickGCmds' gs'
            VBol True ->  (execStmts cmds' >> cont) `mplus`
                          pickGCmds' gs'
