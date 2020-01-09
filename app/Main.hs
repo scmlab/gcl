@@ -94,6 +94,9 @@ handleRequest (Refine i payload) = do
 
   return True
 
+handleRequest Debug = do
+  error "crash!"
+
 handleRequest Quit = do
   return False
 
