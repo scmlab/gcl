@@ -65,6 +65,16 @@ send payload = do
 --------------------------------------------------------------------------------
 -- | Request
 
+
+data Request = Load FilePath | Refine Int Text | Debug | Quit
+  deriving (Generic)
+
+instance FromJSON Request where
+instance ToJSON Request where
+
+--------------------------------------------------------------------------------
+-- | Response
+
 data Response
   = OK [Obligation] [Specification]
   | Error [(Site, Error)]
@@ -72,16 +82,6 @@ data Response
   deriving (Generic)
 
 instance ToJSON Response where
-
---------------------------------------------------------------------------------
--- | Response
-
-
-data Request = Load FilePath | Refine Int Text | Quit
-  deriving (Generic)
-
-instance FromJSON Request where
-instance ToJSON Request where
 
 --------------------------------------------------------------------------------
 -- | Instances of ToJSON
