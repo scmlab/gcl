@@ -20,6 +20,7 @@ import Syntax.Abstract hiding (var)
 import Syntax.Concrete (Fixity(..))
 import GCL.PreCond (Obligation(..), Specification(..))
 import GCL.Type (TypeError(..))
+import GCL.Exec.ExecMonad (Val(..))
 
 --------------------------------------------------------------------------------
 -- | Expr
@@ -189,7 +190,13 @@ instance Pretty TypeError where
   pretty (NotFunction a _) = "The type" <+> pretty a <+> "is not a function type"
 
 --------------------------------------------------------------------------------
--- | Misc
+-- | Val
 
 instance Pretty Loc where
   pretty = pretty . displayLoc
+
+--------------------------------------------------------------------------------
+-- | Misc
+
+instance Pretty Val where
+  pretty = pretty . show 

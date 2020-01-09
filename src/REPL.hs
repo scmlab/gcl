@@ -8,6 +8,7 @@ import Data.Bifunctor (first)
 import qualified Data.ByteString.Lazy.Char8 as BS
 import qualified Data.ByteString.Char8 as Strict
 import Data.Text.Lazy (Text)
+import Data.Either (lefts)
 import GHC.Generics
 import System.IO
 
@@ -19,6 +20,9 @@ import qualified Syntax.Parser.Lexer as Lexer
 import qualified Syntax.Parser as Parser
 import qualified Syntax.Concrete as Concrete
 import qualified Syntax.Abstract as Abstract
+import qualified GCL.Exec.ExecMonad as Exec
+import qualified GCL.Exec.ExNondet as Exec
+import qualified GCL.Exec as Exec
 
 scan :: FilePath -> Text -> Either [Error] TokStream
 scan filepath = first (\x -> [LexicalError x]) . Lexer.scan filepath
@@ -37,6 +41,12 @@ abstract = first (\x -> [ConvertError x]) . Abstract.abstract
 
 typeCheck :: Abstract.Program -> Either [Error] ()
 typeCheck = first (\x -> [TypeError x]) . Type.runTM . Type.checkProg
+
+execute :: Abstract.Program -> Either [Error] [Exec.Store]
+execute program = if null errors then Right stores else Left errors
+  where
+    errors = map ExecError $ lefts results
+    (results, stores) = unzip $ Exec.runExNondet (Exec.execProg program) Exec.prelude
 
 sweep :: Abstract.Program -> Either [Error] ([Obligation], [Specification])
 sweep (Abstract.Program _ Nothing) = return ([], [])

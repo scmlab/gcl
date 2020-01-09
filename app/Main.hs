@@ -31,10 +31,11 @@ main = do
             program <- abstract syntax
             typeCheck program
             (obligations, specifications) <- sweep program
-            return (tokens, program, obligations, specifications)
+            stores <- execute program
+            return (tokens, program, obligations, specifications, stores)
 
       case run of
-        Right (tokens, program, obligations, specifications) -> do
+        Right (tokens, program, obligations, specifications, stores) -> do
 
           -- putStrLn "=== raw ==="
           -- Text.putStrLn raw
@@ -50,6 +51,9 @@ main = do
 
           putStrLn "\n=== specifications ==="
           mapM_ (print . pretty) specifications
+
+          putStrLn "\n=== execution (stores) ==="
+          mapM_ (print . pretty) stores
 
         Left errors -> do
           mapM_ (print . pretty) errors

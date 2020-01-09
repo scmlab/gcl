@@ -13,6 +13,7 @@ import Syntax.Parser.Lexer (LexicalError)
 import Syntax.Parser (SyntacticError)
 import Syntax.Abstract (ConvertError)
 import GCL.Type (TypeError)
+import GCL.Exec.ExecMonad (ExecError)
 
 --------------------------------------------------------------------------------
 -- | Site of Error
@@ -32,6 +33,7 @@ data Error
   | SyntacticError  SyntacticError
   | TypeError       TypeError
   | ConvertError    ConvertError
+  | ExecError       ExecError
   deriving (Eq, Show, Generic)
 
 instance Located Error where
@@ -39,6 +41,7 @@ instance Located Error where
   locOf (SyntacticError (loc, _)) = loc
   locOf (TypeError e) = locOf e
   locOf (ConvertError e) = locOf e
+  locOf (ExecError e) = locOf e
 
 fromLocalError :: Int -> Error -> (Site, Error)
 fromLocalError i e = (Local (locOf e) i, e)
@@ -47,14 +50,3 @@ fromGlobalError :: Error -> (Site, Error)
 fromGlobalError e = (Global (locOf e), e)
 
 instance ToJSON Error where
-
-
--- --------------------------------------------------------------------------------
--- -- | Type Error
---
--- data TypeError
---   = NotInScope Text Loc
---   | UnifyFailed Type Type Loc
---   | RecursiveType TVar Type Loc
---   | NotFunction Type Loc
---   deriving (Show, Eq)
