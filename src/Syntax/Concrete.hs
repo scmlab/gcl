@@ -26,6 +26,12 @@ data Stmt
 
 data GdCmd = GdCmd Expr [Stmt] Loc deriving (Show)
 
+getGuards :: [GdCmd] -> [Expr]
+getGuards = fst . unzipGdCmds
+
+unzipGdCmds :: [GdCmd] -> ([Expr], [[Stmt]])
+unzipGdCmds = unzip . map (\(GdCmd x y _) -> (x, y))
+
 --------------------------------------------------------------------------------
 -- | Types
 
@@ -106,3 +112,6 @@ data Upper = Upper Text Loc
 
 data Lower = Lower Text Loc
   deriving (Show)
+
+lowerToText :: Lower -> Text
+lowerToText (Lower x _) = x
