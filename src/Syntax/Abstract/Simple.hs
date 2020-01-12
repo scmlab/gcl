@@ -1,100 +1,19 @@
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE TypeSynonymInstances #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies #-}
 
-module Syntax.Abstract where
+module Syntax.Abstract.Simple where
 
-import Control.Monad.State
-import Control.Monad.Except
+import Control.Monad (liftM2)
 
 import Data.List ((\\))
 import Data.Aeson
 import Data.Text.Lazy (Text, pack)
-import Data.Loc
 import GHC.Generics (Generic)
 import Prelude hiding (Ordering(..))
--- import Data.Text.Prettyprint.Doc
 
 import Syntax.Concrete (Fixity(..))
-import qualified Syntax.Concrete as C
 import Type ()
 
 type Index = Int
-
-data Program = Program
-                [Declaration]               -- declarations
-                (Maybe ([Stmt], Pred, Loc)) -- statements + postcondition
-              deriving (Eq, Show)
-
-data Declaration
-  = ConstDecl [Const] Type
-  | VarDecl [Var] Type
-  deriving (Eq, Show)
-
-data Stmt
-  = Skip                          Loc
-  | Abort                         Loc
-  | Assign  [Var] [Expr]          Loc
-  | Assert  Pred                  Loc
-  | Do      Pred Expr [GdCmd]     Loc
-  | If      (Maybe Pred) [GdCmd]  Loc
-  | Spec                          Loc
-  deriving (Eq, Show)
-
-instance Located Stmt where
-  locOf (Skip l)        = l
-  locOf (Abort l)       = l
-  locOf (Assign _ _ l)  = l
-  locOf (Assert _ l)    = l
-  locOf (Do _ _ _ l)    = l
-  locOf (If _ _ l)      = l
-  locOf (Spec l)        = l
-
-data GdCmd = GdCmd Pred [Stmt] Loc deriving (Eq, Show)
-
-getGuards :: [GdCmd] -> [Pred]
-getGuards = fst . unzipGdCmds
-
-unzipGdCmds :: [GdCmd] -> ([Pred], [[Stmt]])
-unzipGdCmds = unzip . map (\(GdCmd x y _) -> (x, y))
-
---------------------------------------------------------------------------------
--- | Affixing assertions to DO or IF constructs.
-
-infixr 3 <:>
-(<:>) :: Monad m => m a -> m [a] -> m [a]
-(<:>) = liftM2 (:)
-
-affixAssertions :: [C.Stmt] -> AbstractM [Stmt]
--- affixAssertions = undefined
-affixAssertions      []  = return []
-affixAssertions (  x:[]) = (:) <$> fromConcrete x <*> pure []
-affixAssertions (x:y:xs) = case (x, y) of
-  -- AssertWithBnd + DO : affix!
-  (C.AssertWithBnd p e _, C.Do q loc) ->
-    Do  <$> fromConcrete p <*> fromConcrete e <*> mapM fromConcrete q <*> pure loc
-        <:> affixAssertions xs
-
-  -- AssertWithBnd + _
-  (C.AssertWithBnd _ _ loc, _) -> throwError $ ExcessBound loc
-
-  -- Assert + DO
-  (C.Assert _ loc, C.Do _ _) -> throwError $ MissingBound loc
-
-  -- Assert + If : affix!
-  (C.Assert p _, C.If q loc) ->
-    If  <$> fmap Just (fromConcrete p)
-        <*> mapM fromConcrete q
-        <*> pure loc
-        <:> affixAssertions xs
-
-  -- _ + Do
-  (_, C.Do _ loc) -> throwError $ MissingAssertion loc
-
-  -- otherwise
-  _  -> fromConcrete x <:> affixAssertions (y:xs)
 
 --------------------------------------------------------------------------------
 -- | Predicates and Expressions
@@ -166,13 +85,17 @@ litB = Lit . Bol
 litC :: Char -> Expr
 litC = Lit . Chr
 
+tt, ff :: Pred
+tt = Lit (Bol True)
+ff = Lit (Bol False)
+
 conjunct :: [Pred] -> Pred
-conjunct []     = Lit (Bol True)
+conjunct []     = tt
 conjunct [p]    = p
 conjunct (p:ps) = p `conj` conjunct ps
 
 disjunct :: [Pred] -> Pred
-disjunct []     = Lit (Bol False)
+disjunct []     = ff
 disjunct [p]    = p
 disjunct (p:ps) = p `disj` disjunct ps
 
@@ -276,80 +199,90 @@ instance ToJSON Interval where
 instance ToJSON TBase where
 instance ToJSON Type where
 
+---- obsolete. Kept temporarily
+
+
+{-
+data Program = Program
+                [Declaration]               -- declarations
+                (Maybe ([Stmt], Pred, Loc)) -- statements + postcondition
+              deriving (Eq, Show)
+
+data Declaration
+  = ConstDecl [Const] Type
+  | VarDecl [Var] Type
+  deriving (Eq, Show)
+-}
+{-
+data Stmt
+  = Skip                          Loc
+  | Abort                         Loc
+  | Assign  [Var] [Expr]          Loc
+  | Assert  Pred                  Loc
+  | Do      Pred Expr [GdCmd]     Loc
+  | If      (Maybe Pred) [GdCmd]  Loc
+  | Spec                          Loc
+  deriving (Eq, Show)
+
+
+instance Located Stmt where
+  locOf (Skip l)        = l
+  locOf (Abort l)       = l
+  locOf (Assign _ _ l)  = l
+  locOf (Assert _ l)    = l
+  locOf (Do _ _ _ l)    = l
+  locOf (If _ _ l)      = l
+  locOf (Spec l)        = l
+
+data GdCmd = GdCmd Pred [Stmt] Loc deriving (Eq, Show)
+
+getGuards :: [GdCmd] -> [Pred]
+getGuards = fst . unzipGdCmds
+
+unzipGdCmds :: [GdCmd] -> ([Pred], [[Stmt]])
+unzipGdCmds = unzip . map (\(GdCmd x y _) -> (x, y))
+
+--------------------------------------------------------------------------------
+-- | Affixing assertions to DO or IF constructs.
+
+infixr 3 <:>
+(<:>) :: Monad m => m a -> m [a] -> m [a]
+(<:>) = liftM2 (:)
+
+affixAssertions :: [C.Stmt] -> AbstractM [Stmt]
+-- affixAssertions = undefined
+affixAssertions      []  = return []
+affixAssertions (  x:[]) = (:) <$> fromConcrete x <*> pure []
+affixAssertions (x:y:xs) = case (x, y) of
+  -- AssertWithBnd + DO : affix!
+  (C.AssertWithBnd p e _, C.Do q loc) ->
+    Do  <$> fromConcrete p <*> fromConcrete e <*> mapM fromConcrete q <*> pure loc
+        <:> affixAssertions xs
+
+  -- AssertWithBnd + _
+  (C.AssertWithBnd _ _ loc, _) -> throwError $ ExcessBound loc
+
+  -- Assert + DO
+  (C.Assert _ loc, C.Do _ _) -> throwError $ MissingBound loc
+
+  -- Assert + If : affix!
+  (C.Assert p _, C.If q loc) ->
+    If  <$> fmap Just (fromConcrete p)
+        <*> mapM fromConcrete q
+        <*> pure loc
+        <:> affixAssertions xs
+
+  -- _ + Do
+  (_, C.Do _ loc) -> throwError $ MissingAssertion loc
+
+  -- otherwise
+  _  -> fromConcrete x <:> affixAssertions (y:xs)
+-}
+
 --------------------------------------------------------------------------------
 -- Converting from Concrete Syntax Tree
 
-type AbstractM = ExceptT ConvertError (State Index)
-
-abstract :: FromConcrete a b => a -> Either ConvertError b
-abstract = runAbstractM . fromConcrete
-
-runAbstractM :: AbstractM a -> Either ConvertError a
-runAbstractM f = evalState (runExceptT f) 0
-
--- returns the current index and increment it in the state
-index :: AbstractM Index
-index = do
-  i <- get
-  put (succ i)
-  return i
-
-class FromConcrete a b | a -> b where
-  fromConcrete :: a -> AbstractM b
-
-instance FromConcrete C.Lit Lit where
-  fromConcrete (C.Num x) = Num <$> pure x
-  fromConcrete (C.Bol x) = Bol <$> pure x
-
-instance FromConcrete C.Upper Const where
-  fromConcrete (C.Upper x _) = pure x
-
-instance FromConcrete C.Lower Var where
-  fromConcrete (C.Lower x _) = pure x
-
-instance FromConcrete C.Base TBase where
-  fromConcrete C.TInt = return TInt
-  fromConcrete C.TBool = return TBool
-  fromConcrete C.TChar = return TChar
-
-instance FromConcrete C.Endpoint Endpoint where
-  fromConcrete (C.Including x) = Including <$> fromConcrete x
-  fromConcrete (C.Excluding x) = Excluding <$> fromConcrete x
-
-instance FromConcrete C.Interval Interval where
-  fromConcrete (C.Interval a b _) = Interval <$> fromConcrete a <*> fromConcrete b
-
-instance FromConcrete C.Type Type where
-  fromConcrete (C.TBase base _) = TBase <$> fromConcrete base
-  fromConcrete (C.TArray i s _) = TArray <$> fromConcrete i <*> fromConcrete s
-  fromConcrete (C.TFunc s t _) = TFunc <$> fromConcrete s <*> fromConcrete t
-  fromConcrete (C.TVar x _) = TVar <$> fromConcrete x
-
-instance FromConcrete C.Expr Expr where
-  fromConcrete (C.Var x    _) = Var   <$> fromConcrete x
-  fromConcrete (C.Const x  _) = Const <$> fromConcrete x
-  fromConcrete (C.Lit x    _) = Lit   <$> fromConcrete x
-  fromConcrete (C.App x y  _) = App   <$> fromConcrete x <*> fromConcrete y
-  fromConcrete (C.Op  x    _) = Op    <$> fromConcrete x
-  fromConcrete (C.Hole     _) = Hole  <$> index <*> pure []
-
-instance FromConcrete C.Op Op where
-  fromConcrete (C.EQ  _) = pure EQ
-  fromConcrete (C.NEQ  _) = pure NEQ
-  fromConcrete (C.LTE _) = pure LTE
-  fromConcrete (C.GTE _) = pure GTE
-  fromConcrete (C.LT  _) = pure LT
-  fromConcrete (C.GT  _) = pure GT
-  fromConcrete (C.Implies _) = pure Implies
-  fromConcrete (C.Conj  _) = pure Conj
-  fromConcrete (C.Disj  _) = pure Disj
-  fromConcrete (C.Neg   _) = pure Neg
-  fromConcrete (C.Add   _) = pure Add
-  fromConcrete (C.Sub   _) = pure Sub
-  fromConcrete (C.Mul   _) = pure Mul
-  fromConcrete (C.Div   _) = pure Div
-  fromConcrete (C.Mod   _) = pure Mod
-
+{-
 instance FromConcrete C.Stmt Stmt where
   fromConcrete (C.Assert p   loc) = Assert  <$> fromConcrete p <*> pure loc
   fromConcrete (C.Skip       loc) = Skip    <$> pure loc
@@ -420,3 +353,4 @@ instance Located ConvertError where
   locOf (Panic _) = NoLoc
 
 instance ToJSON ConvertError where
+-}
