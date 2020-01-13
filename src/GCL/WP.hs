@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings, FlexibleContexts, DeriveGeneric,
              TypeSynonymInstances, FlexibleInstances #-}
 
-module GCL.PreCond where
+module GCL.WP where
 
 import Control.Monad.State hiding (guard)
 import Control.Monad.Writer hiding (guard)
@@ -60,31 +60,31 @@ tellSpec h p q loc = do
 --------------------------------------------------------------------------------
 -- | Structure, and Weakest-Precondition
 
-structure :: Bool -> Pred -> Maybe (A.Expr) -> Stmt -> Pred -> SM ()
+struct :: Bool -> Pred -> Maybe (A.Expr) -> Stmt -> Pred -> SM ()
 
-structure _ pre _ (Abort _) _ = obligate pre A.ff
+struct _ pre _ (Abort _) _ = obligate pre A.ff
 
-structure _ pre _ (Skip _) post = obligate pre post
+struct _ pre _ (Skip _) post = obligate pre post
 
-structure _ pre _ (Assert p _) post =
+struct _ pre _ (Assert p _) post =
    obligate pre p' >> obligate p' post
   where p' = depart p
 
-structure _ _ _ (AssertWithBnd _ _ l) _ =
+struct _ _ _ (AssertWithBnd _ _ l) _ =
    throwError (ExcessBound l)
 
-structure _ pre _ (Assign xs es _) post = do
+struct _ pre _ (Assign xs es _) post = do
   post' <- A.subst (zip (map lowerToText xs)
                         (map depart es)) post
   obligate pre post'
 
-structure b pre _ (If gcmds _) post = do
+struct b pre _ (If gcmds _) post = do
   let guards = map depart (getGuards gcmds)
   obligate pre (A.disjunct guards)
   forM_ gcmds $ \(GdCmd guard body _) ->
     structStmts b (pre `A.conj` depart guard) Nothing body post
 
-structure _ _ Nothing (Do _ l) _ =
+struct _ _ Nothing (Do _ l) _ =
   throwError (MissingBound l)
  {- Or if we want to tolerate the user and carry on ---
  do -- warn that bnd is missing
@@ -96,7 +96,7 @@ structure _ _ Nothing (Do _ l) _ =
     structStmts b (inv `A.conj` guard) Nothing body inv
  -}
 
-structure b inv (Just bnd) (Do gcmds _) post = do
+struct b inv (Just bnd) (Do gcmds _) post = do
   -- base case
   let gcmds' = map (\(GdCmd x y _) -> (depart x, y)) gcmds
   let guards = map fst gcmds'
@@ -112,8 +112,8 @@ structure b inv (Just bnd) (Do gcmds _) post = do
   forM_ gcmds' $ \(guard, body) -> do
     structStmts False (inv `A.conj` guard) Nothing body invB
 
-structure b pre _ (SpecQM l) post = when b (tellSpec Soft pre post l)
-structure b pre _ (Spec l) post = when b (tellSpec Soft pre post l)
+struct b pre _ (SpecQM l) post = when b (tellSpec Soft pre post l)
+struct b pre _ (Spec l) post = when b (tellSpec Soft pre post l)
 
 
 structStmts :: Bool -> Pred -> Maybe (A.Expr) -> [Stmt] -> Pred -> SM ()
@@ -132,7 +132,7 @@ structStmts b pre _ (AssertWithBnd p bnd _ : stmts) post =
 
 structStmts b pre bnd (stmt : stmts) post = do
   post' <- wpStmts b stmts post
-  structure b pre bnd stmt post'
+  struct b pre bnd stmt post'
 
 
 wpStmts :: Bool -> [Stmt] -> Pred -> SM Pred

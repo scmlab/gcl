@@ -2,14 +2,16 @@ module SCM.Test where
 
 import qualified Data.Text.Lazy.IO as Text
 
--- import REPL
 import Prelude
+import Data.Text.Prettyprint.Doc
 import Data.Text.Internal.Lazy
+
+-- import REPL
 import Syntax.Parser.Lexer (TokStream)
 import qualified Syntax.Parser.Lexer as Lexer
 import qualified Syntax.Parser as Parser
 import Syntax.Concrete
--- import Pretty ()
+
 -- import System.Random
 
 -- import GCL.Type
@@ -17,7 +19,10 @@ import Syntax.Concrete
 -- import GCL.Exec
 -- import GCL.Exec.ExNondet
 -- import GCL.Exec.ExRand
-import GCL.PreCond
+import GCL.WP
+
+import Pretty.Abstract.Simple ()
+import Pretty.GCL.WP ()
 
 runtst :: String -> IO ()
 runtst filepath = do
@@ -32,10 +37,19 @@ runtst filepath = do
 
         case parseProgram filepath scanned of
          Left errors -> print errors
-         Right (program@(Program _ stmts _)) -> do
+         Right (Program _ stmts _) -> do
           -- print program
           -- putStr "\n"
-          print (runWP (wpProg stmts))
+          -- Either StructError ((a, [Obligation]), [Specification])
+          case runSM (wpProg stmts) (0,0,0) of
+            Left err -> print err
+            Right (((_, obs), specs), state) -> do
+              putStrLn "== obligations"
+              pprintLs obs
+              putStrLn "== specs"
+              pprintLs specs
+              putStrLn "== state"
+              print state
            {-
            case runTM' (checkProg program) of
              (Left terr, tstate) -> print terr >> putStr "\n" >> print tstate
@@ -46,6 +60,13 @@ runtst filepath = do
                 putStr "\n"
                 print (runExRand (execProg program) prelude (mkStdGen 813))
             -}
+
+pprintLs :: Pretty a => [a] -> IO ()
+pprintLs [] = return ()
+pprintLs (x:xs) =
+  putStrLn (show (pretty x)) >>
+  -- putStr "\n" >>
+  pprintLs xs
 
 -- Copied from REPL, so that I can run this file
 --   without making all changes consistant across all modules
