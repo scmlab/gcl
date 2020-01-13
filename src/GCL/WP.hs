@@ -11,7 +11,7 @@ import Data.Loc (Loc(..), Located(..))
 import Data.Aeson
 import GHC.Generics
 
-import Syntax.Concrete
+import Syntax.Abstract
 import Syntax.Abstract.Simple (Fresh(..))
 import qualified Syntax.Abstract.Simple as A
 import Syntax.Abstract.Location
@@ -20,10 +20,8 @@ type Pred = A.Expr
 type Index = A.Index
 
 data Obligation = Obligation Index Pred Pred deriving (Show, Generic)
-data Hardness = Hard | Soft deriving (Show, Generic) -- should be depreciated
 data Specification = Specification
   { specID       :: Int
-  , specHardness :: Hardness
   , specPreCond  :: Pred
   , specPostCond :: Pred
   , specLoc      :: Loc
@@ -51,11 +49,11 @@ obligate p q = do
 
 -- inform existence of a spec hole
 
-tellSpec :: Hardness -> Pred -> Pred -> Loc -> SM ()
-tellSpec h p q loc = do
+tellSpec :: Pred -> Pred -> Loc -> SM ()
+tellSpec p q loc = do
   (i, j, k) <- get
   put (i, succ j, k)
-  lift $ tell [Specification j h p q loc]
+  lift $ tell [Specification j p q loc]
 
 --------------------------------------------------------------------------------
 -- | Structure, and Weakest-Precondition
@@ -110,10 +108,10 @@ struct b inv (Just bnd) (Do gcmds _) post = do
   oldbnd <- freshVar "bnd"
   let invB = inv `A.conj` (bnd `A.eqq` A.Var oldbnd)
   forM_ gcmds' $ \(guard, body) -> do
-    structStmts False (inv `A.conj` guard) Nothing body invB
+    structStmts False (invB `A.conj` guard) Nothing body (bnd `A.lte` A.Var oldbnd)
 
-struct b pre _ (SpecQM l) post = when b (tellSpec Soft pre post l)
-struct b pre _ (Spec l) post = when b (tellSpec Soft pre post l)
+struct b pre _ (SpecQM l) post = when b (tellSpec pre post l)
+struct b pre _ (Spec l) post = when b (tellSpec pre post l)
 
 
 structStmts :: Bool -> Pred -> Maybe (A.Expr) -> [Stmt] -> Pred -> SM ()
@@ -133,6 +131,19 @@ structStmts b pre _ (AssertWithBnd p bnd _ : stmts) post =
 structStmts b pre bnd (stmt : stmts) post = do
   post' <- wpStmts b stmts post
   struct b pre bnd stmt post'
+
+structProg :: [Stmt] -> SM ()
+structProg [] = return ()
+structProg (Assert pre _ : stmts) =
+  case (init stmts, last stmts) of
+    (stmts', Assert post _) ->
+       structStmts True (depart pre) Nothing stmts' (depart post)
+    (_, stmt) -> throwError (MissingPostcondition (locOf stmt))
+structProg stmts =
+  case (init stmts, last stmts) of
+    (stmts', Assert post _) ->
+       structStmts True A.tt Nothing stmts' (depart post)
+    (_, stmt) -> throwError (MissingPostcondition (locOf stmt))
 
 
 wpStmts :: Bool -> [Stmt] -> Pred -> SM Pred
@@ -179,10 +190,10 @@ wp b (If gcmds _) post = do
 wp _ (Do _ l) _ = throwError (MissingAssertion l)
 
 wp b (SpecQM l) post =
-  when b (tellSpec Soft post post l) >> return post  -- not quite right
+  when b (tellSpec post post l) >> return post  -- not quite right
 
 wp b (Spec l) post =
-  when b (tellSpec Soft post post l) >> return post  -- not quite right
+  when b (tellSpec post post l) >> return post  -- not quite right
 
 wpProg :: [Stmt] -> SM Pred
 wpProg [] = return A.tt

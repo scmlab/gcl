@@ -16,6 +16,6 @@ instance Pretty Obligation where
     indent 2 (pretty q) <> line
 
 instance Pretty Specification where
-  pretty (Specification i hardness p q _) = lbracket <> pretty i <> rbracket <+> pretty (show hardness) <> line <>
+  pretty (Specification i p q _) = lbracket <> pretty i <> rbracket <> line <>
     indent 2 (pretty p) <> line <>
     indent 2 (pretty q) <> line

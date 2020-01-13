@@ -7,7 +7,7 @@ import Prelude hiding (Ordering(..))
 
 import Data.Loc
 
-import qualified Syntax.Concrete as C
+import qualified Syntax.Abstract as C
 import Syntax.Abstract.Simple
 
 instance Located C.Stmt where

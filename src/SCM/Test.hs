@@ -10,7 +10,7 @@ import Data.Text.Internal.Lazy
 import Syntax.Parser.Lexer (TokStream)
 import qualified Syntax.Parser.Lexer as Lexer
 import qualified Syntax.Parser as Parser
-import Syntax.Concrete
+import Syntax.Abstract
 
 -- import System.Random
 
@@ -41,7 +41,7 @@ runtst filepath = do
           -- print program
           -- putStr "\n"
           -- Either StructError ((a, [Obligation]), [Specification])
-          case runSM (wpProg stmts) (0,0,0) of
+          case runSM (structProg stmts) (0,0,0) of
             Left err -> print err
             Right (((_, obs), specs), state) -> do
               putStrLn "== obligations"

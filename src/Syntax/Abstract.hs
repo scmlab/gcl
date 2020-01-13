@@ -1,4 +1,4 @@
-module Syntax.Concrete where
+module Syntax.Abstract where
 
 import Data.Loc
 import Data.Text.Lazy (Text)

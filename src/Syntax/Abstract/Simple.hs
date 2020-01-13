@@ -10,7 +10,7 @@ import Data.Text.Lazy (Text, pack)
 import GHC.Generics (Generic)
 import Prelude hiding (Ordering(..))
 
-import Syntax.Concrete (Fixity(..))
+import Syntax.Abstract (Fixity(..))
 import Type ()
 
 type Index = Int
