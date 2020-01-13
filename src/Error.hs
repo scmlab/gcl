@@ -13,7 +13,8 @@ import Syntax.Parser.Lexer (LexicalError)
 import Syntax.Parser (SyntacticError)
 -- import Syntax.Abstract (ConvertError)
 import GCL.Type (TypeError)
-import GCL.Exec.ExecMonad (ExecError)
+-- import GCL.Exec.ExecMonad (ExecError)
+import GCL.WP (StructError)
 
 --------------------------------------------------------------------------------
 -- | Site of Error
@@ -32,16 +33,16 @@ data Error
   = LexicalError    LexicalError
   | SyntacticError  SyntacticError
   | TypeError       TypeError
-  -- | ConvertError    ConvertError
-  | ExecError       ExecError
+  | StructError     StructError
+  -- | ExecError       ExecError
   deriving (Eq, Show, Generic)
 
 instance Located Error where
   locOf (LexicalError pos) = Loc pos pos
   locOf (SyntacticError (loc, _)) = loc
   locOf (TypeError e) = locOf e
-  -- locOf (ConvertError e) = locOf e
-  locOf (ExecError e) = locOf e
+  locOf (StructError e) = locOf e
+  -- locOf (ExecError e) = locOf e
 
 fromLocalError :: Int -> Error -> (Site, Error)
 fromLocalError i e = (Local (locOf e) i, e)

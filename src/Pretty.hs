@@ -3,29 +3,19 @@
 {-# LANGUAGE TypeSynonymInstances, FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 
-module Pretty
-  ( module Pretty.Abstract
-  , module Pretty.GCL.WP
-  ) where
+module Pretty where
 
 import Data.Text.Prettyprint.Doc
-import Control.Monad ((>=>))
 import Prelude hiding (Ordering(..))
 import Data.Loc
-import Text.Megaparsec.Error (errorBundlePretty)
 
 import Error
 import Syntax.Parser.Lexer (LexicalError)
-import Syntax.Parser (SyntacticError(..))
-import Syntax.Abstract hiding (var)
--- import Syntax.Abstract (Expr(..), Lit(..), Op(..), classify, Type(..), TBase(..))
-import Syntax.Concrete (Fixity(..))
-import GCL.WP (Obligation(..), Specification(..))
+import GCL.WP (StructError(..))
 import GCL.Type (TypeError(..))
--- import GCL.Exec.ExecMonad (Val(..))
 
-import Pretty.Abstract
-import Pretty.GCL.WP
+import Pretty.Abstract ()
+import Pretty.GCL.WP ()
 
 --------------------------------------------------------------------------------
 -- | Error
@@ -35,10 +25,17 @@ instance Pretty Error where
   pretty (SyntacticError (loc, err)) = "Syntactic Error" <+> pretty loc <> line
     <> pretty err
   pretty (TypeError err) = "Type Error" <+> pretty (locOf err) <> line <> pretty err
-  -- pretty (ConvertError err) = "AST Convert Error" <+> pretty (locOf err) <> line <> pretty err
+  pretty (StructError err) = "Struct Error" <+> pretty (locOf err) <> line <> pretty err
 
 instance Pretty LexicalError where
--- instance Pretty ConvertError where
+  pretty = pretty
+
+instance Pretty StructError where
+  pretty (MissingAssertion loc) = "Missing Assertion" <+> pretty loc
+  pretty (MissingBound loc) = "Missing Bound" <+> pretty loc
+  pretty (ExcessBound loc) = "Excess Bound" <+> pretty loc
+  pretty (MissingPostcondition loc) = "Missing Postcondition" <+> pretty loc
+  pretty (DigHole loc) = "Dig Hole" <+> pretty loc
 
 instance Pretty TypeError where
   pretty (NotInScope name _) = "The definition" <+> pretty name <+> "is not in scope"

@@ -8,21 +8,19 @@ import Data.Bifunctor (first)
 import qualified Data.ByteString.Lazy.Char8 as BS
 import qualified Data.ByteString.Char8 as Strict
 import Data.Text.Lazy (Text)
-import Data.Either (lefts)
 import GHC.Generics
 import System.IO
 
 import Error
 import GCL.WP
-import GCL.Type as Type
+-- import GCL.Type as Type
 import Syntax.Parser.Lexer (TokStream)
 import qualified Syntax.Parser.Lexer as Lexer
 import qualified Syntax.Parser as Parser
 import qualified Syntax.Concrete as Concrete
-import qualified Syntax.Abstract as Abstract
-import qualified GCL.Exec.ExecMonad as Exec
-import qualified GCL.Exec.ExNondet as Exec
-import qualified GCL.Exec as Exec
+-- import qualified GCL.Exec.ExecMonad as Exec
+-- import qualified GCL.Exec.ExNondet as Exec
+-- import qualified GCL.Exec as Exec
 
 scan :: FilePath -> Text -> Either [Error] TokStream
 scan filepath = first (\x -> [LexicalError x]) . Lexer.scan filepath
@@ -48,17 +46,10 @@ parseSpec = parse Parser.specContent "<specification>"
 --     errors = map ExecError $ lefts results
 --     (results, stores) = unzip $ Exec.runExNondet (Exec.execProg program) Exec.prelude
 
--- NOTE: convertion
 sweep :: Concrete.Program -> Either [Error] ([Obligation], [Specification])
--- sweep (Program statements postcondition _) = return ([], [])
 sweep (Concrete.Program _ statements _) = case runWP (wpProg statements) of
     Right ((_, obligations), specifications) -> return (obligations, specifications)
-    Left _ -> undefined
-
--- sweep (Program _ Nothing) = return ([], [])
--- sweep (Program _ (Just (statements, postcondition, _))) =
---     let ((_, obligations), specifications) = runM $ precondStmts statements postcondition
---     in return (obligations, specifications)
+    Left err -> Left [StructError err]
 
 recv :: FromJSON a => IO (Maybe a)
 recv = decode . BS.fromStrict <$> Strict.getLine

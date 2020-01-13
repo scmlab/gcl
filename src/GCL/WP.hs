@@ -33,12 +33,6 @@ type SM = WriterT [Obligation] (WriterT [Specification]
                 (StateT (Int, Int, Int)
                   (Either StructError)))
 
-data StructError = MissingAssertion Loc
-                 | MissingBound Loc
-                 | ExcessBound  Loc
-                 | MissingPostcondition Loc
-      deriving (Eq, Show, Generic)
-
 -- create a proof obligation
 
 obligate :: Pred -> Pred -> SM ()
@@ -112,7 +106,7 @@ struct b inv (Just bnd) (Do gcmds _) post = do
   forM_ gcmds' $ \(guard, body) -> do
     structStmts False (inv `A.conj` guard) Nothing body invB
 
-struct b pre _ (SpecQM l) post = when b (tellSpec Soft pre post l)
+struct _ _ _ (SpecQM l) _ = throwError $ DigHole l
 struct b pre _ (Spec l) post = when b (tellSpec Soft pre post l)
 
 
@@ -178,8 +172,7 @@ wp b (If gcmds _) post = do
 
 wp _ (Do _ l) _ = throwError (MissingAssertion l)
 
-wp b (SpecQM l) post =
-  when b (tellSpec Soft post post l) >> return post  -- not quite right
+wp _ (SpecQM l) _ = throwError $ DigHole l
 
 wp b (Spec l) post =
   when b (tellSpec Soft post post l) >> return post  -- not quite right
@@ -207,14 +200,6 @@ runSM p s = runStateT (runWriterT . runWriterT $ p) s
 runWP :: SM a -> Either StructError ((a, [Obligation]), [Specification])
 runWP p = fmap fst $ runSM p (0,0,0)
 
-instance Located StructError where
-  locOf (MissingAssertion loc) = loc
-  locOf (MissingBound     loc) = loc
-  locOf (ExcessBound      loc) = loc
-  locOf (MissingPostcondition loc) = loc
-
-instance ToJSON StructError where
-
 {-
 -- SCM: I thought these would be useful,
 --        but it turns out that I do not need them yet.
@@ -224,3 +209,22 @@ censorObli = censor
 censorSpec :: ([Specification] -> [Specification]) -> M a -> M a
 censorSpec f = mapWriterT (censor f)
 -}
+
+--------------------------------------------------------------------------------
+-- | StructError
+
+data StructError = MissingAssertion Loc
+                 | MissingBound Loc
+                 | ExcessBound  Loc
+                 | MissingPostcondition Loc
+                 | DigHole Loc
+                deriving (Eq, Show, Generic)
+
+instance Located StructError where
+  locOf (MissingAssertion loc) = loc
+  locOf (MissingBound     loc) = loc
+  locOf (ExcessBound      loc) = loc
+  locOf (MissingPostcondition loc) = loc
+  locOf (DigHole loc) = loc
+
+instance ToJSON StructError where
