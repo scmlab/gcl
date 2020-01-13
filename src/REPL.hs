@@ -83,6 +83,6 @@ instance ToJSON Response where
 --------------------------------------------------------------------------------
 -- | Instances of ToJSON
 
+instance ToJSON ObliOrigin where
 instance ToJSON Obligation where
-instance ToJSON Hardness where
 instance ToJSON Specification where

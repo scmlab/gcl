@@ -171,7 +171,7 @@ expression = makeExprParser term table <?> "expression"
             , [ InfixL $ binary Add  TokAdd
               , InfixL $ binary Sub  TokSub
               ]
-              
+
             , [ InfixN $ binary NEQ TokNEQ
               , InfixN $ binary LT  TokLT
               , InfixN $ binary LTE TokLTE
