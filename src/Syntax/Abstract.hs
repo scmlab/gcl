@@ -16,9 +16,7 @@ import Type ()
 type Index = Int
 
 --------------------------------------------------------------------------------
--- | Predicates and Expressions
-
-type Pred = Expr  -- predicates are expressions of type Bool
+-- | Expricates and Expressions
 
 data Lit  = Num Int | Bol Bool | Chr Char
           deriving (Show, Eq, Generic)
@@ -85,16 +83,16 @@ litB = Lit . Bol
 litC :: Char -> Expr
 litC = Lit . Chr
 
-tt, ff :: Pred
+tt, ff :: Expr
 tt = Lit (Bol True)
 ff = Lit (Bol False)
 
-conjunct :: [Pred] -> Pred
+conjunct :: [Expr] -> Expr
 conjunct []     = tt
 conjunct [p]    = p
 conjunct (p:ps) = p `conj` conjunct ps
 
-disjunct :: [Pred] -> Pred
+disjunct :: [Expr] -> Expr
 disjunct []     = ff
 disjunct [p]    = p
 disjunct (p:ps) = p `disj` disjunct ps
@@ -106,7 +104,7 @@ instance ToJSON Op where
 instance ToJSON Lit where
 instance ToJSON Expr where
 
-predEq :: Pred -> Pred -> Bool
+predEq :: Expr -> Expr -> Bool
 predEq = (==)
 
 --------------------------------------------------------------------------------
@@ -205,7 +203,7 @@ instance ToJSON Type where
 {-
 data Program = Program
                 [Declaration]               -- declarations
-                (Maybe ([Stmt], Pred, Loc)) -- statements + postcondition
+                (Maybe ([Stmt], Expr, Loc)) -- statements + postcondition
               deriving (Eq, Show)
 
 data Declaration
@@ -218,9 +216,9 @@ data Stmt
   = Skip                          Loc
   | Abort                         Loc
   | Assign  [Var] [Expr]          Loc
-  | Assert  Pred                  Loc
-  | Do      Pred Expr [GdCmd]     Loc
-  | If      (Maybe Pred) [GdCmd]  Loc
+  | Assert  Expr                  Loc
+  | Do      Expr Expr [GdCmd]     Loc
+  | If      (Maybe Expr) [GdCmd]  Loc
   | Spec                          Loc
   deriving (Eq, Show)
 
@@ -234,12 +232,12 @@ instance Located Stmt where
   locOf (If _ _ l)      = l
   locOf (Spec l)        = l
 
-data GdCmd = GdCmd Pred [Stmt] Loc deriving (Eq, Show)
+data GdCmd = GdCmd Expr [Stmt] Loc deriving (Eq, Show)
 
-getGuards :: [GdCmd] -> [Pred]
+getGuards :: [GdCmd] -> [Expr]
 getGuards = fst . unzipGdCmds
 
-unzipGdCmds :: [GdCmd] -> ([Pred], [[Stmt]])
+unzipGdCmds :: [GdCmd] -> ([Expr], [[Stmt]])
 unzipGdCmds = unzip . map (\(GdCmd x y _) -> (x, y))
 
 --------------------------------------------------------------------------------
@@ -325,7 +323,7 @@ instance FromConcrete C.Program Program where
                                             <*> (fromConcrete q >>= checkStatements)
     where
       -- check if the postcondition of the whole program is missing
-      checkStatements :: [Stmt] -> AbstractM (Maybe ([Stmt], Pred, Loc))
+      checkStatements :: [Stmt] -> AbstractM (Maybe ([Stmt], Expr, Loc))
       checkStatements [] = return Nothing
       checkStatements xs = case last xs of
         Assert r l -> return (Just (init xs, r, l))

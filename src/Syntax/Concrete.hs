@@ -67,7 +67,6 @@ data Expr = Lit   Lit       Loc
           | Const Upper     Loc
           | Op    Op        Loc
           | App   Expr Expr Loc
-          | Hole            Loc
           deriving (Eq, Show)
 
 --------------------------------------------------------------------------------

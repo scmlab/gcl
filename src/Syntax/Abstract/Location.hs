@@ -44,7 +44,6 @@ instance Located C.Expr where
   locOf (C.Lit _ l)   = l
   locOf (C.Op _ l)    = l
   locOf (C.App _ _ l) = l
-  locOf (C.Hole l)    = l
 
 instance Located C.Type where
   locOf (C.TBase _    l) = l
@@ -73,21 +72,6 @@ instance Located C.Upper where
 
 --------------------------------------------------------------------------------
 -- Remove location
-
-{-
-type DepartM = ExceptT ConvertError (State Index)
-
-abstract :: Departable a b => a -> Either ConvertError b
-abstract = runAbstractM . depart
-
-runAbstractM :: AbstractM a -> Either ConvertError a
-runAbstractM f = evalState (runExceptT f) 0
-
-index :: AbstractM Index
-index = do i <- get
-           put (succ i)
-           return i
--}
 
 class Located a => Departable a b | a -> b where
   depart :: a -> b
@@ -126,9 +110,6 @@ instance Departable C.Expr Expr where
   depart (C.Lit x    _) = Lit   $ depart x
   depart (C.App x y  _) = App   (depart x) (depart y)
   depart (C.Op  x    _) = Op    $ depart x
-  depart (C.Hole     _) = undefined -- Hole  index []
-     -- SCM: it's the only case where we need a monad.
-     -- Can this be avoided, or done elsewhere?
 
 instance Departable C.Op Op where
   depart (C.EQ  _) = EQ
