@@ -121,8 +121,8 @@ instance Pretty Op where
   pretty LT = "<"
   pretty GT = ">"
   pretty Implies = "→"
-  pretty Conj = "→"
-  pretty Disj = "⋀"
+  pretty Conj = "⋀"
+  pretty Disj = "⋁"
   pretty Neg = "¬"
   pretty Add = "+"
   pretty Sub = "-"
@@ -199,4 +199,4 @@ instance Pretty Loc where
 -- | Misc
 
 instance Pretty Val where
-  pretty = pretty . show 
+  pretty = pretty . show

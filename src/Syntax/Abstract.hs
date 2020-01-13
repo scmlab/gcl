@@ -125,16 +125,16 @@ classify Disj = InfixL 2
 classify Conj = InfixL 3
 classify Neg = Prefix 4
 classify EQ = Infix 5
-classify NEQ = Infix 5
-classify LTE = Infix 5
-classify GTE = Infix 5
-classify LT = Infix 5
-classify GT = Infix 5
-classify Mod = InfixL 1
-classify Mul = InfixL 2
-classify Div = InfixL 2
-classify Add = InfixL 3
-classify Sub = InfixL 3
+classify NEQ = Infix 6
+classify LTE = Infix 6
+classify GTE = Infix 6
+classify LT = Infix 6
+classify GT = Infix 6
+classify Add = InfixL 7
+classify Sub = InfixL 7
+classify Mul = InfixL 8
+classify Div = InfixL 8
+classify Mod = InfixL 9
 
 -- convenient constructors
 

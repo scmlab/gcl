@@ -14,7 +14,6 @@ import qualified Text.Megaparsec as Mega
 
 import Syntax.Concrete hiding (Fixity(..))
 import Syntax.Parser.Lexer
--- import Syntax.Parser.Util hiding (withLoc)
 import Syntax.Parser.Util (PosLog, extract)
 import qualified Syntax.Parser.Util as Util
 
@@ -171,8 +170,7 @@ expression = makeExprParser term table <?> "expression"
             , [ InfixL $ binary Add  TokAdd
               , InfixL $ binary Sub  TokSub
               ]
-
-
+              
             , [ InfixN $ binary NEQ TokNEQ
               , InfixN $ binary LT  TokLT
               , InfixN $ binary LTE TokLTE
