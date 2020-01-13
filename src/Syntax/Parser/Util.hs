@@ -7,7 +7,7 @@ module Syntax.Parser.Util
   , getCurrentLoc, getLastToken
 
   , getLoc, withLoc
-  , symbol, ignore, extract
+  , symbol, ignore, extract, between
   ) where
 
 import Control.Monad.State
@@ -17,7 +17,7 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.Map (Map)
 import qualified Data.Map as Map
-import Text.Megaparsec hiding (Pos, State)
+import Text.Megaparsec hiding (Pos, State, between)
 import Language.Lexer.Applicative (TokenStream)
 import Syntax.Parser.TokenStream (PrettyToken)
 
@@ -108,7 +108,6 @@ withLoc parser = do
 --------------------------------------------------------------------------------
 -- | Combinators
 
-
 -- parses with some parser, and updates the source location
 symbol :: (Eq tok, Ord tok, Show tok, PrettyToken tok) => tok -> P tok ()
 symbol t = do
@@ -138,3 +137,15 @@ extract f = do
     p (L loc tok') = case f tok' of
       Just result -> Just (result, tok', loc)
       Nothing -> Nothing
+
+between :: (Ord tok, Show tok, PrettyToken tok, Relocatable a)
+        => P tok b
+        -> P tok c
+        -> P tok a
+        -> P tok a
+between left right p = do
+  (_, start) <- getLoc left
+  result <- p
+  (_, end) <- getLoc right
+  let newLoc = start <--> end
+  return $ reloc newLoc result

@@ -347,8 +347,8 @@ withLocStmt p = do
   expectNewline <?> "<newline> after a statement"
   return result
 
-parens :: Parser a -> Parser a
-parens = between
+parens :: Relocatable a => Parser a -> Parser a
+parens = Util.between
   (symbol TokParenStart <?> "left parenthesis")
   (symbol TokParenEnd <?> "right parenthesis")
 

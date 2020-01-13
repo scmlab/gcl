@@ -7,68 +7,84 @@ import Prelude hiding (Ordering(..))
 
 import Data.Loc
 
-import qualified Syntax.Concrete as C
-import Syntax.Abstract
+import qualified Syntax.Abstract as A
+import Syntax.Concrete
 
-instance Located C.Stmt where
-  locOf (C.Skip              l) = l
-  locOf (C.Abort             l) = l
-  locOf (C.Assign _ _        l) = l
-  locOf (C.Assert _          l) = l
-  locOf (C.AssertWithBnd _ _ l) = l
-  locOf (C.Do _              l) = l
-  locOf (C.If _              l) = l
-  locOf (C.SpecQM            l) = l
-  locOf (C.Spec              l) = l
+instance Located Stmt where
+  locOf (Skip              l) = l
+  locOf (Abort             l) = l
+  locOf (Assign _ _        l) = l
+  locOf (Assert _          l) = l
+  locOf (AssertWithBnd _ _ l) = l
+  locOf (Do _              l) = l
+  locOf (If _              l) = l
+  locOf (SpecQM            l) = l
+  locOf (Spec              l) = l
 
-instance Located C.Op where
-  locOf (C.EQ l)      = l
-  locOf (C.NEQ l)     = l
-  locOf (C.LTE l)     = l
-  locOf (C.GTE l)     = l
-  locOf (C.LT l)      = l
-  locOf (C.GT l)      = l
-  locOf (C.Implies l) = l
-  locOf (C.Conj l)    = l
-  locOf (C.Disj l)    = l
-  locOf (C.Neg l)     = l
-  locOf (C.Add l)     = l
-  locOf (C.Sub l)     = l
-  locOf (C.Mul l)     = l
-  locOf (C.Div l)     = l
-  locOf (C.Mod l)     = l
+instance Located Op where
+  locOf (EQ l)      = l
+  locOf (NEQ l)     = l
+  locOf (LTE l)     = l
+  locOf (GTE l)     = l
+  locOf (LT l)      = l
+  locOf (GT l)      = l
+  locOf (Implies l) = l
+  locOf (Conj l)    = l
+  locOf (Disj l)    = l
+  locOf (Neg l)     = l
+  locOf (Add l)     = l
+  locOf (Sub l)     = l
+  locOf (Mul l)     = l
+  locOf (Div l)     = l
+  locOf (Mod l)     = l
 
-instance Located C.Expr where
-  locOf (C.Var _ l)   = l
-  locOf (C.Const _ l) = l
-  locOf (C.Lit _ l)   = l
-  locOf (C.Op _ l)    = l
-  locOf (C.App _ _ l) = l
+instance Located Expr where
+  locOf (Var _ l)   = l
+  locOf (Const _ l) = l
+  locOf (Lit _ l)   = l
+  locOf (Op _ l)    = l
+  locOf (App _ _ l) = l
 
-instance Located C.Type where
-  locOf (C.TBase _    l) = l
-  locOf (C.TArray _ _ l) = l
-  locOf (C.TFunc _ _  l) = l
-  locOf (C.TVar _     l) = l
+instance Located Type where
+  locOf (TBase _    l) = l
+  locOf (TArray _ _ l) = l
+  locOf (TFunc _ _  l) = l
+  locOf (TVar _     l) = l
 
-instance Located C.Interval where
-  locOf (C.Interval _ _ l) = l
+instance Located Interval where
+  locOf (Interval _ _ l) = l
 
-instance Located C.Endpoint where
-  locOf (C.Including e) = locOf e
-  locOf (C.Excluding e) = locOf e
+instance Located Endpoint where
+  locOf (Including e) = locOf e
+  locOf (Excluding e) = locOf e
 
-instance Located C.Base where
+instance Located Base where
   locOf _ = NoLoc
 
-instance Located C.Lit where
+instance Located Lit where
   locOf _ = NoLoc
 
-instance Located C.Lower where
-  locOf (C.Lower _ l) = l
+instance Located Lower where
+  locOf (Lower _ l) = l
 
-instance Located C.Upper where
-  locOf (C.Upper _ l) = l
+instance Located Upper where
+  locOf (Upper _ l) = l
+
+--------------------------------------------------------------------------------
+-- Relocatable
+
+instance Relocatable Type where
+  reloc l (TBase  base _) = TBase  base l
+  reloc l (TArray i s _)  = TArray i s l
+  reloc l (TFunc  s t _)  = TFunc  s t l
+  reloc l (TVar   x _)    = TVar   x l
+
+instance Relocatable Expr where
+  reloc l (Var x    _) = Var x l
+  reloc l (Const x  _) = Const x l
+  reloc l (Lit x    _) = Lit x l
+  reloc l (App x y  _) = App x y l
+  reloc l (Op  x    _) = Op x l
 
 --------------------------------------------------------------------------------
 -- Remove location
@@ -76,54 +92,54 @@ instance Located C.Upper where
 class Located a => Departable a b | a -> b where
   depart :: a -> b
 
-instance Departable C.Lit Lit where
-  depart (C.Num x) = Num x
-  depart (C.Bol x) = Bol x
+instance Departable Lit A.Lit where
+  depart (Num x) = A.Num x
+  depart (Bol x) = A.Bol x
 
-instance Departable C.Upper Const where
-  depart (C.Upper x _) = x
+instance Departable Upper A.Const where
+  depart (Upper x _) = x
 
-instance Departable C.Lower Var where
-  depart (C.Lower x _) = x
+instance Departable Lower A.Var where
+  depart (Lower x _) = x
 
-instance Departable C.Base TBase where
-  depart C.TInt  = TInt
-  depart C.TBool = TBool
-  depart C.TChar = TChar
+instance Departable Base A.TBase where
+  depart TInt  = A.TInt
+  depart TBool = A.TBool
+  depart TChar = A.TChar
 
-instance Departable C.Interval Interval where
-  depart (C.Interval a b _) = Interval (depart a) (depart b)
+instance Departable Interval A.Interval where
+  depart (Interval a b _) = A.Interval (depart a) (depart b)
 
-instance Departable C.Endpoint Endpoint where
-  depart (C.Including e) = Including (depart e)
-  depart (C.Excluding e) = Excluding (depart e)
+instance Departable Endpoint A.Endpoint where
+  depart (Including e) = A.Including (depart e)
+  depart (Excluding e) = A.Excluding (depart e)
 
-instance Departable C.Type Type where
-  depart (C.TBase  base _) = TBase  $ depart base
-  depart (C.TArray i s _)  = TArray (depart i) (depart s)
-  depart (C.TFunc  s t _)  = TFunc  (depart s) (depart t)
-  depart (C.TVar   x _)    = TVar   $ depart x
+instance Departable Type A.Type where
+  depart (TBase  base _) = A.TBase  $ depart base
+  depart (TArray i s _)  = A.TArray (depart i) (depart s)
+  depart (TFunc  s t _)  = A.TFunc  (depart s) (depart t)
+  depart (TVar   x _)    = A.TVar   $ depart x
 
-instance Departable C.Expr Expr where
-  depart (C.Var x    _) = Var   $ depart x
-  depart (C.Const x  _) = Const $ depart x
-  depart (C.Lit x    _) = Lit   $ depart x
-  depart (C.App x y  _) = App   (depart x) (depart y)
-  depart (C.Op  x    _) = Op    $ depart x
+instance Departable Expr A.Expr where
+  depart (Var x    _) = A.Var   $ depart x
+  depart (Const x  _) = A.Const $ depart x
+  depart (Lit x    _) = A.Lit   $ depart x
+  depart (App x y  _) = A.App   (depart x) (depart y)
+  depart (Op  x    _) = A.Op    $ depart x
 
-instance Departable C.Op Op where
-  depart (C.EQ  _) = EQ
-  depart (C.NEQ  _) = NEQ
-  depart (C.LTE _) = LTE
-  depart (C.GTE _) = GTE
-  depart (C.LT  _) = LT
-  depart (C.GT  _) = GT
-  depart (C.Implies _) = Implies
-  depart (C.Conj  _) = Conj
-  depart (C.Disj  _) = Disj
-  depart (C.Neg   _) = Neg
-  depart (C.Add   _) = Add
-  depart (C.Sub   _) = Sub
-  depart (C.Mul   _) = Mul
-  depart (C.Div   _) = Div
-  depart (C.Mod   _) = Mod
+instance Departable Op A.Op where
+  depart (EQ  _) = A.EQ
+  depart (NEQ  _) = A.NEQ
+  depart (LTE _) = A.LTE
+  depart (GTE _) = A.GTE
+  depart (LT  _) = A.LT
+  depart (GT  _) = A.GT
+  depart (Implies _) = A.Implies
+  depart (Conj  _) = A.Conj
+  depart (Disj  _) = A.Disj
+  depart (Neg   _) = A.Neg
+  depart (Add   _) = A.Add
+  depart (Sub   _) = A.Sub
+  depart (Mul   _) = A.Mul
+  depart (Div   _) = A.Div
+  depart (Mod   _) = A.Mod

@@ -188,14 +188,14 @@ type' = testGroup "Types" $ map (toTestTree Parser.type')
       $ TBase TChar (1 <-> 4)
   , RightCase "function types 1"
       "(Char -> (Int))"
-      $ TFunc (TBase TChar (2 <-> 5)) (TBase TInt (11 <-> 13)) (2 <-> 13)
+      $ TFunc (TBase TChar (2 <-> 5)) (TBase TInt (10 <-> 14)) (1 <-> 15)
   , RightCase "function types 2"
       "(Char -> Int) -> Int"
       $ TFunc
           (TFunc
-            (TBase TChar (2 <-> 5)) (TBase TInt (10 <-> 12)) (2 <-> 12))
+            (TBase TChar (2 <-> 5)) (TBase TInt (10 <-> 12)) (1 <-> 13))
           (TBase TInt (18 <-> 20))
-          (2 <-> 20)
+          (1 <-> 20)
   , RightCase "array"
       "array [0 .. N) of Int"
       $ TArray
