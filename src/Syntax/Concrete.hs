@@ -4,6 +4,9 @@ import Data.Loc
 import Data.Text.Lazy (Text)
 import Prelude hiding (Ordering(..))
 
+--------------------------------------------------------------------------------
+-- | Program / Declaration / Statement
+
 data Program = Program [Declaration] [Stmt] Loc
   deriving (Eq, Show)
 

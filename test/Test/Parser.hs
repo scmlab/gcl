@@ -179,29 +179,32 @@ type' :: TestTree
 type' = testGroup "Types" $ map (toTestTree Parser.type')
   [ RightCase "base types (Int)"
       "Int"
-      $ TBase TInt NoLoc
+      $ TBase TInt (1 <-> 3)
   , RightCase "base types (Bool)"
       "Bool"
-      $ TBase TBool NoLoc
+      $ TBase TBool (1 <-> 4)
   , RightCase "base types (Char)"
       "Char"
-      $ TBase TChar NoLoc
+      $ TBase TChar (1 <-> 4)
   , RightCase "function types 1"
       "(Char -> (Int))"
-      $ TFunc (TBase TChar NoLoc) (TBase TInt NoLoc) NoLoc
+      $ TFunc (TBase TChar (2 <-> 5)) (TBase TInt (11 <-> 13)) (2 <-> 13)
   , RightCase "function types 2"
       "(Char -> Int) -> Int"
       $ TFunc
           (TFunc
-            (TBase TChar NoLoc) (TBase TInt NoLoc) NoLoc)
-          (TBase TInt NoLoc)
-          NoLoc
+            (TBase TChar (2 <-> 5)) (TBase TInt (10 <-> 12)) (2 <-> 12))
+          (TBase TInt (18 <-> 20))
+          (2 <-> 20)
   , RightCase "array"
       "array [0 .. N) of Int"
       $ TArray
-          (Interval (Including (Lit (Num 0) NoLoc)) (Excluding (Const (Upper "N" NoLoc) NoLoc)) NoLoc)
-          (TBase TInt NoLoc)
-          NoLoc
+          (Interval
+            (Including (Lit (Num 0) (at 8)))
+            (Excluding (Const (Upper "N" (at 13)) (at 13)))
+            (7 <-> 14))
+          (TBase TInt (19 <-> 21))
+          (1 <-> 21)
   ]
 
 --------------------------------------------------------------------------------
@@ -211,10 +214,17 @@ declaration :: TestTree
 declaration = testGroup "Declarations" $ map (toTestTree Parser.declaration)
   [ RightCase "variable"
       "var x : Int\n"
-      $ VarDecl [Lower "x" NoLoc] (TBase TInt NoLoc) NoLoc
+      $ VarDecl
+          [Lower "x" (at 5)]
+          (TBase TInt (9 <-> 11))
+          (1 <-> 11)
   , RightCase "constant"
       "con X, Y : Int\n"
-      $ ConstDecl [Upper "X" NoLoc, Upper "Y" NoLoc] (TBase TInt NoLoc) NoLoc
+      $ ConstDecl
+          [Upper "X" (at 5), Upper "Y" (at 8)]
+          (TBase TInt (12 <-> 14))
+          (1 <-> 14)
+
   ]
 
 --------------------------------------------------------------------------------
@@ -224,27 +234,35 @@ statement :: TestTree
 statement = testGroup "Statements" $ map (toTestTree Parser.statement)
   [ RightCase "skip"
       "skip\n"
-      $ Skip (loc 4)
+      $ Skip (1 <-> 4)
   , RightCase "abort"
       "abort\n"
-      $ Abort (loc 5)
+      $ Abort (1 <-> 5)
   , RightCase "assert"
       "{ True }\n"
-      $ Assert (Lit (Bol True) NoLoc) (loc 8)
-  -- , LeftCase "spec"
-  --     "?\n"
-  --     $ [ConvertError (DigHole (loc 1))]
+      $ Assert
+          (Lit (Bol True) (3 <-> 6))
+          (1 <-> 8)
   , RightCase "assign"
       "x := 0\n"
-      $ Assign [Lower "x" NoLoc] [Lit (Num 0) NoLoc] (loc 6)
+      $ Assign
+          [Lower "x" (at 1)]
+          [Lit (Num 0) (at 6)]
+          (1 <-> 6)
   , RightCase "assign (parallel)"
       "x, y := 0, 1\n"
-      $ Assign [Lower "x" NoLoc, Lower "y" NoLoc] [Lit (Num 0) NoLoc, Lit (Num 1) NoLoc] (loc 12)
+      $ Assign
+          [Lower "x" (at 1), Lower "y" (at 4)]
+          [Lit (Num 0) (at 9), Lit (Num 1) (at 12)]
+          (1 <-> 12)
   ]
 
-  where
-    loc :: Int -> Loc
-    loc len = Loc (Pos "<test>" 1 1 0) (Pos "<test>" 1 len (len - 1))
+(<->) :: Int -> Int -> Loc
+(<->) from to = Loc (Pos "<test>" 1 from (from - 1)) (Pos "<test>" 1 to (to - 1))
+
+at :: Int -> Loc
+at n = n <-> n
+
 
 --------------------------------------------------------------------------------
 -- | Program

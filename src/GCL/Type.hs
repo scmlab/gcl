@@ -24,20 +24,6 @@ import Syntax.Abstract
 --              put (theta, 1+i)
 --              return i
 
-data TypeError
-  = NotInScope Text Loc
-  | UnifyFailed Type Type Loc
-  | RecursiveType TVar Type Loc
-  | NotFunction Type Loc
-  deriving (Show, Eq, Generic)
-instance ToJSON TypeError where
-
-instance Located TypeError where
-  locOf (NotInScope _ loc)      = loc
-  locOf (UnifyFailed _ _ loc)   = loc
-  locOf (RecursiveType _ _ loc) = loc
-  locOf (NotFunction _ loc)     = loc
-
 --
 --
 -- exceptM :: Monad m => Maybe a -> e -> (a -> ExceptT e m b) -> ExceptT e m b
@@ -232,3 +218,21 @@ instance Located TypeError where
 -- subs0 = map (pack *** id)
 --           [("x", var "i" `plus` litN 1),
 --            ("i", var "y" `plus` litN 1)]
+
+
+--------------------------------------------------------------------------------
+-- | Type Error
+
+data TypeError
+  = NotInScope Text Loc
+  | UnifyFailed Type Type Loc
+  | RecursiveType TVar Type Loc
+  | NotFunction Type Loc
+  deriving (Show, Eq, Generic)
+instance ToJSON TypeError where
+
+instance Located TypeError where
+  locOf (NotInScope _ loc)      = loc
+  locOf (UnifyFailed _ _ loc)   = loc
+  locOf (RecursiveType _ _ loc) = loc
+  locOf (NotFunction _ loc)     = loc
