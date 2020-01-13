@@ -13,6 +13,7 @@ import Text.Megaparsec hiding (Pos, State, ParseError, parse)
 import qualified Text.Megaparsec as Mega
 
 import Syntax.Concrete hiding (Fixity(..))
+import Syntax.Abstract.Location ()
 import Syntax.Parser.Lexer
 import Syntax.Parser.Util (PosLog, extract)
 import qualified Syntax.Parser.Util as Util

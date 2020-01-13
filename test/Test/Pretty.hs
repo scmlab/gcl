@@ -15,6 +15,7 @@ import qualified Syntax.Parser as Parser
 import qualified REPL as REPL
 import Syntax.Parser (Parser)
 import Syntax.Abstract
+import Syntax.Abstract.Location
 import Error
 import Pretty ()
 
@@ -28,7 +29,7 @@ tests = testGroup "Prettifier"
 
 expression :: TestTree
 expression = testGroup "Expressions"
-  [ testCase "1" $ run "X > Y && X > Y" @?= Right "X > Y ⋀ X > Y"
+  [ testCase "1" $ run "X > Y && X > Y" @?= Right "X > Y ∧ X > Y"
   , testCase "2" $ run "1 + 2 * 3 - 4" @?= Right "1 + 2 * 3 - 4"
   , testCase "3" $ run "1 + 2 * 3 = 4" @?= Right "1 + 2 * 3 = 4"
   , testCase "4" $ run "1 > 2 = True" @?= Right "1 > 2 = True"
@@ -39,5 +40,5 @@ expression = testGroup "Expressions"
     run text = do
       expr <- REPL.scan "<test>" text
                 >>= REPL.parse Parser.expression "<text>"
-                >>= REPL.abstract
-      return $ renderLazy $ layoutCompact $ pretty expr
+                -- >>= REPL.abstract
+      return $ renderLazy $ layoutCompact $ pretty $ depart expr

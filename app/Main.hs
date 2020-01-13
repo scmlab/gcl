@@ -27,15 +27,15 @@ main = do
 
       let run = do
             tokens <- scan filepath raw
-            syntax <- parseProgram filepath tokens
-            program <- abstract syntax
-            typeCheck program
+            program <- parseProgram filepath tokens
+            -- program <- abstract syntax
+            -- typeCheck program
             (obligations, specifications) <- sweep program
-            stores <- execute program
-            return (tokens, program, obligations, specifications, stores)
+            -- stores <- execute program
+            return (tokens, program, obligations, specifications)
 
       case run of
-        Right (tokens, program, obligations, specifications, stores) -> do
+        Right (tokens, program, obligations, specifications) -> do
 
           -- putStrLn "=== raw ==="
           -- Text.putStrLn raw
@@ -52,8 +52,8 @@ main = do
           putStrLn "\n=== specifications ==="
           mapM_ (print . pretty) specifications
 
-          putStrLn "\n=== execution (stores) ==="
-          mapM_ (print . pretty) stores
+          -- putStrLn "\n=== execution (stores) ==="
+          -- mapM_ (print . pretty) stores
 
         Left errors -> do
           mapM_ (print . pretty) errors
@@ -74,9 +74,9 @@ handleRequest (Load filepath) = do
 
   let run = do
         tokens <- scan filepath raw
-        syntax <- parseProgram filepath tokens
-        program <- abstract syntax
-        typeCheck program
+        program <- parseProgram filepath tokens
+        -- program <- abstract syntax
+        -- typeCheck program
         sweep program
 
   case run of
@@ -87,7 +87,7 @@ handleRequest (Load filepath) = do
 
 handleRequest (Refine i payload) = do
 
-  let run = scan "<spec>" payload >>= parseSpec >>= abstract
+  let run = scan "<spec>" payload >>= parseSpec
   case run of
     Left errors -> send $ Error $ map (fromLocalError i) errors
     Right _ -> send $ Resolve i

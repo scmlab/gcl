@@ -13,7 +13,7 @@ import GHC.Generics
 import System.IO
 
 import Error
-import GCL.PreCond
+import GCL.WP
 import GCL.Type as Type
 import Syntax.Parser.Lexer (TokStream)
 import qualified Syntax.Parser.Lexer as Lexer
@@ -36,23 +36,29 @@ parseProgram = parse Parser.program
 parseSpec :: TokStream -> Either [Error] [Concrete.Stmt]
 parseSpec = parse Parser.specContent "<specification>"
 
-abstract :: Abstract.FromConcrete a b => a -> Either [Error] b
-abstract = first (\x -> [ConvertError x]) . Abstract.abstract
+-- abstract :: FromConcrete a b => a -> Either [Error] b
+-- abstract = first (\x -> [ConvertError x]) . Abstract.abstract
 
-typeCheck :: Abstract.Program -> Either [Error] ()
-typeCheck = first (\x -> [TypeError x]) . Type.runTM . Type.checkProg
+-- typeCheck :: Concrete.Program -> Either [Error] ()
+-- typeCheck = first (\x -> [TypeError x]) . Type.runTM . Type.checkProg
 
-execute :: Abstract.Program -> Either [Error] [Exec.Store]
-execute program = if null errors then Right stores else Left errors
-  where
-    errors = map ExecError $ lefts results
-    (results, stores) = unzip $ Exec.runExNondet (Exec.execProg program) Exec.prelude
+-- execute :: Concrete.Program -> Either [Error] [Exec.Store]
+-- execute program = if null errors then Right stores else Left errors
+--   where
+--     errors = map ExecError $ lefts results
+--     (results, stores) = unzip $ Exec.runExNondet (Exec.execProg program) Exec.prelude
 
-sweep :: Abstract.Program -> Either [Error] ([Obligation], [Specification])
-sweep (Abstract.Program _ Nothing) = return ([], [])
-sweep (Abstract.Program _ (Just (statements, postcondition, _))) =
-    let ((_, obligations), specifications) = runM $ precondStmts statements postcondition
-    in return (obligations, specifications)
+-- NOTE: convertion
+sweep :: Concrete.Program -> Either [Error] ([Obligation], [Specification])
+-- sweep (Program statements postcondition _) = return ([], [])
+sweep (Concrete.Program _ statements _) = case runWP (wpProg statements) of
+    Right ((_, obligations), specifications) -> return (obligations, specifications)
+    Left _ -> undefined
+
+-- sweep (Program _ Nothing) = return ([], [])
+-- sweep (Program _ (Just (statements, postcondition, _))) =
+--     let ((_, obligations), specifications) = runM $ precondStmts statements postcondition
+--     in return (obligations, specifications)
 
 recv :: FromJSON a => IO (Maybe a)
 recv = decode . BS.fromStrict <$> Strict.getLine
