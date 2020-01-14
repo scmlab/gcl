@@ -126,7 +126,7 @@ struct b inv (Just bnd) (Do gcmds l) post = do
       (structStmts False (invB `A.conj` guard) Nothing body
              (bnd `A.lte` A.Var oldbnd))
 
-struct b pre _ (SpecQM l) post = throwError $ DigHole l
+struct _ _ _ (SpecQM l) _    = throwError $ DigHole l
 struct b pre _ (Spec l) post = when b (tellSpec pre post l)
 
 
