@@ -81,5 +81,9 @@ data Upper = Upper Text Loc
 data Lower = Lower Text Loc
   deriving (Eq, Show)
 
+
+upperToText :: Upper -> Text
+upperToText (Upper x _) = x
+
 lowerToText :: Lower -> Text
 lowerToText (Lower x _) = x
