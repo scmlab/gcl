@@ -13,17 +13,13 @@ import qualified Data.Text.Lazy.IO as Text
 import qualified Syntax.Parser as Parser
 import qualified REPL as REPL
 import Syntax.Parser (Parser)
--- import Syntax.Abstract
 import Syntax.Concrete
-  -- hiding (Expr(..), Lit(..), Base(..), Type(..), Interval(..), Endpoint(..), Op(..))
 import Error
 
 tests :: TestTree
 tests = testGroup "Parser"
-  [
-  -- expression
-  -- ,
-  type'
+  [ expression
+  , type'
   , declaration
   , statement
   , program
@@ -57,120 +53,177 @@ parse parser text = REPL.scan "<test>" text
 --------------------------------------------------------------------------------
 -- | Expression
 
--- expression :: TestTree
--- expression = testGroup "Expressions" $ map (toTestTree Parser.expression)
---   [ RightCase "literal (numbers)"
---       "1"
---       $ Lit (Num 1)
---   , RightCase "literal (True)"
---       "True"
---       $ Lit (Bol True)
---   , RightCase "literal (False)"
---       "False"
---       $ Lit (Bol False)
---   , RightCase "variable"
---       "x"
---       $ Var "x"
---   , RightCase "constant"
---       "X"
---       $ Const "X"
---   , RightCase "numeric 1"
---       "(1 + (1))"
---       $ bin Add (Lit (Num 1)) (Lit (Num 1))
---   , RightCase "numeric 2"
---       "A + X * Y"
---       $ bin Add
---           (Const "A")
---           (bin Mul (Const "X") (Const "Y"))
---   , RightCase "numeric 3"
---       "(A + X) * Y % 2"
---       $ bin Mul
---           (bin Add (Const "A") (Const "X"))
---           (bin Mod (Const "Y") (Lit (Num 2)))
---   , RightCase "relation (EQ)"
---       "A = B"
---       $ bin EQ (Const "A") (Const "B")
---   , RightCase "relation (NEQ)"
---       "A /= B"
---       $ bin NEQ (Const "A") (Const "B")
---   , RightCase "relation (LT)"
---       "A < B"
---       $ bin LT (Const "A") (Const "B")
---   , RightCase "relation (LTE)"
---       "A <= B"
---       $ bin LTE (Const "A") (Const "B")
---   , RightCase "relation (GT)"
---       "A > B"
---       $ bin GT (Const "A") (Const "B")
---   , RightCase "relation (GTE)"
---       "A >= B"
---       $ bin GTE (Const "A") (Const "B")
---   , RightCase "boolean (Conj)"
---       "A && B"
---       $ bin Conj (Const "A") (Const "B")
---   , RightCase "boolean (Disj)"
---       "A || B"
---       $ bin Disj (Const "A") (Const "B")
---   , RightCase "boolean (Implies)"
---       "A => B"
---       $ bin Implies (Const "A") (Const "B")
---   , RightCase "boolean (Neg)"
---       "~ A"
---       $ un Neg (Const "A")
---   , RightCase "boolean 1"
---       "A || B => C"
---       $ bin Implies
---           (bin Disj (Const "A") (Const "B"))
---           (Const "C")
---   , RightCase "boolean 2"
---       "A || (B => C)"
---       $ bin Disj
---           (Const "A")
---           (bin Implies (Const "B") (Const "C"))
---   , RightCase "boolean 3"
---       "A || B && C"
---       $ bin Disj
---           (Const "A")
---           (bin Conj (Const "B") (Const "C"))
---   , RightCase "boolean 4"
---       "B && C || A"
---       $ bin Disj
---           (bin Conj (Const "B") (Const "C"))
---           (Const "A")
---   , RightCase "function application 1"
---       "(f (x)) y"
---       $ App
---           (App (Var "f") (Var "x"))
---           (Var "y")
---   , RightCase "function application 2"
---       "f (x y)"
---       $ App
---           (Var "f")
---           (App (Var "x") (Var "y"))
---   , RightCase "mixed 1"
---       "X * Y = N"
---       $ bin EQ
---           (bin Mul (Const "X") (Const "Y"))
---           (Const "N")
---   , RightCase "mixed 2"
---       "X * Y => P = Q"
---       $ bin Implies
---           (bin Mul (Const "X") (Const "Y"))
---           (bin EQ
---             (Const "P")
---             (Const "Q"))
---     , RightCase "mixed 3"
---         "X > Y && X > Y"
---         $ bin Conj
---             (bin GT (Const "X") (Const "Y"))
---             (bin GT (Const "X") (Const "Y"))
---   ]
---   where
---     bin :: Op -> Expr -> Expr -> Expr
---     bin op a b = App (App (Op op) a) b
---
---     un :: Op -> Expr -> Expr
---     un op a = App (Op op) a
+expression :: TestTree
+expression = testGroup "Expressions" $ map (toTestTree Parser.expression)
+  [ RightCase "literal (numbers)"
+      "1"
+      $ Lit (Num 1) (at 1)
+  , RightCase "literal (True)"
+      "True"
+      $ Lit (Bol True) (1 <-> 4)
+  , RightCase "literal (False)"
+      "False"
+      $ Lit (Bol False) (1 <-> 5)
+  , RightCase "variable"
+      "x"
+      $ var "x" (at 1)
+  , RightCase "conant"
+      "X"
+      $ con "X" (at 1)
+  , RightCase "numeric 1"
+      "(1 + (1))"
+      $ bin Add (at 4)
+          (Lit (Num 1) (at 2)) (2 <-> 4)
+          (Lit (Num 1) (6 <-> 8)) (1 <-> 9)
+  , RightCase "numeric 2"
+      "A + X * Y"
+      $ bin Add (at 3)
+          (con "A" (at 1)) (1 <-> 3)
+          (bin Mul (at 7)
+            (con "X" (at 5)) (5 <-> 7)
+            (con "Y" (at 9)) (5 <-> 9)) (1 <-> 9)
+  , RightCase "numeric 3"
+      "(A + X) * Y % 2"
+      $ bin Mul (at 9)
+          (bin Add (at 4)
+            (con "A" (at 2)) (2 <-> 4)
+            (con "X" (at 6)) (1 <-> 7)) (1 <-> 9)
+          (bin Mod (at 13)
+            (con "Y" (at 11)) (11 <-> 13)
+            (Lit (Num 2) (at 15)) (11 <-> 15)) (1 <-> 15)
+  , RightCase "relation (EQ)"
+      "A = B"
+      $ bin EQ (at 3)
+          (con "A" (at 1)) (1 <-> 3)
+          (con "B" (at 5)) (1 <-> 5)
+  , RightCase "relation (NEQ)"
+      "A /= B"
+      $ bin NEQ (3 <-> 4)
+          (con "A" (at 1)) (1 <-> 4)
+          (con "B" (at 6)) (1 <-> 6)
+  , RightCase "relation (LT)"
+      "A < B"
+      $ bin LT (at 3)
+          (con "A" (at 1)) (1 <-> 3)
+          (con "B" (at 5)) (1 <-> 5)
+  , RightCase "relation (LTE)"
+      "A <= B"
+      $ bin LTE (3 <-> 4)
+          (con "A" (at 1)) (1 <-> 4)
+          (con "B" (at 6)) (1 <-> 6)
+  , RightCase "relation (GT)"
+      "A > B"
+      $ bin GT (at 3)
+          (con "A" (at 1)) (1 <-> 3)
+          (con "B" (at 5)) (1 <-> 5)
+  , RightCase "relation (GTE)"
+      "A >= B"
+      $ bin GTE (3 <-> 4)
+          (con "A" (at 1)) (1 <-> 4)
+          (con "B" (at 6)) (1 <-> 6)
+  , RightCase "boolean (Conj)"
+      "A && B"
+      $ bin Conj (3 <-> 4)
+          (con "A" (at 1)) (1 <-> 4)
+          (con "B" (at 6)) (1 <-> 6)
+  , RightCase "boolean (Disj)"
+      "A || B"
+      $ bin Disj (3 <-> 4)
+          (con "A" (at 1)) (1 <-> 4)
+          (con "B" (at 6)) (1 <-> 6)
+  , RightCase "boolean (Implies)"
+      "A => B"
+      $ bin Implies (3 <-> 4)
+          (con "A" (at 1)) (1 <-> 4)
+          (con "B" (at 6)) (1 <-> 6)
+  , RightCase "boolean (Neg)"
+      "~ A"
+      $ un Neg (at 1)
+          (con "A" (at 3)) (1 <-> 3)
+  , RightCase "boolean 1"
+      "A || B => C"
+      $ bin Implies (8 <-> 9)
+          (bin Disj (3 <-> 4)
+              (con "A" (at 1)) (1 <-> 4)
+              (con "B" (at 6)) (1 <-> 6)) (1 <-> 9)
+          (con "C" (at 11)) (1 <-> 11)
+  , RightCase "boolean 2"
+      "A || (B => C)"
+      $ bin Disj (3 <-> 4)
+          (con "A" (at 1)) (1 <-> 4)
+          (bin Implies (9 <-> 10)
+            (con "B" (at 7)) (7 <-> 10)
+            (con "C" (at 12)) (6 <-> 13)) (1 <-> 13)
+  , RightCase "boolean 3"
+      "A || B && C"
+      $ bin Disj (3 <-> 4)
+          (con "A" (at 1)) (1 <-> 4)
+          (bin Conj (8 <-> 9)
+            (con "B" (at 6)) (6 <-> 9)
+            (con "C" (at 11)) (6 <-> 11)) (1 <-> 11)
+  , RightCase "boolean 4"
+      "B && C || A"
+      $ bin Disj (8 <-> 9)
+          (bin Conj (3 <-> 4)
+              (con "B" (at 1)) (1 <-> 4)
+              (con "C" (at 6)) (1 <-> 6)) (1 <-> 9)
+          (con "A" (at 11)) (1 <-> 11)
+  , RightCase "function application 1"
+      "(f (x)) y"
+      $ App
+          (App
+            (var "f" (at 2))
+            (Var (Lower "x" (at 5)) (4 <-> 6))
+            (1 <-> 7))
+          (var "y" (at 9))
+          (1 <-> 9)
+  , RightCase "function application 2"
+      "f (x y)"
+      $ App
+          (var "f" (at 1))
+          (App
+            (var "x" (at 4))
+            (var "y" (at 6))
+            (3 <-> 7))
+          (1 <-> 7)
+  , RightCase "mixed 1"
+      "X * Y = N"
+      $ bin EQ (at 7)
+          (bin Mul (at 3)
+            (con "X" (at 1)) (1 <-> 3)
+            (con "Y" (at 5)) (1 <-> 5)) (1 <-> 7)
+          (con "N" (at 9)) (1 <-> 9)
+  , RightCase "mixed 2"
+      "X * Y => P = Q"
+      $ bin Implies (7 <-> 8)
+          (bin Mul (at 3)
+            (con "X" (at 1)) (1 <-> 3)
+            (con "Y" (at 5)) (1 <-> 5)) (1 <-> 8)
+          (bin EQ (at 12)
+            (con "P" (at 10)) (10 <-> 12)
+            (con "Q" (at 14)) (10 <-> 14)) (1 <-> 14)
+    , RightCase "mixed 3"
+        "X > Y && X > Y"
+        $ bin Conj (7 <-> 8)
+            (bin GT (at 3)
+              (con "X" (at 1)) (1 <-> 3)
+              (con "Y" (at 5)) (1 <-> 5)) (1 <-> 8)
+            (bin GT (at 12)
+              (con "X" (at 10)) (10 <-> 12)
+              (con "Y" (at 14)) (10 <-> 14)) (1 <-> 14)
+  ]
+  where
+    con :: Text -> Loc -> Expr
+    con t l = Const (Upper t l) l
+
+    var :: Text -> Loc -> Expr
+    var t l = Var (Lower t l) l
+
+    bin :: (Loc -> Op) -> Loc -> Expr -> Loc -> Expr -> Loc -> Expr
+    bin op opLoc a aLoc b bLoc = App (App (Op (op opLoc) opLoc) a aLoc) b bLoc
+
+    un :: (Loc -> Op) -> Loc -> Expr -> Loc -> Expr
+    un op opLoc a aLoc = App (Op (op opLoc) opLoc) a aLoc
 
 --------------------------------------------------------------------------------
 -- | Type
@@ -218,7 +271,7 @@ declaration = testGroup "Declarations" $ map (toTestTree Parser.declaration)
           [Lower "x" (at 5)]
           (TBase TInt (9 <-> 11))
           (1 <-> 11)
-  , RightCase "constant"
+  , RightCase "conant"
       "con X, Y : Int\n"
       $ ConstDecl
           [Upper "X" (at 5), Upper "Y" (at 8)]

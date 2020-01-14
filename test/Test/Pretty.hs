@@ -5,16 +5,12 @@ module Test.Pretty where
 import Test.Tasty
 import Test.Tasty.HUnit
 import Data.Text.Lazy (Text)
-import qualified Data.Text.Lazy as Text
 import Data.Text.Prettyprint.Doc
 import Data.Text.Prettyprint.Doc.Render.Text (renderLazy)
-import Data.Loc
 import Prelude hiding (Ordering(..))
 
 import qualified Syntax.Parser as Parser
 import qualified REPL as REPL
-import Syntax.Parser (Parser)
-import Syntax.Abstract
 import Syntax.Abstract.Location
 import Error
 import Pretty ()
