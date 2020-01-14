@@ -23,13 +23,13 @@ evalExpr (App e1 e2 _) =
    evalExpr e1 >>= \case
     VFun f -> evalExpr e2 >>= \v -> liftEither (f v)
     _ -> error "type error, shouldn't happen"
--- evalExpr _ (Quant _ _ _ _) = error "not supported"
+evalExpr (Quant _ _ _ _ _) = error "not supported"
 -- evalExpr _ (Hole _ _) = error "shouldn't happen"
 
 litToVal :: Lit -> Val
 litToVal (Num n) = VNum n
 litToVal (Bol a) = VBol a
--- litToVal (Chr c) = VChr c
+litToVal (Chr c) = VChr c
 
 ---
 
@@ -57,11 +57,11 @@ execAsgn xs es l = do
   vs <- mapM evalExpr es
   mapM_ (uncurry (updateStore l)) (zip (map lowerToText xs) vs)
 
---
---  -- SCM: Not sure whether it is more complicated than necessary,
---  --      but I need a way to distinguish between "all choices failed"
---  --      and "end of choices after some succssful executions".
---
+
+ -- SCM: Not sure whether it is more complicated than necessary,
+ --      but I need a way to distinguish between "all choices failed"
+ --      and "end of choices after some succssful executions".
+
 pickGCmds :: ExecMonad m => m () -> m () -> [GdCmd] -> m ()
 pickGCmds _    ex [] = ex -- no branch has succeeded
 pickGCmds cont ex (GdCmd g cmds _ : gs) =

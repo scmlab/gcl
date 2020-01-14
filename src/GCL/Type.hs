@@ -34,7 +34,7 @@ exceptM :: Monad m => Maybe a -> e -> (a -> ExceptT e m b) -> ExceptT e m b
 exceptM (Just x) _ f = f x
 exceptM Nothing  e _ = throwError e
 
-lookupCxt :: Loc -> Var -> TCxt -> TM Type
+lookupCxt :: Loc -> Text -> TCxt -> TM Type
 lookupCxt l v cxt = exceptM (lookup v cxt) (NotInScope v l) substTM
 
 runTM :: TM a -> Either TypeError a
@@ -48,10 +48,10 @@ runTM' m = runState (runExceptT m) ([],0)
 inferL :: C.Lit -> Type
 inferL (C.Num _) = TBase TInt
 inferL (C.Bol _) = TBase TBool
--- inferL (Chr _) = TChar
+inferL (C.Chr _) = TBase TChar
 
 inferE :: TCxt -> C.Expr -> TM Type
-inferE cxt (C.Var (Lower x l) _)   = lookupCxt l x cxt
+inferE cxt (C.Var   (Lower x l) _) = lookupCxt l x cxt
 inferE cxt (C.Const (Upper x l) _) = lookupCxt l x cxt
 inferE _   (C.Lit v _) = return (inferL v)
 inferE _   (C.Op op _) = return (opTypes op)
@@ -63,32 +63,32 @@ inferE cxt (C.App e1 e2 l) = do
                        substTM t2
      _ -> throwError (NotFunction t l)
 -- inferE _ _ (Hole _ _) = TVar <$> freshVar "t"
--- inferE l cxt (Quant op xs rng trm) = do
---   tOp <- inferE l cxt op
---   tR <- TVar <$> freshVar "t"
---   unify_ l tOp (tR `TFunc` (tR `TFunc` tR))
---   tR' <- substTM tR
---   cxt' <- zip xs . map TVar <$> freshVars "t" (length xs)
---   checkE l (cxt' ++ cxt) rng tBool
---   checkE l (cxt' ++ cxt) trm tR'
---   return tR'
+inferE cxt (C.Quant op xs rng trm l) = do
+  tOp <- inferE cxt op
+  tR <- TVar <$> freshVar "t"
+  unify_ l tOp (tR `TFunc` (tR `TFunc` tR))
+  tR' <- substTM tR
+  cxt' <- zip (map depart xs) . map TVar <$> freshVars "t" (length xs)
+  checkE (cxt' ++ cxt) rng tBool
+  checkE (cxt' ++ cxt) trm tR'
+  return tR'
 
-checkE :: Loc -> TCxt -> C.Expr -> Type -> TM ()
-checkE l cxt e t = do
+checkE :: TCxt -> C.Expr -> Type -> TM ()
+checkE cxt e t = do
    t' <- inferE cxt e
-   unify_ l t t'
+   unify_ (locOf e) t t'
    return ()
 
 checkS :: TCxt -> Stmt -> TM ()
 checkS _ (Skip _)  = return ()
 checkS _ (Abort _) = return ()
-checkS cxt (Assign vs es l) =
-  mapM_ (checkAsgn l cxt) (zip vs es)
-checkS cxt (Assert p l) =
-  checkE l cxt p tBool
-checkS cxt (AssertWithBnd p b l) =
-  checkE l cxt p tBool >>
-  checkE l cxt b tInt
+checkS cxt (Assign vs es _) =
+  mapM_ (checkAsgn cxt) (zip vs es)
+checkS cxt (Assert p _) =
+  checkE cxt p tBool
+checkS cxt (AssertWithBnd p b _) =
+  checkE cxt p tBool >>
+  checkE cxt b tInt
 checkS cxt (Do gcmds _) =
   mapM_ (checkGdCmd cxt) gcmds
 checkS cxt (If gcmds _) =
@@ -99,14 +99,14 @@ checkS _ (Spec   _) = return ()
 checkSs :: TCxt -> [Stmt] -> TM ()
 checkSs cxt = mapM_ (checkS cxt)
 
-checkAsgn :: Loc -> TCxt -> (Lower, C.Expr) -> TM ()
-checkAsgn l cxt (Lower v lv,e) = do
+checkAsgn :: TCxt -> (Lower, C.Expr) -> TM ()
+checkAsgn cxt (Lower v lv,e) = do
    t <- lookupCxt lv v cxt
-   checkE l cxt e t
+   checkE cxt e t
 
 checkGdCmd :: TCxt -> GdCmd -> TM ()
-checkGdCmd cxt (GdCmd g cmds l)= do
-   checkE l cxt g tBool
+checkGdCmd cxt (GdCmd g cmds _)= do
+   checkE cxt g tBool
    checkSs cxt cmds
 
 checkProg :: Program -> TM ()
