@@ -21,23 +21,6 @@ instance Located Stmt where
   locOf (SpecQM            l) = l
   locOf (Spec              l) = l
 
-instance Located Op where
-  locOf (EQ l)      = l
-  locOf (NEQ l)     = l
-  locOf (LTE l)     = l
-  locOf (GTE l)     = l
-  locOf (LT l)      = l
-  locOf (GT l)      = l
-  locOf (Implies l) = l
-  locOf (Conj l)    = l
-  locOf (Disj l)    = l
-  locOf (Neg l)     = l
-  locOf (Add l)     = l
-  locOf (Sub l)     = l
-  locOf (Mul l)     = l
-  locOf (Div l)     = l
-  locOf (Mod l)     = l
-
 instance Located Expr where
   locOf (Var _ l)   = l
   locOf (Const _ l) = l
@@ -125,21 +108,4 @@ instance Departable Expr A.Expr where
   depart (Const x  _) = A.Const $ depart x
   depart (Lit x    _) = A.Lit   $ depart x
   depart (App x y  _) = A.App   (depart x) (depart y)
-  depart (Op  x    _) = A.Op    $ depart x
-
-instance Departable Op A.Op where
-  depart (EQ  _) = A.EQ
-  depart (NEQ  _) = A.NEQ
-  depart (LTE _) = A.LTE
-  depart (GTE _) = A.GTE
-  depart (LT  _) = A.LT
-  depart (GT  _) = A.GT
-  depart (Implies _) = A.Implies
-  depart (Conj  _) = A.Conj
-  depart (Disj  _) = A.Disj
-  depart (Neg   _) = A.Neg
-  depart (Add   _) = A.Add
-  depart (Sub   _) = A.Sub
-  depart (Mul   _) = A.Mul
-  depart (Div   _) = A.Div
-  depart (Mod   _) = A.Mod
+  depart (Op  x    _) = A.Op    x

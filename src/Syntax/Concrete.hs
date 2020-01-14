@@ -1,8 +1,13 @@
-module Syntax.Concrete where
+module Syntax.Concrete
+  ( module Syntax.Concrete
+  , Op(..)  -- re-export Op(..) from Syntax.Abstract
+  ) where
 
 import Data.Loc
 import Data.Text.Lazy (Text)
 import Prelude hiding (Ordering(..))
+
+import Syntax.Abstract (Op(..))
 
 --------------------------------------------------------------------------------
 -- | Program / Declaration / Statement
@@ -52,14 +57,6 @@ data Type = TBase Base Loc
 
 --------------------------------------------------------------------------------
 -- | Expressions
-
-data Fixity = Infix Int | InfixR Int | InfixL Int | Prefix Int | Postfix Int
-  deriving (Show, Eq)
-
-data Op = EQ Loc | NEQ Loc | LTE Loc | GTE Loc | LT Loc | GT Loc
-        | Implies Loc | Conj Loc | Disj Loc | Neg Loc
-        | Add Loc | Sub Loc | Mul Loc | Div Loc | Mod Loc
-        deriving (Eq, Show)
 
 data Lit  = Num Int
           | Bol Bool

@@ -10,13 +10,12 @@ import Data.Text.Lazy (Text, pack)
 import GHC.Generics (Generic)
 import Prelude hiding (Ordering(..))
 
-import Syntax.Concrete (Fixity(..))
 import Type ()
 
 type Index = Int
 
 --------------------------------------------------------------------------------
--- | Expricates and Expressions
+-- | Expressions
 
 data Lit  = Num Int | Bol Bool | Chr Char
           deriving (Show, Eq, Generic)
@@ -34,24 +33,6 @@ data Op = EQ | NEQ | LTE | GTE | LT | GT   -- binary relations
         | Implies | Conj | Disj | Neg  -- logic operators
         | Add | Sub | Mul | Div | Mod       -- arithmetics
      deriving (Show, Eq, Generic)
-
-
-classify :: Op -> Fixity
-classify Implies = InfixR 1
-classify Disj = InfixL 2
-classify Conj = InfixL 3
-classify Neg = Prefix 4
-classify EQ = Infix 5
-classify NEQ = Infix 6
-classify LTE = Infix 6
-classify GTE = Infix 6
-classify LT = Infix 6
-classify GT = Infix 6
-classify Add = InfixL 7
-classify Sub = InfixL 7
-classify Mul = InfixL 8
-classify Div = InfixL 8
-classify Mod = InfixL 9
 
 -- convenient constructors
 
@@ -196,3 +177,26 @@ instance ToJSON Endpoint where
 instance ToJSON Interval where
 instance ToJSON TBase where
 instance ToJSON Type where
+
+--------------------------------------------------------------------------------
+-- | Fixity & Precedence
+
+data Fixity = Infix Int | InfixR Int | InfixL Int | Prefix Int | Postfix Int
+  deriving (Show, Eq)
+
+classify :: Op -> Fixity
+classify Implies = InfixR 1
+classify Disj = InfixL 2
+classify Conj = InfixL 3
+classify Neg = Prefix 4
+classify EQ = Infix 5
+classify NEQ = Infix 6
+classify LTE = Infix 6
+classify GTE = Infix 6
+classify LT = Infix 6
+classify GT = Infix 6
+classify Add = InfixL 7
+classify Sub = InfixL 7
+classify Mul = InfixL 8
+classify Div = InfixL 8
+classify Mod = InfixL 9

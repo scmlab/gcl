@@ -12,7 +12,7 @@ import Data.Foldable (fold)
 import Text.Megaparsec hiding (Pos, State, ParseError, parse)
 import qualified Text.Megaparsec as Mega
 
-import Syntax.Concrete hiding (Fixity(..))
+import Syntax.Concrete
 import Syntax.Abstract.Location ()
 import Syntax.Parser.Lexer
 import Syntax.Parser.Util (PosLog, extract)
@@ -197,15 +197,15 @@ expression = makeExprParser term table <?> "expression"
         let app inner t = App inner t (func <--> t)
         foldl app func terms
 
-    unary :: (Loc -> Op) -> Tok -> Parser (Expr -> Expr)
+    unary :: Op -> Tok -> Parser (Expr -> Expr)
     unary operator tok = do
-      op <- withLoc (operator <$ symbol tok)
-      return $ \result -> App (Op op (locOf op)) result (op <--> result)
+      (op, loc) <- Util.getLoc (operator <$ symbol tok)
+      return $ \result -> App (Op op loc) result (loc <--> result)
 
-    binary :: (Loc -> Op) -> Tok -> Parser (Expr -> Expr -> Expr)
+    binary :: Op -> Tok -> Parser (Expr -> Expr -> Expr)
     binary operator tok = do
-      op <- withLoc (operator <$ symbol tok)
-      return $ \x y -> App (App (Op op (locOf op)) x (x <--> op)) y (x <--> y)
+      (op, loc) <- Util.getLoc (operator <$ symbol tok)
+      return $ \x y -> App (App (Op op loc) x (x <--> loc)) y (x <--> y)
 
     term :: Parser Expr
     term = parens expression <|> withLoc (choice

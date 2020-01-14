@@ -219,11 +219,11 @@ expression = testGroup "Expressions" $ map (toTestTree Parser.expression)
     var :: Text -> Loc -> Expr
     var t l = Var (Lower t l) l
 
-    bin :: (Loc -> Op) -> Loc -> Expr -> Loc -> Expr -> Loc -> Expr
-    bin op opLoc a aLoc b bLoc = App (App (Op (op opLoc) opLoc) a aLoc) b bLoc
+    bin :: Op -> Loc -> Expr -> Loc -> Expr -> Loc -> Expr
+    bin op opLoc a aLoc b bLoc = App (App (Op op opLoc) a aLoc) b bLoc
 
-    un :: (Loc -> Op) -> Loc -> Expr -> Loc -> Expr
-    un op opLoc a aLoc = App (Op (op opLoc) opLoc) a aLoc
+    un :: Op -> Loc -> Expr -> Loc -> Expr
+    un op opLoc a aLoc = App (Op op opLoc) a aLoc
 
 --------------------------------------------------------------------------------
 -- | Type

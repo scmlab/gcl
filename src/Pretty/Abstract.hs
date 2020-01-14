@@ -7,7 +7,6 @@ import Control.Monad ((>=>))
 import Prelude hiding (Ordering(..))
 
 import Syntax.Abstract hiding (var)
-import Syntax.Concrete (Fixity(..))
 
 --------------------------------------------------------------------------------
 -- | Expr
