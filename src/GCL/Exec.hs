@@ -24,7 +24,7 @@ evalExpr (App e1 e2 _) =
     VFun f -> evalExpr e2 >>= \v -> liftEither (f v)
     _ -> error "type error, shouldn't happen"
 evalExpr (Quant _ _ _ _ _) = error "not supported"
--- evalExpr _ (Hole _ _) = error "shouldn't happen"
+evalExpr (Hole _) = error "shouldn't happen"
 
 litToVal :: Lit -> Val
 litToVal (Num n) = VNum n

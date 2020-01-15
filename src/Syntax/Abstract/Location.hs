@@ -28,6 +28,7 @@ instance Located Expr where
   locOf (Lit _ l)   = l
   locOf (Op _ l)    = l
   locOf (App _ _ l) = l
+  locOf (Hole l)    = l
   locOf (Quant _ _ _ _ l) = l
 
 instance Located Type where
@@ -67,6 +68,7 @@ instance Relocatable Expr where
   reloc l (Lit x    _) = Lit x l
   reloc l (App x y  _) = App x y l
   reloc l (Op  x    _) = Op x l
+  reloc l (Hole     _) = Hole l
   reloc l (Quant op xs r t _) = Quant op xs r t l
 
 --------------------------------------------------------------------------------
@@ -100,6 +102,7 @@ instance Departable Expr A.Expr where
   depart (Lit x    _) = A.Lit   x
   depart (App x y  _) = A.App   (depart x) (depart y)
   depart (Op  x    _) = A.Op    x
+  depart (Hole     _) = A.Hole  0 []
   depart (Quant op xs rng trm _) =
     A.Quant (depart op) (map depart xs) (depart rng) (depart trm)
 
@@ -134,5 +137,6 @@ instance Hydratable A.Expr Expr where
   hydrate (A.Lit x  ) = Lit   x NoLoc
   hydrate (A.App x y) = App   (hydrate x) (hydrate y) NoLoc
   hydrate (A.Op  x  ) = Op    x NoLoc
+  hydrate (A.Hole _ _) = Hole NoLoc
   hydrate (A.Quant op xs rng trm) =
     Quant (hydrate op) (map hydrate xs) (hydrate rng) (hydrate trm) NoLoc

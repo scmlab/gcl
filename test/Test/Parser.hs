@@ -55,7 +55,10 @@ parse parser text = REPL.scan "<test>" text
 
 expression :: TestTree
 expression = testGroup "Expressions" $ map (toTestTree Parser.expression)
-  [ RightCase "literal (numbers)"
+  [ RightCase "hole"
+      "?"
+      $ Hole (at 1)
+  , RightCase "literal (numbers)"
       "1"
       $ Lit (Num 1) (at 1)
   , RightCase "literal (True)"

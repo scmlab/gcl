@@ -62,7 +62,7 @@ inferE cxt (C.App e1 e2 l) = do
                        unify_ l t1 t1'
                        substTM t2
      _ -> throwError (NotFunction t l)
--- inferE _ _ (Hole _ _) = TVar <$> freshVar "t"
+inferE _   (C.Hole _) = TVar <$> freshVar "t"
 inferE cxt (C.Quant op xs rng trm l) = do
   tOp <- inferE cxt op
   tR <- TVar <$> freshVar "t"

@@ -212,6 +212,7 @@ expression = makeExprParser term table <?> "expression"
       [ Var    <$> lower
       , Const  <$> upper
       , Lit    <$> literal
+      , Hole   <$  symbol TokQM
       ]) <?> "term"
 
     literal :: Parser Lit
