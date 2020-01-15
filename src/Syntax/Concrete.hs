@@ -60,6 +60,7 @@ data Type = TBase Base Loc
 
 data Lit  = Num Int
           | Bol Bool
+          | Chr Char
           deriving (Eq, Show)
 
 data Expr = Lit   Lit       Loc
@@ -67,6 +68,7 @@ data Expr = Lit   Lit       Loc
           | Const Upper     Loc
           | Op    Op        Loc
           | App   Expr Expr Loc
+          | Quant Expr [Lower] Expr Expr Loc
           deriving (Eq, Show)
 
 --------------------------------------------------------------------------------
@@ -77,6 +79,9 @@ data Upper = Upper Text Loc
 
 data Lower = Lower Text Loc
   deriving (Eq, Show)
+
+upperToText :: Upper -> Text
+upperToText (Upper x _) = x
 
 lowerToText :: Lower -> Text
 lowerToText (Lower x _) = x

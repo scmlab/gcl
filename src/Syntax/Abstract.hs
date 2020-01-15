@@ -12,11 +12,9 @@ import Prelude hiding (Ordering(..))
 
 import Type ()
 
-type Index = Int
-
 --------------------------------------------------------------------------------
 -- | Expressions
-
+type Index = Int 
 data Lit  = Num Int | Bol Bool | Chr Char
           deriving (Show, Eq, Generic)
 

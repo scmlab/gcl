@@ -30,6 +30,8 @@ expression = testGroup "Expressions"
   , testCase "3" $ run "1 + 2 * 3 = 4" @?= Right "1 + 2 * 3 = 4"
   , testCase "4" $ run "1 > 2 = True" @?= Right "1 > 2 = True"
   , testCase "5" $ run "(1 + 2) * 3 = (4)" @?= Right "(1 + 2) * 3 = 4"
+  , testCase "6" $ run "3 / (2 + X)" @?= Right "3 / (2 + X)"
+  , testCase "7" $ run "3 / 2 + X" @?= Right "3 / 2 + X"
   ]
   where
     run :: Text -> Either [Error] Text
