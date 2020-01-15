@@ -1,7 +1,7 @@
 {-# LANGUAGE MultiParamTypeClasses, TypeSynonymInstances,
       FunctionalDependencies#-}
 
-module Syntax.Abstract.Location where
+module Syntax.Location where
 
 import Prelude hiding (Ordering(..))
 
@@ -21,7 +21,7 @@ instance Located Stmt where
   locOf (If _              l) = l
   locOf (SpecQM            l) = l
   locOf (Spec              l) = l
--- 
+--
 -- instance Located Expr where
 --   locOf (Var _ l)   = l
 --   locOf (Const _ l) = l

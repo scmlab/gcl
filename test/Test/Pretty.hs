@@ -11,7 +11,7 @@ import Prelude hiding (Ordering(..))
 
 import qualified Syntax.Parser as Parser
 import qualified REPL as REPL
-import Syntax.Abstract.Location
+import Syntax.Location
 import Error
 import Pretty ()
 

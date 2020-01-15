@@ -13,7 +13,7 @@ import GHC.Generics (Generic)
 import Syntax.Concrete hiding (Type(..), Expr(..), Lit(..), Fresh(..))
 import qualified Syntax.Concrete as C
 import Syntax.Abstract
-import Syntax.Abstract.Location (depart)
+import Syntax.Location (depart)
 
 type TCxt   = [(Text, Type)]
 type SubstT = [(TVar, Type)]

@@ -7,18 +7,15 @@ import Control.Monad.State hiding (guard)
 import Control.Monad.Writer hiding (guard)
 import Control.Monad.Except hiding (guard)
 
-import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Loc (Loc(..), Located(..), posLine, posCol)
 import Data.Aeson
 import GHC.Generics
 
 import Syntax.Concrete
--- import Syntax.Abstract (Fresh(..))
 import qualified Syntax.Abstract as A
-import Syntax.Abstract.Location
+import Syntax.Location
 
--- type Expr = A.Expr
 type Index = A.Index
 
 data Obligation = Obligation Index Expr Expr [ObliOrigin]
@@ -189,11 +186,9 @@ wp _ (Skip _) post = return post
 
 wp _ (Assert p l) post =
    obligate p post (AssertSufficient l) >> return p
- where p' = depart p
 
 wp _ (AssertWithBnd p _ l) post =
    obligate p post (AssertSufficient l) >> return p
- where p' = depart p
 
 wp _ (Assign xs es _) post =
   subst (assignmentEnv xs es) post

@@ -154,13 +154,14 @@ instance Located Expr where
   locOf (Hole l)    = l
   locOf (Quant _ _ _ _ l) = l
 
-
 --------------------------------------------------------------------------------
 -- | Substitution
 
+-- Names are "read-only", they can be variables or constants
 type Name = Either Lower Upper
 type Subst = Map Name Expr
 
+-- Vars can be substituted. They can only be variables
 type Var = Lower
 
 
@@ -170,13 +171,15 @@ type Var = Lower
 
 class Monad m => Fresh m where
   fresh :: m Int
+
+  -- generate a fresh var with a given prefix
   freshVar :: Text -> m Var
   freshVar prefix = do
     i <- fresh
     let name = "_" <> prefix <> Text.pack (show i)
     return $ Lower name NoLoc
 
-
+  -- generate a bunch of fresh vars with a given prefix
   freshVars :: Text -> Int -> m [Var]
   freshVars _  0 = return []
   freshVars pf n = (:) <$> freshVar pf <*> freshVars pf (n-1)
@@ -213,6 +216,7 @@ subst env (Quant op xs range term l) = do
               t' <- subst (Map.singleton (Left i) (Var j NoLoc)) t
               first3 (j:) <$> subLocal is r' t'
           | otherwise = first3 (i:) <$> subLocal is r t
+
         freeInEnv = freeSubst env
         first3 f (x,y,z) = (f x, y, z)
 
@@ -221,7 +225,7 @@ free (Var x _)     = Set.singleton (Left x)
 free (Const x _)   = Set.singleton (Right x)
 free (Op _ _)      = mempty
 free (Lit _ _)     = mempty
-free (App e1 e2 _) = free e1 <> free e2  -- not worrying about duplication
+free (App e1 e2 _) = free e1 <> free e2
 free (Quant op xs range term _) = (free op <> free range <> free term) \\ Set.fromList (map Left xs)
 free (Hole _) = mempty -- banacorn: `subs` has been always empty anyway
     -- concat (map freeSubst subs) -- correct?

@@ -5,7 +5,7 @@ module Pretty.Concrete where
 import Data.Text.Prettyprint.Doc
 -- import Prelude hiding (Ordering(..))
 
-import Syntax.Abstract.Location
+import Syntax.Location
 import Syntax.Concrete
 import Pretty.Abstract ()
 
