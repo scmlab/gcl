@@ -1,13 +1,13 @@
 module Syntax.Concrete
   ( module Syntax.Concrete
-  , Op(..), TBase(..)  -- re-exporting from Syntax.Abstract
+  , Op(..), TBase(..), Lit(..)  -- re-exporting from Syntax.Abstract
   ) where
 
 import Data.Loc
 import Data.Text.Lazy (Text)
 import Prelude hiding (Ordering(..))
 
-import Syntax.Abstract (Op(..), TBase(..))
+import Syntax.Abstract (Op(..), TBase(..), Lit(..))
 
 --------------------------------------------------------------------------------
 -- | Program / Declaration / Statement
@@ -54,11 +54,6 @@ data Type = TBase TBase Loc
 
 --------------------------------------------------------------------------------
 -- | Expressions
-
-data Lit  = Num Int
-          | Bol Bool
-          | Chr Char
-          deriving (Eq, Show)
 
 data Expr = Lit   Lit       Loc
           | Var   Lower     Loc
