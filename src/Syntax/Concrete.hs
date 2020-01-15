@@ -1,10 +1,12 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE DeriveGeneric #-}
 
 module Syntax.Concrete
   ( module Syntax.Concrete
   , Op(..), TBase(..), Lit(..)  -- re-exporting from Syntax.Abstract
   ) where
 
+import Data.Aeson
 import Data.Loc
 import Data.Map (Map)
 import qualified Data.Map as Map
@@ -13,6 +15,7 @@ import qualified Data.Set as Set
 import Data.Text.Lazy (Text)
 import qualified Data.Text.Lazy as Text
 import Prelude hiding (Ordering(..))
+import GHC.Generics (Generic)
 
 import Syntax.Abstract (Op(..), TBase(..), Lit(..))
 
@@ -69,20 +72,26 @@ data Expr = Lit   Lit       Loc
           | App   Expr Expr Loc
           | Hole            Loc
           | Quant Expr [Lower] Expr Expr Loc
-          deriving (Eq, Show)
+          deriving (Eq, Show, Generic)
+
+-- instance ToJSON Op where
+-- instance ToJSON Lit where
+instance ToJSON Expr where
 
 --------------------------------------------------------------------------------
 -- | Variables and stuff
 
 data Upper = Upper Text Loc
-  deriving (Eq, Show)
+  deriving (Eq, Show, Generic)
 
+instance ToJSON Upper where
 instance Ord Upper where
   compare (Upper a _) (Upper b _) = compare a b
 
 data Lower = Lower Text Loc
-  deriving (Eq, Show)
+  deriving (Eq, Show, Generic)
 
+instance ToJSON Lower where
 instance Ord Lower where
   compare (Lower a _) (Lower b _) = compare a b
 
@@ -93,7 +102,10 @@ lowerToText :: Lower -> Text
 lowerToText (Lower x _) = x
 
 --------------------------------------------------------------------------------
--- | Helpers
+-- | Constructors
+
+unary :: Op -> Expr -> Expr
+unary op x = App (Op op NoLoc) x NoLoc
 
 binary :: Op -> Expr -> Expr -> Expr
 binary op x y = App (App (Op op NoLoc) x NoLoc) y (x <--> y)
@@ -107,6 +119,9 @@ eqq = binary EQ
 conj = binary Conj
 disj = binary Disj
 implies = binary Implies
+
+neg :: Expr -> Expr
+neg = unary Neg
 
 true :: Expr
 true = Lit (Bol True) NoLoc
@@ -123,6 +138,9 @@ disjunct :: [Expr] -> Expr
 disjunct []     = false
 disjunct [p]    = p
 disjunct (p:ps) = p `disj` disjunct ps
+
+predEq :: Expr -> Expr -> Bool
+predEq = (==)
 
 --------------------------------------------------------------------------------
 -- | Instance of Located

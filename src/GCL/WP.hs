@@ -7,25 +7,27 @@ import Control.Monad.State hiding (guard)
 import Control.Monad.Writer hiding (guard)
 import Control.Monad.Except hiding (guard)
 
+import Data.Map (Map)
+import qualified Data.Map as Map
 import Data.Loc (Loc(..), Located(..), posLine, posCol)
 import Data.Aeson
 import GHC.Generics
 
 import Syntax.Concrete
-import Syntax.Abstract (Fresh(..))
+-- import Syntax.Abstract (Fresh(..))
 import qualified Syntax.Abstract as A
 import Syntax.Abstract.Location
 
-type Pred = A.Expr
+-- type Expr = A.Expr
 type Index = A.Index
 
-data Obligation = Obligation Index Pred Pred [ObliOrigin]
+data Obligation = Obligation Index Expr Expr [ObliOrigin]
        deriving (Show, Generic)
 
 data Specification = Specification
   { specID       :: Int
-  , specPreCond  :: Pred
-  , specPostCond :: Pred
+  , specPreCond  :: Expr
+  , specPostCond :: Expr
   , specLoc      :: Loc
   } deriving (Show, Generic)
 
@@ -49,17 +51,17 @@ type SM = WriterT [Obligation] (WriterT [Specification]
 
 -- create a proof obligation
 
-obligate :: Pred -> Pred -> ObliOrigin -> SM ()
+obligate :: Expr -> Expr -> ObliOrigin -> SM ()
 obligate p q l = do
   -- NOTE: this could use some love
-  unless (A.predEq p q) $ do
+  unless (predEq p q) $ do
     (i, j, k) <- get
     put (succ i, j, k)
     tell [Obligation i p q [l]]
 
 -- inform existence of a spec hole
 
-tellSpec :: Pred -> Pred -> Loc -> SM ()
+tellSpec :: Expr -> Expr -> Loc -> SM ()
 tellSpec p q loc = do
   (i, j, k) <- get
   put (i, succ j, k)
@@ -68,31 +70,29 @@ tellSpec p q loc = do
 --------------------------------------------------------------------------------
 -- | Structure, and Weakest-Precondition
 
-struct :: Bool -> Pred -> Maybe (A.Expr) -> Stmt -> Pred -> SM ()
+struct :: Bool -> Expr -> Maybe Expr -> Stmt -> Expr -> SM ()
 
-struct _ pre _ (Abort l) _ = obligate pre A.ff (AroundAbort l)
+struct _ pre _ (Abort l) _ = obligate pre false (AroundAbort l)
 
 struct _ pre _ (Skip l) post = obligate pre post (AroundSkip l)
 
 struct _ pre _ (Assert p l) post =
-   obligate pre p' (AssertGuaranteed l) >>
-   obligate p' post (AssertSufficient l)
-  where p' = depart p
+   obligate pre p (AssertGuaranteed l) >>
+   obligate p post (AssertSufficient l)
 
 struct _ _ _ (AssertWithBnd _ _ l) _ =
    throwError (ExcessBound l)
 
 struct _ pre _ (Assign xs es l) post = do
-  post' <- A.subst (zip (map lowerToText xs)
-                        (map depart es)) post
+  post' <- subst (assignmentEnv xs es) post
   obligate pre post' (Assignment l)
 
 struct b pre _ (If gcmds l) post = do
-  let guards = map depart (getGuards gcmds)
-  obligate pre (A.disjunct guards) (IfTotal l)
+  let guards = getGuards gcmds
+  obligate pre (disjunct guards) (IfTotal l)
   forM_ gcmds $ \(GdCmd guard body l') ->
     addObliOrigin (IfBranch l')
-     (structStmts b (pre `A.conj` depart guard) Nothing body post)
+     (structStmts b (pre `conj` guard) Nothing body post)
 
 struct _ _ Nothing (Do _ l) _ =
   throwError (MissingBound l)
@@ -108,43 +108,40 @@ struct _ _ Nothing (Do _ l) _ =
 
 struct b inv (Just bnd) (Do gcmds l) post = do
   -- base case
-  let gcmds' = map (\(GdCmd x y l') -> (depart x, y, l')) gcmds
-  let guards = map (\(g,_,_) -> g) gcmds'
-  obligate (inv `A.conj` (A.conjunct (map A.neg guards))) post (LoopBase l)
+  let guards = getGuards gcmds
+  obligate (inv `conj` (conjunct (map neg guards))) post (LoopBase l)
   -- inductive cases
-  forM_ gcmds' $ \(guard, body, l') ->
+  forM_ gcmds $ \(GdCmd guard body l') ->
     addObliOrigin (LoopInd l')
-      (structStmts b (inv `A.conj` guard) Nothing body inv)
+      (structStmts b (inv `conj` guard) Nothing body inv)
   -- termination
-  obligate (inv `A.conj` A.disjunct guards)
-       (bnd `A.gte` (A.Lit (A.Num 0))) (LoopTermBase l)
+  obligate (inv `conj` disjunct guards)
+       (bnd `gte` (Lit (Num 0) NoLoc)) (LoopTermBase l)
   -- bound decrementation
   oldbnd <- freshVar "bnd"
-  let invB = inv `A.conj` (bnd `A.eqq` A.Var oldbnd)
-  forM_ gcmds' $ \(guard, body, l') ->
+  let invB = inv `conj` (bnd `eqq` Var oldbnd NoLoc)
+  forM_ gcmds $ \(GdCmd guard body l') ->
     addObliOrigin (LoopTermDec l')
-      (structStmts False (invB `A.conj` guard) Nothing body
-             (bnd `A.lte` A.Var oldbnd))
+      (structStmts False (invB `conj` guard) Nothing body
+             (bnd `lte` Var oldbnd NoLoc))
 
 struct _ _ _ (SpecQM l) _    = throwError $ DigHole l
 struct b pre _ (Spec l) post = when b (tellSpec pre post l)
 
 
-structStmts :: Bool -> Pred -> Maybe (A.Expr) -> [Stmt] -> Pred -> SM ()
+structStmts :: Bool -> Expr -> Maybe Expr -> [Stmt] -> Expr -> SM ()
 
 structStmts _ _ _ [] _ = return ()
 
 structStmts b pre _ (Assert p l : stmts) post =
-  obligate pre p' (AssertGuaranteed l) >>
-  structStmts b p' Nothing stmts post
- where p' = depart p
+  obligate pre p (AssertGuaranteed l) >>
+  structStmts b p Nothing stmts post
 
 structStmts b pre _ (AssertWithBnd p bnd l : stmts) post =
-  let (p', bnd') = (depart p, depart bnd)
-      origin = if startsWithDo stmts then LoopInitialize l
+  let origin = if startsWithDo stmts then LoopInitialize l
                    else AssertGuaranteed l
-  in obligate pre p' origin >>
-     structStmts b p' (Just bnd') stmts post
+  in obligate pre p origin >>
+     structStmts b p (Just bnd) stmts post
  where startsWithDo (Do _ _ : _) = True
        startsWithDo _ = False
 
@@ -157,55 +154,55 @@ structProg [] = return ()
 structProg (Assert pre _ : stmts) =
   case (init stmts, last stmts) of
     (stmts', Assert post _) ->
-       structStmts True (depart pre) Nothing stmts' (depart post)
+       structStmts True pre Nothing stmts' post
     (_, stmt) -> throwError (MissingPostcondition (locOf stmt))
 structProg stmts =
   case (init stmts, last stmts) of
     (stmts', Assert post _) ->
-       structStmts True A.tt Nothing stmts' (depart post)
+       structStmts True true Nothing stmts' post
     (_, stmt) -> throwError (MissingPostcondition (locOf stmt))
 
 
-wpStmts :: Bool -> [Stmt] -> Pred -> SM Pred
+wpStmts :: Bool -> [Stmt] -> Expr -> SM Expr
 
 wpStmts _ [] post = return post
 
 wpStmts b (Assert pre _ : stmts) post =
-  structStmts b pre' Nothing stmts post >>
-  return pre'
- where pre' = depart pre
+  structStmts b pre Nothing stmts post >>
+  return pre
+ -- where pre' = depart pre
 
 wpStmts b (AssertWithBnd pre bnd _ : stmts) post =
-  structStmts b pre' (Just bnd') stmts post >>
-  return pre'
- where (pre', bnd') = (depart pre, depart bnd)
+  structStmts b pre (Just bnd) stmts post >>
+  return pre
+ -- where (pre', bnd') = (depart pre, depart bnd)
 
 wpStmts b (stmt : stmts) post = do
   post' <- wpStmts b stmts post
   wp b stmt post'
 
-wp :: Bool -> Stmt -> Pred -> SM Pred
+wp :: Bool -> Stmt -> Expr -> SM Expr
 
-wp _ (Abort _) _ = return A.ff
+wp _ (Abort _) _ = return false
 
 wp _ (Skip _) post = return post
 
 wp _ (Assert p l) post =
-   obligate p' post (AssertSufficient l) >> return p'
+   obligate p post (AssertSufficient l) >> return p
  where p' = depart p
 
 wp _ (AssertWithBnd p _ l) post =
-   obligate p' post (AssertSufficient l) >> return p'
+   obligate p post (AssertSufficient l) >> return p
  where p' = depart p
 
 wp _ (Assign xs es _) post =
-  A.subst (zip (map lowerToText xs) (map depart es)) post
+  subst (assignmentEnv xs es) post
 
 wp b (If gcmds _) post = do
     forM_ gcmds $ \(GdCmd guard body _) ->
-      structStmts b (depart guard) Nothing body post
-    let guards = map depart (getGuards gcmds)
-    return (A.disjunct guards) -- is this enough?
+      structStmts b guard Nothing body post
+    let guards = getGuards gcmds
+    return (disjunct guards) -- is this enough?
 
 wp _ (Do _ l) _ = throwError (MissingAssertion l)
 
@@ -214,13 +211,15 @@ wp _ (SpecQM l) _ = throwError $ DigHole l
 wp b (Spec l) post =
   when b (tellSpec post post l) >> return post  -- not quite right
 
-wpProg :: [Stmt] -> SM Pred
-wpProg [] = return A.tt
+wpProg :: [Stmt] -> SM Expr
+wpProg [] = return $ hydrate A.tt
 wpProg stmts =
   case (init stmts, last stmts) of
-    (stmts', Assert p _) -> wpStmts True stmts' (depart p)
+    (stmts', Assert p _) -> wpStmts True stmts' p
     (_, stmt) -> throwError (MissingPostcondition (locOf stmt))
 
+assignmentEnv :: [Lower] -> [Expr] -> Subst
+assignmentEnv xs es = Map.fromList (zip (map Left xs) es)
 
 --------------------------------------------------------------------------------
 -- | The monad, and other supportive operations

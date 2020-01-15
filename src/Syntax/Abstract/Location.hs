@@ -21,15 +21,15 @@ instance Located Stmt where
   locOf (If _              l) = l
   locOf (SpecQM            l) = l
   locOf (Spec              l) = l
-
-instance Located Expr where
-  locOf (Var _ l)   = l
-  locOf (Const _ l) = l
-  locOf (Lit _ l)   = l
-  locOf (Op _ l)    = l
-  locOf (App _ _ l) = l
-  locOf (Hole l)    = l
-  locOf (Quant _ _ _ _ l) = l
+-- 
+-- instance Located Expr where
+--   locOf (Var _ l)   = l
+--   locOf (Const _ l) = l
+--   locOf (Lit _ l)   = l
+--   locOf (Op _ l)    = l
+--   locOf (App _ _ l) = l
+--   locOf (Hole l)    = l
+--   locOf (Quant _ _ _ _ l) = l
 
 instance Located Type where
   locOf (TBase _    l) = l

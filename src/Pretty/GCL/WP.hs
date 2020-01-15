@@ -6,6 +6,7 @@ import Prelude hiding (Ordering(..))
 import GCL.WP
 
 import Pretty.Abstract ()
+import Pretty.Concrete ()
 
 --------------------------------------------------------------------------------
 -- | Obligation & Specification
