@@ -10,7 +10,7 @@ import Data.Loc
 import Prelude hiding (Ordering(..))
 import GHC.Generics (Generic)
 
-import Syntax.Concrete hiding (Type(..), Expr(..), Base(..), Lit(..))
+import Syntax.Concrete hiding (Type(..), Expr(..), Lit(..))
 import qualified Syntax.Concrete as C
 import Syntax.Abstract
 import Syntax.Abstract.Location (depart)

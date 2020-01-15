@@ -43,9 +43,6 @@ instance Located Endpoint where
   locOf (Including e) = locOf e
   locOf (Excluding e) = locOf e
 
-instance Located Base where
-  locOf _ = NoLoc
-
 instance Located Lit where
   locOf _ = NoLoc
 
@@ -89,11 +86,6 @@ instance Departable Upper Text where
 instance Departable Lower Text where
   depart (Lower x _) = x
 
-instance Departable Base A.TBase where
-  depart TInt  = A.TInt
-  depart TBool = A.TBool
-  depart TChar = A.TChar
-
 instance Departable Interval A.Interval where
   depart (Interval a b _) = A.Interval (depart a) (depart b)
 
@@ -102,7 +94,7 @@ instance Departable Endpoint A.Endpoint where
   depart (Excluding e) = A.Excluding (depart e)
 
 instance Departable Type A.Type where
-  depart (TBase  base _) = A.TBase  $ depart base
+  depart (TBase  base _) = A.TBase  base
   depart (TArray i s _)  = A.TArray (depart i) (depart s)
   depart (TFunc  s t _)  = A.TFunc  (depart s) (depart t)
   depart (TVar   x _)    = A.TVar   $ depart x
@@ -115,20 +107,3 @@ instance Departable Expr A.Expr where
   depart (Op  x    _) = A.Op     x
   depart (Quant op xs rng trm _) =
     A.Quant (depart op) (map depart xs) (depart rng) (depart trm)
---
--- instance Departable Op A.Op where
---   depart (EQ  _) = A.EQ
---   depart (NEQ  _) = A.NEQ
---   depart (LTE _) = A.LTE
---   depart (GTE _) = A.GTE
---   depart (LT  _) = A.LT
---   depart (GT  _) = A.GT
---   depart (Implies _) = A.Implies
---   depart (Conj  _) = A.Conj
---   depart (Disj  _) = A.Disj
---   depart (Neg   _) = A.Neg
---   depart (Add   _) = A.Add
---   depart (Sub   _) = A.Sub
---   depart (Mul   _) = A.Mul
---   depart (Div   _) = A.Div
---   depart (Mod   _) = A.Mod

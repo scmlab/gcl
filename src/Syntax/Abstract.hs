@@ -14,7 +14,7 @@ import Type ()
 
 --------------------------------------------------------------------------------
 -- | Expressions
-type Index = Int 
+type Index = Int
 data Lit  = Num Int | Bol Bool | Chr Char
           deriving (Show, Eq, Generic)
 

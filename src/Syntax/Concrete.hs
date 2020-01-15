@@ -1,13 +1,13 @@
 module Syntax.Concrete
   ( module Syntax.Concrete
-  , Op(..)  -- re-export Op(..) from Syntax.Abstract
+  , Op(..), TBase(..)  -- re-exporting from Syntax.Abstract
   ) where
 
 import Data.Loc
 import Data.Text.Lazy (Text)
 import Prelude hiding (Ordering(..))
 
-import Syntax.Abstract (Op(..))
+import Syntax.Abstract (Op(..), TBase(..))
 
 --------------------------------------------------------------------------------
 -- | Program / Declaration / Statement
@@ -46,10 +46,7 @@ unzipGdCmds = unzip . map (\(GdCmd x y _) -> (x, y))
 data Endpoint = Including Expr | Excluding Expr deriving (Eq, Show)
 data Interval = Interval Endpoint Endpoint Loc deriving (Eq, Show)
 
-data Base = TInt | TBool | TChar
-      deriving (Eq, Show)
-
-data Type = TBase Base Loc
+data Type = TBase TBase Loc
           | TArray Interval Type Loc
           | TFunc Type Type Loc
           | TVar Lower Loc
