@@ -75,11 +75,6 @@ instance Relocatable Expr where
 class Located a => Departable a b | a -> b where
   depart :: a -> b
 
-instance Departable Lit A.Lit where
-  depart (Num x) = A.Num x
-  depart (Bol x) = A.Bol x
-  depart (Chr x) = A.Chr x
-
 instance Departable Upper Text where
   depart (Upper x _) = x
 
@@ -102,8 +97,42 @@ instance Departable Type A.Type where
 instance Departable Expr A.Expr where
   depart (Var x    _) = A.Var   $ depart x
   depart (Const x  _) = A.Const $ depart x
-  depart (Lit x    _) = A.Lit   $ depart x
+  depart (Lit x    _) = A.Lit   x
   depart (App x y  _) = A.App   (depart x) (depart y)
-  depart (Op  x    _) = A.Op     x
+  depart (Op  x    _) = A.Op    x
   depart (Quant op xs rng trm _) =
     A.Quant (depart op) (map depart xs) (depart rng) (depart trm)
+
+--------------------------------------------------------------------------------
+-- Add locations
+
+class Located b => Hydratable a b | b -> a where
+  hydrate :: a -> b
+
+instance Hydratable Text Upper where
+  hydrate x = Upper x NoLoc
+
+instance Hydratable Text Lower where
+  hydrate x = Lower x NoLoc
+
+instance Hydratable A.Interval Interval where
+  hydrate (A.Interval a b) = Interval (hydrate a) (hydrate b) NoLoc
+
+instance Hydratable A.Endpoint Endpoint where
+  hydrate (A.Including e) = Including (hydrate e)
+  hydrate (A.Excluding e) = Excluding (hydrate e)
+
+instance Hydratable A.Type Type where
+  hydrate (A.TBase  base) = TBase  base NoLoc
+  hydrate (A.TArray i s ) = TArray (hydrate i) (hydrate s) NoLoc
+  hydrate (A.TFunc  s t ) = TFunc  (hydrate s) (hydrate t) NoLoc
+  hydrate (A.TVar   x   ) = TVar   (hydrate x) NoLoc
+
+instance Hydratable A.Expr Expr where
+  hydrate (A.Var x  ) = Var   (hydrate x) NoLoc
+  hydrate (A.Const x) = Const (hydrate x) NoLoc
+  hydrate (A.Lit x  ) = Lit   x NoLoc
+  hydrate (A.App x y) = App   (hydrate x) (hydrate y) NoLoc
+  hydrate (A.Op  x  ) = Op    x NoLoc
+  hydrate (A.Quant op xs rng trm) =
+    Quant (hydrate op) (map hydrate xs) (hydrate rng) (hydrate trm) NoLoc
