@@ -22,7 +22,7 @@ type Index = A.Index
 
 data Obligation
   = Obligation Index Expr Expr [ObliOrigin]
-  -- | ObliIfTotal Expr [Expr] -- disjunct
+  | ObliIfTotal Expr [Expr] Loc
   deriving (Show, Generic)
 
 data Specification = Specification
@@ -51,6 +51,8 @@ type SM = WriterT [Obligation] (WriterT [Specification]
                   (Either StructError)))
 
 -- create a proof obligation
+tellObli :: Obligation -> SM ()
+tellObli obligation = tell [obligation]
 
 obligate :: Expr -> Expr -> ObliOrigin -> SM ()
 obligate p q l = do
@@ -58,7 +60,7 @@ obligate p q l = do
   unless (predEq p q) $ do
     (i, j, k) <- get
     put (succ i, j, k)
-    tell [Obligation i p q [l]]
+    tellObli $ Obligation i p q [l]
 
 -- inform existence of a spec hole
 
@@ -90,7 +92,7 @@ struct _ pre _ (Assign xs es l) post = do
 
 struct b pre _ (If gcmds l) post = do
   let guards = getGuards gcmds
-  obligate pre (disjunct guards) (IfTotal l)
+  tellObli $ ObliIfTotal pre guards l
   forM_ gcmds $ \(GdCmd guard body l') ->
     addObliOrigin (IfBranch l')
      (structStmts b (pre `conj` guard) Nothing body post)
