@@ -46,12 +46,6 @@ instance Pretty TypeError where
     <+> pretty v <+> "in" <+> pretty a
   pretty (NotFunction a _) = "The type" <+> pretty a <+> "is not a function type"
 
---------------------------------------------------------------------------------
--- | Misc
-
-instance Pretty Loc where
-  pretty = pretty . displayLoc
-
 -- --------------------------------------------------------------------------------
 -- -- | Val
 --

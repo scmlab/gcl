@@ -74,8 +74,6 @@ data Expr = Lit   Lit       Loc
           | Quant Expr [Lower] Expr Expr Loc
           deriving (Eq, Show, Generic)
 
--- instance ToJSON Op where
--- instance ToJSON Lit where
 instance ToJSON Expr where
 
 --------------------------------------------------------------------------------

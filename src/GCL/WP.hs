@@ -8,20 +8,22 @@ import Control.Monad.Writer hiding (guard)
 import Control.Monad.Except hiding (guard)
 
 import qualified Data.Map as Map
-import Data.Loc (Loc(..), Located(..), posLine, posCol)
+import Data.Loc (Loc(..), Located(..))
 import Data.Aeson
 import GHC.Generics
 
 import Syntax.Concrete
 import qualified Syntax.Abstract as A
-import Syntax.Location
+import Syntax.Location ()
 
 type Index = A.Index
 
 
 
-data Obligation = Obligation Index Expr Expr [ObliOrigin]
-       deriving (Show, Generic)
+data Obligation
+  = Obligation Index Expr Expr [ObliOrigin]
+  -- | ObliIfTotal Expr [Expr] -- disjunct
+  deriving (Show, Generic)
 
 data Specification = Specification
   { specID       :: Int
@@ -42,7 +44,7 @@ data ObliOrigin = AroundAbort Loc
                 | LoopTermBase Loc
                 | LoopTermDec Loc
                 | LoopInitialize Loc
-      deriving Generic
+      deriving (Show, Generic)
 
 type SM = WriterT [Obligation] (WriterT [Specification]
                 (StateT (Int, Int, Int)
@@ -259,27 +261,6 @@ addObliOrigin ori =
 
 censorSpec :: ([Specification] -> [Specification]) -> SM a -> SM a
 censorSpec f = mapWriterT (censor f)
-
--- the following is temporary
-
-showLoc :: Loc -> String
-showLoc NoLoc     = ""
-showLoc (Loc l _) = "(" ++ show (posLine l) ++ "," ++ show (posCol l) ++ ")"
-
-instance Show ObliOrigin where
-  show (AroundAbort l) = "AroundAbort " ++ showLoc l
-  show (AroundSkip l) = "AroundSkip " ++ showLoc l
-  show (AssertGuaranteed l) = "AssertGuaranteed " ++ showLoc l
-  show (AssertSufficient l) = "AssertSufficient " ++ showLoc l
-  show (Assignment l) = "Assignment " ++ showLoc l
-  show (IfTotal l) = "IfTotal " ++ showLoc l
-  show (IfBranch l) = "IfBranch " ++ showLoc l
-  show (LoopBase l) = "LoopBase " ++ showLoc l
-  show (LoopInd l) = "LoopInd " ++ showLoc l
-  show (LoopTermBase l) = "LoopTermBase " ++ showLoc l
-  show (LoopTermDec l) = "LoopTermDec " ++ showLoc l
-  show (LoopInitialize l) = "LoopInitialize " ++ showLoc l
-
 
 
 data StructError = MissingAssertion Loc
