@@ -3,38 +3,15 @@
 module Pretty.Abstract where
 
 import Data.Text.Prettyprint.Doc
-import Control.Monad ((>=>))
 import Prelude hiding (Ordering(..))
 
+import Pretty.Variadic
 import Syntax.Abstract hiding (var)
 
 --------------------------------------------------------------------------------
 -- | Expr
 
-data VarArg a = Expect (Expr -> VarArg a) | Complete a
-  deriving (Functor)
-
-instance Applicative VarArg where
-  pure = Complete
-  Complete f  <*> Complete x = Complete (f x)
-  Expect   f  <*> Complete x = Expect (\arg -> f arg  <*> pure x)
-  Complete f  <*> Expect   g = Expect (\arg -> pure f <*> g arg)
-  Expect   f  <*> Expect   g = Expect (\arg -> f arg  <*> g arg)
-
-instance Monad VarArg where
-  return = Complete
-  Complete x >>= f = f x
-  Expect   g >>= f = Expect (g >=> f)
-
-parensIf :: Int -> Int -> Doc ann -> Doc ann
-parensIf n m
-  | n > m     = parens
-  | otherwise = id
-
-var :: VarArg Expr
-var = Expect Complete
-
-handleOp :: Int -> Op -> VarArg (Doc ann)
+handleOp :: Int -> Op -> Variadic Expr (Doc ann)
 handleOp n op = case classify op of
   Infix m -> do
     p <- var
@@ -68,7 +45,7 @@ handleOp n op = case classify op of
       prettyPrec m p
       <+> pretty op
 
-handleExpr :: Int -> Expr -> VarArg (Doc ann)
+handleExpr :: Int -> Expr -> Variadic Expr (Doc ann)
 handleExpr _ (Var v) = return $ pretty v
 handleExpr _ (Const c) = return $ pretty c
 handleExpr _ (Lit lit) = return $ pretty lit
