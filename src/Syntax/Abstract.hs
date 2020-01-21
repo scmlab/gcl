@@ -62,19 +62,18 @@ litB = Lit . Bol
 litC :: Char -> Expr
 litC = Lit . Chr
 
-tt, ff :: Expr
-tt = Lit (Bol True)
-ff = Lit (Bol False)
+true, false :: Expr
+true = Lit (Bol True)
+false = Lit (Bol False)
 
 conjunct :: [Expr] -> Expr
-conjunct []     = tt
-conjunct [p]    = p
-conjunct (p:ps) = p `conj` conjunct ps
+conjunct = foldl conj true
 
 disjunct :: [Expr] -> Expr
-disjunct []     = ff
-disjunct [p]    = p
-disjunct (p:ps) = p `disj` disjunct ps
+disjunct = foldl disj true
+
+imply :: Expr -> Expr -> Expr
+imply p q = App (App (Op Implies) p) q
 
 neg :: Expr -> Expr
 neg x = App (Op Neg) x

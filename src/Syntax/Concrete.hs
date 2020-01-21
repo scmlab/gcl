@@ -130,14 +130,13 @@ false :: Expr
 false = Lit (Bol False) NoLoc
 
 conjunct :: [Expr] -> Expr
-conjunct []     = true
-conjunct [p]    = p
-conjunct (p:ps) = p `conj` conjunct ps
+conjunct = foldl conj true
 
 disjunct :: [Expr] -> Expr
-disjunct []     = false
-disjunct [p]    = p
-disjunct (p:ps) = p `disj` disjunct ps
+disjunct = foldl disj true
+
+imply :: Expr -> Expr -> Expr
+imply p q = App (App (Op Implies NoLoc) p NoLoc) q NoLoc
 
 predEq :: Expr -> Expr -> Bool
 predEq = (==)

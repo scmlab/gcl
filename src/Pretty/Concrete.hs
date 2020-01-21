@@ -8,9 +8,13 @@ import Data.Text.Prettyprint.Doc
 import Syntax.Location
 import Syntax.Concrete
 import Pretty.Abstract ()
+import Pretty.Variadic
 
 --------------------------------------------------------------------------------
 -- | Expr
+
+instance PrettyPrec Expr where
+  prettyPrec n = prettyPrec n . depart
 
 instance Pretty Expr where
   pretty = pretty . depart

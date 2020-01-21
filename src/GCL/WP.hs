@@ -18,6 +18,8 @@ import Syntax.Location
 
 type Index = A.Index
 
+
+
 data Obligation = Obligation Index Expr Expr [ObliOrigin]
        deriving (Show, Generic)
 
@@ -207,7 +209,7 @@ wp b (Spec l) post =
   when b (tellSpec post post l) >> return post  -- not quite right
 
 wpProg :: [Stmt] -> SM Expr
-wpProg [] = return $ hydrate A.tt
+wpProg [] = return true
 wpProg stmts =
   case (init stmts, last stmts) of
     (stmts', Assert p _) -> wpStmts True stmts' p
@@ -295,3 +297,21 @@ instance Located StructError where
   locOf (DigHole loc) = loc
 
 instance ToJSON StructError where
+
+
+--------------------------------------------------------------------------------
+-- | Predicates
+
+data Pred = Atom       Expr
+          | Conjunct  [Pred]
+          | Disjunct  [Pred]
+          | Imply      Pred  Pred
+          | Negate     Pred
+          deriving (Show, Generic)
+
+predToExpr :: Pred -> Expr
+predToExpr (Atom x) = x
+predToExpr (Conjunct xs) = conjunct (map predToExpr xs)
+predToExpr (Disjunct xs) = disjunct (map predToExpr xs)
+predToExpr (Imply p q) = imply (predToExpr p) (predToExpr q)
+predToExpr (Negate p) = neg (predToExpr p)

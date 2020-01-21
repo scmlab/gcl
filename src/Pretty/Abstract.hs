@@ -65,10 +65,10 @@ handleExpr _ (Quant op xs r t) =
 
 handleExpr _ (Hole i _) = return $ "[" <> pretty i <> "]"
 
-prettyPrec :: Int -> Expr -> Doc ann
-prettyPrec n expr = case handleExpr n expr of
-  Expect   _ -> mempty
-  Complete s -> s
+instance PrettyPrec Expr where
+  prettyPrec n expr = case handleExpr n expr of
+    Expect   _ -> mempty
+    Complete s -> s
 
 -- SCM: used for printing the operator in quantifier. Temporary.
 
