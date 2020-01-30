@@ -21,14 +21,14 @@ type Index = A.Index
 
 
 data Obligation
-  = Obligation Index Expr Expr [ObliOrigin]
+  = Obligation Index Pred Pred [ObliOrigin]
   -- | ObliIfTotal Expr [Expr] -- disjunct
   deriving (Show, Generic)
 
 data Specification = Specification
   { specID       :: Int
-  , specPreCond  :: Expr
-  , specPostCond :: Expr
+  , specPreCond  :: Pred
+  , specPostCond :: Pred
   , specLoc      :: Loc
   } deriving (Show, Generic)
 
@@ -52,17 +52,17 @@ type SM = WriterT [Obligation] (WriterT [Specification]
 
 -- create a proof obligation
 
-obligate :: Expr -> Expr -> ObliOrigin -> SM ()
+obligate :: Pred -> Pred -> ObliOrigin -> SM ()
 obligate p q l = do
   -- NOTE: this could use some love
-  unless (predEq p q) $ do
+  unless (predEq (predToExpr p) (predToExpr q)) $ do
     (i, j, k) <- get
     put (succ i, j, k)
     tell [Obligation i p q [l]]
 
 -- inform existence of a spec hole
 
-tellSpec :: Expr -> Expr -> Loc -> SM ()
+tellSpec :: Pred -> Pred -> Loc -> SM ()
 tellSpec p q loc = do
   (i, j, k) <- get
   put (i, succ j, k)
@@ -71,29 +71,29 @@ tellSpec p q loc = do
 --------------------------------------------------------------------------------
 -- | Structure, and Weakest-Precondition
 
-struct :: Bool -> Expr -> Maybe Expr -> Stmt -> Expr -> SM ()
+struct :: Bool -> Pred -> Maybe Expr -> Stmt -> Pred -> SM ()
 
-struct _ pre _ (Abort l) _ = obligate pre false (AroundAbort l)
+struct _ pre _ (Abort l) _ = obligate pre (Pred false) (AroundAbort l)
 
 struct _ pre _ (Skip l) post = obligate pre post (AroundSkip l)
 
-struct _ pre _ (Assert p l) post =
-   obligate pre p (AssertGuaranteed l) >>
-   obligate p post (AssertSufficient l)
+struct _ pre _ (Assert p l) post = do
+   obligate pre (Pred p) (AssertGuaranteed l)
+   obligate (Pred p) post (AssertSufficient l)
 
 struct _ _ _ (AssertWithBnd _ _ l) _ =
    throwError (ExcessBound l)
 
 struct _ pre _ (Assign xs es l) post = do
-  post' <- subst (assignmentEnv xs es) post
+  post' <- substPred (assignmentEnv xs es) post
   obligate pre post' (Assignment l)
 
 struct b pre _ (If gcmds l) post = do
   let guards = getGuards gcmds
-  obligate pre (disjunct guards) (IfTotal l)
+  obligate pre (IfTotalDisj guards) (IfTotal l)
   forM_ gcmds $ \(GdCmd guard body l') ->
     addObliOrigin (IfBranch l')
-     (structStmts b (pre `conj` guard) Nothing body post)
+     (structStmts b (IfBranchConj pre guard) Nothing body post)
 
 struct _ _ Nothing (Do _ l) _ =
   throwError (MissingBound l)
@@ -110,39 +110,48 @@ struct _ _ Nothing (Do _ l) _ =
 struct b inv (Just bnd) (Do gcmds l) post = do
   -- base case
   let guards = getGuards gcmds
-  obligate (inv `conj` (conjunct (map neg guards))) post (LoopBase l)
+  obligate (LoopBaseConj inv (map neg guards)) post (LoopBase l)
+  -- obligate (LoopBaseConj inv (conjunct (map neg guards))) post (LoopBase l)
   -- inductive cases
   forM_ gcmds $ \(GdCmd guard body l') ->
     addObliOrigin (LoopInd l')
-      (structStmts b (inv `conj` guard) Nothing body inv)
+      (structStmts b (LoopIndConj inv guard) Nothing body inv)
   -- termination
-  obligate (inv `conj` disjunct guards)
-       (bnd `gte` (Lit (Num 0) NoLoc)) (LoopTermBase l)
+  obligate (LoopTermConj inv guards)
+       (Pred $ bnd `gte` (Lit (Num 0) NoLoc)) (LoopTermBase l)
   -- bound decrementation
   oldbnd <- freshVar "bnd"
-  let invB = inv `conj` (bnd `eqq` Var oldbnd NoLoc)
   forM_ gcmds $ \(GdCmd guard body l') ->
     addObliOrigin (LoopTermDec l')
-      (structStmts False (invB `conj` guard) Nothing body
-             (bnd `lte` Var oldbnd NoLoc))
+      (structStmts
+            False
+            (LoopTermDecrConj
+              inv
+              (bnd `eqq` Var oldbnd NoLoc)
+              guard)
+            Nothing
+            body
+            (Pred $ bnd `lte` Var oldbnd NoLoc))
 
 struct _ _ _ (SpecQM l) _    = throwError $ DigHole l
 struct b pre _ (Spec l) post = when b (tellSpec pre post l)
 
 
-structStmts :: Bool -> Expr -> Maybe Expr -> [Stmt] -> Expr -> SM ()
+structStmts :: Bool -> Pred -> Maybe Expr -> [Stmt] -> Pred -> SM ()
 
 structStmts _ _ _ [] _ = return ()
 
-structStmts b pre _ (Assert p l : stmts) post =
-  obligate pre p (AssertGuaranteed l) >>
-  structStmts b p Nothing stmts post
+structStmts b pre _ (Assert p l : stmts) post = do
+  obligate pre (Pred p) (AssertGuaranteed l)
+  structStmts b (Pred p) Nothing stmts post
 
-structStmts b pre _ (AssertWithBnd p bnd l : stmts) post =
-  let origin = if startsWithDo stmts then LoopInitialize l
-                   else AssertGuaranteed l
-  in obligate pre p origin >>
-     structStmts b p (Just bnd) stmts post
+structStmts b pre _ (AssertWithBnd p bnd l : stmts) post = do
+  let origin = if startsWithDo stmts
+                    then LoopInitialize l
+                    else AssertGuaranteed l
+  obligate pre (Pred p) origin
+  structStmts b (Pred p) (Just bnd) stmts post
+
  where startsWithDo (Do _ _ : _) = True
        startsWithDo _ = False
 
@@ -155,66 +164,67 @@ structProg [] = return ()
 structProg (Assert pre _ : stmts) =
   case (init stmts, last stmts) of
     (stmts', Assert post _) ->
-       structStmts True pre Nothing stmts' post
+       structStmts True (Pred pre) Nothing stmts' (Pred post)
     (_, stmt) -> throwError (MissingPostcondition (locOf stmt))
 structProg stmts =
   case (init stmts, last stmts) of
     (stmts', Assert post _) ->
-       structStmts True true Nothing stmts' post
+       structStmts True (Pred true) Nothing stmts' (Pred post)
     (_, stmt) -> throwError (MissingPostcondition (locOf stmt))
 
 
-wpStmts :: Bool -> [Stmt] -> Expr -> SM Expr
+wpStmts :: Bool -> [Stmt] -> Pred -> SM Pred
 
 wpStmts _ [] post = return post
 
 wpStmts b (Assert pre _ : stmts) post =
-  structStmts b pre Nothing stmts post >>
-  return pre
- -- where pre' = depart pre
+  structStmts b (Pred pre) Nothing stmts post >>
+  return (Pred pre)
 
 wpStmts b (AssertWithBnd pre bnd _ : stmts) post =
-  structStmts b pre (Just bnd) stmts post >>
-  return pre
- -- where (pre', bnd') = (depart pre, depart bnd)
+  structStmts b (Pred pre) (Just bnd) stmts post >>
+  return (Pred pre)
 
 wpStmts b (stmt : stmts) post = do
   post' <- wpStmts b stmts post
   wp b stmt post'
 
-wp :: Bool -> Stmt -> Expr -> SM Expr
+wp :: Bool -> Stmt -> Pred -> SM Pred
 
-wp _ (Abort _) _ = return false
+wp _ (Abort _) _ = return (Pred false)
 
 wp _ (Skip _) post = return post
 
-wp _ (Assert p l) post =
-   obligate p post (AssertSufficient l) >> return p
+wp _ (Assert p l) post = do
+  obligate (Pred p) post (AssertSufficient l)
+  return (Pred p)
 
-wp _ (AssertWithBnd p _ l) post =
-   obligate p post (AssertSufficient l) >> return p
+wp _ (AssertWithBnd p _ l) post = do
+  obligate (Pred p) post (AssertSufficient l)
+  return (Pred p)
 
 wp _ (Assign xs es _) post =
-  subst (assignmentEnv xs es) post
+  substPred (assignmentEnv xs es) post
 
 wp b (If gcmds _) post = do
-    forM_ gcmds $ \(GdCmd guard body _) ->
-      structStmts b guard Nothing body post
-    let guards = getGuards gcmds
-    return (disjunct guards) -- is this enough?
+  forM_ gcmds $ \(GdCmd guard body _) ->
+    structStmts b (Pred guard) Nothing body post
+  let guards = getGuards gcmds
+  return (IfTotalDisj guards) -- is this enough?
 
 wp _ (Do _ l) _ = throwError (MissingAssertion l)
 
 wp _ (SpecQM l) _ = throwError $ DigHole l
 
-wp b (Spec l) post =
-  when b (tellSpec post post l) >> return post  -- not quite right
+wp b (Spec l) post = do
+  when b (tellSpec post post l)
+  return post  -- not quite right
 
-wpProg :: [Stmt] -> SM Expr
-wpProg [] = return true
+wpProg :: [Stmt] -> SM Pred
+wpProg [] = return (Pred true)
 wpProg stmts =
   case (init stmts, last stmts) of
-    (stmts', Assert p _) -> wpStmts True stmts' p
+    (stmts', Assert p _) -> wpStmts True stmts' (Pred p)
     (_, stmt) -> throwError (MissingPostcondition (locOf stmt))
 
 assignmentEnv :: [Lower] -> [Expr] -> Subst
@@ -283,16 +293,49 @@ instance ToJSON StructError where
 --------------------------------------------------------------------------------
 -- | Predicates
 
-data Pred = Atom       Expr
-          | Conjunct  [Pred]
-          | Disjunct  [Pred]
-          | Imply      Pred  Pred
-          | Negate     Pred
+data Pred = Pred              Expr
+          | IfTotalDisj       [Expr]
+          | IfBranchConj      Pred Expr
+          | LoopTermDecrConj  Pred Expr Expr
+          | LoopTermConj      Pred [Expr]
+          | LoopIndConj        Pred Expr
+          | LoopBaseConj        Pred [Expr]
+
+          -- | Conjunct  [Pred]
+          -- | Disjunct  [Pred]
+          -- | Imply      Pred  Pred
+          -- | Negate     Pred
           deriving (Show, Generic)
 
+instance ToJSON Pred where
+
 predToExpr :: Pred -> Expr
-predToExpr (Atom x) = x
-predToExpr (Conjunct xs) = conjunct (map predToExpr xs)
-predToExpr (Disjunct xs) = disjunct (map predToExpr xs)
-predToExpr (Imply p q) = imply (predToExpr p) (predToExpr q)
-predToExpr (Negate p) = neg (predToExpr p)
+predToExpr (Pred e) = e
+predToExpr (IfTotalDisj es) = disjunct es
+predToExpr (IfBranchConj x e) = predToExpr x `conj` e
+predToExpr (LoopTermDecrConj x e f) = predToExpr x `conj` e `conj` f
+predToExpr (LoopTermConj x es) = predToExpr x `conj` conjunct es
+predToExpr (LoopIndConj x e) = predToExpr x `conj` e
+predToExpr (LoopBaseConj x es) = predToExpr x `conj` conjunct es
+
+-- predToExpr (Disjunct xs) = disjunct (map predToExpr xs)
+-- predToExpr (Imply p q) = imply (predToExpr p) (predToExpr q)
+-- predToExpr (Negate p) = neg (predToExpr p)
+
+substPred :: Subst -> Pred -> SM Pred
+substPred env (Pred e) = Pred <$> subst env e
+substPred env (IfTotalDisj es) = IfTotalDisj <$> mapM (subst env) es
+substPred env (IfBranchConj x e) = IfBranchConj <$> substPred env x <*> subst env e
+substPred env (LoopTermDecrConj x e f) = LoopTermDecrConj
+  <$> substPred env x
+  <*> subst env e
+  <*> subst env f
+substPred env (LoopTermConj x es) = LoopTermConj
+  <$> substPred env x
+  <*> mapM (subst env) es
+substPred env (LoopIndConj x e) = LoopIndConj
+  <$> substPred env x
+  <*> subst env e
+substPred env (LoopBaseConj x es) = LoopBaseConj
+  <$> substPred env x
+  <*> mapM (subst env) es
