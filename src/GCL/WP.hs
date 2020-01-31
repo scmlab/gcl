@@ -110,7 +110,7 @@ struct _ _ Nothing (Do _ l) _ =
 struct b inv (Just bnd) (Do gcmds l) post = do
   -- base case
   let guards = getGuards gcmds
-  obligate (Conjunct (inv : (map (toGuard . neg) guards))) post (LoopBase l)
+  obligate (Conjunct (inv : (map (Negate . toGuard) guards))) post (LoopBase l)
   -- obligate (LoopBaseConj inv (conjunct (map neg guards))) post (LoopBase l)
   -- inductive cases
   forM_ gcmds $ \(GdCmd guard body l') ->
@@ -298,8 +298,8 @@ data Pred = Pred      Expr
           | Guard     Expr  Loc
           | Conjunct  [Pred]
           | Disjunct  [Pred]
+          | Negate     Pred
           -- | Imply      Pred  Pred
-          -- | Negate     Pred
           deriving (Show, Generic)
 
 instance ToJSON Pred where
@@ -310,9 +310,9 @@ predToExpr (Assertion e _) = e
 predToExpr (Guard e _) = e
 predToExpr (Conjunct xs) = conjunct (map predToExpr xs)
 predToExpr (Disjunct xs) = disjunct (map predToExpr xs)
+predToExpr (Negate x) = neg (predToExpr x)
 
 -- predToExpr (Imply p q) = imply (predToExpr p) (predToExpr q)
--- predToExpr (Negate p) = neg (predToExpr p)
 
 substPred :: Subst -> Pred -> SM Pred
 substPred env (Pred e) = Pred <$> subst env e
@@ -320,6 +320,7 @@ substPred env (Assertion e l) = Assertion <$> subst env e <*> pure l
 substPred env (Guard e l) = Guard <$> subst env e <*> pure l
 substPred env (Conjunct xs) = Conjunct <$> mapM (substPred env) xs
 substPred env (Disjunct es) = Disjunct <$> mapM (substPred env) es
+substPred env (Negate x) = Negate <$> substPred env x
 
 toGuard :: Expr -> Pred
 toGuard x = Guard x (locOf x)
