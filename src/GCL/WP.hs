@@ -110,14 +110,14 @@ struct _ _ Nothing (Do _ l) _ =
 struct b inv (Just bnd) (Do gcmds l) post = do
   -- base case
   let guards = getGuards gcmds
-  obligate (LoopBaseConj inv (map neg guards)) post (LoopBase l)
+  obligate (Conjunct (inv : (map (Guard . neg) guards))) post (LoopBase l)
   -- obligate (LoopBaseConj inv (conjunct (map neg guards))) post (LoopBase l)
   -- inductive cases
   forM_ gcmds $ \(GdCmd guard body l') ->
     addObliOrigin (LoopInd l')
-      (structStmts b (LoopIndConj inv guard) Nothing body inv)
+      (structStmts b (Conjunct [inv, Guard guard]) Nothing body inv)
   -- termination
-  obligate (LoopTermConj inv guards)
+  obligate (Conjunct (inv : map Guard guards))
        (Pred $ bnd `gte` (Lit (Num 0) NoLoc)) (LoopTermBase l)
   -- bound decrementation
   oldbnd <- freshVar "bnd"
@@ -125,10 +125,11 @@ struct b inv (Just bnd) (Do gcmds l) post = do
     addObliOrigin (LoopTermDec l')
       (structStmts
             False
-            (LoopTermDecrConj
-              inv
-              (bnd `eqq` Var oldbnd NoLoc)
-              guard)
+            (Conjunct
+              [ inv
+              , Pred $ bnd `eqq` Var oldbnd NoLoc
+              , Guard guard
+              ])
             Nothing
             body
             (Pred $ bnd `lte` Var oldbnd NoLoc))
@@ -294,13 +295,6 @@ instance ToJSON StructError where
 
 data Pred = Pred              Expr
           | Guard             Expr
-
-          -- | GuardDisj         [Expr]          -- guards
-          | LoopTermDecrConj  Pred Expr Expr  -- inv, bnd, guard
-          | LoopTermConj      Pred [Expr]     -- inv, guards
-          | LoopIndConj        Pred Expr
-          | LoopBaseConj        Pred [Expr]
-
           | Conjunct  [Pred]
           | Disjunct  [Pred]
           -- | Imply      Pred  Pred
@@ -314,10 +308,6 @@ predToExpr (Pred e) = e
 predToExpr (Guard e) = e
 predToExpr (Conjunct xs) = conjunct (map predToExpr xs)
 predToExpr (Disjunct xs) = disjunct (map predToExpr xs)
-predToExpr (LoopTermDecrConj x e f) = predToExpr x `conj` e `conj` f
-predToExpr (LoopTermConj x es) = predToExpr x `conj` conjunct es
-predToExpr (LoopIndConj x e) = predToExpr x `conj` e
-predToExpr (LoopBaseConj x es) = predToExpr x `conj` conjunct es
 
 -- predToExpr (Imply p q) = imply (predToExpr p) (predToExpr q)
 -- predToExpr (Negate p) = neg (predToExpr p)
@@ -327,16 +317,3 @@ substPred env (Pred e) = Pred <$> subst env e
 substPred env (Guard e) = Guard <$> subst env e
 substPred env (Conjunct xs) = Conjunct <$> mapM (substPred env) xs
 substPred env (Disjunct es) = Disjunct <$> mapM (substPred env) es
-substPred env (LoopTermDecrConj x e f) = LoopTermDecrConj
-  <$> substPred env x
-  <*> subst env e
-  <*> subst env f
-substPred env (LoopTermConj x es) = LoopTermConj
-  <$> substPred env x
-  <*> mapM (subst env) es
-substPred env (LoopIndConj x e) = LoopIndConj
-  <$> substPred env x
-  <*> subst env e
-substPred env (LoopBaseConj x es) = LoopBaseConj
-  <$> substPred env x
-  <*> mapM (subst env) es
