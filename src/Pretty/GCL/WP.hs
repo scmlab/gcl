@@ -47,10 +47,10 @@ instance Pretty Obligation where
     indent 2 (pretty p) <> line <>
     indent 2 (pretty q) <> line <>
     indent 2 (pretty os) <> line
-  pretty (ObliIfTotal p qs l) = "ObliIfTotal" <> line <>
-    indent 2 (pretty p) <> line <>
-    indent 2 (pretty qs) <> line <>
-    indent 2 (pretty l) <> line
+  -- pretty (ObliIfTotal p qs l) = "ObliIfTotal" <> line <>
+  --   indent 2 (pretty p) <> line <>
+  --   indent 2 (pretty qs) <> line <>
+  --   indent 2 (pretty l) <> line
 
 instance Pretty Specification where
   pretty (Specification i p q _) = lbracket <> pretty i <> rbracket <> line <>

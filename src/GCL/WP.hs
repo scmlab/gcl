@@ -22,7 +22,6 @@ type Index = A.Index
 
 data Obligation
   = Obligation Index Pred Pred [ObliOrigin]
-  | ObliIfTotal Pred Pred Loc -- disjunction of guards
   deriving (Show, Generic)
 
 data Specification = Specification
@@ -92,8 +91,7 @@ struct _ pre _ (Assign xs es l) post = do
 
 struct b pre _ (If gcmds l) post = do
   let guards = getGuards gcmds
-  tellObli $ ObliIfTotal pre (GuardDisj guards) l
-  -- obligate pre (GuardDisj guards) (IfTotal l)
+  obligate pre (GuardDisj guards) (IfTotal l)
   forM_ gcmds $ \(GdCmd guard body l') ->
     addObliOrigin (IfBranch l')
      (structStmts b (IfBranchConj pre guard) Nothing body post)
