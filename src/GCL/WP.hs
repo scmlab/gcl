@@ -90,10 +90,10 @@ struct _ pre _ (Assign xs es l) post = do
   obligate pre post' (Assignment l)
 
 struct b pre _ (If gcmds l) post = do
-  obligate pre (Disjunct $ map toGuard $ getGuards gcmds) (IfTotal l)
+  obligate pre (Disjunct $ map (toGuard (IF l)) $ getGuards gcmds) (IfTotal l)
   forM_ gcmds $ \(GdCmd guard body l') ->
     addObliOrigin (IfBranch l')
-     (structStmts b (Conjunct [pre, toGuard guard]) Nothing body post)
+     (structStmts b (Conjunct [pre, toGuard (IF l) guard]) Nothing body post)
 
 struct _ _ Nothing (Do _ l) _ =
   throwError (MissingBound l)
@@ -110,14 +110,13 @@ struct _ _ Nothing (Do _ l) _ =
 struct b inv (Just bnd) (Do gcmds l) post = do
   -- base case
   let guards = getGuards gcmds
-  obligate (Conjunct (inv : (map (Negate . toGuard) guards))) post (LoopBase l)
-  -- obligate (LoopBaseConj inv (conjunct (map neg guards))) post (LoopBase l)
+  obligate (Conjunct (inv : (map (Negate . toGuard (LOOP l)) guards))) post (LoopBase l)
   -- inductive cases
   forM_ gcmds $ \(GdCmd guard body l') ->
     addObliOrigin (LoopInd l')
-      (structStmts b (Conjunct [inv, toGuard guard]) Nothing body inv)
+      (structStmts b (Conjunct [inv, (toGuard (LOOP l)) guard]) Nothing body inv)
   -- termination
-  obligate (Conjunct (inv : map toGuard guards))
+  obligate (Conjunct (inv : map (toGuard (LOOP l)) guards))
        (Pred $ bnd `gte` (Lit (Num 0) NoLoc)) (LoopTermBase l)
   -- bound decrementation
   oldbnd <- freshVar "bnd"
@@ -128,7 +127,7 @@ struct b inv (Just bnd) (Do gcmds l) post = do
             (Conjunct
               [ inv
               , Pred $ bnd `eqq` Var oldbnd NoLoc
-              , toGuard guard
+              , toGuard (LOOP l) guard
               ])
             Nothing
             body
@@ -207,10 +206,10 @@ wp _ (AssertWithBnd p _ l) post = do
 wp _ (Assign xs es _) post =
   substPred (assignmentEnv xs es) post
 
-wp b (If gcmds _) post = do
+wp b (If gcmds l) post = do
   forM_ gcmds $ \(GdCmd guard body _) ->
-    structStmts b (toGuard guard) Nothing body post
-  return (Disjunct (map toGuard $ getGuards gcmds)) -- is this enough?
+    structStmts b (toGuard (IF l) guard) Nothing body post
+  return (Disjunct (map (toGuard (IF l)) $ getGuards gcmds)) -- is this enough?
 
 wp _ (Do _ l) _ = throwError (MissingAssertion l)
 
@@ -293,21 +292,26 @@ instance ToJSON StructError where
 --------------------------------------------------------------------------------
 -- | Predicates
 
+
+data Sort = IF Loc | LOOP Loc
+          deriving (Show, Generic)
+
 data Pred = Pred      Expr
           | Assertion Expr  Loc
-          | Guard     Expr  Loc
+          | Guard     Expr  Sort Loc
           | Conjunct  [Pred]
           | Disjunct  [Pred]
           | Negate     Pred
           -- | Imply      Pred  Pred
           deriving (Show, Generic)
 
+instance ToJSON Sort where
 instance ToJSON Pred where
 
 predToExpr :: Pred -> Expr
 predToExpr (Pred e) = e
 predToExpr (Assertion e _) = e
-predToExpr (Guard e _) = e
+predToExpr (Guard e _ _) = e
 predToExpr (Conjunct xs) = conjunct (map predToExpr xs)
 predToExpr (Disjunct xs) = disjunct (map predToExpr xs)
 predToExpr (Negate x) = neg (predToExpr x)
@@ -317,13 +321,13 @@ predToExpr (Negate x) = neg (predToExpr x)
 substPred :: Subst -> Pred -> SM Pred
 substPred env (Pred e) = Pred <$> subst env e
 substPred env (Assertion e l) = Assertion <$> subst env e <*> pure l
-substPred env (Guard e l) = Guard <$> subst env e <*> pure l
+substPred env (Guard e sort l) = Guard <$> subst env e <*> pure sort <*> pure l
 substPred env (Conjunct xs) = Conjunct <$> mapM (substPred env) xs
 substPred env (Disjunct es) = Disjunct <$> mapM (substPred env) es
 substPred env (Negate x) = Negate <$> substPred env x
 
-toGuard :: Expr -> Pred
-toGuard x = Guard x (locOf x)
+toGuard :: Sort -> Expr -> Pred
+toGuard sort x = Guard x sort (locOf x)
 
 
 -- getGuards :: [GdCmd] -> [Pred]
