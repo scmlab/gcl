@@ -79,8 +79,8 @@ struct _ pre _ (Abort l) _ = obligate pre (Pred false) (AroundAbort l)
 struct _ pre _ (Skip l) post = obligate pre post (AroundSkip l)
 
 struct _ pre _ (Assert p l) post = do
-   obligate pre (Pred p) (AssertGuaranteed l)
-   obligate (Pred p) post (AssertSufficient l)
+   obligate pre (Assertion p) (AssertGuaranteed l)
+   obligate (Assertion p) post (AssertSufficient l)
 
 struct _ _ _ (AssertWithBnd _ _ l) _ =
    throwError (ExcessBound l)
@@ -143,15 +143,15 @@ structStmts :: Bool -> Pred -> Maybe Expr -> [Stmt] -> Pred -> SM ()
 structStmts _ _ _ [] _ = return ()
 
 structStmts b pre _ (Assert p l : stmts) post = do
-  obligate pre (Pred p) (AssertGuaranteed l)
-  structStmts b (Pred p) Nothing stmts post
+  obligate pre (Assertion p) (AssertGuaranteed l)
+  structStmts b (Assertion p) Nothing stmts post
 
 structStmts b pre _ (AssertWithBnd p bnd l : stmts) post = do
   let origin = if startsWithDo stmts
                     then LoopInitialize l
                     else AssertGuaranteed l
-  obligate pre (Pred p) origin
-  structStmts b (Pred p) (Just bnd) stmts post
+  obligate pre (Assertion p) origin
+  structStmts b (Assertion p) (Just bnd) stmts post
 
  where startsWithDo (Do _ _ : _) = True
        startsWithDo _ = False
@@ -165,12 +165,12 @@ structProg [] = return ()
 structProg (Assert pre _ : stmts) =
   case (init stmts, last stmts) of
     (stmts', Assert post _) ->
-       structStmts True (Pred pre) Nothing stmts' (Pred post)
+       structStmts True (Assertion pre) Nothing stmts' (Assertion post)
     (_, stmt) -> throwError (MissingPostcondition (locOf stmt))
 structProg stmts =
   case (init stmts, last stmts) of
     (stmts', Assert post _) ->
-       structStmts True (Pred true) Nothing stmts' (Pred post)
+       structStmts True (Pred true) Nothing stmts' (Assertion post)
     (_, stmt) -> throwError (MissingPostcondition (locOf stmt))
 
 
@@ -179,12 +179,12 @@ wpStmts :: Bool -> [Stmt] -> Pred -> SM Pred
 wpStmts _ [] post = return post
 
 wpStmts b (Assert pre _ : stmts) post =
-  structStmts b (Pred pre) Nothing stmts post >>
-  return (Pred pre)
+  structStmts b (Assertion pre) Nothing stmts post >>
+  return (Assertion pre)
 
 wpStmts b (AssertWithBnd pre bnd _ : stmts) post =
-  structStmts b (Pred pre) (Just bnd) stmts post >>
-  return (Pred pre)
+  structStmts b (Assertion pre) (Just bnd) stmts post >>
+  return (Assertion pre)
 
 wpStmts b (stmt : stmts) post = do
   post' <- wpStmts b stmts post
@@ -197,19 +197,19 @@ wp _ (Abort _) _ = return (Pred false)
 wp _ (Skip _) post = return post
 
 wp _ (Assert p l) post = do
-  obligate (Pred p) post (AssertSufficient l)
-  return (Pred p)
+  obligate (Assertion p) post (AssertSufficient l)
+  return (Assertion p)
 
 wp _ (AssertWithBnd p _ l) post = do
-  obligate (Pred p) post (AssertSufficient l)
-  return (Pred p)
+  obligate (Assertion p) post (AssertSufficient l)
+  return (Assertion p)
 
 wp _ (Assign xs es _) post =
   substPred (assignmentEnv xs es) post
 
 wp b (If gcmds _) post = do
   forM_ gcmds $ \(GdCmd guard body _) ->
-    structStmts b (Pred guard) Nothing body post
+    structStmts b (Guard guard) Nothing body post
   return (Disjunct (map Guard $ getGuards gcmds)) -- is this enough?
 
 wp _ (Do _ l) _ = throwError (MissingAssertion l)
@@ -224,7 +224,7 @@ wpProg :: [Stmt] -> SM Pred
 wpProg [] = return (Pred true)
 wpProg stmts =
   case (init stmts, last stmts) of
-    (stmts', Assert p _) -> wpStmts True stmts' (Pred p)
+    (stmts', Assert p _) -> wpStmts True stmts' (Assertion p)
     (_, stmt) -> throwError (MissingPostcondition (locOf stmt))
 
 assignmentEnv :: [Lower] -> [Expr] -> Subst
@@ -294,6 +294,7 @@ instance ToJSON StructError where
 -- | Predicates
 
 data Pred = Pred              Expr
+          | Assertion         Expr
           | Guard             Expr
           | Conjunct  [Pred]
           | Disjunct  [Pred]
@@ -305,6 +306,7 @@ instance ToJSON Pred where
 
 predToExpr :: Pred -> Expr
 predToExpr (Pred e) = e
+predToExpr (Assertion e) = e
 predToExpr (Guard e) = e
 predToExpr (Conjunct xs) = conjunct (map predToExpr xs)
 predToExpr (Disjunct xs) = disjunct (map predToExpr xs)
@@ -314,6 +316,7 @@ predToExpr (Disjunct xs) = disjunct (map predToExpr xs)
 
 substPred :: Subst -> Pred -> SM Pred
 substPred env (Pred e) = Pred <$> subst env e
+substPred env (Assertion e) = Assertion <$> subst env e
 substPred env (Guard e) = Guard <$> subst env e
 substPred env (Conjunct xs) = Conjunct <$> mapM (substPred env) xs
 substPred env (Disjunct es) = Disjunct <$> mapM (substPred env) es
