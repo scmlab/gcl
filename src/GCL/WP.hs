@@ -22,7 +22,7 @@ type Index = A.Index
 
 data Obligation
   = Obligation Index Pred Pred [ObliOrigin]
-  -- | ObliIfTotal Expr [Expr] -- disjunct
+  | ObliIfTotal Pred Pred Loc -- disjunction of guards
   deriving (Show, Generic)
 
 data Specification = Specification
@@ -92,7 +92,8 @@ struct _ pre _ (Assign xs es l) post = do
 
 struct b pre _ (If gcmds l) post = do
   let guards = getGuards gcmds
-  obligate pre (IfTotalDisj guards) (IfTotal l)
+  tellObli $ ObliIfTotal pre (GuardDisj guards) l
+  -- obligate pre (GuardDisj guards) (IfTotal l)
   forM_ gcmds $ \(GdCmd guard body l') ->
     addObliOrigin (IfBranch l')
      (structStmts b (IfBranchConj pre guard) Nothing body post)
@@ -212,7 +213,7 @@ wp b (If gcmds _) post = do
   forM_ gcmds $ \(GdCmd guard body _) ->
     structStmts b (Pred guard) Nothing body post
   let guards = getGuards gcmds
-  return (IfTotalDisj guards) -- is this enough?
+  return (GuardDisj guards) -- is this enough?
 
 wp _ (Do _ l) _ = throwError (MissingAssertion l)
 
@@ -296,10 +297,10 @@ instance ToJSON StructError where
 -- | Predicates
 
 data Pred = Pred              Expr
-          | IfTotalDisj       [Expr]
-          | IfBranchConj      Pred Expr
-          | LoopTermDecrConj  Pred Expr Expr
-          | LoopTermConj      Pred [Expr]
+          | GuardDisj         [Expr]          -- guards
+          | IfBranchConj      Pred Expr       -- guard
+          | LoopTermDecrConj  Pred Expr Expr  -- inv, bnd, guard
+          | LoopTermConj      Pred [Expr]     -- inv, guards
           | LoopIndConj        Pred Expr
           | LoopBaseConj        Pred [Expr]
 
@@ -313,7 +314,7 @@ instance ToJSON Pred where
 
 predToExpr :: Pred -> Expr
 predToExpr (Pred e) = e
-predToExpr (IfTotalDisj es) = disjunct es
+predToExpr (GuardDisj es) = disjunct es
 predToExpr (IfBranchConj x e) = predToExpr x `conj` e
 predToExpr (LoopTermDecrConj x e f) = predToExpr x `conj` e `conj` f
 predToExpr (LoopTermConj x es) = predToExpr x `conj` conjunct es
@@ -326,7 +327,7 @@ predToExpr (LoopBaseConj x es) = predToExpr x `conj` conjunct es
 
 substPred :: Subst -> Pred -> SM Pred
 substPred env (Pred e) = Pred <$> subst env e
-substPred env (IfTotalDisj es) = IfTotalDisj <$> mapM (subst env) es
+substPred env (GuardDisj es) = GuardDisj <$> mapM (subst env) es
 substPred env (IfBranchConj x e) = IfBranchConj <$> substPred env x <*> subst env e
 substPred env (LoopTermDecrConj x e f) = LoopTermDecrConj
   <$> substPred env x
