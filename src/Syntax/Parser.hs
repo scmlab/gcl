@@ -94,7 +94,7 @@ assert :: Parser Stmt
 assert = withLocStmt $ Assert <$> braces predicate
 
 assertWithBnd :: Parser Stmt
-assertWithBnd = withLocStmt $ braces $ AssertWithBnd
+assertWithBnd = withLocStmt $ braces $ LoopInvariant
   <$> predicate
   <*  (symbol TokComma  <?> "comma")
   <*  (symbol TokBnd    <?> "bnd")

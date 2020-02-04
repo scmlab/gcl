@@ -16,7 +16,7 @@ instance Located Stmt where
   locOf (Abort             l) = l
   locOf (Assign _ _        l) = l
   locOf (Assert _          l) = l
-  locOf (AssertWithBnd _ _ l) = l
+  locOf (LoopInvariant _ _ l) = l
   locOf (Do _              l) = l
   locOf (If _              l) = l
   locOf (SpecQM            l) = l

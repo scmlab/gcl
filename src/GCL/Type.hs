@@ -86,7 +86,7 @@ checkS cxt (Assign vs es _) =
   mapM_ (checkAsgn cxt) (zip vs es)
 checkS cxt (Assert p _) =
   checkE cxt p tBool
-checkS cxt (AssertWithBnd p b _) =
+checkS cxt (LoopInvariant p b _) =
   checkE cxt p tBool >>
   checkE cxt b tInt
 checkS cxt (Do gcmds _) =

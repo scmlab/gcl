@@ -10,17 +10,7 @@ import GCL.WP
 
 import Pretty.Abstract ()
 import Pretty.Concrete ()
-import Pretty.Variadic
-
---------------------------------------------------------------------------------
--- | Pred
-
-instance PrettyPrec Pred where
-  prettyPrec n = prettyPrec n . predToExpr
-
-instance Pretty Pred where
-  pretty = prettyPrec 0
-
+import Pretty.Predicate ()
 
 --------------------------------------------------------------------------------
 -- | ObliOrigin

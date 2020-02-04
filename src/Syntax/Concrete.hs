@@ -35,7 +35,7 @@ data Stmt
   | Abort                     Loc
   | Assign  [Lower] [Expr]    Loc
   | Assert  Expr              Loc
-  | AssertWithBnd  Expr Expr  Loc
+  | LoopInvariant  Expr Expr  Loc
   | Do            [GdCmd]     Loc
   | If            [GdCmd]     Loc
   | SpecQM                    Loc -- ? to be rewritten as {!!} by the frontend
