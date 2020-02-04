@@ -32,11 +32,8 @@ instance Pretty ObliOrigin where
   pretty (AssertSufficient l) = "AssertSufficient" <+> pretty l
   pretty (Assignment l) = "Assignment" <+> pretty l
   pretty (IfTotal l) = "IfTotal" <+> pretty l
-  pretty (IfBranch l) = "IfBranch" <+> pretty l
   pretty (LoopBase l) = "LoopBase" <+> pretty l
-  pretty (LoopInd l) = "LoopInd" <+> pretty l
   pretty (LoopTermBase l) = "LoopTermBase" <+> pretty l
-  pretty (LoopTermDec l) = "LoopTermDec" <+> pretty l
   pretty (LoopInitialize l) = "LoopInitialize" <+> pretty l
 
 --------------------------------------------------------------------------------

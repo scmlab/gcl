@@ -21,7 +21,7 @@ type Index = A.Index
 
 
 data Obligation
-  = Obligation Index Pred Pred [ObliOrigin]
+  = Obligation Index Pred Pred ObliOrigin
   deriving (Show, Generic)
 
 data Specification = Specification
@@ -37,11 +37,8 @@ data ObliOrigin = AroundAbort Loc
                 | AssertSufficient Loc
                 | Assignment Loc
                 | IfTotal Loc
-                | IfBranch Loc
                 | LoopBase Loc
-                | LoopInd Loc
                 | LoopTermBase Loc
-                | LoopTermDec Loc
                 | LoopInitialize Loc
       deriving (Show, Generic)
 
@@ -59,7 +56,7 @@ obligate p q l = do
   unless (predEq (predToExpr p) (predToExpr q)) $ do
     (i, j, k) <- get
     put (succ i, j, k)
-    tellObli $ Obligation i p q [l]
+    tellObli $ Obligation i p q l
 
 -- inform existence of a spec hole
 
@@ -92,8 +89,7 @@ struct _ pre _ (Assign xs es l) post = do
 struct b pre _ (If gcmds l) post = do
   obligate pre (Disjunct $ map (toGuard (IF l)) $ getGuards gcmds) (IfTotal l)
   forM_ gcmds $ \(GdCmd guard body l') ->
-    addObliOrigin (IfBranch l')
-     (structStmts b (Conjunct [pre, toGuard (IF l) guard]) Nothing body post)
+    structStmts b (Conjunct [pre, toGuard (IF l) guard]) Nothing body post
 
 struct _ _ Nothing (Do _ l) _ =
   throwError (MissingBound l)
@@ -113,25 +109,23 @@ struct b inv (Just bnd) (Do gcmds l) post = do
   obligate (Conjunct (inv : (map (Negate . toGuard (LOOP l)) guards))) post (LoopBase l)
   -- inductive cases
   forM_ gcmds $ \(GdCmd guard body l') ->
-    addObliOrigin (LoopInd l')
-      (structStmts b (Conjunct [inv, (toGuard (LOOP l)) guard]) Nothing body inv)
+    structStmts b (Conjunct [inv, (toGuard (LOOP l)) guard]) Nothing body inv
   -- termination
   obligate (Conjunct (inv : map (toGuard (LOOP l)) guards))
        (Pred $ bnd `gte` (Lit (Num 0) NoLoc)) (LoopTermBase l)
   -- bound decrementation
   oldbnd <- freshVar "bnd"
   forM_ gcmds $ \(GdCmd guard body l') ->
-    addObliOrigin (LoopTermDec l')
-      (structStmts
-            False
-            (Conjunct
-              [ inv
-              , Pred $ bnd `eqq` Var oldbnd NoLoc
-              , toGuard (LOOP l) guard
-              ])
-            Nothing
-            body
-            (Pred $ bnd `lte` Var oldbnd NoLoc))
+    structStmts
+      False
+      (Conjunct
+        [ inv
+        , Pred $ bnd `eqq` Var oldbnd NoLoc
+        , toGuard (LOOP l) guard
+        ])
+      Nothing
+      body
+      (Pred $ bnd `lte` Var oldbnd NoLoc)
 
 struct _ _ _ (SpecQM l) _    = throwError $ DigHole l
 struct b pre _ (Spec l) post = when b (tellSpec pre post l)
@@ -251,22 +245,12 @@ instance Located ObliOrigin where
   locOf (AssertSufficient l) = l
   locOf (Assignment       l) = l
   locOf (IfTotal          l) = l
-  locOf (IfBranch         l) = l
   locOf (LoopBase         l) = l
-  locOf (LoopInd          l) = l
   locOf (LoopTermBase     l) = l
-  locOf (LoopTermDec      l) = l
   locOf (LoopInitialize   l) = l
 
 -- instance Located Obligation where
 --   locOf (Obligation _ _ _ o) = locOf o
-
-censorObli :: ([Obligation] -> [Obligation]) -> SM a -> SM a
-censorObli = censor
-
-addObliOrigin :: ObliOrigin -> SM a -> SM a
-addObliOrigin ori =
-  censorObli (map (\(Obligation i p q os) -> Obligation i p q (ori:os)))
 
 censorSpec :: ([Specification] -> [Specification]) -> SM a -> SM a
 censorSpec f = mapWriterT (censor f)
@@ -297,7 +281,7 @@ data Sort = IF Loc | LOOP Loc
           deriving (Show, Generic)
 
 data Pred = Pred      Expr
-          | Assertion Expr  Loc
+          | Assertion Expr Loc
           | Guard     Expr  Sort Loc
           | Conjunct  [Pred]
           | Disjunct  [Pred]
