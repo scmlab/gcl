@@ -71,7 +71,7 @@ tellSpec p q loc = do
 
 struct :: Bool -> Pred -> Maybe Expr -> Stmt -> Pred -> SM ()
 
-struct _ pre _ (Abort l) _ = obligate pre (Pred false) (AroundAbort l)
+struct _ pre _ (Abort l) _ = obligate pre (Constant false) (AroundAbort l)
 
 struct _ pre _ (Skip l) post = obligate pre post (AroundSkip l)
 
@@ -112,7 +112,7 @@ struct b inv (Just bnd) (Do gcmds l) post = do
     structStmts b (Conjunct [inv, (toGuard (LOOP l)) guard]) Nothing body inv
   -- termination
   obligate (Conjunct (inv : map (toGuard (LOOP l)) guards))
-       (Pred $ bnd `gte` (Lit (Num 0) NoLoc)) (LoopTermBase l)
+       (Bound $ bnd `gte` (Lit (Num 0) NoLoc)) (LoopTermBase l)
   -- bound decrementation
   oldbnd <- freshVar "bnd"
   forM_ gcmds $ \(GdCmd guard body l') ->
@@ -120,12 +120,12 @@ struct b inv (Just bnd) (Do gcmds l) post = do
       False
       (Conjunct
         [ inv
-        , Pred $ bnd `eqq` Var oldbnd NoLoc
+        , Bound $ bnd `eqq` Var oldbnd NoLoc
         , toGuard (LOOP l) guard
         ])
       Nothing
       body
-      (Pred $ bnd `lte` Var oldbnd NoLoc)
+      (Bound $ bnd `lte` Var oldbnd NoLoc)
 
 struct _ _ _ (SpecQM l) _    = throwError $ DigHole l
 struct b pre _ (Spec l) post = when b (tellSpec pre post l)
@@ -163,7 +163,7 @@ structProg (Assert pre l1 : stmts) =
 structProg stmts =
   case (init stmts, last stmts) of
     (stmts', Assert post l) ->
-       structStmts True (Pred true) Nothing stmts' (Assertion post l)
+       structStmts True (Constant true) Nothing stmts' (Assertion post l)
     (_, stmt) -> throwError (MissingPostcondition (locOf stmt))
 
 
@@ -185,7 +185,7 @@ wpStmts b (stmt : stmts) post = do
 
 wp :: Bool -> Stmt -> Pred -> SM Pred
 
-wp _ (Abort _) _ = return (Pred false)
+wp _ (Abort _) _ = return (Constant false)
 
 wp _ (Skip _) post = return post
 
@@ -214,7 +214,7 @@ wp b (Spec l) post = do
   return post  -- not quite right
 
 wpProg :: [Stmt] -> SM Pred
-wpProg [] = return (Pred true)
+wpProg [] = return (Constant true)
 wpProg stmts =
   case (init stmts, last stmts) of
     (stmts', Assert p l) -> wpStmts True stmts' (Assertion p l)
@@ -280,9 +280,10 @@ instance ToJSON StructError where
 data Sort = IF Loc | LOOP Loc
           deriving (Show, Generic)
 
-data Pred = Pred      Expr
+data Pred = Constant  Expr
+          | Bound     Expr
           | Assertion Expr Loc
-          | Guard     Expr  Sort Loc
+          | Guard     Expr Sort Loc
           | Conjunct  [Pred]
           | Disjunct  [Pred]
           | Negate     Pred
@@ -293,7 +294,8 @@ instance ToJSON Sort where
 instance ToJSON Pred where
 
 predToExpr :: Pred -> Expr
-predToExpr (Pred e) = e
+predToExpr (Constant e) = e
+predToExpr (Bound e) = e
 predToExpr (Assertion e _) = e
 predToExpr (Guard e _ _) = e
 predToExpr (Conjunct xs) = conjunct (map predToExpr xs)
@@ -303,7 +305,8 @@ predToExpr (Negate x) = neg (predToExpr x)
 -- predToExpr (Imply p q) = imply (predToExpr p) (predToExpr q)
 
 substPred :: Subst -> Pred -> SM Pred
-substPred env (Pred e) = Pred <$> subst env e
+substPred env (Constant e) = Constant <$> subst env e
+substPred env (Bound e) = Bound <$> subst env e
 substPred env (Assertion e l) = Assertion <$> subst env e <*> pure l
 substPred env (Guard e sort l) = Guard <$> subst env e <*> pure sort <*> pure l
 substPred env (Conjunct xs) = Conjunct <$> mapM (substPred env) xs
