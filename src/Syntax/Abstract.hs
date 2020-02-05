@@ -23,9 +23,11 @@ data Expr = Var    Var
           | Lit    Lit
           | Op     Op      --- built-in operators
           | App    Expr   Expr
-          | Quant  Expr [Var] Expr Expr
+          | Quant  Expr [Var] Expr Expr -- (+ i : 0 <= i && i < N : f i)
           | Hole   Index  [Subst]
           deriving (Show, Eq, Generic)
+
+
 
 data Op = EQ | NEQ | LTE | GTE | LT | GT   -- binary relations
         | Implies | Conj | Disj | Neg  -- logic operators

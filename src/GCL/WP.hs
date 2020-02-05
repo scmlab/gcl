@@ -123,7 +123,7 @@ struct b inv (Just bnd) (C.Do gcmds l) post = do
         ])
       Nothing
       body
-      (Bound $ bnd `C.lte` C.Var oldbnd NoLoc)
+      (Bound $ bnd `C.lt` C.Var oldbnd NoLoc)
 
 struct _ _ _ (C.SpecQM l) _    = throwError $ DigHole l
 struct b pre _ (C.Spec l) post = when b (tellSpec pre post l)
