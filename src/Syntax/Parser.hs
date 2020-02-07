@@ -12,7 +12,7 @@ import Data.Foldable (fold)
 import Text.Megaparsec hiding (Pos, State, ParseError, parse)
 import qualified Text.Megaparsec as Mega
 
-import Syntax.Concrete
+import Syntax.Concrete hiding (unary, binary)
 import Syntax.Location ()
 import Syntax.Parser.Lexer
 import Syntax.Parser.Util (PosLog, extract)
@@ -58,14 +58,14 @@ program :: Parser Program
 program = withLoc $ do
   ignoreNewlines
   declarations <- many declaration <?> "declarations"
-  statements <- many statement <?> "statements"
+  stmts <- statements <?> "statements"
   eof
-  return $ Program declarations statements
+  return $ Program declarations stmts
 
 specContent :: Parser [Stmt]
 specContent = do
   ignoreNewlines
-  many statement <?> "statements"
+  statements <?> "statements"
 
 --------------------------------------------------------------------------------
 -- | Stmts
@@ -85,11 +85,14 @@ statement = choice
 
 
 statements :: Parser [Stmt]
-statements = do
+statements = try statements1 <|> return []
+
+statements1 :: Parser [Stmt]
+statements1 = do
   stmt <- statement
   rest <- choice
     [ do
-        expectLineEnding
+        expectLineEnding <?> "a newline or a semicolon"
         try statements <|> return []
     , return []
     ]
@@ -106,20 +109,19 @@ expectLineEnding = choice [withSemicolon, withoutSemicolon]
         Just TokSemi -> return ()
         _ -> void $ do
           Util.ignore TokSemi
-          many (Util.ignore TokNewline)
-          return ()
+          void $ many (Util.ignore TokNewline)
 
 skip :: Parser Stmt
 skip = withLoc $ Skip <$ symbol TokSkip
 
 abort :: Parser Stmt
-abort = withLocStmt $ Abort <$ symbol TokAbort
+abort = withLoc $ Abort <$ symbol TokAbort
 
 assert :: Parser Stmt
-assert = withLocStmt $ Assert <$> braces predicate
+assert = withLoc $ Assert <$> braces predicate
 
 assertWithBnd :: Parser Stmt
-assertWithBnd = withLocStmt $ braces $ LoopInvariant
+assertWithBnd = withLoc $ braces $ LoopInvariant
   <$> predicate
   <*  (symbol TokComma  <?> "comma")
   <*  (symbol TokBnd    <?> "bnd")
@@ -127,19 +129,19 @@ assertWithBnd = withLocStmt $ braces $ LoopInvariant
   <*> expression
 
 assign :: Parser Stmt
-assign = withLocStmt $
+assign = withLoc $
   Assign  <$> variableList
           <*  (symbol TokAssign <?> ":=")
           <*> expressionList
 
 repetition :: Parser Stmt
-repetition = withLocStmt $
+repetition = withLoc $
   Do  <$  (symbol TokDo <?> "do")
       <*> guardedCommands
       <*  (symbol TokOd <?> "od")
 
 selection :: Parser Stmt
-selection = withLocStmt $
+selection = withLoc $
   If  <$  (symbol TokIf <?> "if")
       <*> guardedCommands
       <*  (symbol TokFi <?> "fi")
@@ -148,16 +150,16 @@ guardedCommands :: Parser [GdCmd]
 guardedCommands = sepBy1 guardedCommand (symbol TokGuardBar <?> "|")
 
 guardedCommand :: Parser GdCmd
-guardedCommand = withLocStmt $
+guardedCommand = withLoc $
   GdCmd <$> predicate
         <*  (symbol TokArrow <?> "->")
-        <*> some statement
+        <*> statements1
 
 hole :: Parser Stmt
-hole = withLocStmt $ SpecQM <$ (symbol TokQM <?> "?")
+hole = withLoc $ SpecQM <$ (symbol TokQM <?> "?")
 
 spec :: Parser Stmt
-spec = withLocStmt $ do
+spec = withLoc $ do
   symbol TokSpecStart <?> "{!"
   expectNewline <?> "<newline> after a the start of a Spec"
   _ <- specContent
@@ -367,12 +369,12 @@ symbol t = do
 withLoc :: Parser (Loc -> a) -> Parser a
 withLoc = Util.withLoc
 
--- followed by at least 1 newline
-withLocStmt :: Parser (Loc -> a) -> Parser a
-withLocStmt p = do
-  result <- Util.withLoc p
-  expectNewline <?> "<newline> after a statement"
-  return result
+-- -- followed by at least 1 newline
+-- withLocStmt :: Parser (Loc -> a) -> Parser a
+-- withLocStmt p = do
+--   result <- Util.withLoc p
+--   expectNewline <?> "<newline> after a statement"
+--   return result
 
 parens :: Relocatable a => Parser a -> Parser a
 parens = Util.between

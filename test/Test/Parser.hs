@@ -300,21 +300,21 @@ statement = testGroup "Single statement" $ map (toTestTree Parser.statement)
       "skip"
       $ Skip (1 <-> 4)
   , RightCase "abort"
-      "abort\n"
+      "abort"
       $ Abort (1 <-> 5)
   , RightCase "assert"
-      "{ True }\n"
+      "{ True }"
       $ Assert
           (Lit (Bol True) (3 <-> 6))
           (1 <-> 8)
   , RightCase "assign"
-      "x := 0\n"
+      "x := 0"
       $ Assign
           [Lower "x" (at 1)]
           [Lit (Num 0) (at 6)]
           (1 <-> 6)
   , RightCase "assign (parallel)"
-      "x, y := 0, 1\n"
+      "x, y := 0, 1"
       $ Assign
           [Lower "x" (at 1), Lower "y" (at 4)]
           [Lit (Num 0) (at 9), Lit (Num 1) (at 12)]
@@ -348,12 +348,12 @@ statements = testGroup "Multiple statements" $ map (toTestTree Parser.statements
   , RightCase "separated by semicolons 4"
       "skip;"
       [ Skip $ pos 1 1 0 <--> pos 1 4 3]
-  -- , RightCase "separated by semicolons 3"
-  --     "skip;\nskip;"
-  --     [ Skip $ pos 1 1 0 <--> pos 1 4 3
-  --     , Skip $ pos 2 1 6 <--> pos 2 4 9]
+  , RightCase "separated by semicolons 3"
+      "skip;\nskip;"
+      [ Skip $ pos 1 1 0 <--> pos 1 4 3
+      , Skip $ pos 2 1 6 <--> pos 2 4 9]
   , LeftCase2 "separated by a space"
-      "skip skip"
+      "skip abort"
   ]
 
 pos :: Int -> Int -> Int -> Pos
