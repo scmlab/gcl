@@ -46,6 +46,7 @@ data Tok
 
     -- delimiters
     | TokComma
+    | TokColon
     | TokSemi
     | TokAssign
     | TokSpecStart
@@ -108,7 +109,8 @@ instance Show Tok where
     TokGuardBar -> "|"
     TokArrow -> "->"
     TokComma -> ","
-    TokSemi -> ":"
+    TokColon -> ":"
+    TokSemi -> ";"
     TokAssign -> ":="
     TokSpecStart -> "{!"
     TokSpecEnd -> "!}"
@@ -179,7 +181,8 @@ tokRE
 
   -- delimiters
   <|> TokComma        <$ text ","
-  <|> TokSemi         <$ text ":"
+  <|> TokColon        <$ text ":"
+  <|> TokSemi         <$ text ";"
   <|> TokAssign       <$ text ":="
   <|> TokSpecStart    <$ text "{!"
   <|> TokSpecEnd      <$ text "!}"

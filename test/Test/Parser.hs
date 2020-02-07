@@ -7,6 +7,7 @@ import Test.Tasty.HUnit
 import Data.Text.Lazy (Text)
 import Data.Loc
 import Prelude hiding (Ordering(..))
+import Text.Megaparsec (eof)
 
 import qualified Data.Text.Lazy.IO as Text
 
@@ -22,6 +23,7 @@ tests = testGroup "Parser"
   , type'
   , declaration
   , statement
+  , statements
   , program
   ]
 
@@ -31,15 +33,21 @@ tests = testGroup "Parser"
 data TestCase b
   = RightCase String Text b
   | LeftCase String Text [Error]
+  | LeftCase2 String Text
   | ReadFile String FilePath (Either [Error] Program)
 
 toTestTree :: (Eq a, Show a) => Parser a -> TestCase a -> TestTree
 toTestTree parser (RightCase name text expected) = testCase name $ do
-  let actual = parse parser text
+  let actual = parse (parser <* eof) text
   actual @?= Right expected
 toTestTree parser (LeftCase name text expected) = testCase name $ do
-  let actual = parse parser text
+  let actual = parse (parser <* eof) text
   actual @?= Left expected
+toTestTree parser (LeftCase2 name text) = testCase name $ do
+  let actual = parse (parser <* eof) text
+  case actual of
+    Left _ -> assertBool "" True
+    _      -> assertFailure "expecting a Left value"
 toTestTree _ (ReadFile name filepath expected) = testCase name $ do
   text <- Text.readFile filepath
   let actual = parse Parser.program text
@@ -287,9 +295,9 @@ declaration = testGroup "Declarations" $ map (toTestTree Parser.declaration)
 -- | Statements
 
 statement :: TestTree
-statement = testGroup "Statements" $ map (toTestTree Parser.statement)
+statement = testGroup "Single statement" $ map (toTestTree Parser.statement)
   [ RightCase "skip"
-      "skip\n"
+      "skip"
       $ Skip (1 <-> 4)
   , RightCase "abort"
       "abort\n"
@@ -318,6 +326,38 @@ statement = testGroup "Statements" $ map (toTestTree Parser.statement)
 
 at :: Int -> Loc
 at n = n <-> n
+
+statements :: TestTree
+statements = testGroup "Multiple statements" $ map (toTestTree Parser.statements)
+  [ RightCase "separated by newlines 1"
+      "skip\nskip"
+      [ Skip $ pos 1 1 0 <--> pos 1 4 3
+      , Skip $ pos 2 1 5 <--> pos 2 4 8]
+  , RightCase "separated by newlines 2"
+      "skip\n\nskip\n"
+      [ Skip $ pos 1 1 0 <--> pos 1 4 3
+      , Skip $ pos 3 1 6 <--> pos 3 4 9]
+  , RightCase "separated by semicolons 1"
+      "skip;skip"
+      [ Skip $ pos 1 1 0 <--> pos 1 4 3
+      , Skip $ pos 1 6 5 <--> pos 1 9 8]
+  , RightCase "separated by semicolons 2"
+      "skip;\nskip"
+      [ Skip $ pos 1 1 0 <--> pos 1 4 3
+      , Skip $ pos 2 1 6 <--> pos 2 4 9]
+  , RightCase "separated by semicolons 4"
+      "skip;"
+      [ Skip $ pos 1 1 0 <--> pos 1 4 3]
+  -- , RightCase "separated by semicolons 3"
+  --     "skip;\nskip;"
+  --     [ Skip $ pos 1 1 0 <--> pos 1 4 3
+  --     , Skip $ pos 2 1 6 <--> pos 2 4 9]
+  , LeftCase2 "separated by a space"
+      "skip skip"
+  ]
+
+pos :: Int -> Int -> Int -> Pos
+pos = Pos "<test>"
 
 
 --------------------------------------------------------------------------------

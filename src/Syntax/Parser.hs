@@ -84,8 +84,33 @@ statement = choice
   ] <?> "statement"
 
 
+statements :: Parser [Stmt]
+statements = do
+  stmt <- statement
+  rest <- choice
+    [ do
+        expectLineEnding
+        try statements <|> return []
+    , return []
+    ]
+  return (stmt:rest)
+
+expectLineEnding :: Parser ()
+expectLineEnding = choice [withSemicolon, withoutSemicolon]
+  where
+    withoutSemicolon = expectNewline
+    withSemicolon = do
+      -- see if the latest accepcted token is TokSemi
+      t <- lift Util.getLastToken
+      case t of
+        Just TokSemi -> return ()
+        _ -> void $ do
+          Util.ignore TokSemi
+          many (Util.ignore TokNewline)
+          return ()
+
 skip :: Parser Stmt
-skip = withLocStmt $ Skip <$ symbol TokSkip
+skip = withLoc $ Skip <$ symbol TokSkip
 
 abort :: Parser Stmt
 abort = withLocStmt $ Abort <$ symbol TokAbort
@@ -282,7 +307,7 @@ constantDecl :: Parser Declaration
 constantDecl = withLoc $ do
   symbol TokCon
   types <- constList
-  symbol TokSemi <?> "semicolon"
+  symbol TokColon <?> "colon"
   t <- type'
   expectNewline <?> "<newline> after a declaration"
   return $ ConstDecl types t
@@ -291,7 +316,7 @@ variableDecl :: Parser Declaration
 variableDecl = withLoc $ do
   symbol TokVar
   vars <- variableList
-  symbol TokSemi <?> "semicolon"
+  symbol TokColon <?> "colon"
   t <- type'
   expectNewline <?> "<newline> after a declaration"
   return $ VarDecl vars t
@@ -322,6 +347,7 @@ variableList =
 --------------------------------------------------------------------------------
 -- | Combinators
 
+-- consumes 0 or more newlines
 ignoreNewlines :: Parser ()
 ignoreNewlines = void $ many (Util.ignore TokNewline)
 
