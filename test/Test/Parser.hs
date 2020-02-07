@@ -179,6 +179,16 @@ expression = testGroup "Expressions" $ map (toTestTree Parser.expression)
               (con "B" (at 1)) (1 <-> 4)
               (con "C" (at 6)) (1 <-> 6)) (1 <-> 9)
           (con "A" (at 11)) (1 <-> 11)
+  , RightCase "quant 1"
+      "[g i : i > 0 : f i]"
+      $ Quant
+          (var "g" (at 2))
+          [Lower "i" (at 4)]
+          (bin GT (at 10)
+              (var "i" (at 8)) (8 <-> 10)
+              (Lit (Num 0) (at 12)) (8 <-> 12))
+          (App (var "f" (at 16)) (var "i" (at 18)) (16 <-> 18))
+          (1 <-> 19)
   , RightCase "function application 1"
       "(f (x)) y"
       $ App

@@ -239,6 +239,14 @@ expression = makeExprParser term table <?> "expression"
       [ Var    <$> lower
       , Const  <$> upper
       , Lit    <$> literal
+      , Quant  <$  symbol TokBracketStart
+               <*> term
+               <*> some lower
+               <*  symbol TokColon
+               <*> expression
+               <*  symbol TokColon
+               <*> expression
+               <*  symbol TokBracketEnd
       , Hole   <$  symbol TokQM
       ]) <?> "term"
 
