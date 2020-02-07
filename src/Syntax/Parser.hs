@@ -225,30 +225,36 @@ expression = makeExprParser term table <?> "expression"
         foldl app func terms
 
     unary :: Op -> Tok -> Parser (Expr -> Expr)
-    unary operator tok = do
-      (op, loc) <- Util.getLoc (operator <$ symbol tok)
+    unary operator' tok = do
+      (op, loc) <- Util.getLoc (operator' <$ symbol tok)
       return $ \result -> App (Op op loc) result (loc <--> result)
 
     binary :: Op -> Tok -> Parser (Expr -> Expr -> Expr)
-    binary operator tok = do
-      (op, loc) <- Util.getLoc (operator <$ symbol tok)
+    binary operator' tok = do
+      (op, loc) <- Util.getLoc (operator' <$ symbol tok)
       return $ \x y -> App (App (Op op loc) x (x <--> loc)) y (x <--> y)
 
+
     term :: Parser Expr
-    term = parens expression <|> withLoc (choice
-      [ Var    <$> lower
-      , Const  <$> upper
-      , Lit    <$> literal
-      , Quant  <$  symbol TokBracketStart
-               <*> term
-               <*> some lower
-               <*  symbol TokColon
-               <*> expression
-               <*  symbol TokColon
-               <*> expression
-               <*  symbol TokBracketEnd
-      , Hole   <$  symbol TokQM
-      ]) <?> "term"
+    term = try term' <|> parens expression
+      where
+        term' :: Parser Expr
+        term' = withLoc (choice
+          [ Var    <$> lower
+          , Const  <$> upper
+          , Lit    <$> literal
+          , Op     <$ symbol TokParenStart <*> operator <* symbol TokParenEnd
+          , Quant  <$  symbol TokBracketStart
+                   <*> term
+                   <*> some lower
+                   <*  symbol TokColon
+                   <*> expression
+                   <*  symbol TokColon
+                   <*> expression
+                   <*  symbol TokBracketEnd
+          , Hole   <$  symbol TokQM
+          ]) <?> "term"
+
 
     literal :: Parser Lit
     literal = choice
@@ -256,6 +262,31 @@ expression = makeExprParser term table <?> "expression"
       , Bol False <$  symbol TokFalse
       , Num       <$> integer
       ] <?> "literal"
+
+    operator :: Parser Op
+    operator =  choice
+            [ EQ      <$  symbol TokEQ
+            , NEQ     <$  symbol TokNEQ
+            , LTE     <$  symbol TokLTE
+            , GTE     <$  symbol TokGTE
+            , LT      <$  symbol TokLT
+            , GT      <$  symbol TokGT
+            , Implies <$  symbol TokArrow
+            , Conj    <$  symbol TokConj
+            , Disj    <$  symbol TokDisj
+            , Neg     <$  symbol TokNeg
+            , Add     <$  symbol TokAdd
+            , Sub     <$  symbol TokSub
+            , Mul     <$  symbol TokMul
+            , Div     <$  symbol TokDiv
+            , Mod     <$  symbol TokMod
+            ] <?> "operator"
+
+    -- op :: Parser Expr
+    -- op = withLoc (Op <$> choice
+    --         [ EQ    <$  symbol TokEQ
+    --         , Add   <$  symbol TokAdd
+    --         ] <?> "operator")
 
 --------------------------------------------------------------------------------
 -- | Type

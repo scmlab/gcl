@@ -180,15 +180,15 @@ expression = testGroup "Expressions" $ map (toTestTree Parser.expression)
               (con "C" (at 6)) (1 <-> 6)) (1 <-> 9)
           (con "A" (at 11)) (1 <-> 11)
   , RightCase "quant 1"
-      "[g i : i > 0 : f i]"
+      "[(+) i : i > 0 : f i]"
       $ Quant
-          (var "g" (at 2))
-          [Lower "i" (at 4)]
-          (bin GT (at 10)
-              (var "i" (at 8)) (8 <-> 10)
-              (Lit (Num 0) (at 12)) (8 <-> 12))
-          (App (var "f" (at 16)) (var "i" (at 18)) (16 <-> 18))
-          (1 <-> 19)
+          (Op Add (2 <-> 4))
+          [Lower "i" (at 6)]
+          (bin GT (at 12)
+              (var "i" (at 10)) (10 <-> 12)
+              (Lit (Num 0) (at 14)) (10 <-> 14))
+          (App (var "f" (at 18)) (var "i" (at 20)) (18 <-> 20))
+          (1 <-> 21)
   , RightCase "function application 1"
       "(f (x)) y"
       $ App
