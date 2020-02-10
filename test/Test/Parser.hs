@@ -329,6 +329,30 @@ statement = testGroup "Single statement" $ map (toTestTree Parser.statement)
           [Lower "x" (at 1), Lower "y" (at 4)]
           [Lit (Num 0) (at 9), Lit (Num 1) (at 12)]
           (1 <-> 12)
+  , RightCase "loop"
+      "if True -> skip fi"
+      $ If
+          [GdCmd
+            (Lit (Bol True) (4 <-> 7))
+            [Skip (12 <-> 15)]
+            (4 <-> 15)
+          ]
+          (1 <-> 18)
+  , RightCase "loop"
+      "{ True , bnd: a }"
+      $ LoopInvariant
+          (Lit (Bol True) (3 <-> 6))
+          (Var (Lower "a" (at 15)) (at 15))
+          (1 <-> 17)
+  , RightCase "loop"
+      "do True -> skip od"
+      $ Do
+          [GdCmd
+            (Lit (Bol True) (4 <-> 7))
+            [Skip (12 <-> 15)]
+            (4 <-> 15)
+          ]
+          (1 <-> 18)
   ]
 
 (<->) :: Int -> Int -> Loc

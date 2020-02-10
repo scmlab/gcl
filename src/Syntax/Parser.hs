@@ -125,7 +125,7 @@ assertWithBnd = withLoc $ braces $ LoopInvariant
   <$> predicate
   <*  (symbol TokComma  <?> "comma")
   <*  (symbol TokBnd    <?> "bnd")
-  <*  (symbol TokSemi   <?> "semicolon")
+  <*  (symbol TokColon  <?> "colon")
   <*> expression
 
 assign :: Parser Stmt
