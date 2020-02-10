@@ -244,14 +244,14 @@ expression = makeExprParser term table <?> "expression"
           , Const  <$> upper
           , Lit    <$> literal
           , Op     <$ symbol TokParenStart <*> operator <* symbol TokParenEnd
-          , Quant  <$  symbol TokBracketStart
+          , Quant  <$  symbol TokQuantStart
                    <*> term
                    <*> some lower
                    <*  symbol TokColon
                    <*> expression
                    <*  symbol TokColon
                    <*> expression
-                   <*  symbol TokBracketEnd
+                   <*  symbol TokQuantEnd
           , Hole   <$  symbol TokQM
           ]) <?> "term"
 

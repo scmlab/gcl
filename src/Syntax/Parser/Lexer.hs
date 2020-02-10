@@ -57,6 +57,8 @@ data Tok
     | TokBracketEnd
     | TokBraceStart
     | TokBraceEnd
+    | TokQuantStart
+    | TokQuantEnd
 
     -- expression
 
@@ -120,6 +122,8 @@ instance Show Tok where
     TokBracketEnd -> "]"
     TokBraceStart -> "{"
     TokBraceEnd -> "}"
+    TokQuantStart -> "<|"
+    TokQuantEnd -> "|>"
     TokEQ -> "="
     TokNEQ -> "/="
     TokGT -> ">"
@@ -192,6 +196,8 @@ tokRE
   <|> TokBracketEnd   <$ text "]"
   <|> TokBraceStart   <$ text "{"
   <|> TokBraceEnd     <$ text "}"
+  <|> TokQuantStart   <$ text "<|"
+  <|> TokQuantEnd     <$ text "|>"
 
   -- literals
   <|> TokEQ           <$ text "="
