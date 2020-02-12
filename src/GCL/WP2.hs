@@ -23,9 +23,10 @@ import Syntax.Location ()
 -- | Lasagna, alternating sequence of Pred & Statement
 
 data Lasagna = Layer
+                  (Maybe Stmt)    -- the previous statement
                   Pred            -- precondition
-                  Stmt            -- the statement
-                  [Lasagna]       -- sub-lasagne for statements like IF, DO
+                  Stmt            -- the current statement
+                  [Lasagna]       -- sub-lasagne of statements like IF, DO
                   Lasagna         -- following layers
              | Final Pred
              deriving (Show)
@@ -33,16 +34,20 @@ data Lasagna = Layer
 -- access the precondition of a Lasagna
 precond :: Lasagna -> Pred
 precond (Final p) = p
-precond (Layer p _ _ _) = p
+precond (Layer _ p _ _ _) = p
 
 
 toLasagna :: [Stmt] -> Pred -> WPM Lasagna
-toLasagna []     post = return $ Final post
-toLasagna (x:xs) post = do
-  xs' <- toLasagna xs post
-  (pre, subs) <- wp x (precond xs')
-  return $ Layer pre x subs xs'
+toLasagna = toLasagna' Nothing
   where
+
+    toLasagna' :: Maybe Stmt -> [Stmt] -> Pred -> WPM Lasagna
+    toLasagna' _        []     post = return $ Final post
+    toLasagna' previous (x:xs) post = do
+      xs' <- toLasagna' (Just x) xs post
+      (pre, subs) <- wp x (precond xs')
+      return $ Layer previous pre x subs xs'
+
     wp :: Stmt -> Pred -> WPM (Pred, [Lasagna])
     wp (C.Abort _)              _    = return (Constant C.false   , [])
     wp (C.Skip _)               post = return (post               , [])
@@ -51,7 +56,7 @@ toLasagna (x:xs) post = do
     wp (C.Assign xs es _)       post = do
       pre <- subst (assignmentEnv xs es) post
       return (pre, [])
-    wp (C.If gdcmds l)           _    = do
+    wp (C.If gdcmds l)          post = do
       subs <- mapM (gdCmdToLasagna post) gdcmds
       return (Disjunct (map (toGuard (IF l)) $ C.getGuards gdcmds), subs)
     wp (C.Do _ l)               _    = throwError (MissingAssertion l)
@@ -123,13 +128,19 @@ tellObli p q l = do
     put (succ i)
     tell [Obligation i p q l]
 
-genObli :: [Pred]       -- additional Predicates to be conjuncted with
+  -- -> [Pred]       -- additional postconditions to be disjuncted with
+
+
+-- genObli :: [Pred]
+--         -> [Pred]
+
+genObli :: [Pred]       -- additional preconditions to be conjuncted with
         -> Lasagna
         -> ObliM ()
 genObli _ (Final _) = return ()
-genObli pres (Layer preOfStmt stmt subs stmts) = do
+genObli pres (Layer previousStmt stmtPreCond stmt subs stmts) = do
   let post = precond stmts
-  let pre = if null pres then preOfStmt else Conjunct (preOfStmt:pres)
+  let pre = if null pres then stmtPreCond else Conjunct (stmtPreCond:pres)
 
   case stmt of
     C.Abort l -> tellObli pre (Constant C.false) (AroundAbort l)
@@ -147,18 +158,49 @@ genObli pres (Layer preOfStmt stmt subs stmts) = do
       let zipped = zip gdcmds subs
       forM_ zipped $ \(C.GdCmd guard _ _, body) ->
         genObli [pre, toGuard (IF l) guard] body
+    C.Do gdcmds l -> case previousStmt of
+      (Just (C.LoopInvariant _ bnd _)) -> do
+        -- let guards = C.getGuards gdcmds
+        -- -- base case
+        -- tellObli
+        --   (map (Negate . toGuard (LOOP l)) guards ++ pre)
+        --   post
+        --   (LoopBase l)
+        -- -- inductive cases
+        -- let zipped = zip gdcmds subs
+        -- forM_ zipped $ \(C.GdCmd guard _ _, body) ->
+        --   genObli [pre, toGuard (LOOP l) guard] body
+        -- -- termination
+        -- tellObli
+        --   (map (toGuard (LOOP l)) guards ++ pre)
+        --   (Bound $ bnd `C.gte` (C.Lit (C.Num 0) NoLoc))
+        --   (LoopTermBase l)
 
-  -- structStmts b (Conjunct [pre, toGuard (IF l) guard]) Nothing body post
+        -- -- bound decrementation
+        -- oldbnd <- C.freshVar "bnd"
+        -- forM_ gdcmds $ \(C.GdCmd guard body _) ->
+        --   let pre' = pre ++
+        --               [ Bound $ bnd `C.eqq` C.Var oldbnd NoLoc
+        --               , toGuard (LOOP l) guard
+        --               ]
+        --   genObli pre' body
+        --     Nothing
+        --     body
+        --     (Bound $ bnd `C.lt` C.Var oldbnd NoLoc)
 
-      return ()
+        return ()
 
 
-      -- forM_ gdcmds $ \(C.GdCmd guard body _) ->
-      --
-      --
-      --   structStmts b (toGuard (IF l) guard) Nothing body post
-      -- return (Disjunct (map (toGuard (IF l)) $ C.getGuards gdcmds)) -- is this enough?
-
+      _ -> throwError (MissingBound l)
+       {- Or if we want to tolerate the user and carry on ---
+       do -- warn that bnd is missing
+        let gdcmds' = map (\(GdCmd x y _) -> (depart x, y)) gdcmds
+        let guards = map fst gdcmds'
+        obligate (inv `A.conj` (A.conjunct (map A.neg guards))) post
+        --
+        forM_ gdcmds' $ \(guard, body) -> do
+          structStmts b (inv `A.conj` guard) Nothing body inv
+       -}
 
 --------------------------------------------------------------------------------
 -- | StructError
