@@ -56,7 +56,7 @@ sweep (Concrete.Program _ statements _) = case runWP (wpProg statements) of
     Left err -> Left [StructError err]
 
 precond2 :: Concrete.Program -> Either [Error] Predicate.Pred
-precond2 program = case runWPM (wpProgram program) of
+precond2 program = case runWPM (programWP program) of
   Right x -> return x
   Left err -> Left [StructError2 err]
 
