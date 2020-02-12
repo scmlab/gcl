@@ -1,13 +1,14 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Pretty.GCL.WP where
+module Pretty.GCL.WP2 where
 
 import Data.Text.Prettyprint.Doc
 import Prelude hiding (Ordering(..))
 import Data.Loc
 
-import GCL.WP
+import GCL.WP2
 
+import Pretty.GCL.WP ()
 import Pretty.Abstract ()
 import Pretty.Concrete ()
 import Pretty.Predicate ()
@@ -15,7 +16,7 @@ import Pretty.Predicate ()
 --------------------------------------------------------------------------------
 -- | ObliOrigin
 
-instance Pretty ObliOrigin where
+instance Pretty ObliOrigin2 where
   pretty (AroundAbort l) = "AroundAbort" <+> pretty l
   pretty (AroundSkip l) = "AroundSkip" <+> pretty l
   pretty (AssertGuaranteed l) = "AssertGuaranteed" <+> pretty l
@@ -29,19 +30,13 @@ instance Pretty ObliOrigin where
 --------------------------------------------------------------------------------
 -- | Obligation & Specification
 
-instance Pretty Obligation where
+instance Pretty Obligation2 where
   pretty (Obligation i p q os) = lbracket <> pretty i <> rbracket <+> line <>
     indent 2 (pretty p) <> line <>
     indent 2 (pretty q) <> line <>
     indent 2 (pretty os) <> line
 
-instance Pretty Specification where
+instance Pretty Specification2 where
   pretty (Specification i p q _) = lbracket <> pretty i <> rbracket <> line <>
     indent 2 (pretty p) <> line <>
     indent 2 (pretty q) <> line
-
---------------------------------------------------------------------------------
--- | Misc
-
-instance Pretty Loc where
-  pretty = pretty . displayLoc

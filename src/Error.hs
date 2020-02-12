@@ -15,6 +15,7 @@ import Syntax.Parser (SyntacticError)
 import GCL.Type (TypeError)
 -- import GCL.Exec.ExecMonad (ExecError)
 import GCL.WP (StructError)
+import GCL.WP2 (StructError2)
 
 --------------------------------------------------------------------------------
 -- | Site of Error
@@ -34,6 +35,7 @@ data Error
   | SyntacticError  SyntacticError
   | TypeError       TypeError
   | StructError     StructError
+  | StructError2    StructError2
   -- | ExecError       ExecError
   deriving (Eq, Show, Generic)
 
@@ -42,6 +44,7 @@ instance Located Error where
   locOf (SyntacticError (loc, _)) = loc
   locOf (TypeError e) = locOf e
   locOf (StructError e) = locOf e
+  locOf (StructError2 e) = locOf e
   -- locOf (ExecError e) = locOf e
 
 fromLocalError :: Int -> Error -> (Site, Error)

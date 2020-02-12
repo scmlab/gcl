@@ -13,6 +13,7 @@ import System.IO
 
 import Error
 import GCL.WP
+import GCL.WP2
 -- import GCL.Type as Type
 import Syntax.Parser.Lexer (TokStream)
 import qualified Syntax.Parser.Lexer as Lexer
@@ -53,6 +54,11 @@ sweep :: Concrete.Program -> Either [Error] (Predicate.Pred, [Obligation], [Spec
 sweep (Concrete.Program _ statements _) = case runWP (wpProg statements) of
     Right ((p, obligations), specifications) -> return (p, obligations, specifications)
     Left err -> Left [StructError err]
+
+precond2 :: Concrete.Program -> Either [Error] Predicate.Pred
+precond2 program = case runWPM (wpProgram program) of
+  Right x -> return x
+  Left err -> Left [StructError2 err]
 
 recv :: FromJSON a => IO (Maybe a)
 recv = decode . BS.fromStrict <$> Strict.getLine
