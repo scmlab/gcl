@@ -2,6 +2,7 @@ import Test.Tasty
 
 import qualified Test.Parser as Parser
 import qualified Test.Pretty as Pretty
+import qualified Test.WP as WP
 
 main :: IO ()
 main = defaultMain tests
@@ -10,6 +11,7 @@ tests :: TestTree
 tests = testGroup "Tests"
     [ Parser.tests
     , Pretty.tests
+    , WP.tests
     ]
   -- [ testCase "2+2=4" $
   --     2+2 @?= 4

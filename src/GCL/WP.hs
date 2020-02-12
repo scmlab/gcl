@@ -20,14 +20,14 @@ import Syntax.Location ()
 
 data Obligation
   = Obligation Int Pred Pred ObliOrigin
-  deriving (Show, Generic)
+  deriving (Eq, Show, Generic)
 
 data Specification = Specification
   { specID       :: Int
   , specPreCond  :: Pred
   , specPostCond :: Pred
   , specLoc      :: Loc
-  } deriving (Show, Generic)
+  } deriving (Eq, Show, Generic)
 
 data ObliOrigin = AroundAbort Loc
                 | AroundSkip Loc
@@ -38,7 +38,7 @@ data ObliOrigin = AroundAbort Loc
                 | LoopBase Loc
                 | LoopTermBase Loc
                 | LoopInitialize Loc
-      deriving (Show, Generic)
+      deriving (Eq, Show, Generic)
 
 type SM = WriterT [Obligation] (WriterT [Specification]
                 (StateT (Int, Int, Int)

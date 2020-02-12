@@ -18,6 +18,7 @@ import Syntax.Parser.Lexer (TokStream)
 import qualified Syntax.Parser.Lexer as Lexer
 import qualified Syntax.Parser as Parser
 import qualified Syntax.Concrete as Concrete
+import qualified Syntax.Predicate as Predicate
 -- import qualified GCL.Exec.ExecMonad as Exec
 -- import qualified GCL.Exec.ExNondet as Exec
 -- import qualified GCL.Exec as Exec
@@ -46,9 +47,11 @@ parseSpec = parse Parser.specContent "<specification>"
 --     errors = map ExecError $ lefts results
 --     (results, stores) = unzip $ Exec.runExNondet (Exec.execProg program) Exec.prelude
 
-sweep :: Concrete.Program -> Either [Error] ([Obligation], [Specification])
+-- weakestPrecondition :: [Concrete.Statement] -> Either [Error] Predicate.Pred
+
+sweep :: Concrete.Program -> Either [Error] (Predicate.Pred, [Obligation], [Specification])
 sweep (Concrete.Program _ statements _) = case runWP (wpProg statements) of
-    Right ((_, obligations), specifications) -> return (obligations, specifications)
+    Right ((p, obligations), specifications) -> return (p, obligations, specifications)
     Left err -> Left [StructError err]
 
 recv :: FromJSON a => IO (Maybe a)

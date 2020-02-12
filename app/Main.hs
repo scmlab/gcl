@@ -30,7 +30,7 @@ main = do
             program <- parseProgram filepath tokens
             -- program <- abstract syntax
             -- typeCheck program
-            (obligations, specifications) <- sweep program
+            (_, obligations, specifications) <- sweep program
             -- stores <- execute program
             return (tokens, program, obligations, specifications)
 
@@ -81,7 +81,7 @@ handleRequest (Load filepath) = do
 
   case run of
     Left errors -> send $ Error $ map fromGlobalError errors
-    Right (obligations, specifications) -> send $ OK obligations specifications
+    Right (_, obligations, specifications) -> send $ OK obligations specifications
 
   return True
 

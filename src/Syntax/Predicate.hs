@@ -15,7 +15,7 @@ import Syntax.Concrete (Expr, Fresh, Subst)
 
 
 data Sort = IF Loc | LOOP Loc
-          deriving (Show, Generic)
+          deriving (Eq, Show, Generic)
 
 data Pred = Constant  Expr
           | Guard     Expr Sort Loc
@@ -26,7 +26,7 @@ data Pred = Constant  Expr
           | Disjunct  [Pred]
           | Negate     Pred
           -- | Imply      Pred  Pred
-          deriving (Show, Generic)
+          deriving (Eq, Show, Generic)
 
 instance ToJSON Sort where
 instance ToJSON Pred where

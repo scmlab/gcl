@@ -37,6 +37,6 @@ expression = testGroup "Expressions"
     run :: Text -> Either [Error] Text
     run text = do
       expr <- REPL.scan "<test>" text
-                >>= REPL.parse Parser.expression "<text>"
+                >>= REPL.parse Parser.expression "<test>"
                 -- >>= REPL.abstract
       return $ renderLazy $ layoutCompact $ pretty $ depart expr
