@@ -4,7 +4,7 @@ module Pretty.GCL.WP2 where
 
 import Data.Text.Prettyprint.Doc
 import Prelude hiding (Ordering(..))
-import Data.Loc
+-- import Data.Loc
 
 import GCL.WP2
 

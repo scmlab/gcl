@@ -22,11 +22,11 @@ import Syntax.Location ()
 --------------------------------------------------------------------------------
 -- | Lasagna, alternating sequence of Pred & Statement
 
+type PreviousStmt = Maybe Stmt
 data Lasagna = Layer
-                  (Maybe Stmt)    -- the previous statement
+                  PreviousStmt    -- the previous statement
                   Pred            -- precondition
                   Stmt            -- the current statement
-                  [Lasagna]       -- sub-lasagne of statements like IF, DO
                   Lasagna         -- following layers
              | Final Pred
              deriving (Show)
@@ -34,38 +34,36 @@ data Lasagna = Layer
 -- access the precondition of a Lasagna
 precond :: Lasagna -> Pred
 precond (Final p) = p
-precond (Layer _ p _ _ _) = p
+precond (Layer _ p _ _) = p
 
 
 toLasagna :: [Stmt] -> Pred -> WPM Lasagna
 toLasagna = toLasagna' Nothing
   where
 
-    toLasagna' :: Maybe Stmt -> [Stmt] -> Pred -> WPM Lasagna
+    -- the workhorse
+    toLasagna' :: PreviousStmt -> [Stmt] -> Pred -> WPM Lasagna
     toLasagna' _        []     post = return $ Final post
     toLasagna' previous (x:xs) post = do
       xs' <- toLasagna' (Just x) xs post
-      (pre, subs) <- wp x (precond xs')
-      return $ Layer previous pre x subs xs'
+      pre <- wp previous x (precond xs')
+      return $ Layer previous pre x xs'
 
-    wp :: Stmt -> Pred -> WPM (Pred, [Lasagna])
-    wp (C.Abort _)              _    = return (Constant C.false   , [])
-    wp (C.Skip _)               post = return (post               , [])
-    wp (C.Assert p l)           _    = return (Assertion p l      , [])
-    wp (C.LoopInvariant p _ l)  _    = return (LoopInvariant p l  , [])
-    wp (C.Assign xs es _)       post = do
-      pre <- subst (assignmentEnv xs es) post
-      return (pre, [])
-    wp (C.If gdcmds l)          post = do
-      subs <- mapM (gdCmdToLasagna post) gdcmds
-      return (Disjunct (map (toGuard (IF l)) $ C.getGuards gdcmds), subs)
-    wp (C.Do _ l)               _    = throwError (MissingAssertion l)
-    wp (C.SpecQM l)             _    = throwError (DigHole l)
-    wp (C.Spec _)               post = return (post, [])
-
-
-    gdCmdToLasagna :: Pred -> C.GdCmd -> WPM Lasagna
-    gdCmdToLasagna post (C.GdCmd _ body _) = toLasagna body post
+    -- calculates the weakest precondition of a given statement
+    -- along with the postcondition and its previous statement
+    wp :: PreviousStmt -> Stmt -> Pred -> WPM Pred
+    wp previous current post = case (previous, current) of
+      (_, C.Abort _)              -> return (Constant C.false)
+      (_, C.Skip _)               -> return post
+      (_, C.Assert p l)           -> return (Assertion p l)
+      (_, C.LoopInvariant p _ l)  -> return (LoopInvariant p l)
+      (_, C.Assign xs es _)       -> subst (assignmentEnv xs es) post
+      (_, C.If gdCmds l)          ->
+        return (Disjunct (map (toGuard (IF l)) (C.getGuards gdCmds)))
+      (Just (C.LoopInvariant p _ l), C.Do _ _) -> return (LoopInvariant p l)
+      (_, C.Do _ l)               -> throwError (MissingAssertion l)
+      (_, C.SpecQM l)             -> throwError (DigHole l)
+      (_ , C.Spec _)              -> return post
 
 assignmentEnv :: [Lower] -> [Expr] -> C.Subst
 assignmentEnv xs es = Map.fromList (zip (map Left xs) es)
@@ -128,65 +126,71 @@ tellObli p q l = do
     put (succ i)
     tell [Obligation i p q l]
 
-  -- -> [Pred]       -- additional postconditions to be disjuncted with
-
-
--- genObli :: [Pred]
---         -> [Pred]
-
-genObli :: [Pred]       -- additional preconditions to be conjuncted with
+genObli :: [Pred]   -- additional preconditions to be conjuncted with
         -> Lasagna
         -> ObliM ()
-genObli _ (Final _) = return ()
-genObli pres (Layer previousStmt stmtPreCond stmt subs stmts) = do
+genObli _    (Final _) = return ()
+genObli pres (Layer previousStmt stmtPreCond stmt stmts) = do
   let post = precond stmts
   let pre = if null pres then stmtPreCond else Conjunct (stmtPreCond:pres)
 
   case stmt of
     C.Abort l -> tellObli pre (Constant C.false) (AroundAbort l)
+
     C.Skip l -> tellObli pre post (AroundSkip l)
+
     C.Assert p l -> do
       tellObli pre (Assertion p l) (AssertGuaranteed l)
       tellObli (Assertion p l) post (AssertSufficient l)
+
     C.LoopInvariant _ _ _ -> return ()
+
     C.Assign xs es l -> do
       post' <- subst (assignmentEnv xs es) post
       tellObli pre post' (Assignment l)
-    C.If gdcmds l -> do
-      tellObli pre (Disjunct $ map (toGuard (IF l)) $ C.getGuards gdcmds) (IfTotal l)
 
-      let zipped = zip gdcmds subs
-      forM_ zipped $ \(C.GdCmd guard _ _, body) ->
-        genObli [pre, toGuard (IF l) guard] body
-    C.Do gdcmds l -> case previousStmt of
+    C.If gdCmds l -> do
+      tellObli pre (Disjunct $ map (toGuard (IF l)) $ C.getGuards gdCmds) (IfTotal l)
+
+      -- generate POs for each branch
+      forM_ gdCmds $ \(C.GdCmd guard body _) -> do
+        body' <- lift $ lift $ toLasagna body post
+        genObli [pre, toGuard (IF l) guard] body'
+
+    C.Do gdCmds l -> case previousStmt of
       (Just (C.LoopInvariant _ bnd _)) -> do
-        -- let guards = C.getGuards gdcmds
-        -- -- base case
-        -- tellObli
-        --   (map (Negate . toGuard (LOOP l)) guards ++ pre)
-        --   post
-        --   (LoopBase l)
-        -- -- inductive cases
-        -- let zipped = zip gdcmds subs
-        -- forM_ zipped $ \(C.GdCmd guard _ _, body) ->
-        --   genObli [pre, toGuard (LOOP l) guard] body
-        -- -- termination
-        -- tellObli
-        --   (map (toGuard (LOOP l)) guards ++ pre)
-        --   (Bound $ bnd `C.gte` (C.Lit (C.Num 0) NoLoc))
-        --   (LoopTermBase l)
+        let guards = C.getGuards gdCmds
 
-        -- -- bound decrementation
-        -- oldbnd <- C.freshVar "bnd"
-        -- forM_ gdcmds $ \(C.GdCmd guard body _) ->
-        --   let pre' = pre ++
-        --               [ Bound $ bnd `C.eqq` C.Var oldbnd NoLoc
-        --               , toGuard (LOOP l) guard
-        --               ]
-        --   genObli pre' body
-        --     Nothing
-        --     body
-        --     (Bound $ bnd `C.lt` C.Var oldbnd NoLoc)
+        -- base case
+        tellObli
+          (Conjunct $ pre : map (Negate . toGuard (LOOP l)) guards)
+          post
+          (LoopBase l)
+
+        -- inductive cases
+        forM_ gdCmds $ \(C.GdCmd guard body _) -> do
+          -- the precondition of the loop as the postcondition of the branch
+          let post' = pre
+          body' <- lift $ lift $ toLasagna body post'
+          genObli [pre, toGuard (LOOP l) guard] body'
+
+        -- termination
+        tellObli
+          (Conjunct $ pre : map (toGuard (LOOP l)) guards)
+          (Bound $ bnd `C.gte` (C.Lit (C.Num 0) NoLoc))
+          (LoopBase l)
+
+        -- bound decrementation
+        oldBnd <- C.freshVar "bnd"
+        forM_ gdCmds $ \(C.GdCmd guard body _) -> do
+          let post' = Bound $ bnd `C.lt` C.Var oldBnd NoLoc
+          body' <- lift $ lift $ toLasagna body post'
+          genObli
+           [ pre
+           , toGuard (LOOP l) guard
+           , Bound $ bnd `C.eqq` C.Var oldBnd NoLoc
+           ]
+           body'
 
         return ()
 
@@ -194,13 +198,17 @@ genObli pres (Layer previousStmt stmtPreCond stmt subs stmts) = do
       _ -> throwError (MissingBound l)
        {- Or if we want to tolerate the user and carry on ---
        do -- warn that bnd is missing
-        let gdcmds' = map (\(GdCmd x y _) -> (depart x, y)) gdcmds
-        let guards = map fst gdcmds'
+        let gdCmds' = map (\(GdCmd x y _) -> (depart x, y)) gdCmds
+        let guards = map fst gdCmds'
         obligate (inv `A.conj` (A.conjunct (map A.neg guards))) post
         --
-        forM_ gdcmds' $ \(guard, body) -> do
+        forM_ gdCmds' $ \(guard, body) -> do
           structStmts b (inv `A.conj` guard) Nothing body inv
        -}
+
+    C.SpecQM l -> throwError $ DigHole l
+
+    C.Spec _ -> return ()
 
 --------------------------------------------------------------------------------
 -- | StructError
