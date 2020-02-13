@@ -174,16 +174,6 @@ instance ToNoLoc Upper where
 instance ToNoLoc Lower where
   toNoLoc (Lower x _) = Lower x NoLoc
 
-instance ToNoLoc P.Pred where
-  toNoLoc (P.Constant e) = P.Constant (toNoLoc e)
-  toNoLoc (P.Guard e s _) = P.Guard (toNoLoc e) s NoLoc
-  toNoLoc (P.Assertion e _) = P.Assertion (toNoLoc e) NoLoc
-  toNoLoc (P.LoopInvariant e _) = P.LoopInvariant (toNoLoc e) NoLoc
-  toNoLoc (P.Bound e) = P.Bound (toNoLoc e)
-  toNoLoc (P.Conjunct ps) = P.Conjunct (map (toNoLoc) ps)
-  toNoLoc (P.Disjunct ps) = P.Disjunct (map (toNoLoc) ps)
-  toNoLoc (P.Negate p) = P.Negate (toNoLoc p)
-
 instance ToNoLoc Interval where
   toNoLoc (Interval x y _) = Interval x y NoLoc
 
@@ -201,3 +191,17 @@ instance ToNoLoc Expr where
   toNoLoc (Op  x    _) = Op x NoLoc
   toNoLoc (Hole     _) = Hole NoLoc
   toNoLoc (Quant op xs r t _) = Quant (toNoLoc op) (map (toNoLoc) xs) (toNoLoc r) (toNoLoc t) NoLoc
+
+instance ToNoLoc P.Sort where
+  toNoLoc (P.IF _) = P.IF NoLoc
+  toNoLoc (P.LOOP _) = P.LOOP NoLoc
+
+instance ToNoLoc P.Pred where
+  toNoLoc (P.Constant e) = P.Constant (toNoLoc e)
+  toNoLoc (P.Guard e s _) = P.Guard (toNoLoc e) (toNoLoc s) NoLoc
+  toNoLoc (P.Assertion e _) = P.Assertion (toNoLoc e) NoLoc
+  toNoLoc (P.LoopInvariant e _) = P.LoopInvariant (toNoLoc e) NoLoc
+  toNoLoc (P.Bound e) = P.Bound (toNoLoc e)
+  toNoLoc (P.Conjunct ps) = P.Conjunct (map (toNoLoc) ps)
+  toNoLoc (P.Disjunct ps) = P.Disjunct (map (toNoLoc) ps)
+  toNoLoc (P.Negate p) = P.Negate (toNoLoc p)
