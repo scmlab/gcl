@@ -210,6 +210,35 @@ genObli pres (Layer previousStmt stmtPreCond stmt stmts) = do
 
     C.Spec _ -> return ()
 
+  genObli pres stmts
+
+--------------------------------------------------------------------------------
+-- | Specification
+
+data Specification2 = Specification
+  { specID       :: Int
+  , specPreCond  :: Pred
+  , specPostCond :: Pred
+  , specLoc      :: Loc
+  } deriving (Eq, Show, Generic)
+
+-- Monad on top of WPM, for generating specifications
+type SpecM = WriterT [Specification2] (StateT Int WPM)
+
+-- tellSpec :: Pred -> Pred -> Specification2 -> SpecM ()
+-- tellSpec p q l = do
+--   i <- get
+--   put (succ i)
+--   lift $ tell [Specification i p q l]
+
+-- genSpec :: [Pred]   -- additional preconditions to be conjuncted with
+--         -> Lasagna
+--         -> SpecM ()
+-- genSpec _    (Final _) = return ()
+-- genSpec pres (Layer previousStmt stmtPreCond stmt stmts) = do
+--   case stmtPreCond of
+--     C.Spec l -> tellSpec pre post l
+
 --------------------------------------------------------------------------------
 -- | StructError
 
@@ -228,13 +257,3 @@ instance Located StructError2 where
   locOf (DigHole loc) = loc
 
 instance ToJSON StructError2 where
-
---------------------------------------------------------------------------------
--- | Specification
-
-data Specification2 = Specification
-  { specID       :: Int
-  , specPreCond  :: Pred
-  , specPostCond :: Pred
-  , specLoc      :: Loc
-  } deriving (Eq, Show, Generic)
