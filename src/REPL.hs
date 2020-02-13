@@ -14,6 +14,7 @@ import System.IO
 import Error
 import GCL.WP
 import GCL.WP2
+import qualified GCL.WP2 as WP2
 -- import GCL.Type as Type
 import Syntax.Parser.Lexer (TokStream)
 import qualified Syntax.Parser.Lexer as Lexer
@@ -57,6 +58,11 @@ sweep (Concrete.Program _ statements _) = case runWP (wpProg statements) of
 
 precond2 :: Concrete.Program -> Either [Error] Predicate.Pred
 precond2 program = case runWPM (programWP program) of
+  Right x -> return x
+  Left err -> Left [StructError2 err]
+
+sweep2 :: Concrete.Program -> Either [Error] [Obligation2]
+sweep2 program = case WP2.sweep program of
   Right x -> return x
   Left err -> Left [StructError2 err]
 

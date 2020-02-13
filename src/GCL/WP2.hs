@@ -118,6 +118,11 @@ instance C.Fresh ObliM where
 runObliM :: ObliM a -> Either StructError2 (a, [Obligation2])
 runObliM f = runWPM (evalStateT (runWriterT f) 0)
 
+sweep :: C.Program -> Either StructError2 [Obligation2]
+sweep program = fmap snd $ runObliM $ do
+  lasagna <- lift (lift (programToLasagna program))
+  genObli [] lasagna
+
 tellObli :: Pred -> Pred -> ObliOrigin2 -> ObliM ()
 tellObli p q l = do
   -- NOTE: this could use some love
