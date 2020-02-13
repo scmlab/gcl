@@ -16,7 +16,7 @@ import Syntax.Concrete (Expr, Stmt, Lower)
 import qualified Syntax.Concrete as C
 -- import qualified Syntax.Predicate as P
 import Syntax.Predicate
-import Syntax.Location ()
+import Syntax.Location (ToNoLoc(..))
 
 
 --------------------------------------------------------------------------------
@@ -95,6 +95,10 @@ data Obligation2
   = Obligation Int Pred Pred ObliOrigin2
   deriving (Eq, Show, Generic)
 
+instance ToNoLoc Obligation2 where
+  toNoLoc (Obligation i p q o) =
+    Obligation i (toNoLoc p) (toNoLoc q) (toNoLoc o)
+
 data ObliOrigin2 = AroundAbort Loc
                 | AroundSkip Loc
                 | AssertGuaranteed Loc
@@ -105,6 +109,18 @@ data ObliOrigin2 = AroundAbort Loc
                 | LoopTermBase Loc
                 | LoopInitialize Loc
       deriving (Eq, Show, Generic)
+
+instance ToNoLoc ObliOrigin2 where
+  toNoLoc (AroundAbort _)       = AroundAbort NoLoc
+  toNoLoc (AroundSkip _)        = AroundSkip NoLoc
+  toNoLoc (AssertGuaranteed _)  = AssertGuaranteed NoLoc
+  toNoLoc (AssertSufficient _)  = AssertSufficient NoLoc
+  toNoLoc (Assignment _)        = Assignment NoLoc
+  toNoLoc (IfTotal _)           = IfTotal NoLoc
+  toNoLoc (LoopBase _)          = LoopBase NoLoc
+  toNoLoc (LoopTermBase _)      = LoopTermBase NoLoc
+  toNoLoc (LoopInitialize _)    = LoopInitialize NoLoc
+
 
 -- Monad on top of WPM, for generating obligations
 type ObliM = WriterT [Obligation2] (StateT Int WPM)

@@ -9,6 +9,7 @@ import Data.Text.Lazy (Text)
 import Data.Loc
 
 import qualified Syntax.Abstract as A
+import qualified Syntax.Predicate as P
 import Syntax.Concrete
 
 instance Located Stmt where
@@ -56,6 +57,9 @@ instance Located Upper where
 --------------------------------------------------------------------------------
 -- Relocatable
 
+instance Relocatable Interval where
+  reloc l (Interval x y _) = Interval x y l
+
 instance Relocatable Type where
   reloc l (TBase  base _) = TBase  base l
   reloc l (TArray i s _)  = TArray i s l
@@ -70,6 +74,22 @@ instance Relocatable Expr where
   reloc l (Op  x    _) = Op x l
   reloc l (Hole     _) = Hole l
   reloc l (Quant op xs r t _) = Quant op xs r t l
+
+instance Relocatable Upper where
+  reloc l (Upper x _) = Upper x l
+
+instance Relocatable Lower where
+  reloc l (Lower x _) = Lower x l
+
+instance Relocatable P.Pred where
+  reloc _ (P.Constant e) = P.Constant e
+  reloc l (P.Guard e s _) = P.Guard e s l
+  reloc l (P.Assertion e _) = P.Assertion e l
+  reloc l (P.LoopInvariant e _) = P.LoopInvariant e l
+  reloc _ (P.Bound e) = P.Bound e
+  reloc _ (P.Conjunct ps) = P.Conjunct ps
+  reloc _ (P.Disjunct ps) = P.Disjunct ps
+  reloc _ (P.Negate p) = P.Negate p
 
 --------------------------------------------------------------------------------
 -- Remove location
@@ -140,3 +160,44 @@ instance Hydratable A.Expr Expr where
   hydrate (A.Hole _ _) = Hole NoLoc
   hydrate (A.Quant op xs rng trm) =
     Quant (hydrate op) (map hydrate xs) (hydrate rng) (hydrate trm) NoLoc
+
+--------------------------------------------------------------------------------
+-- ToNoLoc
+
+-- Like Relocatable, but recursively relocates everything to NoLoc
+class ToNoLoc a where
+  toNoLoc :: a -> a
+
+instance ToNoLoc Upper where
+  toNoLoc (Upper x _) = Upper x NoLoc
+
+instance ToNoLoc Lower where
+  toNoLoc (Lower x _) = Lower x NoLoc
+
+instance ToNoLoc P.Pred where
+  toNoLoc (P.Constant e) = P.Constant (toNoLoc e)
+  toNoLoc (P.Guard e s _) = P.Guard (toNoLoc e) s NoLoc
+  toNoLoc (P.Assertion e _) = P.Assertion (toNoLoc e) NoLoc
+  toNoLoc (P.LoopInvariant e _) = P.LoopInvariant (toNoLoc e) NoLoc
+  toNoLoc (P.Bound e) = P.Bound (toNoLoc e)
+  toNoLoc (P.Conjunct ps) = P.Conjunct (map (toNoLoc) ps)
+  toNoLoc (P.Disjunct ps) = P.Disjunct (map (toNoLoc) ps)
+  toNoLoc (P.Negate p) = P.Negate (toNoLoc p)
+
+instance ToNoLoc Interval where
+  toNoLoc (Interval x y _) = Interval x y NoLoc
+
+instance ToNoLoc Type where
+  toNoLoc (TBase  base _) = TBase  base NoLoc
+  toNoLoc (TArray i s _)  = TArray (toNoLoc i) (toNoLoc s) NoLoc
+  toNoLoc (TFunc  s t _)  = TFunc  (toNoLoc s) (toNoLoc t) NoLoc
+  toNoLoc (TVar   x _)    = TVar   (toNoLoc x) NoLoc
+
+instance ToNoLoc Expr where
+  toNoLoc (Var x    _) = Var (toNoLoc x) NoLoc
+  toNoLoc (Const x  _) = Const (toNoLoc x) NoLoc
+  toNoLoc (Lit x    _) = Lit x NoLoc
+  toNoLoc (App x y  _) = App (toNoLoc x) (toNoLoc y) NoLoc
+  toNoLoc (Op  x    _) = Op x NoLoc
+  toNoLoc (Hole     _) = Hole NoLoc
+  toNoLoc (Quant op xs r t _) = Quant (toNoLoc op) (map (toNoLoc) xs) (toNoLoc r) (toNoLoc t) NoLoc

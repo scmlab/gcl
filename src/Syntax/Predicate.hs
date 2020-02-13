@@ -31,6 +31,7 @@ data Pred = Constant  Expr
 instance ToJSON Sort where
 instance ToJSON Pred where
 
+
 toExpr :: Pred -> Expr
 toExpr (Constant e) = e
 toExpr (Bound e) = e

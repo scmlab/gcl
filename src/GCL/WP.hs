@@ -16,11 +16,14 @@ import Syntax.Concrete (Expr, Stmt, Lower)
 import qualified Syntax.Concrete as C
 -- import qualified Syntax.Predicate as P
 import Syntax.Predicate
-import Syntax.Location ()
+import Syntax.Location (ToNoLoc(..))
 
 data Obligation
   = Obligation Int Pred Pred ObliOrigin
   deriving (Eq, Show, Generic)
+
+instance ToNoLoc Obligation where
+  toNoLoc (Obligation i p q o) = Obligation i (toNoLoc p) (toNoLoc q) (toNoLoc o)
 
 data Specification = Specification
   { specID       :: Int
@@ -28,6 +31,9 @@ data Specification = Specification
   , specPostCond :: Pred
   , specLoc      :: Loc
   } deriving (Eq, Show, Generic)
+
+instance ToNoLoc Specification where
+  toNoLoc (Specification i p q _) = Specification i (toNoLoc p) (toNoLoc q) NoLoc
 
 data ObliOrigin = AroundAbort Loc
                 | AroundSkip Loc
@@ -39,6 +45,17 @@ data ObliOrigin = AroundAbort Loc
                 | LoopTermBase Loc
                 | LoopInitialize Loc
       deriving (Eq, Show, Generic)
+
+instance ToNoLoc ObliOrigin where
+  toNoLoc (AroundAbort _)       = AroundAbort NoLoc
+  toNoLoc (AroundSkip _)        = AroundSkip NoLoc
+  toNoLoc (AssertGuaranteed _)  = AssertGuaranteed NoLoc
+  toNoLoc (AssertSufficient _)  = AssertSufficient NoLoc
+  toNoLoc (Assignment _)        = Assignment NoLoc
+  toNoLoc (IfTotal _)           = IfTotal NoLoc
+  toNoLoc (LoopBase _)          = LoopBase NoLoc
+  toNoLoc (LoopTermBase _)      = LoopTermBase NoLoc
+  toNoLoc (LoopInitialize _)    = LoopInitialize NoLoc
 
 type SM = WriterT [Obligation] (WriterT [Specification]
                 (StateT (Int, Int, Int)
