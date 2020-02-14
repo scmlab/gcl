@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Test.WP2 where
+module Test.Obligation where
 
 import Data.Text.Lazy hiding (map)
 import Test.Tasty
@@ -18,7 +18,7 @@ import Error
 import Pretty ()
 
 tests :: TestTree
-tests = testGroup "Weakest Precondition 2"
+tests = testGroup "Proof Obligations"
   [ statements
   , assertions
   , if'
@@ -117,7 +117,6 @@ loop = testGroup "if statements"
     , Obligation 1
         (Conjunct
           [ LoopInvariant (makePred 1) NoLoc
-          , LoopInvariant (makePred 1) NoLoc
           , Guard (makePred 2) (LOOP NoLoc) NoLoc
           ])
         (LoopInvariant (makePred 1) NoLoc)

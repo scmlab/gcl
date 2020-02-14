@@ -25,46 +25,59 @@ import Syntax.Location (ToNoLoc(..))
 
 type PreviousStmt = Maybe Stmt
 data Lasagna = Layer
-                  PreviousStmt    -- the previous statement
-                  Pred            -- precondition
-                  Stmt            -- the current statement
-                  Lasagna         -- following layers
+                  PreviousStmt  -- the previous statement
+                  Pred          -- precondition
+                  Stmt          -- the current statement
+                  [Lasagna]     -- sub-lasagne of the current statement (IF, LOOP)
+                  Lasagna       -- following layers
              | Final Pred
              deriving (Show)
 
 -- access the precondition of a Lasagna
 precond :: Lasagna -> Pred
 precond (Final p) = p
-precond (Layer _ p _ _) = p
+precond (Layer _ p _ _ _) = p
 
 
 toLasagna :: [Stmt] -> Pred -> WPM Lasagna
-toLasagna = toLasagna' Nothing
+toLasagna = wpStmts Nothing []
   where
 
     -- the workhorse
-    toLasagna' :: PreviousStmt -> [Stmt] -> Pred -> WPM Lasagna
-    toLasagna' _        []     post = return $ Final post
-    toLasagna' previous (x:xs) post = do
-      xs' <- toLasagna' (Just x) xs post
-      pre <- wp previous x (precond xs')
-      return $ Layer previous pre x xs'
+    wpStmts :: PreviousStmt -> [Pred] -> [Stmt] -> Pred -> WPM Lasagna
+    wpStmts _        _    []     post = return $ Final post
+    wpStmts previous pres (x:xs) post = do
+      xs' <- wpStmts (Just x) pres xs post
+      (pre, branches) <- wp previous pres x (precond xs')
+      return $ Layer previous pre x branches xs'
 
     -- calculates the weakest precondition of a given statement
     -- along with the postcondition and its previous statement
-    wp :: PreviousStmt -> Stmt -> Pred -> WPM Pred
-    wp previous current post = case (previous, current) of
-      (_, C.Abort _)              -> return (Constant C.false)
-      (_, C.Skip _)               -> return post
-      (_, C.Assert p l)           -> return (Assertion p l)
-      (_, C.LoopInvariant p _ l)  -> return (LoopInvariant p l)
-      (_, C.Assign xs es _)       -> subst (assignmentEnv xs es) post
-      (_, C.If gdCmds l)          ->
-        return $ disjunct $ map (toGuard (IF l)) (C.getGuards gdCmds)
-      (Just (C.LoopInvariant p _ l), C.Do _ _) -> return (LoopInvariant p l)
+    wp :: PreviousStmt -> [Pred] -> Stmt -> Pred -> WPM (Pred, [Lasagna])
+    wp previous pres current post = case (previous, current) of
+      (_, C.Abort _)              -> return (Constant C.false, [])
+      (_, C.Skip _)               -> return (post, [])
+      (_, C.Assert p l)           -> return (Assertion p l, [])
+      (_, C.LoopInvariant p _ l)  -> return (LoopInvariant p l, [])
+      (_, C.Assign xs es _)       -> do
+        pre <- subst (assignmentEnv xs es) post
+        return (pre, [])
+
+      (_, C.If gdCmds l)          -> do
+        branches <- forM gdCmds $ \(C.GdCmd guard body _) -> do
+          wpStmts previous (toGuard (IF l) guard : pres) body post
+        return (disjunct (map (toGuard (IF l)) (C.getGuards gdCmds)), branches)
+
+      (Just (C.LoopInvariant p _ l), C.Do gdCmds _) -> do
+        -- use the precondition of the loop as the postcondition of the branch
+        branches <- forM gdCmds $ \(C.GdCmd guard body _) -> do
+          let post' = conjunct (LoopInvariant p l : pres)
+          wpStmts previous (toGuard (LOOP l) guard : pres) body post'
+
+        return (LoopInvariant p l, branches)
       (_, C.Do _ l)               -> throwError (MissingAssertion l)
       (_, C.SpecQM l)             -> throwError (DigHole l)
-      (_ , C.Spec _)              -> return post
+      (_ , C.Spec _)              -> return (post, [])
 
 assignmentEnv :: [Lower] -> [Expr] -> C.Subst
 assignmentEnv xs es = Map.fromList (zip (map Left xs) es)
@@ -165,7 +178,7 @@ genObli :: [Pred]   -- additional preconditions to be conjuncted with
         -> Lasagna
         -> ObliM ()
 genObli _    (Final _) = return ()
-genObli pres (Layer previousStmt stmtPreCond stmt stmts) = do
+genObli pres (Layer previousStmt stmtPreCond stmt branches stmts) = do
 
   -- traceShow ("stmtPreCond: " ++ show stmtPreCond) (return ())
   -- traceShow ("pres: " ++ show pres) (return ())
@@ -195,9 +208,13 @@ genObli pres (Layer previousStmt stmtPreCond stmt stmts) = do
       tellObli pre (map (toGuard (IF l)) $ C.getGuards gdCmds) (IfTotal l)
 
       -- generate POs for each branch
-      forM_ gdCmds $ \(C.GdCmd _ body _) -> do
-        body' <- lift $ lift $ toLasagna body (disjunct post)
-        genObli pre body'
+      forM_ branches (genObli pre)
+
+
+      -- generate POs for each branch
+      -- forM_ gdCmds $ \(C.GdCmd _ body _) -> do
+      --   body' <- lift $ lift $ toLasagna body (disjunct post)
+      --   genObli pre body'
 
     C.Do gdCmds l -> case previousStmt of
       (Just (C.LoopInvariant _ bnd _)) -> do
@@ -210,11 +227,12 @@ genObli pres (Layer previousStmt stmtPreCond stmt stmts) = do
           (LoopBase l)
 
         -- inductive cases
-        forM_ gdCmds $ \(C.GdCmd guard body _) -> do
-          -- the precondition of the loop as the postcondition of the branch
-          let post' = conjunct pre
-          body' <- lift $ lift $ toLasagna body post'
-          genObli (pre ++ [toGuard (LOOP l) guard]) body'
+        forM_ branches (genObli pre)
+        -- forM_ gdCmds $ \(C.GdCmd guard body _) -> do
+        --   -- the precondition of the loop as the postcondition of the branch
+        --   let post' = conjunct pre
+        --   body' <- lift $ lift $ toLasagna body post'
+        --   genObli (pre ++ [toGuard (LOOP l) guard]) body'
 
         -- termination
         tellObli
