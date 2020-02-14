@@ -210,7 +210,7 @@ genObli pres (Layer previousStmt stmtPreCond stmt stmts) = do
         -- inductive cases
         forM_ gdCmds $ \(C.GdCmd guard body _) -> do
           -- the precondition of the loop as the postcondition of the branch
-          let post' = Conjunct pre
+          let post' = conjunct pre
           body' <- lift $ lift $ toLasagna body post'
           genObli (pre ++ [toGuard (LOOP l) guard]) body'
 
@@ -218,7 +218,7 @@ genObli pres (Layer previousStmt stmtPreCond stmt stmts) = do
         tellObli
           (pre ++ map (toGuard (LOOP l)) guards)
           [Bound $ bnd `C.gte` (C.Lit (C.Num 0) NoLoc)]
-          (LoopBase l)
+          (LoopTermBase l)
 
         -- bound decrementation
         oldBnd <- C.freshVar "bnd"

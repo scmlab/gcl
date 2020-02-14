@@ -139,6 +139,15 @@ imply p q = App (App (Op Implies NoLoc) p NoLoc) q NoLoc
 predEq :: Expr -> Expr -> Bool
 predEq = (==)
 
+constant :: Text -> Expr
+constant x = Const (Upper x NoLoc) NoLoc
+
+variable :: Text -> Expr
+variable x = Var (Lower x NoLoc) NoLoc
+
+number :: Int -> Expr
+number n = Lit (Num n) NoLoc
+
 --------------------------------------------------------------------------------
 -- | Instance of Located
 
