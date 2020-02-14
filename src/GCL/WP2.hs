@@ -190,6 +190,8 @@ genObli pres (Layer previousStmt stmtPreCond stmt stmts) = do
       tellObli pre post' (Assignment l)
 
     C.If gdCmds l -> do
+
+      -- NOTE: you don't see this because somehow both antecedent & consequent are the same
       tellObli pre (map (toGuard (IF l)) $ C.getGuards gdCmds) (IfTotal l)
 
       -- generate POs for each branch

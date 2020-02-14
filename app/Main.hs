@@ -77,11 +77,13 @@ handleRequest (Load filepath) = do
         program <- parseProgram filepath tokens
         -- program <- abstract syntax
         -- typeCheck program
-        sweep program
+        -- sweep program
+        sweep2 program
 
   case run of
     Left errors -> send $ Error $ map fromGlobalError errors
-    Right (_, obligations, specifications) -> send $ OK obligations specifications
+    -- Right (_, obligations, specifications) -> send $ OK obligations specifications
+    Right obligations -> send $ OK obligations []
 
   return True
 

@@ -88,7 +88,7 @@ instance ToJSON Request where
 -- | Response
 
 data Response
-  = OK [Obligation] [Specification]
+  = OK [Obligation2] [Specification2]
   | Error [(Site, Error)]
   | Resolve Int -- resolves some Spec
   deriving (Generic)
@@ -99,5 +99,8 @@ instance ToJSON Response where
 -- | Instances of ToJSON
 
 instance ToJSON ObliOrigin where
+instance ToJSON ObliOrigin2 where
 instance ToJSON Obligation where
+instance ToJSON Obligation2 where
 instance ToJSON Specification where
+instance ToJSON Specification2 where

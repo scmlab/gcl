@@ -19,12 +19,10 @@ import Pretty ()
 
 tests :: TestTree
 tests = testGroup "Weakest Precondition 2"
-  [
-  --   statements
-  -- , assertions
-  -- ,
-  -- if'
-  loop
+  [ statements
+  , assertions
+  , if'
+  , loop
   ]
 
 --------------------------------------------------------------------------------
