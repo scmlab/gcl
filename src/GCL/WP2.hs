@@ -17,6 +17,7 @@ import qualified Syntax.Concrete as C
 -- import qualified Syntax.Predicate as P
 import Syntax.Predicate
 import Syntax.Location (ToNoLoc(..))
+-- import Debug.Trace (traceShow)
 
 
 --------------------------------------------------------------------------------
@@ -59,7 +60,7 @@ toLasagna = toLasagna' Nothing
       (_, C.LoopInvariant p _ l)  -> return (LoopInvariant p l)
       (_, C.Assign xs es _)       -> subst (assignmentEnv xs es) post
       (_, C.If gdCmds l)          ->
-        return (Disjunct (map (toGuard (IF l)) (C.getGuards gdCmds)))
+        return $ disjunct $ map (toGuard (IF l)) (C.getGuards gdCmds)
       (Just (C.LoopInvariant p _ l), C.Do _ _) -> return (LoopInvariant p l)
       (_, C.Do _ l)               -> throwError (MissingAssertion l)
       (_, C.SpecQM l)             -> throwError (DigHole l)
@@ -139,44 +140,62 @@ sweep program = fmap snd $ runObliM $ do
   lasagna <- lift (lift (programToLasagna program))
   genObli [] lasagna
 
-tellObli :: Pred -> Pred -> ObliOrigin2 -> ObliM ()
-tellObli p q l = do
+tellObli :: [Pred] -> [Pred] -> ObliOrigin2 -> ObliM ()
+tellObli ps qs l = do
+  let p = conjunct ps
+  let q = disjunct qs
+
   -- NOTE: this could use some love
   unless (C.predEq (toExpr p) (toExpr q)) $ do
     i <- get
     put (succ i)
     tell [Obligation i p q l]
 
+conjunct :: [Pred] -> Pred
+conjunct [] = Constant C.true
+conjunct [x] = x
+conjunct xs = Conjunct xs
+
+disjunct :: [Pred] -> Pred
+disjunct [] = Constant C.false
+disjunct [x] = x
+disjunct xs = Disjunct xs
+
 genObli :: [Pred]   -- additional preconditions to be conjuncted with
         -> Lasagna
         -> ObliM ()
 genObli _    (Final _) = return ()
 genObli pres (Layer previousStmt stmtPreCond stmt stmts) = do
-  let post = precond stmts
-  let pre = if null pres then stmtPreCond else Conjunct (stmtPreCond:pres)
+
+  -- traceShow ("stmtPreCond: " ++ show stmtPreCond) (return ())
+  -- traceShow ("pres: " ++ show pres) (return ())
+  -- traceShow ("stmt: " ++ show stmt) (return ())
+
+  let post = [precond stmts]
+  let pre = if null pres then [stmtPreCond] else stmtPreCond:pres
 
   case stmt of
-    C.Abort l -> tellObli pre (Constant C.false) (AroundAbort l)
+    C.Abort l -> tellObli pre [Constant C.false] (AroundAbort l)
 
     C.Skip l -> tellObli pre post (AroundSkip l)
 
     C.Assert p l -> do
-      tellObli pre (Assertion p l) (AssertGuaranteed l)
-      tellObli (Assertion p l) post (AssertSufficient l)
+      tellObli pre [Assertion p l] (AssertGuaranteed l)
+      tellObli [Assertion p l] post (AssertSufficient l)
 
     C.LoopInvariant _ _ _ -> return ()
 
     C.Assign xs es l -> do
-      post' <- subst (assignmentEnv xs es) post
+      post' <- mapM (subst (assignmentEnv xs es)) post
       tellObli pre post' (Assignment l)
 
     C.If gdCmds l -> do
-      tellObli pre (Disjunct $ map (toGuard (IF l)) $ C.getGuards gdCmds) (IfTotal l)
+      tellObli pre (map (toGuard (IF l)) $ C.getGuards gdCmds) (IfTotal l)
 
       -- generate POs for each branch
-      forM_ gdCmds $ \(C.GdCmd guard body _) -> do
-        body' <- lift $ lift $ toLasagna body post
-        genObli [pre, toGuard (IF l) guard] body'
+      forM_ gdCmds $ \(C.GdCmd _ body _) -> do
+        body' <- lift $ lift $ toLasagna body (disjunct post)
+        genObli pre body'
 
     C.Do gdCmds l -> case previousStmt of
       (Just (C.LoopInvariant _ bnd _)) -> do
@@ -184,21 +203,21 @@ genObli pres (Layer previousStmt stmtPreCond stmt stmts) = do
 
         -- base case
         tellObli
-          (Conjunct $ pre : map (Negate . toGuard (LOOP l)) guards)
+          (pre ++ map (Negate . toGuard (LOOP l)) guards)
           post
           (LoopBase l)
 
         -- inductive cases
         forM_ gdCmds $ \(C.GdCmd guard body _) -> do
           -- the precondition of the loop as the postcondition of the branch
-          let post' = pre
+          let post' = Conjunct pre
           body' <- lift $ lift $ toLasagna body post'
-          genObli [pre, toGuard (LOOP l) guard] body'
+          genObli (pre ++ [toGuard (LOOP l) guard]) body'
 
         -- termination
         tellObli
-          (Conjunct $ pre : map (toGuard (LOOP l)) guards)
-          (Bound $ bnd `C.gte` (C.Lit (C.Num 0) NoLoc))
+          (pre ++ map (toGuard (LOOP l)) guards)
+          [Bound $ bnd `C.gte` (C.Lit (C.Num 0) NoLoc)]
           (LoopBase l)
 
         -- bound decrementation
@@ -207,10 +226,10 @@ genObli pres (Layer previousStmt stmtPreCond stmt stmts) = do
           let post' = Bound $ bnd `C.lt` C.Var oldBnd NoLoc
           body' <- lift $ lift $ toLasagna body post'
           genObli
-           [ pre
-           , toGuard (LOOP l) guard
-           , Bound $ bnd `C.eqq` C.Var oldBnd NoLoc
-           ]
+            (pre ++
+              [ toGuard (LOOP l) guard
+              , Bound $ bnd `C.eqq` C.Var oldBnd NoLoc
+              ])
            body'
 
         return ()
@@ -232,6 +251,7 @@ genObli pres (Layer previousStmt stmtPreCond stmt stmts) = do
     C.Spec _ -> return ()
 
   genObli pres stmts
+
 
 --------------------------------------------------------------------------------
 -- | Specification

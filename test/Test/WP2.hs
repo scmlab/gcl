@@ -19,9 +19,11 @@ import Pretty ()
 
 tests :: TestTree
 tests = testGroup "Weakest Precondition 2"
-  [ statements
-  , assertions
-  , if'
+  [
+  --   statements
+  -- , assertions
+  -- ,
+  if'
   ]
 
 --------------------------------------------------------------------------------
@@ -61,7 +63,6 @@ if' = testGroup "if statements"
     [ Obligation 0
         (Conjunct
           [ Assertion true NoLoc
-          , Disjunct [ Guard false (IF NoLoc) NoLoc ]
           , Guard false (IF NoLoc) NoLoc
           ])
         (Assertion true NoLoc)
