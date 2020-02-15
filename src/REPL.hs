@@ -61,6 +61,11 @@ precond2 program = case runWPM (programWP program) of
   Right x -> return x
   Left err -> Left [StructError2 err]
 
+wpTree :: Concrete.Program -> Either [Error] WPTree
+wpTree program = case runWPM (programWPTree program) of
+  Right x -> return x
+  Left err -> Left [StructError2 err]
+
 sweep2 :: Concrete.Program -> Either [Error] [Obligation2]
 sweep2 program = case WP2.sweep program of
   Right x -> return x

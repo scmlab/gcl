@@ -90,6 +90,9 @@ programToLasagna (C.Program _ stmts _) = case (init stmts, last stmts) of
 programWP :: C.Program -> WPM Pred
 programWP p = precond <$> programToLasagna p
 
+programWPTree :: C.Program -> WPM WPTree
+programWPTree p = toWPTree <$> programToLasagna p
+
 -- Monad for calculating preconditions (for Lasagna)
 type WPM = ExceptT StructError2 (State Int)
 
@@ -318,3 +321,34 @@ instance Located StructError2 where
   locOf (DigHole loc) = loc
 
 instance ToJSON StructError2 where
+
+
+--------------------------------------------------------------------------------
+-- | Rose tree of preconditions, for testing
+
+-- data WPTree = WPLayer Pred [WPTree] WPTree | WPFinal Pred
+
+type WPTree = [WPNode]
+data WPNode = Node Pred [WPTree] | Leaf Pred
+  deriving (Eq, Show)
+
+instance ToNoLoc WPNode where
+  toNoLoc (Node p xs) = Node (toNoLoc p) (map (map toNoLoc) xs)
+  toNoLoc (Leaf p)    = Leaf (toNoLoc p)
+
+toWPTree :: Lasagna -> WPTree
+toWPTree (Final p) = [Leaf p]
+toWPTree (Layer _ p _ [] xs) = Leaf p : toWPTree xs
+toWPTree (Layer _ p _ branches xs) = Node p (map toWPTree branches) : toWPTree xs
+
+  -- case toWPTree xs of
+  -- Leaf q -> case branches of
+  --             [] -> Node [Leaf p, Leaf q]
+  --             _  -> Node [Node p branches, Leaf q]
+  -- Node q xs -> case branches of
+  --               [] -> Node [Leaf p, Leaf q]
+  --               _  -> Node [Node p branches, Leaf q]
+
+  -- WPLayer p (map toWPTree branches) (toWPTree xs)
+-- toWPTree (Final p) = WPFinal p
+-- toWPTree (Layer _ p _ branches xs) = WPLayer p (map toWPTree branches) (toWPTree xs)
