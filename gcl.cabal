@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 2d2684df8976c24f97c1a746ed0c6b321c63652a67a824693c2a8ce6800c450c
+-- hash: 4b2743c5bb67755bfe21d3d0973b46b3ad05e443de6a9ee600cb1435d4ac0686
 
 name:           gcl
 version:        0.1.0.0
@@ -35,6 +35,7 @@ library
       Pretty.GCL.WP
       Pretty.GCL.WP2
       Pretty.Predicate
+      Pretty.Util
       Pretty.Variadic
       REPL
       SCM.Test
@@ -117,6 +118,7 @@ test-suite gcl-test
       Pretty.GCL.WP
       Pretty.GCL.WP2
       Pretty.Predicate
+      Pretty.Util
       Pretty.Variadic
       REPL
       SCM.Test

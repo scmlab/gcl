@@ -10,61 +10,85 @@ import Prelude hiding (Ordering(..))
 import Syntax.Predicate
 import Syntax.Concrete hiding (LoopInvariant)
 import qualified REPL as REPL
-import GCL.WP2 (Obligation2(..), ObliOrigin2(..), WPTree, WPNode(..))
+import GCL.WP2
+-- import GCL.WP2 (Obligation2(..), ObliOrigin2(..), Lasagna(..))
+import Data.Text.Prettyprint.Doc
+
 -- import GCL.WP2 (Obligation2(..), Specification2(..), ObliOrigin2(..))
 import Syntax.Location
-import Data.Loc
 import Error
 import Pretty ()
+
+
 
 tests :: TestTree
 tests = testGroup "Weakest Precondition"
   [
     statements
-  -- , assertions
-  -- , if'
+  , if'
   -- , loop
   ]
 
 statements :: TestTree
 statements = testGroup "simple statements"
-  [ testCase "skip" $ run "skip\n{ 0 = 0 }" @?= Right
-      [ Leaf (Assertion (number 0 `eqq` number 0) NoLoc)
-      , Leaf (Assertion (number 0 `eqq` number 0) NoLoc)
+  [ testCase "skip" $ run "skip\n{ 0 = 0 }" @?= tree
+      [ Leaf $ assertion (0 === 0)
+      , Leaf $ assertion (0 === 0)
       ]
-  , testCase "abort" $ run "abort\n{ True }" @?= Right
-      [ Leaf (Constant false)
-      , Leaf (Assertion true NoLoc)
+  , testCase "abort" $ run "abort\n{ True }" @?= tree
+      [ Leaf $ Constant false
+      , Leaf $ assertion true
       ]
-  , testCase "assertion" $ run "{ 0 = 0 }\n{ 0 = 1 }" @?= Right
-      [ Leaf (Assertion (number 0 `eqq` number 0) NoLoc)
-      , Leaf (Assertion (number 0 `eqq` number 1) NoLoc)
+  , testCase "assertion" $ run "{ 0 = 0 }\n{ 0 = 1 }" @?= tree
+      [ Leaf $ assertion (0 === 0)
+      , Leaf $ assertion (0 === 1)
       ]
-  , testCase "assignment" $ run "x := 1\n{ 0 = x }" @?= Right
-      [ Leaf (Assertion (number 0 `eqq` number 1) NoLoc)
-      , Leaf (Assertion (number 0 `eqq` variable "x") NoLoc)
+  , testCase "assignment" $ run "x := 1\n{ 0 = x }" @?= tree
+      [ Leaf $ assertion (0 === 1)
+      , Leaf $ assertion (number 0 `eqq` variable "x")
       ]
-  , testCase "spec" $ run "{!\n!}\n{ False }" @?= Right
-      [ Leaf (Assertion false NoLoc)
-      , Leaf (Assertion false NoLoc)
+  , testCase "spec" $ run "{!\n!}\n{ False }" @?= tree
+      [ Leaf $ assertion false
+      , Leaf $ assertion false
       ]
   ]
 
--- if' :: TestTree
--- if' = testGroup "if statements"
---   [ testCase "without precondition 1" $ run "if 0 = 0 -> skip fi\n{ 0 = 2 }\n" @?=
---       Right (Guard (number 0 `eqq` number 0) (IF NoLoc) NoLoc)
---   , testCase "without precondition 2" $ run "if 0 = 0 -> skip | 0 = 1 -> abort fi\n{ 0 = 2 }\n" @?=
---       Right (Disjunct
---               [ Guard (number 0 `eqq` number 0) (IF NoLoc) NoLoc
---               , Guard (number 0 `eqq` number 01) (IF NoLoc) NoLoc
---               ])
---   , testCase "with precondition" $ run "{ 0 = 0 }\nif 0 = 1 -> skip fi\n{ 0 = 2 }\n" @?=
---       Right (Assertion (number 0 `eqq` number 0) NoLoc)
---
---   , testCase "nested" $ run "if 0 = 0 -> if 0 = 1 -> skip fi fi\n{ 0 = 2 }\n" @?=
---       Right ( Guard (number 0 `eqq` number 0) (IF NoLoc) NoLoc)
---   ]
+if' :: TestTree
+if' = testGroup "if statements"
+  [ testCase "without precondition 1" $ run "if 0 = 0 -> skip fi\n{ 0 = 2 }\n" @?= tree
+      [ Node (guardIf (0 === 0))
+          [ Tree  [ Leaf $ assertion (0 === 2)
+                  , Leaf $ assertion (0 === 2)
+                  ]
+          ]
+      , Leaf $ assertion (0 === 2)
+      ]
+      -- Right (Guard (0 === 0) (IF NoLoc) NoLoc)
+  -- , testCase "without precondition 2" $ run "if 0 = 0 -> skip | 0 = 1 -> abort fi\n{ 0 = 2 }\n" @?= tree
+  --     []
+  --     -- Right (Disjunct
+  --     --         [ Guard (0 === 0) (IF NoLoc) NoLoc
+  --     --         , Guard (0 === 01) (IF NoLoc) NoLoc
+  --     --         ])
+  -- , testCase "with precondition" $ run "{ 0 = 0 }\nif 0 = 1 -> skip fi\n{ 0 = 2 }\n" @?= tree
+  --     [ Leaf $ Assertion (0 === 0) NoLoc
+  --     ]
+
+  -- , testCase "nested" $ run "if 0 = 0 -> if 0 = 1 -> skip fi fi\n{ 0 = 2 }\n" @?= tree
+  --     [ Node (Guard (0 === 0) (IF NoLoc) NoLoc)
+  --         [ Tree
+  --             [ Node (Guard (0 === 1) (IF NoLoc) NoLoc)
+  --                 [ Tree
+  --                     [ Leaf $ Assertion (0 === 2) NoLoc
+  --                     , Leaf $ Assertion (0 === 2) NoLoc
+  --                     ]
+  --                 ]
+  --             , Leaf $ Assertion (0 === 2) NoLoc
+  --             ]
+  --         ]
+  --     , Leaf $ Assertion (0 === 2) NoLoc
+  --     ]
+  ]
 
 
 
@@ -74,21 +98,21 @@ statements = testGroup "simple statements"
 --   [ testCase "loop" $ run "{ 0 = 1 , bnd: A }\ndo 0 = 2 -> skip od\n{ 0 = 0 }\n" @?= Right
 --     [ Obligation 0
 --         (Conjunct
---           [ LoopInvariant (number 0 `eqq` number 01) NoLoc
+--           [ LoopInvariant (0 === 01) NoLoc
 --           , Negate (Guard (makePred 2) (LOOP NoLoc) NoLoc)
 --           ])
---         (Assertion (number 0 `eqq` number 0) NoLoc)
+--         (Assertion (0 === 0) NoLoc)
 --         (LoopBase NoLoc)
 --     , Obligation 1
 --         (Conjunct
---           [ LoopInvariant (number 0 `eqq` number 01) NoLoc
+--           [ LoopInvariant (0 === 01) NoLoc
 --           , Guard (makePred 2) (LOOP NoLoc) NoLoc
 --           ])
---         (LoopInvariant (number 0 `eqq` number 01) NoLoc)
+--         (LoopInvariant (0 === 01) NoLoc)
 --         (AroundSkip NoLoc)
 --     , Obligation 2
 --         (Conjunct
---           [ LoopInvariant (number 0 `eqq` number 01) NoLoc
+--           [ LoopInvariant (0 === 01) NoLoc
 --           , Guard (makePred 2) (LOOP NoLoc) NoLoc
 --           ])
 --         (Bound (constant "A" `gte` number 0))
@@ -96,7 +120,7 @@ statements = testGroup "simple statements"
 --     , Obligation 4
 --         (Conjunct
 --           [ Bound (constant "A" `lt` variable "_bnd3")
---           , LoopInvariant (number 0 `eqq` number 01) NoLoc
+--           , LoopInvariant (0 === 01) NoLoc
 --           , Guard (makePred 2) (LOOP NoLoc) NoLoc
 --           , Bound (constant "A" `eqq` variable "_bnd3")
 --           ])
@@ -105,8 +129,47 @@ statements = testGroup "simple statements"
 --     ]
 --   ]
 
+(===) :: Int -> Int -> Expr
+x === y = number x `eqq` number y
+
+
+tree :: [WPNode] -> Either a WPTree
+tree = Right . Tree
+
 
 run :: Text -> Either [Error] WPTree
-run text = fmap (map toNoLoc) $ REPL.scan "<test>" text
+run text = toNoLoc . toWPTree <$> (REPL.scan "<test>" text
             >>= REPL.parseProgram "<test>"
-            >>= REPL.wpTree
+            >>= REPL.structError . runWPM . programToLasagna)
+
+newtype WPTree = Tree [WPNode]
+  deriving (Eq)
+
+instance Show WPTree where
+  show = show . pretty
+
+data WPNode = Node Pred [WPTree] | Leaf Pred
+  deriving (Eq)
+
+instance Pretty WPTree where
+  pretty (Tree xs) = "Tree" <> indent 1 (prettyList xs)
+instance ToNoLoc WPTree where
+  toNoLoc (Tree xs) = Tree (map toNoLoc xs)
+
+instance Pretty WPNode where
+  pretty (Leaf p) = "Leaf $" <+> pretty p
+  pretty (Node p xs) = "Node $" <+> pretty p <> line <> indent 1 (prettyList xs)
+instance Show WPNode where
+  show = show . pretty
+instance ToNoLoc WPNode where
+  toNoLoc (Node p xs) = Node (toNoLoc p) (map toNoLoc xs)
+  toNoLoc (Leaf p)    = Leaf (toNoLoc p)
+
+toWPTree :: Lasagna -> WPTree
+toWPTree (Final p) = Tree [Leaf p]
+toWPTree (Layer _ p _ [] xs) =
+  let Tree nodes = toWPTree xs
+  in  Tree $ Leaf p : nodes
+toWPTree (Layer _ p _ branches xs) =
+  let Tree nodes = toWPTree xs
+  in  Tree $ Node p (map toWPTree branches) : nodes

@@ -1,9 +1,9 @@
 import Test.Tasty
 
-import qualified Test.Parser as Parser
-import qualified Test.Pretty as Pretty
-import qualified Test.WP as WP
-import qualified Test.Obligation as Obligation
+-- import qualified Test.Parser as Parser
+-- import qualified Test.Pretty as Pretty
+-- import qualified Test.WP as WP
+-- import qualified Test.Obligation as Obligation
 import qualified Test.WeakestPrecond as WeakestPrecond
 
 main :: IO ()

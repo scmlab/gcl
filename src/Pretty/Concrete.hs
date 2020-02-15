@@ -9,6 +9,7 @@ import Syntax.Location
 import Syntax.Concrete
 import Pretty.Abstract ()
 import Pretty.Variadic
+import Pretty.Util
 
 --------------------------------------------------------------------------------
 -- | Expr

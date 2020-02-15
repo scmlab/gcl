@@ -28,9 +28,3 @@ parensIf n m
 
 var :: Variadic a a
 var = Expect Complete
-
---------------------------------------------------------------------------------
--- | Pretty print with Precedence
-
-class PrettyPrec a where
-  prettyPrec :: Int -> a -> Doc ann

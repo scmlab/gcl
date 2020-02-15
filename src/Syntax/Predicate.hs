@@ -13,7 +13,6 @@ import Syntax.Concrete (Expr, Fresh, Subst)
 --------------------------------------------------------------------------------
 -- | Predicates
 
-
 data Sort = IF Loc | LOOP Loc
           deriving (Eq, Show, Generic)
 
@@ -54,3 +53,15 @@ subst env (Negate x) = Negate <$> subst env x
 
 toGuard :: Sort -> Expr -> Pred
 toGuard sort x = Guard x sort (locOf x)
+
+--------------------------------------------------------------------------------
+-- | Smart constructors for testing
+
+assertion :: Expr -> Pred
+assertion x = Assertion x NoLoc
+
+guardIf :: Expr -> Pred
+guardIf x = Guard x (IF NoLoc) NoLoc
+
+guardLoop :: Expr -> Pred
+guardLoop x = Guard x (LOOP NoLoc) NoLoc
