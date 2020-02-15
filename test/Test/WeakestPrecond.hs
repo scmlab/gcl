@@ -55,7 +55,8 @@ statements = testGroup "simple statements"
 
 if' :: TestTree
 if' = testGroup "if statements"
-  [ testCase "without precondition 1" $ run "if 0 = 0 -> skip fi\n{ 0 = 2 }\n" @?= tree
+  [ testCase "without precondition 1"
+    $ run "if 0 = 0 -> skip fi\n{ 0 = 2 }\n" @?= tree
       [ Node (guardIf (0 === 0))
           [ Tree  [ Leaf $ assertion (0 === 2)
                   , Leaf $ assertion (0 === 2)
@@ -63,31 +64,42 @@ if' = testGroup "if statements"
           ]
       , Leaf $ assertion (0 === 2)
       ]
-      -- Right (Guard (0 === 0) (IF NoLoc) NoLoc)
-  -- , testCase "without precondition 2" $ run "if 0 = 0 -> skip | 0 = 1 -> abort fi\n{ 0 = 2 }\n" @?= tree
-  --     []
-  --     -- Right (Disjunct
-  --     --         [ Guard (0 === 0) (IF NoLoc) NoLoc
-  --     --         , Guard (0 === 01) (IF NoLoc) NoLoc
-  --     --         ])
-  -- , testCase "with precondition" $ run "{ 0 = 0 }\nif 0 = 1 -> skip fi\n{ 0 = 2 }\n" @?= tree
-  --     [ Leaf $ Assertion (0 === 0) NoLoc
-  --     ]
-
-  -- , testCase "nested" $ run "if 0 = 0 -> if 0 = 1 -> skip fi fi\n{ 0 = 2 }\n" @?= tree
-  --     [ Node (Guard (0 === 0) (IF NoLoc) NoLoc)
-  --         [ Tree
-  --             [ Node (Guard (0 === 1) (IF NoLoc) NoLoc)
-  --                 [ Tree
-  --                     [ Leaf $ Assertion (0 === 2) NoLoc
-  --                     , Leaf $ Assertion (0 === 2) NoLoc
-  --                     ]
-  --                 ]
-  --             , Leaf $ Assertion (0 === 2) NoLoc
-  --             ]
-  --         ]
-  --     , Leaf $ Assertion (0 === 2) NoLoc
-  --     ]
+  , testCase "without precondition 2"
+    $ run "if 0 = 0 -> skip | 0 = 1 -> abort fi\n{ 0 = 2 }\n" @?= tree
+      [ Node (Disjunct [ guardIf (0 === 0) , guardIf (0 === 1) ] )
+          [ Tree  [ Leaf $ assertion (0 === 2)
+                  , Leaf $ assertion (0 === 2)
+                  ]
+          , Tree  [ Leaf $ Constant false
+                  , Leaf $ assertion (0 === 2)
+                  ]
+          ]
+      , Leaf $ assertion (0 === 2)
+      ]
+  , testCase "with precondition"
+    $ run "{ 0 = 0 }\nif 0 = 1 -> skip fi\n{ 0 = 2 }\n" @?= tree
+      [ Leaf (assertion (0 === 0))
+      , Node (guardIf (0 === 1))
+          [ Tree  [ Leaf $ assertion (0 === 2)
+                  , Leaf $ assertion (0 === 2)
+                  ]
+          ]
+      , Leaf $ assertion (0 === 2)
+      ]
+  , testCase "nested" $ run "if 0 = 0 -> if 0 = 1 -> skip fi fi\n{ 0 = 2 }\n" @?= tree
+      [ Node (guardIf (0 === 0))
+          [ Tree
+              [ Node (guardIf (0 === 1))
+                  [ Tree
+                      [ Leaf $ assertion (0 === 2)
+                      , Leaf $ assertion (0 === 2)
+                      ]
+                  ]
+              , Leaf $ assertion (0 === 2)
+              ]
+          ]
+      , Leaf $ assertion (0 === 2)
+      ]
   ]
 
 
