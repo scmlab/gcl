@@ -68,3 +68,7 @@ guardIf x = Guard x (IF NoLoc) NoLoc
 
 guardLoop :: Expr -> Pred
 guardLoop x = Guard x (LOOP NoLoc) NoLoc
+
+
+(===) :: Int -> Int -> Expr
+x === y = C.number x `C.eqq` C.number y

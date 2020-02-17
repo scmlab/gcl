@@ -193,18 +193,16 @@ loop = testGroup "loop statements"
 --     ]
 --   ]
 
-(===) :: Int -> Int -> Expr
-x === y = number x `eqq` number y
-
-
 tree :: [WPNode] -> Either a WPTree
 tree = Right . Tree
-
 
 run :: Text -> Either [Error] WPTree
 run text = toNoLoc . toWPTree <$> (REPL.scan "<test>" text
             >>= REPL.parseProgram "<test>"
             >>= REPL.structError . runWPM . programToLasagna)
+
+--------------------------------------------------------------------------------
+-- | Data structure for extracting WPs from a Lasagna
 
 newtype WPTree = Tree [WPNode]
   deriving (Eq)
