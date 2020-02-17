@@ -60,6 +60,9 @@ toGuard sort x = Guard x sort (locOf x)
 assertion :: Expr -> Pred
 assertion x = Assertion x NoLoc
 
+loopInvariant :: Expr -> Pred
+loopInvariant x = LoopInvariant x NoLoc
+
 guardIf :: Expr -> Pred
 guardIf x = Guard x (IF NoLoc) NoLoc
 

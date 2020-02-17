@@ -25,8 +25,9 @@ tests :: TestTree
 tests = testGroup "Weakest Precondition"
   [
     statements
+  , assertions
   , if'
-  -- , loop
+  , loop
   ]
 
 statements :: TestTree
@@ -39,10 +40,6 @@ statements = testGroup "simple statements"
       [ Leaf $ Constant false
       , Leaf $ assertion true
       ]
-  , testCase "assertion" $ run "{ 0 = 0 }\n{ 0 = 1 }" @?= tree
-      [ Leaf $ assertion (0 === 0)
-      , Leaf $ assertion (0 === 1)
-      ]
   , testCase "assignment" $ run "x := 1\n{ 0 = x }" @?= tree
       [ Leaf $ assertion (0 === 1)
       , Leaf $ assertion (number 0 `eqq` variable "x")
@@ -52,6 +49,26 @@ statements = testGroup "simple statements"
       , Leaf $ assertion false
       ]
   ]
+
+assertions :: TestTree
+assertions = testGroup "assertions"
+  [ testCase "1 assertion"
+    $ run "{ 0 = 0 }" @?= tree
+      [ Leaf $ assertion (0 === 0)
+      ]
+  , testCase "2 assertions"
+    $ run "{ 0 = 0 }\n{ 0 = 1 }" @?= tree
+      [ Leaf $ assertion (0 === 0)
+      , Leaf $ assertion (0 === 1)
+      ]
+  , testCase "3 assertions"
+    $ run "{ 0 = 0 }\n{ 0 = 1 }\n{ 0 = 2 }" @?= tree
+      [ Leaf $ assertion (0 === 0)
+      , Leaf $ assertion (0 === 1)
+      , Leaf $ assertion (0 === 2)
+      ]
+  ]
+
 
 if' :: TestTree
 if' = testGroup "if statements"
@@ -86,7 +103,8 @@ if' = testGroup "if statements"
           ]
       , Leaf $ assertion (0 === 2)
       ]
-  , testCase "nested" $ run "if 0 = 0 -> if 0 = 1 -> skip fi fi\n{ 0 = 2 }\n" @?= tree
+  , testCase "nested"
+    $ run "if 0 = 0 -> if 0 = 1 -> skip fi fi\n{ 0 = 2 }\n" @?= tree
       [ Node (guardIf (0 === 0))
           [ Tree
               [ Node (guardIf (0 === 1))
@@ -102,8 +120,42 @@ if' = testGroup "if statements"
       ]
   ]
 
+loop :: TestTree
+loop = testGroup "loop statements"
+  [ testCase "simple"
+    $ run "{ 0 = 1 , bnd: A }\n\
+          \do 0 = 2 -> skip od\n\
+          \{ 0 = 0 }\n" @?= tree
+      [ Leaf $ loopInvariant (0 === 1)
+      , Node (loopInvariant (0 === 1))
+          [ Tree
+              [ Leaf $ loopInvariant (0 === 1)
+              , Leaf $ loopInvariant (0 === 1)
+              ]
+          ]
+      , Leaf $ assertion (0 === 0)
+      ]
+  , testCase "2 branches"
+    $ run "{ 0 = 1 , bnd: A }\n\
+          \do 0 = 2 -> skip \n\
+          \ | 0 = 3 -> abort od\n\
+          \{ 0 = 0 }\n" @?= tree
+      [ Leaf $ loopInvariant (0 === 1)
+      , Node (loopInvariant (0 === 1))
+          [ Tree
+              [ Leaf $ loopInvariant (0 === 1)
+              , Leaf $ loopInvariant (0 === 1)
+              ]
+          , Tree
+              [ Leaf $ Constant false
+              , Leaf $ loopInvariant (0 === 1)
+              ]
+          ]
+      , Leaf $ assertion (0 === 0)
+      ]
+  ]
 
-
+--
 --
 -- loop :: TestTree
 -- loop = testGroup "if statements"
