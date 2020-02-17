@@ -15,10 +15,10 @@ tests = testGroup "Tests"
     --   Parser.tests
     -- , Pretty.tests
     -- , WP.tests
-    -- , WP2.tests
-
-      Obligation.tests
-    -- , WeakestPrecond.tests
+    -- ,
+    --   Obligation.tests
+    -- ,
+    WeakestPrecond.tests
     ]
   -- [ testCase "2+2=4" $
   --     2+2 @?= 4

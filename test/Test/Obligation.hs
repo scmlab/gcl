@@ -21,9 +21,11 @@ import Pretty ()
 
 tests :: TestTree
 tests = testGroup "Proof Obligations"
-  [ statements
-  , assertions
-  , if'
+  [
+  -- statements
+  -- , assertions
+  -- ,
+  if'
   -- , loop
   ]
 
@@ -66,58 +68,75 @@ assertions = testCase "assertions"
 
 if' :: TestTree
 if' = testGroup "if statements"
-  [ testCase "without precondition"
+  [ testCase "without precondition 1"
       $ run "if 0 = 0 -> skip fi\n\
             \{ 0 = 2 }\n" @?= poList
       [ Obligation 0
-          (Conjunct
-            [ assertion (0 === 2)
-            , guardIf (0 === 0)
-            ])
+          (guardIf (0 === 0))
           (assertion (0 === 2))
           (AroundSkip NoLoc)
       ]
   , testCase "without precondition 2"
+      $ run "if 0 = 0 -> abort fi\n\
+            \{ 0 = 2 }\n" @?= poList
+      [ Obligation 0
+          (guardIf (0 === 0))
+          (Constant false)
+          (AroundAbort NoLoc)
+      ]
+  , testCase "without precondition 3"
       $ run "if 0 = 0 -> skip   \n\
             \ | 0 = 1 -> abort  \n\
             \fi                 \n\
             \{ 0 = 2 }          \n" @?= poList
       [ Obligation 0
-          (Conjunct
-            [ assertion (0 === 2)
-            , Disjunct
-                [ guardIf (0 === 0)
-                , guardIf (0 === 1)
-                ]
+          (Disjunct
+            [ guardIf (0 === 0)
+            , guardIf (0 === 1)
             ])
           (assertion (0 === 2))
           (AroundSkip NoLoc)
       , Obligation 1
-          (Conjunct
-            [ Constant false
-            , Disjunct
-                [ guardIf (0 === 0)
-                , guardIf (0 === 1)
-                ]
+          (Disjunct
+            [ guardIf (0 === 0)
+            , guardIf (0 === 1)
             ])
           (Constant false)
           (AroundAbort NoLoc)
       ]
   , testCase "with precondition"
-      $ run "{ 0 = 0 }\nif 0 = 1 -> skip fi\n{ 0 = 2 }\n" @?= poList
+      $ run "{ 0 = 0 }            \n\
+             \if 0 = 1 -> skip    \n\
+             \ | 0 = 3 -> abort fi\n\
+             \{ 0 = 2 }           \n" @?= poList
       [ Obligation 0
           (assertion (0 === 0))
-          (guardIf (0 === 1))
-          (AssertSufficient NoLoc)
+          (Disjunct [ guardIf (0 === 1), guardIf (0 === 3) ])
+          (IfTotal NoLoc)
       , Obligation 1
-          (Conjunct
-            [ assertion (0 === 2)
-            , guardIf (0 === 1)
-            ])
+          (assertion (0 === 0))
+          -- (Disjunct [ guardIf (0 === 1), guardIf (0 === 3) ])
           (assertion (0 === 2))
           (AroundSkip NoLoc)
+      , Obligation 2
+          (assertion (0 === 0))
+          -- (Disjunct [ guardIf (0 === 1), guardIf (0 === 3) ])
+          (Constant false)
+          (AroundAbort NoLoc)
       ]
   ]
+
+
+-- A B C (A => B) (B => C) * (A => B) (A & B => C)  *
+-- 0 0 0 1        1        1 1       1              1
+-- 0 1 0 1        0        0 1       1              1
+-- 1 0 0 0        1        0 0       1              0
+-- 1 1 0 1        0        0 1       0              0
+-- 0 0 1 1        1        1 1       1              1
+-- 0 1 1 1        1        1 1       1              1
+-- 1 0 1 0        1        0 0       1              0
+-- 1 1 1 1        1        1 1       1              1
+
 
 -- loop :: TestTree
 -- loop = testGroup "if statements"

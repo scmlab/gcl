@@ -17,13 +17,19 @@ import qualified Syntax.Concrete as C
 -- import qualified Syntax.Predicate as P
 import Syntax.Predicate
 import Syntax.Location (ToNoLoc(..))
--- import Debug.Trace (traceShow)
+
+import Pretty.Concrete ()
+import Pretty.Predicate ()
+import Debug.Trace (traceShow)
+import Data.Text.Prettyprint.Doc
 
 
 --------------------------------------------------------------------------------
 -- | Lasagna, alternating sequence of Pred & Statement
 
 type PreviousStmt = Maybe Stmt
+type ImposedConds = [Pred]
+
 data Lasagna = Layer
                   PreviousStmt  -- the previous statement
                   Pred          -- precondition
@@ -32,6 +38,8 @@ data Lasagna = Layer
                   Lasagna       -- following layers
              | Final Pred
              deriving (Show)
+
+
 
 -- access the precondition of a Lasagna
 precond :: Lasagna -> Pred
@@ -44,40 +52,75 @@ toLasagna = wpStmts Nothing []
   where
 
     -- the workhorse
-    wpStmts :: PreviousStmt -> [Pred] -> [Stmt] -> Pred -> WPM Lasagna
-    wpStmts _        _    []     post = return $ Final post
-    wpStmts previous pres (x:xs) post = do
-      xs' <- wpStmts (Just x) pres xs post
-      (pre, branches) <- wp previous pres x (precond xs')
+    wpStmts :: PreviousStmt -> ImposedConds -> [Stmt] -> Pred -> WPM Lasagna
+    wpStmts _        _       []     post = return $ Final post
+    wpStmts previous imposed (x:xs) post = do
+
+      -- the preconditions only affect the current statement
+      -- they should not be imposed on the rest of the statements
+      xs' <- wpStmts (Just x) [] xs post
+
+      -- see if the previous statement is an assertion
+      -- if so, then we add it to the list of imposed conditions
+      imposed' <- case previous of
+        Just (C.Assert        p   l) -> return $ Assertion     p l : imposed
+        Just (C.LoopInvariant p _ l) -> return $ LoopInvariant p l : imposed
+        _ -> case x of
+              C.Do _ l -> throwError (MissingAssertion l)
+              _        -> return imposed
+
+      -- calculate the precondition of the current statement
+      let post' = precond xs'
+      (pre, branches) <- wp imposed' x post'
+
       return $ Layer previous pre x branches xs'
 
     -- calculates the weakest precondition of a given statement
-    -- along with the postcondition and its previous statement
-    wp :: PreviousStmt -> [Pred] -> Stmt -> Pred -> WPM (Pred, [Lasagna])
-    wp previous pres current post = case (previous, current) of
-      (_, C.Abort _)              -> return (Constant C.false, [])
-      (_, C.Skip _)               -> return (post, [])
-      (_, C.Assert p l)           -> return (Assertion p l, [])
-      (_, C.LoopInvariant p _ l)  -> return (LoopInvariant p l, [])
-      (_, C.Assign xs es _)       -> do
-        pre <- subst (assignmentEnv xs es) post
-        return (pre, [])
+    -- along with the imposed preconditions
+    wp :: ImposedConds -> Stmt -> Pred -> WPM (Pred, [Lasagna])
+    wp imposed current post = do
 
-      (_, C.If gdCmds l)          -> do
-        branches <- forM gdCmds $ \(C.GdCmd guard body _) -> do
-          wpStmts previous (toGuard (IF l) guard : pres) body post
-        return (disjunct (map (toGuard (IF l)) (C.getGuards gdCmds)), branches)
+      -- traceShow ("") (return ())
+      -- traceShow ("current: " ++ show (pretty current)) (return ())
+      -- traceShow ("imposed: " ++ show (prettyList imposed)) (return ())
 
-      (Just (C.LoopInvariant p _ l), C.Do gdCmds _) -> do
-        -- use the precondition of the loop as the postcondition of the branch
-        branches <- forM gdCmds $ \(C.GdCmd guard body _) -> do
-          let post' = conjunct (LoopInvariant p l : pres)
-          wpStmts previous (toGuard (LOOP l) guard : pres) body post'
+      let pre = if null imposed
+                    then post
+                    else conjunct imposed
 
-        return (LoopInvariant p l, branches)
-      (_, C.Do _ l)               -> throwError (MissingAssertion l)
-      (_, C.SpecQM l)             -> throwError (DigHole l)
-      (_ , C.Spec _)              -> return (post, [])
+      case current of
+        C.Abort _              -> return (Constant C.false, [])
+        C.Skip _               -> return (pre, [])
+        C.Assert p l           -> return (Assertion p l, [])
+        C.LoopInvariant p _ l  -> return (LoopInvariant p l, [])
+        C.Assign xs es _       -> do
+          pre' <- subst (assignmentEnv xs es) pre
+          return (pre', [])
+
+        -- C.If gdCmds l1 -> do
+        --   branches <- forM gdCmds $ \(C.GdCmd guard body _) -> do
+        --     wpStmts previous (Assertion p l0 : toGuard (IF l1) guard : pres) body post
+        --   return (Assertion p l0, branches)
+          -- return (disjunct (map (toGuard (IF l1)) (C.getGuards gdCmds)), branches)
+
+        C.If gdCmds l -> do
+          branches <- forM gdCmds $ \(C.GdCmd guard body _) -> do
+            let imposed' = toGuard (LOOP l) guard : imposed
+            wpStmts Nothing imposed' body post
+
+          return (disjunct (map (toGuard (IF l)) (C.getGuards gdCmds)), branches)
+
+        C.Do gdCmds l -> do
+          let imposedConjunct = conjunct imposed
+          -- use the precondition of the loop as the postcondition of the branch
+          branches <- forM gdCmds $ \(C.GdCmd guard body _) -> do
+            let imposed' = toGuard (LOOP l) guard : imposed
+            wpStmts Nothing imposed' body imposedConjunct
+
+          return (imposedConjunct, branches)
+
+        C.SpecQM l            -> throwError (DigHole l)
+        C.Spec _              -> return (pre, [])
 
 assignmentEnv :: [Lower] -> [Expr] -> C.Subst
 assignmentEnv xs es = Map.fromList (zip (map Left xs) es)
@@ -174,7 +217,7 @@ disjunct [] = Constant C.false
 disjunct [x] = x
 disjunct xs = Disjunct xs
 
-genObli :: [Pred]   -- additional preconditions to be conjuncted with
+genObli :: [Pred]   -- imposed preconditions
         -> Lasagna
         -> ObliM ()
 genObli _    (Final _) = return ()
@@ -185,7 +228,10 @@ genObli pres (Layer previousStmt stmtPreCond stmt branches stmts) = do
   -- traceShow ("stmt: " ++ show stmt) (return ())
 
   let post = [precond stmts]
-  let pre = if null pres then [stmtPreCond] else stmtPreCond:pres
+
+  let pre = if null pres    -- if no imposed preconditions
+              then [stmtPreCond]  -- use the inferred precondition of `stmt`
+              else pres           -- else use the imposed preconditions
 
   case stmt of
     C.Abort l -> tellObli pre [Constant C.false] (AroundAbort l)
@@ -204,17 +250,16 @@ genObli pres (Layer previousStmt stmtPreCond stmt branches stmts) = do
 
     C.If gdCmds l -> do
 
-      -- NOTE: you don't see this because somehow both antecedent & consequent are the same
       tellObli pre (map (toGuard (IF l)) $ C.getGuards gdCmds) (IfTotal l)
 
       -- generate POs for each branch
       forM_ branches (genObli pre)
 
-
-      -- generate POs for each branch
-      -- forM_ gdCmds $ \(C.GdCmd _ body _) -> do
-      --   body' <- lift $ lift $ toLasagna body (disjunct post)
-      --   genObli pre body'
+      -- let guards = C.getGuards gdCmds
+      -- let zipped = zip guards branches
+      --
+      -- forM_ zipped $ \(guard, branch) -> do
+      --   genObli (toGuard (IF l) guard : pres) branch
 
     C.Do gdCmds l -> case previousStmt of
       (Just (C.LoopInvariant _ bnd _)) -> do
@@ -228,11 +273,6 @@ genObli pres (Layer previousStmt stmtPreCond stmt branches stmts) = do
 
         -- inductive cases
         forM_ branches (genObli pre)
-        -- forM_ gdCmds $ \(C.GdCmd guard body _) -> do
-        --   -- the precondition of the loop as the postcondition of the branch
-        --   let post' = conjunct pre
-        --   body' <- lift $ lift $ toLasagna body post'
-        --   genObli (pre ++ [toGuard (LOOP l) guard]) body'
 
         -- termination
         tellObli
@@ -321,18 +361,47 @@ instance ToJSON StructError2 where
 
 
 --------------------------------------------------------------------------------
--- | Rose tree of preconditions, for testing
+-- |
 
--- data WPTree = WPLayer Pred [WPTree] WPTree | WPFinal Pred
+-- data Line = Line Pred Stmt              -- with a precondition
+--           | Free Pred Stmt [FreeBlk]    -- with a common, inferred precondition
+--           | Imposed   Stmt [ImposedBlk]
+--           deriving (Show, Eq)
+--
+-- data ImposedBlk = ImposedBlk Pred [Line] Pred -- with imposed precondition
+--                 deriving (Show, Eq)
+--
+-- data FreeBlk = FreeBlk [Line] Pred
+--              deriving (Show, Eq)
 
-  -- case toWPTree xs of
-  -- Leaf q -> case branches of
-  --             [] -> Node [Leaf p, Leaf q]
-  --             _  -> Node [Node p branches, Leaf q]
-  -- Node q xs -> case branches of
-  --               [] -> Node [Leaf p, Leaf q]
-  --               _  -> Node [Node p branches, Leaf q]
+-- data Block = Imposed Pred [Line] Pred -- with imposed precondition
+--            | Free         [Line] Pred
+--           deriving (Show, Eq)
 
-  -- WPLayer p (map toWPTree branches) (toWPTree xs)
--- toWPTree (Final p) = WPFinal p
--- toWPTree (Layer _ p _ branches xs) = WPLayer p (map toWPTree branches) (toWPTree xs)
+
+-- linePrecond :: Line -> Pred
+-- linePrecond (Line  p _) = p
+-- linePrecond (Block p _) = p
+--
+-- blockPrecond :: Block -> Pred
+-- blockPrecond (Imposed _ []     p) = p
+-- blockPrecond (Imposed _ (x:xs) _) = linePrecond x
+-- blockPrecond (Free      []     p) = p
+-- blockPrecond (Free      (x:xs) _) = linePrecond x
+--
+-- wpStmts :: Maybe Pred -> [Stmt] -> Pred -> WPM Block
+-- wpStmts Nothing    []     post = Free    []  post
+-- wpStmts Nothing    (x:xs) post = do
+
+
+  -- let xs' = case wpStmts Nothing xs post of
+  --           Imposed _ ls _ -> ls
+  --           Free      ls _ -> ls
+  -- x' <- wp x
+  -- return $ Free
+-- wpStmts (Just pre) []     post = Imposed pre post
+
+    -- wpStmts (x:xs) post = do
+    --   xs' <- wpStmts (Just x) pres xs post
+    --   (pre, branches) <- wp previous pres x (precond xs')
+    --   return $ Layer previous pre x branches xs'

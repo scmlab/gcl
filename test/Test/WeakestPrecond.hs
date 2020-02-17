@@ -24,10 +24,11 @@ import Pretty ()
 tests :: TestTree
 tests = testGroup "Weakest Precondition"
   [
-    statements
-  , assertions
-  , if'
-  , loop
+  --   statements
+  -- , assertions
+  -- ,
+    if'
+  -- , loop
   ]
 
 statements :: TestTree
@@ -72,52 +73,54 @@ assertions = testGroup "assertions"
 
 if' :: TestTree
 if' = testGroup "if statements"
-  [ testCase "without precondition 1"
-    $ run "if 0 = 0 -> skip fi\n{ 0 = 2 }\n" @?= tree
-      [ Node (guardIf (0 === 0))
-          [ Tree  [ Leaf $ assertion (0 === 2)
-                  , Leaf $ assertion (0 === 2)
-                  ]
-          ]
-      , Leaf $ assertion (0 === 2)
-      ]
-  , testCase "without precondition 2"
-    $ run "if 0 = 0 -> skip | 0 = 1 -> abort fi\n{ 0 = 2 }\n" @?= tree
-      [ Node (Disjunct [ guardIf (0 === 0) , guardIf (0 === 1) ] )
-          [ Tree  [ Leaf $ assertion (0 === 2)
-                  , Leaf $ assertion (0 === 2)
-                  ]
-          , Tree  [ Leaf $ Constant false
-                  , Leaf $ assertion (0 === 2)
-                  ]
-          ]
-      , Leaf $ assertion (0 === 2)
-      ]
-  , testCase "with precondition"
-    $ run "{ 0 = 0 }\nif 0 = 1 -> skip fi\n{ 0 = 2 }\n" @?= tree
+  -- [ testCase "without precondition 1"
+  --   $ run "if 0 = 0 -> skip fi\n{ 0 = 2 }\n" @?= tree
+  --     [ Node (guardIf (0 === 0))
+  --         [ Tree  [ Leaf $ assertion (0 === 2)
+  --                 , Leaf $ assertion (0 === 2)
+  --                 ]
+  --         ]
+  --     , Leaf $ assertion (0 === 2)
+  --     ]
+  -- , testCase "without precondition 2"
+  --   $ run "if 0 = 0 -> skip | 0 = 1 -> abort fi\n{ 0 = 2 }\n" @?= tree
+  --     [ Node (Disjunct [ guardIf (0 === 0) , guardIf (0 === 1) ] )
+  --         [ Tree  [ Leaf $ assertion (0 === 2)
+  --                 , Leaf $ assertion (0 === 2)
+  --                 ]
+  --         , Tree  [ Leaf $ Constant false
+  --                 , Leaf $ assertion (0 === 2)
+  --                 ]
+  --         ]
+  --     , Leaf $ assertion (0 === 2)
+  --     ]
+  [ testCase "with precondition"
+    $ run "{ 0 = 0 }          \n\
+          \if 0 = 1 -> skip fi\n\
+          \{ 0 = 2 }          \n" @?= tree
       [ Leaf (assertion (0 === 0))
       , Node (guardIf (0 === 1))
-          [ Tree  [ Leaf $ assertion (0 === 2)
+          [ Tree  [ Leaf $ Conjunct [ guardLoop (0 === 1), assertion (0 === 0) ]
                   , Leaf $ assertion (0 === 2)
                   ]
           ]
       , Leaf $ assertion (0 === 2)
       ]
-  , testCase "nested"
-    $ run "if 0 = 0 -> if 0 = 1 -> skip fi fi\n{ 0 = 2 }\n" @?= tree
-      [ Node (guardIf (0 === 0))
-          [ Tree
-              [ Node (guardIf (0 === 1))
-                  [ Tree
-                      [ Leaf $ assertion (0 === 2)
-                      , Leaf $ assertion (0 === 2)
-                      ]
-                  ]
-              , Leaf $ assertion (0 === 2)
-              ]
-          ]
-      , Leaf $ assertion (0 === 2)
-      ]
+  -- , testCase "nested"
+  --   $ run "if 0 = 0 -> if 0 = 1 -> skip fi fi\n{ 0 = 2 }\n" @?= tree
+  --     [ Node (guardIf (0 === 0))
+  --         [ Tree
+  --             [ Node (guardIf (0 === 1))
+  --                 [ Tree
+  --                     [ Leaf $ assertion (0 === 2)
+  --                     , Leaf $ assertion (0 === 2)
+  --                     ]
+  --                 ]
+  --             , Leaf $ assertion (0 === 2)
+  --             ]
+  --         ]
+  --     , Leaf $ assertion (0 === 2)
+  --     ]
   ]
 
 loop :: TestTree
