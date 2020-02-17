@@ -24,11 +24,10 @@ import Pretty ()
 tests :: TestTree
 tests = testGroup "Weakest Precondition"
   [
-  --   statements
-  -- , assertions
-  -- ,
-    if'
-  -- , loop
+    statements
+  , assertions
+  , if'
+  , loop
   ]
 
 statements :: TestTree
@@ -73,84 +72,122 @@ assertions = testGroup "assertions"
 
 if' :: TestTree
 if' = testGroup "if statements"
-  -- [ testCase "without precondition 1"
-  --   $ run "if 0 = 0 -> skip fi\n{ 0 = 2 }\n" @?= tree
-  --     [ Node (guardIf (0 === 0))
-  --         [ Tree  [ Leaf $ assertion (0 === 2)
-  --                 , Leaf $ assertion (0 === 2)
-  --                 ]
-  --         ]
-  --     , Leaf $ assertion (0 === 2)
-  --     ]
-  -- , testCase "without precondition 2"
-  --   $ run "if 0 = 0 -> skip | 0 = 1 -> abort fi\n{ 0 = 2 }\n" @?= tree
-  --     [ Node (Disjunct [ guardIf (0 === 0) , guardIf (0 === 1) ] )
-  --         [ Tree  [ Leaf $ assertion (0 === 2)
-  --                 , Leaf $ assertion (0 === 2)
-  --                 ]
-  --         , Tree  [ Leaf $ Constant false
-  --                 , Leaf $ assertion (0 === 2)
-  --                 ]
-  --         ]
-  --     , Leaf $ assertion (0 === 2)
-  --     ]
-  [ testCase "with precondition"
-    $ run "{ 0 = 0 }          \n\
-          \if 0 = 1 -> skip fi\n\
-          \{ 0 = 2 }          \n" @?= tree
-      [ Leaf (assertion (0 === 0))
-      , Node (guardIf (0 === 1))
-          [ Tree  [ Leaf $ Conjunct [ guardLoop (0 === 1), assertion (0 === 0) ]
+  [ testCase "without precondition"
+    $ run "if 0 = 0 -> skip     \n\
+          \ | 0 = 1 -> abort    \n\
+          \fi                   \n\
+          \{ 0 = 2 }            \n" @?= tree
+      [ Node (Disjunct [ guardIf (0 === 0) , guardIf (0 === 1) ] )
+          [ Tree  [ Leaf $ guardIf (0 === 0)
+                  , Leaf $ assertion (0 === 2)
+                  ]
+          , Tree  [ Leaf $ guardIf (0 === 1)
                   , Leaf $ assertion (0 === 2)
                   ]
           ]
       , Leaf $ assertion (0 === 2)
       ]
-  -- , testCase "nested"
-  --   $ run "if 0 = 0 -> if 0 = 1 -> skip fi fi\n{ 0 = 2 }\n" @?= tree
-  --     [ Node (guardIf (0 === 0))
-  --         [ Tree
-  --             [ Node (guardIf (0 === 1))
-  --                 [ Tree
-  --                     [ Leaf $ assertion (0 === 2)
-  --                     , Leaf $ assertion (0 === 2)
-  --                     ]
-  --                 ]
-  --             , Leaf $ assertion (0 === 2)
-  --             ]
-  --         ]
-  --     , Leaf $ assertion (0 === 2)
-  --     ]
+  , testCase "without precondition (nested)"
+    $ run "if 0 = 0 ->            \n\
+          \     if 0 = 1 -> skip  \n\
+          \     fi                \n\
+          \fi                     \n\
+          \{ 0 = 2 }\n" @?= tree
+      [ Node (guardIf (0 === 0))
+          [ Tree
+              [ Node (guardIf (0 === 1))
+                  [ Tree
+                      [ Leaf $ Conjunct [ guardIf (0 === 0), guardIf (0 === 1) ]
+                      , Leaf $ assertion (0 === 2)
+                      ]
+                  ]
+              , Leaf $ assertion (0 === 2)
+              ]
+          ]
+      , Leaf $ assertion (0 === 2)
+      ]
+  , testCase "with precondition 1"
+    $ run "{ 0 = 0 }          \n\
+          \if 0 = 1 -> skip fi\n\
+          \{ 0 = 2 }          \n" @?= tree
+      [ Leaf (assertion (0 === 0))
+      , Node (guardIf (0 === 1))
+          [ Tree  [ Leaf $ Conjunct [ assertion (0 === 0), guardIf (0 === 1) ]
+                  , Leaf $ assertion (0 === 2)
+                  ]
+          ]
+      , Leaf $ assertion (0 === 2)
+      ]
+  , testCase "with precondition 2"
+    $ run "{ 0 = 0 }          \n\
+          \if 0 = 1 -> skip   \n\
+          \ | 0 = 2 -> abort  \n\
+          \fi                 \n\
+          \{ 0 = 3 }          \n" @?= tree
+      [ Leaf (assertion (0 === 0))
+      , Node (Disjunct [ guardIf (0 === 1), guardIf (0 === 2)])
+          [ Tree  [ Leaf $ Conjunct [ assertion (0 === 0), guardIf (0 === 1) ]
+                  , Leaf $ assertion (0 === 3)
+                  ]
+          , Tree  [ Leaf $ Conjunct [ assertion (0 === 0), guardIf (0 === 2) ]
+                  , Leaf $ assertion (0 === 3)
+                  ]
+          ]
+      , Leaf $ assertion (0 === 3)
+      ]
   ]
 
 loop :: TestTree
 loop = testGroup "loop statements"
-  [ testCase "simple"
-    $ run "{ 0 = 1 , bnd: A }\n\
-          \do 0 = 2 -> skip od\n\
-          \{ 0 = 0 }\n" @?= tree
+  [ testCase "1 branch"
+    $ run "{ 0 = 1 , bnd: A }     \n\
+          \do 0 = 2 -> skip       \n\
+          \od                     \n\
+          \{ 0 = 0 }              \n" @?= tree
       [ Leaf $ loopInvariant (0 === 1)
       , Node (loopInvariant (0 === 1))
           [ Tree
-              [ Leaf $ loopInvariant (0 === 1)
+              [ Leaf $ Conjunct [loopInvariant (0 === 1), guardLoop (0 === 2)]
               , Leaf $ loopInvariant (0 === 1)
               ]
           ]
       , Leaf $ assertion (0 === 0)
       ]
   , testCase "2 branches"
-    $ run "{ 0 = 1 , bnd: A }\n\
-          \do 0 = 2 -> skip \n\
-          \ | 0 = 3 -> abort od\n\
+    $ run "{ 0 = 1 , bnd: A }       \n\
+          \do 0 = 2 -> skip         \n\
+          \ | 0 = 3 -> abort od     \n\
           \{ 0 = 0 }\n" @?= tree
       [ Leaf $ loopInvariant (0 === 1)
       , Node (loopInvariant (0 === 1))
           [ Tree
-              [ Leaf $ loopInvariant (0 === 1)
+              [ Leaf $ Conjunct [loopInvariant (0 === 1), guardLoop (0 === 2)]
               , Leaf $ loopInvariant (0 === 1)
               ]
           , Tree
-              [ Leaf $ Constant false
+              [ Leaf $ Conjunct [loopInvariant (0 === 1), guardLoop (0 === 3)]
+              , Leaf $ loopInvariant (0 === 1)
+              ]
+          ]
+      , Leaf $ assertion (0 === 0)
+      ]
+  , testCase "nested"
+    $ run "{ 0 = 1 , bnd: A }       \n\
+          \do 0 = 2 ->              \n\
+          \   { 0 = 3 , bnd: A }    \n\
+          \   do 0 = 4 -> abort od  \n\
+          \od                       \n\
+          \{ 0 = 0 }\n" @?= tree
+      [ Leaf $ loopInvariant (0 === 1)
+      , Node (loopInvariant (0 === 1))
+          [ Tree
+              [ Leaf $ loopInvariant (0 === 3)
+              , Node (loopInvariant (0 === 3))
+                  [ Tree
+                      [ Leaf $ Conjunct [loopInvariant (0 === 3), guardLoop (0 === 4)]
+                      , Leaf $ loopInvariant (0 === 3)
+                      ]
+                  ]
               , Leaf $ loopInvariant (0 === 1)
               ]
           ]
@@ -217,13 +254,15 @@ data WPNode = Node Pred [WPTree] | Leaf Pred
   deriving (Eq)
 
 instance Pretty WPTree where
-  pretty (Tree xs) = "Tree" <> indent 1 (prettyList xs)
+  pretty (Tree xs) = vsep (map pretty xs)
+    -- "Tree" <> indent 1 (prettyList xs)
 instance ToNoLoc WPTree where
   toNoLoc (Tree xs) = Tree (map toNoLoc xs)
 
 instance Pretty WPNode where
-  pretty (Leaf p) = "Leaf $" <+> pretty p
-  pretty (Node p xs) = "Node $" <+> pretty p <> line <> indent 1 (prettyList xs)
+  pretty (Leaf p) = pretty p
+  pretty (Node p xs) = pretty p <> line <> vsep (map (\x -> " | " <+> align (pretty x)) xs)
+  -- <> indent 4 (vsep (map pretty xs))
 instance Show WPNode where
   show = show . pretty
 instance ToNoLoc WPNode where

@@ -80,47 +80,38 @@ toLasagna = wpStmts Nothing []
     wp :: ImposedConds -> Stmt -> Pred -> WPM (Pred, [Lasagna])
     wp imposed current post = do
 
-      -- traceShow ("") (return ())
-      -- traceShow ("current: " ++ show (pretty current)) (return ())
-      -- traceShow ("imposed: " ++ show (prettyList imposed)) (return ())
-
-      let pre = if null imposed
-                    then post
-                    else conjunct imposed
+      -- override the returned precondition when there are imposed preconditions
+      let conjectedImposed = conjunct (reverse imposed)
+      let override p = if null imposed
+                        then p
+                        else conjectedImposed
 
       case current of
-        C.Abort _              -> return (Constant C.false, [])
-        C.Skip _               -> return (pre, [])
+        C.Abort _              -> return (override (Constant C.false), [])
+        C.Skip _               -> return (override post, [])
         C.Assert p l           -> return (Assertion p l, [])
         C.LoopInvariant p _ l  -> return (LoopInvariant p l, [])
         C.Assign xs es _       -> do
-          pre' <- subst (assignmentEnv xs es) pre
-          return (pre', [])
-
-        -- C.If gdCmds l1 -> do
-        --   branches <- forM gdCmds $ \(C.GdCmd guard body _) -> do
-        --     wpStmts previous (Assertion p l0 : toGuard (IF l1) guard : pres) body post
-        --   return (Assertion p l0, branches)
-          -- return (disjunct (map (toGuard (IF l1)) (C.getGuards gdCmds)), branches)
+          pre <- subst (assignmentEnv xs es) post
+          return (override pre, [])
 
         C.If gdCmds l -> do
           branches <- forM gdCmds $ \(C.GdCmd guard body _) -> do
-            let imposed' = toGuard (LOOP l) guard : imposed
+            let imposed' = toGuard (IF l) guard : imposed
             wpStmts Nothing imposed' body post
 
           return (disjunct (map (toGuard (IF l)) (C.getGuards gdCmds)), branches)
 
         C.Do gdCmds l -> do
-          let imposedConjunct = conjunct imposed
           -- use the precondition of the loop as the postcondition of the branch
           branches <- forM gdCmds $ \(C.GdCmd guard body _) -> do
             let imposed' = toGuard (LOOP l) guard : imposed
-            wpStmts Nothing imposed' body imposedConjunct
+            wpStmts Nothing imposed' body conjectedImposed
 
-          return (imposedConjunct, branches)
+          return (conjectedImposed, branches)
 
         C.SpecQM l            -> throwError (DigHole l)
-        C.Spec _              -> return (pre, [])
+        C.Spec _              -> return (override post, [])
 
 assignmentEnv :: [Lower] -> [Expr] -> C.Subst
 assignmentEnv xs es = Map.fromList (zip (map Left xs) es)
