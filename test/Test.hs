@@ -16,8 +16,8 @@ tests = testGroup "Tests"
     -- , Pretty.tests
     -- , WP.tests
     -- ,
-    --   Obligation.tests
-    -- ,
+      Obligation.tests
+    ,
     WeakestPrecond.tests
     ]
   -- [ testCase "2+2=4" $
