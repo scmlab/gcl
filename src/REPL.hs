@@ -71,7 +71,7 @@ precond2 = structError . runWPM . programWP
 
 
 
-sweep2 :: Concrete.Program -> Either [Error] [Obligation2]
+sweep2 :: Concrete.Program -> Either [Error] [PO]
 sweep2 program = case WP2.sweep program of
   Right x -> return x
   Left err -> Left [StructError2 err]
@@ -109,8 +109,8 @@ instance ToJSON Response where
 -- | Instances of ToJSON
 
 instance ToJSON ObliOrigin where
-instance ToJSON ObliOrigin2 where
+instance ToJSON POOrigin where
 instance ToJSON Obligation where
-instance ToJSON Obligation2 where
+instance ToJSON PO where
 instance ToJSON Specification where
 instance ToJSON Specification2 where

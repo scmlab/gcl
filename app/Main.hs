@@ -82,8 +82,8 @@ handleRequest (Load filepath) = do
 
   case run of
     Left errors -> send $ Error $ map fromGlobalError errors
-    Right (_, obligations, specifications) -> send $ OK obligations specifications
-    -- Right obligations -> send $ OK obligations []
+    -- Right (_, obligations, specifications) -> send $ OK obligations specifications
+    Right obligations -> send $ OK obligations []
 
   return True
 

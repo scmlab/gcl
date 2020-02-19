@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 4b2743c5bb67755bfe21d3d0973b46b3ad05e443de6a9ee600cb1435d4ac0686
+-- hash: 3a445f4fd983faf0e8ae023b54e29a19497d29a17c5c36d93fe091c993b4e285
 
 name:           gcl
 version:        0.1.0.0
@@ -99,11 +99,11 @@ test-suite gcl-test
   type: exitcode-stdio-1.0
   main-is: Test.hs
   other-modules:
-      Test.Obligation
       Test.Parser
+      Test.PO
       Test.Pretty
-      Test.WeakestPrecond
       Test.WP
+      Test.WP2
       Error
       GCL.Exec
       GCL.Exec.ExecMonad

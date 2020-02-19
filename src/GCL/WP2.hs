@@ -10,6 +10,7 @@ import Control.Monad.Except hiding (guard)
 import qualified Data.Map as Map
 import Data.Loc (Loc(..), Located(..))
 import Data.Aeson
+import Data.List (break)
 import GHC.Generics
 
 import Syntax.Concrete (Expr, Stmt, Lower)
@@ -31,8 +32,8 @@ type PreviousStmt = Maybe Stmt
 type ImposedConds = [Pred]
 
 data Lasagna = Layer
-                  PreviousStmt  -- the previous statement
-                  Pred          -- precondition
+                  ImposedConds  -- preconditions imposed on the current statement
+                  Pred          -- precondition of the current statement
                   Stmt          -- the current statement
                   [Lasagna]     -- sub-lasagne of the current statement (IF, LOOP)
                   Lasagna       -- following layers
@@ -73,7 +74,7 @@ toLasagna = wpStmts Nothing []
       let post' = precond xs'
       (pre, branches) <- wp imposed' x post'
 
-      return $ Layer previous pre x branches xs'
+      return $ Layer imposed pre x branches xs'
 
     -- calculates the weakest precondition of a given statement
     -- along with the imposed preconditions
@@ -139,26 +140,26 @@ instance C.Fresh WPM where
 --------------------------------------------------------------------------------
 -- | Obligation
 
-data Obligation2
-  = Obligation Int Pred Pred ObliOrigin2
+data PO
+  = PO Int Pred Pred POOrigin
   deriving (Eq, Show, Generic)
 
-instance ToNoLoc Obligation2 where
-  toNoLoc (Obligation i p q o) =
-    Obligation i (toNoLoc p) (toNoLoc q) (toNoLoc o)
+instance ToNoLoc PO where
+  toNoLoc (PO i p q o) =
+    PO i (toNoLoc p) (toNoLoc q) (toNoLoc o)
 
-data ObliOrigin2 = AroundAbort Loc
-                | AroundSkip Loc
-                | AssertGuaranteed Loc
-                | AssertSufficient Loc
-                | Assignment Loc
-                | IfTotal Loc
-                | LoopBase Loc
-                | LoopTermBase Loc
-                | LoopInitialize Loc
-      deriving (Eq, Show, Generic)
+data POOrigin = AroundAbort Loc
+              | AroundSkip Loc
+              | AssertGuaranteed Loc
+              | AssertSufficient Loc
+              | Assignment Loc
+              | IfTotal Loc
+              | LoopBase Loc
+              | LoopTermBase Loc
+              | LoopInitialize Loc
+              deriving (Eq, Show, Generic)
 
-instance ToNoLoc ObliOrigin2 where
+instance ToNoLoc POOrigin where
   toNoLoc (AroundAbort _)       = AroundAbort NoLoc
   toNoLoc (AroundSkip _)        = AroundSkip NoLoc
   toNoLoc (AssertGuaranteed _)  = AssertGuaranteed NoLoc
@@ -171,24 +172,24 @@ instance ToNoLoc ObliOrigin2 where
 
 
 -- Monad on top of WPM, for generating obligations
-type ObliM = WriterT [Obligation2] (StateT Int WPM)
+type POM = WriterT [PO] (StateT Int WPM)
 
-instance C.Fresh ObliM where
+instance C.Fresh POM where
   fresh = do
     i <- get
     put (succ i)
     return i
 
-runObliM :: ObliM a -> Either StructError2 (a, [Obligation2])
-runObliM f = runWPM (evalStateT (runWriterT f) 0)
+runPOM :: POM a -> Either StructError2 (a, [PO])
+runPOM f = runWPM (evalStateT (runWriterT f) 0)
 
-sweep :: C.Program -> Either StructError2 [Obligation2]
-sweep program = fmap snd $ runObliM $ do
+sweep :: C.Program -> Either StructError2 [PO]
+sweep program = fmap snd $ runPOM $ do
   lasagna <- lift (lift (programToLasagna program))
-  genObli [] lasagna
+  genPO lasagna
 
-tellObli :: [Pred] -> [Pred] -> ObliOrigin2 -> ObliM ()
-tellObli ps qs l = do
+tellPO :: [Pred] -> [Pred] -> POOrigin -> POM ()
+tellPO ps qs l = do
   let p = conjunct ps
   let q = disjunct qs
 
@@ -196,7 +197,7 @@ tellObli ps qs l = do
   unless (C.predEq (toExpr p) (toExpr q)) $ do
     i <- get
     put (succ i)
-    tell [Obligation i p q l]
+    tell [PO i p q l]
 
 conjunct :: [Pred] -> Pred
 conjunct [] = Constant C.true
@@ -208,100 +209,106 @@ disjunct [] = Constant C.false
 disjunct [x] = x
 disjunct xs = Disjunct xs
 
-genObli :: [Pred]   -- imposed preconditions
-        -> Lasagna
-        -> ObliM ()
-genObli _    (Final _) = return ()
-genObli pres (Layer previousStmt stmtPreCond stmt branches stmts) = do
-
-  -- traceShow ("stmtPreCond: " ++ show stmtPreCond) (return ())
-  -- traceShow ("pres: " ++ show pres) (return ())
-  -- traceShow ("stmt: " ++ show stmt) (return ())
-
-  let post = [precond stmts]
-
-  let pre = if null pres    -- if no imposed preconditions
-              then [stmtPreCond]  -- use the inferred precondition of `stmt`
-              else pres           -- else use the imposed preconditions
-
-  case stmt of
-    C.Abort l -> tellObli pre [Constant C.false] (AroundAbort l)
-
-    C.Skip l -> tellObli pre post (AroundSkip l)
-
-    C.Assert p l -> do
-      tellObli pre [Assertion p l] (AssertGuaranteed l)
-      tellObli [Assertion p l] post (AssertSufficient l)
-
-    C.LoopInvariant _ _ _ -> return ()
-
-    C.Assign xs es l -> do
-      post' <- mapM (subst (assignmentEnv xs es)) post
-      tellObli pre post' (Assignment l)
-
-    C.If gdCmds l -> do
-
-      tellObli pre (map (toGuard (IF l)) $ C.getGuards gdCmds) (IfTotal l)
-
-      -- generate POs for each branch
-      forM_ branches (genObli pre)
-
-      -- let guards = C.getGuards gdCmds
-      -- let zipped = zip guards branches
-      --
-      -- forM_ zipped $ \(guard, branch) -> do
-      --   genObli (toGuard (IF l) guard : pres) branch
-
-    C.Do gdCmds l -> case previousStmt of
-      (Just (C.LoopInvariant _ bnd _)) -> do
-        let guards = C.getGuards gdCmds
-
-        -- base case
-        tellObli
-          (pre ++ map (Negate . toGuard (LOOP l)) guards)
-          post
-          (LoopBase l)
-
-        -- inductive cases
-        forM_ branches (genObli pre)
-
-        -- termination
-        tellObli
-          (pre ++ map (toGuard (LOOP l)) guards)
-          [Bound $ bnd `C.gte` (C.Lit (C.Num 0) NoLoc)]
-          (LoopTermBase l)
-
-        -- bound decrementation
-        oldBnd <- C.freshVar "bnd"
-        forM_ gdCmds $ \(C.GdCmd guard body _) -> do
-          let post' = Bound $ bnd `C.lt` C.Var oldBnd NoLoc
-          body' <- lift $ lift $ toLasagna body post'
-          genObli
-            (pre ++
-              [ toGuard (LOOP l) guard
-              , Bound $ bnd `C.eqq` C.Var oldBnd NoLoc
-              ])
-           body'
-
-        return ()
+genPO :: Lasagna -> POM ()
+genPO (Final _) = return ()
+genPO (Layer previousStmt stmtPreCond stmt branches stmts) = return ()
 
 
-      _ -> throwError (MissingBound l)
-       {- Or if we want to tolerate the user and carry on ---
-       do -- warn that bnd is missing
-        let gdCmds' = map (\(GdCmd x y _) -> (depart x, y)) gdCmds
-        let guards = map fst gdCmds'
-        obligate (inv `A.conj` (A.conjunct (map A.neg guards))) post
-        --
-        forM_ gdCmds' $ \(guard, body) -> do
-          structStmts b (inv `A.conj` guard) Nothing body inv
-       -}
 
-    C.SpecQM l -> throwError $ DigHole l
-
-    C.Spec _ -> return ()
-
-  genObli pres stmts
+-- genObli :: [Pred]   -- imposed preconditions
+--         -> Lasagna
+--         -> POM ()
+-- genObli _    (Final _) = return ()
+-- genObli pres (Layer previousStmt stmtPreCond stmt branches stmts) = do
+--
+--   -- traceShow ("stmtPreCond: " ++ show stmtPreCond) (return ())
+--   -- traceShow ("pres: " ++ show pres) (return ())
+--   -- traceShow ("stmt: " ++ show stmt) (return ())
+--
+--   let post = [precond stmts]
+--
+--   let pre = if null pres    -- if no imposed preconditions
+--               then [stmtPreCond]  -- use the inferred precondition of `stmt`
+--               else pres           -- else use the imposed preconditions
+--
+--   case stmt of
+--     C.Abort l -> tellObli pre [Constant C.false] (AroundAbort l)
+--
+--     C.Skip l -> tellObli pre post (AroundSkip l)
+--
+--     C.Assert p l -> do
+--       tellObli pre [Assertion p l] (AssertGuaranteed l)
+--       tellObli [Assertion p l] post (AssertSufficient l)
+--
+--     C.LoopInvariant _ _ _ -> return ()
+--
+--     C.Assign xs es l -> do
+--       post' <- mapM (subst (assignmentEnv xs es)) post
+--       tellObli pre post' (Assignment l)
+--
+--     C.If gdCmds l -> do
+--
+--       tellObli pre (map (toGuard (IF l)) $ C.getGuards gdCmds) (IfTotal l)
+--
+--       -- generate POs for each branch
+--       forM_ branches (genObli pre)
+--
+--       -- let guards = C.getGuards gdCmds
+--       -- let zipped = zip guards branches
+--       --
+--       -- forM_ zipped $ \(guard, branch) -> do
+--       --   genObli (toGuard (IF l) guard : pres) branch
+--
+--     C.Do gdCmds l -> case previousStmt of
+--       (Just (C.LoopxInvariant _ bnd _)) -> do
+--         let guards = C.getGuards gdCmds
+--
+--         -- base case
+--         tellObli
+--           (pre ++ map (Negate . toGuard (LOOP l)) guards)
+--           post
+--           (LoopBase l)
+--
+--         -- inductive cases
+--         forM_ branches (genObli pre)
+--
+--         -- termination
+--         tellObli
+--           (pre ++ map (toGuard (LOOP l)) guards)
+--           [Bound $ bnd `C.gte` (C.Lit (C.Num 0) NoLoc)]
+--           (LoopTermBase l)
+--
+--         -- bound decrementation
+--         oldBnd <- C.freshVar "bnd"
+--         forM_ gdCmds $ \(C.GdCmd guard body _) -> do
+--           let post' = Bound $ bnd `C.lt` C.Var oldBnd NoLoc
+--           body' <- lift $ lift $ toLasagna body post'
+--           genObli
+--             (pre ++
+--               [ toGuard (LOOP l) guard
+--               , Bound $ bnd `C.eqq` C.Var oldBnd NoLoc
+--               ])
+--            body'
+--
+--         return ()
+--
+--
+--       _ -> throwError (MissingBound l)
+--        {- Or if we want to tolerate the user and carry on ---
+--        do -- warn that bnd is missing
+--         let gdCmds' = map (\(GdCmd x y _) -> (depart x, y)) gdCmds
+--         let guards = map fst gdCmds'
+--         obligate (inv `A.conj` (A.conjunct (map A.neg guards))) post
+--         --
+--         forM_ gdCmds' $ \(guard, body) -> do
+--           structStmts b (inv `A.conj` guard) Nothing body inv
+--        -}
+--
+--     C.SpecQM l -> throwError $ DigHole l
+--
+--     C.Spec _ -> return ()
+--
+--   genObli pres stmts
 
 
 --------------------------------------------------------------------------------
@@ -396,3 +403,81 @@ instance ToJSON StructError2 where
     --   xs' <- wpStmts (Just x) pres xs post
     --   (pre, branches) <- wp previous pres x (precond xs')
     --   return $ Layer previous pre x branches xs'
+
+--------------------------------------------------------------------------------
+-- | Struct
+
+data Block = Block [Chunk]          deriving (Eq)
+data Chunk = Chunk Pred [Line] Pred deriving (Eq)
+data Line = Line   Pred
+          | Blocks Pred [Block] deriving (Eq)
+
+wpStmts :: [Pred] -> [Stmt] -> Pred -> WPM Block
+wpStmts imposed []    post = return $ Block [Chunk (conjunct imposed) [] post]
+wpStmts imposed stmts post = do
+  (incompleteLines, Block chunks) <- wpStmts' imposed stmts post
+  let precondOfChunks = precond ([], Block chunks) post
+  if null incompleteLines
+    then return $ Block chunks
+    else return $ Block (Chunk (conjunct imposed) incompleteLines precondOfChunks : chunks)
+  where
+    wpStmts' :: [Pred] -> [Stmt] -> Pred -> WPM ([Line], Block)
+    wpStmts' _       []           _    = return ([], Block [])
+    wpStmts' imposed (stmt:stmts) post = do
+      (ungrouped, Block chunks) <- case stmt of
+        C.Assert p l          -> wpStmts' [Assertion p l]     stmts post
+        C.LoopInvariant p _ l -> wpStmts' [LoopInvariant p l] stmts post
+        otherStmt             -> wpStmts' []                  stmts post
+
+      let precondOfChunks = precond ([], Block chunks) post
+
+      case stmt of
+        C.Assert p l -> do
+          return ([], Block $ Chunk (Assertion p l) ungrouped precondOfChunks : chunks)
+        C.LoopInvariant p _ l -> do
+          return ([], Block $ Chunk (LoopInvariant p l) ungrouped precondOfChunks : chunks)
+        otherStmt -> do
+          line <- wp imposed otherStmt (precond (ungrouped, Block chunks) post)
+          return (line:ungrouped, Block chunks)
+
+    precond :: ([Line], Block) -> Pred -> Pred
+    precond ([], Block []) post = post
+    precond ([], Block (Chunk p _ _:xs)) _ = p
+    precond ((Line p:_), _) _ = p
+    precond ((Blocks p _:_), _) _ = p
+
+wp :: [Pred] -> Stmt -> Pred -> WPM Line
+wp imposed stmt post = case stmt of
+  C.Abort _              -> Line <$> pure (Constant C.false)
+  C.Skip _               -> Line <$> pure post
+  C.Assert p l           -> error "[ Panic ] should not happen"
+  C.LoopInvariant p _ l  -> Line <$> pure (LoopInvariant p l)
+  C.Assign xs es _       -> Line <$> subst (assignmentEnv xs es) post
+
+  C.If gdCmds l -> do
+    blocks <- forM gdCmds $ \(C.GdCmd guard body _) -> do
+      let imposed' = toGuard (IF l) guard : imposed
+      wpStmts imposed' body post
+
+    Blocks <$> pure (disjunct (map (toGuard (IF l)) (C.getGuards gdCmds)))
+           <*> pure blocks
+
+  C.Do gdCmds l -> if null imposed
+    then throwError (MissingAssertion l)
+    else do
+    -- use the loop invariant as the postcondition of the branch
+    blocks <- forM gdCmds $ \(C.GdCmd guard body _) -> do
+      let imposed' = toGuard (LOOP l) guard : imposed
+      wpStmts imposed' body (conjunct imposed)
+
+    Blocks <$> pure (conjunct imposed)
+           <*> pure blocks
+
+  C.SpecQM l            -> throwError (DigHole l)
+  C.Spec _              -> Line <$> pure post
+
+
+programToBlock :: C.Program -> WPM Block
+programToBlock (C.Program _ stmts _) = case (init stmts, last stmts) of
+  (stmts', C.Assert p l) -> wpStmts [Constant C.true] stmts' (Assertion p l)
+  (_     , stmt)         -> throwError (MissingPostcondition (locOf stmt))

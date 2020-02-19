@@ -3,8 +3,8 @@ import Test.Tasty
 -- import qualified Test.Parser as Parser
 -- import qualified Test.Pretty as Pretty
 -- import qualified Test.WP as WP
-import qualified Test.Obligation as Obligation
-import qualified Test.WeakestPrecond as WeakestPrecond
+import qualified Test.PO as PO
+import qualified Test.WP2 as WP2
 
 main :: IO ()
 main = defaultMain tests
@@ -16,9 +16,9 @@ tests = testGroup "Tests"
     -- , Pretty.tests
     -- , WP.tests
     -- ,
-      Obligation.tests
-    ,
-    WeakestPrecond.tests
+    --   PO.tests
+    -- ,
+    WP2.tests
     ]
   -- [ testCase "2+2=4" $
   --     2+2 @?= 4

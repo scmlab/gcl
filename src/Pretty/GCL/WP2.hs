@@ -16,7 +16,7 @@ import Pretty.Predicate ()
 --------------------------------------------------------------------------------
 -- | ObliOrigin
 
-instance Pretty ObliOrigin2 where
+instance Pretty POOrigin where
   pretty (AroundAbort l) = "AroundAbort" <+> pretty l
   pretty (AroundSkip l) = "AroundSkip" <+> pretty l
   pretty (AssertGuaranteed l) = "AssertGuaranteed" <+> pretty l
@@ -30,8 +30,8 @@ instance Pretty ObliOrigin2 where
 --------------------------------------------------------------------------------
 -- | Obligation & Specification
 
-instance Pretty Obligation2 where
-  pretty (Obligation i p q os) = lbracket <> pretty i <> rbracket <+> line <>
+instance Pretty PO where
+  pretty (PO i p q os) = lbracket <> pretty i <> rbracket <+> line <>
     indent 2 (pretty p) <> line <>
     indent 2 (pretty q) <> line <>
     indent 2 (pretty os) <> line
