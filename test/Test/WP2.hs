@@ -32,29 +32,29 @@ tests = testGroup "Weakest Precondition"
 
 statements :: TestTree
 statements = testGroup "simple statements"
-  [ testCase "skip" $ run "skip\n{ 0 = 0 }" @?= chunks
-    [ Chunk
+  [ testCase "skip" $ run "skip\n{ 0 = 0 }" @?= code
+    [ Struct
         (Constant true)
         [ Line $ assertion (0 === 0)
         ]
         (assertion (0 === 0))
     ]
-  , testCase "abort" $ run "abort\n{ True }" @?= chunks
-      [ Chunk
+  , testCase "abort" $ run "abort\n{ True }" @?= code
+      [ Struct
           (Constant true)
           [ Line $ Constant false
           ]
           (assertion true)
       ]
-  , testCase "assignment" $ run "x := 1\n{ 0 = x }" @?= chunks
-      [ Chunk
+  , testCase "assignment" $ run "x := 1\n{ 0 = x }" @?= code
+      [ Struct
           (Constant true)
           [ Line $ assertion (number 0 `eqq` number 1)
           ]
           (assertion (number 0 `eqq` variable "x"))
       ]
-  , testCase "spec" $ run "{!\n!}\n{ 0 = 0 }" @?= chunks
-      [ Chunk
+  , testCase "spec" $ run "{!\n!}\n{ 0 = 0 }" @?= code
+      [ Struct
           (Constant true)
           [ Line $ assertion (0 === 0)
           ]
@@ -65,26 +65,26 @@ statements = testGroup "simple statements"
 assertions :: TestTree
 assertions = testGroup "assertions"
   [ testCase "1 assertion"
-    $ run "{ 0 = 0 }" @?= chunks
-      [ Chunk
+    $ run "{ 0 = 0 }" @?= code
+      [ Struct
           (Constant true)
           []
           (assertion (0 === 0))
       ]
   , testCase "2 assertions"
-    $ run "{ 0 = 0 }\n{ 0 = 1 }" @?= chunks
-      [ Chunk
+    $ run "{ 0 = 0 }\n{ 0 = 1 }" @?= code
+      [ Struct
           (assertion (0 === 0))
           []
           (assertion (0 === 1))
       ]
   , testCase "3 assertions"
-    $ run "{ 0 = 0 }\n{ 0 = 1 }\n{ 0 = 2 }" @?= chunks
-      [ Chunk
+    $ run "{ 0 = 0 }\n{ 0 = 1 }\n{ 0 = 2 }" @?= code
+      [ Struct
           (assertion (0 === 0))
           []
           (assertion (0 === 1))
-      , Chunk
+      , Struct
           (assertion (0 === 1))
           []
           (assertion (0 === 2))
@@ -98,19 +98,19 @@ if' = testGroup "if statements"
     $ run "if 0 = 0 -> skip     \n\
           \ | 0 = 1 -> abort    \n\
           \fi                   \n\
-          \{ 0 = 2 }            \n" @?= chunks
-      [ Chunk
+          \{ 0 = 2 }            \n" @?= code
+      [ Struct
           (Constant true)
-          [ Blocks (Disjunct [ guardIf (0 === 0) , guardIf (0 === 1) ])
-            [ Block
-              [ Chunk
+          [ Block (Disjunct [ guardIf (0 === 0) , guardIf (0 === 1) ])
+            [ Code
+              [ Struct
                   (Conjunct [ guardIf (0 === 0) , Constant true ])
                   [ Line $ assertion (0 === 2)
                   ]
                   (assertion (0 === 2))
               ]
-            , Block
-              [ Chunk
+            , Code
+              [ Struct
                   (Conjunct [ guardIf (0 === 1) , Constant true ])
                   [ Line $ Constant false
                   ]
@@ -125,16 +125,16 @@ if' = testGroup "if statements"
           \     if 0 = 1 -> skip  \n\
           \     fi                \n\
           \fi                     \n\
-          \{ 0 = 2 }\n" @?= chunks
-      [ Chunk
+          \{ 0 = 2 }\n" @?= code
+      [ Struct
           (Constant true)
-          [ Blocks (guardIf (0 === 0))
-            [ Block
-              [ Chunk
+          [ Block (guardIf (0 === 0))
+            [ Code
+              [ Struct
                   (Conjunct [guardIf (0 === 0), Constant true])
-                  [ Blocks (guardIf (0 === 1))
-                    [ Block
-                      [ Chunk
+                  [ Block (guardIf (0 === 1))
+                    [ Code
+                      [ Struct
                           (Conjunct [guardIf (0 === 1), guardIf (0 === 0), Constant true])
                           [ Line (assertion (0 === 2))
                           ]
@@ -151,12 +151,12 @@ if' = testGroup "if statements"
   , testCase "with precondition 1"
     $ run "{ 0 = 0 }          \n\
           \if 0 = 1 -> skip fi\n\
-          \{ 0 = 2 }          \n" @?= chunks
-      [ Chunk
+          \{ 0 = 2 }          \n" @?= code
+      [ Struct
           (assertion (0 === 0))
-          [ Blocks (guardIf (0 === 1))
-            [ Block
-              [ Chunk
+          [ Block (guardIf (0 === 1))
+            [ Code
+              [ Struct
                   (Conjunct [guardIf (0 === 1), assertion (0 === 0)])
                   [ Line $ assertion (0 === 2)
                   ]
@@ -179,7 +179,7 @@ if' = testGroup "if statements"
   --         \if 0 = 1 -> skip   \n\
   --         \ | 0 = 2 -> abort  \n\
   --         \fi                 \n\
-  --         \{ 0 = 3 }          \n" @?= chunks
+  --         \{ 0 = 3 }          \n" @?= code
   --     [ Leaf (assertion (0 === 0))
   --     , Node (Disjunct [ guardIf (0 === 1), guardIf (0 === 2)])
   --         [ Tree  [ Leaf $ Conjunct [ assertion (0 === 0), guardIf (0 === 1) ]
@@ -199,7 +199,7 @@ if' = testGroup "if statements"
 --     $ run "{ 0 = 1 , bnd: A }     \n\
 --           \do 0 = 2 -> skip       \n\
 --           \od                     \n\
---           \{ 0 = 0 }              \n" @?= chunks
+--           \{ 0 = 0 }              \n" @?= code
 --       [ Leaf $ loopInvariant (0 === 1)
 --       , Node (loopInvariant (0 === 1))
 --           [ Tree
@@ -213,7 +213,7 @@ if' = testGroup "if statements"
 --     $ run "{ 0 = 1 , bnd: A }       \n\
 --           \do 0 = 2 -> skip         \n\
 --           \ | 0 = 3 -> abort od     \n\
---           \{ 0 = 0 }\n" @?= chunks
+--           \{ 0 = 0 }\n" @?= code
 --       [ Leaf $ loopInvariant (0 === 1)
 --       , Node (loopInvariant (0 === 1))
 --           [ Tree
@@ -233,7 +233,7 @@ if' = testGroup "if statements"
 --           \   { 0 = 3 , bnd: A }    \n\
 --           \   do 0 = 4 -> abort od  \n\
 --           \od                       \n\
---           \{ 0 = 0 }\n" @?= chunks
+--           \{ 0 = 0 }\n" @?= code
 --       [ Leaf $ loopInvariant (0 === 1)
 --       , Node (loopInvariant (0 === 1))
 --           [ Tree
@@ -251,19 +251,19 @@ if' = testGroup "if statements"
 --       ]
 --   ]
 
-chunks :: [Chunk] -> Either a Block
-chunks = Right . Block
+code :: [Struct] -> Either a Code
+code = Right . Code
 
-run :: Text -> Either [Error] Block
+run :: Text -> Either [Error] Code
 run text = toNoLoc <$> (REPL.scan "<test>" text
             >>= REPL.parseProgram "<test>"
             >>= REPL.structError . runWPM . programToBlock)
 
 --
--- data Block = Block [Chunk]
--- data Chunk = Chunk Pred [Line]
+-- data Block = Block [Struct]
+-- data Struct = Struct Pred [Line]
 -- data Line = Line   Pred
---           | Blocks Pred [Block]
+--           | Block Pred [Block]
 
 
 --------------------------------------------------------------------------------
@@ -281,27 +281,27 @@ run text = toNoLoc <$> (REPL.scan "<test>" text
 -- instance Pretty WPTree where
 --   pretty (Tree xs) = vsep (map pretty xs)
 --     -- "Tree" <> indent 1 (prettyList xs)
-instance ToNoLoc Block where
-  toNoLoc (Block xs) = Block (map toNoLoc xs)
-instance ToNoLoc Chunk where
-  toNoLoc (Chunk pre xs post) = Chunk (toNoLoc pre) (map toNoLoc xs) (toNoLoc post)
+instance ToNoLoc Code where
+  toNoLoc (Code xs) = Code (map toNoLoc xs)
+instance ToNoLoc Struct where
+  toNoLoc (Struct pre xs post) = Struct (toNoLoc pre) (map toNoLoc xs) (toNoLoc post)
 instance ToNoLoc Line where
   toNoLoc (Line p) = Line (toNoLoc p)
-  toNoLoc (Blocks p xs) = Blocks (toNoLoc p) (map toNoLoc xs)
+  toNoLoc (Block p xs) = Block (toNoLoc p) (map toNoLoc xs)
 
 
-instance Show Block where
+instance Show Code where
   show = show . pretty
-instance Pretty Block where
-  pretty (Block xs) = vsep (map pretty xs)
+instance Pretty Code where
+  pretty (Code xs) = vsep (map pretty xs)
   -- pretty (Block xs) = encloseSep mempty mempty hr (map pretty xs)
   --   where
   --       hr = line <> "----------------" <> line
 
-instance Show Chunk where
+instance Show Struct where
   show = show . pretty
-instance Pretty Chunk where
-  pretty (Chunk pre xs post) =
+instance Pretty Struct where
+  pretty (Struct pre xs post) =
     "----------------------------------------------------------------" <> line <>
     "*" <+> pretty pre <> line
     <> vsep (map (\x -> "  " <> pretty x) xs) <> line
@@ -311,7 +311,7 @@ instance Show Line where
   show = show . pretty
 instance Pretty Line where
   pretty (Line p) = pretty p
-  pretty (Blocks p xs) = "*" <+> pretty p <> line <> vsep (map (\x -> "  | " <> align (pretty x)) xs)
+  pretty (Block p xs) = "*" <+> pretty p <> line <> vsep (map (\x -> "  | " <> align (pretty x)) xs)
 
 -- instance Pretty WPNode where
 --   pretty (Leaf p) = pretty p

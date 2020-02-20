@@ -407,44 +407,45 @@ instance ToJSON StructError2 where
 --------------------------------------------------------------------------------
 -- | Struct
 
-data Block = Block [Chunk]          deriving (Eq)
-data Chunk = Chunk Pred [Line] Pred deriving (Eq)
-data Line = Line   Pred
-          | Blocks Pred [Block] deriving (Eq)
+data Code = Code [Struct] deriving (Eq)
+data Struct = Struct Pred [Line] Pred deriving (Eq)
+data Line = Line  Pred
+          | Block Pred [Code] deriving (Eq)
 
-wpStmts :: [Pred] -> [Stmt] -> Pred -> WPM Block
-wpStmts imposed []    post = return $ Block [Chunk (conjunct imposed) [] post]
+wpStmts :: [Pred] -> [Stmt] -> Pred -> WPM Code
+wpStmts imposed []    post = return $ Code [Struct (conjunct imposed) [] post]
 wpStmts imposed stmts post = do
-  (incompleteLines, Block chunks) <- wpStmts' imposed stmts post
-  let precondOfChunks = precond ([], Block chunks) post
+  (incompleteLines, Code chunks) <- wpStmts' imposed stmts post
   if null incompleteLines
-    then return $ Block chunks
-    else return $ Block (Chunk (conjunct imposed) incompleteLines precondOfChunks : chunks)
+    then return $ Code chunks
+    else do
+      let precondOfChunks = precond ([], Code chunks) post
+      return $ Code (Struct (conjunct imposed) incompleteLines precondOfChunks : chunks)
   where
-    wpStmts' :: [Pred] -> [Stmt] -> Pred -> WPM ([Line], Block)
-    wpStmts' _       []           _    = return ([], Block [])
+    wpStmts' :: [Pred] -> [Stmt] -> Pred -> WPM ([Line], Code)
+    wpStmts' _       []           _    = return ([], Code [])
     wpStmts' imposed (stmt:stmts) post = do
-      (ungrouped, Block chunks) <- case stmt of
+      (ungrouped, Code chunks) <- case stmt of
         C.Assert p l          -> wpStmts' [Assertion p l]     stmts post
         C.LoopInvariant p _ l -> wpStmts' [LoopInvariant p l] stmts post
         otherStmt             -> wpStmts' []                  stmts post
 
-      let precondOfChunks = precond ([], Block chunks) post
+      let precondOfChunks = precond ([], Code chunks) post
 
       case stmt of
         C.Assert p l -> do
-          return ([], Block $ Chunk (Assertion p l) ungrouped precondOfChunks : chunks)
+          return ([], Code $ Struct (Assertion p l) ungrouped precondOfChunks : chunks)
         C.LoopInvariant p _ l -> do
-          return ([], Block $ Chunk (LoopInvariant p l) ungrouped precondOfChunks : chunks)
+          return ([], Code $ Struct (LoopInvariant p l) ungrouped precondOfChunks : chunks)
         otherStmt -> do
-          line <- wp imposed otherStmt (precond (ungrouped, Block chunks) post)
-          return (line:ungrouped, Block chunks)
+          line <- wp imposed otherStmt (precond (ungrouped, Code chunks) post)
+          return (line:ungrouped, Code chunks)
 
-    precond :: ([Line], Block) -> Pred -> Pred
-    precond ([], Block []) post = post
-    precond ([], Block (Chunk p _ _:xs)) _ = p
+    precond :: ([Line], Code) -> Pred -> Pred
+    precond ([], Code []) post = post
+    precond ([], Code (Struct p _ _:xs)) _ = p
     precond ((Line p:_), _) _ = p
-    precond ((Blocks p _:_), _) _ = p
+    precond ((Block p _:_), _) _ = p
 
 wp :: [Pred] -> Stmt -> Pred -> WPM Line
 wp imposed stmt post = case stmt of
@@ -459,8 +460,8 @@ wp imposed stmt post = case stmt of
       let imposed' = toGuard (IF l) guard : imposed
       wpStmts imposed' body post
 
-    Blocks <$> pure (disjunct (map (toGuard (IF l)) (C.getGuards gdCmds)))
-           <*> pure blocks
+    Block <$> pure (disjunct (map (toGuard (IF l)) (C.getGuards gdCmds)))
+          <*> pure blocks
 
   C.Do gdCmds l -> if null imposed
     then throwError (MissingAssertion l)
@@ -470,14 +471,14 @@ wp imposed stmt post = case stmt of
       let imposed' = toGuard (LOOP l) guard : imposed
       wpStmts imposed' body (conjunct imposed)
 
-    Blocks <$> pure (conjunct imposed)
-           <*> pure blocks
+    Block <$> pure (conjunct imposed)
+          <*> pure blocks
 
   C.SpecQM l            -> throwError (DigHole l)
   C.Spec _              -> Line <$> pure post
 
 
-programToBlock :: C.Program -> WPM Block
+programToBlock :: C.Program -> WPM Code
 programToBlock (C.Program _ stmts _) = case (init stmts, last stmts) of
   (stmts', C.Assert p l) -> wpStmts [Constant C.true] stmts' (Assertion p l)
   (_     , stmt)         -> throwError (MissingPostcondition (locOf stmt))
