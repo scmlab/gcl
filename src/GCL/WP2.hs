@@ -357,53 +357,6 @@ instance Located StructError2 where
 
 instance ToJSON StructError2 where
 
-
---------------------------------------------------------------------------------
--- |
-
--- data Line = Line Pred Stmt              -- with a precondition
---           | Free Pred Stmt [FreeBlk]    -- with a common, inferred precondition
---           | Imposed   Stmt [ImposedBlk]
---           deriving (Show, Eq)
---
--- data ImposedBlk = ImposedBlk Pred [Line] Pred -- with imposed precondition
---                 deriving (Show, Eq)
---
--- data FreeBlk = FreeBlk [Line] Pred
---              deriving (Show, Eq)
-
--- data Block = Imposed Pred [Line] Pred -- with imposed precondition
---            | Free         [Line] Pred
---           deriving (Show, Eq)
-
-
--- linePrecond :: Line -> Pred
--- linePrecond (Line  p _) = p
--- linePrecond (Block p _) = p
---
--- blockPrecond :: Block -> Pred
--- blockPrecond (Imposed _ []     p) = p
--- blockPrecond (Imposed _ (x:xs) _) = linePrecond x
--- blockPrecond (Free      []     p) = p
--- blockPrecond (Free      (x:xs) _) = linePrecond x
---
--- wpStmts :: Maybe Pred -> [Stmt] -> Pred -> WPM Block
--- wpStmts Nothing    []     post = Free    []  post
--- wpStmts Nothing    (x:xs) post = do
-
-
-  -- let xs' = case wpStmts Nothing xs post of
-  --           Imposed _ ls _ -> ls
-  --           Free      ls _ -> ls
-  -- x' <- wp x
-  -- return $ Free
--- wpStmts (Just pre) []     post = Imposed pre post
-
-    -- wpStmts (x:xs) post = do
-    --   xs' <- wpStmts (Just x) pres xs post
-    --   (pre, branches) <- wp previous pres x (precond xs')
-    --   return $ Layer previous pre x branches xs'
-
 --------------------------------------------------------------------------------
 -- | Struct
 
@@ -412,40 +365,42 @@ data Struct = Struct Pred [Line] Pred deriving (Eq)
 data Line = Line  Pred
           | Block Pred [Code] deriving (Eq)
 
+-- For wpStmts'
+data Accum = Accum [Line] [Struct]
+
 wpStmts :: [Pred] -> [Stmt] -> Pred -> WPM Code
-wpStmts imposed []    post = return $ Code [Struct (conjunct imposed) [] post]
 wpStmts imposed stmts post = do
-  (incompleteLines, Code chunks) <- wpStmts' imposed stmts post
-  if null incompleteLines
-    then return $ Code chunks
-    else do
-      let precondOfChunks = precond ([], Code chunks) post
-      return $ Code (Struct (conjunct imposed) incompleteLines precondOfChunks : chunks)
+  accum <- wpStmts' imposed stmts post
+  return $ Code (toStructs (conjunct imposed) accum post)
   where
-    wpStmts' :: [Pred] -> [Stmt] -> Pred -> WPM ([Line], Code)
-    wpStmts' _       []           _    = return ([], Code [])
-    wpStmts' imposed (stmt:stmts) post = do
-      (ungrouped, Code chunks) <- case stmt of
-        C.Assert p l          -> wpStmts' [Assertion p l]     stmts post
-        C.LoopInvariant p _ l -> wpStmts' [LoopInvariant p l] stmts post
-        otherStmt             -> wpStmts' []                  stmts post
+    wpStmts' :: [Pred] -> [Stmt] -> Pred -> WPM Accum
+    wpStmts' _       []           _    = return (Accum [] [])
+    wpStmts' imposed (stmt:stmts) post = case stmt of
+      C.Assert p l -> do
+        accum <- wpStmts' [Assertion p l]     stmts post
+        return (Accum [] (toStructs (Assertion p l) accum post))
+      C.LoopInvariant p _ l -> do
+        accum <- wpStmts' [LoopInvariant p l] stmts post
+        return (Accum [] (toStructs (LoopInvariant p l) accum post))
+      otherStmt             -> do
+        accum <- wpStmts' []                  stmts post
+        line <- wp imposed otherStmt (precond post accum)
+        return $ insert line accum
 
-      let precondOfChunks = precond ([], Code chunks) post
+    insert :: Line -> Accum -> Accum
+    insert x (Accum xs ys) = Accum (x:xs) ys
 
-      case stmt of
-        C.Assert p l -> do
-          return ([], Code $ Struct (Assertion p l) ungrouped precondOfChunks : chunks)
-        C.LoopInvariant p _ l -> do
-          return ([], Code $ Struct (LoopInvariant p l) ungrouped precondOfChunks : chunks)
-        otherStmt -> do
-          line <- wp imposed otherStmt (precond (ungrouped, Code chunks) post)
-          return (line:ungrouped, Code chunks)
+    precond :: Pred -> Accum -> Pred
+    precond p (Accum [] xs) = precondStructs p xs
+    precond _ (Accum (Line  p  :_) _) = p
+    precond _ (Accum (Block p _:_) _) = p
 
-    precond :: ([Line], Code) -> Pred -> Pred
-    precond ([], Code []) post = post
-    precond ([], Code (Struct p _ _:xs)) _ = p
-    precond ((Line p:_), _) _ = p
-    precond ((Block p _:_), _) _ = p
+    precondStructs :: Pred -> [Struct] -> Pred
+    precondStructs post []               = post
+    precondStructs _    (Struct p _ _:_) = p
+
+    toStructs :: Pred -> Accum -> Pred -> [Struct]
+    toStructs pre (Accum xs ys) post = Struct pre xs (precondStructs post ys) : ys
 
 wp :: [Pred] -> Stmt -> Pred -> WPM Line
 wp imposed stmt post = case stmt of
@@ -480,5 +435,14 @@ wp imposed stmt post = case stmt of
 
 programToBlock :: C.Program -> WPM Code
 programToBlock (C.Program _ stmts _) = case (init stmts, last stmts) of
-  (stmts', C.Assert p l) -> wpStmts [Constant C.true] stmts' (Assertion p l)
+  (stmts', C.Assert p l) -> case splitPrecondition stmts' of
+    -- the first statement is not a statement
+    Nothing          -> wpStmts [Constant C.true] stmts' (Assertion p l)
+    Just (pre, rest) -> wpStmts [pre]             rest   (Assertion p l)
   (_     , stmt)         -> throwError (MissingPostcondition (locOf stmt))
+
+  where
+    -- if the first statement is an Assertion, split it from the rest
+    splitPrecondition :: [C.Stmt] -> Maybe (Pred, [C.Stmt])
+    splitPrecondition (C.Assert p l : stmts) = Just (Assertion p l, stmts)
+    splitPrecondition _ = Nothing

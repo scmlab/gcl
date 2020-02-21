@@ -148,6 +148,29 @@ if' = testGroup "if statements"
           ]
           (assertion (0 === 2))
       ]
+  , testCase "without precondition (with assertion in branches)"
+    $ run "if 0 = 0 ->            \n\
+          \    { 0 = 1 }          \n\
+          \    skip               \n\
+          \fi                     \n\
+          \{ 0 = 2 }\n" @?= code
+      [ Struct
+          (Constant true)
+          [ Block (guardIf (0 === 0))
+            [ Code
+              [ Struct
+                  (Conjunct [guardIf (0 === 0), Constant true])
+                  []
+                  (assertion (0 === 1))
+              , Struct
+                  (assertion (0 === 1))
+                  [ Line $ assertion (0 === 2) ]
+                  (assertion (0 === 2))
+              ]
+            ]
+          ]
+          (assertion (0 === 2))
+      ]
   , testCase "with precondition 1"
     $ run "{ 0 = 0 }          \n\
           \if 0 = 1 -> skip fi\n\
@@ -166,31 +189,31 @@ if' = testGroup "if statements"
           ]
           (assertion (0 === 2))
       ]
-      -- [ Leaf (assertion (0 === 0))
-      -- , Node (guardIf (0 === 1))
-      --     [ Tree  [ Leaf $ Conjunct [ assertion (0 === 0), guardIf (0 === 1) ]
-      --             , Leaf $ assertion (0 === 2)
-      --             ]
-      --     ]
-      -- , Leaf $ assertion (0 === 2)
-      -- ]
-  -- , testCase "with precondition 2"
-  --   $ run "{ 0 = 0 }          \n\
-  --         \if 0 = 1 -> skip   \n\
-  --         \ | 0 = 2 -> abort  \n\
-  --         \fi                 \n\
-  --         \{ 0 = 3 }          \n" @?= code
-  --     [ Leaf (assertion (0 === 0))
-  --     , Node (Disjunct [ guardIf (0 === 1), guardIf (0 === 2)])
-  --         [ Tree  [ Leaf $ Conjunct [ assertion (0 === 0), guardIf (0 === 1) ]
-  --                 , Leaf $ assertion (0 === 3)
-  --                 ]
-  --         , Tree  [ Leaf $ Conjunct [ assertion (0 === 0), guardIf (0 === 2) ]
-  --                 , Leaf $ assertion (0 === 3)
-  --                 ]
-  --         ]
-  --     , Leaf $ assertion (0 === 3)
-  --     ]
+  , testCase "with precondition 2"
+    $ run "{ 0 = 0 }          \n\
+          \if 0 = 1 -> skip   \n\
+          \ | 0 = 2 -> abort  \n\
+          \fi                 \n\
+          \{ 0 = 3 }          \n" @?= code
+      [ Struct
+          (assertion (0 === 0))
+          [ Block (Disjunct [guardIf (0 === 1), guardIf (0 === 2)])
+              [ Code
+                  [ Struct
+                    (Conjunct [guardIf (0 === 1), assertion (0 === 0)])
+                    [ Line $ assertion (0 === 3)]
+                    (assertion (0 === 3))
+                  ]
+              , Code
+                [ Struct
+                    (Conjunct [guardIf (0 === 2), assertion (0 === 0)])
+                    [ Line $ Constant false]
+                    (assertion (0 === 3))
+                ]
+              ]
+          ]
+          (assertion (0 === 3))
+      ]
   ]
 
 -- loop :: TestTree
