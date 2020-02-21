@@ -338,12 +338,19 @@ type SpecM = WriterT [Specification2] (StateT Int WPM)
 --   case stmtPreCond of
 --     C.Spec l -> tellSpec pre post l
 
+
+-- genPO :: Lasagna -> POM ()
+-- genPO (Final _) = return ()
+-- genPO (Layer previousStmt stmtPreCond stmt branches stmts) = return ()
+
+
 --------------------------------------------------------------------------------
 -- | StructError
 
 data StructError2 = MissingAssertion Loc
                  | MissingBound Loc
                  | ExcessBound  Loc
+                 | MissingPrecondition Loc
                  | MissingPostcondition Loc
                  | DigHole Loc
                 deriving (Eq, Show, Generic)
@@ -352,6 +359,7 @@ instance Located StructError2 where
   locOf (MissingAssertion loc) = loc
   locOf (MissingBound     loc) = loc
   locOf (ExcessBound      loc) = loc
+  locOf (MissingPrecondition loc) = loc
   locOf (MissingPostcondition loc) = loc
   locOf (DigHole loc) = loc
 
@@ -396,17 +404,17 @@ wpStmts imposed stmts post = do
     precond _ (Accum (Block p _:_) _) = p
 
     precondStructs :: Pred -> [Struct] -> Pred
-    precondStructs post []               = post
-    precondStructs _    (Struct p _ _:_) = p
+    precondStructs p []               = p
+    precondStructs _ (Struct p _ _:_) = p
 
     toStructs :: Pred -> Accum -> Pred -> [Struct]
-    toStructs pre (Accum xs ys) post = Struct pre xs (precondStructs post ys) : ys
+    toStructs pre (Accum xs ys) post' = Struct pre xs (precondStructs post' ys) : ys
 
 wp :: [Pred] -> Stmt -> Pred -> WPM Line
 wp imposed stmt post = case stmt of
   C.Abort _              -> Line <$> pure (Constant C.false)
   C.Skip _               -> Line <$> pure post
-  C.Assert p l           -> error "[ Panic ] should not happen"
+  C.Assert _ _           -> error "[ Panic ] should not happen"
   C.LoopInvariant p _ l  -> Line <$> pure (LoopInvariant p l)
   C.Assign xs es _       -> Line <$> subst (assignmentEnv xs es) post
 
@@ -435,14 +443,7 @@ wp imposed stmt post = case stmt of
 
 programToBlock :: C.Program -> WPM Code
 programToBlock (C.Program _ stmts _) = case (init stmts, last stmts) of
-  (stmts', C.Assert p l) -> case splitPrecondition stmts' of
-    -- the first statement is not a statement
-    Nothing          -> wpStmts [Constant C.true] stmts' (Assertion p l)
-    Just (pre, rest) -> wpStmts [pre]             rest   (Assertion p l)
+  (C.Assert p l:stmts', C.Assert q m) -> wpStmts [Assertion p l] stmts' (Assertion q m)
+  ([]                 , C.Assert _ l) -> throwError (MissingPrecondition l)
+  (others      :_     , C.Assert _ _) -> throwError (MissingPrecondition (locOf others))
   (_     , stmt)         -> throwError (MissingPostcondition (locOf stmt))
-
-  where
-    -- if the first statement is an Assertion, split it from the rest
-    splitPrecondition :: [C.Stmt] -> Maybe (Pred, [C.Stmt])
-    splitPrecondition (C.Assert p l : stmts) = Just (Assertion p l, stmts)
-    splitPrecondition _ = Nothing
