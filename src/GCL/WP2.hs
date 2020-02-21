@@ -368,47 +368,50 @@ instance ToJSON StructError2 where
 --------------------------------------------------------------------------------
 -- | Struct
 
-data Code = Code [Struct] deriving (Eq)
-data Struct = Struct Pred [Line] Pred deriving (Eq)
+
+data Struct = Struct Pred [Line] Struct
+            | Postcond Pred
+            deriving (Eq)
 data Line = Line  Pred
-          | Block Pred [Code] deriving (Eq)
+          | Block Pred [Struct] deriving (Eq)
 
 -- For wpStmts'
-data Accum = Accum [Line] [Struct]
+data Accum = Accum [Line] Struct
 
-wpStmts :: [Pred] -> [Stmt] -> Pred -> WPM Code
+wpStmts :: [Pred] -> [Stmt] -> Pred -> WPM Struct
 wpStmts imposed stmts post = do
   accum <- wpStmts' imposed stmts post
-  return $ Code (toStructs (conjunct imposed) accum post)
+  return $ toStruct (conjunct $ reverse imposed) accum
   where
     wpStmts' :: [Pred] -> [Stmt] -> Pred -> WPM Accum
-    wpStmts' _       []           _    = return (Accum [] [])
+    wpStmts' _       []           post = return (Accum [] (Postcond post))
     wpStmts' imposed (stmt:stmts) post = case stmt of
       C.Assert p l -> do
         accum <- wpStmts' [Assertion p l]     stmts post
-        return (Accum [] (toStructs (Assertion p l) accum post))
+        return (Accum [] (toStruct (Assertion p l) accum))
       C.LoopInvariant p _ l -> do
         accum <- wpStmts' [LoopInvariant p l] stmts post
-        return (Accum [] (toStructs (LoopInvariant p l) accum post))
+        return (Accum [] (toStruct (LoopInvariant p l) accum))
       otherStmt             -> do
         accum <- wpStmts' []                  stmts post
-        line <- wp imposed otherStmt (precond post accum)
+        line <- wp imposed otherStmt (precondAccum post accum)
         return $ insert line accum
 
     insert :: Line -> Accum -> Accum
     insert x (Accum xs ys) = Accum (x:xs) ys
 
-    precond :: Pred -> Accum -> Pred
-    precond p (Accum [] xs) = precondStructs p xs
-    precond _ (Accum (Line  p  :_) _) = p
-    precond _ (Accum (Block p _:_) _) = p
+    precondAccum :: Pred -> Accum -> Pred
+    precondAccum p (Accum [] xs) = precond xs
+    precondAccum _ (Accum (Line  p  :_) _) = p
+    precondAccum _ (Accum (Block p _:_) _) = p
 
-    precondStructs :: Pred -> [Struct] -> Pred
-    precondStructs p []               = p
-    precondStructs _ (Struct p _ _:_) = p
+    precond :: Struct -> Pred
+    precond (Struct p _ _) = p
+    precond (Postcond p)   = p
 
-    toStructs :: Pred -> Accum -> Pred -> [Struct]
-    toStructs pre (Accum xs ys) post' = Struct pre xs (precondStructs post' ys) : ys
+    toStruct :: Pred -> Accum -> Struct
+    toStruct pre (Accum xs next) = Struct pre xs next
+    -- toStruct pre (Accum xs ys) = Struct pre xs (precondStructs ys) : ys
 
 wp :: [Pred] -> Stmt -> Pred -> WPM Line
 wp imposed stmt post = case stmt of
@@ -432,18 +435,19 @@ wp imposed stmt post = case stmt of
     -- use the loop invariant as the postcondition of the branch
     blocks <- forM gdCmds $ \(C.GdCmd guard body _) -> do
       let imposed' = toGuard (LOOP l) guard : imposed
-      wpStmts imposed' body (conjunct imposed)
+      wpStmts imposed' body (conjunct $ reverse imposed)
 
-    Block <$> pure (conjunct imposed)
+    Block <$> pure (conjunct $ reverse imposed)
           <*> pure blocks
 
   C.SpecQM l            -> throwError (DigHole l)
   C.Spec _              -> Line <$> pure post
 
 
-programToBlock :: C.Program -> WPM Code
+programToBlock :: C.Program -> WPM Struct
 programToBlock (C.Program _ stmts _) = case (init stmts, last stmts) of
   (C.Assert p l:stmts', C.Assert q m) -> wpStmts [Assertion p l] stmts' (Assertion q m)
+  (C.LoopInvariant p _ l:stmts', C.Assert q m) -> wpStmts [LoopInvariant p l] stmts' (Assertion q m)
   ([]                 , C.Assert _ l) -> throwError (MissingPrecondition l)
   (others      :_     , C.Assert _ _) -> throwError (MissingPrecondition (locOf others))
   (_     , stmt)         -> throwError (MissingPostcondition (locOf stmt))
