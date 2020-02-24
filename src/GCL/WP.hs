@@ -127,7 +127,7 @@ struct b inv (Just bnd) (C.Do gcmds l) post = do
     structStmts b (Conjunct [inv, (toGuard (LOOP l)) guard]) Nothing body inv
   -- termination
   obligate (Conjunct (inv : map (toGuard (LOOP l)) guards))
-       (Bound $ bnd `C.gte` (C.Lit (C.Num 0) NoLoc)) (LoopTermBase l)
+       (Bound (bnd `C.gte` (C.Lit (C.Num 0) NoLoc)) NoLoc) (LoopTermBase l)
   -- bound decrementation
   oldbnd <- C.freshVar "bnd"
   forM_ gcmds $ \(C.GdCmd guard body _) ->
@@ -135,12 +135,12 @@ struct b inv (Just bnd) (C.Do gcmds l) post = do
       False
       (Conjunct
         [ inv
-        , Bound $ bnd `C.eqq` C.Var oldbnd NoLoc
+        , Bound (bnd `C.eqq` C.Var oldbnd NoLoc) NoLoc
         , toGuard (LOOP l) guard
         ])
       Nothing
       body
-      (Bound $ bnd `C.lt` C.Var oldbnd NoLoc)
+      (Bound (bnd `C.lt` C.Var oldbnd NoLoc) NoLoc)
 
 struct _ _ _ (C.SpecQM l) _    = throwError $ DigHole l
 struct b pre _ (C.Spec l) post = when b (tellSpec pre post l)

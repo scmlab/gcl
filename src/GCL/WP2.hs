@@ -141,27 +141,41 @@ instance C.Fresh WPM where
 -- | Obligation
 
 data PO
-  = PO Int Pred Pred POOrigin
+  = PO Int Pred Pred Origin
   deriving (Eq, Show, Generic)
 
 instance ToNoLoc PO where
   toNoLoc (PO i p q o) =
     PO i (toNoLoc p) (toNoLoc q) (toNoLoc o)
 
-data POOrigin = AroundAbort Loc
-              | AroundSkip Loc
-              | AssertGuaranteed Loc
-              | AssertSufficient Loc
-              | Assignment Loc
-              | IfTotal Loc
-              | LoopBase Loc
-              | LoopTermBase Loc
-              | LoopInitialize Loc
-              deriving (Eq, Show, Generic)
+data Origin = AtAbort         Loc
+            | AtSkip          Loc
+            | AtSpec          Loc
+            | AtAssignment    Loc
+            | AtAssertion     Loc -- AssertSufficient
+            | AtLoopInvariant Loc
+            | AtIf            Loc
+            | AtLoop          Loc
 
-instance ToNoLoc POOrigin where
-  toNoLoc (AroundAbort _)       = AroundAbort NoLoc
-  toNoLoc (AroundSkip _)        = AroundSkip NoLoc
+            | AssertGuaranteed Loc
+            | AssertSufficient Loc
+            | Assignment Loc
+            | IfTotal Loc
+            | LoopBase Loc
+            | LoopTermBase Loc
+            | LoopInitialize Loc
+            deriving (Eq, Show, Generic)
+
+instance ToNoLoc Origin where
+  toNoLoc (AtAbort          _)  = AtAbort NoLoc
+  toNoLoc (AtSkip           _)  = AtSkip NoLoc
+  toNoLoc (AtSpec           _)  = AtSpec NoLoc
+  toNoLoc (AtAssignment     _)  = AtAssignment NoLoc
+  toNoLoc (AtAssertion      _)  = AtAssertion NoLoc
+  toNoLoc (AtLoopInvariant  _)  = AtLoopInvariant NoLoc
+  toNoLoc (AtIf             _)  = AtIf NoLoc
+  toNoLoc (AtLoop           _)  = AtLoop NoLoc
+
   toNoLoc (AssertGuaranteed _)  = AssertGuaranteed NoLoc
   toNoLoc (AssertSufficient _)  = AssertSufficient NoLoc
   toNoLoc (Assignment _)        = Assignment NoLoc
@@ -170,6 +184,27 @@ instance ToNoLoc POOrigin where
   toNoLoc (LoopTermBase _)      = LoopTermBase NoLoc
   toNoLoc (LoopInitialize _)    = LoopInitialize NoLoc
 
+toOrigin :: C.Stmt -> Origin
+toOrigin (C.Abort             l) = AtAbort l
+toOrigin (C.Skip              l) = AtSkip l
+toOrigin (C.Assert          _ l) = AtAssertion l
+toOrigin (C.LoopInvariant _ _ l) = AtLoopInvariant l
+toOrigin (C.Assign        _ _ l) = AtAssignment l
+toOrigin (C.If              _ l) = AtIf l
+toOrigin (C.Do              _ l) = AtLoop l
+toOrigin (C.SpecQM            l) = AtSpec l
+toOrigin (C.Spec              l) = AtSpec l
+
+-- get the Origin of the first statement in a Struct
+structToOrigin :: Struct -> Origin
+structToOrigin (Struct _ [] next) = AtAssertion (locOf $ precond next)
+structToOrigin (Struct _ (Line _ stmt:_) _) = toOrigin stmt
+structToOrigin (Struct _ (Block _ sort _:_) _) = sortToOgirin sort
+structToOrigin (Postcond p) = AtAssertion (locOf p)
+
+sortToOgirin :: Sort -> Origin
+sortToOgirin (IF l) = AtIf l
+sortToOgirin (LOOP l) = AtLoop l
 
 -- Monad on top of WPM, for generating obligations
 type POM = WriterT [PO] (StateT Int WPM)
@@ -188,7 +223,7 @@ sweep program = fmap snd $ runPOM $ do
   struct <- lift (lift (programToStruct program))
   genPO struct
 
-tellPO :: Pred -> Pred -> POOrigin -> POM ()
+tellPO :: Pred -> Pred -> Origin -> POM ()
 tellPO p q l = do
   -- let p = conjunct ps
   -- let q = disjunct qs
@@ -210,17 +245,20 @@ disjunct [x] = x
 disjunct xs = Disjunct xs
 
 genPO :: Struct -> POM ()
-genPO (Struct pre [] next) = do
-  tellPO pre (precond next) (AroundSkip NoLoc)
-  genPO next
-genPO (Struct pre (Line p _:_) next) = do
-  tellPO pre p (AroundSkip NoLoc)
-  genPO next
-genPO (Struct pre (Block p sort xs:_) next) = do
-  tellPO pre p (AroundSkip NoLoc)
-  mapM_ genPO xs
-  genPO next
-genPO (Postcond post) = return ()
+genPO struct = do
+  let origin = structToOrigin struct
+  case struct of
+    Struct pre [] next -> do
+      tellPO pre (precond next) origin
+      genPO next
+    Struct pre (Line p stmt:_) next -> do
+      tellPO pre p origin
+      genPO next
+    Struct pre (Block p sort xs:_) next -> do
+      tellPO pre p origin
+      mapM_ genPO xs
+      genPO next
+    Postcond _ -> return ()
 
 
 -- genPO (Final _) = return ()
@@ -245,9 +283,9 @@ genPO (Postcond post) = return ()
 --               else pres           -- else use the imposed preconditions
 --
 --   case stmt of
---     C.Abort l -> tellObli pre [Constant C.false] (AroundAbort l)
+--     C.Abort l -> tellObli pre [Constant C.false] (AtAbort l)
 --
---     C.Skip l -> tellObli pre post (AroundSkip l)
+--     C.Skip l -> tellObli pre post (AtSkip l)
 --
 --     C.Assert p l -> do
 --       tellObli pre [Assertion p l] (AssertGuaranteed l)
@@ -384,36 +422,38 @@ precond :: Struct -> Pred
 precond (Struct p _ _) = p
 precond (Postcond p)   = p
 
+toStruct :: Pred -> Accum -> Struct
+toStruct pre (Accum xs next) = Struct pre xs next
+
 wpStmts :: [Pred] -> [Stmt] -> Pred -> WPM Struct
 wpStmts imposed stmts post = do
   accum <- wpStmts' imposed stmts post
   return $ toStruct (conjunct $ reverse imposed) accum
   where
-    wpStmts' :: [Pred] -> [Stmt] -> Pred -> WPM Accum
-    wpStmts' _       []           post = return (Accum [] (Postcond post))
-    wpStmts' imposed (stmt:stmts) post = case stmt of
-      C.Assert p l -> do
-        accum <- wpStmts' [Assertion p l]     stmts post
-        return (Accum [] (toStruct (Assertion p l) accum))
-      C.LoopInvariant p _ l -> do
-        accum <- wpStmts' [LoopInvariant p l] stmts post
-        return (Accum [] (toStruct (LoopInvariant p l) accum))
-      otherStmt             -> do
-        accum <- wpStmts' []                  stmts post
-        line <- wp imposed otherStmt (precondAccum post accum)
-        return $ insert line accum
 
+
+wpStmts' :: [Pred] -> [Stmt] -> Pred -> WPM Accum
+wpStmts' _       []           post = return (Accum [] (Postcond post))
+wpStmts' imposed (stmt:stmts) post = case stmt of
+  C.Assert p l -> do
+    accum <- wpStmts' [Assertion p l]     stmts post
+    return (Accum [] (toStruct (Assertion p l) accum))
+  C.LoopInvariant p _ l -> do
+    accum <- wpStmts' [LoopInvariant p l] stmts post
+    return (Accum [] (toStruct (LoopInvariant p l) accum))
+  otherStmt             -> do
+    xs <- wpStmts' []                  stmts post
+    x <- wp imposed otherStmt (precondAccum xs)
+    return $ insert x xs
+
+  where
     insert :: Line -> Accum -> Accum
     insert x (Accum xs ys) = Accum (x:xs) ys
 
-    precondAccum :: Pred -> Accum -> Pred
-    precondAccum p (Accum [] xs) = precond xs
-    precondAccum _ (Accum (Line  p _  :_) _) = p
-    precondAccum _ (Accum (Block p _ _:_) _) = p
-
-    toStruct :: Pred -> Accum -> Struct
-    toStruct pre (Accum xs next) = Struct pre xs next
-    -- toStruct pre (Accum xs ys) = Struct pre xs (precondStructs ys) : ys
+    precondAccum :: Accum -> Pred
+    precondAccum (Accum [] xs) = precond xs
+    precondAccum (Accum (Line  p _  :_) _) = p
+    precondAccum (Accum (Block p _ _:_) _) = p
 
 wp :: [Pred] -> Stmt -> Pred -> WPM Line
 wp imposed stmt post = case stmt of

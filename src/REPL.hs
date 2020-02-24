@@ -99,7 +99,7 @@ instance ToJSON Response where
 -- | Instances of ToJSON
 
 instance ToJSON ObliOrigin where
-instance ToJSON POOrigin where
+instance ToJSON Origin where
 instance ToJSON Obligation where
 instance ToJSON PO where
 instance ToJSON Specification where

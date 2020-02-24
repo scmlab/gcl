@@ -16,9 +16,17 @@ import Pretty.Predicate ()
 --------------------------------------------------------------------------------
 -- | ObliOrigin
 
-instance Pretty POOrigin where
-  pretty (AroundAbort l) = "AroundAbort" <+> pretty l
-  pretty (AroundSkip l) = "AroundSkip" <+> pretty l
+instance Pretty Origin where
+
+  pretty (AtAbort          l) = "Abort" <+> pretty l
+  pretty (AtSkip           l) = "Skip" <+> pretty l
+  pretty (AtSpec           l) = "Spec" <+> pretty l
+  pretty (AtAssignment     l) = "Assigment" <+> pretty l
+  pretty (AtAssertion      l) = "Assertion" <+> pretty l
+  pretty (AtLoopInvariant  l) = "LoopInvariant" <+> pretty l
+  pretty (AtIf             l) = "If" <+> pretty l
+  pretty (AtLoop           l) = "Loop" <+> pretty l
+
   pretty (AssertGuaranteed l) = "AssertGuaranteed" <+> pretty l
   pretty (AssertSufficient l) = "AssertSufficient" <+> pretty l
   pretty (Assignment l) = "Assignment" <+> pretty l

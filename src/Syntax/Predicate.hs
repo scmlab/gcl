@@ -20,7 +20,7 @@ data Pred = Constant  Expr
           | Guard     Expr Sort Loc
           | Assertion Expr Loc
           | LoopInvariant Expr Loc
-          | Bound     Expr
+          | Bound     Expr Loc
           | Conjunct  [Pred]
           | Disjunct  [Pred]
           | Negate     Pred
@@ -33,7 +33,7 @@ instance ToJSON Pred where
 
 toExpr :: Pred -> Expr
 toExpr (Constant e) = e
-toExpr (Bound e) = e
+toExpr (Bound e _) = e
 toExpr (Assertion e _) = e
 toExpr (LoopInvariant e _) = e
 toExpr (Guard e _ _) = e
@@ -43,7 +43,7 @@ toExpr (Negate x) = C.neg (toExpr x)
 
 subst :: Fresh m => Subst -> Pred -> m Pred
 subst env (Constant e) = Constant <$> C.subst env e
-subst env (Bound e) = Bound <$> C.subst env e
+subst env (Bound e l) = Bound <$> C.subst env e <*> pure l
 subst env (Assertion e l) = Assertion <$> C.subst env e <*> pure l
 subst env (LoopInvariant e l) = LoopInvariant <$> C.subst env e <*> pure l
 subst env (Guard e sort l) = Guard <$> C.subst env e <*> pure sort <*> pure l
@@ -70,13 +70,13 @@ guardLoop :: Expr -> Pred
 guardLoop x = Guard x (LOOP NoLoc) NoLoc
 
 boundEq :: Expr -> Expr -> Pred
-boundEq x var = Bound $ x `C.eqq` var
+boundEq x var = Bound (x `C.eqq` var) NoLoc
 
 boundLT :: Expr -> Expr -> Pred
-boundLT x var = Bound $ x `C.lt` var
+boundLT x var = Bound (x `C.lt` var) NoLoc
 
 boundGTE :: Expr -> Expr -> Pred
-boundGTE x var = Bound $ x `C.gte` var
+boundGTE x var = Bound (x `C.gte` var) NoLoc
 
 
 (===) :: Int -> Int -> Expr

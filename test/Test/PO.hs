@@ -10,7 +10,7 @@ import Prelude hiding (Ordering(..))
 import Syntax.Predicate
 import Syntax.Concrete hiding (LoopInvariant)
 import qualified REPL as REPL
-import GCL.WP2 (PO(..), POOrigin(..))
+import GCL.WP2 (PO(..), Origin(..))
 -- import GCL.WP2 (Obligation2(..), Specification2(..), ObliOrigin2(..))
 import Data.Text.Prettyprint.Doc
 
@@ -39,7 +39,7 @@ statements = testGroup "simple statements"
       [ PO 0
           (assertion true)
           (assertion (0 === 0))
-          (AroundSkip NoLoc)
+          (AtSkip NoLoc)
       ]
   , testCase "abort"
       $ run "{ True }     \n\
@@ -48,7 +48,7 @@ statements = testGroup "simple statements"
       [ PO 0
           (assertion true)
           (Constant false)
-          (AroundSkip NoLoc)
+          (AtAbort NoLoc)
       ]
   , testCase "assignment"
       $ run "{ True }     \n\
@@ -57,7 +57,7 @@ statements = testGroup "simple statements"
       [ PO 0
           (assertion true)
           (assertion (number 0 `eqq` number 1))
-          (AroundSkip NoLoc)
+          (AtAssignment NoLoc)
       ]
   , testCase "spec"
       $ run "{ True }     \n\
@@ -67,7 +67,7 @@ statements = testGroup "simple statements"
       [ PO 0
           (assertion true)
           (assertion false)
-          (AroundSkip NoLoc)
+          (AtSpec NoLoc)
       ]
   ]
 
@@ -80,11 +80,11 @@ assertions = testGroup "assertions"
       [ PO 0
           (assertion true)
           (assertion false)
-          (AroundSkip NoLoc)
+          (AtAssertion NoLoc)
       , PO 1
           (assertion false)
           (assertion true)
-          (AroundSkip NoLoc)
+          (AtAssertion NoLoc)
       ]
   , testCase "2 assertions"
       $ run "{ 0 = 0 }    \n\
@@ -92,7 +92,7 @@ assertions = testGroup "assertions"
       [ PO 0
           (assertion (0 === 0))
           (assertion (0 === 1))
-          (AroundSkip NoLoc)
+          (AtAssertion NoLoc)
       ]
   ]
 
@@ -107,15 +107,15 @@ if' = testGroup "if statements"
         [ PO 0
           (assertion (0 === 0))
           (Disjunct [ guardIf (0 === 1), guardIf (0 === 2) ])
-          (AroundSkip NoLoc)
+          (AtIf NoLoc)
         , PO 1
           (Conjunct [ assertion (0 === 0), guardIf (0 === 1) ])
           (assertion (0 === 3))
-          (AroundSkip NoLoc)
+          (AtSkip NoLoc)
         , PO 2
           (Conjunct [ assertion (0 === 0), guardIf (0 === 2) ])
           (Constant false)
-          (AroundSkip NoLoc)
+          (AtAbort NoLoc)
         ]
   , testCase "without precondition (nested)"
       $ run "{ 0 = 0 }              \n\
@@ -127,15 +127,15 @@ if' = testGroup "if statements"
       [ PO 0
           (assertion (0 === 0))
           (guardIf (0 === 1))
-          (AroundSkip NoLoc)
+          (AtIf NoLoc)
       , PO 1
           (Conjunct [ assertion (0 === 0), guardIf (0 === 1) ])
           (guardIf (0 === 2))
-          (AroundSkip NoLoc)
+          (AtIf NoLoc)
       , PO 2
           (Conjunct [ assertion (0 === 0), guardIf (0 === 1), guardIf (0 === 2) ])
           (assertion (0 === 3))
-          (AroundSkip NoLoc)
+          (AtSkip NoLoc)
 
       ]
   , testCase "with precondition"
@@ -147,15 +147,15 @@ if' = testGroup "if statements"
       [ PO 0
           (assertion (0 === 0))
           (Disjunct [ guardIf (0 === 1), guardIf (0 === 3) ])
-          (AroundSkip NoLoc)
+          (AtIf NoLoc)
       , PO 1
           (Conjunct [ assertion (0 === 0), guardIf (0 === 1) ])
           (assertion (0 === 2))
-          (AroundSkip NoLoc)
+          (AtSkip NoLoc)
       , PO 2
           (Conjunct [ assertion (0 === 0), guardIf (0 === 3) ])
           (Constant false)
-          (AroundSkip NoLoc)
+          (AtAbort NoLoc)
       ]
   ]
 
@@ -184,7 +184,7 @@ loop = testGroup "loop statements"
                     , boundEq (constant "A") (variable "_bnd2")
                     ])
           (boundLT (constant "A") (variable "_bnd2"))
-          (AroundSkip NoLoc)
+          (AtSkip NoLoc)
       ]
   , testCase "2 branches"
     $ run "{ 0 = 1 , bnd: A }       \n\
@@ -201,7 +201,7 @@ loop = testGroup "loop statements"
       , PO 1
           (loopInvariant (0 === 1))
           (Constant false)
-          (AroundAbort NoLoc)
+          (AtAbort NoLoc)
       , PO 2
           (Conjunct [ loopInvariant (0 === 1)
                     , guardLoop (0 === 2)
@@ -215,14 +215,14 @@ loop = testGroup "loop statements"
                     , boundEq (constant "A") (variable "_bnd3")
                     ])
           (boundLT (constant "A") (variable "_bnd3"))
-          (AroundSkip NoLoc)
+          (AtSkip NoLoc)
       , PO 5
           (Conjunct [ loopInvariant (0 === 1)
                     , guardLoop (0 === 3)
                     , boundEq (constant "A") (variable "_bnd3")
                     ])
           (Constant false)
-          (AroundAbort NoLoc)
+          (AtAbort NoLoc)
       ]
   ]
 -- loop :: TestTree
@@ -241,7 +241,7 @@ loop = testGroup "loop statements"
 --           , guardLoop (0 === 2)
 --           ])
 --         (koopInvariant (0 === 1))
---         (AroundSkip NoLoc)
+--         (AtSkip NoLoc)
 --     , PO 2
 --         (Conjunct
 --           [ koopInvariant (0 === 1)
@@ -257,7 +257,7 @@ loop = testGroup "loop statements"
 --           , Bound (constant "A" `eqq` variable "_bnd3")
 --           ])
 --         (Bound (constant "A" `lt` variable "_bnd3"))
---         (AroundSkip NoLoc)
+--         (AtSkip NoLoc)
 --     ]
 --   ]
 
