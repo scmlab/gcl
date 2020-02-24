@@ -239,7 +239,7 @@ loop = testGroup "loop statements"
 run :: Text -> Either [Error] Struct
 run text = toNoLoc <$> (REPL.scan "<test>" text
             >>= REPL.parseProgram "<test>"
-            >>= REPL.structError . runWPM . programToBlock)
+            >>= REPL.structError . runWPM . programToStruct)
 
 --------------------------------------------------------------------------------
 -- |

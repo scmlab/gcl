@@ -16,8 +16,8 @@ tests = testGroup "Tests"
     -- , Pretty.tests
     -- , WP.tests
     -- ,
-    --   PO.tests
-    -- ,
+      PO.tests
+    ,
     WP2.tests
     ]
   -- [ testCase "2+2=4" $

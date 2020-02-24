@@ -25,106 +25,106 @@ import Debug.Trace (traceShow)
 import Data.Text.Prettyprint.Doc
 
 
---------------------------------------------------------------------------------
--- | Lasagna, alternating sequence of Pred & Statement
-
-type PreviousStmt = Maybe Stmt
-type ImposedConds = [Pred]
-
-data Lasagna = Layer
-                  ImposedConds  -- preconditions imposed on the current statement
-                  Pred          -- precondition of the current statement
-                  Stmt          -- the current statement
-                  [Lasagna]     -- sub-lasagne of the current statement (IF, LOOP)
-                  Lasagna       -- following layers
-             | Final Pred
-             deriving (Show)
-
-
-
--- access the precondition of a Lasagna
-precond :: Lasagna -> Pred
-precond (Final p) = p
-precond (Layer _ p _ _ _) = p
-
-
-toLasagna :: [Stmt] -> Pred -> WPM Lasagna
-toLasagna = wpStmts Nothing []
-  where
-
-    -- the workhorse
-    wpStmts :: PreviousStmt -> ImposedConds -> [Stmt] -> Pred -> WPM Lasagna
-    wpStmts _        _       []     post = return $ Final post
-    wpStmts previous imposed (x:xs) post = do
-
-      -- the preconditions only affect the current statement
-      -- they should not be imposed on the rest of the statements
-      xs' <- wpStmts (Just x) [] xs post
-
-      -- see if the previous statement is an assertion
-      -- if so, then we add it to the list of imposed conditions
-      imposed' <- case previous of
-        Just (C.Assert        p   l) -> return $ Assertion     p l : imposed
-        Just (C.LoopInvariant p _ l) -> return $ LoopInvariant p l : imposed
-        _ -> case x of
-              C.Do _ l -> throwError (MissingAssertion l)
-              _        -> return imposed
-
-      -- calculate the precondition of the current statement
-      let post' = precond xs'
-      (pre, branches) <- wp imposed' x post'
-
-      return $ Layer imposed pre x branches xs'
-
-    -- calculates the weakest precondition of a given statement
-    -- along with the imposed preconditions
-    wp :: ImposedConds -> Stmt -> Pred -> WPM (Pred, [Lasagna])
-    wp imposed current post = do
-
-      -- override the returned precondition when there are imposed preconditions
-      let conjectedImposed = conjunct (reverse imposed)
-      let override p = if null imposed
-                        then p
-                        else conjectedImposed
-
-      case current of
-        C.Abort _              -> return (override (Constant C.false), [])
-        C.Skip _               -> return (override post, [])
-        C.Assert p l           -> return (Assertion p l, [])
-        C.LoopInvariant p _ l  -> return (LoopInvariant p l, [])
-        C.Assign xs es _       -> do
-          pre <- subst (assignmentEnv xs es) post
-          return (override pre, [])
-
-        C.If gdCmds l -> do
-          branches <- forM gdCmds $ \(C.GdCmd guard body _) -> do
-            let imposed' = toGuard (IF l) guard : imposed
-            wpStmts Nothing imposed' body post
-
-          return (disjunct (map (toGuard (IF l)) (C.getGuards gdCmds)), branches)
-
-        C.Do gdCmds l -> do
-          -- use the precondition of the loop as the postcondition of the branch
-          branches <- forM gdCmds $ \(C.GdCmd guard body _) -> do
-            let imposed' = toGuard (LOOP l) guard : imposed
-            wpStmts Nothing imposed' body conjectedImposed
-
-          return (conjectedImposed, branches)
-
-        C.SpecQM l            -> throwError (DigHole l)
-        C.Spec _              -> return (override post, [])
+-- --------------------------------------------------------------------------------
+-- -- | Lasagna, alternating sequence of Pred & Statement
+--
+-- type PreviousStmt = Maybe Stmt
+-- type ImposedConds = [Pred]
+--
+-- data Lasagna = Layer
+--                   ImposedConds  -- preconditions imposed on the current statement
+--                   Pred          -- precondition of the current statement
+--                   Stmt          -- the current statement
+--                   [Lasagna]     -- sub-lasagne of the current statement (IF, LOOP)
+--                   Lasagna       -- following layers
+--              | Final Pred
+--              deriving (Show)
+--
+--
+--
+-- -- access the precondition of a Lasagna
+-- precond :: Lasagna -> Pred
+-- precond (Final p) = p
+-- precond (Layer _ p _ _ _) = p
+--
+--
+-- toLasagna :: [Stmt] -> Pred -> WPM Lasagna
+-- toLasagna = wpStmts Nothing []
+--   where
+--
+--     -- the workhorse
+--     wpStmts :: PreviousStmt -> ImposedConds -> [Stmt] -> Pred -> WPM Lasagna
+--     wpStmts _        _       []     post = return $ Final post
+--     wpStmts previous imposed (x:xs) post = do
+--
+--       -- the preconditions only affect the current statement
+--       -- they should not be imposed on the rest of the statements
+--       xs' <- wpStmts (Just x) [] xs post
+--
+--       -- see if the previous statement is an assertion
+--       -- if so, then we add it to the list of imposed conditions
+--       imposed' <- case previous of
+--         Just (C.Assert        p   l) -> return $ Assertion     p l : imposed
+--         Just (C.LoopInvariant p _ l) -> return $ LoopInvariant p l : imposed
+--         _ -> case x of
+--               C.Do _ l -> throwError (MissingAssertion l)
+--               _        -> return imposed
+--
+--       -- calculate the precondition of the current statement
+--       let post' = precond xs'
+--       (pre, branches) <- wp imposed' x post'
+--
+--       return $ Layer imposed pre x branches xs'
+--
+--     -- calculates the weakest precondition of a given statement
+--     -- along with the imposed preconditions
+--     wp :: ImposedConds -> Stmt -> Pred -> WPM (Pred, [Lasagna])
+--     wp imposed current post = do
+--
+--       -- override the returned precondition when there are imposed preconditions
+--       let conjectedImposed = conjunct (reverse imposed)
+--       let override p = if null imposed
+--                         then p
+--                         else conjectedImposed
+--
+--       case current of
+--         C.Abort _              -> return (override (Constant C.false), [])
+--         C.Skip _               -> return (override post, [])
+--         C.Assert p l           -> return (Assertion p l, [])
+--         C.LoopInvariant p _ l  -> return (LoopInvariant p l, [])
+--         C.Assign xs es _       -> do
+--           pre <- subst (assignmentEnv xs es) post
+--           return (override pre, [])
+--
+--         C.If gdCmds l -> do
+--           branches <- forM gdCmds $ \(C.GdCmd guard body _) -> do
+--             let imposed' = toGuard (IF l) guard : imposed
+--             wpStmts Nothing imposed' body post
+--
+--           return (disjunct (map (toGuard (IF l)) (C.getGuards gdCmds)), branches)
+--
+--         C.Do gdCmds l -> do
+--           -- use the precondition of the loop as the postcondition of the branch
+--           branches <- forM gdCmds $ \(C.GdCmd guard body _) -> do
+--             let imposed' = toGuard (LOOP l) guard : imposed
+--             wpStmts Nothing imposed' body conjectedImposed
+--
+--           return (conjectedImposed, branches)
+--
+--         C.SpecQM l            -> throwError (DigHole l)
+--         C.Spec _              -> return (override post, [])
 
 assignmentEnv :: [Lower] -> [Expr] -> C.Subst
 assignmentEnv xs es = Map.fromList (zip (map Left xs) es)
-
-programToLasagna :: C.Program -> WPM Lasagna
-programToLasagna (C.Program _ stmts _) = case (init stmts, last stmts) of
-  (stmts', C.Assert p l) -> toLasagna stmts' (Assertion p l)
-  (_     , stmt)         -> throwError (MissingPostcondition (locOf stmt))
-
-programWP :: C.Program -> WPM Pred
-programWP p = precond <$> programToLasagna p
-
+--
+-- programToLasagna :: C.Program -> WPM Lasagna
+-- programToLasagna (C.Program _ stmts _) = case (init stmts, last stmts) of
+--   (stmts', C.Assert p l) -> toLasagna stmts' (Assertion p l)
+--   (_     , stmt)         -> throwError (MissingPostcondition (locOf stmt))
+--
+-- programWP :: C.Program -> WPM Pred
+-- programWP p = precond <$> programToLasagna p
+--
 -- Monad for calculating preconditions (for Lasagna)
 type WPM = ExceptT StructError2 (State Int)
 
@@ -185,13 +185,13 @@ runPOM f = runWPM (evalStateT (runWriterT f) 0)
 
 sweep :: C.Program -> Either StructError2 [PO]
 sweep program = fmap snd $ runPOM $ do
-  lasagna <- lift (lift (programToLasagna program))
-  genPO lasagna
+  struct <- lift (lift (programToStruct program))
+  genPO struct
 
-tellPO :: [Pred] -> [Pred] -> POOrigin -> POM ()
-tellPO ps qs l = do
-  let p = conjunct ps
-  let q = disjunct qs
+tellPO :: Pred -> Pred -> POOrigin -> POM ()
+tellPO p q l = do
+  -- let p = conjunct ps
+  -- let q = disjunct qs
 
   -- NOTE: this could use some love
   unless (C.predEq (toExpr p) (toExpr q)) $ do
@@ -209,9 +209,22 @@ disjunct [] = Constant C.false
 disjunct [x] = x
 disjunct xs = Disjunct xs
 
-genPO :: Lasagna -> POM ()
-genPO (Final _) = return ()
-genPO (Layer previousStmt stmtPreCond stmt branches stmts) = return ()
+genPO :: Struct -> POM ()
+genPO (Struct pre [] next) = do
+  tellPO pre (precond next) (AroundSkip NoLoc)
+  genPO next
+genPO (Struct pre (Line p   :_) next) = do
+  tellPO pre p (AroundSkip NoLoc)
+  genPO next
+genPO (Struct pre (Block p xs:_) next) = do
+  tellPO pre p (AroundSkip NoLoc)
+  mapM_ genPO xs
+  genPO next
+genPO (Postcond post) = return ()
+
+
+-- genPO (Final _) = return ()
+-- genPO (Layer previousStmt stmtPreCond stmt branches stmts) = return ()
 
 
 
@@ -324,25 +337,6 @@ data Specification2 = Specification
 -- Monad on top of WPM, for generating specifications
 type SpecM = WriterT [Specification2] (StateT Int WPM)
 
--- tellSpec :: Pred -> Pred -> Specification2 -> SpecM ()
--- tellSpec p q l = do
---   i <- get
---   put (succ i)
---   lift $ tell [Specification i p q l]
-
--- genSpec :: [Pred]   -- additional preconditions to be conjuncted with
---         -> Lasagna
---         -> SpecM ()
--- genSpec _    (Final _) = return ()
--- genSpec pres (Layer previousStmt stmtPreCond stmt stmts) = do
---   case stmtPreCond of
---     C.Spec l -> tellSpec pre post l
-
-
--- genPO :: Lasagna -> POM ()
--- genPO (Final _) = return ()
--- genPO (Layer previousStmt stmtPreCond stmt branches stmts) = return ()
-
 
 --------------------------------------------------------------------------------
 -- | StructError
@@ -378,6 +372,10 @@ data Line = Line  Pred
 -- For wpStmts'
 data Accum = Accum [Line] Struct
 
+precond :: Struct -> Pred
+precond (Struct p _ _) = p
+precond (Postcond p)   = p
+
 wpStmts :: [Pred] -> [Stmt] -> Pred -> WPM Struct
 wpStmts imposed stmts post = do
   accum <- wpStmts' imposed stmts post
@@ -405,10 +403,6 @@ wpStmts imposed stmts post = do
     precondAccum _ (Accum (Line  p  :_) _) = p
     precondAccum _ (Accum (Block p _:_) _) = p
 
-    precond :: Struct -> Pred
-    precond (Struct p _ _) = p
-    precond (Postcond p)   = p
-
     toStruct :: Pred -> Accum -> Struct
     toStruct pre (Accum xs next) = Struct pre xs next
     -- toStruct pre (Accum xs ys) = Struct pre xs (precondStructs ys) : ys
@@ -417,7 +411,7 @@ wp :: [Pred] -> Stmt -> Pred -> WPM Line
 wp imposed stmt post = case stmt of
   C.Abort _              -> Line <$> pure (Constant C.false)
   C.Skip _               -> Line <$> pure post
-  C.Assert _ _           -> error "[ Panic ] should not happen"
+  C.Assert p l           -> Line <$> pure (Assertion p l)
   C.LoopInvariant p _ l  -> Line <$> pure (LoopInvariant p l)
   C.Assign xs es _       -> Line <$> subst (assignmentEnv xs es) post
 
@@ -444,10 +438,10 @@ wp imposed stmt post = case stmt of
   C.Spec _              -> Line <$> pure post
 
 
-programToBlock :: C.Program -> WPM Struct
-programToBlock (C.Program _ stmts _) = case (init stmts, last stmts) of
-  (C.Assert p l:stmts', C.Assert q m) -> wpStmts [Assertion p l] stmts' (Assertion q m)
+programToStruct :: C.Program -> WPM Struct
+programToStruct (C.Program _ stmts _) = case (init stmts, last stmts) of
+  (C.Assert          p l:stmts', C.Assert q m) -> wpStmts [Assertion p l] stmts' (Assertion q m)
   (C.LoopInvariant p _ l:stmts', C.Assert q m) -> wpStmts [LoopInvariant p l] stmts' (Assertion q m)
-  ([]                 , C.Assert _ l) -> throwError (MissingPrecondition l)
-  (others      :_     , C.Assert _ _) -> throwError (MissingPrecondition (locOf others))
-  (_     , stmt)         -> throwError (MissingPostcondition (locOf stmt))
+  ([]                          , C.Assert _ l) -> throwError (MissingPrecondition l)
+  (others               :_     , C.Assert _ _) -> throwError (MissingPrecondition (locOf others))
+  (_                           , stmt)         -> throwError (MissingPostcondition (locOf stmt))

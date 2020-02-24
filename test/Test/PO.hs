@@ -24,7 +24,7 @@ tests = testGroup "Proof POs"
   [ statements
   , assertions
   , if'
-  , loop
+  -- , loop
   ]
 
 --------------------------------------------------------------------------------
@@ -33,103 +33,131 @@ tests = testGroup "Proof POs"
 statements :: TestTree
 statements = testGroup "simple statements"
   [ testCase "skip"
-      $ run "skip\n{ False }" @?= poList []
+      $ run "{ True }     \n\
+            \skip         \n\
+            \{ 0 = 0 }    \n" @?= poList
+      [ PO 0
+          (assertion true)
+          (assertion (0 === 0))
+          (AroundSkip NoLoc)
+      ]
   , testCase "abort"
-      $ run "abort\n{ False }" @?= poList []
-  , testCase "assertion"
-      $ run "{ True }\n{ False }" @?= poList
+      $ run "{ True }     \n\
+            \abort        \n\
+            \{ 0 = 0 }    \n" @?= poList
+      [ PO 0
+          (assertion true)
+          (Constant false)
+          (AroundSkip NoLoc)
+      ]
+  , testCase "assignment"
+      $ run "{ True }     \n\
+            \x := 1       \n\
+            \{ 0 = x }    \n" @?= poList
+      [ PO 0
+          (assertion true)
+          (assertion (number 0 `eqq` number 1))
+          (AroundSkip NoLoc)
+      ]
+  , testCase "spec"
+      $ run "{ True }     \n\
+            \{!           \n\
+            \!}           \n\
+            \{ False }    \n" @?= poList
       [ PO 0
           (assertion true)
           (assertion false)
-          (AssertSufficient NoLoc)
+          (AroundSkip NoLoc)
       ]
-  , testCase "assignment"
-      $ run "x := 1\n{ False }" @?= poList []
-  , testCase "spec"
-      $ run "{!\n!}\n{ False }" @?= poList []
   ]
 
 assertions :: TestTree
 assertions = testGroup "assertions"
   [ testCase "3 assertions"
-      $ run "{ True }\n\
-            \{ False }\n\
-            \{ True }\n" @?= poList
+      $ run "{ True }     \n\
+            \{ False }    \n\
+            \{ True }     \n" @?= poList
       [ PO 0
           (assertion true)
           (assertion false)
-          (AssertSufficient NoLoc)
+          (AroundSkip NoLoc)
       , PO 1
           (assertion false)
           (assertion true)
-          (AssertSufficient NoLoc)
+          (AroundSkip NoLoc)
       ]
   , testCase "2 assertions"
-      $ run "{ 0 = 0 }\n{ 0 = 1 }" @?= poList
-        []
+      $ run "{ 0 = 0 }    \n\
+            \{ 0 = 1 }    \n" @?= poList
+      [ PO 0
+          (assertion (0 === 0))
+          (assertion (0 === 1))
+          (AroundSkip NoLoc)
+      ]
   ]
 
 if' :: TestTree
 if' = testGroup "if statements"
   [ testCase "without precondition"
-      $ run "if 0 = 0 -> skip     \n\
-            \ | 0 = 1 -> abort    \n\
+      $ run "{ 0 = 0 }              \n\
+            \if 0 = 1 -> skip     \n\
+            \ | 0 = 2 -> abort    \n\
             \fi                   \n\
-            \{ 0 = 2 }            \n" @?= poList
+            \{ 0 = 3 }            \n" @?= poList
         [ PO 0
-           (Disjunct [ guardIf (0 === 0), guardIf (0 === 1) ])
-           (assertion (0 === 2))
-           (AroundSkip NoLoc)
+          (assertion (0 === 0))
+          (Disjunct [ guardIf (0 === 1), guardIf (0 === 2) ])
+          (AroundSkip NoLoc)
         , PO 1
-           (Disjunct [ guardIf (0 === 0), guardIf (0 === 1) ])
-           (Constant false)
-           (AroundAbort NoLoc)
+          (Conjunct [ assertion (0 === 0), guardIf (0 === 1) ])
+          (assertion (0 === 3))
+          (AroundSkip NoLoc)
+        , PO 2
+          (Conjunct [ assertion (0 === 0), guardIf (0 === 2) ])
+          (Constant false)
+          (AroundSkip NoLoc)
         ]
   , testCase "without precondition (nested)"
-      $ run "if 0 = 0 ->            \n\
-            \     if 0 = 1 -> skip  \n\
+      $ run "{ 0 = 0 }              \n\
+            \if 0 = 1 ->            \n\
+            \     if 0 = 2 -> skip  \n\
             \     fi                \n\
             \fi                     \n\
-            \{ 0 = 2 }\n" @?= poList
-        [ PO 0
-           (guardIf (0 === 0))
-           (guardIf (0 === 1))
-           (IfTotal NoLoc)
-        , PO 1
-           (guardIf (0 === 0))
-           (assertion (0 === 2))
-           (AroundSkip NoLoc)
-        ]
+            \{ 0 = 3 }\n" @?= poList
+      [ PO 0
+          (assertion (0 === 0))
+          (guardIf (0 === 1))
+          (AroundSkip NoLoc)
+      , PO 1
+          (Conjunct [ assertion (0 === 0), guardIf (0 === 1) ])
+          (guardIf (0 === 2))
+          (AroundSkip NoLoc)
+      , PO 2
+          (Conjunct [ assertion (0 === 0), guardIf (0 === 1), guardIf (0 === 2) ])
+          (assertion (0 === 3))
+          (AroundSkip NoLoc)
+
+      ]
   , testCase "with precondition"
       $ run "{ 0 = 0 }            \n\
              \if 0 = 1 -> skip    \n\
-             \ | 0 = 3 -> abort fi\n\
+             \ | 0 = 3 -> abort   \n\
+             \fi                  \n\
              \{ 0 = 2 }           \n" @?= poList
       [ PO 0
           (assertion (0 === 0))
           (Disjunct [ guardIf (0 === 1), guardIf (0 === 3) ])
-          (AssertSufficient NoLoc)
+          (AroundSkip NoLoc)
       , PO 1
-          (Disjunct [ guardIf (0 === 1), guardIf (0 === 3) ])
+          (Conjunct [ assertion (0 === 0), guardIf (0 === 1) ])
           (assertion (0 === 2))
           (AroundSkip NoLoc)
       , PO 2
-          (Disjunct [ guardIf (0 === 1), guardIf (0 === 3) ])
+          (Conjunct [ assertion (0 === 0), guardIf (0 === 3) ])
           (Constant false)
-          (AroundAbort NoLoc)
+          (AroundSkip NoLoc)
       ]
   ]
-
-
--- A B C (A => B) (B => C) * (A => B) (A & B => C)  *
--- 0 0 0 1        1        1 1       1              1
--- 0 1 0 1        0        0 1       1              1
--- 1 0 0 0        1        0 0       1              0
--- 1 1 0 1        0        0 1       0              0
--- 0 0 1 1        1        1 1       1              1
--- 0 1 1 1        1        1 1       1              1
--- 1 0 1 0        1        0 0       1              0
--- 1 1 1 1        1        1 1       1              1
 
 loop :: TestTree
 loop = testGroup "loop statements"
