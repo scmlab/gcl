@@ -37,7 +37,7 @@ statements = testGroup "simple statements"
             \skip       \n\
             \{ 0 = 0 }" @?= Right
       ( Struct (assertion true)
-          [ Line $ assertion (0 === 0) ]
+          [ Line (assertion (0 === 0)) undefined ]
       $ Postcond (assertion (0 === 0))
       )
   , testCase "abort"
@@ -45,7 +45,7 @@ statements = testGroup "simple statements"
             \abort      \n\
             \{ True }" @?= Right
       ( Struct (assertion true)
-          [ Line $ Constant false ]
+          [ Line (Constant false) undefined ]
       $ Postcond (assertion true)
       )
   , testCase "assignment"
@@ -53,7 +53,7 @@ statements = testGroup "simple statements"
             \x := 1     \n\
             \{ 0 = x }" @?= Right
       ( Struct (assertion true)
-          [ Line $ assertion (number 0 `eqq` number 1) ]
+          [ Line (assertion (number 0 `eqq` number 1)) undefined ]
       $ Postcond (assertion (number 0 `eqq` variable "x"))
       )
   , testCase "spec"
@@ -62,7 +62,7 @@ statements = testGroup "simple statements"
             \!}       \n\
             \{ 0 = 0 }" @?= Right
       ( Struct (assertion true)
-          [ Line $ assertion (0 === 0) ]
+          [ Line (assertion (0 === 0)) undefined ]
       $ Postcond (assertion (0 === 0))
       )
   ]
@@ -95,12 +95,12 @@ if' = testGroup "if statements"
           \fi                   \n\
           \{ 0 = 2 }            \n" @?= Right
       ( Struct (assertion true)
-          [ Block (Disjunct [ guardIf (0 === 0) , guardIf (0 === 1) ])
+          [ Block (Disjunct [ guardIf (0 === 0) , guardIf (0 === 1) ]) undefined
             [ Struct (Conjunct [ assertion true, guardIf (0 === 0) ])
-              [ Line $ assertion (0 === 2) ]
+              [ Line (assertion (0 === 2)) undefined ]
             $ Postcond (assertion (0 === 2))
             , Struct (Conjunct [ assertion true, guardIf (0 === 1) ])
-              [ Line $ Constant false ]
+              [ Line (Constant false) undefined ]
             $ Postcond (assertion (0 === 2))
             ]
           ]
@@ -114,11 +114,11 @@ if' = testGroup "if statements"
           \fi                     \n\
           \{ 0 = 2 }\n" @?= Right
       ( Struct (assertion true)
-          [ Block (guardIf (0 === 0))
+          [ Block (guardIf (0 === 0)) undefined
             [ Struct (Conjunct [ assertion true, guardIf (0 === 0) ])
-              [ Block (guardIf (0 === 1))
+              [ Block (guardIf (0 === 1)) undefined
                 [ Struct (Conjunct [ assertion true, guardIf (0 === 0), guardIf (0 === 1) ])
-                  [ Line (assertion (0 === 2)) ]
+                  [ Line (assertion (0 === 2)) undefined ]
                 $ Postcond (assertion (0 === 2))
                 ]
               ]
@@ -135,11 +135,11 @@ if' = testGroup "if statements"
           \fi                     \n\
           \{ 0 = 2 }\n" @?= Right
       ( Struct (assertion true)
-        [ Block (guardIf (0 === 0))
+        [ Block (guardIf (0 === 0)) undefined
           [ Struct (Conjunct [ assertion true, guardIf (0 === 0) ])
             []
           $ Struct (assertion (0 === 1))
-            [ Line $ assertion (0 === 2) ]
+            [ Line (assertion (0 === 2)) undefined ]
           $ Postcond (assertion (0 === 2))
           ]
         ]
@@ -150,9 +150,9 @@ if' = testGroup "if statements"
           \if 0 = 1 -> skip fi\n\
           \{ 0 = 2 }          \n" @?= Right
       ( Struct (assertion (0 === 0))
-        [ Block (guardIf (0 === 1))
+        [ Block (guardIf (0 === 1)) undefined
           [ Struct (Conjunct [ assertion (0 === 0), guardIf (0 === 1) ])
-            [ Line $ assertion (0 === 2) ]
+            [ Line (assertion (0 === 2)) undefined ]
           $ Postcond (assertion (0 === 2))
           ]
         ]
@@ -165,12 +165,12 @@ if' = testGroup "if statements"
           \fi                 \n\
           \{ 0 = 3 }          \n" @?= Right
       ( Struct (assertion (0 === 0))
-        [ Block (Disjunct [guardIf (0 === 1), guardIf (0 === 2)])
+        [ Block (Disjunct [guardIf (0 === 1), guardIf (0 === 2)]) undefined
           [ Struct (Conjunct [assertion (0 === 0), guardIf (0 === 1)])
-            [ Line $ assertion (0 === 3)]
+            [ Line (assertion (0 === 3)) undefined]
           $ Postcond (assertion (0 === 3))
           , Struct (Conjunct [assertion (0 === 0), guardIf (0 === 2)])
-            [ Line $ Constant false ]
+            [ Line (Constant false) undefined ]
           $ Postcond (assertion (0 === 3))
           ]
         ]
@@ -186,9 +186,9 @@ loop = testGroup "loop statements"
           \od                     \n\
           \{ 0 = 0 }              \n" @?= Right
       ( Struct (loopInvariant (0 === 1))
-        [ Block (loopInvariant (0 === 1))
+        [ Block (loopInvariant (0 === 1)) undefined
           [ Struct (Conjunct [loopInvariant (0 === 1), guardLoop (0 === 2)])
-            [ Line $ loopInvariant (0 === 1) ]
+            [ Line (loopInvariant (0 === 1)) undefined ]
           $ Postcond (loopInvariant (0 === 1))
           ]
         ]
@@ -200,12 +200,12 @@ loop = testGroup "loop statements"
           \ | 0 = 3 -> abort od     \n\
           \{ 0 = 0 }\n" @?= Right
       ( Struct (loopInvariant (0 === 1))
-        [ Block (loopInvariant (0 === 1))
+        [ Block (loopInvariant (0 === 1)) undefined
           [ Struct (Conjunct [loopInvariant (0 === 1), guardLoop (0 === 2)])
-            [ Line $ loopInvariant (0 === 1) ]
+            [ Line (loopInvariant (0 === 1)) undefined ]
           $ Postcond (loopInvariant (0 === 1))
           , Struct (Conjunct [loopInvariant (0 === 1), guardLoop (0 === 3)])
-            [ Line $ Constant false ]
+            [ Line (Constant false) undefined ]
           $ Postcond (loopInvariant (0 === 1))
           ]
         ]
@@ -219,13 +219,13 @@ loop = testGroup "loop statements"
           \od                       \n\
           \{ 0 = 0 }\n" @?= Right
       ( Struct (loopInvariant (0 === 1))
-        [ Block (loopInvariant (0 === 1))
+        [ Block (loopInvariant (0 === 1)) undefined
           [ Struct (Conjunct [loopInvariant (0 === 1), guardLoop (0 === 2)])
             []
           $ Struct (loopInvariant (0 === 3))
-            [ Block (loopInvariant (0 === 3))
+            [ Block (loopInvariant (0 === 3)) undefined
               [ Struct (Conjunct [loopInvariant (0 === 3), guardLoop (0 === 4)])
-                [ Line $ Constant false ]
+                [ Line (Constant false) undefined ]
               $ Postcond (loopInvariant (0 === 3))
               ]
             ]
@@ -248,8 +248,8 @@ instance ToNoLoc Struct where
   toNoLoc (Struct pre xs ys) = Struct (toNoLoc pre) (map toNoLoc xs) (toNoLoc ys)
   toNoLoc (Postcond post) = Postcond (toNoLoc post)
 instance ToNoLoc Line where
-  toNoLoc (Line p) = Line (toNoLoc p)
-  toNoLoc (Block p xs) = Block (toNoLoc p) (map toNoLoc xs)
+  toNoLoc (Line p stmt) = Line (toNoLoc p) stmt
+  toNoLoc (Block p sort xs) = Block (toNoLoc p) sort (map toNoLoc xs)
 
 instance Show Struct where
   show = show . pretty
@@ -266,5 +266,5 @@ instance Pretty Struct where
 instance Show Line where
   show = show . pretty
 instance Pretty Line where
-  pretty (Line p) = pretty p
-  pretty (Block p xs) = "*" <+> pretty p <> line <> vsep (map (\x -> "  | " <> align (pretty x)) xs)
+  pretty (Line p _) = pretty p
+  pretty (Block p _ xs) = "*" <+> pretty p <> line <> vsep (map (\x -> "  | " <> align (pretty x)) xs)

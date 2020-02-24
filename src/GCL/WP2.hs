@@ -213,10 +213,10 @@ genPO :: Struct -> POM ()
 genPO (Struct pre [] next) = do
   tellPO pre (precond next) (AroundSkip NoLoc)
   genPO next
-genPO (Struct pre (Line p   :_) next) = do
+genPO (Struct pre (Line p _:_) next) = do
   tellPO pre p (AroundSkip NoLoc)
   genPO next
-genPO (Struct pre (Block p xs:_) next) = do
+genPO (Struct pre (Block p sort xs:_) next) = do
   tellPO pre p (AroundSkip NoLoc)
   mapM_ genPO xs
   genPO next
@@ -366,8 +366,16 @@ instance ToJSON StructError2 where
 data Struct = Struct Pred [Line] Struct
             | Postcond Pred
             deriving (Eq)
-data Line = Line  Pred
-          | Block Pred [Struct] deriving (Eq)
+
+data Line = Line  Pred C.Stmt
+          | Block Pred Sort [Struct]
+
+
+-- igonring Stmt in Lines and Sort in Blocks
+instance Eq Line where
+  Line p _    == Line q _     = p == q
+  Block p _ _ == Block q _ _  = p == q
+  _           == _            = False
 
 -- For wpStmts'
 data Accum = Accum [Line] Struct
@@ -400,8 +408,8 @@ wpStmts imposed stmts post = do
 
     precondAccum :: Pred -> Accum -> Pred
     precondAccum p (Accum [] xs) = precond xs
-    precondAccum _ (Accum (Line  p  :_) _) = p
-    precondAccum _ (Accum (Block p _:_) _) = p
+    precondAccum _ (Accum (Line  p _  :_) _) = p
+    precondAccum _ (Accum (Block p _ _:_) _) = p
 
     toStruct :: Pred -> Accum -> Struct
     toStruct pre (Accum xs next) = Struct pre xs next
@@ -409,33 +417,36 @@ wpStmts imposed stmts post = do
 
 wp :: [Pred] -> Stmt -> Pred -> WPM Line
 wp imposed stmt post = case stmt of
-  C.Abort _              -> Line <$> pure (Constant C.false)
-  C.Skip _               -> Line <$> pure post
-  C.Assert p l           -> Line <$> pure (Assertion p l)
-  C.LoopInvariant p _ l  -> Line <$> pure (LoopInvariant p l)
-  C.Assign xs es _       -> Line <$> subst (assignmentEnv xs es) post
+  C.Abort _              -> return $ Line (Constant C.false)  stmt
+  C.Skip _               -> return $ Line post                stmt
+  C.Assert p l           -> return $ Line (Assertion     p l) stmt
+  C.LoopInvariant p _ l  -> return $ Line (LoopInvariant p l) stmt
+  C.Assign xs es _       -> do
+    pre <- subst (assignmentEnv xs es) post
+    return $ Line pre stmt
 
   C.If gdCmds l -> do
-    blocks <- forM gdCmds $ \(C.GdCmd guard body _) -> do
+    structs <- forM gdCmds $ \(C.GdCmd guard body _) -> do
       let imposed' = toGuard (IF l) guard : imposed
       wpStmts imposed' body post
 
-    Block <$> pure (disjunct (map (toGuard (IF l)) (C.getGuards gdCmds)))
-          <*> pure blocks
+    return $ Block
+              (disjunct (map (toGuard (IF l)) (C.getGuards gdCmds)))
+              (IF l)
+              structs
 
   C.Do gdCmds l -> if null imposed
     then throwError (MissingAssertion l)
     else do
     -- use the loop invariant as the postcondition of the branch
-    blocks <- forM gdCmds $ \(C.GdCmd guard body _) -> do
+    structs <- forM gdCmds $ \(C.GdCmd guard body _) -> do
       let imposed' = toGuard (LOOP l) guard : imposed
       wpStmts imposed' body (conjunct $ reverse imposed)
 
-    Block <$> pure (conjunct $ reverse imposed)
-          <*> pure blocks
+    return $ Block (conjunct $ reverse imposed) (LOOP l) structs
 
   C.SpecQM l            -> throwError (DigHole l)
-  C.Spec _              -> Line <$> pure post
+  C.Spec _              -> return $ Line post stmt
 
 
 programToStruct :: C.Program -> WPM Struct
