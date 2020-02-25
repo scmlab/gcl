@@ -42,9 +42,9 @@ import Pretty.Predicate ()
 --
 --
 -- -- access the precondition of a Lasagna
--- precond :: Lasagna -> Pred
--- precond (Final p) = p
--- precond (Layer _ p _ _ _) = p
+-- precondStruct :: Lasagna -> Pred
+-- precondStruct (Final p) = p
+-- precondStruct (Layer _ p _ _ _) = p
 --
 --
 -- toLasagna :: [Stmt] -> Pred -> WPM Lasagna
@@ -70,7 +70,7 @@ import Pretty.Predicate ()
 --               _        -> return imposed
 --
 --       -- calculate the precondition of the current statement
---       let post' = precond xs'
+--       let post' = precondStruct xs'
 --       (pre, branches) <- wp imposed' x post'
 --
 --       return $ Layer imposed pre x branches xs'
@@ -122,7 +122,7 @@ assignmentEnv xs es = Map.fromList (zip (map Left xs) es)
 --   (_     , stmt)         -> throwError (MissingPostcondition (locOf stmt))
 --
 -- programWP :: C.Program -> WPM Pred
--- programWP p = precond <$> programToLasagna p
+-- programWP p = precondStruct <$> programToLasagna p
 --
 -- Monad for calculating preconditions (for Lasagna)
 type WPM = ExceptT StructError2 (State Int)
@@ -147,14 +147,16 @@ instance ToNoLoc PO where
   toNoLoc (PO i p q o) =
     PO i (toNoLoc p) (toNoLoc q) (toNoLoc o)
 
-data Origin = AtAbort         Loc
-            | AtSkip          Loc
-            | AtSpec          Loc
-            | AtAssignment    Loc
-            | AtAssertion     Loc -- AssertSufficient
-            | AtLoopInvariant Loc
-            | AtIf            Loc
-            | AtLoop          Loc
+data Origin = AtAbort           Loc
+            | AtSkip            Loc
+            | AtSpec            Loc
+            | AtAssignment      Loc
+            | AtAssertion       Loc -- AssertSufficient
+            | AtLoopInvariant   Loc
+            | AtIf              Loc
+            | AtLoop            Loc
+            | AtTermination     Loc
+            | AtBoundDecrement  Loc
 
             -- | AssertGuaranteed Loc
             -- | AssertSufficient Loc
@@ -174,36 +176,29 @@ instance ToNoLoc Origin where
   toNoLoc (AtLoopInvariant  _)  = AtLoopInvariant NoLoc
   toNoLoc (AtIf             _)  = AtIf NoLoc
   toNoLoc (AtLoop           _)  = AtLoop NoLoc
+  toNoLoc (AtTermination    _)  = AtTermination NoLoc
+  toNoLoc (AtBoundDecrement _)  = AtBoundDecrement NoLoc
 
   -- toNoLoc (AssertGuaranteed _)  = AssertGuaranteed NoLoc
   -- toNoLoc (AssertSufficient _)  = AssertSufficient NoLoc
   -- toNoLoc (Assignment _)        = Assignment NoLoc
   -- toNoLoc (IfTotal _)           = IfTotal NoLoc
   -- toNoLoc (LoopBase _)          = LoopBase NoLoc
-  -- toNoLoc (LoopTermBase _)      = LoopTermBase NoLoc
   -- toNoLoc (LoopInitialize _)    = LoopInitialize NoLoc
 
--- originOfStmt :: C.Stmt -> Origin
--- originOfStmt (C.Abort             l) = AtAbort l
--- originOfStmt (C.Skip              l) = AtSkip l
--- originOfStmt (C.Assert          _ l) = AtAssertion l
--- originOfStmt (C.LoopInvariant _ _ l) = AtLoopInvariant l
--- originOfStmt (C.Assign        _ _ l) = AtAssignment l
--- originOfStmt (C.If              _ l) = AtIf l
--- originOfStmt (C.Do              _ l) = AtLoop l
--- originOfStmt (C.SpecQM            l) = AtSpec l
--- originOfStmt (C.Spec              l) = AtSpec l
---
--- -- get the Origin of the first statement in a Struct
--- originOfStruct :: Struct -> Origin
--- originOfStruct (Struct _ []                 next) = AtAssertion (locOf $ precond next)
--- originOfStruct (Struct _ (Stmt  _ stmt  :_)    _) = originOfStmt stmt
--- originOfStruct (Struct _ (Block _ sort _:_)    _) = originOfSort sort
--- originOfStruct (Postcond p)                       = AtAssertion (locOf p)
---
--- originOfSort :: Sort -> Origin
--- originOfSort (IF l) = AtIf l
--- originOfSort (LOOP l) = AtLoop l
+originOfStmt :: Stmt -> Origin
+originOfStmt (Abort  l) = AtAbort (locOf l)
+originOfStmt (Skip   l) = AtSkip (locOf l)
+originOfStmt (Assign l) = AtAssignment (locOf l)
+originOfStmt (If l _  ) = AtIf (locOf l)
+originOfStmt (Do l _ _) = AtLoop (locOf l)
+originOfStmt (Spec   l) = AtSpec (locOf l)
+
+-- get the Origin of the first statement in a Struct
+originOfStruct :: Struct -> Origin
+originOfStruct (Struct _ []       next) = AtAssertion (locOf $ precondStruct next)
+originOfStruct (Struct _ (stmt:_)    _) = originOfStmt stmt
+originOfStruct (Postcond p)             = AtAssertion (locOf p)
 
 -- Monad on top of WPM, for generating obligations
 type POM = WriterT [PO] (StateT Int WPM)
@@ -244,97 +239,59 @@ disjunct [x] = x
 disjunct xs = Disjunct xs
 
 genPO :: Struct -> POM ()
-genPO struct = return ()
--- genPO struct = do
---   let origin = originOfStruct struct
---   case struct of
---     Struct pre [] next -> do
---       tellPO pre (precond next) origin
---       genPO next
---     -- if
---     Struct pre (Block p (IF _) xs:_) next -> do
---       tellPO pre p origin
---       mapM_ genPO xs
---       genPO next
---     -- loop
---     Struct inv (Block p (LOOP _) xs:_) next -> do
---       genPO
---         (Conjunct [inv, (map (Negate . toGuard (LOOP l)) guards)])
---       -- tellPO pre p origin
---
---
---       mapM_ genPO xs
---
---
---       genPO next
---     -- other statements
---     Struct pre (Stmt p _:_) next -> do
---       tellPO pre p origin
---       genPO next
---     Postcond _ -> return ()
+genPO (Postcond _) = return ()
+genPO (Struct pre [] next) = do
+  tellPO pre (precondStruct next) (AtAssertion (locOf $ precondStruct next))
+  genPO next
+genPO (Struct pre (stmt:stmts) next) = do
+  tellPO pre (precond stmt) (originOfStmt stmt)
 
+  case stmt of
+    If _ gdCmds -> do
+      -- inductive case
+      mapM_ (genPO . gdCmdBody) gdCmds
+    Do l bnd gdCmds -> do
+      let loc = locOf l
+      let guards = map gdCmdGuard gdCmds
+      -- the loop invariant has already been stored in Struct
+      let loopInvariant = pre
+      -- post condition of the current DO statement
+      let post = case stmts of
+                  []    -> precondStruct next
+                  (x:_) -> precond x
 
--- genPO (Final _) = return ()
--- genPO (Layer previousStmt stmtPreCond stmt branches stmts) = return ()
+      -- base case
+      tellPO
+        (conjunct (loopInvariant : map Negate guards))
+        post
+        (AtLoop loc)
 
+      -- inductive case
+      mapM_ (genPO . gdCmdBody) gdCmds
 
+      -- termination
+      bndVar <- C.Var <$> C.freshVar "bnd" <*> pure NoLoc
+      tellPO
+        (conjunct (loopInvariant : guards))
+        (Bound (bndVar `C.gte` C.number 0) NoLoc)
+        (AtTermination loc)
 
--- genObli :: [Pred]   -- imposed preconditions
---         -> Lasagna
---         -> POM ()
--- genObli _    (Final _) = return ()
--- genObli pres (Layer previousStmt stmtPreCond stmt branches stmts) = do
---
---   -- traceShow ("stmtPreCond: " ++ show stmtPreCond) (return ())
---   -- traceShow ("pres: " ++ show pres) (return ())
---   -- traceShow ("stmt: " ++ show stmt) (return ())
---
---   let post = [precond stmts]
---
---   let pre = if null pres    -- if no imposed preconditions
---               then [stmtPreCond]  -- use the inferred precondition of `stmt`
---               else pres           -- else use the imposed preconditions
---
---   case stmt of
---     C.Abort l -> tellObli pre [Constant C.false] (AtAbort l)
---
---     C.Skip l -> tellObli pre post (AtSkip l)
---
---     C.Assert p l -> do
---       tellObli pre [Assertion p l] (AssertGuaranteed l)
---       tellObli [Assertion p l] post (AssertSufficient l)
---
---     C.LoopInvariant _ _ _ -> return ()
---
---     C.Assign xs es l -> do
---       post' <- mapM (subst (assignmentEnv xs es)) post
---       tellObli pre post' (Assignment l)
---
---     C.If gdCmds l -> do
---
---       tellObli pre (map (toGuard (IF l)) $ C.getGuards gdCmds) (IfTotal l)
---
---       -- generate POs for each branch
---       forM_ branches (genObli pre)
---
---       -- let guards = C.getGuards gdCmds
---       -- let zipped = zip guards branches
---       --
---       -- forM_ zipped $ \(guard, branch) -> do
---       --   genObli (toGuard (IF l) guard : pres) branch
---
+      -- -- bound decrement
+      -- forM_ gdCmds $ \(GdCmd guard body) -> do
+      --   let start = Bound (bnd `C.eqq` C.Var bndVar NoLoc) loc
+      --   let pre = Conjunct (start : precondStruct body)
+      --   let post = Bound (bnd `C.lt` C.Var bndVar NoLoc) NoLoc
+      --
+      --   body' <- resetStruct pre body post
+      --
+      --   genPO body'
+
+    _ -> return ()
+
+  genPO next
+
 --     C.Do gdCmds l -> case previousStmt of
 --       (Just (C.LoopInvariant _ bnd _)) -> do
---         let guards = C.getGuards gdCmds
---
---         -- base case
---         tellObli
---           (pre ++ map (Negate . toGuard (LOOP l)) guards)
---           post
---           (LoopBase l)
---
---         -- inductive cases
---         forM_ branches (genObli pre)
 --
 --         -- termination
 --         tellObli
@@ -428,7 +385,10 @@ data Stmt
   | If     (L Pred)      [GdCmd]
   | Spec   (L Pred)
 
-data GdCmd = GdCmd Pred Struct
+data GdCmd = GdCmd
+  { gdCmdGuard :: Pred
+  , gdCmdBody :: Struct
+  }
   deriving (Eq)
 
 -- comparing only the constructor and the predicate
@@ -444,12 +404,29 @@ instance Eq Stmt where
 -- For wpStmts'
 data Accum = Accum [Stmt] Struct
 
-precond :: Struct -> Pred
-precond (Struct p _ _) = p
-precond (Postcond p)   = p
+precondStruct :: Struct -> Pred
+precondStruct (Struct p _ _) = p
+precondStruct (Postcond p)   = p
+
+precond :: Stmt -> Pred
+precond (Skip   l) = unLoc l
+precond (Abort  l) = unLoc l
+precond (Assign l) = unLoc l
+precond (Do l _ _) = unLoc l
+precond (If l _  ) = unLoc l
+precond (Spec   l) = unLoc l
 
 toStruct :: Pred -> Accum -> Struct
 toStruct pre (Accum xs next) = Struct pre xs next
+
+-- -- reset the stored preconditions and postconditions of a struct
+-- resetStruct :: [Pred] -> Struct -> Pred -> WPM Struct
+-- resetStruct _       (Postcond _dumped)          post = return $ Postcond post
+-- resetStruct imposed (Struct _dumped stmts next) post = do
+--   next' <- resetStruct [] next post
+--   accum <- wpStmts' imposed stmts (precondStruct next')
+--   return $ toStruct (conjunct $ reverse imposed) accum
+
 
 wpStmts :: [Pred] -> [C.Stmt] -> Pred -> WPM Struct
 wpStmts imposed stmts post = do
@@ -477,16 +454,8 @@ wpStmts' imposed (stmt:stmts) post = case stmt of
     insert x (Accum xs ys) = Accum (x:xs) ys
 
     precondAccum :: Accum -> Pred
-    precondAccum (Accum []      xs) = precond xs
-    precondAccum (Accum (stmt:_) _) = precondStmt stmt
-
-    precondStmt :: Stmt -> Pred
-    precondStmt (Skip   l) = unLoc l
-    precondStmt (Abort  l) = unLoc l
-    precondStmt (Assign l) = unLoc l
-    precondStmt (Do l _ _) = unLoc l
-    precondStmt (If l _  ) = unLoc l
-    precondStmt (Spec   l) = unLoc l
+    precondAccum (Accum []      xs) = precondStruct xs
+    precondAccum (Accum (stmt:_) _) = precond stmt
 
 wp :: [Pred] -> C.Stmt -> Pred -> WPM Stmt
 wp imposed stmt post = case stmt of

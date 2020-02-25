@@ -26,6 +26,8 @@ instance Pretty Origin where
   pretty (AtLoopInvariant  l) = "LoopInvariant" <+> pretty l
   pretty (AtIf             l) = "If" <+> pretty l
   pretty (AtLoop           l) = "Loop" <+> pretty l
+  pretty (AtTermination    l) = "Termination" <+> pretty l
+  pretty (AtBoundDecrement l) = "BoundDecrement" <+> pretty l
 
   -- pretty (AssertGuaranteed l) = "AssertGuaranteed" <+> pretty l
   -- pretty (AssertSufficient l) = "AssertSufficient" <+> pretty l
