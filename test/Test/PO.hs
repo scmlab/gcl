@@ -21,210 +21,216 @@ import Pretty ()
 
 tests :: TestTree
 tests = testGroup "Proof POs"
-  [ statements
-  , assertions
-  , if'
+  [
+    -- statements
+  -- , assertions
+  -- , if'
   -- , loop
   ]
 
 --------------------------------------------------------------------------------
 -- | Expression
 
-statements :: TestTree
-statements = testGroup "simple statements"
-  [ testCase "skip"
-      $ run "{ True }     \n\
-            \skip         \n\
-            \{ 0 = 0 }    \n" @?= poList
-      [ PO 0
-          (assertion true)
-          (assertion (0 === 0))
-          (AtSkip NoLoc)
-      ]
-  , testCase "abort"
-      $ run "{ True }     \n\
-            \abort        \n\
-            \{ 0 = 0 }    \n" @?= poList
-      [ PO 0
-          (assertion true)
-          (Constant false)
-          (AtAbort NoLoc)
-      ]
-  , testCase "assignment"
-      $ run "{ True }     \n\
-            \x := 1       \n\
-            \{ 0 = x }    \n" @?= poList
-      [ PO 0
-          (assertion true)
-          (assertion (number 0 `eqq` number 1))
-          (AtAssignment NoLoc)
-      ]
-  , testCase "spec"
-      $ run "{ True }     \n\
-            \{!           \n\
-            \!}           \n\
-            \{ False }    \n" @?= poList
-      [ PO 0
-          (assertion true)
-          (assertion false)
-          (AtSpec NoLoc)
-      ]
-  ]
-
-assertions :: TestTree
-assertions = testGroup "assertions"
-  [ testCase "3 assertions"
-      $ run "{ True }     \n\
-            \{ False }    \n\
-            \{ True }     \n" @?= poList
-      [ PO 0
-          (assertion true)
-          (assertion false)
-          (AtAssertion NoLoc)
-      , PO 1
-          (assertion false)
-          (assertion true)
-          (AtAssertion NoLoc)
-      ]
-  , testCase "2 assertions"
-      $ run "{ 0 = 0 }    \n\
-            \{ 0 = 1 }    \n" @?= poList
-      [ PO 0
-          (assertion (0 === 0))
-          (assertion (0 === 1))
-          (AtAssertion NoLoc)
-      ]
-  ]
-
-if' :: TestTree
-if' = testGroup "if statements"
-  [ testCase "without precondition"
-      $ run "{ 0 = 0 }              \n\
-            \if 0 = 1 -> skip     \n\
-            \ | 0 = 2 -> abort    \n\
-            \fi                   \n\
-            \{ 0 = 3 }            \n" @?= poList
-        [ PO 0
-          (assertion (0 === 0))
-          (Disjunct [ guardIf (0 === 1), guardIf (0 === 2) ])
-          (AtIf NoLoc)
-        , PO 1
-          (Conjunct [ assertion (0 === 0), guardIf (0 === 1) ])
-          (assertion (0 === 3))
-          (AtSkip NoLoc)
-        , PO 2
-          (Conjunct [ assertion (0 === 0), guardIf (0 === 2) ])
-          (Constant false)
-          (AtAbort NoLoc)
-        ]
-  , testCase "without precondition (nested)"
-      $ run "{ 0 = 0 }              \n\
-            \if 0 = 1 ->            \n\
-            \     if 0 = 2 -> skip  \n\
-            \     fi                \n\
-            \fi                     \n\
-            \{ 0 = 3 }\n" @?= poList
-      [ PO 0
-          (assertion (0 === 0))
-          (guardIf (0 === 1))
-          (AtIf NoLoc)
-      , PO 1
-          (Conjunct [ assertion (0 === 0), guardIf (0 === 1) ])
-          (guardIf (0 === 2))
-          (AtIf NoLoc)
-      , PO 2
-          (Conjunct [ assertion (0 === 0), guardIf (0 === 1), guardIf (0 === 2) ])
-          (assertion (0 === 3))
-          (AtSkip NoLoc)
-
-      ]
-  , testCase "with precondition"
-      $ run "{ 0 = 0 }            \n\
-             \if 0 = 1 -> skip    \n\
-             \ | 0 = 3 -> abort   \n\
-             \fi                  \n\
-             \{ 0 = 2 }           \n" @?= poList
-      [ PO 0
-          (assertion (0 === 0))
-          (Disjunct [ guardIf (0 === 1), guardIf (0 === 3) ])
-          (AtIf NoLoc)
-      , PO 1
-          (Conjunct [ assertion (0 === 0), guardIf (0 === 1) ])
-          (assertion (0 === 2))
-          (AtSkip NoLoc)
-      , PO 2
-          (Conjunct [ assertion (0 === 0), guardIf (0 === 3) ])
-          (Constant false)
-          (AtAbort NoLoc)
-      ]
-  ]
-
-loop :: TestTree
-loop = testGroup "loop statements"
-  [ testCase "1 branch"
-    $ run "{ 0 = 1 , bnd: A }     \n\
-          \do 0 = 2 -> skip       \n\
-          \od                     \n\
-          \{ 0 = 0 }              \n" @?= poList
-      [ PO 0
-          (Conjunct [ loopInvariant (0 === 1)
-                    , Negate (guardLoop (0 === 2))
-                    ])
-          (assertion (0 === 0))
-          (LoopBase NoLoc)
-      , PO 1
-          (Conjunct [ loopInvariant (0 === 1)
-                    , guardLoop (0 === 2)
-                    ])
-          (boundGTE (constant "A") (number 0))
-          (LoopTermBase NoLoc)
-      , PO 3
-          (Conjunct [ loopInvariant (0 === 1)
-                    , guardLoop (0 === 2)
-                    , boundEq (constant "A") (variable "_bnd2")
-                    ])
-          (boundLT (constant "A") (variable "_bnd2"))
-          (AtSkip NoLoc)
-      ]
-  , testCase "2 branches"
-    $ run "{ 0 = 1 , bnd: A }       \n\
-          \do 0 = 2 -> skip         \n\
-          \ | 0 = 3 -> abort od     \n\
-          \{ 0 = 0 }\n" @?= poList
-      [ PO 0
-          (Conjunct [ loopInvariant (0 === 1)
-                    , Negate (guardLoop (0 === 2))
-                    , Negate (guardLoop (0 === 3))
-                    ])
-          (assertion (0 === 0))
-          (LoopBase NoLoc)
-      , PO 1
-          (loopInvariant (0 === 1))
-          (Constant false)
-          (AtAbort NoLoc)
-      , PO 2
-          (Conjunct [ loopInvariant (0 === 1)
-                    , guardLoop (0 === 2)
-                    , guardLoop (0 === 3)
-                    ])
-          (boundGTE (constant "A") (number 0))
-          (LoopTermBase NoLoc)
-      , PO 4
-          (Conjunct [ loopInvariant (0 === 1)
-                    , guardLoop (0 === 2)
-                    , boundEq (constant "A") (variable "_bnd3")
-                    ])
-          (boundLT (constant "A") (variable "_bnd3"))
-          (AtSkip NoLoc)
-      , PO 5
-          (Conjunct [ loopInvariant (0 === 1)
-                    , guardLoop (0 === 3)
-                    , boundEq (constant "A") (variable "_bnd3")
-                    ])
-          (Constant false)
-          (AtAbort NoLoc)
-      ]
-  ]
+-- statements :: TestTree
+-- statements = testGroup "simple statements"
+--   [ testCase "skip"
+--       $ run "{ True }     \n\
+--             \skip         \n\
+--             \{ 0 = 0 }    \n" @?= poList
+--       [ PO 0
+--           (assertion true)
+--           (assertion (0 === 0))
+--           (AtSkip NoLoc)
+--       ]
+--   , testCase "abort"
+--       $ run "{ True }     \n\
+--             \abort        \n\
+--             \{ 0 = 0 }    \n" @?= poList
+--       [ PO 0
+--           (assertion true)
+--           (Constant false)
+--           (AtAbort NoLoc)
+--       ]
+--   , testCase "assignment"
+--       $ run "{ True }     \n\
+--             \x := 1       \n\
+--             \{ 0 = x }    \n" @?= poList
+--       [ PO 0
+--           (assertion true)
+--           (assertion (number 0 `eqq` number 1))
+--           (AtAssignment NoLoc)
+--       ]
+--   , testCase "spec"
+--       $ run "{ True }     \n\
+--             \{!           \n\
+--             \!}           \n\
+--             \{ False }    \n" @?= poList
+--       [ PO 0
+--           (assertion true)
+--           (assertion false)
+--           (AtSpec NoLoc)
+--       ]
+--   ]
+--
+-- assertions :: TestTree
+-- assertions = testGroup "assertions"
+--   [ testCase "3 assertions"
+--       $ run "{ True }     \n\
+--             \{ False }    \n\
+--             \{ True }     \n" @?= poList
+--       [ PO 0
+--           (assertion true)
+--           (assertion false)
+--           (AtAssertion NoLoc)
+--       , PO 1
+--           (assertion false)
+--           (assertion true)
+--           (AtAssertion NoLoc)
+--       ]
+--   , testCase "2 assertions"
+--       $ run "{ 0 = 0 }    \n\
+--             \{ 0 = 1 }    \n" @?= poList
+--       [ PO 0
+--           (assertion (0 === 0))
+--           (assertion (0 === 1))
+--           (AtAssertion NoLoc)
+--       ]
+--   ]
+--
+-- if' :: TestTree
+-- if' = testGroup "if statements"
+--   [ testCase "without precondition"
+--       $ run "{ 0 = 0 }              \n\
+--             \if 0 = 1 -> skip     \n\
+--             \ | 0 = 2 -> abort    \n\
+--             \fi                   \n\
+--             \{ 0 = 3 }            \n" @?= poList
+--         [ PO 0
+--           (assertion (0 === 0))
+--           (Disjunct [ guardIf (0 === 1), guardIf (0 === 2) ])
+--           (AtIf NoLoc)
+--         , PO 1
+--           (Conjunct [ assertion (0 === 0), guardIf (0 === 1) ])
+--           (assertion (0 === 3))
+--           (AtSkip NoLoc)
+--         , PO 2
+--           (Conjunct [ assertion (0 === 0), guardIf (0 === 2) ])
+--           (Constant false)
+--           (AtAbort NoLoc)
+--         ]
+--   , testCase "without precondition (nested)"
+--       $ run "{ 0 = 0 }              \n\
+--             \if 0 = 1 ->            \n\
+--             \     if 0 = 2 -> skip  \n\
+--             \     fi                \n\
+--             \fi                     \n\
+--             \{ 0 = 3 }\n" @?= poList
+--       [ PO 0
+--           (assertion (0 === 0))
+--           (guardIf (0 === 1))
+--           (AtIf NoLoc)
+--       , PO 1
+--           (Conjunct [ assertion (0 === 0), guardIf (0 === 1) ])
+--           (guardIf (0 === 2))
+--           (AtIf NoLoc)
+--       , PO 2
+--           (Conjunct [ assertion (0 === 0), guardIf (0 === 1), guardIf (0 === 2) ])
+--           (assertion (0 === 3))
+--           (AtSkip NoLoc)
+--
+--       ]
+--   , testCase "with precondition"
+--       $ run "{ 0 = 0 }            \n\
+--              \if 0 = 1 -> skip    \n\
+--              \ | 0 = 3 -> abort   \n\
+--              \fi                  \n\
+--              \{ 0 = 2 }           \n" @?= poList
+--       [ PO 0
+--           (assertion (0 === 0))
+--           (Disjunct [ guardIf (0 === 1), guardIf (0 === 3) ])
+--           (AtIf NoLoc)
+--       , PO 1
+--           (Conjunct [ assertion (0 === 0), guardIf (0 === 1) ])
+--           (assertion (0 === 2))
+--           (AtSkip NoLoc)
+--       , PO 2
+--           (Conjunct [ assertion (0 === 0), guardIf (0 === 3) ])
+--           (Constant false)
+--           (AtAbort NoLoc)
+--       ]
+--   ]
+--
+-- loop :: TestTree
+-- loop = testGroup "loop statements"
+--   [ testCase "1 branch"
+--     $ run "{ 0 = 1 , bnd: A }     \n\
+--           \do 0 = 2 -> skip       \n\
+--           \od                     \n\
+--           \{ 0 = 0 }              \n" @?= poList
+--     [ PO 0
+--       (Conjunct [ loopInvariant (0 === 1), Negate (guardLoop (0 === 2)) ])
+--       (loopInvariant (0 === 0))
+--       (AtSkip NoLoc)
+--     ]
+      -- [ PO 0
+      --     (Conjunct [ loopInvariant (0 === 1)
+      --               , Negate (guardLoop (0 === 2))
+      --               ])
+      --     (assertion (0 === 0))
+      --     (AtSkip NoLoc)
+      -- , PO 1
+      --     (Conjunct [ loopInvariant (0 === 1)
+      --               , guardLoop (0 === 2)
+      --               ])
+      --     (boundGTE (constant "A") (number 0))
+      --     (AtSkip NoLoc)
+      -- , PO 3
+      --     (Conjunct [ loopInvariant (0 === 1)
+      --               , guardLoop (0 === 2)
+      --               , boundEq (constant "A") (variable "_bnd2")
+      --               ])
+      --     (boundLT (constant "A") (variable "_bnd2"))
+      --     (AtSkip NoLoc)
+      -- ]
+  -- , testCase "2 branches"
+  --   $ run "{ 0 = 1 , bnd: A }       \n\
+  --         \do 0 = 2 -> skip         \n\
+  --         \ | 0 = 3 -> abort od     \n\
+  --         \{ 0 = 0 }\n" @?= poList
+  --     [ PO 0
+  --         (Conjunct [ loopInvariant (0 === 1)
+  --                   , Negate (guardLoop (0 === 2))
+  --                   , Negate (guardLoop (0 === 3))
+  --                   ])
+  --         (assertion (0 === 0))
+  --         (AtSkip NoLoc)
+  --     , PO 1
+  --         (loopInvariant (0 === 1))
+  --         (Constant false)
+  --         (AtAbort NoLoc)
+  --     , PO 2
+  --         (Conjunct [ loopInvariant (0 === 1)
+  --                   , guardLoop (0 === 2)
+  --                   , guardLoop (0 === 3)
+  --                   ])
+  --         (boundGTE (constant "A") (number 0))
+  --         (AtSkip NoLoc)
+  --     , PO 4
+  --         (Conjunct [ loopInvariant (0 === 1)
+  --                   , guardLoop (0 === 2)
+  --                   , boundEq (constant "A") (variable "_bnd3")
+  --                   ])
+  --         (boundLT (constant "A") (variable "_bnd3"))
+  --         (AtSkip NoLoc)
+  --     , PO 5
+  --         (Conjunct [ loopInvariant (0 === 1)
+  --                   , guardLoop (0 === 3)
+  --                   , boundEq (constant "A") (variable "_bnd3")
+  --                   ])
+  --         (Constant false)
+  --         (AtAbort NoLoc)
+  --     ]
+  -- ]
 -- loop :: TestTree
 -- loop = testGroup "if statements"
 --   [ testCase "loop" $ run "{ 0 = 1 , bnd: A }\ndo 0 = 2 -> skip od\n{ 0 = 0 }\n" @?= Right

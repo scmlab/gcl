@@ -58,7 +58,7 @@ instance Located P.Pred where
   locOf (P.Constant _) = NoLoc
   locOf (P.Guard _ _ l) = l
   locOf (P.Assertion _ l) = l
-  locOf (P.LoopInvariant _ l) = l
+  locOf (P.LoopInvariant _ _ l) = l
   locOf (P.Bound _ l) = l
   locOf (P.Conjunct _) = NoLoc
   locOf (P.Disjunct _) = NoLoc
@@ -95,7 +95,7 @@ instance Relocatable P.Pred where
   reloc _ (P.Constant e) = P.Constant e
   reloc l (P.Guard e s _) = P.Guard e s l
   reloc l (P.Assertion e _) = P.Assertion e l
-  reloc l (P.LoopInvariant e _) = P.LoopInvariant e l
+  reloc l (P.LoopInvariant e b _) = P.LoopInvariant e b l
   reloc l (P.Bound e _) = P.Bound e l
   reloc _ (P.Conjunct ps) = P.Conjunct ps
   reloc _ (P.Disjunct ps) = P.Disjunct ps
@@ -210,8 +210,11 @@ instance ToNoLoc P.Pred where
   toNoLoc (P.Constant e) = P.Constant (toNoLoc e)
   toNoLoc (P.Guard e s _) = P.Guard (toNoLoc e) (toNoLoc s) NoLoc
   toNoLoc (P.Assertion e _) = P.Assertion (toNoLoc e) NoLoc
-  toNoLoc (P.LoopInvariant e _) = P.LoopInvariant (toNoLoc e) NoLoc
+  toNoLoc (P.LoopInvariant e b _) = P.LoopInvariant (toNoLoc e) (toNoLoc b) NoLoc
   toNoLoc (P.Bound e _) = P.Bound (toNoLoc e) NoLoc
   toNoLoc (P.Conjunct ps) = P.Conjunct (map (toNoLoc) ps)
   toNoLoc (P.Disjunct ps) = P.Disjunct (map (toNoLoc) ps)
   toNoLoc (P.Negate p) = P.Negate (toNoLoc p)
+
+instance ToNoLoc a => ToNoLoc (L a) where
+  toNoLoc (L _ a) = L NoLoc (toNoLoc a)

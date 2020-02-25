@@ -2,13 +2,15 @@
 
 module Test.WP2 where
 
+import Data.Loc
 import Data.Text.Lazy hiding (map)
 import Test.Tasty
 import Test.Tasty.HUnit
 import Prelude hiding (Ordering(..))
 
 import Syntax.Predicate
-import Syntax.Concrete hiding (LoopInvariant)
+import qualified Syntax.Concrete as C
+import Syntax.Concrete (true, false, variable, number, eqq, constant)
 import qualified REPL as REPL
 import GCL.WP2
 -- import GCL.WP2 (Obligation2(..), ObliOrigin2(..), Lasagna(..))
@@ -37,7 +39,7 @@ statements = testGroup "simple statements"
             \skip       \n\
             \{ 0 = 0 }" @?= Right
       ( Struct (assertion true)
-          [ Line (assertion (0 === 0)) undefined ]
+        [ Skip $ loc (assertion (0 === 0)) ]
       $ Postcond (assertion (0 === 0))
       )
   , testCase "abort"
@@ -45,7 +47,7 @@ statements = testGroup "simple statements"
             \abort      \n\
             \{ True }" @?= Right
       ( Struct (assertion true)
-          [ Line (Constant false) undefined ]
+          [ Abort $ loc (Constant false) ]
       $ Postcond (assertion true)
       )
   , testCase "assignment"
@@ -53,7 +55,7 @@ statements = testGroup "simple statements"
             \x := 1     \n\
             \{ 0 = x }" @?= Right
       ( Struct (assertion true)
-          [ Line (assertion (number 0 `eqq` number 1)) undefined ]
+          [ Assign $ loc (assertion (number 0 `eqq` number 1)) ]
       $ Postcond (assertion (number 0 `eqq` variable "x"))
       )
   , testCase "spec"
@@ -62,7 +64,7 @@ statements = testGroup "simple statements"
             \!}       \n\
             \{ 0 = 0 }" @?= Right
       ( Struct (assertion true)
-          [ Line (assertion (0 === 0)) undefined ]
+          [ Spec $ loc (assertion (0 === 0)) ]
       $ Postcond (assertion (0 === 0))
       )
   ]
@@ -95,13 +97,15 @@ if' = testGroup "if statements"
           \fi                   \n\
           \{ 0 = 2 }            \n" @?= Right
       ( Struct (assertion true)
-          [ Block (Disjunct [ guardIf (0 === 0) , guardIf (0 === 1) ]) undefined
-            [ Struct (Conjunct [ assertion true, guardIf (0 === 0) ])
-              [ Line (assertion (0 === 2)) undefined ]
-            $ Postcond (assertion (0 === 2))
-            , Struct (Conjunct [ assertion true, guardIf (0 === 1) ])
-              [ Line (Constant false) undefined ]
-            $ Postcond (assertion (0 === 2))
+          [ If (loc $ Disjunct [ guardIf (0 === 0) , guardIf (0 === 1) ])
+            [ GdCmd (guardIf (0 === 0))
+              $ Struct (Conjunct [ assertion true, guardIf (0 === 0) ])
+                [ Skip $ loc (assertion (0 === 2)) ]
+              $ Postcond (assertion (0 === 2))
+            , GdCmd (guardIf (0 === 1))
+              $ Struct (Conjunct [ assertion true, guardIf (0 === 1) ])
+                [ Abort $ loc (Constant false) ]
+              $ Postcond (assertion (0 === 2))
             ]
           ]
       $ Postcond (assertion (0 === 2))
@@ -114,14 +118,16 @@ if' = testGroup "if statements"
           \fi                     \n\
           \{ 0 = 2 }\n" @?= Right
       ( Struct (assertion true)
-          [ Block (guardIf (0 === 0)) undefined
-            [ Struct (Conjunct [ assertion true, guardIf (0 === 0) ])
-              [ Block (guardIf (0 === 1)) undefined
-                [ Struct (Conjunct [ assertion true, guardIf (0 === 0), guardIf (0 === 1) ])
-                  [ Line (assertion (0 === 2)) undefined ]
-                $ Postcond (assertion (0 === 2))
+          [ If (loc $ guardIf (0 === 0))
+            [ GdCmd (guardIf (0 === 0))
+              $ Struct (Conjunct [ assertion true, guardIf (0 === 0) ])
+                [ If (loc $ guardIf (0 === 1))
+                  [ GdCmd (guardIf (0 === 1))
+                    $ Struct (Conjunct [ assertion true, guardIf (0 === 0), guardIf (0 === 1) ])
+                      [ Skip $ loc (assertion (0 === 2)) ]
+                    $ Postcond (assertion (0 === 2))
+                  ]
                 ]
-              ]
               $ Postcond (assertion (0 === 2))
             ]
           ]
@@ -135,12 +141,13 @@ if' = testGroup "if statements"
           \fi                     \n\
           \{ 0 = 2 }\n" @?= Right
       ( Struct (assertion true)
-        [ Block (guardIf (0 === 0)) undefined
-          [ Struct (Conjunct [ assertion true, guardIf (0 === 0) ])
-            []
-          $ Struct (assertion (0 === 1))
-            [ Line (assertion (0 === 2)) undefined ]
-          $ Postcond (assertion (0 === 2))
+        [ If (loc $ guardIf (0 === 0))
+          [ GdCmd (guardIf (0 === 0))
+            $ Struct (Conjunct [ assertion true, guardIf (0 === 0) ])
+              []
+            $ Struct (assertion (0 === 1))
+              [ Skip $ loc (assertion (0 === 2)) ]
+            $ Postcond (assertion (0 === 2))
           ]
         ]
       $ Postcond (assertion (0 === 2))
@@ -150,10 +157,11 @@ if' = testGroup "if statements"
           \if 0 = 1 -> skip fi\n\
           \{ 0 = 2 }          \n" @?= Right
       ( Struct (assertion (0 === 0))
-        [ Block (guardIf (0 === 1)) undefined
-          [ Struct (Conjunct [ assertion (0 === 0), guardIf (0 === 1) ])
-            [ Line (assertion (0 === 2)) undefined ]
-          $ Postcond (assertion (0 === 2))
+        [ If (loc $ guardIf (0 === 1))
+          [ GdCmd (guardIf (0 === 1))
+            $ Struct (Conjunct [ assertion (0 === 0), guardIf (0 === 1) ])
+              [ Skip $ loc (assertion (0 === 2)) ]
+            $ Postcond (assertion (0 === 2))
           ]
         ]
       $ Postcond (assertion (0 === 2))
@@ -165,13 +173,15 @@ if' = testGroup "if statements"
           \fi                 \n\
           \{ 0 = 3 }          \n" @?= Right
       ( Struct (assertion (0 === 0))
-        [ Block (Disjunct [guardIf (0 === 1), guardIf (0 === 2)]) undefined
-          [ Struct (Conjunct [assertion (0 === 0), guardIf (0 === 1)])
-            [ Line (assertion (0 === 3)) undefined]
-          $ Postcond (assertion (0 === 3))
-          , Struct (Conjunct [assertion (0 === 0), guardIf (0 === 2)])
-            [ Line (Constant false) undefined ]
-          $ Postcond (assertion (0 === 3))
+        [ If (loc $ Disjunct [guardIf (0 === 1), guardIf (0 === 2)])
+          [ GdCmd (guardIf (0 === 1))
+            $ Struct (Conjunct [assertion (0 === 0), guardIf (0 === 1)])
+              [ Skip $ loc (assertion (0 === 3))]
+            $ Postcond (assertion (0 === 3))
+          , GdCmd (guardIf (0 === 2))
+            $ Struct (Conjunct [assertion (0 === 0), guardIf (0 === 2)])
+              [ Abort $ loc (Constant false) ]
+            $ Postcond (assertion (0 === 3))
           ]
         ]
       $ Postcond (assertion (0 === 3))
@@ -185,11 +195,12 @@ loop = testGroup "loop statements"
           \do 0 = 2 -> skip       \n\
           \od                     \n\
           \{ 0 = 0 }              \n" @?= Right
-      ( Struct (loopInvariant (0 === 1))
-        [ Block (loopInvariant (0 === 1)) undefined
-          [ Struct (Conjunct [loopInvariant (0 === 1), guardLoop (0 === 2)])
-            [ Line (loopInvariant (0 === 1)) undefined ]
-          $ Postcond (loopInvariant (0 === 1))
+      ( Struct (loopInvariant (0 === 1) "A")
+        [ Do (loc $ loopInvariant (0 === 1) "A") (constant "A")
+          [ GdCmd (guardLoop (0 === 2))
+            $ Struct (Conjunct [loopInvariant (0 === 1) "A", guardLoop (0 === 2)])
+              [ Skip (loc $ loopInvariant (0 === 1) "A") ]
+            $ Postcond (loopInvariant (0 === 1) "A")
           ]
         ]
       $ Postcond (assertion (0 === 0))
@@ -199,14 +210,16 @@ loop = testGroup "loop statements"
           \do 0 = 2 -> skip         \n\
           \ | 0 = 3 -> abort od     \n\
           \{ 0 = 0 }\n" @?= Right
-      ( Struct (loopInvariant (0 === 1))
-        [ Block (loopInvariant (0 === 1)) undefined
-          [ Struct (Conjunct [loopInvariant (0 === 1), guardLoop (0 === 2)])
-            [ Line (loopInvariant (0 === 1)) undefined ]
-          $ Postcond (loopInvariant (0 === 1))
-          , Struct (Conjunct [loopInvariant (0 === 1), guardLoop (0 === 3)])
-            [ Line (Constant false) undefined ]
-          $ Postcond (loopInvariant (0 === 1))
+      ( Struct (loopInvariant (0 === 1) "A")
+        [ Do (loc $ loopInvariant (0 === 1) "A") (constant "A")
+          [ GdCmd (guardLoop (0 === 2))
+            $ Struct (Conjunct [loopInvariant (0 === 1) "A", guardLoop (0 === 2)])
+              [ Skip (loc $ loopInvariant (0 === 1) "A") ]
+            $ Postcond (loopInvariant (0 === 1) "A")
+          , GdCmd (guardLoop (0 === 3))
+            $ Struct (Conjunct [loopInvariant (0 === 1) "A", guardLoop (0 === 3)])
+              [ Abort (loc $ Constant false) ]
+            $ Postcond (loopInvariant (0 === 1) "A")
           ]
         ]
       $ Postcond (assertion (0 === 0))
@@ -218,23 +231,28 @@ loop = testGroup "loop statements"
           \   do 0 = 4 -> abort od  \n\
           \od                       \n\
           \{ 0 = 0 }\n" @?= Right
-      ( Struct (loopInvariant (0 === 1))
-        [ Block (loopInvariant (0 === 1)) undefined
-          [ Struct (Conjunct [loopInvariant (0 === 1), guardLoop (0 === 2)])
-            []
-          $ Struct (loopInvariant (0 === 3))
-            [ Block (loopInvariant (0 === 3)) undefined
-              [ Struct (Conjunct [loopInvariant (0 === 3), guardLoop (0 === 4)])
-                [ Line (Constant false) undefined ]
-              $ Postcond (loopInvariant (0 === 3))
+      ( Struct (loopInvariant (0 === 1) "A")
+        [ Do (loc $ loopInvariant (0 === 1) "A") (constant "A")
+          [ GdCmd (guardLoop (0 === 2))
+            $ Struct (Conjunct [loopInvariant (0 === 1) "A", guardLoop (0 === 2)])
+              []
+            $ Struct (loopInvariant (0 === 3) "A")
+              [ Do (loc $ loopInvariant (0 === 3) "A") (constant "A")
+                [ GdCmd (guardLoop (0 === 4))
+                  $ Struct (Conjunct [loopInvariant (0 === 3) "A", guardLoop (0 === 4)])
+                    [ Abort (loc $ Constant false) ]
+                  $ Postcond (loopInvariant (0 === 3) "A")
+                ]
               ]
-            ]
-          $ Postcond (loopInvariant (0 === 1))
+            $ Postcond (loopInvariant (0 === 1) "A")
           ]
         ]
       $ Postcond (assertion (0 === 0))
       )
   ]
+
+loc :: Pred -> L Pred
+loc = L NoLoc
 
 run :: Text -> Either [Error] Struct
 run text = toNoLoc <$> (REPL.scan "<test>" text
@@ -243,28 +261,18 @@ run text = toNoLoc <$> (REPL.scan "<test>" text
 
 --------------------------------------------------------------------------------
 -- |
-
+--
 instance ToNoLoc Struct where
   toNoLoc (Struct pre xs ys) = Struct (toNoLoc pre) (map toNoLoc xs) (toNoLoc ys)
   toNoLoc (Postcond post) = Postcond (toNoLoc post)
-instance ToNoLoc Line where
-  toNoLoc (Line p stmt) = Line (toNoLoc p) stmt
-  toNoLoc (Block p sort xs) = Block (toNoLoc p) sort (map toNoLoc xs)
 
-instance Show Struct where
-  show = show . pretty
-instance Pretty Struct where
-  pretty (Struct pre xs next) =
-    "----------------------------------------------------------------" <> line
-    <> "*" <+> pretty pre <> line
-    <> vsep (map (\x -> "  " <> pretty x) xs) <> line
-    <> pretty next
-  pretty (Postcond post) =
-    "----------------------------------------------------------------" <> line
-    <> "*" <+> pretty post
+instance ToNoLoc GdCmd where
+  toNoLoc (GdCmd p xs) = GdCmd (toNoLoc p) (toNoLoc xs)
 
-instance Show Line where
-  show = show . pretty
-instance Pretty Line where
-  pretty (Line p _) = pretty p
-  pretty (Block p _ xs) = "*" <+> pretty p <> line <> vsep (map (\x -> "  | " <> align (pretty x)) xs)
+instance ToNoLoc Stmt where
+  toNoLoc (Skip l) = Skip (toNoLoc l)
+  toNoLoc (Abort l) = Abort (toNoLoc l)
+  toNoLoc (Assign l) = Assign (toNoLoc l)
+  toNoLoc (Do l bnd xs) = Do (toNoLoc l) (toNoLoc bnd) (map toNoLoc xs)
+  toNoLoc (If l xs) = If (toNoLoc l) (map toNoLoc xs)
+  toNoLoc (Spec l) = Spec (toNoLoc l)

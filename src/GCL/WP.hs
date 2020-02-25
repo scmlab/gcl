@@ -158,8 +158,8 @@ structStmts b pre _ (C.LoopInvariant p bnd l : stmts) post = do
   let origin = if startsWithDo stmts
                     then LoopInitialize l
                     else AssertGuaranteed l
-  obligate pre (LoopInvariant p l) origin
-  structStmts b (LoopInvariant p l) (Just bnd) stmts post
+  obligate pre (LoopInvariant p bnd l) origin
+  structStmts b (LoopInvariant p bnd l) (Just bnd) stmts post
 
  where startsWithDo (C.Do _ _ : _) = True
        startsWithDo _ = False
@@ -191,8 +191,8 @@ wpStmts b (C.Assert pre l : stmts) post =
   return (Assertion pre l)
 
 wpStmts b (C.LoopInvariant pre bnd l : stmts) post =
-  structStmts b (LoopInvariant pre l) (Just bnd) stmts post >>
-  return (LoopInvariant pre l)
+  structStmts b (LoopInvariant pre bnd l) (Just bnd) stmts post >>
+  return (LoopInvariant pre bnd l)
 
 wpStmts b (stmt : stmts) post = do
   post' <- wpStmts b stmts post
@@ -208,9 +208,9 @@ wp _ (C.Assert p l) post = do
   obligate (Assertion p l) post (AssertSufficient l)
   return (Assertion p l)
 
-wp _ (C.LoopInvariant p _ l) post = do
-  obligate (LoopInvariant p l) post (AssertSufficient l)
-  return (LoopInvariant p l)
+wp _ (C.LoopInvariant p b l) post = do
+  obligate (LoopInvariant p b l) post (AssertSufficient l)
+  return (LoopInvariant p b l)
 
 wp _ (C.Assign xs es _) post =
   subst (assignmentEnv xs es) post

@@ -18,7 +18,7 @@ instance PrettyPrec Pred where
     Guard p (IF _) _ -> "Guard IF" <+> prettyPrec n p
     Guard p (LOOP _) _ -> "Guard LOOP" <+> prettyPrec n p
     Assertion p _ -> "Assertion" <+> prettyPrec n p
-    LoopInvariant p _ -> "LoopInvariant" <+> prettyPrec n p
+    LoopInvariant p b _ -> "LoopInvariant" <+> prettyPrec n p <+> "bnd:" <+> prettyPrec n b
     Bound p _ -> "Bound" <+> prettyPrec n p
     Conjunct ps -> "Conjunct" <+> prettyList ps
     Disjunct ps -> "Disjunct" <+> prettyList ps
