@@ -57,14 +57,6 @@ data Origin = AtAbort           Loc
             | AtLoop            Loc
             | AtTermination     Loc
             | AtBoundDecrement  Loc
-
-            -- | AssertGuaranteed Loc
-            -- | AssertSufficient Loc
-            -- | Assignment Loc
-            -- | IfTotal Loc
-            -- | LoopBase Loc
-            -- | LoopTermBase Loc
-            -- | LoopInitialize Loc
             deriving (Eq, Show, Generic)
 
 instance ToNoLoc Origin where
@@ -78,13 +70,6 @@ instance ToNoLoc Origin where
   toNoLoc (AtLoop           _)  = AtLoop NoLoc
   toNoLoc (AtTermination    _)  = AtTermination NoLoc
   toNoLoc (AtBoundDecrement _)  = AtBoundDecrement NoLoc
-
-  -- toNoLoc (AssertGuaranteed _)  = AssertGuaranteed NoLoc
-  -- toNoLoc (AssertSufficient _)  = AssertSufficient NoLoc
-  -- toNoLoc (Assignment _)        = Assignment NoLoc
-  -- toNoLoc (IfTotal _)           = IfTotal NoLoc
-  -- toNoLoc (LoopBase _)          = LoopBase NoLoc
-  -- toNoLoc (LoopInitialize _)    = LoopInitialize NoLoc
 
 originOfStmt :: Stmt -> Origin
 originOfStmt (Abort  l) = AtAbort (locOf l)

@@ -88,7 +88,7 @@ instance ToJSON Request where
 -- | Response
 
 data Response
-  = OK [Obligation] [Specification]
+  = OK [PO] [Specification2]
   | Error [(Site, Error)]
   | Resolve Int -- resolves some Spec
   deriving (Generic)

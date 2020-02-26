@@ -77,8 +77,8 @@ handleRequest (Load filepath) = do
         program <- parseProgram filepath tokens
         -- program <- abstract syntax
         -- typeCheck program
-        sweep program
-        -- sweep2 program
+        -- sweep program
+        sweep2 program
 
   case run of
     Left errors -> send $ Error $ map fromGlobalError errors
