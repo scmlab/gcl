@@ -2,7 +2,6 @@
 
 module Pretty.Util where
 
-import Data.List (intercalate)
 import Data.Text.Prettyprint.Doc
 import Prelude hiding (Ordering(..))
 

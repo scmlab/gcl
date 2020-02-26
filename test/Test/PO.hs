@@ -177,11 +177,15 @@ loop = testGroup "loop statements"
           inv
           (AtSkip NoLoc)
       , PO 3
-          (Conjunct [ inv
-                    , guardLoop (0 === 2)
-                    ])
+          (Conjunct [ inv , guardLoop (0 === 2) ])
           (boundGTE (variable "_bnd2") (number 0))
           (AtTermination NoLoc)
+      , PO 4
+          (Conjunct [ Conjunct [ inv , guardLoop (0 === 2) ]
+                    , boundEq (constant "A") (variable "_bnd2")
+                    ])
+          (boundLT (constant "A") (variable "_bnd2"))
+          (AtSkip NoLoc)
       ]
   , testCase "2 branches"
     $ run "{ 0 = 1 , bnd: A }       \n\
@@ -211,41 +215,39 @@ loop = testGroup "loop statements"
                     ])
           (boundGTE (variable "_bnd3") (number 0))
           (AtTermination NoLoc)
-      -- , PO 4
-      --     (Conjunct [ loopInvariant (0 === 1) "A"
-      --               , guardLoop (0 === 2)
-      --               , boundEq (constant "A") (variable "_bnd3")
-      --               ])
-      --     (boundLT (constant "A") (variable "_bnd3"))
-      --     (AtSkip NoLoc)
-      -- , PO 5
-      --     (Conjunct [ loopInvariant (0 === 1) "A"
-      --               , guardLoop (0 === 3)
-      --               , boundEq (constant "A") (variable "_bnd3")
-      --               ])
-      --     (Constant false)
-      --     (AtAbort NoLoc)
+      , PO 5
+          (Conjunct [ Conjunct [ inv , guardLoop (0 === 2) ]
+                    , boundEq (constant "A") (variable "_bnd3")
+                    ])
+          (boundLT (constant "A") (variable "_bnd3"))
+          (AtSkip NoLoc)
+      , PO 6
+          (Conjunct [ Conjunct [ inv , guardLoop (0 === 3) ]
+                    , boundEq (constant "A") (variable "_bnd3")
+                    ])
+          (Constant false)
+          (AtAbort NoLoc)
       ]
+  -- , testCase "nested"
+  --   $ run "{ 0 = 1 , bnd: A }     \n\
+  --         \do 0 = 2 ->            \n\
+  --         \    { 0 = 3 , bnd: B } \n\
+  --         \    do 0 = 4 -> skip od\n\
+  --         \od                     \n\
+  --         \{ 0 = 0 }              \n" @?=
+  --     let inv1 = loopInvariant (0 === 1) "A"
+  --         inv2 = loopInvariant (0 === 3) "B"
+  --     in poList
+  --     [ PO 0
+  --         (Conjunct [ inv1, Negate (guardLoop (0 === 2)) ])
+  --         (assertion (0 === 0))
+  --         (AtLoop NoLoc)
+  --     , PO 1
+  --         (Conjunct [ inv1, guardLoop (0 === 2) ])
+  --         inv1
+  --         (AtSkip NoLoc)
+  --     ]
   ]
-
---     , PO 2
---         (Conjunct
---           [ koopInvariant (0 === 1)
---           , guardLoop (0 === 2)
---           ])
---         (Bound (constant "A" `gte` number 0))
---         (LoopTermBase NoLoc)
---     , PO 4
---         (Conjunct
---           [ Bound (constant "A" `lt` variable "_bnd3")
---           , koopInvariant (0 === 1)
---           , guardLoop (0 === 2)
---           , Bound (constant "A" `eqq` variable "_bnd3")
---           ])
---         (Bound (constant "A" `lt` variable "_bnd3"))
---         (AtSkip NoLoc)
---     ]
---   ]
 
 
 poList :: [PO] -> Either a POList

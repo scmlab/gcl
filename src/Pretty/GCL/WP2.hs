@@ -71,7 +71,7 @@ instance Show Stmt where
 instance Pretty Stmt where
   pretty (Skip l) = braces (pretty (unLoc l)) <> line <> "Skip"
   pretty (Abort l) = braces (pretty (unLoc l)) <> line <> "Abort"
-  pretty (Assign l) = braces (pretty (unLoc l)) <> line <> "Assign"
+  pretty (Assign l _ _) = braces (pretty (unLoc l)) <> line <> "Assign"
   pretty (Do l _ xs) = braces (pretty (unLoc l)) <> line
     <> "Loop" <> line
     <> vsep (map pretty xs)

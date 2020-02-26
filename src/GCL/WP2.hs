@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings, FlexibleContexts, DeriveGeneric,
              TypeSynonymInstances, FlexibleInstances #-}
+{-# OPTIONS_GHC -fno-warn-name-shadowing #-}
 
 module GCL.WP2 where
 
@@ -20,111 +21,10 @@ import Syntax.Location (ToNoLoc(..))
 
 import Pretty.Concrete ()
 import Pretty.Predicate ()
--- import Debug.Trace (traceShow)
--- import Data.Text.Prettyprint.Doc
-
-
--- --------------------------------------------------------------------------------
--- -- | Lasagna, alternating sequence of Pred & Statement
---
--- type PreviousStmt = Maybe Stmt
--- type ImposedConds = [Pred]
---
--- data Lasagna = Layer
---                   ImposedConds  -- preconditions imposed on the current statement
---                   Pred          -- precondition of the current statement
---                   Stmt          -- the current statement
---                   [Lasagna]     -- sub-lasagne of the current statement (IF, LOOP)
---                   Lasagna       -- following layers
---              | Final Pred
---              deriving (Show)
---
---
---
--- -- access the precondition of a Lasagna
--- precondStruct :: Lasagna -> Pred
--- precondStruct (Final p) = p
--- precondStruct (Layer _ p _ _ _) = p
---
---
--- toLasagna :: [Stmt] -> Pred -> WPM Lasagna
--- toLasagna = wpStmts Nothing []
---   where
---
---     -- the workhorse
---     wpStmts :: PreviousStmt -> ImposedConds -> [Stmt] -> Pred -> WPM Lasagna
---     wpStmts _        _       []     post = return $ Final post
---     wpStmts previous imposed (x:xs) post = do
---
---       -- the preconditions only affect the current statement
---       -- they should not be imposed on the rest of the statements
---       xs' <- wpStmts (Just x) [] xs post
---
---       -- see if the previous statement is an assertion
---       -- if so, then we add it to the list of imposed conditions
---       imposed' <- case previous of
---         Just (C.Assert        p   l) -> return $ Assertion     p l : imposed
---         Just (C.LoopInvariant p _ l) -> return $ LoopInvariant p l : imposed
---         _ -> case x of
---               C.Do _ l -> throwError (MissingAssertion l)
---               _        -> return imposed
---
---       -- calculate the precondition of the current statement
---       let post' = precondStruct xs'
---       (pre, branches) <- wp imposed' x post'
---
---       return $ Layer imposed pre x branches xs'
---
---     -- calculates the weakest precondition of a given statement
---     -- along with the imposed preconditions
---     wp :: ImposedConds -> Stmt -> Pred -> WPM (Pred, [Lasagna])
---     wp imposed current post = do
---
---       -- override the returned precondition when there are imposed preconditions
---       let conjectedImposed = conjunct (reverse imposed)
---       let override p = if null imposed
---                         then p
---                         else conjectedImposed
---
---       case current of
---         C.Abort _              -> return (override (Constant C.false), [])
---         C.Skip _               -> return (override post, [])
---         C.Assert p l           -> return (Assertion p l, [])
---         C.LoopInvariant p _ l  -> return (LoopInvariant p l, [])
---         C.Assign xs es _       -> do
---           pre <- subst (assignmentEnv xs es) post
---           return (override pre, [])
---
---         C.If gdCmds l -> do
---           branches <- forM gdCmds $ \(C.GdCmd guard body _) -> do
---             let imposed' = toGuard (IF l) guard : imposed
---             wpStmts Nothing imposed' body post
---
---           return (disjunct (map (toGuard (IF l)) (C.getGuards gdCmds)), branches)
---
---         C.Do gdCmds l -> do
---           -- use the precondition of the loop as the postcondition of the branch
---           branches <- forM gdCmds $ \(C.GdCmd guard body _) -> do
---             let imposed' = toGuard (LOOP l) guard : imposed
---             wpStmts Nothing imposed' body conjectedImposed
---
---           return (conjectedImposed, branches)
---
---         C.SpecQM l            -> throwError (DigHole l)
---         C.Spec _              -> return (override post, [])
 
 assignmentEnv :: [Lower] -> [Expr] -> C.Subst
 assignmentEnv xs es = Map.fromList (zip (map Left xs) es)
---
--- programToLasagna :: C.Program -> WPM Lasagna
--- programToLasagna (C.Program _ stmts _) = case (init stmts, last stmts) of
---   (stmts', C.Assert p l) -> toLasagna stmts' (Assertion p l)
---   (_     , stmt)         -> throwError (MissingPostcondition (locOf stmt))
---
--- programWP :: C.Program -> WPM Pred
--- programWP p = precondStruct <$> programToLasagna p
---
--- Monad for calculating preconditions (for Lasagna)
+
 type WPM = ExceptT StructError2 (State Int)
 
 runWPM :: WPM a -> Either StructError2 a
@@ -189,7 +89,7 @@ instance ToNoLoc Origin where
 originOfStmt :: Stmt -> Origin
 originOfStmt (Abort  l) = AtAbort (locOf l)
 originOfStmt (Skip   l) = AtSkip (locOf l)
-originOfStmt (Assign l) = AtAssignment (locOf l)
+originOfStmt (Assign l _ _) = AtAssignment (locOf l)
 originOfStmt (If l _  ) = AtIf (locOf l)
 originOfStmt (Do l _ _) = AtLoop (locOf l)
 originOfStmt (Spec   l) = AtSpec (locOf l)
@@ -276,61 +176,19 @@ genPO (Struct pre (stmt:stmts) next) = do
         (Bound (bndVar `C.gte` C.number 0) NoLoc)
         (AtTermination loc)
 
-      -- -- bound decrement
-      -- forM_ gdCmds $ \(GdCmd guard body) -> do
-      --   let start = Bound (bnd `C.eqq` C.Var bndVar NoLoc) loc
-      --   let pre = Conjunct (start : precondStruct body)
-      --   let post = Bound (bnd `C.lt` C.Var bndVar NoLoc) NoLoc
-      --
-      --   body' <- resetStruct pre body post
-      --
-      --   genPO body'
+      -- bound decrement
+      forM_ gdCmds $ \(GdCmd _ body) -> do
+        let start = Bound (bnd `C.eqq` bndVar) loc
+        let pre = [start, precondStruct body]
+        let post = Bound (bnd `C.lt` bndVar) NoLoc
+
+        body' <- lift $ lift $ resetStruct pre body post
+
+        genPO body'
 
     _ -> return ()
 
   genPO next
-
---     C.Do gdCmds l -> case previousStmt of
---       (Just (C.LoopInvariant _ bnd _)) -> do
---
---         -- termination
---         tellObli
---           (pre ++ map (toGuard (LOOP l)) guards)
---           [Bound $ bnd `C.gte` (C.Lit (C.Num 0) NoLoc)]
---           (LoopTermBase l)
---
---         -- bound decrementation
---         oldBnd <- C.freshVar "bnd"
---         forM_ gdCmds $ \(C.GdCmd guard body _) -> do
---           let post' = Bound $ bnd `C.lt` C.Var oldBnd NoLoc
---           body' <- lift $ lift $ toLasagna body post'
---           genObli
---             (pre ++
---               [ toGuard (LOOP l) guard
---               , Bound $ bnd `C.eqq` C.Var oldBnd NoLoc
---               ])
---            body'
---
---         return ()
---
---
---       _ -> throwError (MissingBound l)
---        {- Or if we want to tolerate the user and carry on ---
---        do -- warn that bnd is missing
---         let gdCmds' = map (\(GdCmd x y _) -> (depart x, y)) gdCmds
---         let guards = map fst gdCmds'
---         obligate (inv `A.conj` (A.conjunct (map A.neg guards))) post
---         --
---         forM_ gdCmds' $ \(guard, body) -> do
---           structStmts b (inv `A.conj` guard) Nothing body inv
---        -}
---
---     C.SpecQM l -> throwError $ DigHole l
---
---     C.Spec _ -> return ()
---
---   genObli pres stmts
-
 
 --------------------------------------------------------------------------------
 -- | Specification
@@ -380,7 +238,7 @@ data Struct = Struct Pred [Stmt] Struct
 data Stmt
   = Skip   (L Pred)
   | Abort  (L Pred)
-  | Assign (L Pred)
+  | Assign (L Pred) [Lower] [Expr]
   | Do     (L Pred) Expr [GdCmd]
   | If     (L Pred)      [GdCmd]
   | Spec   (L Pred)
@@ -395,7 +253,7 @@ data GdCmd = GdCmd
 instance Eq Stmt where
   Skip l == Skip m = l == m
   Abort l == Abort m = l == m
-  Assign l == Assign m = l == m
+  Assign l _ _ == Assign m _ _ = l == m
   Do l _ xs == Do m _ ys = l == m && xs == ys
   If l xs == If m ys = l == m && xs == ys
   Spec l == Spec m = l == m
@@ -409,24 +267,53 @@ precondStruct (Struct p _ _) = p
 precondStruct (Postcond p)   = p
 
 precond :: Stmt -> Pred
-precond (Skip   l) = unLoc l
-precond (Abort  l) = unLoc l
-precond (Assign l) = unLoc l
-precond (Do l _ _) = unLoc l
-precond (If l _  ) = unLoc l
-precond (Spec   l) = unLoc l
+precond (Skip   l    ) = unLoc l
+precond (Abort  l    ) = unLoc l
+precond (Assign l _ _) = unLoc l
+precond (Do     l _ _) = unLoc l
+precond (If     l _  ) = unLoc l
+precond (Spec   l    ) = unLoc l
 
 toStruct :: Pred -> Accum -> Struct
 toStruct pre (Accum xs next) = Struct pre xs next
 
--- -- reset the stored preconditions and postconditions of a struct
--- resetStruct :: [Pred] -> Struct -> Pred -> WPM Struct
--- resetStruct _       (Postcond _dumped)          post = return $ Postcond post
--- resetStruct imposed (Struct _dumped stmts next) post = do
---   next' <- resetStruct [] next post
---   accum <- wpStmts' imposed stmts (precondStruct next')
---   return $ toStruct (conjunct $ reverse imposed) accum
+-- reset the stored preconditions and postconditions of a struct
+resetStruct :: [Pred] -> Struct -> Pred -> WPM Struct
+resetStruct _       (Postcond _dumped)          post = return $ Postcond post
+resetStruct imposed (Struct _dumped stmts next) post = do
+  next' <- resetStruct [] next post
+  accum <- wpStmts'' imposed stmts next'
+  return $ toStruct (conjunct $ reverse imposed) accum
 
+  where
+    wpStmts'' :: [Pred] -> [Stmt] -> Struct -> WPM Accum
+    wpStmts'' _       []           next = return $ Accum [] next
+    wpStmts'' imposed (stmt:stmts) next = do
+      xs <- wpStmts'' [] stmts next
+      x <- wp'' imposed stmt (precondAccum xs)
+      return $ insert x xs
+
+    wp'' :: [Pred] -> Stmt -> Pred -> WPM Stmt
+    wp'' imposed stmt post = case stmt of
+      Skip l -> return $ Skip (L (locOf l) post)
+      Abort l -> return $ Abort l
+      Assign l xs es -> do
+        pre <- subst (assignmentEnv xs es) post
+        return $ Assign (L (locOf l) pre) xs es
+      If l gdCmds -> do
+        gdCmds' <- forM gdCmds $ \(GdCmd guard body) -> do
+          let imposed' = guard : imposed
+          body' <- resetStruct imposed' body post
+          return $ GdCmd guard body'
+        return $ If l gdCmds'
+      Do (L l inv) bnd gdCmds -> do
+        gdCmds' <- forM gdCmds $ \(GdCmd guard body) -> do
+          let imposed' = guard : imposed
+          body' <- resetStruct imposed' body inv
+          return $ GdCmd guard body'
+
+        return $ Do (L l inv) bnd gdCmds'
+      Spec l -> return $ Spec (L (locOf l) post)
 
 wpStmts :: [Pred] -> [C.Stmt] -> Pred -> WPM Struct
 wpStmts imposed stmts post = do
@@ -449,13 +336,12 @@ wpStmts' imposed (stmt:stmts) post = case stmt of
     x <- wp imposed otherStmt (precondAccum xs)
     return $ insert x xs
 
-  where
-    insert :: Stmt -> Accum -> Accum
-    insert x (Accum xs ys) = Accum (x:xs) ys
+insert :: Stmt -> Accum -> Accum
+insert x (Accum xs ys) = Accum (x:xs) ys
 
-    precondAccum :: Accum -> Pred
-    precondAccum (Accum []      xs) = precondStruct xs
-    precondAccum (Accum (stmt:_) _) = precond stmt
+precondAccum :: Accum -> Pred
+precondAccum (Accum []      xs) = precondStruct xs
+precondAccum (Accum (stmt:_) _) = precond stmt
 
 wp :: [Pred] -> C.Stmt -> Pred -> WPM Stmt
 wp imposed stmt post = case stmt of
@@ -465,7 +351,7 @@ wp imposed stmt post = case stmt of
   C.LoopInvariant _ _ _  -> error "[ panic ] LoopInvariant in wp"
   C.Assign xs es l       -> do
     pre <- subst (assignmentEnv xs es) post
-    return $ Assign (L l pre)
+    return $ Assign (L l pre) xs es
 
   C.If gdCmds l -> do
     gdCmds' <- forM gdCmds $ \(C.GdCmd guard body m) -> do
@@ -477,17 +363,17 @@ wp imposed stmt post = case stmt of
     return $ If (L l pre) gdCmds'
 
   C.Do gdCmds l -> case imposed of
-    (LoopInvariant inv bnd _: ps) -> do
+    (LoopInvariant _ bnd _: _) -> do
 
-      let loopInvariant = conjunct $ reverse imposed
+      let loopInvariant' = conjunct $ reverse imposed
 
       -- use the loop invariant as the postcondition of the branch
       gdCmds' <- forM gdCmds $ \(C.GdCmd guard body m) -> do
         let imposed' = toGuard (LOOP l) guard : imposed
-        struct <- wpStmts imposed' body loopInvariant
+        struct <- wpStmts imposed' body loopInvariant'
         return $ GdCmd (Guard guard (LOOP l) m) struct
 
-      return $ Do (L l loopInvariant) bnd gdCmds'
+      return $ Do (L l loopInvariant') bnd gdCmds'
 
     _ -> throwError (MissingLoopInvariant l)
 

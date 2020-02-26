@@ -9,14 +9,10 @@ import Test.Tasty.HUnit
 import Prelude hiding (Ordering(..))
 
 import Syntax.Predicate
-import qualified Syntax.Concrete as C
 import Syntax.Concrete (true, false, variable, number, eqq, constant)
 import qualified REPL as REPL
 import GCL.WP2
--- import GCL.WP2 (Obligation2(..), ObliOrigin2(..), Lasagna(..))
-import Data.Text.Prettyprint.Doc
 
--- import GCL.WP2 (Obligation2(..), Specification2(..), ObliOrigin2(..))
 import Syntax.Location
 import Error
 import Pretty ()
@@ -55,7 +51,7 @@ statements = testGroup "simple statements"
             \x := 1     \n\
             \{ 0 = x }" @?= Right
       ( Struct (assertion true)
-          [ Assign $ loc (assertion (number 0 `eqq` number 1)) ]
+          [ Assign (loc (assertion (number 0 `eqq` number 1))) undefined undefined ]
       $ Postcond (assertion (number 0 `eqq` variable "x"))
       )
   , testCase "spec"
@@ -272,7 +268,7 @@ instance ToNoLoc GdCmd where
 instance ToNoLoc Stmt where
   toNoLoc (Skip l) = Skip (toNoLoc l)
   toNoLoc (Abort l) = Abort (toNoLoc l)
-  toNoLoc (Assign l) = Assign (toNoLoc l)
+  toNoLoc (Assign l xs es) = Assign (toNoLoc l) (map toNoLoc xs) (map toNoLoc es)
   toNoLoc (Do l bnd xs) = Do (toNoLoc l) (toNoLoc bnd) (map toNoLoc xs)
   toNoLoc (If l xs) = If (toNoLoc l) (map toNoLoc xs)
   toNoLoc (Spec l) = Spec (toNoLoc l)

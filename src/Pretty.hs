@@ -42,6 +42,7 @@ instance Pretty StructError where
 
 instance Pretty WP2.StructError2 where
   pretty (WP2.MissingAssertion loc) = "Missing Assertion" <+> pretty loc
+  pretty (WP2.MissingLoopInvariant loc) = "Missing Loop Invariant" <+> pretty loc
   pretty (WP2.MissingBound loc) = "Missing Bound" <+> pretty loc
   pretty (WP2.ExcessBound loc) = "Excess Bound" <+> pretty loc
   pretty (WP2.MissingPrecondition loc) = "Missing Precondition" <+> pretty loc
