@@ -340,11 +340,11 @@ wp imposed stmt post = case stmt of
 
   C.If gdCmds l -> do
     gdCmds' <- forM gdCmds $ \(C.GdCmd guard body m) -> do
-      let imposed' = toGuard (IF l) guard : imposed
+      let imposed' = guardIf guard : imposed
       struct <- wpStmts imposed' body post
-      return $ GdCmd (Guard guard (IF l) m) struct
+      return $ GdCmd (GuardIf guard m) struct
 
-    let pre = disjunct (map (toGuard (IF l)) (C.getGuards gdCmds))
+    let pre = disjunct (map guardIf (C.getGuards gdCmds))
     return $ If (L l pre) gdCmds'
 
   C.Do gdCmds l -> case imposed of
@@ -354,9 +354,9 @@ wp imposed stmt post = case stmt of
 
       -- use the loop invariant as the postcondition of the branch
       gdCmds' <- forM gdCmds $ \(C.GdCmd guard body m) -> do
-        let imposed' = toGuard (LOOP l) guard : imposed
+        let imposed' = guardLoop guard : imposed
         struct <- wpStmts imposed' body loopInvariant'
-        return $ GdCmd (Guard guard (LOOP l) m) struct
+        return $ GdCmd (GuardLoop guard m) struct
 
       return $ Do (L l loopInvariant') bnd gdCmds'
 

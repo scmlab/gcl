@@ -56,7 +56,8 @@ instance Located Upper where
 
 instance Located P.Pred where
   locOf (P.Constant _) = NoLoc
-  locOf (P.Guard _ _ l) = l
+  locOf (P.GuardIf _ l) = l
+  locOf (P.GuardLoop _ l) = l
   locOf (P.Assertion _ l) = l
   locOf (P.LoopInvariant _ _ l) = l
   locOf (P.Bound _ l) = l
@@ -93,7 +94,8 @@ instance Relocatable Lower where
 
 instance Relocatable P.Pred where
   reloc _ (P.Constant e) = P.Constant e
-  reloc l (P.Guard e s _) = P.Guard e s l
+  reloc l (P.GuardIf e _) = P.GuardIf e l
+  reloc l (P.GuardLoop e _) = P.GuardLoop e l
   reloc l (P.Assertion e _) = P.Assertion e l
   reloc l (P.LoopInvariant e b _) = P.LoopInvariant e b l
   reloc l (P.Bound e _) = P.Bound e l
@@ -202,13 +204,10 @@ instance ToNoLoc Expr where
   toNoLoc (Hole     _) = Hole NoLoc
   toNoLoc (Quant op xs r t _) = Quant (toNoLoc op) (map (toNoLoc) xs) (toNoLoc r) (toNoLoc t) NoLoc
 
-instance ToNoLoc P.Sort where
-  toNoLoc (P.IF _) = P.IF NoLoc
-  toNoLoc (P.LOOP _) = P.LOOP NoLoc
-
 instance ToNoLoc P.Pred where
   toNoLoc (P.Constant e) = P.Constant (toNoLoc e)
-  toNoLoc (P.Guard e s _) = P.Guard (toNoLoc e) (toNoLoc s) NoLoc
+  toNoLoc (P.GuardIf e _) = P.GuardIf (toNoLoc e) NoLoc
+  toNoLoc (P.GuardLoop e _) = P.GuardLoop (toNoLoc e) NoLoc
   toNoLoc (P.Assertion e _) = P.Assertion (toNoLoc e) NoLoc
   toNoLoc (P.LoopInvariant e b _) = P.LoopInvariant (toNoLoc e) (toNoLoc b) NoLoc
   toNoLoc (P.Bound e _) = P.Bound (toNoLoc e) NoLoc

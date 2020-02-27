@@ -20,7 +20,8 @@ data Sort = IF Loc | LOOP Loc
           deriving (Eq, Show, Generic)
 
 data Pred = Constant  Expr
-          | Guard     Expr Sort Loc
+          | GuardIf   Expr Loc
+          | GuardLoop Expr Loc
           | Assertion Expr Loc
           | LoopInvariant Expr Expr Loc -- predicate & bound
           | Bound     Expr Loc
@@ -39,7 +40,8 @@ toExpr (Constant e) = e
 toExpr (Bound e _) = e
 toExpr (Assertion e _) = e
 toExpr (LoopInvariant e _ _) = e
-toExpr (Guard e _ _) = e
+toExpr (GuardIf e _) = e
+toExpr (GuardLoop e _) = e
 toExpr (Conjunct xs) = C.conjunct (map toExpr xs)
 toExpr (Disjunct xs) = C.disjunct (map toExpr xs)
 toExpr (Negate x) = C.neg (toExpr x)
@@ -49,13 +51,11 @@ subst env (Constant e) = Constant <$> C.subst env e
 subst env (Bound e l) = Bound <$> C.subst env e <*> pure l
 subst env (Assertion e l) = Assertion <$> C.subst env e <*> pure l
 subst env (LoopInvariant e b l) = LoopInvariant <$> C.subst env e <*> pure b <*> pure l
-subst env (Guard e sort l) = Guard <$> C.subst env e <*> pure sort <*> pure l
+subst env (GuardIf e l) = GuardLoop <$> C.subst env e <*> pure l
+subst env (GuardLoop e l) = GuardLoop <$> C.subst env e <*> pure l
 subst env (Conjunct xs) = Conjunct <$> mapM (subst env) xs
 subst env (Disjunct es) = Disjunct <$> mapM (subst env) es
 subst env (Negate x) = Negate <$> subst env x
-
-toGuard :: Sort -> Expr -> Pred
-toGuard sort x = Guard x sort (locOf x)
 
 --------------------------------------------------------------------------------
 -- | Smart constructors for testing
@@ -72,10 +72,10 @@ loopInvariant x b = LoopInvariant x (bnd b) NoLoc
                   else C.variable
 
 guardIf :: Expr -> Pred
-guardIf x = Guard x (IF NoLoc) NoLoc
+guardIf x = GuardIf x NoLoc
 
 guardLoop :: Expr -> Pred
-guardLoop x = Guard x (LOOP NoLoc) NoLoc
+guardLoop x = GuardLoop x NoLoc
 
 boundEq :: Expr -> Expr -> Pred
 boundEq x var = Bound (x `C.eqq` var) NoLoc

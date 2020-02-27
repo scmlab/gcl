@@ -83,7 +83,7 @@ if' :: TestTree
 if' = testGroup "if statements"
   [ testCase "without precondition" $ run "if False -> skip fi\n{ True }\n" @?= Right
     ( [ Obligation 0
-        (Guard false (IF NoLoc) NoLoc)
+        (GuardIf false NoLoc)
         -- (Conjunct
         --   [ Assertion true NoLoc
         --   , Disjunct [ Guard false (IF NoLoc) NoLoc ]

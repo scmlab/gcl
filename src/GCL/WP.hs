@@ -102,9 +102,9 @@ struct _ pre _ (C.Assign xs es l) post = do
   obligate pre post' (Assignment l)
 
 struct b pre _ (C.If gcmds l) post = do
-  obligate pre (Disjunct $ map (toGuard (IF l)) $ C.getGuards gcmds) (IfTotal l)
+  obligate pre (Disjunct $ map guardIf (C.getGuards gcmds)) (IfTotal l)
   forM_ gcmds $ \(C.GdCmd guard body _) ->
-    structStmts b (Conjunct [pre, toGuard (IF l) guard]) Nothing body post
+    structStmts b (Conjunct [pre, guardIf guard]) Nothing body post
 
 struct _ _ Nothing (C.Do _ l) _ =
   throwError (MissingBound l)
@@ -121,12 +121,12 @@ struct _ _ Nothing (C.Do _ l) _ =
 struct b inv (Just bnd) (C.Do gcmds l) post = do
   -- base case
   let guards = C.getGuards gcmds
-  obligate (Conjunct (inv : (map (Negate . toGuard (LOOP l)) guards))) post (LoopBase l)
+  obligate (Conjunct (inv : (map (Negate . guardLoop) guards))) post (LoopBase l)
   -- inductive cases
   forM_ gcmds $ \(C.GdCmd guard body _) ->
-    structStmts b (Conjunct [inv, (toGuard (LOOP l)) guard]) Nothing body inv
+    structStmts b (Conjunct [inv, guardLoop guard]) Nothing body inv
   -- termination
-  obligate (Conjunct (inv : map (toGuard (LOOP l)) guards))
+  obligate (Conjunct (inv : map guardLoop guards))
        (Bound (bnd `C.gte` (C.Lit (C.Num 0) NoLoc)) NoLoc) (LoopTermBase l)
   -- bound decrementation
   oldbnd <- C.freshVar "bnd"
@@ -136,7 +136,7 @@ struct b inv (Just bnd) (C.Do gcmds l) post = do
       (Conjunct
         [ inv
         , Bound (bnd `C.eqq` C.Var oldbnd NoLoc) NoLoc
-        , toGuard (LOOP l) guard
+        , guardLoop guard
         ])
       Nothing
       body
@@ -217,8 +217,8 @@ wp _ (C.Assign xs es _) post =
 
 wp b (C.If gcmds l) post = do
   forM_ gcmds $ \(C.GdCmd guard body _) ->
-    structStmts b (toGuard (IF l) guard) Nothing body post
-  return (Disjunct (map (toGuard (IF l)) $ C.getGuards gcmds)) -- is this enough?
+    structStmts b (guardIf guard) Nothing body post
+  return (Disjunct (map guardIf (C.getGuards gcmds))) -- is this enough?
 
 wp _ (C.Do _ l) _ = throwError (MissingAssertion l)
 
