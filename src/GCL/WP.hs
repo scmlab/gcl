@@ -15,7 +15,7 @@ import GHC.Generics
 import Syntax.Concrete (Expr, Stmt, Lower)
 import qualified Syntax.Concrete as C
 -- import qualified Syntax.Predicate as P
-import Syntax.Predicate
+import Syntax.Predicate hiding (Stmt)
 import Syntax.Location (ToNoLoc(..))
 
 data Obligation
@@ -215,7 +215,7 @@ wp _ (C.LoopInvariant p b l) post = do
 wp _ (C.Assign xs es _) post =
   subst (assignmentEnv xs es) post
 
-wp b (C.If gcmds l) post = do
+wp b (C.If gcmds _) post = do
   forM_ gcmds $ \(C.GdCmd guard body _) ->
     structStmts b (guardIf guard) Nothing body post
   return (Disjunct (map guardIf (C.getGuards gcmds))) -- is this enough?

@@ -12,7 +12,6 @@ import Data.Loc
 import Error
 import Syntax.Parser.Lexer (LexicalError)
 import GCL.WP (StructError(..))
-import qualified GCL.WP2 as WP2
 import GCL.Type (TypeError(..))
 
 import Pretty.Abstract ()
@@ -39,15 +38,6 @@ instance Pretty StructError where
   pretty (ExcessBound loc) = "Excess Bound" <+> pretty loc
   pretty (MissingPostcondition loc) = "Missing Postcondition" <+> pretty loc
   pretty (DigHole loc) = "Dig Hole" <+> pretty loc
-
-instance Pretty WP2.StructError2 where
-  pretty (WP2.MissingAssertion loc) = "Missing Assertion" <+> pretty loc
-  pretty (WP2.MissingLoopInvariant loc) = "Missing Loop Invariant" <+> pretty loc
-  pretty (WP2.MissingBound loc) = "Missing Bound" <+> pretty loc
-  pretty (WP2.ExcessBound loc) = "Excess Bound" <+> pretty loc
-  pretty (WP2.MissingPrecondition loc) = "Missing Precondition" <+> pretty loc
-  pretty (WP2.MissingPostcondition loc) = "Missing Postcondition" <+> pretty loc
-  pretty (WP2.DigHole loc) = "Dig Hole" <+> pretty loc
 
 instance Pretty TypeError where
   pretty (NotInScope name _) = "The definition" <+> pretty name <+> "is not in scope"

@@ -11,13 +11,10 @@ import Data.Char (isUpper)
 import GHC.Generics
 
 import qualified Syntax.Concrete as C
-import Syntax.Concrete (Expr, Fresh, Subst)
+import Syntax.Concrete (Expr, Lower, Fresh, Subst)
 
 --------------------------------------------------------------------------------
 -- | Predicates
-
-data Sort = IF Loc | LOOP Loc
-          deriving (Eq, Show, Generic)
 
 data Pred = Constant  Expr
           | GuardIf   Expr Loc
@@ -28,12 +25,9 @@ data Pred = Constant  Expr
           | Conjunct  [Pred]
           | Disjunct  [Pred]
           | Negate     Pred
-          -- | Imply      Pred  Pred
           deriving (Eq, Show, Generic)
 
-instance ToJSON Sort where
 instance ToJSON Pred where
-
 
 toExpr :: Pred -> Expr
 toExpr (Constant e) = e
@@ -89,3 +83,63 @@ boundGTE x var = Bound (x `C.gte` var) NoLoc
 
 (===) :: Int -> Int -> Expr
 x === y = C.number x `C.eqq` C.number y
+
+--------------------------------------------------------------------------------
+-- | Data structure for storing Assertions in a program
+--
+--    { P }   ----- Struct { P } ----
+--    stmt
+--    stmt
+--    stmt
+--    { Q }    ----- Struct { Q } ----
+--    stmt
+--    stmt
+--    stmt
+--    { R }    ----- Postcond { R } ----
+
+data Struct = Struct
+                Pred    --  assertion
+                [Stmt]  --  statements after the assertion
+                Struct  --  the next chunk of assertion with statements after it
+            | Postcond Pred
+            deriving (Eq)
+
+-- extracting the assertion from a Struct
+extractAssertion :: Struct -> Pred
+extractAssertion (Struct p _ _) = p
+extractAssertion (Postcond p)   = p
+
+--------------------------------------------------------------------------------
+-- | Statement with its computed precondition
+
+data Stmt
+  = Skip   (L Pred)
+  | Abort  (L Pred)
+  | Assign (L Pred) [Lower] [Expr]
+  | Do     (L Pred) Expr [GdCmd]
+  | If     (L Pred)      [GdCmd]
+  | Spec   (L Pred)
+
+data GdCmd = GdCmd
+  { gdCmdGuard :: Pred
+  , gdCmdBody :: Struct
+  }
+  deriving (Eq)
+
+-- comparing only the constructor and the predicate
+instance Eq Stmt where
+  Skip l        == Skip m       = l == m
+  Abort l       == Abort m      = l == m
+  Assign l _ _  == Assign m _ _ = l == m
+  Do l _ xs     == Do m _ ys    = l == m && xs == ys
+  If l xs       == If m ys      = l == m && xs == ys
+  Spec l        == Spec m       = l == m
+  _             == _            = False
+
+precond :: Stmt -> Pred
+precond (Skip   l    ) = unLoc l
+precond (Abort  l    ) = unLoc l
+precond (Assign l _ _) = unLoc l
+precond (Do     l _ _) = unLoc l
+precond (If     l _  ) = unLoc l
+precond (Spec   l    ) = unLoc l
