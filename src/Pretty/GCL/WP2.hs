@@ -38,7 +38,7 @@ instance Pretty PO where
     indent 2 (pretty q) <> line <>
     indent 2 (pretty os) <> line
 
-instance Pretty Specification2 where
+instance Pretty Spec where
   pretty (Specification i p q _) = lbracket <> pretty i <> rbracket <> line <>
     indent 2 (pretty p) <> line <>
     indent 2 (pretty q) <> line

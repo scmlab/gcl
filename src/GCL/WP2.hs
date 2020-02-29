@@ -22,8 +22,24 @@ import Syntax.Location (ToNoLoc(..))
 import Pretty.Concrete ()
 import Pretty.Predicate ()
 
+sweep :: C.Program -> Either StructError2 [PO]
+-- sweep :: C.Program -> Either StructError2 ([PO], [Spec])
+sweep program = runWPM $ do
+  struct <- programToStruct program
+
+  pos <- runPOM $ genPO struct
+
+  -- struct <- lift (lift (programToStruct program))
+  -- runPOM $ do
+  --   pos <- genPO struct
+  --   specs <- genSpec struct
+  return (pos)
+
 assignmentEnv :: [Lower] -> [Expr] -> C.Subst
 assignmentEnv xs es = Map.fromList (zip (map Left xs) es)
+
+--------------------------------------------------------------------------------
+-- | Monad for calculating the weakest precondition
 
 type WPM = ExceptT StructError2 (State Int)
 
@@ -37,7 +53,7 @@ instance C.Fresh WPM where
     return i
 
 --------------------------------------------------------------------------------
--- | Origin of Obligation
+-- | Origin of Proof Obligations
 
 data Origin = AtAbort           Loc
             | AtSkip            Loc
@@ -69,7 +85,7 @@ originOfStmt (Skip   l) = AtSkip (locOf l)
 originOfStmt (Assign l _ _) = AtAssignment (locOf l)
 originOfStmt (If l _  ) = AtIf (locOf l)
 originOfStmt (Do l _ _) = AtLoop (locOf l)
-originOfStmt (Spec   l) = AtSpec (locOf l)
+originOfStmt (Spec l _) = AtSpec (locOf l)
 
 -- get the Origin of the first statement in a Struct
 originOfStruct :: Struct -> Origin
@@ -88,7 +104,7 @@ instance ToNoLoc PO where
   toNoLoc (PO i p q o) =
     PO i (toNoLoc p) (toNoLoc q) (toNoLoc o)
 
--- Monad on top of WPM, for generating obligations
+-- Monad on top of WPM, for generating proof obligations
 type POM = WriterT [PO] (StateT Int WPM)
 
 instance C.Fresh POM where
@@ -97,32 +113,16 @@ instance C.Fresh POM where
     put (succ i)
     return i
 
-runPOM :: POM a -> Either StructError2 (a, [PO])
-runPOM f = runWPM (evalStateT (runWriterT f) 0)
-
-sweep :: C.Program -> Either StructError2 [PO]
-sweep program = fmap snd $ runPOM $ do
-  struct <- lift (lift (programToStruct program))
-  genPO struct
+runPOM :: POM a -> WPM [PO]
+runPOM f = evalStateT (execWriterT f) 0
 
 tellPO :: Pred -> Pred -> Origin -> POM ()
 tellPO p q l = do
-
   -- NOTE: this could use some love
   unless (C.predEq (toExpr p) (toExpr q)) $ do
     i <- get
     put (succ i)
     tell [PO i p q l]
-
-conjunct :: [Pred] -> Pred
-conjunct [] = Constant C.true
-conjunct [x] = x
-conjunct xs = Conjunct xs
-
-disjunct :: [Pred] -> Pred
-disjunct [] = Constant C.false
-disjunct [x] = x
-disjunct xs = Disjunct xs
 
 genPO :: Struct -> POM ()
 genPO (Postcond _) = return ()
@@ -179,7 +179,7 @@ genPO (Struct pre (stmt:stmts) next) = do
 --------------------------------------------------------------------------------
 -- | Specification
 
-data Specification2 = Specification
+data Spec = Specification
   { specID       :: Int
   , specPreCond  :: Pred
   , specPostCond :: Pred
@@ -187,7 +187,30 @@ data Specification2 = Specification
   } deriving (Eq, Show, Generic)
 
 -- Monad on top of WPM, for generating specifications
-type SpecM = WriterT [Specification2] (StateT Int WPM)
+type SpecM = WriterT [Spec] (StateT Int WPM)
+
+instance C.Fresh SpecM where
+  fresh = do
+    i <- get
+    put (succ i)
+    return i
+
+tellSpec :: L Pred -> Pred -> SpecM ()
+tellSpec (L l pre) post = do
+  i <- get
+  put (succ i)
+  tell [Specification i pre post l]
+
+runSpecM :: SpecM a -> WPM [Spec]
+runSpecM f = evalStateT (execWriterT f) 0
+
+
+genSpec :: Struct -> SpecM ()
+genSpec (Postcond _) = return ()
+genSpec (Struct pre [] next) = genSpec next
+-- genSpec (Struct pre (Spec (L l p):stmts) next) = do
+--
+--   tellPO pre (precond stmt) (originOfStmt stmt)
 
 
 --------------------------------------------------------------------------------
@@ -220,7 +243,6 @@ programToStruct (C.Program _ stmts _) = case (init stmts, last stmts) of
   (others               :_     , C.Assert _ _) -> throwError (MissingPrecondition (locOf others))
   (_                           , stmt)         -> throwError (MissingPostcondition (locOf stmt))
 
-
 --------------------------------------------------------------------------------
 -- | Concrete Statements -> Struct
 
@@ -233,13 +255,13 @@ wpStmts imposed stmts post = do
     wpStmts' _       []           post = return (Accum [] (Postcond post))
     wpStmts' imposed (stmt:stmts) post = case stmt of
       C.Assert p l -> do
-        accum <- wpStmts' [Assertion p l]     stmts post
+        accum <- wpStmts' [Assertion p l] stmts post
         return (Accum [] (fromAccum (Assertion p l) accum))
       C.LoopInvariant p b l -> do
         accum <- wpStmts' [LoopInvariant p b l] stmts post
         return (Accum [] (fromAccum (LoopInvariant p b l) accum))
       otherStmt             -> do
-        xs <- wpStmts' []                  stmts post
+        xs <- wpStmts' [] stmts post
         x <- wp imposed otherStmt (precondAccum xs)
         return $ insertAccum x xs
 
@@ -279,7 +301,9 @@ wpStmts imposed stmts post = do
         _ -> throwError (MissingLoopInvariant l)
 
       C.SpecQM l            -> throwError (DigHole l)
-      C.Spec l              -> return $ Spec (L l post)
+      C.Spec l              -> if null imposed
+        then return $ Spec (L l post) post
+        else return $ Spec (L l (conjunct (reverse imposed))) post
 
 
 --------------------------------------------------------------------------------
@@ -298,11 +322,11 @@ rewriteStruct imposed (Struct _dumped stmts next) post = do
     wpStmts' _       []           next = return $ Accum [] next
     wpStmts' imposed (stmt:stmts) next = do
       xs <- wpStmts' [] stmts next
-      x <- wp'' imposed stmt (precondAccum xs)
+      x <- wp imposed stmt (precondAccum xs)
       return $ insertAccum x xs
 
-    wp'' :: [Pred] -> Stmt -> Pred -> WPM Stmt
-    wp'' imposed stmt post = case stmt of
+    wp :: [Pred] -> Stmt -> Pred -> WPM Stmt
+    wp imposed stmt post = case stmt of
       Skip l -> return $ Skip (L (locOf l) post)
       Abort l -> return $ Abort l
       Assign l xs es -> do
@@ -319,9 +343,10 @@ rewriteStruct imposed (Struct _dumped stmts next) post = do
           let imposed' = guard : imposed
           body' <- rewriteStruct imposed' body inv
           return $ GdCmd guard body'
-
         return $ Do (L l inv) bnd gdCmds'
-      Spec l -> return $ Spec (L (locOf l) post)
+      Spec l p -> if null imposed
+        then return $ Spec (L (locOf l) post) post
+        else return $ Spec (L (locOf l) (conjunct (reverse imposed))) post
 
 --------------------------------------------------------------------------------
 -- | Accum, temporary datatype for "incomplete" Structs

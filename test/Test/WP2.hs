@@ -60,7 +60,7 @@ statements = testGroup "simple statements"
             \!}       \n\
             \{ 0 = 0 }" @?= Right
       ( Struct (assertion true)
-          [ Spec $ loc (assertion (0 === 0)) ]
+          [ Spec (loc (assertion true)) (assertion (0 === 0)) ]
       $ Postcond (assertion (0 === 0))
       )
   ]
@@ -271,4 +271,4 @@ instance ToNoLoc Stmt where
   toNoLoc (Assign l xs es) = Assign (toNoLoc l) (map toNoLoc xs) (map toNoLoc es)
   toNoLoc (Do l bnd xs) = Do (toNoLoc l) (toNoLoc bnd) (map toNoLoc xs)
   toNoLoc (If l xs) = If (toNoLoc l) (map toNoLoc xs)
-  toNoLoc (Spec l) = Spec (toNoLoc l)
+  toNoLoc (Spec l p) = Spec (toNoLoc l) (toNoLoc p)

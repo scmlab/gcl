@@ -55,7 +55,7 @@ instance Pretty Stmt where
   pretty (If l xs) = braces (pretty (unLoc l)) <> line
     <> "If" <> line
     <> vsep (map pretty xs)
-  pretty (Spec l) = braces (pretty (unLoc l)) <> line <> "Spec"
+  pretty (Spec l _) = braces (pretty (unLoc l)) <> line <> "Spec" 
 
 
 instance Show GdCmd where

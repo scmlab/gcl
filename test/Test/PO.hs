@@ -11,7 +11,7 @@ import Syntax.Predicate
 import Syntax.Concrete hiding (LoopInvariant)
 import qualified REPL as REPL
 import GCL.WP2 (PO(..), Origin(..))
--- import GCL.WP2 (Obligation2(..), Specification2(..), ObliOrigin2(..))
+-- import GCL.WP2 (Obligation2(..), Spec(..), ObliOrigin2(..))
 import Data.Text.Prettyprint.Doc
 
 import Syntax.Location
@@ -65,11 +65,7 @@ statements = testGroup "simple statements"
             \{!           \n\
             \!}           \n\
             \{ False }    \n" @?= poList
-      [ PO 0
-          (assertion true)
-          (assertion false)
-          (AtSpec NoLoc)
-      ]
+      []
   ]
 
 assertions :: TestTree

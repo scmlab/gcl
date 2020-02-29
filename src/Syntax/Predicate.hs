@@ -84,6 +84,16 @@ boundGTE x var = Bound (x `C.gte` var) NoLoc
 (===) :: Int -> Int -> Expr
 x === y = C.number x `C.eqq` C.number y
 
+conjunct :: [Pred] -> Pred
+conjunct [] = Constant C.true
+conjunct [x] = x
+conjunct xs = Conjunct xs
+
+disjunct :: [Pred] -> Pred
+disjunct [] = Constant C.false
+disjunct [x] = x
+disjunct xs = Disjunct xs
+
 --------------------------------------------------------------------------------
 -- | Data structure for storing Assertions in a program
 --
@@ -118,7 +128,7 @@ data Stmt
   | Assign (L Pred) [Lower] [Expr]
   | Do     (L Pred) Expr [GdCmd]
   | If     (L Pred)      [GdCmd]
-  | Spec   (L Pred)
+  | Spec   (L Pred) Pred -- pre and post
 
 data GdCmd = GdCmd
   { gdCmdGuard :: Pred
@@ -133,7 +143,7 @@ instance Eq Stmt where
   Assign l _ _  == Assign m _ _ = l == m
   Do l _ xs     == Do m _ ys    = l == m && xs == ys
   If l xs       == If m ys      = l == m && xs == ys
-  Spec l        == Spec m       = l == m
+  Spec l _      == Spec m _     = l == m
   _             == _            = False
 
 precond :: Stmt -> Pred
@@ -142,4 +152,4 @@ precond (Abort  l    ) = unLoc l
 precond (Assign l _ _) = unLoc l
 precond (Do     l _ _) = unLoc l
 precond (If     l _  ) = unLoc l
-precond (Spec   l    ) = unLoc l
+precond (Spec   l _  ) = unLoc l
