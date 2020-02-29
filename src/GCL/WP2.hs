@@ -22,18 +22,14 @@ import Syntax.Location (ToNoLoc(..))
 import Pretty.Concrete ()
 import Pretty.Predicate ()
 
-sweep :: C.Program -> Either StructError2 [PO]
--- sweep :: C.Program -> Either StructError2 ([PO], [Spec])
+sweep :: C.Program -> Either StructError2 ([PO], [Spec])
 sweep program = runWPM $ do
   struct <- programToStruct program
 
   pos <- runPOM $ genPO struct
+  specs <- runSpecM $ genSpec struct
 
-  -- struct <- lift (lift (programToStruct program))
-  -- runPOM $ do
-  --   pos <- genPO struct
-  --   specs <- genSpec struct
-  return (pos)
+  return (pos, specs)
 
 assignmentEnv :: [Lower] -> [Expr] -> C.Subst
 assignmentEnv xs es = Map.fromList (zip (map Left xs) es)
@@ -207,10 +203,12 @@ runSpecM f = evalStateT (execWriterT f) 0
 
 genSpec :: Struct -> SpecM ()
 genSpec (Postcond _) = return ()
-genSpec (Struct pre [] next) = genSpec next
--- genSpec (Struct pre (Spec (L l p):stmts) next) = do
---
---   tellPO pre (precond stmt) (originOfStmt stmt)
+genSpec (Struct _   []     next) = genSpec next
+genSpec (Struct pre (Spec p q:xs) next) = do
+  tellSpec p q
+  genSpec (Struct pre xs next)
+genSpec (Struct pre (_:xs) next) = do
+  genSpec (Struct pre xs next)
 
 
 --------------------------------------------------------------------------------
@@ -344,7 +342,7 @@ rewriteStruct imposed (Struct _dumped stmts next) post = do
           body' <- rewriteStruct imposed' body inv
           return $ GdCmd guard body'
         return $ Do (L l inv) bnd gdCmds'
-      Spec l p -> if null imposed
+      Spec l _ -> if null imposed
         then return $ Spec (L (locOf l) post) post
         else return $ Spec (L (locOf l) (conjunct (reverse imposed))) post
 

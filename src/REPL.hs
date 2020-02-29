@@ -61,7 +61,7 @@ structError f = case f of
   Right x -> return x
   Left err -> Left [StructError2 err]
 
-sweep2 :: Concrete.Program -> Either [Error] [PO]
+sweep2 :: Concrete.Program -> Either [Error] ([PO], [Spec])
 sweep2 program = case WP2.sweep program of
   Right x -> return x
   Left err -> Left [StructError2 err]

@@ -250,7 +250,7 @@ poList :: [PO] -> Either a POList
 poList = Right . POList
 
 run :: Text -> Either [Error] POList
-run text = fmap (POList . map toNoLoc) $ REPL.scan "<test>" text
+run text = fmap (POList . map toNoLoc . fst) $ REPL.scan "<test>" text
             >>= REPL.parseProgram "<test>"
             >>= REPL.sweep2
 
