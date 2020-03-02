@@ -55,8 +55,8 @@ main = do
           -- putStrLn "\n=== execution (stores) ==="
           -- mapM_ (print . pretty) stores
 
-        Left errors -> do
-          mapM_ (print . pretty) errors
+        Left err -> do
+          print $ pretty err
 
   where
     loop :: IO ()
@@ -81,7 +81,7 @@ handleRequest (Load filepath) = do
         sweep2 program
 
   case run of
-    Left errors -> send $ Error $ map fromGlobalError errors
+    Left errors -> send $ Error [fromGlobalError errors]
     Right (obligations, specifications) -> send $ OK obligations specifications
 
   return True
@@ -90,13 +90,13 @@ handleRequest (Refine i payload) = do
 
   let run = scan "<spec>" payload >>= parseSpec
   case run of
-    Left errors -> send $ Error $ map (fromLocalError i) errors
+    Left err -> send $ Error [fromLocalError i err]
     Right _ -> send $ Resolve i
 
   return True
 
 handleRequest (InsertAssertion i) = do
-  -- insertAssertion 
+  -- insertAssertion
   -- let run = scan "<spec>" payload >>= parseSpec
   -- case run of
   --   Left errors -> send $ Error $ map (fromLocalError i) errors

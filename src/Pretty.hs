@@ -23,8 +23,7 @@ import Pretty.GCL.WP2 ()
 
 instance Pretty Error where
   pretty (LexicalError err) = "Lexical Error" <+> pretty err
-  pretty (SyntacticError (loc, err)) = "Syntactic Error" <+> pretty loc <> line
-    <> pretty err
+  pretty (SyntacticError errors) = "Syntactic Error" <+> prettyList errors
   pretty (TypeError err) = "Type Error" <+> pretty (locOf err) <> line <> pretty err
   pretty (StructError err) = "Struct Error" <+> pretty (locOf err) <> line <> pretty err
   pretty (StructError2 err) = "Struct Error" <+> pretty (locOf err) <> line <> pretty err

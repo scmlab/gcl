@@ -33,7 +33,7 @@ instance ToJSON Site where
 
 data Error
   = LexicalError    LexicalError
-  | SyntacticError  SyntacticError
+  | SyntacticError  [SyntacticError]
   | TypeError       TypeError
   | StructError     StructError
   | StructError2    StructError2
@@ -43,12 +43,11 @@ data Error
 
 instance Located Error where
   locOf (LexicalError pos) = Loc pos pos
-  locOf (SyntacticError (loc, _)) = loc
+  locOf (SyntacticError es) = foldl (\l (m, _) -> l <--> m) NoLoc es
   locOf (TypeError e) = locOf e
   locOf (StructError e) = locOf e
   locOf (StructError2 e) = locOf e
   locOf (CannotReadFile _) = NoLoc
-  -- locOf (ExecError e) = locOf e
 
 fromLocalError :: Int -> Error -> (Site, Error)
 fromLocalError i e = (Local (locOf e) i, e)
