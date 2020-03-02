@@ -6,6 +6,7 @@ module Error where
 import Control.Exception (IOException)
 import Data.Aeson
 import Data.Loc
+-- import Data.ByteString.Lazy (ByteString)
 import GHC.Generics
 
 import Syntax.Parser.Util ()
@@ -32,12 +33,13 @@ instance ToJSON Site where
 -- | Error
 
 data Error
-  = LexicalError    LexicalError
-  | SyntacticError  [SyntacticError]
-  | TypeError       TypeError
-  | StructError     StructError
-  | StructError2    StructError2
-  | CannotReadFile  FilePath
+  = LexicalError        LexicalError
+  | SyntacticError      [SyntacticError]
+  | TypeError           TypeError
+  | StructError         StructError
+  | StructError2        StructError2
+  | CannotDecodeRequest
+  | CannotReadFile      FilePath
   | NotLoaded
   -- | ExecError       ExecError
   deriving (Eq, Show, Generic)
@@ -48,6 +50,7 @@ instance Located Error where
   locOf (TypeError e) = locOf e
   locOf (StructError e) = locOf e
   locOf (StructError2 e) = locOf e
+  locOf CannotDecodeRequest = NoLoc
   locOf (CannotReadFile _) = NoLoc
   locOf NotLoaded  = NoLoc
 

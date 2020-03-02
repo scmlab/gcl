@@ -18,7 +18,9 @@ main = do
   (opts, _) <- getArgs >>= parseOpts
   case optMode opts of
     ModeHelp -> putStrLn $ usageInfo usage options
-    ModeREPL -> loop
+    ModeREPL -> do
+      _ <- runREPLM loop
+      return ()
     ModeDev -> do
       let filepath = "examples/b.gcl"
       raw <- Text.readFile filepath
@@ -52,41 +54,20 @@ main = do
         Left err -> do
           print $ pretty err
 
-  where
-    loop :: IO ()
-    loop = do
-      request <- recv
-      case request of
-        Nothing -> return ()
-        Just req -> do
-          result <- handleRequest req
-          case result of
-            Nothing -> return ()
-            Just response -> do
-              send response
-              loop
+  -- where
+  --   loop :: IO ()
+  --   loop = do
+  --     request <- recv
+  --     case request of
+  --       Nothing -> return ()
+  --       Just req -> do
+  --         result <- handleRequest req
+  --         case result of
+  --           Nothing -> return ()
+  --           Just response -> do
+  --             send response
+  --             loop
 
-
-handleRequest :: Request -> IO (Maybe Response)
-handleRequest (Load filepath) = do
-  result <- runREPLM $ load filepath
-  case result of
-    Left err -> return (Just $ Error [globalError err])
-    Right (pos, specs) -> return (Just $ OK pos specs)
-handleRequest (Refine i payload) = do
-  result <- runREPLM $ refine payload
-  case result of
-    Left err -> return (Just $ Error [localError i err])
-    Right () -> return (Just $ Resolve i)
-handleRequest (InsertAssertion i) = do
-  result <- runREPLM $ insertAssertion i
-  case result of
-    Left err -> return (Just $ Error [globalError err])
-    Right expr -> return (Just $ Insert expr)
-handleRequest Debug = do
-  error "crash!"
-handleRequest Quit = do
-  return Nothing
 
 --------------------------------------------------------------------------------
 -- | Command-line arguments

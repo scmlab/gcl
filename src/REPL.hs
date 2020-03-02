@@ -55,6 +55,47 @@ runREPLM f = evalStateT (runExceptT f) initREPLState
 
 --------------------------------------------------------------------------------
 
+data ReqSort = LocalReq Int | GlobalReq | BreakLoop
+
+loop :: REPLM ()
+loop = do
+  request <- recv
+  case classifyRequest request of
+    LocalReq i -> do
+      request <- handleRequest request `catchError` handleLocalError i
+      send request
+      loop
+    GlobalReq -> do
+      request <- handleRequest request `catchError` handleGlobalError
+      send request
+      loop
+    BreakLoop -> return ()
+  where
+    handleGlobalError err = return $ Error [globalError err]
+    handleLocalError i err = return $ Error [localError i err]
+
+classifyRequest :: Request -> ReqSort
+classifyRequest (Load _) = GlobalReq
+classifyRequest (Refine i _) = LocalReq i
+classifyRequest (InsertAssertion _) = GlobalReq
+classifyRequest Debug = error "crash!"
+classifyRequest Quit = BreakLoop
+
+handleRequest :: Request -> REPLM Response
+handleRequest (Load filepath) = do
+  (pos, specs) <- load filepath
+  return $ OK pos specs
+handleRequest (Refine i payload) = do
+  _ <- refine payload
+  return $ Resolve i
+handleRequest (InsertAssertion i) = do
+  expr <- insertAssertion i
+  return $ Insert expr
+handleRequest Debug = do
+  error "crash!"
+handleRequest Quit =
+  error "panic!"
+
 load :: FilePath -> REPLM ([PO], [Spec])
 load filepath = do
   persistFilePath filepath
@@ -159,11 +200,15 @@ structError f = case f of
 sweep2 :: Concrete.Program -> Either Error ([PO], [Spec])
 sweep2 program = structError $ WP2.sweep program
 
-recv :: FromJSON a => IO (Maybe a)
-recv = decode . BS.fromStrict <$> Strict.getLine
+recv :: FromJSON a => REPLM a
+recv = do
+  raw <- liftIO Strict.getLine
+  case decode (BS.fromStrict raw) of
+    Nothing -> throwError CannotDecodeRequest
+    Just x -> return x
 
-send :: ToJSON a => a -> IO ()
-send payload = do
+send :: ToJSON a => a -> REPLM ()
+send payload = liftIO $ do
   Strict.putStrLn $ BS.toStrict $ encode $ payload
   hFlush stdout
 
