@@ -38,6 +38,7 @@ data Error
   | StructError     StructError
   | StructError2    StructError2
   | CannotReadFile  FilePath
+  | NotLoaded
   -- | ExecError       ExecError
   deriving (Eq, Show, Generic)
 
@@ -48,11 +49,12 @@ instance Located Error where
   locOf (StructError e) = locOf e
   locOf (StructError2 e) = locOf e
   locOf (CannotReadFile _) = NoLoc
+  locOf NotLoaded  = NoLoc
 
-fromLocalError :: Int -> Error -> (Site, Error)
-fromLocalError i e = (Local (locOf e) i, e)
+localError :: Int -> Error -> (Site, Error)
+localError i e = (Local (locOf e) i, e)
 
-fromGlobalError :: Error -> (Site, Error)
-fromGlobalError e = (Global (locOf e), e)
+globalError :: Error -> (Site, Error)
+globalError e = (Global (locOf e), e)
 
 instance ToJSON Error where

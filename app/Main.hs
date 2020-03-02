@@ -6,7 +6,6 @@ import REPL
 
 import Error
 
-import Control.Monad (when)
 import Data.Text.Prettyprint.Doc
 import qualified Data.Text.Lazy.IO as Text
 import Prelude
@@ -22,23 +21,18 @@ main = do
     ModeREPL -> loop
     ModeDev -> do
       let filepath = "examples/b.gcl"
-
       raw <- Text.readFile filepath
 
-      let run = do
+      result <- runREPLM $ do
             tokens <- scan filepath raw
             program <- parseProgram filepath tokens
-            -- program <- abstract syntax
             -- typeCheck program
-            (_, obligations, specifications) <- sweep program
+            ((_, obligations), specifications) <- sweep1 program
             -- stores <- execute program
             return (tokens, program, obligations, specifications)
 
-      case run of
+      case result of
         Right (tokens, program, obligations, specifications) -> do
-
-          -- putStrLn "=== raw ==="
-          -- Text.putStrLn raw
 
           putStrLn "\n=== tokens ==="
           print tokens
@@ -63,53 +57,36 @@ main = do
     loop = do
       request <- recv
       case request of
-        Just req -> do
-          keepGoing <- handleRequest req
-          when keepGoing loop
         Nothing -> return ()
+        Just req -> do
+          result <- handleRequest req
+          case result of
+            Nothing -> return ()
+            Just response -> do
+              send response
+              loop
 
-handleRequest :: Request -> IO Bool
+
+handleRequest :: Request -> IO (Maybe Response)
 handleRequest (Load filepath) = do
-  raw <- Text.readFile filepath
-
-  let run = do
-        tokens <- scan filepath raw
-        program <- parseProgram filepath tokens
-        -- program <- abstract syntax
-        -- typeCheck program
-        -- sweep program
-        sweep2 program
-
-  case run of
-    Left errors -> send $ Error [fromGlobalError errors]
-    Right (obligations, specifications) -> send $ OK obligations specifications
-
-  return True
-
+  result <- runREPLM $ load filepath
+  case result of
+    Left err -> return (Just $ Error [globalError err])
+    Right (pos, specs) -> return (Just $ OK pos specs)
 handleRequest (Refine i payload) = do
-
-  let run = scan "<spec>" payload >>= parseSpec
-  case run of
-    Left err -> send $ Error [fromLocalError i err]
-    Right _ -> send $ Resolve i
-
-  return True
-
+  result <- runREPLM $ refine payload
+  case result of
+    Left err -> return (Just $ Error [localError i err])
+    Right () -> return (Just $ Resolve i)
 handleRequest (InsertAssertion i) = do
-  -- insertAssertion
-  -- let run = scan "<spec>" payload >>= parseSpec
-  -- case run of
-  --   Left errors -> send $ Error $ map (fromLocalError i) errors
-  --   Right _ -> send $ Resolve i
-  send $ Insert "HI"
-
-  return True
-
+  result <- runREPLM $ insertAssertion i
+  case result of
+    Left err -> return (Just $ Error [globalError err])
+    Right expr -> return (Just $ Insert expr)
 handleRequest Debug = do
   error "crash!"
-
 handleRequest Quit = do
-  return False
+  return Nothing
 
 --------------------------------------------------------------------------------
 -- | Command-line arguments

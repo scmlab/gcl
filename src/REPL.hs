@@ -55,48 +55,89 @@ runREPLM f = evalStateT (runExceptT f) initREPLState
 
 --------------------------------------------------------------------------------
 
-load :: FilePath -> REPLM ()
+load :: FilePath -> REPLM ([PO], [Spec])
 load filepath = do
-  -- persists FilePath
-  modify $ \s -> s { replFilePath = Just filepath }
+  persistFilePath filepath
 
   result <- liftIO $ try $ Text.readFile filepath :: REPLM (Either IOException Text)
   case result of
     Left _  -> throwError $ CannotReadFile filepath
     Right raw -> do
-      tokens <- withExceptT LexicalError $ liftEither $ Lexer.scan filepath raw
-      program <- withExceptT SyntacticError $ liftEither $ Parser.parse Parser.program filepath tokens
-      -- persists Program
-      modify $ \s -> s { replProgram = Just program }
-      struct <- withExceptT StructError2 $ liftEither $ runWPM $ WP2.programToStruct program
-      -- persists Struct
-      modify $ \s -> s { replStruct = Just struct }
+      tokens <- scan filepath raw
+      program <- parseProgram filepath tokens
+      persistProgram program
+      struct <- toStruct program
+      persistStruct struct
 
-      (pos, specs) <- withExceptT StructError2 $ liftEither $ runWPM $ do
+      withExceptT StructError2 $ liftEither $ runWPM $ do
         pos <- runPOM $ genPO struct
         specs <- runSpecM $ genSpec struct
         return (pos, specs)
 
-      liftIO $ send $ OK pos specs
+refine :: Text -> REPLM ()
+refine payload = do
+  _ <- scan "<spec>" payload >>= parseSpec
+  return ()
 
-
+insertAssertion :: Int -> REPLM Concrete.Expr
+insertAssertion n = do
+  program <- getProgram
+  struct <- getStruct
+  withExceptT StructError2 $ liftEither $ runWPM $ do
+    let pos = case locOf program of
+              Loc p _ -> linePos (posFile p) n
+              NoLoc -> linePos "<untitled>" n
+    case Predicate.precondAtLine n struct of
+      Nothing -> throwError $ PreconditionUnknown (Loc pos pos)
+      Just x -> return $ Predicate.toExpr x
 
 --------------------------------------------------------------------------------
 
-scan :: FilePath -> Text -> Either Error TokStream
-scan filepath = first LexicalError . Lexer.scan filepath
+persistFilePath :: FilePath -> REPLM ()
+persistFilePath filepath = modify $ \s -> s { replFilePath = Just filepath }
 
-parse :: Parser.Parser a -> FilePath -> TokStream -> Either Error a
-parse parser filepath = first SyntacticError . Parser.parse parser filepath
+persistProgram :: Concrete.Program -> REPLM ()
+persistProgram program = modify $ \s -> s { replProgram = Just program }
 
-parseProgram :: FilePath -> TokStream -> Either Error Concrete.Program
+persistStruct :: Predicate.Struct -> REPLM ()
+persistStruct struct = modify $ \s -> s { replStruct = Just struct }
+
+getProgram :: REPLM Concrete.Program
+getProgram = do
+  result <- gets replProgram
+  case result of
+    Nothing -> throwError NotLoaded
+    Just p -> return p
+
+getStruct :: REPLM Predicate.Struct
+getStruct = do
+  result <- gets replStruct
+  case result of
+    Nothing -> throwError NotLoaded
+    Just p -> return p
+
+--------------------------------------------------------------------------------
+
+scan :: FilePath -> Text -> REPLM TokStream
+scan filepath = withExceptT LexicalError . liftEither . Lexer.scan filepath
+
+parse :: Parser.Parser a -> FilePath -> TokStream -> REPLM a
+parse parser filepath = withExceptT SyntacticError . liftEither . Parser.parse parser filepath
+
+parseProgram :: FilePath -> TokStream -> REPLM Concrete.Program
 parseProgram = parse Parser.program
 
-parseSpec :: TokStream -> Either Error [Concrete.Stmt]
+toStruct :: Concrete.Program -> REPLM Predicate.Struct
+toStruct = withExceptT StructError2 . liftEither . runWPM . WP2.programToStruct
+
+parseSpec :: TokStream -> REPLM [Concrete.Stmt]
 parseSpec = parse Parser.specContent "<specification>"
 
--- abstract :: FromConcrete a b => a -> Either Error b
--- abstract = first (\x -> [ConvertError x]) . Abstract.abstract
+sweep1 :: Concrete.Program -> REPLM ((Predicate.Pred, [Obligation]), [Specification])
+sweep1 (Concrete.Program _ statements _) =
+  withExceptT StructError $ liftEither $ runWP (wpProg statements)
+
+--------------------------------------------------------------------------------
 
 -- typeCheck :: Concrete.Program -> Either Error ()
 -- typeCheck = first (\x -> [TypeError x]) . Type.runTM . Type.checkProg
@@ -108,21 +149,6 @@ parseSpec = parse Parser.specContent "<specification>"
 --     (results, stores) = unzip $ Exec.runExNondet (Exec.execProg program) Exec.prelude
 
 -- weakestPrecondition :: [Concrete.Statement] -> Either Error Predicate.Pred
-
-sweep :: Concrete.Program -> Either Error (Predicate.Pred, [Obligation], [Specification])
-sweep (Concrete.Program _ statements _) = case runWP (wpProg statements) of
-    Right ((p, obligations), specifications) -> return (p, obligations, specifications)
-    Left err -> Left $ StructError err
-
-insertAssertion :: Concrete.Program -> Int -> Either Error Concrete.Expr
-insertAssertion program n = structError $ WP2.runWPM $ do
-  let pos = case locOf program of
-            Loc p _ -> linePos (posFile p) n
-            NoLoc -> linePos "<untitled>" n
-  struct <- WP2.programToStruct program
-  case Predicate.precondAtLine n struct of
-    Nothing -> throwError $ PreconditionUnknown (Loc pos pos)
-    Just x -> return $ Predicate.toExpr x
 
 
 structError :: Either StructError2 a -> Either Error a
@@ -158,7 +184,7 @@ data Response
   = OK [PO] [Spec]
   | Error [(Site, Error)]
   | Resolve Int -- resolves some Spec
-  | Insert Text
+  | Insert Concrete.Expr
   deriving (Generic)
 
 instance ToJSON Response where
