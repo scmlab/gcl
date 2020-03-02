@@ -3,11 +3,13 @@
 
 module REPL where
 
+import Control.Monad.Except (throwError)
 import Data.Aeson hiding (Error)
 import Data.Bifunctor (first)
 import qualified Data.ByteString.Lazy.Char8 as BS
 import qualified Data.ByteString.Char8 as Strict
 import Data.Text.Lazy (Text)
+import Data.Loc
 import GHC.Generics
 import System.IO
 
@@ -21,6 +23,7 @@ import qualified Syntax.Parser.Lexer as Lexer
 import qualified Syntax.Parser as Parser
 import qualified Syntax.Concrete as Concrete
 import qualified Syntax.Predicate as Predicate
+import Syntax.Location ()
 -- import qualified GCL.Exec.ExecMonad as Exec
 -- import qualified GCL.Exec.ExNondet as Exec
 -- import qualified GCL.Exec as Exec
@@ -56,15 +59,24 @@ sweep (Concrete.Program _ statements _) = case runWP (wpProg statements) of
     Right ((p, obligations), specifications) -> return (p, obligations, specifications)
     Left err -> Left [StructError err]
 
+insertAssertion :: Concrete.Program -> Int -> Either [Error] Concrete.Expr
+insertAssertion program n = structError $ WP2.runWPM $ do
+  let pos = case locOf program of
+            Loc p _ -> linePos (posFile p) n
+            NoLoc -> linePos "<untitled>" n
+  struct <- WP2.programToStruct program
+  case Predicate.precondAtLine n struct of
+    Nothing -> throwError $ PreconditionUnknown (Loc pos pos)
+    Just x -> return $ Predicate.toExpr x
+
+
 structError :: Either StructError2 a -> Either [Error] a
 structError f = case f of
   Right x -> return x
   Left err -> Left [StructError2 err]
 
 sweep2 :: Concrete.Program -> Either [Error] ([PO], [Spec])
-sweep2 program = case WP2.sweep program of
-  Right x -> return x
-  Left err -> Left [StructError2 err]
+sweep2 program = structError $ WP2.sweep program
 
 recv :: FromJSON a => IO (Maybe a)
 recv = decode . BS.fromStrict <$> Strict.getLine
@@ -78,7 +90,7 @@ send payload = do
 -- | Request
 
 
-data Request = Load FilePath | Refine Int Text | Debug | Quit
+data Request = Load FilePath | Refine Int Text | InsertAssertion Int | Debug | Quit
   deriving (Generic)
 
 instance FromJSON Request where
@@ -91,6 +103,7 @@ data Response
   = OK [PO] [Spec]
   | Error [(Site, Error)]
   | Resolve Int -- resolves some Spec
+  | Insert Text
   deriving (Generic)
 
 instance ToJSON Response where

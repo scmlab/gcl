@@ -12,6 +12,9 @@ import qualified Syntax.Abstract as A
 import qualified Syntax.Predicate as P
 import Syntax.Concrete
 
+instance Located Program where
+  locOf (Program _ _ l) = l
+
 instance Located Stmt where
   locOf (Skip              l) = l
   locOf (Abort             l) = l
@@ -53,17 +56,6 @@ instance Located Lower where
 
 instance Located Upper where
   locOf (Upper _ l) = l
-
-instance Located P.Pred where
-  locOf (P.Constant _) = NoLoc
-  locOf (P.GuardIf _ l) = l
-  locOf (P.GuardLoop _ l) = l
-  locOf (P.Assertion _ l) = l
-  locOf (P.LoopInvariant _ _ l) = l
-  locOf (P.Bound _ l) = l
-  locOf (P.Conjunct _) = NoLoc
-  locOf (P.Disjunct _) = NoLoc
-  locOf (P.Negate _) = NoLoc
 
 --------------------------------------------------------------------------------
 -- Relocatable

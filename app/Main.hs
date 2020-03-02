@@ -95,6 +95,16 @@ handleRequest (Refine i payload) = do
 
   return True
 
+handleRequest (InsertAssertion i) = do
+  -- insertAssertion 
+  -- let run = scan "<spec>" payload >>= parseSpec
+  -- case run of
+  --   Left errors -> send $ Error $ map (fromLocalError i) errors
+  --   Right _ -> send $ Resolve i
+  send $ Insert "HI"
+
+  return True
+
 handleRequest Debug = do
   error "crash!"
 

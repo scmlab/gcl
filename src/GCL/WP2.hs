@@ -218,6 +218,7 @@ data StructError2 = MissingLoopInvariant Loc
                  | MissingBound Loc
                  | MissingPrecondition Loc
                  | MissingPostcondition Loc
+                 | PreconditionUnknown Loc
                  | DigHole Loc
                 deriving (Eq, Show, Generic)
 

@@ -27,6 +27,17 @@ data Pred = Constant  Expr
           | Negate     Pred
           deriving (Eq, Show, Generic)
 
+instance Located Pred where
+  locOf (Constant _) = NoLoc
+  locOf (GuardIf _ l) = l
+  locOf (GuardLoop _ l) = l
+  locOf (Assertion _ l) = l
+  locOf (LoopInvariant _ _ l) = l
+  locOf (Bound _ l) = l
+  locOf (Conjunct _) = NoLoc
+  locOf (Disjunct _) = NoLoc
+  locOf (Negate _) = NoLoc
+
 instance ToJSON Pred where
 
 toExpr :: Pred -> Expr
@@ -119,6 +130,22 @@ extractAssertion :: Struct -> Pred
 extractAssertion (Struct p _ _) = p
 extractAssertion (Postcond p)   = p
 
+-- given a line number, get the precondition of the statement after that line
+precondAtLine :: Int -> Struct -> Maybe Pred
+precondAtLine i = findNext i . toPredList
+  where
+    toPredList :: Struct -> [Pred]
+    toPredList (Postcond p) = [p]
+    toPredList (Struct p xs next) = p : map precond xs ++ toPredList next
+
+    findNext :: Int -> [Pred] -> Maybe Pred
+    findNext _ []     = Nothing
+    findNext n (p:ps) = case locOf p of
+      NoLoc -> Nothing
+      Loc start _ -> if n <= posLine start
+                      then Just p
+                      else findNext n ps
+
 --------------------------------------------------------------------------------
 -- | Statement with its computed precondition
 
@@ -135,6 +162,14 @@ data GdCmd = GdCmd
   , gdCmdBody :: Struct
   }
   deriving (Eq)
+
+instance Located Stmt where
+  locOf (Skip l) = locOf l
+  locOf (Abort l) = locOf l
+  locOf (Assign l _ _) = locOf l
+  locOf (Do l _ _) = locOf l
+  locOf (If l _) = locOf l
+  locOf (Spec l _) = locOf l
 
 -- comparing only the constructor and the predicate
 instance Eq Stmt where
