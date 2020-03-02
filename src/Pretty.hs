@@ -27,6 +27,9 @@ instance Pretty Error where
   pretty (TypeError err) = "Type Error" <+> pretty (locOf err) <> line <> pretty err
   pretty (StructError err) = "Struct Error" <+> pretty (locOf err) <> line <> pretty err
   pretty (StructError2 err) = "Struct Error" <+> pretty (locOf err) <> line <> pretty err
+  pretty (CannotReadFile path) = "CannotReadFile" <+> pretty path
+  pretty CannotDecodeRequest = "CannotDecodeRequest"
+  pretty NotLoaded = "NotLoaded"
 
 instance Pretty LexicalError where
   pretty = pretty

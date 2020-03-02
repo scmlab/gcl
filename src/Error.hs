@@ -3,7 +3,6 @@
 
 module Error where
 
-import Control.Exception (IOException)
 import Data.Aeson
 import Data.Loc
 -- import Data.ByteString.Lazy (ByteString)

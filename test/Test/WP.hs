@@ -28,70 +28,84 @@ tests = testGroup "Weakest Precondition"
 
 simple :: TestTree
 simple = testGroup "simple program"
-  [ testCase "skip" $ run "skip\n{ False }" @?= Right
-      ( []
-      , []
-      )
-  , testCase "abort" $ run "abort\n{ False }" @?= Right
-      ( []
-      , []
-      )
-  , testCase "assertion" $ run "{ True }\n{ False }" @?= Right
-      ( []
-      , []
-      )
-  , testCase "assignment" $ run "x := 1\n{ False }" @?= Right
-      ( []
-      , []
-      )
-  , testCase "spec" $ run "{!\n!}\n{ False }" @?= Right
-      ( []
-      , [ Specification
-            0
-            (Assertion false NoLoc)
-            (Assertion false NoLoc)
-            NoLoc
-        ]
-      )
+  [ testCase "skip" $ do
+      actual <- run "skip\n{ False }"
+      actual @?= Right
+          ( []
+          , []
+          )
+  , testCase "abort" $ do
+      actual <- run "abort\n{ False }"
+      actual @?= Right
+          ( []
+          , []
+          )
+  , testCase "assertion" $ do
+      actual <- run "{ True }\n{ False }"
+      actual @?= Right
+          ( []
+          , []
+          )
+  , testCase "assignment" $ do
+      actual <- run "x := 1\n{ False }"
+      actual @?= Right
+        ( []
+        , []
+        )
+  , testCase "spec" $ do
+      actual <- run "{!\n!}\n{ False }"
+      actual @?= Right
+        ( []
+        , [ Specification
+              0
+              (Assertion false NoLoc)
+              (Assertion false NoLoc)
+              NoLoc
+          ]
+        )
   ]
 
 
-run :: Text -> Either [Error] ([Obligation], [Specification])
-run text = fmap (\(_, y, z) -> (map toNoLoc y, map toNoLoc z))
-            $ REPL.scan "<test>" (text)
+run :: Text -> IO (Either Error ([Obligation], [Specification]))
+run text = REPL.runREPLM $ (\((_, y), z) -> (map toNoLoc y, map toNoLoc z)) <$>
+             (REPL.scan "<test>" (text)
               >>= REPL.parseProgram "<test>"
-              >>= REPL.sweep
+              >>= REPL.sweep1)
 
 assertions :: TestTree
-assertions = testCase "assertions" $ run "{ True }\n{ False }\n{ True }\n" @?= Right
-  ( [ Obligation 0
-      (Assertion true NoLoc)
-      (Assertion false NoLoc)
-      (AssertGuaranteed NoLoc)
-
-    -- NOTE: missing the second proof obligation
-
-    -- , Obligation 1
-    --   (Assertion false NoLoc)
-    --   (Assertion true NoLoc)
-    --   (AssertGuaranteed NoLoc)
-    ]
-  , []
-  )
-
-if' :: TestTree
-if' = testGroup "if statements"
-  [ testCase "without precondition" $ run "if False -> skip fi\n{ True }\n" @?= Right
+assertions = testCase "assertions" $ do
+  actual <- run "{ True }\n{ False }\n{ True }\n"
+  actual @?= Right
     ( [ Obligation 0
-        (GuardIf false NoLoc)
-        -- (Conjunct
-        --   [ Assertion true NoLoc
-        --   , Disjunct [ Guard false (IF NoLoc) NoLoc ]
-        --   , Guard false (IF NoLoc) NoLoc
-        --   ])
         (Assertion true NoLoc)
-        (AroundSkip NoLoc)
+        (Assertion false NoLoc)
+        (AssertGuaranteed NoLoc)
+
+      -- NOTE: missing the second proof obligation
+
+      -- , Obligation 1
+      --   (Assertion false NoLoc)
+      --   (Assertion true NoLoc)
+      --   (AssertGuaranteed NoLoc)
       ]
     , []
     )
+
+if' :: TestTree
+if' = testGroup "if statements"
+  [ testCase "without precondition" $ do
+    actual <- run "if False -> skip fi\n{ True }\n"
+    actual @?= Right
+      ( [ Obligation 0
+          (GuardIf false NoLoc)
+          -- (Conjunct
+          --   [ Assertion true NoLoc
+          --   , Disjunct [ Guard false (IF NoLoc) NoLoc ]
+          --   , Guard false (IF NoLoc) NoLoc
+          --   ])
+          (Assertion true NoLoc)
+          (AroundSkip NoLoc)
+        ]
+      , []
+      )
   ]

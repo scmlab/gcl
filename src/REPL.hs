@@ -8,7 +8,6 @@ import Control.Monad.State hiding (guard)
 import Control.Monad.Except hiding (guard)
 
 import Data.Aeson hiding (Error)
-import Data.Bifunctor (first)
 import qualified Data.ByteString.Lazy.Char8 as BS
 import qualified Data.ByteString.Char8 as Strict
 import Data.Text.Lazy (Text)
@@ -19,7 +18,7 @@ import System.IO
 import Control.Exception (IOException, try)
 
 import Error
-import GCL.WP
+import GCL.WP (Specification, Obligation, ObliOrigin, wpProg, runWP)
 import GCL.WP2
 import qualified GCL.WP2 as WP2
 -- import GCL.Type as Type
@@ -29,10 +28,6 @@ import qualified Syntax.Parser as Parser
 import qualified Syntax.Concrete as Concrete
 import qualified Syntax.Predicate as Predicate
 import Syntax.Location ()
--- import qualified GCL.Exec.ExecMonad as Exec
--- import qualified GCL.Exec.ExNondet as Exec
--- import qualified GCL.Exec as Exec
-
 
 --------------------------------------------------------------------------------
 -- | The REPL Monad
@@ -55,46 +50,37 @@ runREPLM f = evalStateT (runExceptT f) initREPLState
 
 --------------------------------------------------------------------------------
 
-data ReqSort = LocalReq Int | GlobalReq | BreakLoop
-
 loop :: REPLM ()
 loop = do
   request <- recv
-  case classifyRequest request of
-    LocalReq i -> do
-      request <- handleRequest request `catchError` handleLocalError i
-      send request
+  result <- handleRequest request
+  case result of
+    Just response -> do
+      send response
       loop
-    GlobalReq -> do
-      request <- handleRequest request `catchError` handleGlobalError
-      send request
-      loop
-    BreakLoop -> return ()
-  where
-    handleGlobalError err = return $ Error [globalError err]
-    handleLocalError i err = return $ Error [localError i err]
+    Nothing -> return ()
 
-classifyRequest :: Request -> ReqSort
-classifyRequest (Load _) = GlobalReq
-classifyRequest (Refine i _) = LocalReq i
-classifyRequest (InsertAssertion _) = GlobalReq
-classifyRequest Debug = error "crash!"
-classifyRequest Quit = BreakLoop
+catchGlobalError :: REPLM (Maybe Response) -> REPLM (Maybe Response)
+catchGlobalError program = program `catchError` (\err -> return $ Just $ Error [globalError err])
 
-handleRequest :: Request -> REPLM Response
-handleRequest (Load filepath) = do
+catchLocalError :: Int -> REPLM (Maybe Response) -> REPLM (Maybe Response)
+catchLocalError i program = program `catchError` (\err -> return $ Just $ Error [localError i err])
+
+-- returns Nothing to break the REPL loop
+handleRequest :: Request -> REPLM (Maybe Response)
+handleRequest (Load filepath) = catchGlobalError $ do
   (pos, specs) <- load filepath
-  return $ OK pos specs
-handleRequest (Refine i payload) = do
+  return $ Just $ OK pos specs
+handleRequest (Refine i payload) = catchLocalError i $ do
   _ <- refine payload
-  return $ Resolve i
-handleRequest (InsertAssertion i) = do
+  return $ Just $ Resolve i
+handleRequest (InsertAssertion i) = catchGlobalError $ do
   expr <- insertAssertion i
-  return $ Insert expr
+  return $ Just $ Insert expr
 handleRequest Debug = do
   error "crash!"
 handleRequest Quit =
-  error "panic!"
+  return Nothing
 
 load :: FilePath -> REPLM ([PO], [Spec])
 load filepath = do
@@ -109,11 +95,7 @@ load filepath = do
       persistProgram program
       struct <- toStruct program
       persistStruct struct
-
-      withExceptT StructError2 $ liftEither $ runWPM $ do
-        pos <- runPOM $ genPO struct
-        specs <- runSpecM $ genSpec struct
-        return (pos, specs)
+      sweep2 struct
 
 refine :: Text -> REPLM ()
 refine payload = do
@@ -178,6 +160,12 @@ sweep1 :: Concrete.Program -> REPLM ((Predicate.Pred, [Obligation]), [Specificat
 sweep1 (Concrete.Program _ statements _) =
   withExceptT StructError $ liftEither $ runWP (wpProg statements)
 
+sweep2 :: Predicate.Struct -> REPLM ([PO], [Spec])
+sweep2 struct = withExceptT StructError2 $ liftEither $ runWPM $ do
+  pos <- runPOM $ genPO struct
+  specs <- runSpecM $ genSpec struct
+  return (pos, specs)
+
 --------------------------------------------------------------------------------
 
 -- typeCheck :: Concrete.Program -> Either Error ()
@@ -188,17 +176,6 @@ sweep1 (Concrete.Program _ statements _) =
 --   where
 --     errors = map ExecError $ lefts results
 --     (results, stores) = unzip $ Exec.runExNondet (Exec.execProg program) Exec.prelude
-
--- weakestPrecondition :: [Concrete.Statement] -> Either Error Predicate.Pred
-
-
-structError :: Either StructError2 a -> Either Error a
-structError f = case f of
-  Right x -> return x
-  Left err -> Left $ StructError2 err
-
-sweep2 :: Concrete.Program -> Either Error ([PO], [Spec])
-sweep2 program = structError $ WP2.sweep program
 
 recv :: FromJSON a => REPLM a
 recv = do

@@ -25,18 +25,22 @@ tests = testGroup "Prettifier"
 
 expression :: TestTree
 expression = testGroup "Expressions"
-  [ testCase "1" $ run "X > Y && X > Y" @?= Right "X > Y ∧ X > Y"
-  , testCase "2" $ run "1 + 2 * 3 - 4" @?= Right "1 + 2 * 3 - 4"
-  , testCase "3" $ run "1 + 2 * 3 = 4" @?= Right "1 + 2 * 3 = 4"
-  , testCase "4" $ run "1 > 2 = True" @?= Right "1 > 2 = True"
-  , testCase "5" $ run "(1 + 2) * 3 = (4)" @?= Right "(1 + 2) * 3 = 4"
-  , testCase "6" $ run "3 / (2 + X)" @?= Right "3 / (2 + X)"
-  , testCase "7" $ run "3 / 2 + X" @?= Right "3 / 2 + X"
+  [ testCase "1" $ run "X > Y && X > Y" @== "X > Y ∧ X > Y"
+  , testCase "2" $ run "1 + 2 * 3 - 4" @== "1 + 2 * 3 - 4"
+  , testCase "3" $ run "1 + 2 * 3 = 4" @== "1 + 2 * 3 = 4"
+  , testCase "4" $ run "1 > 2 = True" @== "1 > 2 = True"
+  , testCase "5" $ run "(1 + 2) * 3 = (4)" @== "(1 + 2) * 3 = 4"
+  , testCase "6" $ run "3 / (2 + X)" @== "3 / (2 + X)"
+  , testCase "7" $ run "3 / 2 + X" @== "3 / 2 + X"
   ]
   where
-    run :: Text -> Either [Error] Text
+    run :: Text -> IO (Either Error Text)
     run text = do
-      expr <- REPL.scan "<test>" text
+      expr <- REPL.runREPLM $ REPL.scan "<test>" text
                 >>= REPL.parse Parser.expression "<test>"
-                -- >>= REPL.abstract
-      return $ renderLazy $ layoutCompact $ pretty $ depart expr
+      return $ fmap (renderLazy . layoutCompact . pretty . depart) expr
+
+(@==) :: (Eq a, Eq b, Show a, Show b) => IO (Either a b) -> b -> IO ()
+f @== b = do
+  a <- f
+  a @?= Right b

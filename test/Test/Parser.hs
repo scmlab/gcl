@@ -32,29 +32,29 @@ tests = testGroup "Parser"
 
 data TestCase b
   = RightCase String Text b
-  | LeftCase String Text [Error]
+  | LeftCase String Text Error
   | LeftCase2 String Text
-  | ReadFile String FilePath (Either [Error] Program)
+  | ReadFile String FilePath (Either Error Program)
 
 toTestTree :: (Eq a, Show a) => Parser a -> TestCase a -> TestTree
 toTestTree parser (RightCase name text expected) = testCase name $ do
-  let actual = parse (parser <* eof) text
+  actual <- parse (parser <* eof) text
   actual @?= Right expected
 toTestTree parser (LeftCase name text expected) = testCase name $ do
-  let actual = parse (parser <* eof) text
+  actual <- parse (parser <* eof) text
   actual @?= Left expected
 toTestTree parser (LeftCase2 name text) = testCase name $ do
-  let actual = parse (parser <* eof) text
+  actual <- parse (parser <* eof) text
   case actual of
     Left _ -> assertBool "" True
     _      -> assertFailure "expecting a Left value"
 toTestTree _ (ReadFile name filepath expected) = testCase name $ do
   text <- Text.readFile filepath
-  let actual = parse Parser.program text
+  actual <- parse Parser.program text
   actual @?= expected
 
-parse :: Parser a -> Text -> Either [Error] a
-parse parser text = REPL.scan "<test>" text
+parse :: Parser a -> Text -> IO (Either Error a)
+parse parser text = REPL.runREPLM $ REPL.scan "<test>" text
         >>= REPL.parse parser "<text>"
         -- >>= REPL.abstract
 

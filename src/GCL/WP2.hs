@@ -227,6 +227,7 @@ instance Located StructError2 where
   locOf (MissingBound     loc) = loc
   locOf (MissingPrecondition loc) = loc
   locOf (MissingPostcondition loc) = loc
+  locOf (PreconditionUnknown loc) = loc
   locOf (DigHole loc) = loc
 
 instance ToJSON StructError2 where

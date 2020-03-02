@@ -30,51 +30,57 @@ tests = testGroup "Weakest Precondition"
 
 statements :: TestTree
 statements = testGroup "simple statements"
-  [ testCase "skip"
-      $ run "{ True }   \n\
-            \skip       \n\
-            \{ 0 = 0 }" @?= Right
-      ( Struct (assertion true)
-        [ Skip $ loc (assertion (0 === 0)) ]
-      $ Postcond (assertion (0 === 0))
-      )
-  , testCase "abort"
-      $ run "{ True }   \n\
-            \abort      \n\
-            \{ True }" @?= Right
-      ( Struct (assertion true)
-          [ Abort $ loc (Constant false) ]
-      $ Postcond (assertion true)
-      )
-  , testCase "assignment"
-      $ run "{ True }   \n\
-            \x := 1     \n\
-            \{ 0 = x }" @?= Right
-      ( Struct (assertion true)
-          [ Assign (loc (assertion (number 0 `eqq` number 1))) undefined undefined ]
-      $ Postcond (assertion (number 0 `eqq` variable "x"))
-      )
-  , testCase "spec"
-      $ run "{ True }   \n\
-            \{!       \n\
-            \!}       \n\
-            \{ 0 = 0 }" @?= Right
-      ( Struct (assertion true)
-          [ Spec (loc (assertion true)) (assertion (0 === 0)) ]
-      $ Postcond (assertion (0 === 0))
-      )
+  [ testCase "skip" $ do
+      actual <- run "{ True }   \n\
+                    \skip       \n\
+                    \{ 0 = 0 }"
+      actual @?= Right
+        ( Struct (assertion true)
+          [ Skip $ loc (assertion (0 === 0)) ]
+        $ Postcond (assertion (0 === 0))
+        )
+  , testCase "abort" $ do
+      actual <- run "{ True }   \n\
+                    \abort      \n\
+                    \{ True }"
+      actual @?= Right
+        ( Struct (assertion true)
+            [ Abort $ loc (Constant false) ]
+        $ Postcond (assertion true)
+        )
+  , testCase "assignment" $ do
+      actual <- run "{ True }   \n\
+                    \x := 1     \n\
+                    \{ 0 = x }"
+      actual @?= Right
+        ( Struct (assertion true)
+            [ Assign (loc (assertion (number 0 `eqq` number 1))) undefined undefined ]
+        $ Postcond (assertion (number 0 `eqq` variable "x"))
+        )
+  , testCase "spec" $ do
+      actual <- run "{ True }   \n\
+                    \{!       \n\
+                    \!}       \n\
+                    \{ 0 = 0 }"
+      actual @?= Right
+        ( Struct (assertion true)
+            [ Spec (loc (assertion true)) (assertion (0 === 0)) ]
+        $ Postcond (assertion (0 === 0))
+        )
   ]
 
 assertions :: TestTree
 assertions = testGroup "assertions"
-  [ testCase "2 assertions"
-    $ run "{ 0 = 0 }\n{ 0 = 1 }" @?= Right
+  [ testCase "2 assertions" $ do
+    actual <- run "{ 0 = 0 }\n{ 0 = 1 }"
+    actual @?= Right
       ( Struct (assertion (0 === 0))
         []
       $ Postcond (assertion (0 === 1))
       )
-  , testCase "3 assertions"
-    $ run "{ 0 = 0 }\n{ 0 = 1 }\n{ 0 = 2 }" @?= Right
+  , testCase "3 assertions" $ do
+    actual <- run "{ 0 = 0 }\n{ 0 = 1 }\n{ 0 = 2 }"
+    actual @?= Right
       ( Struct (assertion (0 === 0))
         []
       $ Struct (assertion (0 === 1))
@@ -86,12 +92,13 @@ assertions = testGroup "assertions"
 
 if' :: TestTree
 if' = testGroup "if statements"
-  [ testCase "without precondition"
-    $ run "{ True }             \n\
-          \if 0 = 0 -> skip     \n\
-          \ | 0 = 1 -> abort    \n\
-          \fi                   \n\
-          \{ 0 = 2 }            \n" @?= Right
+  [ testCase "without precondition" $ do
+    actual <- run "{ True }             \n\
+                  \if 0 = 0 -> skip     \n\
+                  \ | 0 = 1 -> abort    \n\
+                  \fi                   \n\
+                  \{ 0 = 2 }            \n"
+    actual @?= Right
       ( Struct (assertion true)
           [ If (loc $ Disjunct [ guardIf (0 === 0) , guardIf (0 === 1) ])
             [ GdCmd (guardIf (0 === 0))
@@ -106,13 +113,14 @@ if' = testGroup "if statements"
           ]
       $ Postcond (assertion (0 === 2))
       )
-  , testCase "without precondition (nested)"
-    $ run "{ True }               \n\
-          \if 0 = 0 ->            \n\
-          \     if 0 = 1 -> skip  \n\
-          \     fi                \n\
-          \fi                     \n\
-          \{ 0 = 2 }\n" @?= Right
+  , testCase "without precondition (nested)" $ do
+    actual <- run "{ True }               \n\
+                  \if 0 = 0 ->            \n\
+                  \     if 0 = 1 -> skip  \n\
+                  \     fi                \n\
+                  \fi                     \n\
+                  \{ 0 = 2 }\n"
+    actual @?= Right
       ( Struct (assertion true)
           [ If (loc $ guardIf (0 === 0))
             [ GdCmd (guardIf (0 === 0))
@@ -129,13 +137,14 @@ if' = testGroup "if statements"
           ]
       $ Postcond (assertion (0 === 2))
       )
-  , testCase "without precondition (with assertion in branches)"
-    $ run "{ True }               \n\
-          \if 0 = 0 ->            \n\
-          \    { 0 = 1 }          \n\
-          \    skip               \n\
-          \fi                     \n\
-          \{ 0 = 2 }\n" @?= Right
+  , testCase "without precondition (with assertion in branches)" $ do
+    actual <- run "{ True }               \n\
+                  \if 0 = 0 ->            \n\
+                  \    { 0 = 1 }          \n\
+                  \    skip               \n\
+                  \fi                     \n\
+                  \{ 0 = 2 }\n"
+    actual @?= Right
       ( Struct (assertion true)
         [ If (loc $ guardIf (0 === 0))
           [ GdCmd (guardIf (0 === 0))
@@ -148,10 +157,11 @@ if' = testGroup "if statements"
         ]
       $ Postcond (assertion (0 === 2))
       )
-  , testCase "with precondition 1"
-    $ run "{ 0 = 0 }          \n\
-          \if 0 = 1 -> skip fi\n\
-          \{ 0 = 2 }          \n" @?= Right
+  , testCase "with precondition 1" $ do
+    actual <- run "{ 0 = 0 }          \n\
+                  \if 0 = 1 -> skip fi\n\
+                  \{ 0 = 2 }          \n"
+    actual @?= Right
       ( Struct (assertion (0 === 0))
         [ If (loc $ guardIf (0 === 1))
           [ GdCmd (guardIf (0 === 1))
@@ -162,12 +172,13 @@ if' = testGroup "if statements"
         ]
       $ Postcond (assertion (0 === 2))
       )
-  , testCase "with precondition 2"
-    $ run "{ 0 = 0 }          \n\
-          \if 0 = 1 -> skip   \n\
-          \ | 0 = 2 -> abort  \n\
-          \fi                 \n\
-          \{ 0 = 3 }          \n" @?= Right
+  , testCase "with precondition 2" $ do
+    actual <- run "{ 0 = 0 }          \n\
+                  \if 0 = 1 -> skip   \n\
+                  \ | 0 = 2 -> abort  \n\
+                  \fi                 \n\
+                  \{ 0 = 3 }          \n"
+    actual @?= Right
       ( Struct (assertion (0 === 0))
         [ If (loc $ Disjunct [guardIf (0 === 1), guardIf (0 === 2)])
           [ GdCmd (guardIf (0 === 1))
@@ -186,11 +197,12 @@ if' = testGroup "if statements"
 
 loop :: TestTree
 loop = testGroup "loop statements"
-  [ testCase "1 branch"
-    $ run "{ 0 = 1 , bnd: A }     \n\
-          \do 0 = 2 -> skip       \n\
-          \od                     \n\
-          \{ 0 = 0 }              \n" @?= Right
+  [ testCase "1 branch" $ do
+    actual <- run "{ 0 = 1 , bnd: A }     \n\
+                  \do 0 = 2 -> skip       \n\
+                  \od                     \n\
+                  \{ 0 = 0 }              \n"
+    actual @?= Right
       ( Struct (loopInvariant (0 === 1) "A")
         [ Do (loc $ loopInvariant (0 === 1) "A") (constant "A")
           [ GdCmd (guardLoop (0 === 2))
@@ -201,11 +213,12 @@ loop = testGroup "loop statements"
         ]
       $ Postcond (assertion (0 === 0))
       )
-  , testCase "2 branches"
-    $ run "{ 0 = 1 , bnd: A }       \n\
-          \do 0 = 2 -> skip         \n\
-          \ | 0 = 3 -> abort od     \n\
-          \{ 0 = 0 }\n" @?= Right
+  , testCase "2 branches" $ do
+    actual <- run "{ 0 = 1 , bnd: A }       \n\
+                  \do 0 = 2 -> skip         \n\
+                  \ | 0 = 3 -> abort od     \n\
+                  \{ 0 = 0 }\n"
+    actual @?= Right
       ( Struct (loopInvariant (0 === 1) "A")
         [ Do (loc $ loopInvariant (0 === 1) "A") (constant "A")
           [ GdCmd (guardLoop (0 === 2))
@@ -220,13 +233,14 @@ loop = testGroup "loop statements"
         ]
       $ Postcond (assertion (0 === 0))
       )
-  , testCase "nested"
-    $ run "{ 0 = 1 , bnd: A }       \n\
-          \do 0 = 2 ->              \n\
-          \   { 0 = 3 , bnd: A }    \n\
-          \   do 0 = 4 -> abort od  \n\
-          \od                       \n\
-          \{ 0 = 0 }\n" @?= Right
+  , testCase "nested" $ do
+    actual <- run "{ 0 = 1 , bnd: A }       \n\
+                  \do 0 = 2 ->              \n\
+                  \   { 0 = 3 , bnd: A }    \n\
+                  \   do 0 = 4 -> abort od  \n\
+                  \od                       \n\
+                  \{ 0 = 0 }\n"
+    actual @?= Right
       ( Struct (loopInvariant (0 === 1) "A")
         [ Do (loc $ loopInvariant (0 === 1) "A") (constant "A")
           [ GdCmd (guardLoop (0 === 2))
@@ -250,10 +264,10 @@ loop = testGroup "loop statements"
 loc :: Pred -> L Pred
 loc = L NoLoc
 
-run :: Text -> Either [Error] Struct
-run text = toNoLoc <$> (REPL.scan "<test>" text
+run :: Text -> IO (Either Error Struct)
+run text = REPL.runREPLM $ toNoLoc <$> (REPL.scan "<test>" text
             >>= REPL.parseProgram "<test>"
-            >>= REPL.structError . runWPM . programToStruct)
+            >>= REPL.toStruct)
 
 --------------------------------------------------------------------------------
 -- |

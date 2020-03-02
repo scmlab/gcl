@@ -4,8 +4,6 @@ module Main where
 
 import REPL
 
-import Error
-
 import Data.Text.Prettyprint.Doc
 import qualified Data.Text.Lazy.IO as Text
 import Prelude
@@ -53,21 +51,6 @@ main = do
 
         Left err -> do
           print $ pretty err
-
-  -- where
-  --   loop :: IO ()
-  --   loop = do
-  --     request <- recv
-  --     case request of
-  --       Nothing -> return ()
-  --       Just req -> do
-  --         result <- handleRequest req
-  --         case result of
-  --           Nothing -> return ()
-  --           Just response -> do
-  --             send response
-  --             loop
-
 
 --------------------------------------------------------------------------------
 -- | Command-line arguments

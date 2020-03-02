@@ -36,7 +36,7 @@ statements = testGroup "simple statements"
   [ testCase "skip"
       $ run "{ True }     \n\
             \skip         \n\
-            \{ 0 = 0 }    \n" @?= poList
+            \{ 0 = 0 }    \n" @== poList
       [ PO 0
           (assertion true)
           (assertion (0 === 0))
@@ -45,7 +45,7 @@ statements = testGroup "simple statements"
   , testCase "abort"
       $ run "{ True }     \n\
             \abort        \n\
-            \{ 0 = 0 }    \n" @?= poList
+            \{ 0 = 0 }    \n" @== poList
       [ PO 0
           (assertion true)
           (Constant false)
@@ -54,7 +54,7 @@ statements = testGroup "simple statements"
   , testCase "assignment"
       $ run "{ True }     \n\
             \x := 1       \n\
-            \{ 0 = x }    \n" @?= poList
+            \{ 0 = x }    \n" @== poList
       [ PO 0
           (assertion true)
           (assertion (number 0 `eqq` number 1))
@@ -64,7 +64,7 @@ statements = testGroup "simple statements"
       $ run "{ True }     \n\
             \{!           \n\
             \!}           \n\
-            \{ False }    \n" @?= poList
+            \{ False }    \n" @== poList
       []
   ]
 
@@ -73,7 +73,7 @@ assertions = testGroup "assertions"
   [ testCase "3 assertions"
       $ run "{ True }     \n\
             \{ False }    \n\
-            \{ True }     \n" @?= poList
+            \{ True }     \n" @== poList
       [ PO 0
           (assertion true)
           (assertion false)
@@ -85,7 +85,7 @@ assertions = testGroup "assertions"
       ]
   , testCase "2 assertions"
       $ run "{ 0 = 0 }    \n\
-            \{ 0 = 1 }    \n" @?= poList
+            \{ 0 = 1 }    \n" @== poList
       [ PO 0
           (assertion (0 === 0))
           (assertion (0 === 1))
@@ -100,7 +100,7 @@ if' = testGroup "if statements"
             \if 0 = 1 -> skip     \n\
             \ | 0 = 2 -> abort    \n\
             \fi                   \n\
-            \{ 0 = 3 }            \n" @?= poList
+            \{ 0 = 3 }            \n" @== poList
         [ PO 0
           (assertion (0 === 0))
           (Disjunct [ guardIf (0 === 1), guardIf (0 === 2) ])
@@ -120,7 +120,7 @@ if' = testGroup "if statements"
             \     if 0 = 2 -> skip  \n\
             \     fi                \n\
             \fi                     \n\
-            \{ 0 = 3 }\n" @?= poList
+            \{ 0 = 3 }\n" @== poList
       [ PO 0
           (assertion (0 === 0))
           (guardIf (0 === 1))
@@ -140,7 +140,7 @@ if' = testGroup "if statements"
              \if 0 = 1 -> skip    \n\
              \ | 0 = 3 -> abort   \n\
              \fi                  \n\
-             \{ 0 = 2 }           \n" @?= poList
+             \{ 0 = 2 }           \n" @== poList
       [ PO 0
           (assertion (0 === 0))
           (Disjunct [ guardIf (0 === 1), guardIf (0 === 3) ])
@@ -162,7 +162,7 @@ loop = testGroup "loop statements"
     $ run "{ 0 = 1 , bnd: A }     \n\
           \do 0 = 2 -> skip       \n\
           \od                     \n\
-          \{ 0 = 0 }              \n" @?=
+          \{ 0 = 0 }              \n" @==
       let inv = loopInvariant (0 === 1) "A" in poList
       [ PO 0
           (Conjunct [ inv, Negate (guardLoop (0 === 2)) ])
@@ -187,7 +187,7 @@ loop = testGroup "loop statements"
     $ run "{ 0 = 1 , bnd: A }       \n\
           \do 0 = 2 -> skip         \n\
           \ | 0 = 3 -> abort od     \n\
-          \{ 0 = 0 }\n" @?=
+          \{ 0 = 0 }\n" @==
       let inv = loopInvariant (0 === 1) "A" in poList
       [ PO 0
           (Conjunct [ inv
@@ -230,7 +230,7 @@ loop = testGroup "loop statements"
   --         \    { 0 = 3 , bnd: B } \n\
   --         \    do 0 = 4 -> skip od\n\
   --         \od                     \n\
-  --         \{ 0 = 0 }              \n" @?=
+  --         \{ 0 = 0 }              \n" @==
   --     let inv1 = loopInvariant (0 === 1) "A"
   --         inv2 = loopInvariant (0 === 3) "B"
   --     in poList
@@ -249,10 +249,18 @@ loop = testGroup "loop statements"
 poList :: [PO] -> Either a POList
 poList = Right . POList
 
-run :: Text -> Either [Error] POList
-run text = fmap (POList . map toNoLoc . fst) $ REPL.scan "<test>" text
+run :: Text -> IO (Either Error POList)
+run text = REPL.runREPLM $ REPL.scan "<test>" text
             >>= REPL.parseProgram "<test>"
+            >>= REPL.toStruct
             >>= REPL.sweep2
+            >>= return . POList . map toNoLoc . fst
+
+(@==) :: (Eq a, Show a) => IO a -> a -> IO ()
+f @== b = do
+  a <- f
+  a @?= b
+
 
 --------------------------------------------------------------------------------
 -- | Wrap [Obligation] in POList for pretty-printing
