@@ -3,15 +3,20 @@
 
 module REPL where
 
-import Control.Monad.Except (throwError)
+import Control.Monad.State hiding (guard)
+-- import Control.Monad.Writer hiding (guard)
+import Control.Monad.Except hiding (guard)
+
 import Data.Aeson hiding (Error)
 import Data.Bifunctor (first)
 import qualified Data.ByteString.Lazy.Char8 as BS
 import qualified Data.ByteString.Char8 as Strict
 import Data.Text.Lazy (Text)
+import qualified Data.Text.Lazy.IO as Text
 import Data.Loc
 import GHC.Generics
 import System.IO
+import Control.Exception (IOException, try)
 
 import Error
 import GCL.WP
@@ -27,6 +32,56 @@ import Syntax.Location ()
 -- import qualified GCL.Exec.ExecMonad as Exec
 -- import qualified GCL.Exec.ExNondet as Exec
 -- import qualified GCL.Exec as Exec
+
+
+--------------------------------------------------------------------------------
+-- | The REPL Monad
+
+-- State
+data REPLState = REPLState
+  { replFilePath :: Maybe FilePath
+  , replProgram :: Maybe Concrete.Program
+  , replStruct :: Maybe Predicate.Struct
+  }
+
+initREPLState :: REPLState
+initREPLState = REPLState Nothing Nothing Nothing
+
+-- Monad
+type REPLM = ExceptT [Error] (StateT REPLState IO)
+
+runREPLM :: REPLM a -> IO (Either [Error] a)
+runREPLM f = evalStateT (runExceptT f) initREPLState
+
+--------------------------------------------------------------------------------
+
+load :: FilePath -> REPLM ()
+load filepath = do
+  -- persists FilePath
+  modify $ \s -> s { replFilePath = Just filepath }
+
+  result <- liftIO $ try $ Text.readFile filepath :: REPLM (Either IOException Text)
+  case result of
+    Left _  -> throwError [CannotReadFile filepath]
+    Right raw -> do
+      tokens <- withExceptT (\x -> [LexicalError x]) $ liftEither $ Lexer.scan filepath raw
+      program <- withExceptT (map SyntacticError) $ liftEither $ Parser.parse Parser.program filepath tokens
+      -- persists Program
+      modify $ \s -> s { replProgram = Just program }
+      struct <- withExceptT (\x -> [StructError2 x]) $ liftEither $ runWPM $ WP2.programToStruct program
+      -- persists Struct
+      modify $ \s -> s { replStruct = Just struct }
+
+      (pos, specs) <- withExceptT (\x -> [StructError2 x]) $ liftEither $ runWPM $ do
+        pos <- runPOM $ genPO struct
+        specs <- runSpecM $ genSpec struct
+        return (pos, specs)
+
+      liftIO $ send $ OK pos specs
+
+
+
+--------------------------------------------------------------------------------
 
 scan :: FilePath -> Text -> Either [Error] TokStream
 scan filepath = first (\x -> [LexicalError x]) . Lexer.scan filepath

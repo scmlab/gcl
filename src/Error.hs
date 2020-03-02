@@ -3,6 +3,7 @@
 
 module Error where
 
+import Control.Exception (IOException)
 import Data.Aeson
 import Data.Loc
 import GHC.Generics
@@ -36,6 +37,7 @@ data Error
   | TypeError       TypeError
   | StructError     StructError
   | StructError2    StructError2
+  | CannotReadFile  FilePath
   -- | ExecError       ExecError
   deriving (Eq, Show, Generic)
 
@@ -45,6 +47,7 @@ instance Located Error where
   locOf (TypeError e) = locOf e
   locOf (StructError e) = locOf e
   locOf (StructError2 e) = locOf e
+  locOf (CannotReadFile _) = NoLoc
   -- locOf (ExecError e) = locOf e
 
 fromLocalError :: Int -> Error -> (Site, Error)
