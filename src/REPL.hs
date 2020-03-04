@@ -76,7 +76,7 @@ handleRequest (Refine i payload) = catchLocalError i $ do
   return $ Just $ Resolve i
 handleRequest (InsertAssertion i) = catchGlobalError $ do
   expr <- insertAssertion i
-  return $ Just $ Insert expr
+  return $ Just $ Insert i expr
 handleRequest Debug = do
   error "crash!"
 handleRequest Quit =
@@ -206,7 +206,7 @@ data Response
   = OK [PO] [Spec]
   | Error [(Site, Error)]
   | Resolve Int -- resolves some Spec
-  | Insert Concrete.Expr
+  | Insert Int Concrete.Expr
   deriving (Generic)
 
 instance ToJSON Response where
