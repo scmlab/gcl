@@ -204,10 +204,12 @@ runSpecM f = evalStateT (execWriterT f) 0
 genSpec :: Struct -> SpecM ()
 genSpec (Postcond _) = return ()
 genSpec (Struct _   []     next) = genSpec next
-genSpec (Struct pre (Spec p q:xs) next) = do
-  tellSpec p q
-  genSpec (Struct pre xs next)
-genSpec (Struct pre (_:xs) next) = do
+genSpec (Struct pre (stmt:xs) next) = do
+  case stmt of
+    Spec p q -> tellSpec p q
+    If _ gdCmds -> mapM_ (genSpec . gdCmdBody) gdCmds
+    Do _ _ gdCmds -> mapM_ (genSpec . gdCmdBody) gdCmds
+    _ -> return ()
   genSpec (Struct pre xs next)
 
 
