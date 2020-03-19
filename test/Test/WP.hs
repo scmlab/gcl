@@ -25,37 +25,55 @@ statements :: TestTree
 statements = testGroup
   "simple program"
   [ testCase "skip" $ do
-    actual <- run "{ True }   \n\
+    actual <-
+      run
+        "{ True }   \n\
                   \skip       \n\
                   \{ 0 = 0 }"
-    actual @?= Right (
-      [ PO 0 (assertion true) (assertion (number 0 `eqq` number 0)) (AtSkip NoLoc)
-      ], 
-      [])
+    actual @?= Right
+      ( [ PO 0
+             (assertion true)
+             (assertion (number 0 `eqq` number 0))
+             (AtSkip NoLoc)
+        ]
+      , []
+      )
   , testCase "abort" $ do
-    actual <- run "{ True }   \n\
+    actual <-
+      run
+        "{ True }   \n\
                   \abort      \n\
                   \{ True }"
-    actual @?= Right (
-      [ PO 0 (assertion true) (Constant false) (AtAbort NoLoc)
-      ], 
-      [])
+    actual
+      @?= Right ([PO 0 (assertion true) (Constant false) (AtAbort NoLoc)], [])
   , testCase "assignment" $ do
-    actual <- run "{ True }   \n\
+    actual <-
+      run
+        "{ True }   \n\
                   \x := 1     \n\
                   \{ 0 = x }"
-    actual @?= Right (
-      [ PO 0 (assertion true) (assertion (number 0 `eqq` number 1)) (AtAssignment NoLoc)
-      ], 
-      [])
+    actual @?= Right
+      ( [ PO 0
+             (assertion true)
+             (assertion (number 0 `eqq` number 1))
+             (AtAssignment NoLoc)
+        ]
+      , []
+      )
   , testCase "spec" $ do
-    actual <- run "{ True }   \n\
+    actual <-
+      run
+        "{ True }   \n\
                   \{!       \n\
                   \!}       \n\
                   \{ 0 = 0 }"
     actual @?= Right
       ( []
-      , [Specification 0 (Assertion true NoLoc) (assertion (number 0 `eqq` number 0)) NoLoc]
+      , [ Specification 0
+                        (Assertion true NoLoc)
+                        (assertion (number 0 `eqq` number 0))
+                        NoLoc
+        ]
       )
   ]
 
@@ -102,8 +120,8 @@ statements = testGroup
 
 run :: Text -> IO (Either Error ([PO], [Spec]))
 run text =
-  REPL.runREPLM 
-    $   (\((_, pos), specs) -> (map toNoLoc pos, map toNoLoc specs))
+  REPL.runREPLM
+    $   (\(pos, specs) -> (map toNoLoc pos, map toNoLoc specs))
     <$> (   REPL.scan "<test>" (text)
         >>= REPL.parseProgram "<test>"
         >>= REPL.sweep1

@@ -26,15 +26,6 @@ import           Syntax.Predicate
 import           Pretty.Concrete                ( )
 import           Pretty.Predicate               ( )
 
-sweep :: C.Program -> Either StructError2 ([PO], [Spec])
-sweep program = runWPM $ do
-  struct <- programToStruct program
-
-  pos    <- runPOM $ genPO struct
-  specs  <- runSpecM $ genSpec struct
-
-  return (pos, specs)
-
 assignmentEnv :: [Lower] -> [Expr] -> C.Subst
 assignmentEnv xs es = Map.fromList (zip (map Left xs) es)
 

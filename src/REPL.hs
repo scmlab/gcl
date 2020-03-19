@@ -81,6 +81,9 @@ handleRequest :: Request -> REPLM (Maybe Response)
 handleRequest (Load filepath) = catchGlobalError $ do
   (pos, specs) <- load filepath
   return $ Just $ OK pos specs
+handleRequest (Load2 filepath) = catchGlobalError $ do
+  (pos, specs) <- load2 filepath
+  return $ Just $ OK pos specs
 handleRequest (Refine i payload) = catchLocalError i $ do
   _ <- refine payload
   return $ Just $ Resolve i
@@ -92,6 +95,20 @@ handleRequest Quit  = return Nothing
 
 load :: FilePath -> REPLM ([PO], [Spec])
 load filepath = do
+  persistFilePath filepath
+
+  result <-
+    liftIO $ try $ Text.readFile filepath :: REPLM (Either IOException Text)
+  case result of
+    Left  _   -> throwError $ CannotReadFile filepath
+    Right raw -> do
+      tokens  <- scan filepath raw
+      program <- parseProgram filepath tokens
+      persistProgram program
+      sweep1 program
+
+load2 :: FilePath -> REPLM ([PO], [Spec])
+load2 filepath = do
   persistFilePath filepath
 
   result <-
@@ -166,9 +183,11 @@ toStruct = withExceptT StructError2 . liftEither . runWPM . WP2.programToStruct
 parseSpec :: TokStream -> REPLM [Concrete.Stmt]
 parseSpec = parse Parser.specContent "<specification>"
 
-sweep1 :: Concrete.Program -> REPLM ((Predicate.Pred, [PO]), [Spec])
-sweep1 (Concrete.Program _ statements _) =
-  withExceptT StructError $ liftEither $ runWP (wpProg statements)
+sweep1 :: Concrete.Program -> REPLM ([PO], [Spec])
+sweep1 (Concrete.Program _ statements _) = do
+  ((_, pos), specs) <- withExceptT StructError $ liftEither $ runWP
+    (wpProg statements)
+  return (pos, specs)
 
 sweep2 :: Predicate.Struct -> REPLM ([PO], [Spec])
 sweep2 struct = withExceptT StructError2 $ liftEither $ runWPM $ do
@@ -203,11 +222,16 @@ send payload = liftIO $ do
 -- | Request
 
 
-data Request = Load FilePath | Refine Int Text | InsertAssertion Int | Debug | Quit
+data Request
+  = Load FilePath
+  | Load2 FilePath
+  | Refine Int Text
+  | InsertAssertion Int
+  | Debug
+  | Quit
   deriving (Generic)
 
 instance FromJSON Request where
-instance ToJSON Request where
 
 --------------------------------------------------------------------------------
 -- | Response

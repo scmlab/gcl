@@ -2,14 +2,14 @@
 
 module Main where
 
-import REPL
+import           REPL
 
-import Data.Text.Prettyprint.Doc
-import qualified Data.Text.Lazy.IO as Text
-import Prelude
-import Pretty ()
-import System.Console.GetOpt
-import System.Environment
+import           Data.Text.Prettyprint.Doc
+import qualified Data.Text.Lazy.IO             as Text
+import           Prelude
+import           Pretty                         ( )
+import           System.Console.GetOpt
+import           System.Environment
 
 main :: IO ()
 main = do
@@ -21,15 +21,15 @@ main = do
       return ()
     ModeDev -> do
       let filepath = "examples/b.gcl"
-      raw <- Text.readFile filepath
+      raw    <- Text.readFile filepath
 
       result <- runREPLM $ do
-            tokens <- scan filepath raw
-            program <- parseProgram filepath tokens
-            -- typeCheck program
-            ((_, obligations), specifications) <- sweep1 program
-            -- stores <- execute program
-            return (tokens, program, obligations, specifications)
+        tokens                        <- scan filepath raw
+        program                       <- parseProgram filepath tokens
+        -- typeCheck program
+        (obligations, specifications) <- sweep1 program
+        -- stores <- execute program
+        return (tokens, program, obligations, specifications)
 
       case result of
         Right (tokens, program, obligations, specifications) -> do
@@ -62,21 +62,24 @@ data Options = Options
   }
 
 defaultOptions :: Options
-defaultOptions = Options
-  { optMode = ModeREPL
-  }
+defaultOptions = Options { optMode = ModeREPL }
 
 options :: [OptDescr (Options -> Options)]
 options =
-  [ Option ['h']  ["help"]  (NoArg (\opts -> opts { optMode = ModeHelp }))  "print this help message"
-  , Option ['d']  ["dev"]  (NoArg (\opts -> opts { optMode = ModeDev }))   "for testing"
+  [ Option ['h']
+           ["help"]
+           (NoArg (\opts -> opts { optMode = ModeHelp }))
+           "print this help message"
+  , Option ['d']
+           ["dev"]
+           (NoArg (\opts -> opts { optMode = ModeDev }))
+           "for testing"
   ]
 
 usage :: String
-usage =  "GCL v0.0.1 \nUsage: gcl [Options...]\n"
+usage = "GCL v0.0.1 \nUsage: gcl [Options...]\n"
 
 parseOpts :: [String] -> IO (Options, [String])
-parseOpts argv =
-  case getOpt Permute options argv of
-    (o,n,[]  ) -> return (foldl (flip id) defaultOptions o, n)
-    (_,_,errs) -> ioError $ userError $ concat errs ++ usageInfo usage options
+parseOpts argv = case getOpt Permute options argv of
+  (o, n, []  ) -> return (foldl (flip id) defaultOptions o, n)
+  (_, _, errs) -> ioError $ userError $ concat errs ++ usageInfo usage options
