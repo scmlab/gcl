@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Test.PO where
+module Test.WP2.PO where
 
 import Data.Text.Lazy hiding (map)
 import Test.Tasty
@@ -10,7 +10,6 @@ import Prelude hiding (Ordering(..))
 import Syntax.Predicate
 import Syntax.Concrete hiding (LoopInvariant)
 import qualified REPL as REPL
-import GCL.WP2 (PO(..), Origin(..))
 -- import GCL.WP2 (Obligation2(..), Spec(..), ObliOrigin2(..))
 import Data.Text.Prettyprint.Doc
 
@@ -20,7 +19,7 @@ import Error
 import Pretty ()
 
 tests :: TestTree
-tests = testGroup "Proof POs"
+tests = testGroup "WP2 Proof Obligations"
   [
     statements
   , assertions
