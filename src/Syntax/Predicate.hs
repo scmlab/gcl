@@ -3,15 +3,19 @@
 
 module Syntax.Predicate where
 
-import Data.Aeson
-import Data.Text.Lazy (Text)
-import qualified Data.Text.Lazy as Text
-import Data.Loc
-import Data.Char (isUpper)
-import GHC.Generics
+import           Data.Aeson
+import           Data.Text.Lazy                 ( Text )
+import qualified Data.Text.Lazy                as Text
+import           Data.Loc
+import           Data.Char                      ( isUpper )
+import           GHC.Generics
 
-import qualified Syntax.Concrete as C
-import Syntax.Concrete (Expr, Lower, Fresh, Subst)
+import qualified Syntax.Concrete               as C
+import           Syntax.Concrete                ( Expr
+                                                , Lower
+                                                , Fresh
+                                                , Subst
+                                                )
 
 --------------------------------------------------------------------------------
 -- | Predicates
@@ -28,39 +32,40 @@ data Pred = Constant  Expr
           deriving (Eq, Show, Generic)
 
 instance Located Pred where
-  locOf (Constant _) = NoLoc
-  locOf (GuardIf _ l) = l
-  locOf (GuardLoop _ l) = l
-  locOf (Assertion _ l) = l
+  locOf (Constant _         ) = NoLoc
+  locOf (GuardIf   _ l      ) = l
+  locOf (GuardLoop _ l      ) = l
+  locOf (Assertion _ l      ) = l
   locOf (LoopInvariant _ _ l) = l
-  locOf (Bound _ l) = l
-  locOf (Conjunct _) = NoLoc
-  locOf (Disjunct _) = NoLoc
-  locOf (Negate _) = NoLoc
+  locOf (Bound _ l          ) = l
+  locOf (Conjunct _         ) = NoLoc
+  locOf (Disjunct _         ) = NoLoc
+  locOf (Negate   _         ) = NoLoc
 
 instance ToJSON Pred where
 
 toExpr :: Pred -> Expr
-toExpr (Constant e) = e
-toExpr (Bound e _) = e
-toExpr (Assertion e _) = e
+toExpr (Constant e         ) = e
+toExpr (Bound     e _      ) = e
+toExpr (Assertion e _      ) = e
 toExpr (LoopInvariant e _ _) = e
-toExpr (GuardIf e _) = e
-toExpr (GuardLoop e _) = e
-toExpr (Conjunct xs) = C.conjunct (map toExpr xs)
-toExpr (Disjunct xs) = C.disjunct (map toExpr xs)
-toExpr (Negate x) = C.neg (toExpr x)
+toExpr (GuardIf   e _      ) = e
+toExpr (GuardLoop e _      ) = e
+toExpr (Conjunct xs        ) = C.conjunct (map toExpr xs)
+toExpr (Disjunct xs        ) = C.disjunct (map toExpr xs)
+toExpr (Negate   x         ) = C.neg (toExpr x)
 
 subst :: Fresh m => Subst -> Pred -> m Pred
-subst env (Constant e) = Constant <$> C.subst env e
-subst env (Bound e l) = Bound <$> C.subst env e <*> pure l
+subst env (Constant e   ) = Constant <$> C.subst env e
+subst env (Bound     e l) = Bound <$> C.subst env e <*> pure l
 subst env (Assertion e l) = Assertion <$> C.subst env e <*> pure l
-subst env (LoopInvariant e b l) = LoopInvariant <$> C.subst env e <*> pure b <*> pure l
-subst env (GuardIf e l) = GuardLoop <$> C.subst env e <*> pure l
+subst env (LoopInvariant e b l) =
+  LoopInvariant <$> C.subst env e <*> pure b <*> pure l
+subst env (GuardIf   e l) = GuardLoop <$> C.subst env e <*> pure l
 subst env (GuardLoop e l) = GuardLoop <$> C.subst env e <*> pure l
-subst env (Conjunct xs) = Conjunct <$> mapM (subst env) xs
-subst env (Disjunct es) = Disjunct <$> mapM (subst env) es
-subst env (Negate x) = Negate <$> subst env x
+subst env (Conjunct xs  ) = Conjunct <$> mapM (subst env) xs
+subst env (Disjunct es  ) = Disjunct <$> mapM (subst env) es
+subst env (Negate   x   ) = Negate <$> subst env x
 
 --------------------------------------------------------------------------------
 -- | Smart constructors for testing
@@ -70,11 +75,10 @@ assertion x = Assertion x NoLoc
 
 loopInvariant :: Expr -> Text -> Pred
 loopInvariant x b = LoopInvariant x (bnd b) NoLoc
-  where bnd = if Text.null b
-                then C.variable
-                else if isUpper (Text.head b)
-                  then C.constant
-                  else C.variable
+ where
+  bnd = if Text.null b
+    then C.variable
+    else if isUpper (Text.head b) then C.constant else C.variable
 
 guardIf :: Expr -> Pred
 guardIf x = GuardIf x NoLoc
@@ -96,14 +100,14 @@ boundGTE x var = Bound (x `C.gte` var) NoLoc
 x === y = C.number x `C.eqq` C.number y
 
 conjunct :: [Pred] -> Pred
-conjunct [] = Constant C.true
+conjunct []  = Constant C.true
 conjunct [x] = x
-conjunct xs = Conjunct xs
+conjunct xs  = Conjunct xs
 
 disjunct :: [Pred] -> Pred
-disjunct [] = Constant C.false
+disjunct []  = Constant C.false
 disjunct [x] = x
-disjunct xs = Disjunct xs
+disjunct xs  = Disjunct xs
 
 --------------------------------------------------------------------------------
 -- | Data structure for storing Assertions in a program
@@ -128,23 +132,21 @@ data Struct = Struct
 -- extracting the assertion from a Struct
 extractAssertion :: Struct -> Pred
 extractAssertion (Struct p _ _) = p
-extractAssertion (Postcond p)   = p
+extractAssertion (Postcond p  ) = p
 
 -- given a line number, get the precondition of the statement after that line
 precondAtLine :: Int -> Struct -> Maybe Pred
 precondAtLine i = findNext i . toPredList
-  where
-    toPredList :: Struct -> [Pred]
-    toPredList (Postcond p) = [p]
-    toPredList (Struct p xs next) = p : map precond xs ++ toPredList next
+ where
+  toPredList :: Struct -> [Pred]
+  toPredList (Postcond p      ) = [p]
+  toPredList (Struct p xs next) = p : map precond xs ++ toPredList next
 
-    findNext :: Int -> [Pred] -> Maybe Pred
-    findNext _ []     = Nothing
-    findNext n (p:ps) = case locOf p of
-      NoLoc -> Nothing
-      Loc start _ -> if n <= posLine start
-                      then Just p
-                      else findNext n ps
+  findNext :: Int -> [Pred] -> Maybe Pred
+  findNext _ []       = Nothing
+  findNext n (p : ps) = case locOf p of
+    NoLoc       -> Nothing
+    Loc start _ -> if n <= posLine start then Just p else findNext n ps
 
 --------------------------------------------------------------------------------
 -- | Statement with its computed precondition
@@ -164,27 +166,47 @@ data GdCmd = GdCmd
   deriving (Eq)
 
 instance Located Stmt where
-  locOf (Skip l) = locOf l
-  locOf (Abort l) = locOf l
+  locOf (Skip  l     ) = locOf l
+  locOf (Abort l     ) = locOf l
   locOf (Assign l _ _) = locOf l
-  locOf (Do l _ _) = locOf l
-  locOf (If l _) = locOf l
-  locOf (Spec l _) = locOf l
+  locOf (Do     l _ _) = locOf l
+  locOf (If   l _    ) = locOf l
+  locOf (Spec l _    ) = locOf l
 
 -- comparing only the constructor and the predicate
 instance Eq Stmt where
-  Skip l        == Skip m       = l == m
-  Abort l       == Abort m      = l == m
-  Assign l _ _  == Assign m _ _ = l == m
-  Do l _ xs     == Do m _ ys    = l == m && xs == ys
-  If l xs       == If m ys      = l == m && xs == ys
-  Spec l _      == Spec m _     = l == m
-  _             == _            = False
+  Skip  l       == Skip  m       = l == m
+  Abort l       == Abort m       = l == m
+  Assign l _ _  == Assign m _ _  = l == m
+  Do     l _ xs == Do     m _ ys = l == m && xs == ys
+  If   l xs     == If   m ys     = l == m && xs == ys
+  Spec l _      == Spec m _      = l == m
+  _             == _             = False
 
 precond :: Stmt -> Pred
-precond (Skip   l    ) = unLoc l
-precond (Abort  l    ) = unLoc l
+precond (Skip  l     ) = unLoc l
+precond (Abort l     ) = unLoc l
 precond (Assign l _ _) = unLoc l
 precond (Do     l _ _) = unLoc l
-precond (If     l _  ) = unLoc l
-precond (Spec   l _  ) = unLoc l
+precond (If   l _    ) = unLoc l
+precond (Spec l _    ) = unLoc l
+
+
+--------------------------------------------------------------------------------
+-- | Obligation
+
+data PO
+  = PO Int Pred Pred Origin
+  deriving (Eq, Show, Generic)
+
+data Origin = AtAbort           Loc
+            | AtSkip            Loc
+            | AtSpec            Loc
+            | AtAssignment      Loc
+            | AtAssertion       Loc -- AssertSufficient
+            | AtLoopInvariant   Loc
+            | AtIf              Loc
+            | AtLoop            Loc
+            | AtTermination     Loc
+            | AtBoundDecrement  Loc
+            deriving (Eq, Show, Generic)

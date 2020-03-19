@@ -22,7 +22,6 @@ import           Syntax.Concrete                ( Expr
 import qualified Syntax.Concrete               as C
 -- import qualified Syntax.Predicate as P
 import           Syntax.Predicate
-import           Syntax.Location                ( ToNoLoc(..) )
 
 import           Pretty.Concrete                ( )
 import           Pretty.Predicate               ( )
@@ -56,30 +55,6 @@ instance C.Fresh WPM where
 --------------------------------------------------------------------------------
 -- | Origin of Proof Obligations
 
-data Origin = AtAbort           Loc
-            | AtSkip            Loc
-            | AtSpec            Loc
-            | AtAssignment      Loc
-            | AtAssertion       Loc -- AssertSufficient
-            | AtLoopInvariant   Loc
-            | AtIf              Loc
-            | AtLoop            Loc
-            | AtTermination     Loc
-            | AtBoundDecrement  Loc
-            deriving (Eq, Show, Generic)
-
-instance ToNoLoc Origin where
-  toNoLoc (AtAbort          _) = AtAbort NoLoc
-  toNoLoc (AtSkip           _) = AtSkip NoLoc
-  toNoLoc (AtSpec           _) = AtSpec NoLoc
-  toNoLoc (AtAssignment     _) = AtAssignment NoLoc
-  toNoLoc (AtAssertion      _) = AtAssertion NoLoc
-  toNoLoc (AtLoopInvariant  _) = AtLoopInvariant NoLoc
-  toNoLoc (AtIf             _) = AtIf NoLoc
-  toNoLoc (AtLoop           _) = AtLoop NoLoc
-  toNoLoc (AtTermination    _) = AtTermination NoLoc
-  toNoLoc (AtBoundDecrement _) = AtBoundDecrement NoLoc
-
 originOfStmt :: Stmt -> Origin
 originOfStmt (Abort l     ) = AtAbort (locOf l)
 originOfStmt (Skip  l     ) = AtSkip (locOf l)
@@ -96,13 +71,6 @@ originOfStruct (Postcond p) = AtAssertion (locOf p)
 
 --------------------------------------------------------------------------------
 -- | Obligation
-
-data PO
-  = PO Int Pred Pred Origin
-  deriving (Eq, Show, Generic)
-
-instance ToNoLoc PO where
-  toNoLoc (PO i p q o) = PO i (toNoLoc p) (toNoLoc q) (toNoLoc o)
 
 -- Monad on top of WPM, for generating proof obligations
 type POM = WriterT [PO] (StateT Int WPM)
