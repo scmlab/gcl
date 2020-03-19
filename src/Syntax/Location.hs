@@ -48,6 +48,44 @@ instance Located Upper where
   locOf (Upper _ l) = l
 
 --------------------------------------------------------------------------------
+-- Relocatable
+
+instance Relocatable Interval where
+  reloc l (Interval x y _) = Interval x y l
+
+instance Relocatable Type where
+  reloc l (TBase base _) = TBase base l
+  reloc l (TArray i s _) = TArray i s l
+  reloc l (TFunc  s t _) = TFunc s t l
+  reloc l (TVar x _    ) = TVar x l
+
+instance Relocatable Expr where
+  reloc l (Var   x _        ) = Var x l
+  reloc l (Const x _        ) = Const x l
+  reloc l (Lit   x _        ) = Lit x l
+  reloc l (App x y _        ) = App x y l
+  reloc l (Op x _           ) = Op x l
+  reloc l (Hole _           ) = Hole l
+  reloc l (Quant op xs r t _) = Quant op xs r t l
+
+instance Relocatable Upper where
+  reloc l (Upper x _) = Upper x l
+
+instance Relocatable Lower where
+  reloc l (Lower x _) = Lower x l
+
+instance Relocatable P.Pred where
+  reloc _ (P.Constant e         ) = P.Constant e
+  reloc l (P.GuardIf   e _      ) = P.GuardIf e l
+  reloc l (P.GuardLoop e _      ) = P.GuardLoop e l
+  reloc l (P.Assertion e _      ) = P.Assertion e l
+  reloc l (P.LoopInvariant e b _) = P.LoopInvariant e b l
+  reloc l (P.Bound e _          ) = P.Bound e l
+  reloc _ (P.Conjunct ps        ) = P.Conjunct ps
+  reloc _ (P.Disjunct ps        ) = P.Disjunct ps
+  reloc _ (P.Negate   p         ) = P.Negate p
+
+--------------------------------------------------------------------------------
 -- Remove location
 
 class Located a => Departable a b | a -> b where
@@ -178,3 +216,7 @@ instance ToNoLoc P.Origin where
   toNoLoc (P.AtLoop           _) = P.AtLoop NoLoc
   toNoLoc (P.AtTermination    _) = P.AtTermination NoLoc
   toNoLoc (P.AtBoundDecrement _) = P.AtBoundDecrement NoLoc
+
+instance ToNoLoc P.Spec where
+  toNoLoc (P.Specification i p q _) =
+    P.Specification i (toNoLoc p) (toNoLoc q) NoLoc

@@ -3,31 +3,39 @@
 
 module REPL where
 
-import Control.Monad.State hiding (guard)
+import           Control.Monad.State     hiding ( guard )
 -- import Control.Monad.Writer hiding (guard)
-import Control.Monad.Except hiding (guard)
+import           Control.Monad.Except    hiding ( guard )
 
-import Data.Aeson hiding (Error)
-import qualified Data.ByteString.Lazy.Char8 as BS
-import qualified Data.ByteString.Char8 as Strict
-import Data.Text.Lazy (Text)
-import qualified Data.Text.Lazy.IO as Text
-import Data.Loc
-import GHC.Generics
-import System.IO
-import Control.Exception (IOException, try)
+import           Data.Aeson              hiding ( Error )
+import qualified Data.ByteString.Lazy.Char8    as BS
+import qualified Data.ByteString.Char8         as Strict
+import           Data.Text.Lazy                 ( Text )
+import qualified Data.Text.Lazy.IO             as Text
+import           Data.Loc
+import           GHC.Generics
+import           System.IO
+import           Control.Exception              ( IOException
+                                                , try
+                                                )
 
-import Error
-import GCL.WP (Specification, Obligation, ObliOrigin, wpProg, runWP)
-import GCL.WP2
-import qualified GCL.WP2 as WP2
+import           Error
+import           GCL.WP                         ( wpProg
+                                                , runWP
+                                                )
+import           GCL.WP2
+import qualified GCL.WP2                       as WP2
 -- import GCL.Type as Type
-import Syntax.Parser.Lexer (TokStream)
-import qualified Syntax.Parser.Lexer as Lexer
-import qualified Syntax.Parser as Parser
-import qualified Syntax.Concrete as Concrete
-import qualified Syntax.Predicate as Predicate
-import Syntax.Location ()
+import           Syntax.Parser.Lexer            ( TokStream )
+import qualified Syntax.Parser.Lexer           as Lexer
+import qualified Syntax.Parser                 as Parser
+import qualified Syntax.Concrete               as Concrete
+import qualified Syntax.Predicate              as Predicate
+import           Syntax.Predicate               ( Spec
+                                                , PO
+                                                , Origin
+                                                )
+import           Syntax.Location                ( )
 
 --------------------------------------------------------------------------------
 -- | The REPL Monad
@@ -53,7 +61,7 @@ runREPLM f = evalStateT (runExceptT f) initREPLState
 loop :: REPLM ()
 loop = do
   request <- recv
-  result <- handleRequest request
+  result  <- handleRequest request
   case result of
     Just response -> do
       send response
@@ -61,10 +69,12 @@ loop = do
     Nothing -> return ()
 
 catchGlobalError :: REPLM (Maybe Response) -> REPLM (Maybe Response)
-catchGlobalError program = program `catchError` (\err -> return $ Just $ Error [globalError err])
+catchGlobalError program =
+  program `catchError` (\err -> return $ Just $ Error [globalError err])
 
 catchLocalError :: Int -> REPLM (Maybe Response) -> REPLM (Maybe Response)
-catchLocalError i program = program `catchError` (\err -> return $ Just $ Error [localError i err])
+catchLocalError i program =
+  program `catchError` (\err -> return $ Just $ Error [localError i err])
 
 -- returns Nothing to break the REPL loop
 handleRequest :: Request -> REPLM (Maybe Response)
@@ -77,20 +87,19 @@ handleRequest (Refine i payload) = catchLocalError i $ do
 handleRequest (InsertAssertion i) = catchGlobalError $ do
   expr <- insertAssertion i
   return $ Just $ Insert i expr
-handleRequest Debug = do
-  error "crash!"
-handleRequest Quit =
-  return Nothing
+handleRequest Debug = error "crash!"
+handleRequest Quit  = return Nothing
 
 load :: FilePath -> REPLM ([PO], [Spec])
 load filepath = do
   persistFilePath filepath
 
-  result <- liftIO $ try $ Text.readFile filepath :: REPLM (Either IOException Text)
+  result <-
+    liftIO $ try $ Text.readFile filepath :: REPLM (Either IOException Text)
   case result of
-    Left _  -> throwError $ CannotReadFile filepath
+    Left  _   -> throwError $ CannotReadFile filepath
     Right raw -> do
-      tokens <- scan filepath raw
+      tokens  <- scan filepath raw
       program <- parseProgram filepath tokens
       persistProgram program
       struct <- toStruct program
@@ -105,14 +114,14 @@ refine payload = do
 insertAssertion :: Int -> REPLM Concrete.Expr
 insertAssertion n = do
   program <- getProgram
-  struct <- getStruct
+  struct  <- getStruct
   withExceptT StructError2 $ liftEither $ runWPM $ do
     let pos = case locOf program of
-              Loc p _ -> linePos (posFile p) n
-              NoLoc -> linePos "<untitled>" n
+          Loc p _ -> linePos (posFile p) n
+          NoLoc   -> linePos "<untitled>" n
     case Predicate.precondAtLine n struct of
       Nothing -> throwError $ PreconditionUnknown (Loc pos pos)
-      Just x -> return $ Predicate.toExpr x
+      Just x  -> return $ Predicate.toExpr x
 
 --------------------------------------------------------------------------------
 
@@ -130,14 +139,14 @@ getProgram = do
   result <- gets replProgram
   case result of
     Nothing -> throwError NotLoaded
-    Just p -> return p
+    Just p  -> return p
 
 getStruct :: REPLM Predicate.Struct
 getStruct = do
   result <- gets replStruct
   case result of
     Nothing -> throwError NotLoaded
-    Just p -> return p
+    Just p  -> return p
 
 --------------------------------------------------------------------------------
 
@@ -145,7 +154,8 @@ scan :: FilePath -> Text -> REPLM TokStream
 scan filepath = withExceptT LexicalError . liftEither . Lexer.scan filepath
 
 parse :: Parser.Parser a -> FilePath -> TokStream -> REPLM a
-parse parser filepath = withExceptT SyntacticError . liftEither . Parser.parse parser filepath
+parse parser filepath =
+  withExceptT SyntacticError . liftEither . Parser.parse parser filepath
 
 parseProgram :: FilePath -> TokStream -> REPLM Concrete.Program
 parseProgram = parse Parser.program
@@ -156,13 +166,13 @@ toStruct = withExceptT StructError2 . liftEither . runWPM . WP2.programToStruct
 parseSpec :: TokStream -> REPLM [Concrete.Stmt]
 parseSpec = parse Parser.specContent "<specification>"
 
-sweep1 :: Concrete.Program -> REPLM ((Predicate.Pred, [Obligation]), [Specification])
+sweep1 :: Concrete.Program -> REPLM ((Predicate.Pred, [PO]), [Spec])
 sweep1 (Concrete.Program _ statements _) =
   withExceptT StructError $ liftEither $ runWP (wpProg statements)
 
 sweep2 :: Predicate.Struct -> REPLM ([PO], [Spec])
 sweep2 struct = withExceptT StructError2 $ liftEither $ runWPM $ do
-  pos <- runPOM $ genPO struct
+  pos   <- runPOM $ genPO struct
   specs <- runSpecM $ genSpec struct
   return (pos, specs)
 
@@ -182,7 +192,7 @@ recv = do
   raw <- liftIO Strict.getLine
   case decode (BS.fromStrict raw) of
     Nothing -> throwError CannotDecodeRequest
-    Just x -> return x
+    Just x  -> return x
 
 send :: ToJSON a => a -> REPLM ()
 send payload = liftIO $ do
@@ -214,9 +224,6 @@ instance ToJSON Response where
 --------------------------------------------------------------------------------
 -- | Instances of ToJSON
 
-instance ToJSON ObliOrigin where
 instance ToJSON Origin where
-instance ToJSON Obligation where
 instance ToJSON PO where
-instance ToJSON Specification where
 instance ToJSON Spec where

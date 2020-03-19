@@ -143,13 +143,6 @@ genPO (Struct pre (stmt : stmts) next) = do
 --------------------------------------------------------------------------------
 -- | Specification
 
-data Spec = Specification
-  { specID       :: Int
-  , specPreCond  :: Pred
-  , specPostCond :: Pred
-  , specLoc      :: Loc
-  } deriving (Eq, Show, Generic)
-
 -- Monad on top of WPM, for generating specifications
 type SpecM = WriterT [Spec] (StateT Int WPM)
 

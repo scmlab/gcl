@@ -210,3 +210,13 @@ data Origin = AtAbort           Loc
             | AtTermination     Loc
             | AtBoundDecrement  Loc
             deriving (Eq, Show, Generic)
+
+--------------------------------------------------------------------------------
+-- | Specification
+
+data Spec = Specification
+  { specID       :: Int
+  , specPreCond  :: Pred
+  , specPostCond :: Pred
+  , specLoc      :: Loc
+  } deriving (Eq, Show, Generic)

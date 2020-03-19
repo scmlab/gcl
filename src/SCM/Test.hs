@@ -22,7 +22,7 @@ import Syntax.Concrete
 import GCL.WP
 
 import Pretty.Abstract ()
-import Pretty.GCL.WP ()
+import Pretty.Predicate ()
 
 runtst :: String -> IO ()
 runtst filepath = do

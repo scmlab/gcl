@@ -21,34 +21,10 @@ import           Syntax.Concrete                ( Expr
 import qualified Syntax.Concrete               as C
 -- import qualified Syntax.Predicate as P
 import           Syntax.Predicate        hiding ( Stmt )
-import           Syntax.Location                ( ToNoLoc(..) )
-
-data Specification = Specification
-  { specID       :: Int
-  , specPreCond  :: Pred
-  , specPostCond :: Pred
-  , specLoc      :: Loc
-  } deriving (Eq, Show, Generic)
-
-instance ToNoLoc Specification where
-  toNoLoc (Specification i p q _) =
-    Specification i (toNoLoc p) (toNoLoc q) NoLoc
-
-data ObliOrigin = AroundAbort Loc
-                | AroundSkip Loc
-                | AssertGuaranteed Loc
-                | AssertSufficient Loc
-                | Assignment Loc
-                | IfTotal Loc
-                | LoopBase Loc
-                | LoopTermBase Loc
-                | LoopInitialize Loc
-      deriving (Eq, Show, Generic)
+import           Syntax.Location                ( )
 
 type SM
-  = WriterT
-      [PO]
-      (WriterT [Specification] (StateT (Int, Int, Int) (Either StructError)))
+  = WriterT [PO] (WriterT [Spec] (StateT (Int, Int, Int) (Either StructError)))
 
 -- create a proof obligation
 tellObli :: PO -> SM ()
@@ -228,27 +204,13 @@ instance C.Fresh SM where
 runSM
   :: SM a
   -> (Int, Int, Int)
-  -> Either StructError (((a, [PO]), [Specification]), (Int, Int, Int))
+  -> Either StructError (((a, [PO]), [Spec]), (Int, Int, Int))
 runSM p = runStateT (runWriterT . runWriterT $ p)
 
-runWP :: SM a -> Either StructError ((a, [PO]), [Specification])
+runWP :: SM a -> Either StructError ((a, [PO]), [Spec])
 runWP p = fmap fst $ runSM p (0, 0, 0)
 
-instance Located ObliOrigin where
-  locOf (AroundAbort      l) = l
-  locOf (AroundSkip       l) = l
-  locOf (AssertGuaranteed l) = l
-  locOf (AssertSufficient l) = l
-  locOf (Assignment       l) = l
-  locOf (IfTotal          l) = l
-  locOf (LoopBase         l) = l
-  locOf (LoopTermBase     l) = l
-  locOf (LoopInitialize   l) = l
-
--- instance Located Obligation where
---   locOf (Obligation _ _ _ o) = locOf o
-
-censorSpec :: ([Specification] -> [Specification]) -> SM a -> SM a
+censorSpec :: ([Spec] -> [Spec]) -> SM a -> SM a
 censorSpec f = mapWriterT (censor f)
 
 

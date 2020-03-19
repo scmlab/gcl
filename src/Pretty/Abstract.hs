@@ -1,13 +1,13 @@
-{-# LANGUAGE DeriveFunctor, OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Pretty.Abstract where
 
-import Data.Text.Prettyprint.Doc
-import Prelude hiding (Ordering(..))
+import           Data.Text.Prettyprint.Doc
+import           Prelude                 hiding ( Ordering(..) )
 
-import Pretty.Variadic
-import Syntax.Abstract hiding (var)
-import Pretty.Util
+import           Pretty.Variadic
+import           Syntax.Abstract         hiding ( var )
+import           Pretty.Util
 
 --------------------------------------------------------------------------------
 -- | Expr
@@ -17,52 +17,57 @@ handleOp n op = case classify op of
   Infix m -> do
     p <- var
     q <- var
-    return $ parensIf n m $
-      prettyPrec (succ m) p
+    return
+      $   parensIf n m
+      $   prettyPrec (succ m) p
       <+> pretty op
       <+> prettyPrec (succ m) q
   InfixL m -> do
     p <- var
     q <- var
-    return $ parensIf n m $
-      prettyPrec m p
+    return
+      $   parensIf n m
+      $   prettyPrec m p
       <+> pretty op
       <+> prettyPrec (succ m) q
   InfixR m -> do
     p <- var
     q <- var
-    return $ parensIf n m $
-      prettyPrec (succ m) p
+    return
+      $   parensIf n m
+      $   prettyPrec (succ m) p
       <+> pretty op
       <+> prettyPrec m q
   Prefix m -> do
     p <- var
-    return $ parensIf n m $
-      pretty op
-      <+> prettyPrec m p
+    return $ parensIf n m $ pretty op <+> prettyPrec m p
   Postfix m -> do
     p <- var
-    return $ parensIf n m $
-      prettyPrec m p
-      <+> pretty op
+    return $ parensIf n m $ prettyPrec m p <+> pretty op
 
 handleExpr :: Int -> Expr -> Variadic Expr (Doc ann)
-handleExpr _ (Var v) = return $ pretty v
-handleExpr _ (Const c) = return $ pretty c
-handleExpr _ (Lit lit) = return $ pretty lit
-handleExpr n (Op op) = handleOp n op
-handleExpr n (App p q) = case handleExpr n p of
-  Expect f -> f q
+handleExpr _ (Var   v  ) = return $ pretty v
+handleExpr _ (Const c  ) = return $ pretty c
+handleExpr _ (Lit   lit) = return $ pretty lit
+handleExpr n (Op    op ) = handleOp n op
+handleExpr n (App p q  ) = case handleExpr n p of
+  Expect   f -> f q
   Complete s -> do
     t <- handleExpr n q
     -- see if the second argument is an application, apply parenthesis when needed
     case q of
       App _ _ -> return $ s <+> parensIf n 0 t
-      _ ->       return $ s <+> t
+      _       -> return $ s <+> t
 handleExpr _ (Quant op xs r t) =
-  return $
-    "⟨" <> ppQuantOp op <+> hsep (map pretty xs) <+>
-        ":" <+> pretty r <+> ":" <+> pretty t <> "⟩"
+  return
+    $   "⟨"
+    <>  ppQuantOp op
+    <+> hsep (map pretty xs)
+    <+> ":"
+    <+> pretty r
+    <+> ":"
+    <+> pretty t
+    <>  "⟩"
 
 handleExpr _ (Hole i _) = return $ "[" <> pretty i <> "]"
 
@@ -74,10 +79,10 @@ instance PrettyPrec Expr where
 -- SCM: used for printing the operator in quantifier. Temporary.
 
 ppQuantOp :: Expr -> Doc ann
-ppQuantOp (Op Add)  = "Σ"
+ppQuantOp (Op Add ) = "Σ"
 ppQuantOp (Op Conj) = "∀"
 ppQuantOp (Op Disj) = "∃"
-ppQuantOp (Op op)   = pretty op
+ppQuantOp (Op op  ) = pretty op
 ppQuantOp other     = pretty other
 
 instance Pretty Expr where
@@ -90,21 +95,21 @@ instance Pretty Lit where
 
 
 instance Pretty Op where
-  pretty EQ = "="
-  pretty NEQ = "≠"
-  pretty LTE = "≤"
-  pretty GTE = "≥"
-  pretty LT = "<"
-  pretty GT = ">"
+  pretty EQ      = "="
+  pretty NEQ     = "≠"
+  pretty LTE     = "≤"
+  pretty GTE     = "≥"
+  pretty LT      = "<"
+  pretty GT      = ">"
   pretty Implies = "→"
-  pretty Conj = "∧"
-  pretty Disj = "∨"
-  pretty Neg = "¬"
-  pretty Add = "+"
-  pretty Sub = "-"
-  pretty Mul = "*"
-  pretty Div = "/"
-  pretty Mod = "%"
+  pretty Conj    = "∧"
+  pretty Disj    = "∨"
+  pretty Neg     = "¬"
+  pretty Add     = "+"
+  pretty Sub     = "-"
+  pretty Mul     = "*"
+  pretty Div     = "/"
+  pretty Mod     = "%"
 
 --------------------------------------------------------------------------------
 -- | Type
@@ -113,18 +118,18 @@ instance Pretty Op where
 --   pretty (Including e) = ""
 instance Pretty Interval where
   pretty (Interval (Including a) (Including b)) =
-      "[" <+> pretty a <+> ".." <+> pretty b <+> "]"
+    "[" <+> pretty a <+> ".." <+> pretty b <+> "]"
   pretty (Interval (Including a) (Excluding b)) =
-      "[" <+> pretty a <+> ".." <+> pretty b <+> ")"
+    "[" <+> pretty a <+> ".." <+> pretty b <+> ")"
   pretty (Interval (Excluding a) (Including b)) =
-      "(" <+> pretty a <+> ".." <+> pretty b <+> "]"
+    "(" <+> pretty a <+> ".." <+> pretty b <+> "]"
   pretty (Interval (Excluding a) (Excluding b)) =
-      "(" <+> pretty a <+> ".." <+> pretty b <+> ")"
+    "(" <+> pretty a <+> ".." <+> pretty b <+> ")"
 
 instance Pretty Type where
-  pretty (TBase TInt) = "Int"
+  pretty (TBase TInt ) = "Int"
   pretty (TBase TBool) = "Bool"
   pretty (TBase TChar) = "Char"
-  pretty (TFunc a b) = pretty a <+> "->" <+> pretty b
-  pretty (TArray i b) = "array" <+> pretty i <+> "of" <+> pretty b
-  pretty (TVar i) = "TVar" <+> pretty i
+  pretty (TFunc  a b ) = pretty a <+> "->" <+> pretty b
+  pretty (TArray i b ) = "array" <+> pretty i <+> "of" <+> pretty b
+  pretty (TVar i     ) = "TVar" <+> pretty i
