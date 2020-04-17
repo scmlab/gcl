@@ -199,14 +199,14 @@ expression = makeExprParser term table <?> "expression"
               , InfixL $ binary Sub  TokSub
               ]
 
-            , [ InfixN $ binary NEQ TokNEQ
-              , InfixN $ binary LT  TokLT
-              , InfixN $ binary LTE TokLTE
-              , InfixN $ binary GT  TokGT
-              , InfixN $ binary GTE TokGTE
+            , [ InfixL $ binary NEQ TokNEQ
+              , InfixL $ binary LT  TokLT
+              , InfixL $ binary LTE TokLTE
+              , InfixL $ binary GT  TokGT
+              , InfixL $ binary GTE TokGTE
               ]
 
-            , [ InfixN $ binary EQ  TokEQ
+            , [ InfixL $ binary EQ  TokEQ
               ]
 
             , [ Prefix $ unary  Neg  TokNeg     ]
