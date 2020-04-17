@@ -19,6 +19,7 @@ import Syntax.Parser.Util (PosLog, extract)
 import qualified Syntax.Parser.Util as Util
 
 import Prelude hiding (Ordering(..))
+import Data.Maybe (maybeToList)
 
 --------------------------------------------------------------------------------
 -- | States for source location bookkeeping
@@ -57,10 +58,10 @@ parse parser filepath tokenStream = do
 program :: Parser Program
 program = withLoc $ do
   ignoreNewlines
-  declarations <- many declaration <?> "declarations"
+  (decls, asrts) <- declarations <?> "declarations"
   stmts <- statements <?> "statements"
   eof
-  return $ Program declarations stmts
+  return $ Program decls (asrts ++ stmts)
 
 specContent :: Parser [Stmt]
 specContent = do
@@ -338,29 +339,42 @@ type' = makeExprParser term table <?> "type"
 --------------------------------------------------------------------------------
 -- | Declarations
 
-declaration :: Parser Declaration
+declaration :: Parser (Declaration, Maybe Stmt)
 declaration = choice
   [ constantDecl
   , variableDecl
   ] <?> "declaration"
 
-constantDecl :: Parser Declaration
+constantDecl :: Parser (Declaration, Maybe Stmt)
 constantDecl = withLoc $ do
   symbol TokCon
   types <- constList
   symbol TokColon <?> "colon"
   t <- type'
+  masrt <- optional (Assert <$> braces predicate)
   expectNewline <?> "<newline> after a declaration"
-  return $ ConstDecl types t
+  return $ (\loc -> (ConstDecl types t loc, mlc masrt loc))
+ where mlc Nothing  _   = Nothing
+       mlc (Just f) loc = Just (f loc)
 
-variableDecl :: Parser Declaration
+variableDecl :: Parser (Declaration, Maybe Stmt)
 variableDecl = withLoc $ do
   symbol TokVar
   vars <- variableList
   symbol TokColon <?> "colon"
   t <- type'
   expectNewline <?> "<newline> after a declaration"
-  return $ VarDecl vars t
+  return $ (\loc -> (VarDecl vars t loc, Nothing))
+
+declarations :: Parser ([Declaration], [Stmt])
+declarations =
+     (do (decl, asrt) <- declaration
+         (decls, asrts) <- declarations
+         return (decl:decls, maybeToList asrt ++ asrts))
+ <|> (do asrt <- assert
+         (decls, asrts) <- declarations
+         return (decls, asrt:asrts))
+ <|> return ([],[])
 
 --------------------------------------------------------------------------------
 -- | Variables and stuff
