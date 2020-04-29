@@ -8,7 +8,6 @@ import           Control.Monad                  ( void )
 import           Data.Text.Lazy                 ( Text )
 import           Data.Loc
 import           Data.Void
-import           Data.Foldable                  ( fold )
 import           Text.Megaparsec         hiding ( Pos
                                                 , State
                                                 , ParseError
@@ -380,13 +379,16 @@ variableDecl = withLoc $ do
   return $ VarDecl vars t assertion
 
 letDecl :: Parser Declaration
-letDecl = withLoc $ braces $ do
-  symbol TokLet <?> "let"
-  name <- upper
-  symbol TokColon <?> ":"
-  expr <- predicate
+letDecl = withLoc $ do 
+  decl <- braces $ do
+    symbol TokLet <?> "let"
+    name <- upper
+    symbol TokColon <?> ":"
+    expr <- predicate
+    return $ LetDecl name expr
   expectNewline <?> "<newline> after a declaration"
-  return $ LetDecl name expr
+  return decl
+  
 
 
 --------------------------------------------------------------------------------

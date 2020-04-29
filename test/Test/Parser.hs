@@ -252,18 +252,18 @@ expression = testGroup "Expressions" $ map
         )
         (1 <-> 14)
     ]
-  where
-    con :: Text -> Loc -> Expr
-    con t l = Const (Upper t l) l
 
-    var :: Text -> Loc -> Expr
-    var t l = Var (Lower t l) l
+con :: Text -> Loc -> Expr
+con t l = Const (Upper t l) l
 
-    bin :: Op -> Loc -> Expr -> Loc -> Expr -> Loc -> Expr
-    bin op opLoc a aLoc b bLoc = App (App (Op op opLoc) a aLoc) b bLoc
+var :: Text -> Loc -> Expr
+var t l = Var (Lower t l) l
 
-    un :: Op -> Loc -> Expr -> Loc -> Expr
-    un op opLoc a aLoc = App (Op op opLoc) a aLoc
+bin :: Op -> Loc -> Expr -> Loc -> Expr -> Loc -> Expr
+bin op opLoc a aLoc b bLoc = App (App (Op op opLoc) a aLoc) b bLoc
+
+un :: Op -> Loc -> Expr -> Loc -> Expr
+un op opLoc a aLoc = App (Op op opLoc) a aLoc
 
 --------------------------------------------------------------------------------
 -- | Type
@@ -297,11 +297,14 @@ declaration = testGroup "Declarations" $ map
     (toTestTree Parser.declaration)
     [ RightCase "variable" "var x : Int\n"
         $ VarDecl [Lower "x" (at 5)] (TBase TInt (9 <-> 11)) Nothing (1 <-> 11)
-    , RightCase "conant" "con X, Y : Int\n" $ ConstDecl
+    , RightCase "constant" "con X, Y : Int\n" $ ConstDecl
         [Upper "X" (at 5), Upper "Y" (at 8)]
         (TBase TInt (12 <-> 14))
         Nothing
         (1 <-> 14)
+    , RightCase "let binding" "{ let X : N > 0 }\n"
+        $ LetDecl (Upper "X" (at 7)) 
+            (bin GT (at 13) (con "N" (at 11)) (11 <-> 13) (Lit (Num 0) (at 15)) (11 <-> 15)) (1 <-> 17)
     ]
 
 --------------------------------------------------------------------------------
@@ -381,6 +384,7 @@ program :: TestTree
 program = testGroup "Program" $ map
     (toTestTree Parser.program)
     [ ReadFile "empty" "./test/source/empty.gcl" $ Right $ Program []
+                                                                   []
                                                                    []
                                                                    []
                                                                    NoLoc
