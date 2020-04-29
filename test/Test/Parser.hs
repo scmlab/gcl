@@ -297,6 +297,8 @@ declaration = testGroup "Declarations" $ map
     (toTestTree Parser.declaration)
     [ RightCase "variable" "var x : Int\n"
         $ VarDecl [Lower "x" (at 5)] (TBase TInt (9 <-> 11)) Nothing (1 <-> 11)
+    , RightCase "variable with properties" "var x : Int { True }\n"
+        $ VarDecl [Lower "x" (at 5)] (TBase TInt (9 <-> 11)) (Just (Lit (Bol True) (15 <-> 18))) (1 <-> 20)
     , RightCase "constant" "con X, Y : Int\n" $ ConstDecl
         [Upper "X" (at 5), Upper "Y" (at 8)]
         (TBase TInt (12 <-> 14))
