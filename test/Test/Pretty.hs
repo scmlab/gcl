@@ -2,29 +2,29 @@
 
 module Test.Pretty where
 
-import Test.Tasty
-import Test.Tasty.HUnit
-import Data.Text.Lazy (Text)
-import Data.Text.Prettyprint.Doc
-import Data.Text.Prettyprint.Doc.Render.Text (renderLazy)
-import Prelude hiding (Ordering(..))
+import           Test.Tasty
+import           Test.Tasty.HUnit
+import           Data.Text.Lazy                 ( Text )
+import           Data.Text.Prettyprint.Doc
+import           Data.Text.Prettyprint.Doc.Render.Text
+                                                ( renderLazy )
+import           Prelude                 hiding ( Ordering(..) )
 
-import qualified Syntax.Parser as Parser
-import qualified REPL as REPL
-import Syntax.Location
-import Error
-import Pretty ()
+import qualified Syntax.Parser                 as Parser
+import qualified REPL                          as REPL
+import           Syntax.Location
+import           Error
+import           Pretty                         ( )
 
 tests :: TestTree
-tests = testGroup "Prettifier"
-  [ expression
-  ]
+tests = testGroup "Prettifier" [expression]
 
 --------------------------------------------------------------------------------
 -- | Expression
 
 expression :: TestTree
-expression = testGroup "Expressions"
+expression = testGroup
+  "Expressions"
   [ testCase "1" $ run "X > Y && X > Y" @== "X > Y ∧ X > Y"
   , testCase "2" $ run "1 + 2 * 3 - 4" @== "1 + 2 * 3 - 4"
   , testCase "3" $ run "1 + 2 * 3 = 4" @== "1 + 2 * 3 = 4"
@@ -33,12 +33,13 @@ expression = testGroup "Expressions"
   , testCase "6" $ run "3 / (2 + X)" @== "3 / (2 + X)"
   , testCase "7" $ run "3 / 2 + X" @== "3 / 2 + X"
   ]
-  where
-    run :: Text -> IO (Either Error Text)
-    run text = do
-      expr <- REPL.runREPLM $ REPL.scan "<test>" text
-                >>= REPL.parse Parser.expression "<test>"
-      return $ fmap (renderLazy . layoutCompact . pretty . depart) expr
+ where
+  run :: Text -> IO (Either Error Text)
+  run text = do
+    expr <- REPL.runREPLM $ REPL.scan "<test>" text >>= REPL.parse
+      Parser.expression
+      "<test>"
+    return $ fmap (renderLazy . layoutCompact . pretty . depart) expr
 
 (@==) :: (Eq a, Eq b, Show a, Show b) => IO (Either a b) -> b -> IO ()
 f @== b = do
