@@ -37,7 +37,7 @@ runtst filepath = do
 
         case parseProgram filepath scanned of
          Left errors -> print errors
-         Right (Program _ stmts _) -> do
+         Right (Program _ _ stmts _) -> do
           -- print program
           -- putStr "\n"
           -- Either StructError ((a, [Obligation]), [Specification])

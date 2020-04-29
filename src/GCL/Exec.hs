@@ -80,7 +80,7 @@ pickGCmds cont ex (GdCmd g cmds _ : gs) =
            _ -> error "type error, shouldn't happen"
 
 execProg :: ExecMonad m => Program -> m ()
-execProg (Program decls stmts _) = do
+execProg (Program decls _ stmts _) = do
   mapM_ declare decls
   execStmts stmts
 

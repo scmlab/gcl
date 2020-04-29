@@ -110,7 +110,7 @@ checkGdCmd cxt (GdCmd g cmds _)= do
    checkSs cxt cmds
 
 checkProg :: Program -> TM ()
-checkProg (Program decls stmts _) = do
+checkProg (Program decls _ stmts _) = do
   checkSs cxt stmts
  where cxt = concat (map f decls)
        f (ConstDecl cs t _) = [(c, depart t) | Upper c _ <- cs]

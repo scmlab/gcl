@@ -22,7 +22,11 @@ import Syntax.Abstract (Op(..), TBase(..), Lit(..))
 --------------------------------------------------------------------------------
 -- | Program / Declaration / Statement
 
-data Program = Program [Declaration] [Stmt] Loc
+data Program = Program
+      [Declaration] -- constant and variable declarations
+      [Expr]        -- global properties
+      [Stmt]        -- main program
+      Loc
   deriving (Eq, Show)
 
 data Declaration
@@ -128,10 +132,12 @@ false :: Expr
 false = Lit (Bol False) NoLoc
 
 conjunct :: [Expr] -> Expr
-conjunct = foldl conj true
+conjunct [] = true
+conjunct xs = foldl1 conj xs
 
 disjunct :: [Expr] -> Expr
-disjunct = foldl disj true
+disjunct [] = false
+disjunct xs = foldl1 disj xs
 
 imply :: Expr -> Expr -> Expr
 imply p q = App (App (Op Implies NoLoc) p NoLoc) q NoLoc

@@ -190,7 +190,7 @@ instance ToJSON StructError2 where
 -- | Struct
 
 programToStruct :: C.Program -> WPM Struct
-programToStruct (C.Program _ stmts _) = case (init stmts, last stmts) of
+programToStruct (C.Program _ _ stmts _) = case (init stmts, last stmts) of
   (C.Assert p l : stmts', C.Assert q m) ->
     wpStmts [Assertion p l] stmts' (Assertion q m)
   (C.LoopInvariant p b l : stmts', C.Assert q m) ->

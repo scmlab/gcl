@@ -17,6 +17,7 @@ import Syntax.Location ()
 import Syntax.Parser.Lexer
 import Syntax.Parser.Util (PosLog, extract)
 import qualified Syntax.Parser.Util as Util
+import Syntax.ConstExpr
 
 import Prelude hiding (Ordering(..))
 import Data.Maybe (maybeToList)
@@ -61,8 +62,11 @@ program = withLoc $ do
   (decls, asrts) <- declarations <?> "declarations"
   stmts <- statements <?> "statements"
   eof
-  return $ Program decls (asrts ++ stmts)
-
+  let (glob, asrts') = pickGlobals asrts
+  let pre = if null asrts' then []
+               else [Assert (conjunct asrts') NoLoc]
+  return $ Program decls glob (pre ++ stmts)
+ 
 specContent :: Parser [Stmt]
 specContent = do
   ignoreNewlines
@@ -363,9 +367,11 @@ variableDecl = withLoc $ do
   vars <- variableList
   symbol TokColon <?> "colon"
   t <- type'
+  masrt <- optional (Assert <$> braces predicate)
   expectNewline <?> "<newline> after a declaration"
-  return $ (\loc -> (VarDecl vars t loc, Nothing))
-
+  return $ (\loc -> (VarDecl vars t loc, mlc masrt loc))
+ where mlc Nothing  _   = Nothing
+       mlc (Just f) loc = Just (f loc)
 declarations :: Parser ([Declaration], [Stmt])
 declarations =
      (do (decl, asrt) <- declaration

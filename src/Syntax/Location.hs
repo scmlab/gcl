@@ -12,7 +12,7 @@ import qualified Syntax.Predicate              as P
 import           Syntax.Concrete
 
 instance Located Program where
-  locOf (Program _ _ l) = l
+  locOf (Program _ _ _ l) = l
 
 instance Located Stmt where
   locOf (Skip  l            ) = l

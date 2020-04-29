@@ -20,7 +20,7 @@ import           Control.Exception              ( IOException
                                                 )
 
 import           Error
-import           GCL.WP                         ( wpProg
+import           GCL.WP                         ( structProg
                                                 , runWP
                                                 )
 import           GCL.WP2
@@ -184,9 +184,9 @@ parseSpec :: TokStream -> REPLM [Concrete.Stmt]
 parseSpec = parse Parser.specContent "<specification>"
 
 sweep1 :: Concrete.Program -> REPLM ([PO], [Spec])
-sweep1 (Concrete.Program _ statements _) = do
+sweep1 (Concrete.Program _ _ statements _) = do
   ((_, pos), specs) <- withExceptT StructError $ liftEither $ runWP
-    (wpProg statements)
+    (structProg statements)
   return (pos, specs)
 
 sweep2 :: Predicate.Struct -> REPLM ([PO], [Spec])
