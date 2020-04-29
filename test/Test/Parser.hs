@@ -302,9 +302,9 @@ declaration = testGroup "Declarations" $ map
         (TBase TInt (12 <-> 14))
         Nothing
         (1 <-> 14)
-    , RightCase "let binding" "{ let X : N > 0 }\n"
-        $ LetDecl (Upper "X" (at 7)) 
-            (bin GT (at 13) (con "N" (at 11)) (11 <-> 13) (Lit (Num 0) (at 15)) (11 <-> 15)) (1 <-> 17)
+    , RightCase "let binding" "let X : N > 0\n"
+        $ LetDecl (Upper "X" (at 5)) 
+            (bin GT (at 11) (con "N" (at 9)) (9 <-> 11) (Lit (Num 0) (at 13)) (9 <-> 13)) (1 <-> 13)
     ]
 
 --------------------------------------------------------------------------------
