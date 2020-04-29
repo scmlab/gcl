@@ -65,10 +65,11 @@ parse parser filepath tokenStream = do
 program :: Parser Program
 program = withLoc $ do
   ignoreNewlines
-  (decls, asrts) <- declarations <?> "declarations"
-  stmts          <- statements <?> "statements"
+  decls <- many declaration <?> "declarations"
+  stmts <- statements <?> "statements"
   eof
-  let (glob, asrts') = pickGlobals asrts
+
+  let (glob, asrts') = pickGlobals $ extractAssertions decls
   let pre = if null asrts' then [] else [Assert (conjunct asrts') NoLoc]
   return $ Program decls glob (pre ++ stmts)
 
@@ -353,47 +354,28 @@ type' = makeExprParser term table <?> "type"
 --------------------------------------------------------------------------------
 -- | Declarations
 
-declaration :: Parser (Declaration, Maybe Stmt)
+declaration :: Parser Declaration
 declaration = choice [constantDecl, variableDecl] <?> "declaration"
 
-constantDecl :: Parser (Declaration, Maybe Stmt)
+constantDecl :: Parser Declaration
 constantDecl = withLoc $ do
   symbol TokCon
-  types <- constList
+  vars <- constList
   symbol TokColon <?> "colon"
-  t     <- type'
-  masrt <- optional (Assert <$> braces predicate)
+  t         <- type'
+  assertion <- optional (braces predicate)
   expectNewline <?> "<newline> after a declaration"
-  return $ (\loc -> (ConstDecl types t loc, mlc masrt loc))
- where
-  mlc Nothing  _   = Nothing
-  mlc (Just f) loc = Just (f loc)
+  return $ ConstDecl vars t assertion
 
-variableDecl :: Parser (Declaration, Maybe Stmt)
+variableDecl :: Parser Declaration
 variableDecl = withLoc $ do
   symbol TokVar
   vars <- variableList
   symbol TokColon <?> "colon"
-  t     <- type'
-  masrt <- optional (Assert <$> braces predicate)
+  t         <- type'
+  assertion <- optional (braces predicate)
   expectNewline <?> "<newline> after a declaration"
-  return $ (\loc -> (VarDecl vars t loc, mlc masrt loc))
- where
-  mlc Nothing  _   = Nothing
-  mlc (Just f) loc = Just (f loc)
-declarations :: Parser ([Declaration], [Stmt])
-declarations =
-  (do
-      (decl , asrt ) <- declaration
-      (decls, asrts) <- declarations
-      return (decl : decls, maybeToList asrt ++ asrts)
-    )
-    <|> (do
-          asrt           <- assert
-          (decls, asrts) <- declarations
-          return (decls, asrt : asrts)
-        )
-    <|> return ([], [])
+  return $ VarDecl vars t assertion
 
 --------------------------------------------------------------------------------
 -- | Variables and stuff

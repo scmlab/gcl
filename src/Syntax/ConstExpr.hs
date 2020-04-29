@@ -2,7 +2,6 @@
 
 module Syntax.ConstExpr where
 
-import           Control.Arrow                  ( (***) )
 import           Data.List                      ( partition )
 import           Data.Text.Lazy                 ( Text )
 
@@ -10,6 +9,7 @@ import           Syntax.Concrete         hiding ( unary
                                                 , binary
                                                 )
 import           Syntax.Location                ( )
+import           Data.Maybe                     ( mapMaybe )
 
 constExpr :: [Text] -> Expr -> Bool
 constExpr _     (Lit   _ _  ) = True
@@ -24,10 +24,9 @@ constExpr bvars (Quant op bvs range body _) =
     && constExpr (bvs' ++ bvars) body
   where bvs' = map lowerToText bvs
 
-pickGlobals :: [Stmt] -> ([Expr], [Expr])
-pickGlobals = (map unAssert *** map unAssert) . partition constExpr'
- where
-  constExpr' (Assert e _) = constExpr [] e
-  constExpr' _            = False
-  unAssert (Assert e _) = e
-  unAssert _            = error "impossible"
+pickGlobals :: [Expr] -> ([Expr], [Expr])
+pickGlobals = partition (constExpr [])
+
+-- extract assertions in declarations
+extractAssertions :: [Declaration] -> [Expr]
+extractAssertions = mapMaybe extractAssertion

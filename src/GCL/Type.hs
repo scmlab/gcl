@@ -114,8 +114,8 @@ checkProg (Program decls _ stmts _) = do
   checkSs cxt stmts
  where
   cxt = concat (map f decls)
-  f (ConstDecl cs t _) = [ (c, depart t) | Upper c _ <- cs ]
-  f (VarDecl   vs t _) = [ (v, depart t) | Lower v _ <- vs ]
+  f (ConstDecl cs t _ _) = [ (c, depart t) | Upper c _ <- cs ]
+  f (VarDecl   vs t _ _) = [ (v, depart t) | Lower v _ <- vs ]
 
 -- substitution
 

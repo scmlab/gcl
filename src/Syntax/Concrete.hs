@@ -38,8 +38,8 @@ data Program = Program
   deriving (Eq, Show)
 
 data Declaration
-  = ConstDecl [Upper] Type Loc
-  | VarDecl [Lower] Type Loc
+  = ConstDecl [Upper] Type (Maybe Expr) Loc
+  | VarDecl [Lower] Type (Maybe Expr) Loc
   deriving (Eq, Show)
 
 data Stmt
@@ -55,6 +55,10 @@ data Stmt
   deriving (Eq, Show)
 
 data GdCmd = GdCmd Expr [Stmt] Loc deriving (Eq, Show)
+
+extractAssertion :: Declaration -> Maybe Expr
+extractAssertion (ConstDecl _ _ e _) = e
+extractAssertion (VarDecl   _ _ e _) = e
 
 getGuards :: [GdCmd] -> [Expr]
 getGuards = fst . unzipGdCmds

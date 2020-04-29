@@ -80,9 +80,9 @@ execProg (Program decls _ stmts _) = do
   execStmts stmts
 
 declare :: ExecMonad m => Declaration -> m ()
-declare (ConstDecl cs _ _) =
+declare (ConstDecl cs _ _ _) =
   mapM_ (\x -> updateStore NoLoc x Undef) (map upperToText cs)
-declare (VarDecl xs _ _) =
+declare (VarDecl xs _ _ _) =
   mapM_ (\x -> updateStore NoLoc x Undef) (map lowerToText xs)
 
 -- Lifting primitive operators.
