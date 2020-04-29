@@ -44,6 +44,7 @@ data Tok
 
     | TokVar
     | TokCon
+    | TokLet
     | TokArray
     | TokOf
     | TokRange
@@ -112,6 +113,7 @@ instance Show Tok where
     TokQM           -> "?"
     TokVar          -> "var"
     TokCon          -> "con"
+    TokLet          -> "let"
     TokArray        -> "array"
     TokOf           -> "of"
     TokRange        -> ".."
@@ -192,6 +194,8 @@ tokRE =
     <$  text "con"
     <|> TokVar
     <$  text "var"
+    <|> TokLet
+    <$  text "let"
     <|> TokArray
     <$  text "array"
     <|> TokOf

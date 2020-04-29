@@ -35,8 +35,8 @@ runtst filepath = do
    -- let parsed = scan filepath raw >>=
    --               parseProgram filepath
                      case parseProgram filepath scanned of
-      Left  errors                -> print errors
-      Right (Program _ _ stmts _) -> do
+      Left  errors                  -> print errors
+      Right (Program _ _ _ stmts _) -> do
        -- print program
        -- putStr "\n"
        -- Either StructError ((a, [Obligation]), [Specification])

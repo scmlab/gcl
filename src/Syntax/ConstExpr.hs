@@ -24,9 +24,10 @@ constExpr bvars (Quant op bvs range body _) =
     && constExpr (bvs' ++ bvars) body
   where bvs' = map lowerToText bvs
 
-pickGlobals :: [Expr] -> ([Expr], [Expr])
-pickGlobals = partition (constExpr [])
+-- extract assertions from declarations
+pickGlobals :: [Declaration] -> ([Expr], [Expr])
+pickGlobals = partition (constExpr []) . mapMaybe extractAssertion
 
--- extract assertions in declarations
-extractAssertions :: [Declaration] -> [Expr]
-extractAssertions = mapMaybe extractAssertion
+-- extract let bindings in declarations
+pickLetBindings :: [Declaration] -> [(Upper, Expr)]
+pickLetBindings = mapMaybe extractLetBinding

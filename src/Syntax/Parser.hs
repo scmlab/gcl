@@ -28,7 +28,6 @@ import qualified Syntax.Parser.Util            as Util
 import           Syntax.ConstExpr
 
 import           Prelude                 hiding ( Ordering(..) )
-import           Data.Maybe                     ( maybeToList )
 
 --------------------------------------------------------------------------------
 -- | States for source location bookkeeping
@@ -37,7 +36,7 @@ type Parser = ParsecT Void TokStream (PosLog Tok)
 type SyntacticError = (Loc, String)
 
 parse :: Parser a -> FilePath -> TokStream -> Either [SyntacticError] a
-parse parser filepath tokenStream = do
+parse parser filepath tokenStream =
   case Util.runPosLog (runParserT parser filepath tokenStream) of
     Left  e -> Left (fromParseErrorBundle e)
     Right x -> Right x
@@ -59,7 +58,7 @@ parse parser filepath tokenStream = do
 
     getLoc :: ShowErrorComponent e => Mega.ParseError TokStream e -> Loc
     -- get the Loc of all unexpected tokens
-    getLoc (TrivialError _ (Just (Tokens xs)) _) = fold $ fmap locOf xs
+    getLoc (TrivialError _ (Just (Tokens xs)) _) = foldMap locOf xs
     getLoc _ = mempty
 
 program :: Parser Program
@@ -68,10 +67,13 @@ program = withLoc $ do
   decls <- many declaration <?> "declarations"
   stmts <- statements <?> "statements"
   eof
+  -- let construct
+  let letBindings    = pickLetBindings decls
 
-  let (glob, asrts') = pickGlobals $ extractAssertions decls
+  -- globals and precondition
+  let (glob, asrts') = pickGlobals decls
   let pre = if null asrts' then [] else [Assert (conjunct asrts') NoLoc]
-  return $ Program decls glob (pre ++ stmts)
+  return $ Program decls glob letBindings (pre ++ stmts)
 
 specContent :: Parser [Stmt]
 specContent = do
@@ -355,11 +357,11 @@ type' = makeExprParser term table <?> "type"
 -- | Declarations
 
 declaration :: Parser Declaration
-declaration = choice [constantDecl, variableDecl] <?> "declaration"
+declaration = choice [constantDecl, variableDecl, letDecl] <?> "declaration"
 
 constantDecl :: Parser Declaration
 constantDecl = withLoc $ do
-  symbol TokCon
+  symbol TokCon <?> "con"
   vars <- constList
   symbol TokColon <?> "colon"
   t         <- type'
@@ -369,7 +371,7 @@ constantDecl = withLoc $ do
 
 variableDecl :: Parser Declaration
 variableDecl = withLoc $ do
-  symbol TokVar
+  symbol TokVar <?> "var"
   vars <- variableList
   symbol TokColon <?> "colon"
   t         <- type'
@@ -377,11 +379,18 @@ variableDecl = withLoc $ do
   expectNewline <?> "<newline> after a declaration"
   return $ VarDecl vars t assertion
 
+letDecl :: Parser Declaration
+letDecl = withLoc $ braces $ do
+  symbol TokLet <?> "let"
+  name <- upper
+  symbol TokColon <?> ":"
+  expr <- predicate
+  expectNewline <?> "<newline> after a declaration"
+  return $ LetDecl name expr
+
+
 --------------------------------------------------------------------------------
 -- | Variables and stuff
-
--- constant :: Parser Expr
--- constant = withLoc (Const <$> upper) <?> "constant"
 
 -- separated by commas
 constList :: Parser [Upper]
@@ -390,9 +399,6 @@ constList =
     <?> "a list of constants separated by commas"
     )
     <* ignoreNewlines
-
--- variable :: Parser Expr
--- variable = withLoc (Var <$> lower) <?> "variable"
 
 -- separated by commas
 variableList :: Parser [Lower]
