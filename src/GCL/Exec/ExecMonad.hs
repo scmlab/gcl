@@ -3,14 +3,14 @@
 
 module GCL.Exec.ExecMonad where
 
-import Data.Aeson
-import Data.Loc
-import Control.Monad.Except
-import Control.Monad.State hiding (guard)
-import GHC.Generics
+import           Data.Aeson
+import           Data.Loc
+import           Control.Monad.Except
+import           Control.Monad.State     hiding ( guard )
+import           GHC.Generics
 
-import Syntax.Concrete hiding (Var)
-import Syntax.Abstract (Var)
+import           Syntax.Concrete         hiding ( Var )
+import           Syntax.Abstract                ( Var )
 
 type Store = [(Var, Val)]
 
@@ -27,9 +27,9 @@ data ExecError = Aborted Loc
 
 instance ToJSON ExecError where
 instance Located ExecError where
-  locOf (Aborted l) = l
-  locOf (AllFailedInIf l) = l
-  locOf (DivByZero l) = l
+  locOf (Aborted       l      ) = l
+  locOf (AllFailedInIf l      ) = l
+  locOf (DivByZero     l      ) = l
   locOf (ArrayOutOfBound _ _ l) = l
 
 class (MonadPlus m, MonadError ExecError m, MonadState Store m)
@@ -51,15 +51,14 @@ class (MonadPlus m, MonadError ExecError m, MonadState Store m)
   shuffle = return
 
 arrToFun :: Loc -> Int -> [a] -> Val -> Either ExecError a
-arrToFun l n xs (VNum i)
-  | i < n     = Right (xs !! i)
-  | otherwise = Left (ArrayOutOfBound i n l)
+arrToFun l n xs (VNum i) | i < n     = Right (xs !! i)
+                         | otherwise = Left (ArrayOutOfBound i n l)
 arrToFun _ _ _ _ = error "type error, shouldn't hapen"
 
 instance Show Val where
-  showsPrec p (VNum i) = showsPrec p i
-  showsPrec p (VBol b) = showsPrec p b
-  showsPrec p (VChr c) = showsPrec p c
-  showsPrec _ (VFun _) = ("<Fun>" ++)
+  showsPrec p (VNum i   ) = showsPrec p i
+  showsPrec p (VBol b   ) = showsPrec p b
+  showsPrec p (VChr c   ) = showsPrec p c
+  showsPrec _ (VFun _   ) = ("<Fun>" ++)
   showsPrec p (VArr _ xs) = showsPrec p xs
-  showsPrec _ Undef = ("undef" ++)
+  showsPrec _ Undef       = ("undef" ++)

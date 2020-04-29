@@ -186,8 +186,8 @@ wp b (C.Spec   l) post = do
 wpProg :: [Stmt] -> SM Pred
 wpProg []    = return (Constant C.true)
 wpProg stmts = case (init stmts, last stmts) of
-    (stmts', C.Assert p l) -> wpStmts True stmts' (Assertion p l)
-    (_     , stmt        ) -> throwError (MissingPostcondition (locOf stmt))
+  (stmts', C.Assert p l) -> wpStmts True stmts' (Assertion p l)
+  (_     , stmt        ) -> throwError (MissingPostcondition (locOf stmt))
 
 assignmentEnv :: [Lower] -> [Expr] -> C.Subst
 assignmentEnv xs es = Map.fromList (zip (map Left xs) es)

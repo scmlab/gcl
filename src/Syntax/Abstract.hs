@@ -2,15 +2,17 @@
 
 module Syntax.Abstract where
 
-import Control.Monad (liftM2)
+import           Control.Monad                  ( liftM2 )
 
-import Data.List ((\\))
-import Data.Aeson
-import Data.Text.Lazy (Text, pack)
-import GHC.Generics (Generic)
-import Prelude hiding (Ordering(..))
+import           Data.List                      ( (\\) )
+import           Data.Aeson
+import           Data.Text.Lazy                 ( Text
+                                                , pack
+                                                )
+import           GHC.Generics                   ( Generic )
+import           Prelude                 hiding ( Ordering(..) )
 
-import Type ()
+import           Type                           ( )
 
 --------------------------------------------------------------------------------
 -- | Expressions
@@ -93,7 +95,7 @@ predEq = (==)
   -- SCM: the substituion is generally not too large and
   --      a list should be sufficient.
 
-type Subst = [(Text,Expr)]
+type Subst = [(Text, Expr)]
 
   -- SCM: substituion needs fresh names. However, I don't
   --      want to move M into this module. Therefore I am
@@ -111,36 +113,38 @@ class Monad m => Fresh m where
   freshVars pf n = liftM2 (:) (freshVar pf) (freshVars pf (n-1))
 
 subst :: Fresh m => Subst -> Expr -> m Expr
-subst env (Var x)     = return $ maybe (Var x) id (lookup x env)
-subst env (Const x)   = return $ maybe (Const x) id (lookup x env)
-subst _   (Op op)     = return $ Op op
-subst _   (Lit n)     = return $ Lit n
-subst env (App e1 e2) = App <$> subst env e1 <*> subst env e2
-subst env (Hole idx subs) = return $ Hole idx (env:subs)
+subst env (Var   x               ) = return $ maybe (Var x) id (lookup x env)
+subst env (Const x               ) = return $ maybe (Const x) id (lookup x env)
+subst _   (Op    op              ) = return $ Op op
+subst _   (Lit   n               ) = return $ Lit n
+subst env (App  e1  e2           ) = App <$> subst env e1 <*> subst env e2
+subst env (Hole idx subs         ) = return $ Hole idx (env : subs)
 subst env (Quant op xs range term) = do
-   op' <- subst env op
-   (xs', range', term') <- subLocal xs range term
-   let env' = filter (not . (`elem` xs') . fst) env
-   Quant op' xs' <$> subst env' range' <*> subst env' term'
-  where subLocal :: Fresh m => [Var] -> Expr -> Expr -> m ([Var], Expr, Expr)
-        subLocal []     r t = return ([],r,t)
-        subLocal (i:is) r t
-          | i `elem` fre = do j <- freshVar "dm"    -- "dummy" variable
-                              r' <- subst [(i,Var j)] r
-                              t' <- subst [(i,Var j)] t
-                              first3 (j:) <$> subLocal is r' t'
-          | otherwise = first3 (i:) <$> subLocal is r t
-        fre = freeSubst env
-        first3 f (x,y,z) = (f x, y, z)
+  op'                  <- subst env op
+  (xs', range', term') <- subLocal xs range term
+  let env' = filter (not . (`elem` xs') . fst) env
+  Quant op' xs' <$> subst env' range' <*> subst env' term'
+ where
+  subLocal :: Fresh m => [Var] -> Expr -> Expr -> m ([Var], Expr, Expr)
+  subLocal [] r t = return ([], r, t)
+  subLocal (i : is) r t
+    | i `elem` fre = do
+      j  <- freshVar "dm"    -- "dummy" variable
+      r' <- subst [(i, Var j)] r
+      t' <- subst [(i, Var j)] t
+      first3 (j :) <$> subLocal is r' t'
+    | otherwise = first3 (i :) <$> subLocal is r t
+  fre = freeSubst env
+  first3 f (x, y, z) = (f x, y, z)
 
 free :: Expr -> [Var]
-free (Var x)     = [x]
-free (Const x)   = [x]
-free (Op _)      = []
-free (Lit _)     = []
-free (App e1 e2) = free e1 ++ free e2  -- not worrying about duplication
+free (Var   x               ) = [x]
+free (Const x               ) = [x]
+free (Op    _               ) = []
+free (Lit   _               ) = []
+free (App e1 e2             ) = free e1 ++ free e2  -- not worrying about duplication
 free (Quant op xs range term) = (free op ++ free range ++ free term) \\ xs
-free (Hole _ subs) = concat (map freeSubst subs) -- correct?
+free (Hole _ subs           ) = concat (map freeSubst subs) -- correct?
 
 freeSubst :: Subst -> [Var]
 freeSubst = concat . map (free . snd)
@@ -168,7 +172,7 @@ data Type = TBase TBase
       deriving (Show, Eq, Generic)
 
 tInt, tBool, tChar :: Type
-tInt  = TBase TInt
+tInt = TBase TInt
 tBool = TBase TBool
 tChar = TBase TChar
 
@@ -185,17 +189,17 @@ data Fixity = Infix Int | InfixR Int | InfixL Int | Prefix Int | Postfix Int
 
 classify :: Op -> Fixity
 classify Implies = InfixR 1
-classify Disj = InfixL 2
-classify Conj = InfixL 3
-classify Neg = Prefix 4
-classify EQ = Infix 5
-classify NEQ = Infix 6
-classify LTE = Infix 6
-classify GTE = Infix 6
-classify LT = Infix 6
-classify GT = Infix 6
-classify Add = InfixL 7
-classify Sub = InfixL 7
-classify Mul = InfixL 8
-classify Div = InfixL 8
-classify Mod = InfixL 9
+classify Disj    = InfixL 2
+classify Conj    = InfixL 3
+classify Neg     = Prefix 4
+classify EQ      = Infix 5
+classify NEQ     = Infix 6
+classify LTE     = Infix 6
+classify GTE     = Infix 6
+classify LT      = Infix 6
+classify GT      = Infix 6
+classify Add     = InfixL 7
+classify Sub     = InfixL 7
+classify Mul     = InfixL 8
+classify Div     = InfixL 8
+classify Mod     = InfixL 9

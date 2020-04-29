@@ -3,20 +3,20 @@
 
 module Error where
 
-import Data.Aeson
-import Data.Loc
+import           Data.Aeson
+import           Data.Loc
 -- import Data.ByteString.Lazy (ByteString)
-import GHC.Generics
+import           GHC.Generics
 
-import Syntax.Parser.Util ()
-import Type ()
-import Syntax.Parser.Lexer (LexicalError)
-import Syntax.Parser (SyntacticError)
+import           Syntax.Parser.Util             ( )
+import           Type                           ( )
+import           Syntax.Parser.Lexer            ( LexicalError )
+import           Syntax.Parser                  ( SyntacticError )
 -- import Syntax.Abstract (ConvertError)
-import GCL.Type (TypeError)
+import           GCL.Type                       ( TypeError )
 -- import GCL.Exec.ExecMonad (ExecError)
-import GCL.WP (StructError)
-import GCL.WP2 (StructError2)
+import           GCL.WP                         ( StructError )
+import           GCL.WP2                        ( StructError2 )
 
 --------------------------------------------------------------------------------
 -- | Site of Error
@@ -44,14 +44,14 @@ data Error
   deriving (Eq, Show, Generic)
 
 instance Located Error where
-  locOf (LexicalError pos) = Loc pos pos
-  locOf (SyntacticError es) = foldl (\l (m, _) -> l <--> m) NoLoc es
-  locOf (TypeError e) = locOf e
-  locOf (StructError e) = locOf e
-  locOf (StructError2 e) = locOf e
-  locOf CannotDecodeRequest = NoLoc
-  locOf (CannotReadFile _) = NoLoc
-  locOf NotLoaded  = NoLoc
+  locOf (LexicalError   pos) = Loc pos pos
+  locOf (SyntacticError es ) = foldl (\l (m, _) -> l <--> m) NoLoc es
+  locOf (TypeError      e  ) = locOf e
+  locOf (StructError    e  ) = locOf e
+  locOf (StructError2   e  ) = locOf e
+  locOf CannotDecodeRequest  = NoLoc
+  locOf (CannotReadFile _)   = NoLoc
+  locOf NotLoaded            = NoLoc
 
 localError :: Int -> Error -> (Site, Error)
 localError i e = (Local (locOf e) i, e)

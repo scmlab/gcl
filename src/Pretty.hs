@@ -1,6 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE DeriveFunctor #-}
-{-# LANGUAGE TypeSynonymInstances, FlexibleInstances #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 
 module Pretty where

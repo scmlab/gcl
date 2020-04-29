@@ -2,12 +2,12 @@
 
 module GCL.Exec.ExNondet where
 
-import Control.Arrow ((***))
-import Control.Monad.Except
-import Control.Monad.State hiding (guard)
-import GHC.Base (Alternative(..))
+import           Control.Arrow                  ( (***) )
+import           Control.Monad.Except
+import           Control.Monad.State     hiding ( guard )
+import           GHC.Base                       ( Alternative(..) )
 
-import GCL.Exec.ExecMonad
+import           GCL.Exec.ExecMonad
 
 -- run a program by
 --    runExNondet (execProg program) prelude
@@ -19,16 +19,20 @@ instance Functor (ExNondet e s) where
 
 instance Applicative (ExNondet e s) where
   pure = return
-  fs <*> xs = do {f <- fs; x <- xs; return (f x)}
+  fs <*> xs = do
+    f <- fs
+    x <- xs
+    return (f x)
 
 instance Monad (ExNondet e s) where
   return x = ExNd (\s -> [(Right x, s)])
   (ExNd m) >>= f = ExNd (concat . map (bindW f) . m)
-    where bindW _ (Left e,  s) = [(Left e, s)]
-          bindW g (Right x, s) = runExNondet (g x) s
+   where
+    bindW _ (Left  e, s) = [(Left e, s)]
+    bindW g (Right x, s) = runExNondet (g x) s
 
 instance MonadState s (ExNondet e s) where
-  get   = ExNd (\s -> [(Right s,  s)])
+  get = ExNd (\s -> [(Right s, s)])
   put s = ExNd (\_ -> [(Right (), s)])
 
 instance MonadError e (ExNondet e s) where
