@@ -79,11 +79,11 @@ catchLocalError i program =
 -- returns Nothing to break the REPL loop
 handleRequest :: Request -> REPLM (Maybe Response)
 handleRequest (Load filepath) = catchGlobalError $ do
-  (pos, specs) <- load filepath
-  return $ Just $ OK pos specs
+  (pos, specs, globalProps) <- load filepath
+  return $ Just $ OK pos specs globalProps
 handleRequest (Load2 filepath) = catchGlobalError $ do
-  (pos, specs) <- load2 filepath
-  return $ Just $ OK pos specs
+  (pos, specs, globalProps) <- load2 filepath
+  return $ Just $ OK pos specs globalProps
 handleRequest (Refine i payload) = catchLocalError i $ do
   _ <- refine payload
   return $ Just $ Resolve i
@@ -93,7 +93,7 @@ handleRequest (InsertAssertion i) = catchGlobalError $ do
 handleRequest Debug = error "crash!"
 handleRequest Quit  = return Nothing
 
-load :: FilePath -> REPLM ([PO], [Spec])
+load :: FilePath -> REPLM ([PO], [Spec], [Concrete.Expr])
 load filepath = do
   persistFilePath filepath
 
@@ -102,12 +102,14 @@ load filepath = do
   case result of
     Left  _   -> throwError $ CannotReadFile filepath
     Right raw -> do
-      tokens  <- scan filepath raw
-      program <- parseProgram filepath tokens
+      tokens <- scan filepath raw
+      program@(Concrete.Program _ globalProps _ _ _) <- parseProgram filepath
+                                                                     tokens
       persistProgram program
-      sweep1 program
+      (pos, specs) <- sweep1 program
+      return (pos, specs, globalProps)
 
-load2 :: FilePath -> REPLM ([PO], [Spec])
+load2 :: FilePath -> REPLM ([PO], [Spec], [Concrete.Expr])
 load2 filepath = do
   persistFilePath filepath
 
@@ -116,12 +118,14 @@ load2 filepath = do
   case result of
     Left  _   -> throwError $ CannotReadFile filepath
     Right raw -> do
-      tokens  <- scan filepath raw
-      program <- parseProgram filepath tokens
+      tokens <- scan filepath raw
+      program@(Concrete.Program _ globalProps _ _ _) <- parseProgram filepath
+                                                                     tokens
       persistProgram program
       struct <- toStruct program
       persistStruct struct
-      sweep2 struct
+      (pos, specs) <- sweep2 struct
+      return (pos, specs, globalProps)
 
 refine :: Text -> REPLM ()
 refine payload = do
@@ -237,7 +241,7 @@ instance FromJSON Request where
 -- | Response
 
 data Response
-  = OK [PO] [Spec]
+  = OK [PO] [Spec] [Concrete.Expr]
   | Error [(Site, Error)]
   | Resolve Int -- resolves some Spec
   | Insert Int Concrete.Expr
