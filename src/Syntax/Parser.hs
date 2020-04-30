@@ -379,14 +379,15 @@ variableDecl = withLoc $ do
   return $ VarDecl vars t assertion
 
 letDecl :: Parser Declaration
-letDecl = withLoc $ do 
+letDecl = withLoc $ do
   symbol TokLet <?> "let"
   name <- upper
-  symbol TokColon <?> ":"
+  args <- many lower
+  symbol TokColon <?> "="
   expr <- predicate
   expectNewline <?> "<newline> after a declaration"
-  return $ LetDecl name expr
-  
+  return $ LetDecl name args expr
+
 
 
 --------------------------------------------------------------------------------

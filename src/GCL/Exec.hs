@@ -84,7 +84,7 @@ declare (ConstDecl cs _ _ _) =
   mapM_ (\x -> updateStore NoLoc x Undef) (map upperToText cs)
 declare (VarDecl xs _ _ _) =
   mapM_ (\x -> updateStore NoLoc x Undef) (map lowerToText xs)
-declare (LetDecl c _ _) = updateStore NoLoc (upperToText c) Undef
+declare (LetDecl c _ _ _) = updateStore NoLoc (upperToText c) Undef
 
 -- Lifting primitive operators.
 -- Should these be written with dependent type, or type family?

@@ -31,17 +31,17 @@ import           Syntax.Abstract                ( Op(..)
 -- | Program / Declaration / Statement
 
 data Program = Program
-      [Declaration]   -- constant and variable declarations
-      [Expr]          -- global properties
-      [(Upper, Expr)] -- let bindings
-      [Stmt]          -- main program
+      [Declaration]            -- constant and variable declarations
+      [Expr]                   -- global properties
+      [(Upper, [Lower], Expr)] -- let bindings
+      [Stmt]                   -- main program
       Loc
   deriving (Eq, Show)
 
 data Declaration
   = ConstDecl [Upper] Type (Maybe Expr) Loc
   | VarDecl [Lower] Type (Maybe Expr) Loc
-  | LetDecl Upper Expr Loc
+  | LetDecl Upper [Lower] Expr Loc
   deriving (Eq, Show)
 
 data Stmt
@@ -61,12 +61,12 @@ data GdCmd = GdCmd Expr [Stmt] Loc deriving (Eq, Show)
 extractAssertion :: Declaration -> Maybe Expr
 extractAssertion (ConstDecl _ _ e _) = e
 extractAssertion (VarDecl   _ _ e _) = e
-extractAssertion (LetDecl _ _ _    ) = Nothing
+extractAssertion (LetDecl _ _ _ _  ) = Nothing
 
-extractLetBinding :: Declaration -> Maybe (Upper, Expr)
+extractLetBinding :: Declaration -> Maybe (Upper, [Lower], Expr)
 extractLetBinding (ConstDecl _ _ _ _) = Nothing
 extractLetBinding (VarDecl   _ _ _ _) = Nothing
-extractLetBinding (LetDecl c e _    ) = Just (c, e)
+extractLetBinding (LetDecl c a e _  ) = Just (c, a, e)
 
 getGuards :: [GdCmd] -> [Expr]
 getGuards = fst . unzipGdCmds

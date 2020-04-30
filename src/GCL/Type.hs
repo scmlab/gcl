@@ -115,7 +115,7 @@ checkProg (Program decls _ _ stmts _) = checkSs cxt stmts
   cxt = concatMap f decls
   f (ConstDecl cs t _ _) = [ (c, depart t) | Upper c _ <- cs ]
   f (VarDecl   vs t _ _) = [ (v, depart t) | Lower v _ <- vs ]
-  f (LetDecl _c _ _    ) = [] -- TODO: check the { let ... } constructs
+  f (LetDecl _c _ _ _  ) = [] -- TODO: check the { let ... } constructs
 
 -- substitution
 
