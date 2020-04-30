@@ -13,9 +13,11 @@ import           GHC.Generics
 import qualified Syntax.Concrete               as C
 import           Syntax.Concrete                ( Expr
                                                 , Lower
-                                                , Fresh
+                                                )
+import           GCL.Expr                       ( Fresh
                                                 , Subst
                                                 )
+import qualified GCL.Expr                      as E                                    
 
 --------------------------------------------------------------------------------
 -- | Predicates
@@ -56,13 +58,13 @@ toExpr (Disjunct xs        ) = C.disjunct (map toExpr xs)
 toExpr (Negate   x         ) = C.neg (toExpr x)
 
 subst :: Fresh m => Subst -> Pred -> m Pred
-subst env (Constant e   ) = Constant <$> C.subst env e
-subst env (Bound     e l) = Bound <$> C.subst env e <*> pure l
-subst env (Assertion e l) = Assertion <$> C.subst env e <*> pure l
+subst env (Constant e   ) = Constant <$> E.subst env e
+subst env (Bound     e l) = Bound <$> E.subst env e <*> pure l
+subst env (Assertion e l) = Assertion <$> E.subst env e <*> pure l
 subst env (LoopInvariant e b l) =
-  LoopInvariant <$> C.subst env e <*> pure b <*> pure l
-subst env (GuardIf   e l) = GuardLoop <$> C.subst env e <*> pure l
-subst env (GuardLoop e l) = GuardLoop <$> C.subst env e <*> pure l
+  LoopInvariant <$> E.subst env e <*> pure b <*> pure l
+subst env (GuardIf   e l) = GuardLoop <$> E.subst env e <*> pure l
+subst env (GuardLoop e l) = GuardLoop <$> E.subst env e <*> pure l
 subst env (Conjunct xs  ) = Conjunct <$> mapM (subst env) xs
 subst env (Disjunct es  ) = Disjunct <$> mapM (subst env) es
 subst env (Negate   x   ) = Negate <$> subst env x

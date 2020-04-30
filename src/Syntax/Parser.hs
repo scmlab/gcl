@@ -382,7 +382,7 @@ letDecl :: Parser Declaration
 letDecl = withLoc $ do
   symbol TokLet <?> "let"
   name <- upper
-  args <- many lower
+  args <- map lowerToText <$> many lower
   symbol TokColon <?> "="
   expr <- predicate
   expectNewline <?> "<newline> after a declaration"

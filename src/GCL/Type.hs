@@ -13,7 +13,6 @@ import           GHC.Generics                   ( Generic )
 import           Syntax.Concrete         hiding ( Type(..)
                                                 , Expr(..)
                                                 , Lit(..)
-                                                , Fresh(..)
                                                 )
 import qualified Syntax.Concrete               as C
 import           Syntax.Abstract

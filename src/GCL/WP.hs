@@ -23,6 +23,8 @@ import qualified Syntax.Concrete               as C
 import           Syntax.Predicate        hiding ( Stmt )
 import           Syntax.Location                ( )
 
+import qualified GCL.Expr                      as E
+
 type SM
   = WriterT [PO] (WriterT [Spec] (StateT (Int, Int, Int) (Either StructError)))
 
@@ -92,7 +94,7 @@ struct b inv (Just bnd) (C.Do gcmds l) post = do
            (Bound (bnd `C.gte` (C.Lit (C.Num 0) NoLoc)) NoLoc)
            (AtTermination l)
   -- bound decrementation
-  oldbnd <- C.freshVar "bnd"
+  oldbnd <- E.freshVar "bnd"
   forM_ gcmds $ \(C.GdCmd guard body _) -> structStmts
     False
     (Conjunct
@@ -189,13 +191,13 @@ wpProg stmts = case (init stmts, last stmts) of
   (stmts', C.Assert p l) -> wpStmts True stmts' (Assertion p l)
   (_     , stmt        ) -> throwError (MissingPostcondition (locOf stmt))
 
-assignmentEnv :: [Lower] -> [Expr] -> C.Subst
+assignmentEnv :: [Lower] -> [Expr] -> E.Subst
 assignmentEnv xs es = Map.fromList (zip (map Left xs) es)
 
 --------------------------------------------------------------------------------
 -- | The monad, and other supportive operations
 
-instance C.Fresh SM where
+instance E.Fresh SM where
   fresh = do
     (i, j, k) <- get
     put (i, j, succ k)
