@@ -383,7 +383,7 @@ letDecl = withLoc $ do
   symbol TokLet <?> "let"
   name <- upper
   args <- map lowerToText <$> many lower
-  symbol TokColon <?> "="
+  symbol TokEQ <?> "="
   expr <- predicate
   expectNewline <?> "<newline> after a declaration"
   return $ LetDecl name args expr
