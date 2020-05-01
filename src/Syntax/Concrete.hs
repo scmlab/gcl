@@ -87,6 +87,7 @@ data Expr = Lit   Lit       Loc
           | Const Upper     Loc
           | Op    Op        Loc
           | App   Expr Expr Loc
+          | Lam   Text Expr Loc
           | Hole            Loc
           | Quant Expr [Lower] Expr Expr Loc
           deriving (Eq, Show, Generic)
@@ -176,5 +177,6 @@ instance Located Expr where
   locOf (Lit   _ l      ) = l
   locOf (Op    _ l      ) = l
   locOf (App _ _ l      ) = l
+  locOf (Lam _ _ l      ) = l
   locOf (Hole l         ) = l
   locOf (Quant _ _ _ _ l) = l

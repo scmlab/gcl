@@ -64,6 +64,7 @@ instance Relocatable Expr where
   reloc l (Const x _        ) = Const x l
   reloc l (Lit   x _        ) = Lit x l
   reloc l (App x y _        ) = App x y l
+  reloc l (Lam x e _        ) = Lam x e l
   reloc l (Op x _           ) = Op x l
   reloc l (Hole _           ) = Hole l
   reloc l (Quant op xs r t _) = Quant op xs r t l
@@ -115,6 +116,7 @@ instance Departable Expr A.Expr where
   depart (Const x _) = A.Const $ depart x
   depart (Lit   x _) = A.Lit x
   depart (App x y _) = A.App (depart x) (depart y)
+  depart (Lam _ _ _) = error "depart Lam To be implemented"
   depart (Op x _   ) = A.Op x
   depart (Hole _   ) = A.Hole 0 []
   depart (Quant op xs rng trm _) =
@@ -182,6 +184,7 @@ instance ToNoLoc Expr where
   toNoLoc (Const x _) = Const (toNoLoc x) NoLoc
   toNoLoc (Lit   x _) = Lit x NoLoc
   toNoLoc (App x y _) = App (toNoLoc x) (toNoLoc y) NoLoc
+  toNoLoc (Lam x e _) = Lam x (toNoLoc e) NoLoc
   toNoLoc (Op x _   ) = Op x NoLoc
   toNoLoc (Hole _   ) = Hole NoLoc
   toNoLoc (Quant op xs r t _) =

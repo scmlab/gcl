@@ -24,6 +24,7 @@ evalExpr (Op    op          l) = evalOp op l
 evalExpr (App e1 e2 _        ) = evalExpr e1 >>= \case
   VFun f -> evalExpr e2 >>= \v -> liftEither (f v)
   _      -> error "type error, shouldn't happen"
+evalExpr (Lam _ _ _)       = error "to be implemented"
 evalExpr (Quant _ _ _ _ _) = error "not supported"
 evalExpr (Hole _         ) = error "shouldn't happen"
 
