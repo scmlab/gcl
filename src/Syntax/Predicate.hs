@@ -13,11 +13,10 @@ import           GHC.Generics
 import qualified Syntax.Concrete               as C
 import           Syntax.Concrete                ( Expr
                                                 , Lower
-                                                )
-import           GCL.Expr                       ( Fresh
                                                 , Subst
                                                 )
-import qualified GCL.Expr                      as E                                    
+import           GCL.Expr                       ( Fresh )
+import qualified GCL.Expr                      as E
 
 --------------------------------------------------------------------------------
 -- | Predicates

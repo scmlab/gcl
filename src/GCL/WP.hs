@@ -21,7 +21,7 @@ import           Syntax.Concrete                ( Expr
 import qualified Syntax.Concrete               as C
 -- import qualified Syntax.Predicate as P
 import           Syntax.Predicate        hiding ( Stmt )
-import           Syntax.Location                ( )
+import           Syntax.Location                ( Hydratable(..) )
 
 import qualified GCL.Expr                      as E
 
@@ -98,11 +98,11 @@ struct b inv (Just bnd) (C.Do gcmds l) post = do
   forM_ gcmds $ \(C.GdCmd guard body _) -> structStmts
     False
     (Conjunct
-      [inv, Bound (bnd `C.eqq` C.Var oldbnd NoLoc) NoLoc, guardLoop guard]
+      [inv, Bound (bnd `C.eqq` C.Var (hydrate oldbnd) NoLoc) NoLoc, guardLoop guard]
     )
     Nothing
     body
-    (Bound (bnd `C.lt` C.Var oldbnd NoLoc) NoLoc)
+    (Bound (bnd `C.lt` C.Var (hydrate oldbnd) NoLoc) NoLoc)
 
 struct _ _   _ (C.SpecQM l) _    = throwError $ DigHole l
 struct b pre _ (C.Spec   l) post = when b (tellSpec pre post l)
@@ -191,8 +191,8 @@ wpProg stmts = case (init stmts, last stmts) of
   (stmts', C.Assert p l) -> wpStmts True stmts' (Assertion p l)
   (_     , stmt        ) -> throwError (MissingPostcondition (locOf stmt))
 
-assignmentEnv :: [Lower] -> [Expr] -> E.Subst
-assignmentEnv xs es = Map.fromList (zip (map Left xs) es)
+assignmentEnv :: [Lower] -> [Expr] -> C.Subst
+assignmentEnv xs es = Map.fromList (zip (map C.lowerToText xs) es)
 
 --------------------------------------------------------------------------------
 -- | The monad, and other supportive operations

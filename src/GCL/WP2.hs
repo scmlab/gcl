@@ -22,13 +22,14 @@ import           Syntax.Concrete                ( Expr
 import qualified Syntax.Concrete               as C
 -- import qualified Syntax.Predicate as P
 import           Syntax.Predicate
+import           Syntax.Location                ( Hydratable(..) )
 
 import           Pretty.Concrete                ( )
 import           Pretty.Predicate               ( )
 import qualified GCL.Expr                      as E
 
-assignmentEnv :: [Lower] -> [Expr] -> E.Subst
-assignmentEnv xs es = Map.fromList (zip (map Left xs) es)
+assignmentEnv :: [Lower] -> [Expr] -> C.Subst
+assignmentEnv xs es = Map.fromList (zip (map C.lowerToText xs) es)
 
 --------------------------------------------------------------------------------
 -- | Monad for calculating the weakest precondition
@@ -113,7 +114,7 @@ genPO (Struct pre (stmt : stmts) next) = do
       mapM_ (genPO . gdCmdBody) gdCmds
 
       -- termination
-      bndVar <- C.Var <$> E.freshVar "bnd" <*> pure NoLoc
+      bndVar <- (C.Var . hydrate) <$> E.freshVar "bnd" <*> pure NoLoc
       tellPO (conjunct (loopInvariant : guards))
              (Bound (bndVar `C.gte` C.number 0) NoLoc)
              (AtTermination loc)
