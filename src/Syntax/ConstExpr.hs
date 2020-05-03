@@ -24,6 +24,7 @@ constExpr bvars (Quant op bvs range body _) =
     && constExpr (bvs' ++ bvars) range
     && constExpr (bvs' ++ bvars) body
   where bvs' = map lowerToText bvs
+constExpr _     (Subst _ _  ) = error "constExpr Subst to be implemented"
 
 -- extract assertions from declarations
 pickGlobals :: [Declaration] -> ([Expr], [Expr])

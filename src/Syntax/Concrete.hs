@@ -91,7 +91,7 @@ data Expr = Lit   Lit       Loc
           | Lam   Text Expr Loc
           | Hole            Loc
           | Quant Expr [Lower] Expr Expr Loc
---          | Subst Expr Subst -- internal. Location not necessary?
+          | Subst Expr Subst -- internal. Location not necessary?
           deriving (Eq, Show, Generic)
 
 type Subst = Map Text Expr
@@ -184,4 +184,4 @@ instance Located Expr where
   locOf (Lam _ _ l      ) = l
   locOf (Hole l         ) = l
   locOf (Quant _ _ _ _ l) = l
---  locOf (Subst _ _      ) = NoLoc
+  locOf (Subst _ _      ) = NoLoc

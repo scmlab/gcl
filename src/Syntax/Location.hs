@@ -68,6 +68,7 @@ instance Relocatable Expr where
   reloc l (Op x _           ) = Op x l
   reloc l (Hole _           ) = Hole l
   reloc l (Quant op xs r t _) = Quant op xs r t l
+  reloc _ (Subst e s        ) = Subst e s
 
 instance Relocatable Upper where
   reloc l (Upper x _) = Upper x l
@@ -116,11 +117,12 @@ instance Departable Expr A.Expr where
   depart (Const x _) = A.Const $ depart x
   depart (Lit   x _) = A.Lit x
   depart (App x y _) = A.App (depart x) (depart y)
-  depart (Lam _ _ _) = error "depart Lam To be implemented"
+  depart (Lam _ _ _) = error "depart Lam to be implemented"
   depart (Op x _   ) = A.Op x
   depart (Hole _   ) = A.Hole 0 []
   depart (Quant op xs rng trm _) =
     A.Quant (depart op) (map depart xs) (depart rng) (depart trm)
+  depart (Subst _ _) = error "depart Subst to be implemented"
 
 --------------------------------------------------------------------------------
 -- Add locations
@@ -189,6 +191,7 @@ instance ToNoLoc Expr where
   toNoLoc (Hole _   ) = Hole NoLoc
   toNoLoc (Quant op xs r t _) =
     Quant (toNoLoc op) (map toNoLoc xs) (toNoLoc r) (toNoLoc t) NoLoc
+  toNoLoc (Subst e s) = Subst e s
 
 instance ToNoLoc P.Pred where
   toNoLoc (P.Constant e   ) = P.Constant (toNoLoc e)

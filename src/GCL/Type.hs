@@ -67,7 +67,7 @@ inferE cxt (C.App e1 e2 l        ) = do
       unify_ l t1 t1'
       substTM t2
     _ -> throwError (NotFunction t l)
-inferE _ (C.Lam _ _ _) = error "to be implemented"
+inferE _ (C.Lam _ _ _) = error "to be implemented" -- SCM
 inferE _   (C.Hole _               ) = TVar <$> freshVar "t"
 inferE cxt (C.Quant op xs rng trm l) = do
   tOp <- inferE cxt op
@@ -78,6 +78,7 @@ inferE cxt (C.Quant op xs rng trm l) = do
   checkE (cxt' ++ cxt) rng tBool
   checkE (cxt' ++ cxt) trm tR'
   return tR'
+inferE _ (C.Subst _ _) = error "SCM: to be implemented"
 
 checkE :: TCxt -> C.Expr -> Type -> TM ()
 checkE cxt e t = do
