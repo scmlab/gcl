@@ -10,7 +10,6 @@ import           Data.Set                       ( Set
 import qualified Data.Set                      as Set
 import           Data.Text.Lazy                 ( Text )
 import qualified Data.Text.Lazy                as Text
-import           Control.Arrow                  ( (***) )
 import           Syntax.Concrete
 
 --------------------------------------------------------------------------------
@@ -51,11 +50,8 @@ free (Subst e s) = (free e \\ Set.fromList (Map.keys s)) <> freeSubst s
 freeSubst :: Subst -> Set Text
 freeSubst = Set.unions . map free . Map.elems
 
-freeDefns :: [(Text, ([Text], Expr))] -> Set Text
-freeDefns = Set.unions . map (freeDefn . snd)
-
-freeDefn :: ([Text], Expr) -> Set Text
-freeDefn (args, body) = free body \\ Set.fromList args
+freeDefns :: Defns -> Set Text
+freeDefns = Set.unions . map (free . snd)
 
 --------------------------------------------------------------------------------
 -- | Substitution
@@ -110,15 +106,15 @@ subst env (Subst e theta) = return $ Subst (Subst e theta) env
 --------------------------------------------------------------------------------
 -- | Expansion
 
-expand :: Fresh m => [(Text, ([Text], Expr))] -> Int -> Expr -> m Expr
+expand :: Fresh m => Defns -> Int -> Expr -> m Expr
 expand _    0 e                      = return e
 expand _    _ (  Lit   v          l) = return $ Lit v l
 expand defs n c@(Const (Name x _) _) = case lookup x defs of
-  Just (args, body) -> wrapLam args <$> expand defs (n - 1) body
-  Nothing           -> return $ c
+  Just e  -> expand defs (n - 1) e
+  Nothing -> return $ c
 expand defs n v@(Var (Name x _) _) = case lookup x defs of
-  Just (args, body) -> wrapLam args <$> expand defs (n - 1) body
-  Nothing           -> return $ v
+  Just e  -> expand defs (n - 1) e
+  Nothing -> return $ v
 expand _    _ op@(Op _ _     ) = return op
 expand defs n (   App e1 e2 l) = do
   e1' <- expand defs n e1
@@ -136,23 +132,18 @@ expand defs n (Lam x e l) = do
 expand _ _ h@(Hole _) = return h
 expand _ _ (Quant op ys r t l) =  --- SCM: deal with this later
   return $ Quant op ys r t l
-expand defs _ (Subst e env) = return
-  $ Subst (Subst e env) (Map.fromList . map (id *** uncurry wrapLam) $ defs)
+expand defs _ (Subst e env) = return $
+  Subst (Subst e env) (Map.fromList defs)
      -- SCM: deal with this later
-
-wrapLam :: [Text] -> Expr -> Expr
-wrapLam []       body = body
-wrapLam (x : xs) body = Lam x (wrapLam xs body) NoLoc
 
   -- generating substition when a definition is encountered.
 
-substDefns :: Subst -> [(Text, ([Text], Expr))] -> Subst
+substDefns :: Subst -> Defns -> Subst
 substDefns env = Map.fromList . concat . map (substDefn env)
 
-substDefn :: Subst -> (Text, ([Text], Expr)) -> [(Text, Expr)]
-substDefn env (f, (xs, e)) = if disjoint
-  then []
+substDefn :: Subst -> (Text, Expr) -> [(Text, Expr)]
+substDefn env (f, e) = if disjoint then []
   else [(f, Subst (Var (Name f NoLoc) NoLoc) env)]
  where
-  fe       = freeDefn (xs, e)
-  disjoint = foldr (\y b -> Map.notMember y env && b) True fe
+  disjoint = foldr (\y b -> Map.notMember y env && b)
+               True (free e)
