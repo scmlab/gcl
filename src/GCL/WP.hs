@@ -17,6 +17,7 @@ import           GHC.Generics
 import           Syntax.Concrete                ( Expr
                                                 , Stmt
                                                 , Name
+                                                , Defns
                                                 )
 import qualified Syntax.Concrete               as C
 -- import qualified Syntax.Predicate as P
@@ -50,28 +51,31 @@ tellSpec p q loc = do
 --------------------------------------------------------------------------------
 -- | Structure, and Weakest-Precondition
 
-struct :: Bool -> Pred -> Maybe Expr -> Stmt -> Pred -> SM ()
+struct :: Defns -> Bool
+       -> Pred -> Maybe Expr -> Stmt -> Pred -> SM ()
 
-struct _ pre _ (C.Abort l   ) _    = obligate pre (Constant C.false) (AtAbort l)
+struct _ _ pre _ (C.Abort l   ) _    = obligate pre (Constant C.false) (AtAbort l)
 
-struct _ pre _ (C.Skip  l   ) post = obligate pre post (AtSkip l)
+struct _ _ pre _ (C.Skip  l   ) post = obligate pre post (AtSkip l)
 
-struct _ pre _ (C.Assert p l) post = do
+struct _ _ pre _ (C.Assert p l) post = do
   obligate pre             (Assertion p l) (AtAssertion l)
   obligate (Assertion p l) post            (AtAssertion l)
 
-struct _ _   _ (C.LoopInvariant _  _  l) _    = throwError (ExcessBound l)
+struct _ _ _   _ (C.LoopInvariant _  _  l) _    = throwError (ExcessBound l)
 
-struct _ pre _ (C.Assign        xs es l) post = do
-  post' <- subst (assignmentEnv xs es) post
+struct ds _ pre _ (C.Assign        xs es l) post = do
+  let env  = assignmentEnv xs es
+  let denv = E.substDefns env ds
+  post' <- subst (Map.union env denv) post
   obligate pre post' (AtAssignment l)
 
-struct b pre _ (C.If gcmds l) post = do
+struct ds b pre _ (C.If gcmds l) post = do
   obligate pre (Disjunct $ map guardIf (C.getGuards gcmds)) (AtIf l)
   forM_ gcmds $ \(C.GdCmd guard body _) ->
-    structStmts b (Conjunct [pre, guardIf guard]) Nothing body post
+    structStmts ds b (Conjunct [pre, guardIf guard]) Nothing body post
 
-struct _ _   Nothing    (C.Do _     l) _    = throwError (MissingBound l)
+struct _ _ _   Nothing    (C.Do _     l) _    = throwError (MissingBound l)
  {- Or if we want to tolerate the user and carry on ---
  do -- warn that bnd is missing
   let gcmds' = map (\(GdCmd x y _) -> (depart x, y)) gcmds
@@ -82,20 +86,20 @@ struct _ _   Nothing    (C.Do _     l) _    = throwError (MissingBound l)
     structStmts b (inv `A.conj` guard) Nothing body inv
  -}
 
-struct b inv (Just bnd) (C.Do gcmds l) post = do
+struct ds b inv (Just bnd) (C.Do gcmds l) post = do
   -- base case
   let guards = C.getGuards gcmds
   obligate (Conjunct (inv : (map (Negate . guardLoop) guards))) post (AtLoop l)
   -- inductive cases
   forM_ gcmds $ \(C.GdCmd guard body _) ->
-    structStmts b (Conjunct [inv, guardLoop guard]) Nothing body inv
+    structStmts ds b (Conjunct [inv, guardLoop guard]) Nothing body inv
   -- termination
   obligate (Conjunct (inv : map guardLoop guards))
            (Bound (bnd `C.gte` (C.Lit (C.Num 0) NoLoc)) NoLoc)
            (AtTermination l)
   -- bound decrementation
   oldbnd <- E.freshVar "bnd"
-  forM_ gcmds $ \(C.GdCmd guard body _) -> structStmts
+  forM_ gcmds $ \(C.GdCmd guard body _) -> structStmts ds
     False
     (Conjunct
       [ inv
@@ -107,92 +111,99 @@ struct b inv (Just bnd) (C.Do gcmds l) post = do
     body
     (Bound (bnd `C.lt` C.Var (hydrate oldbnd) NoLoc) NoLoc)
 
-struct _ _   _ (C.SpecQM l) _    = throwError $ DigHole l
-struct b pre _ (C.Spec   l) post = when b (tellSpec pre post l)
+struct _ _ _   _ (C.SpecQM l) _    = throwError $ DigHole l
+struct _ b pre _ (C.Spec   l) post = when b (tellSpec pre post l)
 
 
-structStmts :: Bool -> Pred -> Maybe Expr -> [Stmt] -> Pred -> SM ()
+structStmts :: Defns -> Bool
+    -> Pred -> Maybe Expr -> [Stmt] -> Pred -> SM ()
 
-structStmts _ _   _ []                     _    = return ()
+structStmts _ _ _   _ []                     _    = return ()
 
-structStmts b pre _ (C.Assert p l : stmts) post = do
+structStmts ds b pre _ (C.Assert p l : stmts) post = do
   obligate pre (Assertion p l) (AtAssertion l)
-  structStmts b (Assertion p l) Nothing stmts post
+  structStmts ds b (Assertion p l) Nothing stmts post
 
-structStmts b pre _ (C.LoopInvariant p bnd l : stmts) post = do
+structStmts ds b pre _ (C.LoopInvariant p bnd l : stmts) post = do
   let origin = if startsWithDo stmts then AtLoop l else AtAssertion l
   obligate pre (LoopInvariant p bnd l) origin
-  structStmts b (LoopInvariant p bnd l) (Just bnd) stmts post
+  structStmts ds b (LoopInvariant p bnd l) (Just bnd) stmts post
 
  where
   startsWithDo (C.Do _ _ : _) = True
   startsWithDo _              = False
 
-structStmts b pre bnd (stmt : stmts) post = do
-  post' <- wpStmts b stmts post
-  struct b pre bnd stmt post'
+structStmts ds b pre bnd (stmt : stmts) post = do
+  post' <- wpStmts ds b stmts post
+  struct ds b pre bnd stmt post'
 
-structProg :: [Stmt] -> SM ()
-structProg []                        = return ()
-structProg [C.Assert _ _]            = return ()
-structProg (C.Assert pre l1 : stmts) = case (init stmts, last stmts) of
+structProg :: Defns -> [Stmt] -> SM ()
+structProg _ []                        = return ()
+structProg _ [C.Assert _ _]            = return ()
+structProg ds (C.Assert pre l1 : stmts) = case (init stmts, last stmts) of
   (stmts', C.Assert post l2) ->
-    structStmts True (Assertion pre l1) Nothing stmts' (Assertion post l2)
+    structStmts ds True (Assertion pre l1) Nothing stmts' (Assertion post l2)
   (_, stmt) -> throwError (MissingPostcondition (locOf stmt))
-structProg stmts = case (init stmts, last stmts) of
+structProg ds stmts = case (init stmts, last stmts) of
   (stmts', C.Assert post l) ->
-    structStmts True (Constant C.true) Nothing stmts' (Assertion post l)
+    structStmts ds True (Constant C.true) Nothing stmts' (Assertion post l)
   (_, stmt) -> throwError (MissingPostcondition (locOf stmt))
 
 
-wpStmts :: Bool -> [Stmt] -> Pred -> SM Pred
+wpStmts :: Defns -> Bool
+        -> [Stmt] -> Pred -> SM Pred
 
-wpStmts _ [] post = return post
+wpStmts _ _ [] post = return post
 
-wpStmts b (C.Assert pre l : stmts) post =
-  structStmts b (Assertion pre l) Nothing stmts post >> return (Assertion pre l)
+wpStmts ds b (C.Assert pre l : stmts) post =
+  structStmts ds b (Assertion pre l) Nothing stmts post
+    >> return (Assertion pre l)
 
-wpStmts b (C.LoopInvariant pre bnd l : stmts) post =
-  structStmts b (LoopInvariant pre bnd l) (Just bnd) stmts post
+wpStmts ds b (C.LoopInvariant pre bnd l : stmts) post =
+  structStmts ds b (LoopInvariant pre bnd l) (Just bnd) stmts post
     >> return (LoopInvariant pre bnd l)
 
-wpStmts b (stmt : stmts) post = do
-  post' <- wpStmts b stmts post
-  wp b stmt post'
+wpStmts ds b (stmt : stmts) post = do
+  post' <- wpStmts ds b stmts post
+  wp ds b stmt post'
 
-wp :: Bool -> Stmt -> Pred -> SM Pred
+wp :: Defns -> Bool
+   -> Stmt -> Pred -> SM Pred
 
-wp _ (C.Abort _   ) _    = return (Constant C.false)
+wp _ _ (C.Abort _   ) _    = return (Constant C.false)
 
-wp _ (C.Skip  _   ) post = return post
+wp _ _ (C.Skip  _   ) post = return post
 
-wp _ (C.Assert p l) post = do
+wp _ _ (C.Assert p l) post = do
   obligate (Assertion p l) post (AtAssertion l)
   return (Assertion p l)
 
-wp _ (C.LoopInvariant p b l) post = do
+wp _ _ (C.LoopInvariant p b l) post = do
   obligate (LoopInvariant p b l) post (AtAssertion l)
   return (LoopInvariant p b l)
 
-wp _ (C.Assign xs es _) post = subst (assignmentEnv xs es) post
+wp ds _ (C.Assign xs es _) post =
+  let env  = assignmentEnv xs es
+      denv = E.substDefns env ds
+  in subst (Map.union env denv) post
 
-wp b (C.If gcmds _    ) post = do
+wp ds b (C.If gcmds _    ) post = do
   forM_ gcmds $ \(C.GdCmd guard body _) ->
-    structStmts b (guardIf guard) Nothing body post
+    structStmts ds b (guardIf guard) Nothing body post
   return (Disjunct (map guardIf (C.getGuards gcmds))) -- is this enough?
 
-wp _ (C.Do _ l  ) _    = throwError (MissingAssertion l)
+wp _ _ (C.Do _ l  ) _    = throwError (MissingAssertion l)
 
-wp _ (C.SpecQM l) _    = throwError $ DigHole l
+wp _ _ (C.SpecQM l) _    = throwError $ DigHole l
 
-wp b (C.Spec   l) post = do
+wp _ b (C.Spec   l) post = do
   when b (tellSpec post post l)
   return post  -- not quite right
 
-wpProg :: [Stmt] -> SM Pred
-wpProg []    = return (Constant C.true)
-wpProg stmts = case (init stmts, last stmts) of
-  (stmts', C.Assert p l) -> wpStmts True stmts' (Assertion p l)
+wpProg :: Defns -> [Stmt] -> SM Pred
+wpProg _  []    = return (Constant C.true)
+wpProg ds stmts = case (init stmts, last stmts) of
+  (stmts', C.Assert p l) -> wpStmts ds True stmts' (Assertion p l)
   (_     , stmt        ) -> throwError (MissingPostcondition (locOf stmt))
 
 assignmentEnv :: [Name] -> [Expr] -> C.Subst
