@@ -142,8 +142,8 @@ substDefns :: Subst -> Defns -> Subst
 substDefns env = Map.fromList . concat . map (substDefn env)
 
 substDefn :: Subst -> (Text, Expr) -> [(Text, Expr)]
-substDefn env (f, e) = if disjoint then []
-  else [(f, Subst (Var (Name f NoLoc) NoLoc) env)]
+substDefn env (f, e) = if null env' then []
+  else [(f, Subst (Var (Name f NoLoc) NoLoc) env')]
  where
-  disjoint = foldr (\y b -> Map.notMember y env && b)
-               True (free e)
+  fe = free e
+  env' = Map.filterWithKey (\x _ -> x `elem` fe) env
