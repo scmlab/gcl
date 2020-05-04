@@ -27,7 +27,7 @@ import           Syntax.Abstract                ( Op(..)
 data Program = Program
       [Declaration]            -- constant and variable declarations
       [Expr]                   -- global properties
-      [(Name, [Text], Expr)]  -- let bindings
+      [(Name, ([Text], Expr))]  -- let bindings
       [Stmt]                   -- main program
       Loc
   deriving (Eq, Show)
@@ -57,10 +57,10 @@ extractAssertion (ConstDecl _ _ e _) = e
 extractAssertion (VarDecl   _ _ e _) = e
 extractAssertion (LetDecl   _ _ _ _) = Nothing
 
-extractLetBinding :: Declaration -> Maybe (Name, [Text], Expr)
+extractLetBinding :: Declaration -> Maybe (Name, ([Text], Expr))
 extractLetBinding (ConstDecl _ _ _ _) = Nothing
 extractLetBinding (VarDecl   _ _ _ _) = Nothing
-extractLetBinding (LetDecl   c a e _) = Just (c, a, e)
+extractLetBinding (LetDecl   c a e _) = Just (c, (a, e))
 
 getGuards :: [GdCmd] -> [Expr]
 getGuards = fst . unzipGdCmds
