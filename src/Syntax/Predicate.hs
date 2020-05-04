@@ -12,7 +12,7 @@ import           GHC.Generics
 
 import qualified Syntax.Concrete               as C
 import           Syntax.Concrete                ( Expr
-                                                , Lower
+                                                , Name
                                                 , Subst
                                                 )
 import           GCL.Expr                       ( Fresh )
@@ -155,7 +155,7 @@ precondAtLine i = findNext i . toPredList
 data Stmt
   = Skip   (L Pred)
   | Abort  (L Pred)
-  | Assign (L Pred) [Lower] [Expr]
+  | Assign (L Pred) [Name] [Expr]
   | Do     (L Pred) Expr [GdCmd]
   | If     (L Pred)      [GdCmd]
   | Spec   (L Pred) Pred -- pre and post

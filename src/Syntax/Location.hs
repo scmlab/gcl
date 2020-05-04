@@ -41,11 +41,8 @@ instance Located Endpoint where
 instance Located Lit where
   locOf _ = NoLoc
 
-instance Located Lower where
-  locOf (Lower _ l) = l
-
-instance Located Upper where
-  locOf (Upper _ l) = l
+instance Located Name where
+  locOf (Name _ l) = l
 
 --------------------------------------------------------------------------------
 -- Relocatable
@@ -70,11 +67,8 @@ instance Relocatable Expr where
   reloc l (Quant op xs r t _) = Quant op xs r t l
   reloc _ (Subst e s        ) = Subst e s
 
-instance Relocatable Upper where
-  reloc l (Upper x _) = Upper x l
-
-instance Relocatable Lower where
-  reloc l (Lower x _) = Lower x l
+instance Relocatable Name where
+  reloc l (Name x _) = Name x l
 
 instance Relocatable P.Pred where
   reloc _ (P.Constant e         ) = P.Constant e
@@ -93,11 +87,8 @@ instance Relocatable P.Pred where
 class Located a => Departable a b | a -> b where
   depart :: a -> b
 
-instance Departable Upper Text where
-  depart (Upper x _) = x
-
-instance Departable Lower Text where
-  depart (Lower x _) = x
+instance Departable Name Text where
+  depart (Name x _) = x
 
 instance Departable Interval A.Interval where
   depart (Interval a b _) = A.Interval (depart a) (depart b)
@@ -130,11 +121,8 @@ instance Departable Expr A.Expr where
 class Located b => Hydratable a b | b -> a where
   hydrate :: a -> b
 
-instance Hydratable Text Upper where
-  hydrate x = Upper x NoLoc
-
-instance Hydratable Text Lower where
-  hydrate x = Lower x NoLoc
+instance Hydratable Text Name where
+  hydrate x = Name x NoLoc
 
 instance Hydratable A.Interval Interval where
   hydrate (A.Interval a b) = Interval (hydrate a) (hydrate b) NoLoc
@@ -166,11 +154,8 @@ instance Hydratable A.Expr Expr where
 class ToNoLoc a where
   toNoLoc :: a -> a
 
-instance ToNoLoc Upper where
-  toNoLoc (Upper x _) = Upper x NoLoc
-
-instance ToNoLoc Lower where
-  toNoLoc (Lower x _) = Lower x NoLoc
+instance ToNoLoc Name where
+  toNoLoc (Name x _) = Name x NoLoc
 
 instance ToNoLoc Interval where
   toNoLoc (Interval x y _) = Interval x y NoLoc

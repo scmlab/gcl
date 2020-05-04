@@ -55,11 +55,11 @@ inferL (C.Bol _) = TBase TBool
 inferL (C.Chr _) = TBase TChar
 
 inferE :: TCxt -> C.Expr -> TM Type
-inferE cxt (C.Var   (Lower x l) _) = lookupCxt l x cxt
-inferE cxt (C.Const (Upper x l) _) = lookupCxt l x cxt
-inferE _   (C.Lit   v           _) = return (inferL v)
-inferE _   (C.Op    op          _) = return (opTypes op)
-inferE cxt (C.App e1 e2 l        ) = do
+inferE cxt (C.Var   (Name x l) _) = lookupCxt l x cxt
+inferE cxt (C.Const (Name x l) _) = lookupCxt l x cxt
+inferE _   (C.Lit   v          _) = return (inferL v)
+inferE _   (C.Op    op         _) = return (opTypes op)
+inferE cxt (C.App e1 e2 l       ) = do
   t <- inferE cxt e1
   case t of
     TFunc t1 t2 -> do
@@ -67,7 +67,7 @@ inferE cxt (C.App e1 e2 l        ) = do
       unify_ l t1 t1'
       substTM t2
     _ -> throwError (NotFunction t l)
-inferE _ (C.Lam _ _ _) = error "to be implemented" -- SCM
+inferE _   (C.Lam _ _ _            ) = error "to be implemented" -- SCM
 inferE _   (C.Hole _               ) = TVar <$> freshVar "t"
 inferE cxt (C.Quant op xs rng trm l) = do
   tOp <- inferE cxt op
@@ -100,8 +100,8 @@ checkS _   (Spec   _           ) = return ()
 checkSs :: TCxt -> [Stmt] -> TM ()
 checkSs cxt = mapM_ (checkS cxt)
 
-checkAsgn :: TCxt -> (Lower, C.Expr) -> TM ()
-checkAsgn cxt (Lower v lv, e) = do
+checkAsgn :: TCxt -> (Name, C.Expr) -> TM ()
+checkAsgn cxt (Name v lv, e) = do
   t <- lookupCxt lv v cxt
   checkE cxt e t
 
@@ -114,9 +114,9 @@ checkProg :: Program -> TM ()
 checkProg (Program decls _ _ stmts _) = checkSs cxt stmts
  where
   cxt = concatMap f decls
-  f (ConstDecl cs t _ _) = [ (c, depart t) | Upper c _ <- cs ]
-  f (VarDecl   vs t _ _) = [ (v, depart t) | Lower v _ <- vs ]
-  f (LetDecl _c _ _ _  ) = [] -- TODO: check the { let ... } constructs
+  f (ConstDecl cs t _ _) = [ (c, depart t) | Name c _ <- cs ]
+  f (VarDecl   vs t _ _) = [ (v, depart t) | Name v _ <- vs ]
+  f (LetDecl   _c _ _ _) = [] -- TODO: check the { let ... } constructs
 
 -- substitution
 

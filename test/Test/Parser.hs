@@ -200,7 +200,7 @@ expression = testGroup "Expressions" $ map
         (1 <-> 11)
     , RightCase "quant 1" "<| (+) i : i > 0 : f i |>" $ Quant
         (Op Add (4 <-> 6))
-        [Lower "i" (at 8)]
+        [Name "i" (at 8)]
         (bin GT
              (at 14)
              (var "i" (at 12))
@@ -211,7 +211,7 @@ expression = testGroup "Expressions" $ map
         (App (var "f" (at 20)) (var "i" (at 22)) (20 <-> 22))
         (1 <-> 25)
     , RightCase "function application 1" "(f (x)) y" $ App
-        (App (var "f" (at 2)) (Var (Lower "x" (at 5)) (4 <-> 6)) (1 <-> 7))
+        (App (var "f" (at 2)) (Var (Name "x" (at 5)) (4 <-> 6)) (1 <-> 7))
         (var "y" (at 9))
         (1 <-> 9)
     , RightCase "function application 2" "f (x y)" $ App
@@ -254,10 +254,10 @@ expression = testGroup "Expressions" $ map
     ]
 
 con :: Text -> Loc -> Expr
-con t l = Const (Upper t l) l
+con t l = Const (Name t l) l
 
 var :: Text -> Loc -> Expr
-var t l = Var (Lower t l) l
+var t l = Var (Name t l) l
 
 bin :: Op -> Loc -> Expr -> Loc -> Expr -> Loc -> Expr
 bin op opLoc a aLoc b bLoc = App (App (Op op opLoc) a aLoc) b bLoc
@@ -282,7 +282,7 @@ type' = testGroup "Types" $ map
         (1 <-> 20)
     , RightCase "array" "array [0 .. N) of Int" $ TArray
         (Interval (Including (Lit (Num 0) (at 8)))
-                  (Excluding (Const (Upper "N" (at 13)) (at 13)))
+                  (Excluding (Const (Name "N" (at 13)) (at 13)))
                   (7 <-> 14)
         )
         (TBase TInt (19 <-> 21))
@@ -296,16 +296,16 @@ declaration :: TestTree
 declaration = testGroup "Declarations" $ map
     (toTestTree Parser.declaration)
     [ RightCase "variable" "var x : Int\n"
-        $ VarDecl [Lower "x" (at 5)] (TBase TInt (9 <-> 11)) Nothing (1 <-> 11)
+        $ VarDecl [Name "x" (at 5)] (TBase TInt (9 <-> 11)) Nothing (1 <-> 11)
     , RightCase "variable with properties" "var x : Int { True }\n"
-        $ VarDecl [Lower "x" (at 5)] (TBase TInt (9 <-> 11)) (Just (Lit (Bol True) (15 <-> 18))) (1 <-> 20)
+        $ VarDecl [Name "x" (at 5)] (TBase TInt (9 <-> 11)) (Just (Lit (Bol True) (15 <-> 18))) (1 <-> 20)
     , RightCase "constant" "con X, Y : Int\n" $ ConstDecl
-        [Upper "X" (at 5), Upper "Y" (at 8)]
+        [Name "X" (at 5), Name "Y" (at 8)]
         (TBase TInt (12 <-> 14))
         Nothing
         (1 <-> 14)
     , RightCase "let binding" "let X i = N > 0\n"
-        $ LetDecl (Upper "X" (at 5)) ["i"]
+        $ LetDecl (Name "X" (at 5)) ["i"]
             (bin GT (at 13) (con "N" (at 11)) (11 <-> 13) (Lit (Num 0) (at 15)) (11 <-> 15)) (1 <-> 15)
     ]
 
@@ -320,9 +320,9 @@ statement = testGroup "Single statement" $ map
     , RightCase "assert" "{ True }"
         $ Assert (Lit (Bol True) (3 <-> 6)) (1 <-> 8)
     , RightCase "assign" "x := 0"
-        $ Assign [Lower "x" (at 1)] [Lit (Num 0) (at 6)] (1 <-> 6)
+        $ Assign [Name "x" (at 1)] [Lit (Num 0) (at 6)] (1 <-> 6)
     , RightCase "assign (parallel)" "x, y := 0, 1" $ Assign
-        [Lower "x" (at 1), Lower "y" (at 4)]
+        [Name "x" (at 1), Name "y" (at 4)]
         [Lit (Num 0) (at 9), Lit (Num 1) (at 12)]
         (1 <-> 12)
     , RightCase "loop" "if True -> skip fi"
@@ -331,7 +331,7 @@ statement = testGroup "Single statement" $ map
               (1 <-> 18)
     , RightCase "loop" "{ True , bnd: a }" $ LoopInvariant
         (Lit (Bol True) (3 <-> 6))
-        (Var (Lower "a" (at 15)) (at 15))
+        (Var (Name "a" (at 15)) (at 15))
         (1 <-> 17)
     , RightCase "loop" "do True -> skip od"
         $ Do

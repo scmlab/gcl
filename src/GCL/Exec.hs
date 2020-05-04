@@ -17,14 +17,14 @@ import           GCL.Exec.ExecMonad
   --   since it may want to throw errors (e.g. div by zero).
 
 evalExpr :: ExecMonad m => Expr -> m Val
-evalExpr (Lit   v           _) = return (litToVal v)
-evalExpr (Const (Upper x l) _) = lookupStore l x
-evalExpr (Var   (Lower x l) _) = lookupStore l x
-evalExpr (Op    op          l) = evalOp op l
-evalExpr (App e1 e2 _        ) = evalExpr e1 >>= \case
+evalExpr (Lit   v          _) = return (litToVal v)
+evalExpr (Const (Name x l) _) = lookupStore l x
+evalExpr (Var   (Name x l) _) = lookupStore l x
+evalExpr (Op    op         l) = evalOp op l
+evalExpr (App e1 e2 _       ) = evalExpr e1 >>= \case
   VFun f -> evalExpr e2 >>= \v -> liftEither (f v)
   _      -> error "type error, shouldn't happen"
-evalExpr (Lam _ _ _)       = error "to be implemented"
+evalExpr (Lam _ _ _      ) = error "to be implemented"
 evalExpr (Quant _ _ _ _ _) = error "not supported"
 evalExpr (Hole _         ) = error "shouldn't happen"
 
@@ -52,10 +52,10 @@ execStmts :: ExecMonad m => [Stmt] -> m ()
 execStmts []       = return ()
 execStmts (s : ss) = execStmt s >> execStmts ss
 
-execAsgn :: ExecMonad m => [Lower] -> [Expr] -> Loc -> m ()
+execAsgn :: ExecMonad m => [Name] -> [Expr] -> Loc -> m ()
 execAsgn xs es l = do
   vs <- mapM evalExpr es
-  mapM_ (uncurry (updateStore l)) (zip (map lowerToText xs) vs)
+  mapM_ (uncurry (updateStore l)) (zip (map nameToText xs) vs)
 
 
  -- SCM: Not sure whether it is more complicated than necessary,
@@ -82,10 +82,10 @@ execProg (Program decls _ _ stmts _) = do
 
 declare :: ExecMonad m => Declaration -> m ()
 declare (ConstDecl cs _ _ _) =
-  mapM_ (\x -> updateStore NoLoc x Undef) (map upperToText cs)
+  mapM_ (\x -> updateStore NoLoc x Undef) (map nameToText cs)
 declare (VarDecl xs _ _ _) =
-  mapM_ (\x -> updateStore NoLoc x Undef) (map lowerToText xs)
-declare (LetDecl c _ _ _) = updateStore NoLoc (upperToText c) Undef
+  mapM_ (\x -> updateStore NoLoc x Undef) (map nameToText xs)
+declare (LetDecl c _ _ _) = updateStore NoLoc (nameToText c) Undef
 
 -- Lifting primitive operators.
 -- Should these be written with dependent type, or type family?

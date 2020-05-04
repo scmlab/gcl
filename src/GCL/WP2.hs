@@ -17,7 +17,7 @@ import           Data.Aeson
 import           GHC.Generics
 
 import           Syntax.Concrete                ( Expr
-                                                , Lower
+                                                , Name
                                                 )
 import qualified Syntax.Concrete               as C
 -- import qualified Syntax.Predicate as P
@@ -28,8 +28,8 @@ import           Pretty.Concrete                ( )
 import           Pretty.Predicate               ( )
 import qualified GCL.Expr                      as E
 
-assignmentEnv :: [Lower] -> [Expr] -> C.Subst
-assignmentEnv xs es = Map.fromList (zip (map C.lowerToText xs) es)
+assignmentEnv :: [Name] -> [Expr] -> C.Subst
+assignmentEnv xs es = Map.fromList (zip (map C.nameToText xs) es)
 
 --------------------------------------------------------------------------------
 -- | Monad for calculating the weakest precondition

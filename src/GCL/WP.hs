@@ -16,7 +16,7 @@ import           GHC.Generics
 
 import           Syntax.Concrete                ( Expr
                                                 , Stmt
-                                                , Lower
+                                                , Name
                                                 )
 import qualified Syntax.Concrete               as C
 -- import qualified Syntax.Predicate as P
@@ -98,7 +98,10 @@ struct b inv (Just bnd) (C.Do gcmds l) post = do
   forM_ gcmds $ \(C.GdCmd guard body _) -> structStmts
     False
     (Conjunct
-      [inv, Bound (bnd `C.eqq` C.Var (hydrate oldbnd) NoLoc) NoLoc, guardLoop guard]
+      [ inv
+      , Bound (bnd `C.eqq` C.Var (hydrate oldbnd) NoLoc) NoLoc
+      , guardLoop guard
+      ]
     )
     Nothing
     body
@@ -191,8 +194,8 @@ wpProg stmts = case (init stmts, last stmts) of
   (stmts', C.Assert p l) -> wpStmts True stmts' (Assertion p l)
   (_     , stmt        ) -> throwError (MissingPostcondition (locOf stmt))
 
-assignmentEnv :: [Lower] -> [Expr] -> C.Subst
-assignmentEnv xs es = Map.fromList (zip (map C.lowerToText xs) es)
+assignmentEnv :: [Name] -> [Expr] -> C.Subst
+assignmentEnv xs es = Map.fromList (zip (map C.nameToText xs) es)
 
 --------------------------------------------------------------------------------
 -- | The monad, and other supportive operations

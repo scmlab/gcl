@@ -382,7 +382,7 @@ letDecl :: Parser Declaration
 letDecl = withLoc $ do
   symbol TokLet <?> "let"
   name <- upper
-  args <- map lowerToText <$> many lower
+  args <- map nameToText <$> many lower
   symbol TokEQ <?> "="
   expr <- predicate
   expectNewline <?> "<newline> after a declaration"
@@ -394,7 +394,7 @@ letDecl = withLoc $ do
 -- | Variables and stuff
 
 -- separated by commas
-constList :: Parser [Upper]
+constList :: Parser [Name]
 constList =
   (   sepBy1 upper (symbol TokComma <?> "comma")
     <?> "a list of constants separated by commas"
@@ -402,7 +402,7 @@ constList =
     <* ignoreNewlines
 
 -- separated by commas
-variableList :: Parser [Lower]
+variableList :: Parser [Name]
 variableList =
   (   sepBy1 lower (symbol TokComma <?> "comma")
     <?> "a list of variables separated by commas"
@@ -453,9 +453,9 @@ upperName = extract p
   p (TokUpperName s) = Just s
   p _                = Nothing
 
-upper :: Parser Upper
+upper :: Parser Name
 upper =
-  withLoc (Upper <$> upperName)
+  withLoc (Name <$> upperName)
     <?> "identifier that starts with a uppercase letter"
 
 lowerName :: Parser Text
@@ -464,9 +464,9 @@ lowerName = extract p
   p (TokLowerName s) = Just s
   p _                = Nothing
 
-lower :: Parser Lower
+lower :: Parser Name
 lower =
-  withLoc (Lower <$> lowerName)
+  withLoc (Name <$> lowerName)
     <?> "identifier that starts with a lowercase letter"
 
 integer :: Parser Int

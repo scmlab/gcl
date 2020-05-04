@@ -27,21 +27,21 @@ import           Syntax.Abstract                ( Op(..)
 data Program = Program
       [Declaration]            -- constant and variable declarations
       [Expr]                   -- global properties
-      [(Upper, [Text], Expr)]  -- let bindings
+      [(Name, [Text], Expr)]  -- let bindings
       [Stmt]                   -- main program
       Loc
   deriving (Eq, Show)
 
 data Declaration
-  = ConstDecl [Upper] Type (Maybe Expr) Loc
-  | VarDecl [Lower] Type (Maybe Expr) Loc
-  | LetDecl Upper [Text] Expr Loc
+  = ConstDecl [Name] Type (Maybe Expr) Loc
+  | VarDecl [Name] Type (Maybe Expr) Loc
+  | LetDecl Name [Text] Expr Loc
   deriving (Eq, Show)
 
 data Stmt
   = Skip                      Loc
   | Abort                     Loc
-  | Assign  [Lower] [Expr]    Loc
+  | Assign  [Name] [Expr]     Loc
   | Assert  Expr              Loc
   | LoopInvariant  Expr Expr  Loc
   | Do            [GdCmd]     Loc
@@ -55,12 +55,12 @@ data GdCmd = GdCmd Expr [Stmt] Loc deriving (Eq, Show)
 extractAssertion :: Declaration -> Maybe Expr
 extractAssertion (ConstDecl _ _ e _) = e
 extractAssertion (VarDecl   _ _ e _) = e
-extractAssertion (LetDecl _ _ _ _  ) = Nothing
+extractAssertion (LetDecl   _ _ _ _) = Nothing
 
-extractLetBinding :: Declaration -> Maybe (Upper, [Text], Expr)
+extractLetBinding :: Declaration -> Maybe (Name, [Text], Expr)
 extractLetBinding (ConstDecl _ _ _ _) = Nothing
 extractLetBinding (VarDecl   _ _ _ _) = Nothing
-extractLetBinding (LetDecl c a e _  ) = Just (c, a, e)
+extractLetBinding (LetDecl   c a e _) = Just (c, a, e)
 
 getGuards :: [GdCmd] -> [Expr]
 getGuards = fst . unzipGdCmds
@@ -77,20 +77,20 @@ data Interval = Interval Endpoint Endpoint Loc deriving (Eq, Show)
 data Type = TBase TBase Loc
           | TArray Interval Type Loc
           | TFunc Type Type Loc
-          | TVar Lower Loc
+          | TVar Name Loc
           deriving (Eq, Show)
 
 --------------------------------------------------------------------------------
 -- | Expressions
 
 data Expr = Lit   Lit       Loc
-          | Var   Lower     Loc
-          | Const Upper     Loc
+          | Var   Name      Loc
+          | Const Name      Loc
           | Op    Op        Loc
           | App   Expr Expr Loc
           | Lam   Text Expr Loc
           | Hole            Loc
-          | Quant Expr [Lower] Expr Expr Loc
+          | Quant Expr [Name] Expr Expr Loc
           | Subst Expr Subst -- internal. Location not necessary?
           deriving (Eq, Show, Generic)
 
@@ -101,25 +101,15 @@ instance ToJSON Expr where
 --------------------------------------------------------------------------------
 -- | Variables and stuff
 
-data Upper = Upper Text Loc
+data Name = Name Text Loc
   deriving (Eq, Show, Generic)
 
-instance ToJSON Upper where
-instance Ord Upper where
-  compare (Upper a _) (Upper b _) = compare a b
+instance ToJSON Name where
+instance Ord Name where
+  compare (Name a _) (Name b _) = compare a b
 
-data Lower = Lower Text Loc
-  deriving (Eq, Show, Generic)
-
-instance ToJSON Lower where
-instance Ord Lower where
-  compare (Lower a _) (Lower b _) = compare a b
-
-upperToText :: Upper -> Text
-upperToText (Upper x _) = x
-
-lowerToText :: Lower -> Text
-lowerToText (Lower x _) = x
+nameToText :: Name -> Text
+nameToText (Name x _) = x
 
 --------------------------------------------------------------------------------
 -- | Constructors
@@ -164,10 +154,10 @@ predEq :: Expr -> Expr -> Bool
 predEq = (==)
 
 constant :: Text -> Expr
-constant x = Const (Upper x NoLoc) NoLoc
+constant x = Const (Name x NoLoc) NoLoc
 
 variable :: Text -> Expr
-variable x = Var (Lower x NoLoc) NoLoc
+variable x = Var (Name x NoLoc) NoLoc
 
 number :: Int -> Expr
 number n = Lit (Num n) NoLoc
