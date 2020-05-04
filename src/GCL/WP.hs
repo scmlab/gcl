@@ -134,6 +134,7 @@ structStmts b pre bnd (stmt : stmts) post = do
 
 structProg :: [Stmt] -> SM ()
 structProg []                        = return ()
+structProg [C.Assert _ _]            = return ()
 structProg (C.Assert pre l1 : stmts) = case (init stmts, last stmts) of
   (stmts', C.Assert post l2) ->
     structStmts True (Assertion pre l1) Nothing stmts' (Assertion post l2)
