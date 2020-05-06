@@ -297,16 +297,27 @@ declaration = testGroup "Declarations" $ map
     (toTestTree Parser.declaration)
     [ RightCase "variable" "var x : Int\n"
         $ VarDecl [Name "x" (at 5)] (TBase TInt (9 <-> 11)) Nothing (1 <-> 11)
-    , RightCase "variable with properties" "var x : Int { True }\n"
-        $ VarDecl [Name "x" (at 5)] (TBase TInt (9 <-> 11)) (Just (Lit (Bol True) (15 <-> 18))) (1 <-> 20)
+    , RightCase "variable with properties" "var x : Int { True }\n" $ VarDecl
+        [Name "x" (at 5)]
+        (TBase TInt (9 <-> 11))
+        (Just (Lit (Bol True) (15 <-> 18)))
+        (1 <-> 20)
     , RightCase "constant" "con X, Y : Int\n" $ ConstDecl
         [Name "X" (at 5), Name "Y" (at 8)]
         (TBase TInt (12 <-> 14))
         Nothing
         (1 <-> 14)
-    , RightCase "let binding" "let X i = N > 0\n"
-        $ LetDecl (Name "X" (at 5)) ["i"]
-            (bin GT (at 13) (con "N" (at 11)) (11 <-> 13) (Lit (Num 0) (at 15)) (11 <-> 15)) (1 <-> 15)
+    , RightCase "let binding" "let X i = N > 0\n" $ LetDecl
+        (Name "X" (at 5))
+        ["i"]
+        (bin GT
+             (at 13)
+             (con "N" (at 11))
+             (11 <-> 13)
+             (Lit (Num 0) (at 15))
+             (11 <-> 15)
+        )
+        (1 <-> 15)
     ]
 
 --------------------------------------------------------------------------------
