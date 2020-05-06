@@ -4,6 +4,7 @@ module Test.Parser where
 
 import           Test.Tasty
 import           Test.Tasty.HUnit
+import           Test.Tasty.Golden
 import           Data.Text.Lazy                 ( Text )
 import           Data.Loc
 import           Prelude                 hiding ( Ordering(..) )

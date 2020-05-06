@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: fd46e8d807834202861af25e931ef8cbdd5365b528c26fb1fb8e1c311e231697
+-- hash: 8919571cbc06f36c9d4d5e752ef7b16523815045faba3d003168effe9bde7c38
 
 name:           gcl
 version:        0.1.0.0
@@ -53,7 +53,7 @@ library
       Paths_gcl
   hs-source-dirs:
       src
-  ghc-options: -Wall -threaded -rtsopts -with-rtsopts=-N -fno-warn-orphans
+  ghc-options: -Wall -fno-warn-orphans
   build-depends:
       aeson
     , base >=4.7 && <5
@@ -138,7 +138,6 @@ test-suite gcl-test
   hs-source-dirs:
       test
       src
-  ghc-options: -Wall -threaded -rtsopts -with-rtsopts=-N -fno-warn-orphans
   build-depends:
       aeson
     , base >=4.7 && <5
@@ -154,6 +153,7 @@ test-suite gcl-test
     , regex-applicative
     , srcloc
     , tasty
+    , tasty-golden
     , tasty-hunit
     , tasty-quickcheck
     , text

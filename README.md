@@ -18,6 +18,13 @@ To build and install the binary `gcl` somewhere in your `$PATH`:
 stack install
 ```
 
+
+To build the tests: 
+
+```
+stack build --test --no-run-tests
+```
+
 To run the tests:
 
 ```
