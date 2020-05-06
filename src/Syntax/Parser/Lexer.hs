@@ -51,6 +51,7 @@ data Tok
 
     | TokGuardBar
     | TokArrow
+    | TokArrowU
 
     -- delimiters
     | TokComma
@@ -67,21 +68,30 @@ data Tok
     | TokBraceEnd
     | TokQuantStart
     | TokQuantEnd
+    | TokQuantStartU
+    | TokQuantEndU
 
     -- expression
 
     -- operators
     | TokEQ
     | TokNEQ
+    | TokNEQU
     | TokGT
     | TokGTE
+    | TokGTEU
     | TokLT
     | TokLTE
+    | TokLTEU
 
     | TokImpl
     | TokConj
     | TokDisj
     | TokNeg
+    | TokImplU
+    | TokConjU
+    | TokDisjU
+    | TokNegU
 
     | TokAdd
     | TokSub
@@ -119,6 +129,7 @@ instance Show Tok where
     TokRange        -> ".."
     TokGuardBar     -> "|"
     TokArrow        -> "->"
+    TokArrowU       -> "→"
     TokComma        -> ","
     TokColon        -> ":"
     TokSemi         -> ";"
@@ -133,16 +144,25 @@ instance Show Tok where
     TokBraceEnd     -> "}"
     TokQuantStart   -> "<|"
     TokQuantEnd     -> "|>"
+    TokQuantStartU  -> "⟨"
+    TokQuantEndU    -> "⟩"
     TokEQ           -> "="
     TokNEQ          -> "/="
+    TokNEQU         -> "≠"
     TokGT           -> ">"
     TokGTE          -> ">="
+    TokGTEU         -> "≥"
     TokLT           -> "<"
     TokLTE          -> "<="
+    TokLTEU         -> "≤"
     TokImpl         -> "=>"
     TokConj         -> "&&"
     TokDisj         -> "||"
     TokNeg          -> "~"
+    TokImplU        -> "⇒"
+    TokConjU        -> "∧"
+    TokDisjU        -> "∨"
+    TokNegU         -> "¬"
     TokAdd          -> "+"
     TokSub          -> "-"
     TokMul          -> "*"
@@ -207,6 +227,8 @@ tokRE =
     <$  text "|"
     <|> TokArrow
     <$  text "->"
+    <|> TokArrowU
+    <$  text "→"
 
 
   -- delimiters
@@ -238,20 +260,30 @@ tokRE =
     <$  text "<|"
     <|> TokQuantEnd
     <$  text "|>"
+    <|> TokQuantStartU
+    <$  text "⟨"
+    <|> TokQuantEndU
+    <$  text "⟩"
 
   -- literals
     <|> TokEQ
     <$  text "="
     <|> TokNEQ
     <$  text "/="
+    <|> TokNEQU
+    <$  text "≠"
     <|> TokGT
     <$  text ">"
     <|> TokGTE
     <$  text ">="
+    <|> TokGTEU
+    <$  text "≥"
     <|> TokLT
     <$  text "<"
     <|> TokLTE
     <$  text "<="
+    <|> TokLTEU
+    <$  text "≤"
     <|> TokImpl
     <$  text "=>"
     <|> TokConj
@@ -260,6 +292,14 @@ tokRE =
     <$  text "||"
     <|> TokNeg
     <$  text "~"
+    <|> TokImplU
+    <$  text "⇒"
+    <|> TokConjU
+    <$  text "∧"
+    <|> TokDisjU
+    <$  text "∨"
+    <|> TokNegU
+    <$  text "¬"
 
     <|> TokAdd
     <$  text "+"

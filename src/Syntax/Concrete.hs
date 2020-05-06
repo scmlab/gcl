@@ -27,10 +27,12 @@ import           Syntax.Abstract                ( Op(..)
 data Program = Program
       [Declaration]            -- constant and variable declarations
       [Expr]                   -- global properties
-      [(Name, [Text], Expr)]  -- let bindings
+      Defns                    -- let bindings
       [Stmt]                   -- main program
       Loc
   deriving (Eq, Show)
+
+type Defns = [(Text, Expr)]
 
 data Declaration
   = ConstDecl [Name] Type (Maybe Expr) Loc
@@ -57,10 +59,10 @@ extractAssertion (ConstDecl _ _ e _) = e
 extractAssertion (VarDecl   _ _ e _) = e
 extractAssertion (LetDecl   _ _ _ _) = Nothing
 
-extractLetBinding :: Declaration -> Maybe (Name, [Text], Expr)
+extractLetBinding :: Declaration -> Maybe (Text, Expr)
 extractLetBinding (ConstDecl _ _ _ _) = Nothing
 extractLetBinding (VarDecl   _ _ _ _) = Nothing
-extractLetBinding (LetDecl   c a e _) = Just (c, a, e)
+extractLetBinding (LetDecl   c a e _) = Just (nameToText c, wrapLam a e)
 
 getGuards :: [GdCmd] -> [Expr]
 getGuards = fst . unzipGdCmds
@@ -97,6 +99,10 @@ data Expr = Lit   Lit       Loc
 type Subst = Map Text Expr
 
 instance ToJSON Expr where
+
+wrapLam :: [Text] -> Expr -> Expr
+wrapLam []       body = body
+wrapLam (x : xs) body = Lam x (wrapLam xs body) NoLoc
 
 --------------------------------------------------------------------------------
 -- | Variables and stuff

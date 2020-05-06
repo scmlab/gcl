@@ -188,9 +188,9 @@ parseSpec :: TokStream -> REPLM [Concrete.Stmt]
 parseSpec = parse Parser.specContent "<specification>"
 
 sweep1 :: Concrete.Program -> REPLM ([PO], [Spec])
-sweep1 (Concrete.Program _ _ _ statements _) = do
+sweep1 (Concrete.Program _ _ ds statements _) = do
   ((_, pos), specs) <- withExceptT StructError $ liftEither $ runWP
-    (structProg statements)
+    (structProg ds statements)
   return (pos, specs)
 
 sweep2 :: Predicate.Struct -> REPLM ([PO], [Spec])

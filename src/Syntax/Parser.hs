@@ -174,7 +174,9 @@ guardedCommands = sepBy1 guardedCommand (symbol TokGuardBar <?> "|")
 
 guardedCommand :: Parser GdCmd
 guardedCommand =
-  withLoc $ GdCmd <$> predicate <* (symbol TokArrow <?> "->") <*> statements1
+  withLoc $ GdCmd <$> predicate <*
+    ((symbol TokArrow <?> "->") <|>
+     (symbol TokArrowU <?> "→")) <*> statements1
 
 hole :: Parser Stmt
 hole = withLoc $ SpecQM <$ (symbol TokQM <?> "?")
@@ -216,16 +218,19 @@ expression = makeExprParser term table <?> "expression"
     , [InfixL $ binary Mul TokMul, InfixL $ binary Div TokDiv]
     , [InfixL $ binary Add TokAdd, InfixL $ binary Sub TokSub]
     , [ InfixL $ binary NEQ TokNEQ
+      , InfixL $ binary NEQ TokNEQU
       , InfixL $ binary LT TokLT
       , InfixL $ binary LTE TokLTE
+      , InfixL $ binary LTE TokLTEU
       , InfixL $ binary GT TokGT
       , InfixL $ binary GTE TokGTE
+      , InfixL $ binary GTE TokGTEU
       ]
     , [InfixL $ binary EQ TokEQ]
-    , [Prefix $ unary Neg TokNeg]
-    , [InfixL $ binary Conj TokConj]
-    , [InfixL $ binary Disj TokDisj]
-    , [InfixR $ binary Implies TokImpl]
+    , [Prefix $ unary Neg TokNeg, Prefix $ unary Neg TokNegU]
+    , [InfixL $ binary Conj TokConj, InfixL $ binary Conj TokConjU]
+    , [InfixL $ binary Disj TokDisj, InfixL $ binary Disj TokDisjU]
+    , [InfixR $ binary Implies TokImpl, InfixR $ binary Implies TokImplU]
     ]
 
   application :: Parser (Expr -> Expr)
@@ -266,6 +271,15 @@ expression = makeExprParser term table <?> "expression"
             <*  symbol TokColon
             <*> expression
             <*  symbol TokQuantEnd
+            , Quant
+            <$  symbol TokQuantStartU
+            <*> term
+            <*> some lower
+            <*  symbol TokColon
+            <*> expression
+            <*  symbol TokColon
+            <*> expression
+            <*  symbol TokQuantEndU
             , Hole <$ symbol TokQM
             ]
           )
@@ -286,14 +300,21 @@ expression = makeExprParser term table <?> "expression"
     choice
         [ EQ <$ symbol TokEQ
         , NEQ <$ symbol TokNEQ
+        , NEQ <$ symbol TokNEQU
         , LTE <$ symbol TokLTE
+        , LTE <$ symbol TokLTEU
         , GTE <$ symbol TokGTE
+        , GTE <$ symbol TokGTEU
         , LT <$ symbol TokLT
         , GT <$ symbol TokGT
-        , Implies <$ symbol TokArrow
+        , Implies <$ symbol TokImpl
+        , Implies <$ symbol TokImplU
         , Conj <$ symbol TokConj
+        , Conj <$ symbol TokConjU
         , Disj <$ symbol TokDisj
+        , Disj <$ symbol TokDisjU
         , Neg <$ symbol TokNeg
+        , Neg <$ symbol TokNegU
         , Add <$ symbol TokAdd
         , Sub <$ symbol TokSub
         , Mul <$ symbol TokMul
@@ -318,9 +339,11 @@ type' = makeExprParser term table <?> "type"
   table = [[InfixR function]]
 
   function :: Parser (Type -> Type -> Type)
-  function = do
-    symbol TokArrow <?> "->"
-    return $ \x y -> TFunc x y (x <--> y)
+  function = 
+    (do symbol TokArrow <?> "->"
+        return $ \x y -> TFunc x y (x <--> y)) <|>
+    (do symbol TokArrowU <?> "→"
+        return $ \x y -> TFunc x y (x <--> y))
 
   term :: Parser Type
   term = parens type' <|> array <|> base <?> "type term"
