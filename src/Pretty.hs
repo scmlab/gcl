@@ -2,7 +2,10 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 
-module Pretty where
+module Pretty
+  ( module Data.Text.Prettyprint.Doc
+  )
+where
 
 import           Data.Text.Prettyprint.Doc
 import           Prelude                 hiding ( Ordering(..) )
@@ -14,6 +17,7 @@ import           GCL.WP                         ( StructError(..) )
 import           GCL.Type                       ( TypeError(..) )
 
 import           Pretty.Abstract                ( )
+import           Pretty.Concrete                ( )
 import           Pretty.GCL.WP2                 ( )
 
 --------------------------------------------------------------------------------

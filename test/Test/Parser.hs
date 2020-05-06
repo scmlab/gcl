@@ -5,12 +5,19 @@ module Test.Parser where
 import           Test.Tasty
 import           Test.Tasty.HUnit
 import           Test.Tasty.Golden
+import           Test.Tasty.Golden.Advanced
 import           Data.Text.Lazy                 ( Text )
 import           Data.Loc
 import           Prelude                 hiding ( Ordering(..) )
 import           Text.Megaparsec                ( eof )
 
 import qualified Data.Text.Lazy.IO             as Text
+import qualified Data.Text.Lazy                as Text
+import qualified Data.Text.Lazy.Encoding       as Text
+import qualified Data.ByteString               as Strict
+import qualified Data.ByteString.Lazy          as BS
+import           Data.ByteString.Lazy           ( ByteString )
+import           Data.ByteString.Lazy.Char8     ( pack )
 
 import qualified Syntax.Parser                 as Parser
 import qualified REPL                          as REPL
@@ -18,10 +25,10 @@ import           Syntax.Parser                  ( Parser )
 import           Syntax.Concrete
 import           Error
 
+
 tests :: TestTree
-tests = testGroup
-    "Parser"
-    [expression, type', declaration, statement, statements, program]
+tests = testGroup "Parser" [program]
+    -- [expression, type', declaration, statement, statements, program]
 
 --------------------------------------------------------------------------------
 -- | Helpers
@@ -395,11 +402,44 @@ pos = Pos "<test>"
 -- | Program
 
 program :: TestTree
-program = testGroup "Program" $ map
-    (toTestTree Parser.program)
-    [ ReadFile "empty" "./test/source/empty.gcl" $ Right $ Program []
-                                                                   []
-                                                                   []
-                                                                   []
-                                                                   NoLoc
-    ]
+program =
+    testGroup "Program"
+        $ [ goldenTest "empty"
+                       (readFile "./test/source/empty.golden")
+                       (readFile "./test/source/empty.gcl")
+                       compare
+                       update
+          , goldenTest "quant 1"
+                       (readFile "./test/source/quant1.golden")
+                       (readFile "./test/source/quant1.gcl")
+                       compare
+                       update
+          ]
+
+  where
+    readFile :: FilePath -> IO (FilePath, ByteString)
+    readFile path = do
+        raw <- Strict.readFile path
+        return (path, BS.fromStrict raw)
+
+    compare
+        :: (FilePath, ByteString) -> (FilePath, ByteString) -> IO (Maybe String)
+    compare (goldenFilePath, golden) (inputFilePath, input) = do
+        result <- pack . show <$> parseProgram (inputFilePath, input)
+
+
+        case golden == result of
+            True  -> return Nothing
+            False -> return (Just "different")
+
+    update :: (FilePath, ByteString) -> IO ()
+    update (inputFilePath, input) = do
+        result <- pack . show <$> parseProgram (inputFilePath, input)
+        let newPath = inputFilePath ++ ".golden"
+        createDirectoriesAndWriteFile newPath result
+
+    parseProgram :: (FilePath, ByteString) -> IO (Either Error Program)
+    parseProgram (fileName, raw) =
+        REPL.runREPLM
+            $   REPL.scan fileName (Text.decodeUtf8 raw)
+            >>= REPL.parse Parser.program fileName
