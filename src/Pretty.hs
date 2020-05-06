@@ -21,6 +21,13 @@ import           Pretty.Concrete                ( )
 import           Pretty.GCL.WP2                 ( )
 
 --------------------------------------------------------------------------------
+-- | Misc
+
+instance (Pretty a, Pretty b) => Pretty (Either a b) where
+  pretty (Left  a) = "Error" <+> pretty a
+  pretty (Right b) = pretty b
+
+--------------------------------------------------------------------------------
 -- | Error
 
 instance Pretty Error where

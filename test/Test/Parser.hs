@@ -14,6 +14,8 @@ import           Text.Megaparsec                ( eof )
 import qualified Data.Text.Lazy.IO             as Text
 import qualified Data.Text.Lazy                as Text
 import qualified Data.Text.Lazy.Encoding       as Text
+import           Data.Text.Prettyprint.Doc.Render.Text
+                                                ( renderLazy )
 import qualified Data.ByteString               as Strict
 import qualified Data.ByteString.Lazy          as BS
 import           Data.ByteString.Lazy           ( ByteString )
@@ -24,6 +26,8 @@ import qualified REPL                          as REPL
 import           Syntax.Parser                  ( Parser )
 import           Syntax.Concrete
 import           Error
+
+import           Pretty
 
 
 tests :: TestTree
@@ -402,21 +406,21 @@ pos = Pos "<test>"
 -- | Program
 
 program :: TestTree
-program =
-    testGroup "Program"
-        $ [ goldenTest "empty"
-                       (readFile "./test/source/empty.golden")
-                       (readFile "./test/source/empty.gcl")
-                       compare
-                       update
-          , goldenTest "quant 1"
-                       (readFile "./test/source/quant1.golden")
-                       (readFile "./test/source/quant1.gcl")
-                       compare
-                       update
-          ]
+program = testGroup
+    "Program"
+    [ golden "empty"   "./test/source/empty.gcl"
+    , golden "quant 1" "./test/source/quant1.gcl"
+    ]
 
   where
+    golden :: String -> FilePath -> TestTree
+    golden name path = goldenTest name
+                                  (readFile (path ++ ".golden"))
+                                  (readFile path)
+                                  compare
+                                  update
+
+
     readFile :: FilePath -> IO (FilePath, ByteString)
     readFile path = do
         raw <- Strict.readFile path
@@ -425,7 +429,12 @@ program =
     compare
         :: (FilePath, ByteString) -> (FilePath, ByteString) -> IO (Maybe String)
     compare (goldenFilePath, golden) (inputFilePath, input) = do
-        result <- pack . show <$> parseProgram (inputFilePath, input)
+        result <-
+            Text.encodeUtf8
+            .   renderLazy
+            .   layoutCompact
+            .   pretty
+            <$> parseProgram (inputFilePath, input)
 
 
         case golden == result of
@@ -434,7 +443,12 @@ program =
 
     update :: (FilePath, ByteString) -> IO ()
     update (inputFilePath, input) = do
-        result <- pack . show <$> parseProgram (inputFilePath, input)
+        result <-
+            Text.encodeUtf8
+            .   renderLazy
+            .   layoutCompact
+            .   pretty
+            <$> parseProgram (inputFilePath, input)
         let newPath = inputFilePath ++ ".golden"
         createDirectoriesAndWriteFile newPath result
 

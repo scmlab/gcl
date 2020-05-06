@@ -3,12 +3,55 @@
 module Pretty.Concrete where
 
 import           Data.Text.Prettyprint.Doc
--- import Prelude hiding (Ordering(..))
 
 import           Syntax.Location
 import           Syntax.Concrete
 import           Pretty.Abstract                ( )
 import           Pretty.Util
+
+--------------------------------------------------------------------------------
+-- | Program
+
+instance Pretty Program where
+  pretty (Program decls _ _ stmts loc) =
+    vsep (map pretty decls ++ map pretty stmts)
+
+--------------------------------------------------------------------------------
+-- | Declaration
+
+
+instance Pretty Declaration where
+  pretty (ConstDecl names t Nothing _) =
+    "con" <+> hsep (punctuate comma (map pretty names)) <+> ":" <+> pretty t
+  pretty (ConstDecl names t (Just p) _) =
+    "con"
+      <+> hsep (punctuate comma (map pretty names))
+      <+> ":"
+      <+> pretty t
+      <+> braces (pretty p)
+  pretty (VarDecl names t Nothing _) =
+    "con" <+> hsep (punctuate comma (map pretty names)) <+> ":" <+> pretty t
+  pretty (VarDecl names t (Just p) _) =
+    "var"
+      <+> hsep (punctuate comma (map pretty names))
+      <+> ":"
+      <+> pretty t
+      <+> braces (pretty p)
+  pretty (LetDecl name args expr _) =
+    "let" <+> pretty name <+> hsep (map pretty args) <+> "=" <+> pretty expr
+    -- vsep (map pretty decls ++ map pretty stmts)
+
+-- data Declaration
+--   = ConstDecl [Name] Type (Maybe Expr) Loc
+--   | VarDecl [Name] Type (Maybe Expr) Loc
+--   | LetDecl Name [Text] Expr Loc
+--   deriving (Eq, Show)
+
+--------------------------------------------------------------------------------
+-- | Name
+
+instance Pretty Name where
+  pretty (Name n _) = pretty n
 
 --------------------------------------------------------------------------------
 -- | Stmt
