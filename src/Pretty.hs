@@ -44,7 +44,7 @@ instance Pretty Error where
   pretty NotLoaded             = "NotLoaded"
 
 instance Pretty LexicalError where
-  pretty = pretty
+  pretty = pretty . show
 
 instance Pretty StructError where
   pretty (MissingAssertion     loc) = "Missing Assertion" <+> pretty loc

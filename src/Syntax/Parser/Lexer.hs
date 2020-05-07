@@ -350,7 +350,6 @@ intRE :: RE Text Int
 intRE = read <$> (Text.unpack . Text.concat <$> some (psym (adapt isDigit)))
 
 whitespaceButNewlineRE :: RE Text Tok
--- whitespaceRE = matchWhen isSpace TokWhitespace
 whitespaceButNewlineRE = matchWhen
   (adapt (\c -> isSpace c && c /= '\n' && c /= '\r'))
   TokWhitespace

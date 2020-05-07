@@ -174,9 +174,12 @@ guardedCommands = sepBy1 guardedCommand (symbol TokGuardBar <?> "|")
 
 guardedCommand :: Parser GdCmd
 guardedCommand =
-  withLoc $ GdCmd <$> predicate <*
-    ((symbol TokArrow <?> "->") <|>
-     (symbol TokArrowU <?> "→")) <*> statements1
+  withLoc
+    $   GdCmd
+    <$> predicate
+    <*  ((symbol TokArrow <?> "->") <|> (symbol TokArrowU <?> "→"))
+    <*  ignoreNewlines
+    <*> statements1
 
 hole :: Parser Stmt
 hole = withLoc $ SpecQM <$ (symbol TokQM <?> "?")
@@ -339,11 +342,15 @@ type' = makeExprParser term table <?> "type"
   table = [[InfixR function]]
 
   function :: Parser (Type -> Type -> Type)
-  function = 
-    (do symbol TokArrow <?> "->"
-        return $ \x y -> TFunc x y (x <--> y)) <|>
-    (do symbol TokArrowU <?> "→"
-        return $ \x y -> TFunc x y (x <--> y))
+  function =
+    (do
+        symbol TokArrow <?> "->"
+        return $ \x y -> TFunc x y (x <--> y)
+      )
+      <|> (do
+            symbol TokArrowU <?> "→"
+            return $ \x y -> TFunc x y (x <--> y)
+          )
 
   term :: Parser Type
   term = parens type' <|> array <|> base <?> "type term"
@@ -448,19 +455,10 @@ expectNewline = do
     _               -> void $ some (Util.ignore TokNewline)
 
 symbol :: Tok -> Parser ()
-symbol t = do
-  Util.symbol t
-  ignoreNewlines
+symbol = Util.symbol
 
 withLoc :: Parser (Loc -> a) -> Parser a
 withLoc = Util.withLoc
-
--- -- followed by at least 1 newline
--- withLocStmt :: Parser (Loc -> a) -> Parser a
--- withLocStmt p = do
---   result <- Util.withLoc p
---   expectNewline <?> "<newline> after a statement"
---   return result
 
 parens :: Relocatable a => Parser a -> Parser a
 parens = Util.between (symbol TokParenStart <?> "left parenthesis")

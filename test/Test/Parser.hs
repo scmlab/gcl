@@ -19,7 +19,9 @@ import           Data.Text.Prettyprint.Doc.Render.Text
 import qualified Data.ByteString               as Strict
 import qualified Data.ByteString.Lazy          as BS
 import           Data.ByteString.Lazy           ( ByteString )
-import           Data.ByteString.Lazy.Char8     ( pack )
+import           Data.ByteString.Lazy.Char8     ( pack
+                                                , unpack
+                                                )
 
 import qualified Syntax.Parser                 as Parser
 import qualified REPL                          as REPL
@@ -31,8 +33,9 @@ import           Pretty
 
 
 tests :: TestTree
-tests = testGroup "Parser" [program]
-    -- [expression, type', declaration, statement, statements, program]
+tests = testGroup
+    "Parser"
+    [expression, type', declaration, statement, statements, program]
 
 --------------------------------------------------------------------------------
 -- | Helpers
@@ -381,6 +384,23 @@ statements = testGroup "Multiple statements" $ map
         "skip\n\nskip\n"
         [Skip $ pos 1 1 0 <--> pos 1 4 3, Skip $ pos 3 1 6 <--> pos 3 4 9]
     , RightCase
+        "separated by newlines 3"
+        "a := <| (+) i : 0 : 0 |>\na := 0"
+        [ Assign
+            [Name "a" $ pos 1 1 0 <--> pos 1 1 0]
+            [ Quant (Op Add $ pos 1 9 8 <--> pos 1 11 10)
+                    [Name "i" $ pos 1 13 12 <--> pos 1 13 12]
+                    (Lit (Num 0) $ pos 1 17 16 <--> pos 1 17 16)
+                    (Lit (Num 0) $ pos 1 21 20 <--> pos 1 21 20)
+                    (pos 1 6 5 <--> pos 1 24 23)
+            ]
+            (pos 1 1 0 <--> pos 1 24 23)
+        , Assign [Name "a" $ pos 2 1 25 <--> pos 2 1 25]
+                 [Lit (Num 0) $ pos 2 6 30 <--> pos 2 6 30]
+        $    pos 2 1 25
+        <--> pos 2 6 30
+        ]
+    , RightCase
         "separated by semicolons 1"
         "skip;skip"
         [Skip $ pos 1 1 0 <--> pos 1 4 3, Skip $ pos 1 6 5 <--> pos 1 9 8]
@@ -436,10 +456,9 @@ program = testGroup
             .   pretty
             <$> parseProgram (inputFilePath, input)
 
-
         case golden == result of
             True  -> return Nothing
-            False -> return (Just "different")
+            False -> return (Just $ unpack result)
 
     update :: (FilePath, ByteString) -> IO ()
     update (inputFilePath, input) = do

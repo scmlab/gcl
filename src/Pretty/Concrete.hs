@@ -41,12 +41,6 @@ instance Pretty Declaration where
     "let" <+> pretty name <+> hsep (map pretty args) <+> "=" <+> pretty expr
     -- vsep (map pretty decls ++ map pretty stmts)
 
--- data Declaration
---   = ConstDecl [Name] Type (Maybe Expr) Loc
---   | VarDecl [Name] Type (Maybe Expr) Loc
---   | LetDecl Name [Text] Expr Loc
---   deriving (Eq, Show)
-
 --------------------------------------------------------------------------------
 -- | Name
 
