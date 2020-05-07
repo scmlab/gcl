@@ -326,12 +326,6 @@ expression = makeExprParser term table <?> "expression"
         ]
       <?> "operator"
 
-    -- op :: Parser Expr
-    -- op = withLoc (Op <$> choice
-    --         [ EQ    <$  symbol TokEQ
-    --         , Add   <$  symbol TokAdd
-    --         ] <?> "operator")
-
 --------------------------------------------------------------------------------
 -- | Type
 
@@ -446,6 +440,7 @@ variableList =
 ignoreNewlines :: Parser ()
 ignoreNewlines = void $ many (Util.ignore TokNewline)
 
+-- consumes 1 or more newlines
 expectNewline :: Parser ()
 expectNewline = do
   -- see if the latest accepcted token is TokNewline

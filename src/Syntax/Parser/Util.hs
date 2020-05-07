@@ -3,11 +3,6 @@
 module Syntax.Parser.Util
   ( PosLog
   , runPosLog
-  , markStart
-  , markEnd
-  , updateLoc
-  , updateToken
-  , getCurrentLoc
   , getLastToken
   , getLoc
   , withLoc
@@ -34,7 +29,6 @@ import           Syntax.Parser.TokenStream      ( PrettyToken )
 
 --------------------------------------------------------------------------------
 -- | Source location bookkeeping
-
 
 type PosLog token = State (LocState token)
 
@@ -88,14 +82,14 @@ updateLoc loc = do
 
 -- | Updates the latest scanned token
 updateToken :: token -> PosLog token ()
-updateToken tok = do
-  modify $ \st -> st { lastToken = Just tok }
+updateToken tok = modify $ \st -> st { lastToken = Just tok }
 
 --------------------------------------------------------------------------------
 -- | Helper functions
 
 type P token = ParsecT Void (TokenStream (L token)) (PosLog token)
 
+-- Augment the parser with Loc
 getLoc :: (Ord tok, Show tok, PrettyToken tok) => P tok a -> P tok (a, Loc)
 getLoc parser = do
   i      <- lift markStart
@@ -111,7 +105,7 @@ withLoc parser = do
 --------------------------------------------------------------------------------
 -- | Combinators
 
--- parses with some parser, and updates the source location
+-- Create a parser of some symbol (while respecting source locations)
 symbol :: (Eq tok, Ord tok, Show tok, PrettyToken tok) => tok -> P tok ()
 symbol t = do
   L loc tok <- satisfy (\(L _ t') -> t == t')
@@ -120,7 +114,7 @@ symbol t = do
     updateToken tok
   return ()
 
--- parses with some parser, but don't update the source location
+-- Create a parser of some symbol, that doesn't update source locations
 -- effectively excluding it from source location tracking
 ignore :: (Eq tok, Ord tok, Show tok, PrettyToken tok) => tok -> P tok ()
 ignore t = do
@@ -128,6 +122,7 @@ ignore t = do
   lift $ updateToken tok
   return ()
 
+-- Useful for extracting values from a Token 
 extract :: (Ord tok, Show tok, PrettyToken tok) => (tok -> Maybe a) -> P tok a
 extract f = do
   (result, tok, loc) <- token p Set.empty
@@ -141,6 +136,7 @@ extract f = do
     Just result -> Just (result, tok', loc)
     Nothing     -> Nothing
 
+-- Adjust source location of the result from the given parser to include the enclosing tokens
 between
   :: (Ord tok, Show tok, PrettyToken tok, Relocatable a)
   => P tok b
