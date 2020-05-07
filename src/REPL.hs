@@ -236,10 +236,10 @@ data Request
   = ReqLoad FilePath Bool
   | ReqRefine Int Text
   | ReqInsertAssertion Int
+  -- | ReqSubstitute Concrete.Expr Concrete.Subst
   | ReqDebug
   | ReqQuit
   deriving (Generic)
-  -- | Substitute Concrete.Expr Concrete.Subst
 
 instance FromJSON Request where
 
@@ -261,3 +261,7 @@ instance ToJSON Response where
 instance ToJSON Origin where
 instance ToJSON PO where
 instance ToJSON Spec where
+
+-- instance FromJSON Loc where
+-- instance Generic Loc where
+-- instance GFromZero Zero (Rep Loc) where

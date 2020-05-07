@@ -13,7 +13,7 @@ import           Pretty.Util
 -- | Program
 
 instance Pretty Program where
-  pretty (Program decls _ _ stmts loc) =
+  pretty (Program decls _ _ stmts _) =
     vsep (map pretty decls ++ map pretty stmts)
 
 --------------------------------------------------------------------------------

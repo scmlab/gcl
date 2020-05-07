@@ -20,6 +20,8 @@ type Index = Int
 data Lit  = Num Int | Bol Bool | Chr Char
           deriving (Show, Eq, Generic)
 
+instance FromJSON Lit
+
 data Expr = Var    Var
           | Const  Const
           | Lit    Lit
@@ -36,8 +38,9 @@ data Op = EQ | NEQ | LTE | GTE | LT | GT   -- binary relations
         | Add | Sub | Mul | Div | Mod       -- arithmetics
      deriving (Show, Eq, Generic)
 
--- convenient constructors
+instance FromJSON Op
 
+-- convenient constructors
 lt, gt, gte, lte, eqq, conj, disj, implies :: Expr -> Expr -> Expr
 x `lt` y = App (App (Op LT) x) y
 x `gt` y = App (App (Op GT) x) y

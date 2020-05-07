@@ -1,4 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DeriveGeneric #-}
 
 module Syntax.Concrete
@@ -99,6 +98,7 @@ data Expr = Lit   Lit       Loc
 type Subst = Map Text Expr
 
 instance ToJSON Expr where
+instance FromJSON Expr where
 
 wrapLam :: [Text] -> Expr -> Expr
 wrapLam []       body = body
@@ -111,6 +111,8 @@ data Name = Name Text Loc
   deriving (Eq, Show, Generic)
 
 instance ToJSON Name where
+instance FromJSON Name where
+
 instance Ord Name where
   compare (Name a _) (Name b _) = compare a b
 
