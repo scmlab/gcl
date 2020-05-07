@@ -1,4 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DeriveGeneric #-}
 
 module Error where
@@ -37,21 +36,21 @@ data Error
   | TypeError           TypeError
   | StructError         StructError
   | StructError2        StructError2
-  | CannotDecodeRequest
+  | CannotDecodeRequest String
   | CannotReadFile      FilePath
   | NotLoaded
   -- | ExecError       ExecError
   deriving (Eq, Show, Generic)
 
 instance Located Error where
-  locOf (LexicalError   pos) = Loc pos pos
-  locOf (SyntacticError es ) = foldl (\l (m, _) -> l <--> m) NoLoc es
-  locOf (TypeError      e  ) = locOf e
-  locOf (StructError    e  ) = locOf e
-  locOf (StructError2   e  ) = locOf e
-  locOf CannotDecodeRequest  = NoLoc
-  locOf (CannotReadFile _)   = NoLoc
-  locOf NotLoaded            = NoLoc
+  locOf (LexicalError        pos) = Loc pos pos
+  locOf (SyntacticError      es ) = foldl (\l (m, _) -> l <--> m) NoLoc es
+  locOf (TypeError           e  ) = locOf e
+  locOf (StructError         e  ) = locOf e
+  locOf (StructError2        e  ) = locOf e
+  locOf (CannotDecodeRequest _  ) = NoLoc
+  locOf (CannotReadFile      _  ) = NoLoc
+  locOf NotLoaded                 = NoLoc
 
 localError :: Int -> Error -> (Site, Error)
 localError i e = (Local (locOf e) i, e)

@@ -10,6 +10,7 @@ import           Data.Set                       ( Set
 import qualified Data.Set                      as Set
 import           Data.Text.Lazy                 ( Text )
 import qualified Data.Text.Lazy                as Text
+import           Data.Maybe                     ( fromMaybe )
 import           Syntax.Concrete
 
 --------------------------------------------------------------------------------
@@ -68,8 +69,8 @@ convLam xs x e
   | otherwise = return (x, e, False)
 
 subst :: Fresh m => Subst -> Expr -> m Expr
-subst env v@(Var   x  _ ) = return $ maybe v id (Map.lookup (nameToText x) env)
-subst env c@(Const x  _ ) = return $ maybe c id (Map.lookup (nameToText x) env)
+subst env v@(Var   x  _ ) = return $ fromMaybe v (Map.lookup (nameToText x) env)
+subst env c@(Const x  _ ) = return $ fromMaybe c (Map.lookup (nameToText x) env)
 subst _   (  Op    op l ) = return $ Op op l
 subst _   (  Lit   n  l ) = return $ Lit n l
 subst env (  App e1 e2 l) = App <$> subst env e1 <*> subst env e2 <*> pure l
@@ -132,18 +133,18 @@ expand defs n (Lam x e l) = do
 expand _ _ h@(Hole _) = return h
 expand _ _ (Quant op ys r t l) =  --- SCM: deal with this later
   return $ Quant op ys r t l
-expand defs _ (Subst e env) = return $
-  Subst (Subst e env) (Map.fromList defs)
+expand defs _ (Subst e env) = return $ Subst (Subst e env) (Map.fromList defs)
      -- SCM: deal with this later
 
   -- generating substition when a definition is encountered.
 
 substDefns :: Subst -> Defns -> Subst
-substDefns env = Map.fromList . concat . map (substDefn env)
+substDefns env = Map.fromList . concatMap (substDefn env)
 
 substDefn :: Subst -> (Text, Expr) -> [(Text, Expr)]
-substDefn env (f, e) = if null env' then []
+substDefn env (f, e) = if null env'
+  then []
   else [(f, Subst (Var (Name f NoLoc) NoLoc) env')]
  where
-  fe = free e
+  fe   = free e
   env' = Map.filterWithKey (\x _ -> x `elem` fe) env

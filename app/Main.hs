@@ -49,8 +49,7 @@ main = do
           -- putStrLn "\n=== execution (stores) ==="
           -- mapM_ (print . pretty) stores
 
-        Left err -> do
-          print $ pretty err
+        Left err -> print $ pretty err
 
 --------------------------------------------------------------------------------
 -- | Command-line arguments
