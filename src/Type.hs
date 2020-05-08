@@ -4,52 +4,11 @@
 module Type where
 
 import           Data.Aeson
-import           Data.Aeson.Types               ( prependFailure
-                                                , typeMismatch
-                                                )
 import qualified Data.Loc                      as L
 import           GHC.Generics
 
 
 import           Syntax.Parser.Util             ( )
-
---------------------------------------------------------------------------------
--- | Instances of ToJSON
-
--- instance ToJSON Pos where
---   toJSON (Pos filepath line column offset) = object
---     [ "filepath" .= filepath
---     , "line" .= line
---     , "column" .= column
---     , "offset" .= offset
---     ]
-
---   toEncoding (Pos filepath line column offset) =
---     pairs
---       $  "filepath"
---       .= filepath
---       <> "line"
---       .= line
---       <> "column"
---       .= column
---       <> "offset"
---       .= offset
-
--- instance ToJSON Loc where
---   toJSON NoLoc           = object ["tag" .= ("NoLoc" :: String)]
---   toJSON (Loc start end) = object
---     [ "tag" .= ("Loc" :: String)
---     , "contents" .= object ["start" .= start, "end" .= end]
---     ]
-
---------------------------------------------------------------------------------
--- | Instances of FromJSON
-
--- instance FromJSON Loc where
---   parseJSON (Object v) =
---     Pos <$> v .: "filepath" <*> v .: "line" <*> v .: "column" <*> v .: "offset"
---   parseJSON invalid =
---     prependFailure "parsing Loc failed, " (typeMismatch "Object" invalid)
 
 --------------------------------------------------------------------------------
 -- | Pos

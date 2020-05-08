@@ -30,6 +30,7 @@ import           Syntax.Parser.Lexer            ( TokStream )
 import qualified Syntax.Parser.Lexer           as Lexer
 import qualified Syntax.Parser                 as Parser
 import qualified Syntax.Concrete               as Concrete
+import qualified Syntax.Abstract               as Abstract
 import qualified Syntax.Predicate              as Predicate
 import           Syntax.Predicate               ( Spec
                                                 , PO
@@ -97,6 +98,8 @@ handleRequest (ReqRefine i payload) = catchLocalError i $ do
 handleRequest (ReqInsertAssertion i) = catchGlobalError $ do
   expr <- insertAssertion i
   return $ Just $ ResInsert i expr
+handleRequest (ReqSubstitute _expr _subst) = catchGlobalError $ do
+  return $ Nothing
 handleRequest ReqDebug = error "crash!"
 handleRequest ReqQuit  = return Nothing
 
@@ -236,7 +239,7 @@ data Request
   = ReqLoad FilePath Bool
   | ReqRefine Int Text
   | ReqInsertAssertion Int
-  -- | ReqSubstitute Concrete.Expr Concrete.Subst
+  | ReqSubstitute Concrete.Expr Concrete.Subst
   | ReqDebug
   | ReqQuit
   deriving (Generic)
@@ -251,6 +254,7 @@ data Response
   | ResError [(Site, Error)]
   | ResResolve Int -- resolves some Spec
   | ResInsert Int Concrete.Expr
+  | ResSubstitute Concrete.Expr Concrete.Subst
   deriving (Generic)
 
 instance ToJSON Response where
