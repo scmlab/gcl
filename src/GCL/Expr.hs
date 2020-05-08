@@ -52,7 +52,7 @@ freeSubst :: Subst -> Set Text
 freeSubst = Set.unions . map free . Map.elems
 
 freeDefns :: Defns -> Set Text
-freeDefns = Set.unions . map (free . snd)
+freeDefns = Set.unions . map (free . snd) . Map.toList
 
 --------------------------------------------------------------------------------
 -- | Substitution
@@ -110,10 +110,10 @@ subst env (Subst e theta) = return $ Subst (Subst e theta) env
 expand :: Fresh m => Defns -> Int -> Expr -> m Expr
 expand _    0 e                      = return e
 expand _    _ (  Lit   v          l) = return $ Lit v l
-expand defs n c@(Const (Name x _) _) = case lookup x defs of
+expand defs n c@(Const (Name x _) _) = case Map.lookup x defs of
   Just e  -> expand defs (n - 1) e
   Nothing -> return $ c
-expand defs n v@(Var (Name x _) _) = case lookup x defs of
+expand defs n v@(Var (Name x _) _) = case Map.lookup x defs of
   Just e  -> expand defs (n - 1) e
   Nothing -> return $ v
 expand _    _ op@(Op _ _     ) = return op
@@ -127,19 +127,19 @@ expand defs n (   App e1 e2 l) = do
     _ -> return $ App e1' e2' l
 expand defs n (Lam x e l) = do
   (x', e', c) <- convLam (freeDefns defs) x e
-  let defs' = if not c then defs else filter ((x /=) . fst) defs
+  let defs' = if not c then defs else Map.filterWithKey (\k _ -> x /= k) defs
   e'' <- expand defs' n e'
   return $ Lam x' e'' l
 expand _ _ h@(Hole _) = return h
 expand _ _ (Quant op ys r t l) =  --- SCM: deal with this later
   return $ Quant op ys r t l
-expand defs _ (Subst e env) = return $ Subst (Subst e env) (Map.fromList defs)
+expand defs _ (Subst e env) = return $ Subst (Subst e env) defs
      -- SCM: deal with this later
 
   -- generating substition when a definition is encountered.
 
 substDefns :: Subst -> Defns -> Subst
-substDefns env = Map.fromList . concatMap (substDefn env)
+substDefns env = Map.fromList . concatMap (substDefn env) . Map.toList
 
 substDefn :: Subst -> (Text, Expr) -> [(Text, Expr)]
 substDefn env (f, e) = if null env'

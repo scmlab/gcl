@@ -31,7 +31,7 @@ data Program = Program
       Loc
   deriving (Eq, Show)
 
-type Defns = [(Text, Expr)]
+type Defns = Map Text Expr
 
 data Declaration
   = ConstDecl [Name] Type (Maybe Expr) Loc

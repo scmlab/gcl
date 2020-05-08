@@ -3,8 +3,8 @@ module SCM.Test where
 import qualified Data.Text.Lazy.IO             as Text
 
 import           Prelude
-import           Data.Text.Prettyprint.Doc
 import           Data.Text.Internal.Lazy
+import qualified Data.Map                      as Map
 
 -- import REPL
 import           Syntax.Parser.Lexer            ( TokStream )
@@ -12,17 +12,9 @@ import qualified Syntax.Parser.Lexer           as Lexer
 import qualified Syntax.Parser                 as Parser
 import           Syntax.Concrete
 
--- import System.Random
-
--- import GCL.Type
-
--- import GCL.Exec
--- import GCL.Exec.ExNondet
--- import GCL.Exec.ExRand
 import           GCL.WP
 
-import           Pretty.Abstract                ( )
-import           Pretty.Predicate               ( )
+import           Pretty
 
 runtst :: String -> IO ()
 runtst filepath = do
@@ -40,7 +32,7 @@ runtst filepath = do
        -- print program
        -- putStr "\n"
        -- Either StructError ((a, [Obligation]), [Specification])
-        case runSM (structProg [] stmts) (0, 0, 0) of
+        case runSM (structProg Map.empty stmts) (0, 0, 0) of
           Left  err                        -> print err
           Right (((_, obs), specs), state) -> do
             putStrLn "== obligations"

@@ -10,6 +10,7 @@ import           Syntax.Concrete         hiding ( unary
                                                 )
 import           Syntax.Location                ( )
 import           Data.Maybe                     ( mapMaybe )
+import qualified Data.Map                      as Map
 
 constExpr :: [Text] -> Expr -> Bool
 constExpr _     (Lit   _ _  ) = True
@@ -31,5 +32,5 @@ pickGlobals :: [Declaration] -> ([Expr], [Expr])
 pickGlobals = partition (constExpr []) . mapMaybe extractAssertion
 
 -- extract let bindings in declarations
-pickLetBindings :: [Declaration] -> [(Text, Expr)]
-pickLetBindings = mapMaybe extractLetBinding
+pickLetBindings :: [Declaration] -> Defns
+pickLetBindings = Map.fromList . mapMaybe extractLetBinding
