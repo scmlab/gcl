@@ -49,10 +49,10 @@ free (Subst e s) = (free e \\ Set.fromList (Map.keys s)) <> freeSubst s
 -- free variables in substitutions and list of definitions
 
 freeSubst :: Subst -> Set Text
-freeSubst = Set.unions . map free . Map.elems
+freeSubst = Set.unions . Map.map free
 
 freeDefns :: Defns -> Set Text
-freeDefns = Set.unions . map (free . snd) . Map.toList
+freeDefns = Set.unions . Map.map free
 
 --------------------------------------------------------------------------------
 -- | Substitution
@@ -122,8 +122,7 @@ expand defs n (   App e1 e2 l) = do
   e2' <- expand defs n e2
   case e1' of
     Lam x body _ ->
-      let env = Map.singleton x e2'
-      in  subst (Map.union env (substDefns env defs)) body
+      subst (extendSubstWithDefns (Map.singleton x e2') defs) body
     _ -> return $ App e1' e2' l
 expand defs n (Lam x e l) = do
   (x', e', c) <- convLam (freeDefns defs) x e
@@ -136,15 +135,15 @@ expand _ _ (Quant op ys r t l) =  --- SCM: deal with this later
 expand defs _ (Subst e env) = return $ Subst (Subst e env) defs
      -- SCM: deal with this later
 
-  -- generating substition when a definition is encountered.
+-- Extend a `Subst` with a `Defns` 
+extendSubstWithDefns :: Subst -> Defns -> Subst
+extendSubstWithDefns env defns = env <> Map.mapMaybeWithKey (substDefn) defns
 
-substDefns :: Subst -> Defns -> Subst
-substDefns env = Map.fromList . concatMap (substDefn env) . Map.toList
-
-substDefn :: Subst -> (Text, Expr) -> [(Text, Expr)]
-substDefn env (f, e) = if null env'
-  then []
-  else [(f, Subst (Var (Name f NoLoc) NoLoc) env')]
  where
-  fe   = free e
-  env' = Map.filterWithKey (\x _ -> x `elem` fe) env
+  substDefn :: Text -> Expr -> Maybe Expr
+  substDefn name expr = if null env'
+    then Nothing
+    else Just (Subst (Var (Name name NoLoc) NoLoc) env')
+    where
+      -- entries of `env` that are free in `expr`
+          env' = Map.filterWithKey (\x _ -> x `elem` free expr) env

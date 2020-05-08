@@ -30,7 +30,6 @@ import           Syntax.Parser.Lexer            ( TokStream )
 import qualified Syntax.Parser.Lexer           as Lexer
 import qualified Syntax.Parser                 as Parser
 import qualified Syntax.Concrete               as Concrete
-import qualified Syntax.Abstract               as Abstract
 import qualified Syntax.Predicate              as Predicate
 import           Syntax.Predicate               ( Spec
                                                 , PO

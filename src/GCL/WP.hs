@@ -51,23 +51,21 @@ tellSpec p q loc = do
 --------------------------------------------------------------------------------
 -- | Structure, and Weakest-Precondition
 
-struct :: Defns -> Bool
-       -> Pred -> Maybe Expr -> Stmt -> Pred -> SM ()
+struct :: Defns -> Bool -> Pred -> Maybe Expr -> Stmt -> Pred -> SM ()
 
-struct _ _ pre _ (C.Abort l   ) _    = obligate pre (Constant C.false) (AtAbort l)
+struct _ _ pre _ (C.Abort l) _ = obligate pre (Constant C.false) (AtAbort l)
 
-struct _ _ pre _ (C.Skip  l   ) post = obligate pre post (AtSkip l)
+struct _ _ pre _ (C.Skip l) post = obligate pre post (AtSkip l)
 
 struct _ _ pre _ (C.Assert p l) post = do
   obligate pre             (Assertion p l) (AtAssertion l)
   obligate (Assertion p l) post            (AtAssertion l)
 
-struct _ _ _   _ (C.LoopInvariant _  _  l) _    = throwError (ExcessBound l)
+struct _  _ _   _ (C.LoopInvariant _  _  l) _    = throwError (ExcessBound l)
 
 struct ds _ pre _ (C.Assign        xs es l) post = do
-  let env  = assignmentEnv xs es
-  let denv = E.substDefns env ds
-  post' <- subst (Map.union env denv) post
+  let denv = E.extendSubstWithDefns (assignmentEnv xs es) ds
+  post' <- subst denv post
   obligate pre post' (AtAssignment l)
 
 struct ds b pre _ (C.If gcmds l) post = do
@@ -75,7 +73,7 @@ struct ds b pre _ (C.If gcmds l) post = do
   forM_ gcmds $ \(C.GdCmd guard body _) ->
     structStmts ds b (Conjunct [pre, guardIf guard]) Nothing body post
 
-struct _ _ _   Nothing    (C.Do _     l) _    = throwError (MissingBound l)
+struct _  _ _   Nothing    (C.Do _     l) _    = throwError (MissingBound l)
  {- Or if we want to tolerate the user and carry on ---
  do -- warn that bnd is missing
   let gcmds' = map (\(GdCmd x y _) -> (depart x, y)) gcmds
@@ -99,7 +97,8 @@ struct ds b inv (Just bnd) (C.Do gcmds l) post = do
            (AtTermination l)
   -- bound decrementation
   oldbnd <- E.freshVar "bnd"
-  forM_ gcmds $ \(C.GdCmd guard body _) -> structStmts ds
+  forM_ gcmds $ \(C.GdCmd guard body _) -> structStmts
+    ds
     False
     (Conjunct
       [ inv
@@ -115,10 +114,9 @@ struct _ _ _   _ (C.SpecQM l) _    = throwError $ DigHole l
 struct _ b pre _ (C.Spec   l) post = when b (tellSpec pre post l)
 
 
-structStmts :: Defns -> Bool
-    -> Pred -> Maybe Expr -> [Stmt] -> Pred -> SM ()
+structStmts :: Defns -> Bool -> Pred -> Maybe Expr -> [Stmt] -> Pred -> SM ()
 
-structStmts _ _ _   _ []                     _    = return ()
+structStmts _  _ _   _ []                     _    = return ()
 
 structStmts ds b pre _ (C.Assert p l : stmts) post = do
   obligate pre (Assertion p l) (AtAssertion l)
@@ -138,8 +136,8 @@ structStmts ds b pre bnd (stmt : stmts) post = do
   struct ds b pre bnd stmt post'
 
 structProg :: Defns -> [Stmt] -> SM ()
-structProg _ []                        = return ()
-structProg _ [C.Assert _ _]            = return ()
+structProg _  []                        = return ()
+structProg _  [C.Assert        _ _    ] = return ()
 structProg ds (C.Assert pre l1 : stmts) = case (init stmts, last stmts) of
   (stmts', C.Assert post l2) ->
     structStmts ds True (Assertion pre l1) Nothing stmts' (Assertion post l2)
@@ -150,8 +148,7 @@ structProg ds stmts = case (init stmts, last stmts) of
   (_, stmt) -> throwError (MissingPostcondition (locOf stmt))
 
 
-wpStmts :: Defns -> Bool
-        -> [Stmt] -> Pred -> SM Pred
+wpStmts :: Defns -> Bool -> [Stmt] -> Pred -> SM Pred
 
 wpStmts _ _ [] post = return post
 
@@ -167,8 +164,7 @@ wpStmts ds b (stmt : stmts) post = do
   post' <- wpStmts ds b stmts post
   wp ds b stmt post'
 
-wp :: Defns -> Bool
-   -> Stmt -> Pred -> SM Pred
+wp :: Defns -> Bool -> Stmt -> Pred -> SM Pred
 
 wp _ _ (C.Abort _   ) _    = return (Constant C.false)
 
@@ -182,12 +178,11 @@ wp _ _ (C.LoopInvariant p b l) post = do
   obligate (LoopInvariant p b l) post (AtAssertion l)
   return (LoopInvariant p b l)
 
-wp ds _ (C.Assign xs es _) post =
-  let env  = assignmentEnv xs es
-      denv = E.substDefns env ds
-  in subst (Map.union env denv) post
+wp ds _ (C.Assign xs es _) post = do
+  let denv = E.extendSubstWithDefns (assignmentEnv xs es) ds
+  subst denv post
 
-wp ds b (C.If gcmds _    ) post = do
+wp ds b (C.If gcmds _) post = do
   forM_ gcmds $ \(C.GdCmd guard body _) ->
     structStmts ds b (guardIf guard) Nothing body post
   return (Disjunct (map guardIf (C.getGuards gcmds))) -- is this enough?
