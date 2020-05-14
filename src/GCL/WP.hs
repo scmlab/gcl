@@ -14,6 +14,8 @@ import           Data.Loc                       ( Loc(..)
 import           Data.Aeson
 import           GHC.Generics
 
+
+import           Syntax.Abstract                ( Fresh(..) )
 import           Syntax.Concrete                ( Expr
                                                 , Stmt
                                                 , Name
@@ -96,7 +98,7 @@ struct ds b inv (Just bnd) (C.Do gcmds l) post = do
            (Bound (bnd `C.gte` (C.Lit (C.Num 0) NoLoc)) NoLoc)
            (AtTermination l)
   -- bound decrementation
-  oldbnd <- E.freshVar "bnd"
+  oldbnd <- freshVar "bnd"
   forM_ gcmds $ \(C.GdCmd guard body _) -> structStmts
     ds
     False
@@ -207,7 +209,7 @@ assignmentEnv xs es = Map.fromList (zip (map C.nameToText xs) es)
 --------------------------------------------------------------------------------
 -- | The monad, and other supportive operations
 
-instance E.Fresh SM where
+instance Fresh SM where
   fresh = do
     (i, j, k) <- get
     put (i, j, succ k)

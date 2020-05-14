@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE FlexibleInstances #-}
 
 module GCL.Expr where
 
@@ -9,26 +10,21 @@ import           Data.Set                       ( Set
                                                 )
 import qualified Data.Set                      as Set
 import           Data.Text.Lazy                 ( Text )
-import qualified Data.Text.Lazy                as Text
 import           Data.Maybe                     ( fromMaybe )
+import           Syntax.Abstract                ( Fresh(..) )
 import           Syntax.Concrete
+import           Control.Monad.State
 
 --------------------------------------------------------------------------------
--- | Names and Fresh Names
+-- | Subst Monad
 
-class Monad m => Fresh m where
-  fresh :: m Int
+type SubstM = State Int
 
-  -- generate a fresh var with a given prefix
-  freshVar :: Text -> m Text
-  freshVar prefix = do
-    i <- fresh
-    return ("_" <> prefix <> Text.pack (show i))
+runSubstM :: SubstM a -> a
+runSubstM f = evalState f 0
 
-  -- generate a bunch of fresh vars with a given prefix
-  freshVars :: Text -> Int -> m [Text]
-  freshVars _  0 = return []
-  freshVars pf n = (:) <$> freshVar pf <*> freshVars pf (n-1)
+instance Fresh SubstM where
+  fresh = get
 
 --------------------------------------------------------------------------------
 -- | Free Names
@@ -137,7 +133,7 @@ expand defs _ (Subst e env) = return $ Subst (Subst e env) defs
 
 -- Extend a `Subst` with a `Defns` 
 extendSubstWithDefns :: Subst -> Defns -> Subst
-extendSubstWithDefns env defns = env <> Map.mapMaybeWithKey (substDefn) defns
+extendSubstWithDefns env defns = env <> Map.mapMaybeWithKey substDefn defns
 
  where
   substDefn :: Text -> Expr -> Maybe Expr

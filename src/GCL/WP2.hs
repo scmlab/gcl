@@ -19,6 +19,7 @@ import           GHC.Generics
 import           Syntax.Concrete                ( Expr
                                                 , Name
                                                 )
+import           Syntax.Abstract                ( Fresh(..) )
 import qualified Syntax.Concrete               as C
 -- import qualified Syntax.Predicate as P
 import           Syntax.Predicate
@@ -26,7 +27,6 @@ import           Syntax.Location                ( Hydratable(..) )
 
 import           Pretty.Concrete                ( )
 import           Pretty.Predicate               ( )
-import qualified GCL.Expr                      as E
 
 assignmentEnv :: [Name] -> [Expr] -> C.Subst
 assignmentEnv xs es = Map.fromList (zip (map C.nameToText xs) es)
@@ -39,7 +39,7 @@ type WPM = ExceptT StructError2 (State Int)
 runWPM :: WPM a -> Either StructError2 a
 runWPM f = evalState (runExceptT f) 0
 
-instance E.Fresh WPM where
+instance Fresh WPM where
   fresh = do
     i <- get
     put (succ i)
@@ -68,7 +68,7 @@ originOfStruct (Postcond p) = AtAssertion (locOf p)
 -- Monad on top of WPM, for generating proof obligations
 type POM = WriterT [PO] (StateT Int WPM)
 
-instance E.Fresh POM where
+instance Fresh POM where
   fresh = do
     i <- get
     put (succ i)
@@ -114,7 +114,7 @@ genPO (Struct pre (stmt : stmts) next) = do
       mapM_ (genPO . gdCmdBody) gdCmds
 
       -- termination
-      bndVar <- (C.Var . hydrate) <$> E.freshVar "bnd" <*> pure NoLoc
+      bndVar <- (C.Var . hydrate) <$> freshVar "bnd" <*> pure NoLoc
       tellPO (conjunct (loopInvariant : guards))
              (Bound (bndVar `C.gte` C.number 0) NoLoc)
              (AtTermination loc)
@@ -139,7 +139,7 @@ genPO (Struct pre (stmt : stmts) next) = do
 -- Monad on top of WPM, for generating specifications
 type SpecM = WriterT [Spec] (StateT Int WPM)
 
-instance E.Fresh SpecM where
+instance Fresh SpecM where
   fresh = do
     i <- get
     put (succ i)

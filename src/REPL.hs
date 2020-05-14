@@ -20,6 +20,10 @@ import           Control.Exception              ( IOException
                                                 )
 
 import           Error
+import           GCL.Expr                       ( SubstM
+                                                , runSubstM
+                                                , expand
+                                                )
 import           GCL.WP                         ( structProg
                                                 , runWP
                                                 )
@@ -97,8 +101,10 @@ handleRequest (ReqRefine i payload) = catchLocalError i $ do
 handleRequest (ReqInsertAssertion i) = catchGlobalError $ do
   expr <- insertAssertion i
   return $ Just $ ResInsert i expr
-handleRequest (ReqSubstitute _expr _subst) = catchGlobalError $ do
-  return $ Nothing
+handleRequest (ReqSubstitute expr _subst) = catchGlobalError $ do
+  Concrete.Program _ _ defns _ _ <- getProgram
+  let expr' = runSubstM (expand defns 1 expr)
+  return $ Just $ ResSubstitute expr'
 handleRequest ReqDebug = error "crash!"
 handleRequest ReqQuit  = return Nothing
 
@@ -253,7 +259,7 @@ data Response
   | ResError [(Site, Error)]
   | ResResolve Int -- resolves some Spec
   | ResInsert Int Concrete.Expr
-  | ResSubstitute Concrete.Expr Concrete.Subst
+  | ResSubstitute Concrete.Expr
   deriving (Generic)
 
 instance ToJSON Response where

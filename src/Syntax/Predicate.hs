@@ -15,7 +15,7 @@ import           Syntax.Concrete                ( Expr
                                                 , Name
                                                 , Subst
                                                 )
-import           GCL.Expr                       ( Fresh )
+import           Syntax.Abstract                ( Fresh )
 import qualified GCL.Expr                      as E
 
 --------------------------------------------------------------------------------
