@@ -49,10 +49,11 @@ data REPLState = REPLState
   { replFilePath :: Maybe FilePath
   , replProgram :: Maybe Concrete.Program
   , replStruct :: Maybe Predicate.Struct
+  , replID :: Int
   }
 
 initREPLState :: REPLState
-initREPLState = REPLState Nothing Nothing Nothing
+initREPLState = REPLState Nothing Nothing Nothing 0
 
 -- Monad
 type REPLM = ExceptT Error (StateT REPLState IO)
@@ -87,24 +88,32 @@ catchLocalError :: Int -> REPLM (Maybe Response) -> REPLM (Maybe Response)
 catchLocalError i program =
   program `catchError` (\err -> return $ Just $ ResError [localError i err])
 
+freshID :: REPLM Int
+freshID = do
+  i <- gets replID
+  modify $ \st -> st { replID = succ i }
+  return i
+
 -- returns Nothing to break the REPL loop
 handleRequest :: Request -> REPLM (Maybe Response)
 handleRequest (ReqLoad filepath False) = catchGlobalError $ do
+  i                         <- freshID
   (pos, specs, globalProps) <- load filepath
-  return $ Just $ ResOK pos specs globalProps
+  return $ Just $ ResOK i pos specs globalProps
 handleRequest (ReqLoad filepath True) = catchGlobalError $ do
+  i                         <- freshID
   (pos, specs, globalProps) <- load2 filepath
-  return $ Just $ ResOK pos specs globalProps
+  return $ Just $ ResOK i pos specs globalProps
 handleRequest (ReqRefine i payload) = catchLocalError i $ do
   _ <- refine payload
   return $ Just $ ResResolve i
 handleRequest (ReqInsertAssertion i) = catchGlobalError $ do
   expr <- insertAssertion i
   return $ Just $ ResInsert i expr
-handleRequest (ReqSubstitute expr _subst) = catchGlobalError $ do
+handleRequest (ReqSubstitute i expr _subst) = catchGlobalError $ do
   Concrete.Program _ _ defns _ _ <- getProgram
   let expr' = runSubstM (expand defns 1 expr)
-  return $ Just $ ResSubstitute expr'
+  return $ Just $ ResSubstitute i expr'
 handleRequest ReqDebug = error "crash!"
 handleRequest ReqQuit  = return Nothing
 
@@ -234,7 +243,7 @@ recv = do
 
 send :: ToJSON a => a -> REPLM ()
 send payload = liftIO $ do
-  Strict.putStrLn $ BS.toStrict $ encode $ payload
+  Strict.putStrLn $ BS.toStrict $ encode payload
   hFlush stdout
 
 --------------------------------------------------------------------------------
@@ -244,7 +253,7 @@ data Request
   = ReqLoad FilePath Bool
   | ReqRefine Int Text
   | ReqInsertAssertion Int
-  | ReqSubstitute Concrete.Expr Concrete.Subst
+  | ReqSubstitute Int Concrete.Expr Concrete.Subst
   | ReqDebug
   | ReqQuit
   deriving (Generic)
@@ -254,12 +263,13 @@ instance FromJSON Request where
 --------------------------------------------------------------------------------
 -- | Response
 
+type ID = Int
 data Response
-  = ResOK [PO] [Spec] [Concrete.Expr]
+  = ResOK ID [PO] [Spec] [Concrete.Expr]
   | ResError [(Site, Error)]
   | ResResolve Int -- resolves some Spec
   | ResInsert Int Concrete.Expr
-  | ResSubstitute Concrete.Expr
+  | ResSubstitute Int Concrete.Expr
   deriving (Generic)
 
 instance ToJSON Response where
