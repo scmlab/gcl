@@ -11,7 +11,7 @@ import           Syntax.Predicate
 import           Syntax.Concrete         hiding ( LoopInvariant )
 import qualified REPL                          as REPL
 -- import GCL.WP2 (Obligation2(..), Spec(..), ObliOrigin2(..))
-import           Data.Text.Prettyprint.Doc
+import Data.Text.Prettyprint.Doc ( indent, Pretty(..) )
 
 import           Syntax.Location
 import           Data.Loc
@@ -19,7 +19,7 @@ import           Error
 import           Pretty                         ( )
 
 tests :: TestTree
-tests = testGroup "WP2 Proof Obligations" [statements, assertions, if', loop]
+tests = testGroup "WP2 Proof Obligations" [statements, assertions, if', loop, issue2]
 
 --------------------------------------------------------------------------------
 -- | Expression
@@ -253,6 +253,27 @@ loop = testGroup
   --     ]
     ]
 
+issue2 :: TestTree
+issue2 = testGroup
+    "Issue #2"
+    [ testCase "Postcondition only"
+    $   run
+            "con A, B : Int\n\
+            \var x, y, z : Int\n\
+            \{ z = A * B }"
+        @== poList [PO 0 (assertion true) (assertion (variable "z" `eqq` binary Mul (constant "A") (constant "B"))) (AtAssertion NoLoc)]
+    , testCase "Postcondition + precondition"
+    $   run
+            "con A, B : Int\n\
+            \var x, y, z : Int\n\
+            \{ True }\n\
+            \{ z = A * B }"
+        @== poList [PO 0 (assertion true) (assertion (variable "z" `eqq` binary Mul (constant "A") (constant "B"))) (AtAssertion NoLoc)]
+    ]
+
+
+--------------------------------------------------------------------------------
+-- | Helper functions
 
 poList :: [PO] -> Either a POList
 poList = Right . POList

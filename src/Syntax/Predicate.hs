@@ -96,7 +96,6 @@ boundLT x var = Bound (x `C.lt` var) NoLoc
 boundGTE :: Expr -> Expr -> Pred
 boundGTE x var = Bound (x `C.gte` var) NoLoc
 
-
 (===) :: Int -> Int -> Expr
 x === y = C.number x `C.eqq` C.number y
 

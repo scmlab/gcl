@@ -19,8 +19,9 @@ import           GHC.Generics
 import           Syntax.Concrete                ( Expr
                                                 , Name
                                                 )
-import           Syntax.Abstract                ( Fresh(..) )
 import qualified Syntax.Concrete               as C
+import qualified Syntax.Abstract               as A
+import           Syntax.Abstract                ( Fresh(..) )
 -- import qualified Syntax.Predicate as P
 import           Syntax.Predicate
 import           Syntax.Location                ( Hydratable(..) )
@@ -172,7 +173,6 @@ genSpec (Struct pre (stmt : xs) next) = do
 
 data StructError2 = MissingLoopInvariant Loc
                  | MissingBound Loc
-                 | MissingPrecondition Loc
                  | MissingPostcondition Loc
                  | PreconditionUnknown Loc
                  | DigHole Loc
@@ -181,7 +181,6 @@ data StructError2 = MissingLoopInvariant Loc
 instance Located StructError2 where
   locOf (MissingLoopInvariant loc) = loc
   locOf (MissingBound         loc) = loc
-  locOf (MissingPrecondition  loc) = loc
   locOf (MissingPostcondition loc) = loc
   locOf (PreconditionUnknown  loc) = loc
   locOf (DigHole              loc) = loc
@@ -193,12 +192,17 @@ instance ToJSON StructError2 where
 
 programToStruct :: C.Program -> WPM Struct
 programToStruct (C.Program _ _ _ stmts _) = case (init stmts, last stmts) of
+  -- Precondition + Postcondition
   (C.Assert p l : stmts', C.Assert q m) ->
     wpStmts [Assertion p l] stmts' (Assertion q m)
+  -- Precondition (loop invariant) + Postcondition
   (C.LoopInvariant p b l : stmts', C.Assert q m) ->
     wpStmts [LoopInvariant p b l] stmts' (Assertion q m)
-  ([]        , C.Assert _ l) -> throwError (MissingPrecondition l)
-  (others : _, C.Assert _ _) -> throwError (MissingPrecondition (locOf others))
+  -- Missing precondition
+  -- we use "{ True }" as the default precondition here
+  ([]        , C.Assert q m) -> wpStmts [Assertion (C.Lit (A.Bol True) NoLoc) NoLoc] [] (Assertion q m)
+  (otherStmts, C.Assert q m) -> wpStmts [Assertion (C.Lit (A.Bol True) NoLoc) NoLoc] otherStmts (Assertion q m)
+  -- Missing Postcondition
   (_         , stmt        ) -> throwError (MissingPostcondition (locOf stmt))
 
 --------------------------------------------------------------------------------

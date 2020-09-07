@@ -18,7 +18,6 @@ import           Pretty.Predicate               ( )
 instance Pretty StructError2 where
   pretty (MissingLoopInvariant loc) = "Missing Loop Invariant" <+> pretty loc
   pretty (MissingBound         loc) = "Missing Bound" <+> pretty loc
-  pretty (MissingPrecondition  loc) = "Missing Precondition" <+> pretty loc
   pretty (MissingPostcondition loc) = "Missing Postcondition" <+> pretty loc
   pretty (PreconditionUnknown  loc) = "Precondition Unknown" <+> pretty loc
   pretty (DigHole              loc) = "Dig Hole" <+> pretty loc
