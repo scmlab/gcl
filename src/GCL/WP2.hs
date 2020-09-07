@@ -200,8 +200,8 @@ programToStruct (C.Program _ _ _ stmts _) = case (init stmts, last stmts) of
     wpStmts [LoopInvariant p b l] stmts' (Assertion q m)
   -- Missing precondition
   -- we use "{ True }" as the default precondition here
-  ([]        , C.Assert q m) -> wpStmts [Assertion (C.Lit (A.Bol True) NoLoc) NoLoc] [] (Assertion q m)
-  (otherStmts, C.Assert q m) -> wpStmts [Assertion (C.Lit (A.Bol True) NoLoc) NoLoc] otherStmts (Assertion q m)
+  ([]        , C.Assert q m) -> wpStmts [Constant C.true] [] (Assertion q m)
+  (otherStmts, C.Assert q m) -> wpStmts [Assertion C.true NoLoc] otherStmts (Assertion q m)
   -- Missing Postcondition
   (_         , stmt        ) -> throwError (MissingPostcondition (locOf stmt))
 

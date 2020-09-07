@@ -118,7 +118,9 @@ struct _ b pre _ (C.Spec   l) post = when b (tellSpec pre post l)
 
 structStmts :: Defns -> Bool -> Pred -> Maybe Expr -> [Stmt] -> Pred -> SM ()
 
-structStmts _  _ _   _ []                     _    = return ()
+structStmts _  _ pre _ []                     post = do 
+  obligate pre post (AtAssertion (locOf pre))
+  return ()
 
 structStmts ds b pre _ (C.Assert p l : stmts) post = do
   obligate pre (Assertion p l) (AtAssertion l)
@@ -137,18 +139,30 @@ structStmts ds b pre bnd (stmt : stmts) post = do
   post' <- wpStmts ds b stmts post
   struct ds b pre bnd stmt post'
 
-structProg :: Defns -> [Stmt] -> SM ()
-structProg _  []                        = return ()
-structProg _  [C.Assert        _ _    ] = return ()
-structProg ds (C.Assert pre l1 : stmts) = case (init stmts, last stmts) of
-  (stmts', C.Assert post l2) ->
-    structStmts ds True (Assertion pre l1) Nothing stmts' (Assertion post l2)
-  (_, stmt) -> throwError (MissingPostcondition (locOf stmt))
-structProg ds stmts = case (init stmts, last stmts) of
-  (stmts', C.Assert post l) ->
-    structStmts ds True (Constant C.true) Nothing stmts' (Assertion post l)
-  (_, stmt) -> throwError (MissingPostcondition (locOf stmt))
+data ProgView 
+    = ProgViewEmpty 
+    | ProgViewOkay Pred [Stmt] Pred
+    | ProgViewMissingPrecondition [Stmt] Pred
+    | ProgViewMissingPostcondition Pred [Stmt]
+    | ProgViewMissingBoth [Stmt]
 
+progView :: [Stmt] -> ProgView
+progView [] = ProgViewEmpty
+progView (C.Assert pre l:[]) = ProgViewMissingPrecondition [] (Assertion pre l)
+progView stmts = case (head stmts, last stmts) of 
+  (C.Assert pre l, C.Assert post m) -> ProgViewOkay (Assertion pre l) (init (tail stmts)) (Assertion post m)
+  (C.Assert pre l, _) -> ProgViewMissingPostcondition (Assertion pre l) (tail stmts)
+  (_, C.Assert post m) -> ProgViewMissingPrecondition (init stmts) (Assertion post m)
+  (_, _) -> ProgViewMissingBoth stmts
+
+structProg :: Defns -> [Stmt] -> SM ()
+structProg defns statements = case progView statements of 
+  ProgViewEmpty -> return ()
+  ProgViewOkay pre stmts post -> structStmts defns True pre Nothing stmts post
+  -- Missing precondition, insert { True } instead 
+  ProgViewMissingPrecondition stmts post -> structStmts defns True (Constant C.true) Nothing stmts post
+  ProgViewMissingPostcondition _pre stmts -> throwError (MissingPostcondition (locOf (last stmts)))
+  ProgViewMissingBoth stmts -> throwError (MissingPostcondition (locOf (last stmts)))
 
 wpStmts :: Defns -> Bool -> [Stmt] -> Pred -> SM Pred
 
@@ -196,12 +210,6 @@ wp _ _ (C.SpecQM l) _    = throwError $ DigHole l
 wp _ b (C.Spec   l) post = do
   when b (tellSpec post post l)
   return post  -- not quite right
-
-wpProg :: Defns -> [Stmt] -> SM Pred
-wpProg _  []    = return (Constant C.true)
-wpProg ds stmts = case (init stmts, last stmts) of
-  (stmts', C.Assert p l) -> wpStmts ds True stmts' (Assertion p l)
-  (_     , stmt        ) -> throwError (MissingPostcondition (locOf stmt))
 
 assignmentEnv :: [Name] -> [Expr] -> C.Subst
 assignmentEnv xs es = Map.fromList (zip (map C.nameToText xs) es)

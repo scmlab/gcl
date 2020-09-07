@@ -148,7 +148,7 @@ issue2 =
             \{ z = A * B }"
         actual
           @?= Right
-            ( [],
+            ( [PO 0 (Constant true) (assertion (variable "z" `eqq` binary Mul (constant "A") (constant "B"))) (AtAssertion NoLoc)],
               []
             )
     , testCase "Postcondition + precondition" $ do
@@ -160,8 +160,9 @@ issue2 =
             \{ z = A * B }"
         actual
           @?= Right
-            ( [],
+            ( [PO 0 (assertion true) (assertion (variable "z" `eqq` binary Mul (constant "A") (constant "B"))) (AtAssertion NoLoc)],
               []
             )
    
     ]
+

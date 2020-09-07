@@ -261,7 +261,7 @@ issue2 = testGroup
             "con A, B : Int\n\
             \var x, y, z : Int\n\
             \{ z = A * B }"
-        @== poList [PO 0 (assertion true) (assertion (variable "z" `eqq` binary Mul (constant "A") (constant "B"))) (AtAssertion NoLoc)]
+        @== poList [PO 0 (Constant true) (assertion (variable "z" `eqq` binary Mul (constant "A") (constant "B"))) (AtAssertion NoLoc)]
     , testCase "Postcondition + precondition"
     $   run
             "con A, B : Int\n\
@@ -274,9 +274,6 @@ issue2 = testGroup
 
 --------------------------------------------------------------------------------
 -- | Helper functions
-
-poList :: [PO] -> Either a POList
-poList = Right . POList
 
 run :: Text -> IO (Either Error POList)
 run text =
@@ -298,6 +295,9 @@ f @== b = do
 
 --------------------------------------------------------------------------------
 -- | Wrap [Obligation] in POList for pretty-printing
+
+poList :: [PO] -> Either a POList
+poList = Right . POList
 
 newtype POList = POList [PO]
   deriving (Eq)
