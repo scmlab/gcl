@@ -16,7 +16,16 @@ import           Error
 import           Pretty                         ( )
 
 tests :: TestTree
-tests = testGroup "WP 1" [statements]
+tests = testGroup "WP 1" [statements, issues]
+
+run :: Text -> IO (Either Error ([PO], [Spec]))
+run text =
+  REPL.runREPLM
+    $   (\(pos, specs) -> (map toNoLoc pos, map toNoLoc specs))
+    <$> (   REPL.scan "<test>" (text)
+        >>= REPL.parseProgram "<test>"
+        >>= REPL.sweep1
+        )
 
 --------------------------------------------------------------------------------
 -- | Expression
@@ -118,11 +127,41 @@ statements = testGroup
 --         )
 --   ]
 
-run :: Text -> IO (Either Error ([PO], [Spec]))
-run text =
-  REPL.runREPLM
-    $   (\(pos, specs) -> (map toNoLoc pos, map toNoLoc specs))
-    <$> (   REPL.scan "<test>" (text)
-        >>= REPL.parseProgram "<test>"
-        >>= REPL.sweep1
-        )
+--------------------------------------------------------------------------------
+-- | Issues
+issues :: TestTree
+issues =
+  testGroup
+    "issues"
+    [ issue2
+    ]
+
+issue2 :: TestTree
+issue2 =
+  testGroup
+    "Issue #2"
+    [ testCase "Postcondition only" $ do
+        actual <-
+          run
+            "con A, B : Int\n\
+            \var x, y, z : Int\n\
+            \{ z = A * B }"
+        actual
+          @?= Right
+            ( [],
+              []
+            )
+    , testCase "Postcondition + precondition" $ do
+        actual <-
+          run
+            "con A, B : Int\n\
+            \var x, y, z : Int\n\
+            \{ True }\n\
+            \{ z = A * B }"
+        actual
+          @?= Right
+            ( [],
+              []
+            )
+   
+    ]
