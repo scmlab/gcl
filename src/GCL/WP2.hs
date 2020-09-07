@@ -20,7 +20,6 @@ import           Syntax.Concrete                ( Expr
                                                 , Name
                                                 )
 import qualified Syntax.Concrete               as C
-import qualified Syntax.Abstract               as A
 import           Syntax.Abstract                ( Fresh(..) )
 -- import qualified Syntax.Predicate as P
 import           Syntax.Predicate
@@ -190,20 +189,33 @@ instance ToJSON StructError2 where
 --------------------------------------------------------------------------------
 -- | Struct
 
-programToStruct :: C.Program -> WPM Struct
-programToStruct (C.Program _ _ _ stmts _) = case (init stmts, last stmts) of
-  -- Precondition + Postcondition
-  (C.Assert p l : stmts', C.Assert q m) ->
-    wpStmts [Assertion p l] stmts' (Assertion q m)
-  -- Precondition (loop invariant) + Postcondition
-  (C.LoopInvariant p b l : stmts', C.Assert q m) ->
-    wpStmts [LoopInvariant p b l] stmts' (Assertion q m)
-  -- Missing precondition
-  -- we use "{ True }" as the default precondition here
-  ([]        , C.Assert q m) -> wpStmts [Constant C.true] [] (Assertion q m)
-  (otherStmts, C.Assert q m) -> wpStmts [Assertion C.true NoLoc] otherStmts (Assertion q m)
-  -- Missing Postcondition
-  (_         , stmt        ) -> throwError (MissingPostcondition (locOf stmt))
+data ProgView 
+    = ProgViewEmpty 
+    | ProgViewOkay Pred [C.Stmt] Pred
+    | ProgViewMissingPrecondition [C.Stmt] Pred
+    | ProgViewMissingPostcondition Pred [C.Stmt]
+    | ProgViewMissingBoth [C.Stmt]
+
+progView :: [C.Stmt] -> ProgView
+progView [] = ProgViewEmpty
+progView (C.Assert pre l:[]) = ProgViewMissingPrecondition [] (Assertion pre l)
+progView (C.LoopInvariant pre bnd l:[]) = ProgViewMissingPrecondition [] (LoopInvariant pre bnd l)
+progView stmts = case (head stmts, last stmts) of 
+  (C.Assert pre l, C.Assert post m) -> ProgViewOkay (Assertion pre l) (init (tail stmts)) (Assertion post m)
+  (C.LoopInvariant pre bnd l, C.Assert post m) -> ProgViewOkay (LoopInvariant pre bnd l) (init (tail stmts)) (Assertion post m)
+  (C.Assert pre l, _) -> ProgViewMissingPostcondition (Assertion pre l) (tail stmts)
+  (C.LoopInvariant pre bnd l, _) -> ProgViewMissingPostcondition (LoopInvariant pre bnd l) (tail stmts)
+  (_, C.Assert post m) -> ProgViewMissingPrecondition (init stmts) (Assertion post m)
+  (_, _) -> ProgViewMissingBoth stmts
+
+programToStruct :: C.Program -> WPM (Maybe Struct)
+programToStruct (C.Program _ _ _ statements _) = case progView statements of 
+  ProgViewEmpty -> return Nothing
+  ProgViewOkay pre stmts post -> Just <$> wpStmts [pre] stmts post
+  -- Missing precondition, insert { True } instead 
+  ProgViewMissingPrecondition stmts post ->Just <$> wpStmts [Constant C.true] stmts post
+  ProgViewMissingPostcondition _pre stmts -> throwError (MissingPostcondition (locOf (last stmts)))
+  ProgViewMissingBoth stmts -> throwError (MissingPostcondition (locOf (last stmts)))
 
 --------------------------------------------------------------------------------
 -- | Concrete Statements -> Struct

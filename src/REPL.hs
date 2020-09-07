@@ -20,8 +20,7 @@ import           Control.Exception              ( IOException
                                                 )
 
 import           Error
-import           GCL.Expr                       ( SubstM
-                                                , runSubstM
+import           GCL.Expr                       ( runSubstM
                                                 , expand
                                                 )
 import           GCL.WP                         ( structProg
@@ -147,9 +146,12 @@ load2 filepath = do
                                                                      tokens
       persistProgram program
       struct <- toStruct program
-      persistStruct struct
-      (pos, specs) <- sweep2 struct
-      return (pos, specs, globalProps)
+      case struct of 
+        Nothing -> return ([], [], globalProps)
+        Just struct' -> do
+          persistStruct struct'
+          (pos, specs) <- sweep2 struct'
+          return (pos, specs, globalProps)
 
 refine :: Text -> REPLM ()
 refine payload = do
@@ -205,7 +207,7 @@ parse parser filepath =
 parseProgram :: FilePath -> TokStream -> REPLM Concrete.Program
 parseProgram = parse Parser.program
 
-toStruct :: Concrete.Program -> REPLM Predicate.Struct
+toStruct :: Concrete.Program -> REPLM (Maybe Predicate.Struct)
 toStruct = withExceptT StructError2 . liftEither . runWPM . WP2.programToStruct
 
 parseSpec :: TokStream -> REPLM [Concrete.Stmt]

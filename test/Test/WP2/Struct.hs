@@ -23,8 +23,16 @@ import           Error
 import           Pretty                         ( )
 
 tests :: TestTree
-tests = testGroup "WP2 Struct" [statements, assertions, if', loop]
+tests = testGroup "WP2 Struct" [emptyProg, statements, assertions, if', loop]
 
+emptyProg :: TestTree
+emptyProg = testGroup
+  "empty" 
+  [ testCase "empty" $ do
+    actual <- run ""
+    actual @?= Right Nothing 
+  ]
+  
 statements :: TestTree
 statements = testGroup
   "simple statements"
@@ -35,7 +43,8 @@ statements = testGroup
                     \skip       \n\
                     \{ 0 = 0 }"
     actual @?= Right
-      ( Struct (assertion true) [Skip $ loc (assertion (0 === 0))]
+      ( Just 
+      $ Struct (assertion true) [Skip $ loc (assertion (0 === 0))]
       $ Postcond (assertion (0 === 0))
       )
   , testCase "abort" $ do
@@ -45,7 +54,8 @@ statements = testGroup
                     \abort      \n\
                     \{ True }"
     actual @?= Right
-      ( Struct (assertion true) [Abort $ loc (Constant false)]
+      ( Just 
+      $ Struct (assertion true) [Abort $ loc (Constant false)]
       $ Postcond (assertion true)
       )
   , testCase "assignment" $ do
@@ -55,7 +65,8 @@ statements = testGroup
                     \x := 1     \n\
                     \{ 0 = x }"
     actual @?= Right
-      ( Struct
+      ( Just 
+      $ Struct
           (assertion true)
           [ Assign (loc (assertion (number 0 `eqq` number 1)))
                    undefined
@@ -71,7 +82,8 @@ statements = testGroup
                     \!}       \n\
                     \{ 0 = 0 }"
     actual @?= Right
-      ( Struct (assertion true)
+      ( Just 
+      $ Struct (assertion true)
                [Spec (loc (assertion true)) (assertion (0 === 0))]
       $ Postcond (assertion (0 === 0))
       )
@@ -83,11 +95,12 @@ assertions = testGroup
   [ testCase "2 assertions" $ do
     actual <- run "{ 0 = 0 }\n{ 0 = 1 }"
     actual @?= Right
-      (Struct (assertion (0 === 0)) [] $ Postcond (assertion (0 === 1)))
+      (Just $ Struct (assertion (0 === 0)) [] $ Postcond (assertion (0 === 1)))
   , testCase "3 assertions" $ do
     actual <- run "{ 0 = 0 }\n{ 0 = 1 }\n{ 0 = 2 }"
     actual @?= Right
-      ( Struct (assertion (0 === 0)) []
+      (Just 
+      $ Struct (assertion (0 === 0)) []
       $ Struct (assertion (0 === 1)) []
       $ Postcond (assertion (0 === 2))
       )
@@ -106,7 +119,7 @@ if' = testGroup
                   \fi                   \n\
                   \{ 0 = 2 }            \n"
     actual @?= Right
-      ( Struct
+      ( Just $ Struct
           (assertion true)
           [ If
               (loc $ Disjunct [guardIf (0 === 0), guardIf (0 === 1)])
@@ -132,7 +145,7 @@ if' = testGroup
                   \fi                     \n\
                   \{ 0 = 2 }\n"
     actual @?= Right
-      ( Struct
+      ( Just $ Struct
           (assertion true)
           [ If
               (loc $ guardIf (0 === 0))
@@ -168,7 +181,7 @@ if' = testGroup
                   \fi                     \n\
                   \{ 0 = 2 }\n"
     actual @?= Right
-      ( Struct
+      ( Just $ Struct
           (assertion true)
           [ If
               (loc $ guardIf (0 === 0))
@@ -188,7 +201,7 @@ if' = testGroup
                   \if 0 = 1 -> skip fi\n\
                   \{ 0 = 2 }          \n"
     actual @?= Right
-      ( Struct
+      ( Just $ Struct
           (assertion (0 === 0))
           [ If
               (loc $ guardIf (0 === 1))
@@ -209,7 +222,7 @@ if' = testGroup
                   \fi                 \n\
                   \{ 0 = 3 }          \n"
     actual @?= Right
-      ( Struct
+      ( Just $ Struct
           (assertion (0 === 0))
           [ If
               (loc $ Disjunct [guardIf (0 === 1), guardIf (0 === 2)])
@@ -238,7 +251,7 @@ loop = testGroup
                   \od                     \n\
                   \{ 0 = 0 }              \n"
     actual @?= Right
-      ( Struct
+      ( Just $ Struct
           (loopInvariant (0 === 1) "A")
           [ Do
               (loc $ loopInvariant (0 === 1) "A")
@@ -261,7 +274,7 @@ loop = testGroup
                   \ | 0 = 3 -> abort od     \n\
                   \{ 0 = 0 }\n"
     actual @?= Right
-      ( Struct
+      ( Just $ Struct
           (loopInvariant (0 === 1) "A")
           [ Do
               (loc $ loopInvariant (0 === 1) "A")
@@ -290,7 +303,7 @@ loop = testGroup
                   \od                       \n\
                   \{ 0 = 0 }\n"
     actual @?= Right
-      ( Struct
+      ( Just $ Struct
           (loopInvariant (0 === 1) "A")
           [ Do
               (loc $ loopInvariant (0 === 1) "A")
@@ -326,14 +339,12 @@ loop = testGroup
 loc :: Pred -> L Pred
 loc = L NoLoc
 
-run :: Text -> IO (Either Error Struct)
-run text =
-  REPL.runREPLM
-    $   toNoLoc
-    <$> (   REPL.scan "<test>" text
+run :: Text -> IO (Either Error (Maybe Struct))
+run text = REPL.runREPLM $ do 
+  struct <- REPL.scan "<test>" text
         >>= REPL.parseProgram "<test>"
         >>= REPL.toStruct
-        )
+  return $ fmap toNoLoc struct
 
 --------------------------------------------------------------------------------
 -- |

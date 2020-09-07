@@ -276,16 +276,15 @@ issue2 = testGroup
 -- | Helper functions
 
 run :: Text -> IO (Either Error POList)
-run text =
-    REPL.runREPLM
-        $   REPL.scan "<test>" text
+run text = REPL.runREPLM $ do 
+    struct <- REPL.scan "<test>" text
         >>= REPL.parseProgram "<test>"
         >>= REPL.toStruct
-        >>= REPL.sweep2
-        >>= return
-        .   POList
-        .   map toNoLoc
-        .   fst
+    case struct of 
+        Nothing -> return $ POList []
+        Just struct' -> do
+            (pos, _) <- REPL.sweep2 struct'
+            return (POList (map toNoLoc pos))
 
 (@==) :: (Eq a, Show a) => IO a -> a -> IO ()
 f @== b = do

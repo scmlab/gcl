@@ -39,7 +39,6 @@ data Error
   | CannotDecodeRequest String
   | CannotReadFile      FilePath
   | NotLoaded
-  -- | ExecError       ExecError
   deriving (Eq, Show, Generic)
 
 instance Located Error where

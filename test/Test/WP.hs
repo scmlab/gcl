@@ -16,7 +16,7 @@ import           Error
 import           Pretty                         ( )
 
 tests :: TestTree
-tests = testGroup "WP 1" [statements, issues]
+tests = testGroup "WP 1" [emptyProg, statements, issues]
 
 run :: Text -> IO (Either Error ([PO], [Spec]))
 run text =
@@ -27,6 +27,17 @@ run text =
         >>= REPL.sweep1
         )
 
+--------------------------------------------------------------------------------
+-- | 
+
+emptyProg :: TestTree
+emptyProg = testGroup
+  "empty" 
+  [ testCase "empty" $ do
+    actual <- run ""
+    actual @?= Right ([], []) 
+  ]
+  
 --------------------------------------------------------------------------------
 -- | Expression
 
