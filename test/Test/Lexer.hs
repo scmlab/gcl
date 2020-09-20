@@ -29,8 +29,22 @@ empty = testCase "Empty" $ do
 
 
 indentation :: TestTree
-indentation = testGroup "Indentation" [testCase "top level" $ do 
-    let actual = run "skip\n  skip\n    skip\n"
-    let expected = Right [TokSkip, TokNewlineAndWhitespace 2, TokSkip, TokNewlineAndWhitespace 4,TokSkip, TokNewlineAndWhitespace 0]
-    actual @?= expected
+indentation = testGroup "Indentation" 
+    [
+        testCase "top level" $ do 
+        let actual = run "skip\nskip\nskip\n"
+        let expected = Right [TokSkip, TokNewline, TokSkip, TokNewline, TokSkip, TokNewline]
+        actual @?= expected
+    ,   testCase "indent" $ do 
+        let actual = run "skip\n  skip\n  skip\n"
+        let expected = Right [TokSkip, TokIndent, TokSkip, TokNewline, TokSkip, TokDedent, TokNewline]
+        actual @?= expected
+    ,   testCase "nested" $ do 
+        let actual = run "skip\n  skip\n    skip\n  skip\n"
+        let expected = Right [TokSkip, TokIndent, TokSkip, TokIndent, TokSkip, TokDedent, TokNewline, TokSkip, TokDedent, TokNewline]
+        actual @?= expected
+    ,   testCase "consecutive dedent" $ do 
+        let actual = run "skip\n  skip\n    skip\nskip\n"
+        let expected = Right [TokSkip, TokIndent, TokSkip, TokIndent, TokSkip, TokDedent, TokDedent, TokNewline, TokSkip, TokNewline]
+        actual @?= expected
     ]

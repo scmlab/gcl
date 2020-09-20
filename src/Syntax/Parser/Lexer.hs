@@ -14,7 +14,7 @@ import           Syntax.Parser.TokenStream      ( PrettyToken(..) )
 import           Data.Char
 import           Data.List.NonEmpty             ( NonEmpty(..) )
 import qualified Data.List.NonEmpty            as NE
-import           Data.Loc
+import Data.Loc (L(..), Pos, unLoc)
 import           Data.Maybe                     ( fromMaybe )
 import           Data.Text.Lazy                 ( Text )
 import qualified Data.Text.Lazy                as Text
@@ -22,15 +22,25 @@ import           Language.Lexer.Applicative
                                          hiding ( LexicalError )
 import qualified Language.Lexer.Applicative    as Lex
 import           Text.Regex.Applicative
+import Control.Monad.Except
+import Control.Monad.State.Lazy 
+import Data.List (uncons)
 
 --------------------------------------------------------------------------------
 -- | Tok & TokStream
 
 data Tok
-    = TokNewlineAndWhitespace Int
-    | TokWhitespace
+    = 
+    -- the following tokens will not be sent to the parser 
+      TokWhitespace
     | TokEOF
     | TokComment Text
+    |  TokNewlineAndWhitespace Int 
+    -- the following 3 kinds of tokens will be generated from `TokNewlineAndWhitespace` 
+    -- and inserted to the TokenStream instead
+    | TokIndent    
+    | TokDedent 
+    | TokNewline
 
     -- keywords
     | TokSkip
@@ -110,7 +120,10 @@ data Tok
 
 instance Show Tok where
   show tok = case tok of
-    TokNewlineAndWhitespace n -> "\n" ++ replicate n ' '
+    TokNewlineAndWhitespace n -> "\\n + " ++ show n ++ " \n"
+    TokIndent   -> " >>\\n\n"
+    TokDedent   -> " <<\\n\n"
+    TokNewline   -> "\\n\n"
     TokWhitespace   -> " "
     TokEOF          -> ""
     TokComment s    -> "-- " ++ Text.unpack s
@@ -396,18 +409,49 @@ lexer = mconcat
 -- | scan
 
 type LexicalError = Pos
+type IndentLevels = [Int]
+
+type PreprocessM = ExceptT LexicalError (State IndentLevels)
+
+runPreprocess :: PreprocessM a -> Either LexicalError a
+runPreprocess program = evalState (runExceptT program) [0]
 
 scan :: FilePath -> Text -> Either LexicalError TokStream
-scan filepath = filterError . runLexer lexer filepath . Text.unpack
- where
-  filterError :: TokStream -> Either LexicalError TokStream
-  filterError TsEof                            = Right TsEof
-  filterError (TsError (Lex.LexicalError pos)) = Left pos
-  filterError (TsToken l xs                  ) = TsToken l <$> filterError xs
+scan filepath = runPreprocess . preprocess . runLexer lexer filepath . Text.unpack
 
+  where
+    preprocess :: TokenStream (L Tok) -> PreprocessM TokStream
+    preprocess TsEof = return TsEof
+    preprocess (TsError (Lex.LexicalError pos)) = throwError pos
+    preprocess (TsToken tok xs) = 
+      case tok of 
+        L loc (TokNewlineAndWhitespace n) -> do
+          levels <- get 
+          let (current, previous) = case uncons levels of 
+                Nothing -> (0, [])
+                Just pair -> pair
+          case n `compare` current of 
+            -- the indentation is lesser than the current level
+            LT -> do 
+              -- pop the indentation stack
+              put previous
+              -- insert a `dedent`
+              TsToken (L loc TokDedent) <$> preprocess (TsToken tok xs)
+            -- the indentation is the same as the current level
+            EQ -> do
+              -- insert a `newline` 
+              TsToken (L loc TokNewline) <$> preprocess xs
+            -- the indentation is greater thab the current level
+            GT -> do 
+              -- push it into the indentation stack
+              put (n : levels)
+              -- insert a `indent`
+              TsToken (L loc TokIndent) <$> preprocess xs
+        _ -> TsToken tok <$> preprocess xs
 
 --------------------------------------------------------------------------------
 -- | Instances of PrettyToken
+
 
 instance PrettyToken Tok where
   prettyTokens (x :| []) =
