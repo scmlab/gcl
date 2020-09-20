@@ -5,6 +5,7 @@ module Syntax.Parser.Lexer
   , LexicalError
   , Tok(..)
   , TokStream
+  , isIndentation
   )
 where
 
@@ -26,7 +27,7 @@ import           Text.Regex.Applicative
 -- | Tok & TokStream
 
 data Tok
-    = TokNewline
+    = TokNewlineAndWhitespace Int
     | TokWhitespace
     | TokEOF
     | TokComment Text
@@ -109,7 +110,7 @@ data Tok
 
 instance Show Tok where
   show tok = case tok of
-    TokNewline      -> "\n"
+    TokNewlineAndWhitespace n -> "\n" ++ replicate n ' '
     TokWhitespace   -> " "
     TokEOF          -> ""
     TokComment s    -> "-- " ++ Text.unpack s
@@ -174,6 +175,12 @@ instance Show Tok where
     TokTrue         -> "True"
     TokFalse        -> "False"
 
+
+isIndentation :: Tok -> Bool
+isIndentation (TokNewlineAndWhitespace _) = True 
+isIndentation _ = False 
+
+
 type TokStream = TokenStream (L Tok)
 
 --------------------------------------------------------------------------------
@@ -188,11 +195,7 @@ text raw = Text.foldr f (pure "") raw
 
 
 tokRE :: RE Text Tok
-tokRE =
-  TokNewline
-    <$  text "\n"
-
-    <|> TokSkip
+tokRE = TokSkip
     <$  text "skip"
     <|> TokAbort
     <$  text "abort"
@@ -349,9 +352,15 @@ upperNameRE =
 intRE :: RE Text Int
 intRE = read <$> (Text.unpack . Text.concat <$> some (psym (adapt isDigit)))
 
+isNewline :: Char -> Bool 
+isNewline '\n' = True 
+isNewline '\r' = True 
+isNewline _ = False 
+
+
 whitespaceButNewlineRE :: RE Text Tok
 whitespaceButNewlineRE = matchWhen
-  (adapt (\c -> isSpace c && c /= '\n' && c /= '\r'))
+  (adapt (\c -> isSpace c && not (isNewline c)))
   TokWhitespace
  where
   matchWhen :: (Text -> Bool) -> Tok -> RE Text Tok
@@ -366,12 +375,19 @@ commentEndRE prefix =
   TokComment <$> (pure prefix +++ (Text.concat <$> many anySym) +++ text "\n")
   where (+++) = liftA2 (<>)
 
+indentation :: RE Text Tok
+indentation = TokNewlineAndWhitespace <$ psym (adapt isNewline) <*> reFoldl Greedy (\n _ -> succ n) 0 (psym $ adapt (\c -> isSpace c && not (isNewline c)))
+
 contra :: RE Text a -> RE Char a
 contra = comap Text.singleton
 
 lexer :: Lexer Tok
 lexer = mconcat
-  [ token (longest $ contra tokRE)
+  [ 
+    -- meaning tokens that are sent to the parser
+    token (longest $ contra tokRE)
+  , token (longest $ contra indentation)
+    -- meaningless tokens that will be dumped 
   , whitespace (longest $ contra whitespaceButNewlineRE)
   , whitespace (longestShortest (contra commentStartRE) (contra . commentEndRE))
   ]
@@ -407,7 +423,7 @@ instance PrettyToken Tok where
 
 prettyToken' :: Tok -> Maybe String
 prettyToken' tok = case tok of
-  TokNewline    -> Just "newline"
+  TokNewlineAndWhitespace n   -> Just $ "indent [" ++ show n ++ "]"
   TokWhitespace -> Just "space"
   TokEOF        -> Just "end of file"
   _             -> Nothing

@@ -122,8 +122,8 @@ expectLineEnding = choice [withSemicolon, withoutSemicolon]
     case t of
       Just TokSemi -> return ()
       _            -> void $ do
-        Util.ignore TokSemi
-        void $ many (Util.ignore TokNewline)
+        Util.ignore ((==) TokSemi)
+        void $ many (Util.ignore isIndentation)
 
 skip :: Parser Stmt
 skip = withLoc $ Skip <$ symbol TokSkip
@@ -438,16 +438,16 @@ variableList =
 
 -- consumes 0 or more newlines
 ignoreNewlines :: Parser ()
-ignoreNewlines = void $ many (Util.ignore TokNewline)
+ignoreNewlines = void $ many (Util.ignore isIndentation)
 
 -- consumes 1 or more newlines
 expectNewline :: Parser ()
 expectNewline = do
-  -- see if the latest accepcted token is TokNewline
+  -- see if the latest accepcted token is TokNewlineAndWhitespace
   t <- lift Util.getLastToken
   case t of
-    Just TokNewline -> return ()
-    _               -> void $ some (Util.ignore TokNewline)
+    Just (TokNewlineAndWhitespace _) -> return ()
+    _               -> void $ some (Util.ignore isIndentation)
 
 symbol :: Tok -> Parser ()
 symbol = Util.symbol

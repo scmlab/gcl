@@ -116,9 +116,9 @@ symbol t = do
 
 -- Create a parser of some symbol, that doesn't update source locations
 -- effectively excluding it from source location tracking
-ignore :: (Eq tok, Ord tok, Show tok, PrettyToken tok) => tok -> P tok ()
-ignore t = do
-  L _ tok <- satisfy (\(L _ t') -> t == t')
+ignore :: (Eq tok, Ord tok, Show tok, PrettyToken tok) => (tok -> Bool) -> P tok ()
+ignore p = do
+  L _ tok <- satisfy (\(L _ t) -> p t)
   lift $ updateToken tok
   return ()
 

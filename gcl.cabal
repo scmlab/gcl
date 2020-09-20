@@ -1,10 +1,10 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.31.2.
+-- This file has been generated from package.yaml by hpack version 0.33.0.
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 8919571cbc06f36c9d4d5e752ef7b16523815045faba3d003168effe9bde7c38
+-- hash: f060c6d0a4e6dc6cb4a248ce040bb6ff7b3c2e82a3ed7ee5e7e26cc6fe9f542c
 
 name:           gcl
 version:        0.1.0.0
@@ -100,6 +100,7 @@ test-suite gcl-test
   type: exitcode-stdio-1.0
   main-is: Test.hs
   other-modules:
+      Test.Lexer
       Test.Parser
       Test.Pretty
       Test.WP
