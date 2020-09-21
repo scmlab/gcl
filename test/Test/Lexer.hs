@@ -43,10 +43,18 @@ indentation = testGroup "Indentation"
                             \  skip\n"
         let expected = Right [TokDo, TokIndent, TokSkip, TokNewline, TokSkip, TokDedent, TokNewline]
         actual @?= expected
-    -- ,   testCase "indent on the same line" $ do 
-    --     let actual = run "do  skip\n    skip\n    skip\n"
-    --     let expected = Right [TokDo, TokIndent, TokSkip, TokNewline, TokSkip, TokNewline, TokSkip, TokDedent, TokNewline]
-    --     actual @?= expected
+    ,   testCase "indent on the same line" $ do 
+        let actual = run    "do  skip\n\
+                            \    skip\n\
+                            \    skip\n"
+        let expected = Right [TokDo, TokIndent, TokSkip, TokNewline, TokSkip, TokNewline, TokSkip, TokDedent, TokNewline]
+        actual @?= expected
+    ,   testCase "indent and dedent on the same line" $ do 
+        let actual = run    "do  skip\n\
+                            \skip\n\
+                            \skip\n"
+        let expected = Right [TokDo, TokIndent, TokSkip, TokDedent, TokNewline, TokSkip, TokNewline, TokSkip, TokNewline]
+        actual @?= expected
     ,   testCase "nested" $ do 
         let actual = run    "do\n\
                             \  do\n\

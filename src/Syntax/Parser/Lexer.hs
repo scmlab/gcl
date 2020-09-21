@@ -13,7 +13,7 @@ import           Syntax.Parser.TokenStream      ( PrettyToken(..) )
 import           Data.Char
 import           Data.List.NonEmpty             ( NonEmpty(..) )
 import qualified Data.List.NonEmpty            as NE
-import Data.Loc (L(..), Pos, unLoc)
+import           Data.Loc 
 import           Data.Maybe                     ( fromMaybe )
 import           Data.Text.Lazy                 ( Text )
 import qualified Data.Text.Lazy                as Text
@@ -404,11 +404,16 @@ lexer = mconcat
 
 type LexicalError = Pos
 type IndentLevels = [Int]
+type PreviousToken = Maybe Tok
 
-type PreprocessM = ExceptT LexicalError (State IndentLevels)
+type PreprocessM = ExceptT LexicalError (State (IndentLevels, PreviousToken))
 
 runPreprocess :: PreprocessM a -> Either LexicalError a
-runPreprocess program = evalState (runExceptT program) [0]
+runPreprocess program = evalState (runExceptT program) ([0], Nothing)
+
+expectingIndent :: Tok -> Bool
+expectingIndent TokDo = True 
+expectingIndent _ = False 
 
 scan :: FilePath -> Text -> Either LexicalError TokStream
 scan filepath = runPreprocess . preprocess . runLexer lexer filepath . Text.unpack
@@ -417,31 +422,54 @@ scan filepath = runPreprocess . preprocess . runLexer lexer filepath . Text.unpa
     preprocess :: TokenStream (L Tok) -> PreprocessM TokStream
     preprocess TsEof = return TsEof
     preprocess (TsError (Lex.LexicalError pos)) = throwError pos
-    preprocess (TsToken tok xs) = 
+    preprocess (TsToken (L loc tok) xs) = do 
+      (levels, previousToken) <- get 
+
+      -- see if the previous token is expecting an indent (e.g. TokDo)
+      let shouldIndent = case previousToken of 
+            Nothing -> False 
+            Just t  -> expectingIndent t
+
       case tok of 
-        L loc (TokNewlineAndWhitespace n) -> do
-          levels <- get 
+        TokNewlineAndWhitespace level -> do
+          -- analyse the stack of indentation levels
           let (current, previous) = case uncons levels of 
                 Nothing -> (0, [])
                 Just pair -> pair
-          case n `compare` current of 
+          
+          case level `compare` current of 
             -- the indentation is lesser than the current level
             LT -> do 
               -- pop the indentation stack
-              put previous
+              put (previous, Just tok)
               -- insert a `dedent`
-              TsToken (L loc TokDedent) <$> preprocess (TsToken tok xs)
+              TsToken (L (locStart loc) TokDedent) <$> preprocess (TsToken (L loc tok) xs)
             -- the indentation is the same as the current level
             EQ -> do
               -- insert a `newline` 
-              TsToken (L loc TokNewline) <$> preprocess xs
+              TsToken (L (locStart loc) TokNewline) <$> preprocess xs
             -- the indentation is greater thab the current level
             GT -> do 
               -- push it into the indentation stack
-              put (n : levels)
-              -- insert a `indent`
-              TsToken (L loc TokIndent) <$> preprocess xs
-        _ -> TsToken tok <$> preprocess xs
+              put (level : levels, Just tok)
+              -- insert a `indent` if the previous token is expecting one, 
+              -- else insert a `newline` instead
+              if shouldIndent
+                then TsToken (L (locEnd loc) TokIndent) <$> preprocess xs
+                else TsToken (L (locStart loc) TokNewline) <$> preprocess xs
+        _ -> do 
+          if shouldIndent
+            then do 
+              -- if the previous token is expecting a indent
+              -- calculate the indentation level, and push it into the stack
+              let level = case loc of 
+                        NoLoc -> 0 
+                        Loc p _ -> posCol p - 1
+              put (level : levels, Just tok)
+              TsToken (L (locStart loc) TokIndent) <$> TsToken (L loc tok) <$> preprocess xs
+            else do 
+              put (levels, Just tok)
+              TsToken (L loc tok) <$> preprocess xs
 
 --------------------------------------------------------------------------------
 -- | Instances of PrettyToken
