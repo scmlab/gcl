@@ -6,6 +6,7 @@ import           Test.Tasty
 import           Test.Tasty.HUnit
 import           Test.Tasty.Golden
 import           Test.Tasty.Golden.Advanced
+import           Control.Monad.Combinators      ( many )
 import           Data.Text.Lazy                 ( Text )
 import           Data.Loc
 import           Prelude                 hiding ( Ordering(..) )
@@ -341,25 +342,25 @@ declaration = testGroup "Declarations" $ map
 statement :: TestTree
 statement = testGroup "Single statement" $ map
     (toTestTree Parser.statement)
-    [ RightCase "skip" "skip" $ Skip (1 <-> 4)
-    , RightCase "abort" "abort" $ Abort (1 <-> 5)
-    , RightCase "assert" "{ True }"
+    [ RightCase "skip" "skip\n" $ Skip (1 <-> 4)
+    , RightCase "abort" "abort\n" $ Abort (1 <-> 5)
+    , RightCase "assert" "{ True }\n"
         $ Assert (Lit (Bol True) (3 <-> 6)) (1 <-> 8)
-    , RightCase "assign" "x := 0"
+    , RightCase "assign" "x := 0\n"
         $ Assign [Name "x" (at 1)] [Lit (Num 0) (at 6)] (1 <-> 6)
-    , RightCase "assign (parallel)" "x, y := 0, 1" $ Assign
+    , RightCase "assign (parallel)" "x, y := 0, 1\n" $ Assign
         [Name "x" (at 1), Name "y" (at 4)]
         [Lit (Num 0) (at 9), Lit (Num 1) (at 12)]
         (1 <-> 12)
-    , RightCase "loop" "if True -> skip fi"
+    , RightCase "selection" "if True -> skip fi\n"
         $ If
               [GdCmd (Lit (Bol True) (4 <-> 7)) [Skip (12 <-> 15)] (4 <-> 15)]
               (1 <-> 18)
-    , RightCase "loop" "{ True , bnd: a }" $ LoopInvariant
+    , RightCase "loop" "{ True , bnd: a }\n" $ LoopInvariant
         (Lit (Bol True) (3 <-> 6))
         (Var (Name "a" (at 15)) (at 15))
         (1 <-> 17)
-    , RightCase "loop" "do True -> skip od"
+    , RightCase "loop" "do True -> skip od\n"
         $ Do
               [GdCmd (Lit (Bol True) (4 <-> 7)) [Skip (12 <-> 15)] (4 <-> 15)]
               (1 <-> 18)
@@ -374,7 +375,7 @@ at n = n <-> n
 
 statements :: TestTree
 statements = testGroup "Multiple statements" $ map
-    (toTestTree Parser.statements)
+    (toTestTree (many Parser.statement))
     [ RightCase
         "separated by newlines 1"
         "skip\nskip"

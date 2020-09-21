@@ -63,7 +63,7 @@ parse parser filepath tokenStream =
 program :: Parser Program
 program = withLoc $ do
   decls <- many declaration <?> "declarations"
-  stmts <- statements <?> "statements"
+  stmts <- many statement <?> "statements"
   eof
   -- let construct
   let letBindings    = pickLetBindings decls
@@ -75,14 +75,14 @@ program = withLoc $ do
 
 specContent :: Parser [Stmt]
 specContent = do
-  statements <?> "statements"
+  many statement <?> "statements"
 
 --------------------------------------------------------------------------------
 -- | Stmts
 
 statement :: Parser Stmt
-statement =
-  choice
+statement = do
+  stmt <- choice
       [ try assign
       , abort
       , try assertWithBnd
@@ -94,21 +94,24 @@ statement =
       , hole
       ]
     <?> "statement"
+  expectNewline <?> "<newline> after a statement"
+  return stmt
+  
 
 
-statements :: Parser [Stmt]
-statements = try statements1 <|> return []
+-- statements :: Parser [Stmt]
+-- statements = try statements1 <|> return []
 
-statements1 :: Parser [Stmt]
-statements1 = do
-  stmt <- statement
-  rest <- choice
-    [ do
-      expectLineEnding <?> "a newline or a semicolon"
-      try statements <|> return []
-    , return []
-    ]
-  return (stmt : rest)
+-- statements1 :: Parser [Stmt]
+-- statements1 = do
+--   stmt <- statement
+--   rest <- choice
+--     [ do
+--       expectLineEnding <?> "a newline or a semicolon"
+--       try statements <|> return []
+--     , return []
+--     ]
+--   return (stmt : rest)
 
 expectLineEnding :: Parser ()
 expectLineEnding = choice [withoutSemicolon, withSemicolon]
@@ -177,7 +180,7 @@ guardedCommand =
     <$> predicate
     <*  ((symbol TokArrow <?> "->") <|> (symbol TokArrowU <?> "→"))
     -- <*  ignoreNewlines
-    <*> statements1
+    <*> some statement
 
 hole :: Parser Stmt
 hole = withLoc $ SpecQM <$ (symbol TokQM <?> "?")

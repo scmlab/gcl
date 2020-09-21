@@ -120,8 +120,8 @@ data Tok
 instance Show Tok where
   show tok = case tok of
     TokNewlineAndWhitespace n -> "\\n + " ++ show n ++ " \n"
-    TokIndent   -> " >>\\n\n"
-    TokDedent   -> " <<\\n\n"
+    TokIndent   -> " >>\n"
+    TokDedent   -> " <<\n"
     TokNewline   -> "\\n\n"
     TokWhitespace   -> " "
     TokEOF          -> ""
