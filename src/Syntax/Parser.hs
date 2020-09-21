@@ -62,7 +62,6 @@ parse parser filepath tokenStream =
 
 program :: Parser Program
 program = withLoc $ do
-  ignoreNewlines
   decls <- many declaration <?> "declarations"
   stmts <- statements <?> "statements"
   eof
@@ -76,7 +75,6 @@ program = withLoc $ do
 
 specContent :: Parser [Stmt]
 specContent = do
-  ignoreNewlines
   statements <?> "statements"
 
 --------------------------------------------------------------------------------
@@ -113,7 +111,7 @@ statements1 = do
   return (stmt : rest)
 
 expectLineEnding :: Parser ()
-expectLineEnding = choice [withSemicolon, withoutSemicolon]
+expectLineEnding = choice [withoutSemicolon, withSemicolon]
  where
   withoutSemicolon = expectNewline
   withSemicolon    = do
@@ -122,8 +120,8 @@ expectLineEnding = choice [withSemicolon, withoutSemicolon]
     case t of
       Just TokSemi -> return ()
       _            -> void $ do
-        Util.ignore ((==) TokSemi)
-        void $ many (Util.ignore isIndentation)
+        Util.ignore TokSemi
+        void $ many (Util.ignore TokNewline)
 
 skip :: Parser Stmt
 skip = withLoc $ Skip <$ symbol TokSkip
@@ -178,7 +176,7 @@ guardedCommand =
     $   GdCmd
     <$> predicate
     <*  ((symbol TokArrow <?> "->") <|> (symbol TokArrowU <?> "→"))
-    <*  ignoreNewlines
+    -- <*  ignoreNewlines
     <*> statements1
 
 hole :: Parser Stmt
@@ -187,11 +185,11 @@ hole = withLoc $ SpecQM <$ (symbol TokQM <?> "?")
 spec :: Parser Stmt
 spec = withLoc $ do
   symbol TokSpecStart <?> "{!"
-  expectNewline <?> "<newline> after a the start of a Spec"
+  -- expectNewline <?> "<newline> after a the start of a Spec"
   _ <- specContent
   _ <- takeWhileP (Just "anything other than '!}'") isTokSpecEnd
   symbol TokSpecEnd <?> "!}"
-  expectNewline <?> "<newline> after a the end of a Spec"
+  -- expectNewline <?> "<newline> after a the end of a Spec"
 
   return $ Spec
 
@@ -380,7 +378,10 @@ type' = makeExprParser term table <?> "type"
 -- | Declarations
 
 declaration :: Parser Declaration
-declaration = choice [constantDecl, variableDecl, letDecl] <?> "declaration"
+declaration = do 
+  decl <- choice [constantDecl, variableDecl, letDecl] <?> "declaration"
+  expectNewline <?> "<newline> after a declaration"
+  return decl
 
 constantDecl :: Parser Declaration
 constantDecl = withLoc $ do
@@ -389,7 +390,7 @@ constantDecl = withLoc $ do
   symbol TokColon <?> "colon"
   t         <- type'
   assertion <- optional (braces predicate)
-  expectNewline <?> "<newline> after a declaration"
+  
   return $ ConstDecl vars t assertion
 
 variableDecl :: Parser Declaration
@@ -399,7 +400,6 @@ variableDecl = withLoc $ do
   symbol TokColon <?> "colon"
   t         <- type'
   assertion <- optional (braces predicate)
-  expectNewline <?> "<newline> after a declaration"
   return $ VarDecl vars t assertion
 
 letDecl :: Parser Declaration
@@ -409,7 +409,6 @@ letDecl = withLoc $ do
   args <- map nameToText <$> many lower
   symbol TokEQ <?> "="
   expr <- predicate
-  expectNewline <?> "<newline> after a declaration"
   return $ LetDecl name args expr
 
 
@@ -419,35 +418,27 @@ letDecl = withLoc $ do
 
 -- separated by commas
 constList :: Parser [Name]
-constList =
-  (   sepBy1 upper (symbol TokComma <?> "comma")
-    <?> "a list of constants separated by commas"
-    )
-    <* ignoreNewlines
+constList = sepBy1 upper (symbol TokComma <?> "comma") <?> "a list of constants separated by commas"
 
 -- separated by commas
 variableList :: Parser [Name]
-variableList =
-  (   sepBy1 lower (symbol TokComma <?> "comma")
-    <?> "a list of variables separated by commas"
-    )
-    <* ignoreNewlines
+variableList = sepBy1 lower (symbol TokComma <?> "comma") <?> "a list of variables separated by commas"
 
 --------------------------------------------------------------------------------
 -- | Combinators
 
--- consumes 0 or more newlines
-ignoreNewlines :: Parser ()
-ignoreNewlines = void $ many (Util.ignore isIndentation)
+-- -- consumes 0 or more newlines
+-- ignoreNewlines :: Parser ()
+-- ignoreNewlines = void $ many (Util.ignore isIndentation)
 
 -- consumes 1 or more newlines
 expectNewline :: Parser ()
 expectNewline = do
-  -- see if the latest accepcted token is TokNewlineAndWhitespace
+  -- see if the latest accepcted token is TokNewline
   t <- lift Util.getLastToken
   case t of
-    Just (TokNewlineAndWhitespace _) -> return ()
-    _               -> void $ some (Util.ignore isIndentation)
+    Just TokNewline -> return ()
+    _               -> void $ some (Util.ignore TokNewline)
 
 symbol :: Tok -> Parser ()
 symbol = Util.symbol

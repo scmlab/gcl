@@ -5,7 +5,6 @@ module Syntax.Parser.Lexer
   , LexicalError
   , Tok(..)
   , TokStream
-  , isIndentation
   )
 where
 
@@ -187,11 +186,6 @@ instance Show Tok where
     TokInt       i  -> show i
     TokTrue         -> "True"
     TokFalse        -> "False"
-
-
-isIndentation :: Tok -> Bool
-isIndentation (TokNewlineAndWhitespace _) = True 
-isIndentation _ = False 
 
 
 type TokStream = TokenStream (L Tok)
