@@ -34,7 +34,8 @@ data Tok
       TokWhitespace
     | TokEOF
     | TokComment Text
-    |  TokNewlineAndWhitespace Int 
+    | TokNewlineAndWhitespace Int 
+    | TokNewlineAndWhitespaceAndBar Int 
     -- the following 3 kinds of tokens will be generated from `TokNewlineAndWhitespace` 
     -- and inserted to the TokenStream instead
     | TokIndent    
@@ -120,6 +121,7 @@ data Tok
 instance Show Tok where
   show tok = case tok of
     TokNewlineAndWhitespace n -> "\\n + " ++ show n ++ " \n"
+    TokNewlineAndWhitespaceAndBar n -> "\\n + " ++ show n ++ " | \n"
     TokIndent   -> " >>\n"
     TokDedent   -> " <<\n"
     TokNewline   -> "\\n\n"
@@ -382,8 +384,11 @@ commentEndRE prefix =
   TokComment <$> (pure prefix +++ (Text.concat <$> many anySym) +++ text "\n")
   where (+++) = liftA2 (<>)
 
-indentation :: RE Text Tok
-indentation = TokNewlineAndWhitespace <$ psym (adapt isNewline) <*> reFoldl Greedy (\n _ -> succ n) 0 (psym $ adapt (\c -> isSpace c && not (isNewline c)))
+newlineAndWhitespace :: RE Text Tok
+newlineAndWhitespace = TokNewlineAndWhitespace <$ psym (adapt isNewline) <*> reFoldl Greedy (\n _ -> succ n) 0 (psym $ adapt (\c -> isSpace c && not (isNewline c)))
+
+newlineAndWhitespaceAndBar :: RE Text Tok
+newlineAndWhitespaceAndBar = TokNewlineAndWhitespaceAndBar <$ psym (adapt isNewline) <*> reFoldl Greedy (\n _ -> succ n) 2 (psym $ adapt (\c -> isSpace c && not (isNewline c))) <* text "| "
 
 contra :: RE Text a -> RE Char a
 contra = comap Text.singleton
@@ -393,7 +398,8 @@ lexer = mconcat
   [ 
     -- meaning tokens that are sent to the parser
     token (longest $ contra tokRE)
-  , token (longest $ contra indentation)
+  , token (longest $ contra newlineAndWhitespaceAndBar)
+  , token (longest $ contra newlineAndWhitespace)
     -- meaningless tokens that will be dumped 
   , whitespace (longest $ contra whitespaceButNewlineRE)
   , whitespace (longestShortest (contra commentStartRE) (contra . commentEndRE))
@@ -431,24 +437,38 @@ scan filepath = runPreprocess . preprocess . runLexer lexer filepath . Text.unpa
             Nothing -> False 
             Just t  -> expectingIndent t
 
-      case tok of 
-        TokNewlineAndWhitespace level -> do
+      let hasGuardedBar = case tok of 
+            TokNewlineAndWhitespaceAndBar _ -> True 
+            _ -> False
+
+      let indentLevel = case tok of 
+            TokNewlineAndWhitespaceAndBar level -> Just level
+            TokNewlineAndWhitespace level -> Just level
+            _ -> Nothing
+
+      case indentLevel of 
+        Just level -> do
           -- analyse the stack of indentation levels
           let (current, previous) = case uncons levels of 
                 Nothing -> (0, [])
                 Just pair -> pair
           
           case level `compare` current of 
+
             -- the indentation is lesser than the current level
             LT -> do 
               -- pop the indentation stack
               put (previous, Just tok)
               -- insert a `dedent`
               TsToken (L (locStart loc) TokDedent) <$> preprocess (TsToken (L loc tok) xs)
+
             -- the indentation is the same as the current level
             EQ -> do
-              -- insert a `newline` 
-              TsToken (L (locStart loc) TokNewline) <$> preprocess xs
+              -- insert a `newline` (and perhaps a `|`)
+              if hasGuardedBar
+                then TsToken (L (locStart loc) TokNewline) <$> TsToken (L (locEnd loc) TokGuardBar) <$> preprocess xs 
+                else TsToken (L (locStart loc) TokNewline) <$> preprocess xs
+                
             -- the indentation is greater thab the current level
             GT -> do 
               -- insert a `indent` if the previous token is expecting one, 
@@ -458,7 +478,7 @@ scan filepath = runPreprocess . preprocess . runLexer lexer filepath . Text.unpa
                   put (level : levels, Just tok)
                   TsToken (L (locEnd loc) TokIndent) <$> preprocess xs
                 else preprocess xs
-        _ -> do 
+        Nothing -> do 
           if shouldIndent
             then do 
               -- if the previous token is expecting a indent

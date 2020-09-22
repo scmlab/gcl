@@ -14,14 +14,14 @@ import Syntax.Parser.Lexer (Tok(..), LexicalError, scan)
 tests :: TestTree
 tests = testGroup
     "Lexer"
-    [indentation, indentingTokens, nonIndentingTokens, empty]
+    [indentation, indentingTokens, nonIndentingTokens, guardedCommands, empty]
 
 -- helper function
 run :: Text -> Either LexicalError [Tok]
 run text = map unLoc  . streamToList <$> scan "<filepath>" text
 
 empty :: TestTree
-empty = testCase "Empty" $ do 
+empty = testCase "empty source file" $ do 
     let actual = run ""
     let expected = Right []
     actual @?= expected
@@ -87,10 +87,37 @@ indentingTokens = testGroup "Tokens expecting indentation"
 
 nonIndentingTokens :: TestTree
 nonIndentingTokens = testGroup "Tokens not expecting indentation" 
-    [   testCase "Assignment" $ do 
+    [   testCase "assignment" $ do 
         let actual = run    "a\n\
                             \    :=\n\
                             \  1\n"
         let expected = Right [TokLowerName "a", TokAssign, TokInt 1, TokNewline]
         actual @?= expected   
+    ]
+
+guardedCommands :: TestTree
+guardedCommands = testGroup "Guarded commands" 
+    [   testCase "single line" $ do 
+        let actual = run    "if True -> skip fi"
+        let expected = Right [TokIf, TokIndent, TokTrue, TokArrow, TokSkip, TokFi]
+        actual @?= expected      
+    ,   testCase "multiline" $ do 
+        let actual = run    "if True -> skip\n\
+                            \ | True -> skip\n\
+                            \fi"
+        let expected = Right [TokIf, TokIndent, TokTrue, TokArrow, TokSkip, TokNewline, TokGuardBar, TokTrue, TokArrow, TokSkip, TokDedent, TokNewline, TokFi]
+        actual @?= expected     
+    ,   testCase "multiple guarded command on a single line" $ do 
+        let actual = run    "if True -> skip | True -> skip\n\
+                            \ | True -> skip\n\
+                            \fi"
+        let expected = Right [TokIf, TokIndent, TokTrue, TokArrow, TokSkip, TokGuardBar, TokTrue, TokArrow, TokSkip, TokNewline, TokGuardBar, TokTrue, TokArrow, TokSkip, TokDedent, TokNewline, TokFi]
+        actual @?= expected      
+    ,   testCase "nested nightmare" $ do 
+        let actual = run    "if True -> do False -> skip\n\
+                            \            | False -> skip\n\
+                            \ | True -> skip\n\
+                            \fi"
+        let expected = Right [TokIf, TokIndent, TokTrue, TokArrow, TokDo, TokIndent, TokFalse, TokArrow, TokSkip, TokNewline, TokGuardBar, TokFalse, TokArrow, TokSkip, TokDedent, TokNewline, TokGuardBar, TokTrue, TokArrow, TokSkip, TokDedent, TokNewline, TokFi]
+        actual @?= expected
     ]

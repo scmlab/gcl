@@ -94,8 +94,12 @@ statement = do
       , hole
       ]
     <?> "statement"
-  expectNewline <?> "<newline> after a statement"
+  -- expectNewline <?> "<newline> after a statement"
   return stmt
+
+
+statements :: Parser [Stmt]
+statements = sepBy statement (symbol TokNewline)
   
 
 
@@ -113,18 +117,18 @@ statement = do
 --     ]
 --   return (stmt : rest)
 
-expectLineEnding :: Parser ()
-expectLineEnding = choice [withoutSemicolon, withSemicolon]
- where
-  withoutSemicolon = expectNewline
-  withSemicolon    = do
-    -- see if the latest accepcted token is TokSemi
-    t <- lift Util.getLastToken
-    case t of
-      Just TokSemi -> return ()
-      _            -> void $ do
-        Util.ignore TokSemi
-        void $ many (Util.ignore TokNewline)
+-- expectLineEnding :: Parser ()
+-- expectLineEnding = choice [withoutSemicolon, withSemicolon]
+--  where
+--   withoutSemicolon = expectNewline
+--   withSemicolon    = do
+--     -- see if the latest accepcted token is TokSemi
+--     t <- lift Util.getLastToken
+--     case t of
+--       Just TokSemi -> return ()
+--       _            -> void $ do
+--         Util.ignore TokSemi
+--         void $ many (Util.ignore TokNewline)
 
 skip :: Parser Stmt
 skip = withLoc $ Skip <$ symbol TokSkip
@@ -159,6 +163,7 @@ repetition =
   withLoc
     $   Do
     <$  (symbol TokDo <?> "do")
+    <*  (symbol TokIndent <?> "indentation")
     <*> guardedCommands
     <*  (symbol TokOd <?> "od")
 
@@ -167,6 +172,7 @@ selection =
   withLoc
     $   If
     <$  (symbol TokIf <?> "if")
+    <*  (symbol TokIndent <?> "indentation")
     <*> guardedCommands
     <*  (symbol TokFi <?> "fi")
 

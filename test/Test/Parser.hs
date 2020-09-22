@@ -342,25 +342,31 @@ declaration = testGroup "Declarations" $ map
 statement :: TestTree
 statement = testGroup "Single statement" $ map
     (toTestTree Parser.statement)
-    [ RightCase "skip" "skip\n" $ Skip (1 <-> 4)
-    , RightCase "abort" "abort\n" $ Abort (1 <-> 5)
-    , RightCase "assert" "{ True }\n"
+    [ RightCase "skip" "skip" $ Skip (1 <-> 4)
+    , RightCase "abort" "abort" $ Abort (1 <-> 5)
+    , RightCase "assert" "{ True }"
         $ Assert (Lit (Bol True) (3 <-> 6)) (1 <-> 8)
-    , RightCase "assign" "x := 0\n"
+    , RightCase "assign" "x := 0"
         $ Assign [Name "x" (at 1)] [Lit (Num 0) (at 6)] (1 <-> 6)
-    , RightCase "assign (parallel)" "x, y := 0, 1\n" $ Assign
+    , RightCase "assign (parallel)" "x, y := 0, 1" $ Assign
         [Name "x" (at 1), Name "y" (at 4)]
         [Lit (Num 0) (at 9), Lit (Num 1) (at 12)]
         (1 <-> 12)
-    , RightCase "selection" "if True -> skip fi\n"
+    , RightCase "selection" "if True -> skip fi"
         $ If
               [GdCmd (Lit (Bol True) (4 <-> 7)) [Skip (12 <-> 15)] (4 <-> 15)]
               (1 <-> 18)
-    , RightCase "loop" "{ True , bnd: a }\n" $ LoopInvariant
+    , RightCase "selection 2"   "if True -> skip\n\
+                                \ | False -> abort fi"
+        $ If
+              [ GdCmd (Lit (Bol True) (4 <-> 7)) [Skip (12 <-> 15)] (4 <-> 15)
+              , GdCmd (Lit (Bol True) (pos 2 9 8 <--> pos 2 11 10)) [Abort (pos 1 9 8 <--> pos 1 11 10)] (pos 1 9 8 <--> pos 1 11 10)]
+              (pos 1 1 1 <--> pos 1 11 10)
+    , RightCase "loop" "{ True , bnd: a }" $ LoopInvariant
         (Lit (Bol True) (3 <-> 6))
         (Var (Name "a" (at 15)) (at 15))
         (1 <-> 17)
-    , RightCase "loop" "do True -> skip od\n"
+    , RightCase "loop" "do True -> skip od"
         $ Do
               [GdCmd (Lit (Bol True) (4 <-> 7)) [Skip (12 <-> 15)] (4 <-> 15)]
               (1 <-> 18)
