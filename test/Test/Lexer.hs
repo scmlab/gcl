@@ -14,8 +14,7 @@ import Syntax.Parser.Lexer (Tok(..), LexicalError, scan)
 tests :: TestTree
 tests = testGroup
     "Lexer"
-    [indentation, empty]
-
+    [indentation, indentingTokens, nonIndentingTokens, empty]
 
 -- helper function
 run :: Text -> Either LexicalError [Tok]
@@ -30,8 +29,7 @@ empty = testCase "Empty" $ do
 
 indentation :: TestTree
 indentation = testGroup "Indentation" 
-    [
-        testCase "top level" $ do 
+    [   testCase "top level" $ do 
         let actual = run    "skip\n\
                             \skip\n\
                             \skip\n"
@@ -69,4 +67,30 @@ indentation = testGroup "Indentation"
                             \skip\n"
         let expected = Right [TokDo, TokIndent, TokDo, TokIndent, TokSkip, TokDedent, TokDedent, TokNewline, TokSkip, TokNewline]
         actual @?= expected
+    ]
+
+indentingTokens :: TestTree
+indentingTokens = testGroup "Tokens expecting indentation" 
+    [   testCase "TokDo" $ do 
+        let actual = run    "do\n\
+                            \  skip\n\
+                            \  skip\n"
+        let expected = Right [TokDo, TokIndent, TokSkip, TokNewline, TokSkip, TokDedent, TokNewline]
+        actual @?= expected   
+    ,   testCase "TokIf" $ do 
+        let actual = run    "if\n\
+                            \  skip\n\
+                            \  skip\n"
+        let expected = Right [TokIf, TokIndent, TokSkip, TokNewline, TokSkip, TokDedent, TokNewline]
+        actual @?= expected  
+    ]
+
+nonIndentingTokens :: TestTree
+nonIndentingTokens = testGroup "Tokens not expecting indentation" 
+    [   testCase "Assignment" $ do 
+        let actual = run    "a\n\
+                            \    :=\n\
+                            \  1\n"
+        let expected = Right [TokLowerName "a", TokAssign, TokInt 1, TokNewline]
+        actual @?= expected   
     ]

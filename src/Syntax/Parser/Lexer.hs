@@ -413,6 +413,7 @@ runPreprocess program = evalState (runExceptT program) ([0], Nothing)
 
 expectingIndent :: Tok -> Bool
 expectingIndent TokDo = True 
+expectingIndent TokIf = True 
 expectingIndent _ = False 
 
 scan :: FilePath -> Text -> Either LexicalError TokStream
@@ -450,13 +451,13 @@ scan filepath = runPreprocess . preprocess . runLexer lexer filepath . Text.unpa
               TsToken (L (locStart loc) TokNewline) <$> preprocess xs
             -- the indentation is greater thab the current level
             GT -> do 
-              -- push it into the indentation stack
-              put (level : levels, Just tok)
               -- insert a `indent` if the previous token is expecting one, 
-              -- else insert a `newline` instead
               if shouldIndent
-                then TsToken (L (locEnd loc) TokIndent) <$> preprocess xs
-                else TsToken (L (locStart loc) TokNewline) <$> preprocess xs
+                then do 
+                  -- push it into the indentation stack
+                  put (level : levels, Just tok)
+                  TsToken (L (locEnd loc) TokIndent) <$> preprocess xs
+                else preprocess xs
         _ -> do 
           if shouldIndent
             then do 
