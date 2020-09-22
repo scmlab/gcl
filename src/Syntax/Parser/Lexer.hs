@@ -410,18 +410,69 @@ lexer = mconcat
 
 type LexicalError = Pos
 type IndentLevels = [Int]
-type PreviousToken = Maybe Tok
+type PreviousToken = Maybe (L Tok)
 
 type PreprocessM = ExceptT LexicalError (State (IndentLevels, PreviousToken))
 
 runPreprocess :: PreprocessM a -> Either LexicalError a
 runPreprocess program = evalState (runExceptT program) ([0], Nothing)
 
+updateStack :: IndentLevels -> PreprocessM ()
+updateStack stack = modify (\((_, p)) -> (stack, p))
+
+updateToken :: L Tok -> PreprocessM ()
+updateToken tok = modify (\((s, _)) -> (s, Just tok))
+
+indent :: L Tok -> L Tok -> PreprocessM (TokStream -> TokStream)
+indent previousToken currentToken = do 
+  levels <- gets fst
+  case indentedLevel (unLoc previousToken) of 
+    Nothing -> do 
+      -- the previous token is not `TokNewlineAndWhitespace` an such
+      -- calculate the indentation level, and push it into the stack
+      let level = case locOf currentToken of 
+                    NoLoc -> 0 
+                    Loc p _ -> posCol p - 1
+      let loc = locStart (locOf currentToken)
+      updateStack (level : levels)
+      return $ TsToken (L loc TokIndent)
+    Just level -> do 
+      let loc = locEnd (locOf previousToken)
+      updateStack (level : levels)
+      return $ TsToken (L loc TokIndent)
+
+dedent :: L Tok -> PreprocessM (TokStream -> TokStream)
+dedent previousToken = do 
+  levels <- gets fst
+  -- analyse the stack of indentation levels
+  let (_, lvls) = case uncons levels of 
+        Nothing -> (0, [])
+        Just pair -> pair
+
+  updateStack lvls
+  let loc = locEnd (locOf previousToken)
+  return $ TsToken (L loc TokDedent)
+
+newline :: L Tok -> PreprocessM (TokStream -> TokStream)
+newline previousToken = do 
+  -- insert a `newline`
+  let loc = locEnd $ locOf previousToken
+  return $ TsToken (L loc TokNewline)
+
 expectingIndent :: Tok -> Bool
 expectingIndent TokDo = True 
 expectingIndent TokIf = True 
 expectingIndent TokArrow = True 
 expectingIndent _ = False 
+
+expectingDedent :: Tok -> Bool
+expectingDedent TokOd = True 
+expectingDedent _ = False 
+
+indentedLevel :: Tok -> Maybe Int
+indentedLevel (TokNewlineAndWhitespaceAndBar level) = Just level
+indentedLevel (TokNewlineAndWhitespace level) = Just level
+indentedLevel _ = Nothing
 
 scan :: FilePath -> Text -> Either LexicalError TokStream
 scan filepath = runPreprocess . preprocess . runLexer lexer filepath . Text.unpack
@@ -430,68 +481,192 @@ scan filepath = runPreprocess . preprocess . runLexer lexer filepath . Text.unpa
     preprocess :: TokenStream (L Tok) -> PreprocessM TokStream
     preprocess TsEof = return TsEof
     preprocess (TsError (Lex.LexicalError pos)) = throwError pos
-    preprocess (TsToken (L loc tok) xs) = do 
-      (levels, previousToken) <- get 
+    preprocess (TsToken currentToken xs) = do 
+      (levels, previous) <- get 
 
-      -- see if the previous token is expecting an indent (e.g. TokDo)
-      let shouldIndent = case previousToken of 
-            Nothing -> False 
-            Just t  -> expectingIndent t
 
-      let hasGuardedBar = case tok of 
-            TokNewlineAndWhitespaceAndBar _ -> True 
-            _ -> False
-
-      let indentLevel = case tok of 
-            TokNewlineAndWhitespaceAndBar level -> Just level
-            TokNewlineAndWhitespace level -> Just level
-            _ -> Nothing
-
-      case indentLevel of 
-        Just level -> do
-          -- analyse the stack of indentation levels
-          let (current, previous) = case uncons levels of 
-                Nothing -> (0, [])
-                Just pair -> pair
-          
-          case level `compare` current of 
-
-            -- the indentation is lesser than the current level
-            LT -> do 
-              -- pop the indentation stack
-              put (previous, Just tok)
-              -- insert a `dedent`
-              TsToken (L (locStart loc) TokDedent) <$> preprocess (TsToken (L loc tok) xs)
-
-            -- the indentation is the same as the current level
-            EQ -> do
-              -- insert a `newline` (and perhaps a `|`)
-              if hasGuardedBar
-                then TsToken (L (locStart loc) TokNewline) <$> TsToken (L (locEnd loc) TokGuardBar) <$> preprocess xs 
-                else TsToken (L (locStart loc) TokNewline) <$> preprocess xs
-
-            -- the indentation is greater thab the current level
-            GT -> do 
-              -- insert a `indent` if the previous token is expecting one, 
-              if shouldIndent
-                then do 
-                  -- push it into the indentation stack
-                  put (level : levels, Just tok)
-                  TsToken (L (locEnd loc) TokIndent) <$> preprocess xs
-                else preprocess xs
+      case previous of 
+        -- this is the first token of the stream
         Nothing -> do 
-          if shouldIndent
-            then do 
-              -- if the previous token is expecting a indent
-              -- calculate the indentation level, and push it into the stack
-              let level = case loc of 
-                        NoLoc -> 0 
-                        Loc p _ -> posCol p - 1
-              put (level : levels, Just tok)
-              TsToken (L (locStart loc) TokIndent) <$> TsToken (L loc tok) <$> preprocess xs
-            else do 
-              put (levels, Just tok)
-              TsToken (L loc tok) <$> preprocess xs
+          -- update the state
+          put (levels, Just currentToken)
+          -- return the first token
+          TsToken currentToken <$> preprocess xs
+
+        Just previousToken -> do 
+
+          -- see if the previous token is expecting an indent after it (e.g. TokDo)
+          let shouldIndent = expectingIndent (unLoc previousToken)
+
+          -- see if the current token is expecting an dedent before it (e.g. TokOd)
+          let shouldDedent = expectingDedent (unLoc currentToken)
+
+          -- see if the previous token is 
+          --  `TokNewlineAndWhitespaceAndBar` or `TokNewlineAndWhitespace`
+          let previousIndentation = indentedLevel (unLoc previousToken)
+
+
+          case indentedLevel (unLoc currentToken) of 
+            Just _ -> do 
+              -- update the state but DON'T return the current token (we will deal with that in the next round)
+              put (levels, Just currentToken)
+              preprocess xs
+            Nothing -> do 
+
+              -- analyse the stack of indentation levels
+              let (lvl, _) = case uncons levels of 
+                    Nothing -> (0, [])
+                    Just pair -> pair
+              
+              case previousIndentation of 
+                Just n -> do 
+
+                  case n `compare` lvl of 
+
+                    -- the indentation is lesser than the current level
+                    LT -> do 
+                      tok' <- dedent previousToken 
+
+                      updateToken currentToken
+                      tok' <$> TsToken currentToken <$> preprocess xs
+
+                    -- the indentation is the same as the current level
+                    EQ -> do
+
+                      if shouldDedent 
+                        then do 
+                          tok' <- dedent previousToken 
+
+                          updateToken currentToken
+                          tok' <$> TsToken currentToken <$> preprocess xs
+                        else do 
+                          tok <- newline previousToken 
+
+                          updateToken currentToken
+                          tok <$> TsToken currentToken <$> preprocess xs
+
+                    -- the indentation is greater than the current level
+                    GT -> do 
+                      tok <- indent previousToken currentToken 
+
+                      updateToken currentToken
+                      tok <$> TsToken currentToken <$> preprocess xs
+
+                Nothing -> do 
+                  case (shouldIndent, shouldDedent) of 
+                    (True, True) -> do 
+                      tok <- indent previousToken currentToken 
+                      tok' <- dedent previousToken 
+
+                      updateToken currentToken
+                      tok . tok' <$> TsToken currentToken <$> preprocess xs
+
+                    (True, False) -> do 
+                      tok <- indent previousToken currentToken 
+
+                      updateToken currentToken
+                      tok <$> TsToken currentToken <$> preprocess xs
+
+                    (False, True) -> do 
+                      tok' <- dedent previousToken 
+
+                      updateToken currentToken
+                      tok' <$> TsToken currentToken <$> preprocess xs
+
+                    (False, _) -> do 
+
+                      updateToken currentToken
+                      -- return the current token and carry on
+                      TsToken currentToken <$> preprocess xs
+
+          -- case indentedLevel of 
+          --   Just n -> TsToken currentToken <$> preprocess xs
+          --   Nothing -> do 
+          --     TsToken currentToken <$> preprocess xs
+
+
+      -- -- see if the previous token is expecting an indent after it (e.g. TokDo)
+      -- let shouldIndent = case previousToken of 
+      --       Nothing -> False 
+      --       Just t  -> expectingIndent t
+
+      -- -- see if the current token is expecting an dedent before it (e.g. TokOd)
+      -- let shouldDedent = case previousToken of 
+      --       Nothing -> False 
+      --       Just _ -> case tok of 
+      --         TokOd -> True 
+      --         _ -> False 
+
+      -- let hasGuardedBar = case tok of 
+      --       TokNewlineAndWhitespaceAndBar _ -> True 
+      --       _ -> False
+
+      -- let indentLevel = case tok of 
+      --       TokNewlineAndWhitespaceAndBar level -> Just level
+      --       TokNewlineAndWhitespace level -> Just level
+      --       _ -> Nothing
+
+      -- case indentLevel of 
+      --   Just level -> do
+      --     -- analyse the stack of indentation levels
+      --     let (current, previous) = case uncons levels of 
+      --           Nothing -> (0, [])
+      --           Just pair -> pair
+          
+      --     case level `compare` current of 
+
+      --       -- the indentation is lesser than the current level
+      --       LT -> do 
+      --         -- pop the indentation stack
+      --         put (previous, Just tok)
+      --         -- insert a `dedent`
+      --         TsToken (L (locStart loc) TokDedent) <$> preprocess (TsToken (L loc tok) xs)
+      --         -- if shouldDedent
+      --         --   then 
+      --         --   else TsToken (L (locStart loc) TokDedent) <$> preprocess (TsToken (L loc tok) xs)
+
+      --       -- the indentation is the same as the current level
+      --       EQ -> do
+      --         -- insert a `newline` (and perhaps a `|`)
+      --         if hasGuardedBar
+      --           then TsToken (L (locStart loc) TokNewline) <$> TsToken (L (locEnd loc) TokGuardBar) <$> preprocess xs 
+      --           else TsToken (L (locStart loc) TokNewline) <$> preprocess xs
+
+      --       -- the indentation is greater thab the current level
+      --       GT -> do 
+      --         -- insert a `indent` if the previous token is expecting one, 
+      --         if shouldIndent
+      --           then do 
+      --             -- push it into the indentation stack
+      --             put (level : levels, Just tok)
+      --             TsToken (L (locEnd loc) TokIndent) <$> preprocess xs
+      --           else preprocess xs
+      --   Nothing -> case (shouldIndent, shouldDedent) of 
+      --     (True, True) -> do 
+      --       -- the previous token is expecting a indent
+      --       put (levels, Just tok)
+      --       TsToken (L (locStart loc) TokIndent) <$> TsToken (L (locStart loc) TokDedent) <$> TsToken (L loc tok) <$> preprocess xs
+      --     (True, False) -> do 
+      --       -- the previous token is expecting a indent
+      --       -- calculate the indentation level, and push it into the stack
+      --       let level = case loc of 
+      --                 NoLoc -> 0 
+      --                 Loc p _ -> posCol p - 1
+      --       put (level : levels, Just tok)
+      --       TsToken (L (locStart loc) TokIndent) <$> TsToken (L loc tok) <$> preprocess xs
+      --     (False, True) -> do 
+      --       -- analyse the stack of indentation levels
+      --       let (_, previous) = case uncons levels of 
+      --             Nothing -> (0, [])
+      --             Just pair -> pair
+      --       -- pop the indentation stack
+      --       put (previous, Just tok)
+      --       -- insert a `dedent`
+      --       TsToken (L (locStart loc) TokDedent) <$> TsToken (L loc tok) <$> preprocess xs
+
+      --     (False, False) -> do 
+      --       put (levels, Just tok)
+      --       TsToken (L loc tok) <$> preprocess xs
 
 --------------------------------------------------------------------------------
 -- | Instances of PrettyToken
