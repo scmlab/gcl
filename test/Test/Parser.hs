@@ -360,8 +360,8 @@ statement = testGroup "Single statement" $ map
                                 \ | False -> abort fi"
         $ If
               [ GdCmd (Lit (Bol True) (4 <-> 7)) [Skip (12 <-> 15)] (4 <-> 15)
-              , GdCmd (Lit (Bol True) (pos 2 9 8 <--> pos 2 11 10)) [Abort (pos 1 9 8 <--> pos 1 11 10)] (pos 1 9 8 <--> pos 1 11 10)]
-              (pos 1 1 1 <--> pos 1 11 10)
+              , GdCmd (Lit (Bol False) (pos 2 4 19 <--> pos 2 8 23)) [Abort (pos 2 13 28 <--> pos 2 17 32)] (pos 2 4 19 <--> pos 2 17 32)]
+              (pos 1 1 0 <--> pos 2 20 35)
     , RightCase "loop" "{ True , bnd: a }" $ LoopInvariant
         (Lit (Bol True) (3 <-> 6))
         (Var (Name "a" (at 15)) (at 15))

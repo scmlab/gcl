@@ -420,6 +420,7 @@ runPreprocess program = evalState (runExceptT program) ([0], Nothing)
 expectingIndent :: Tok -> Bool
 expectingIndent TokDo = True 
 expectingIndent TokIf = True 
+expectingIndent TokArrow = True 
 expectingIndent _ = False 
 
 scan :: FilePath -> Text -> Either LexicalError TokStream
@@ -468,7 +469,7 @@ scan filepath = runPreprocess . preprocess . runLexer lexer filepath . Text.unpa
               if hasGuardedBar
                 then TsToken (L (locStart loc) TokNewline) <$> TsToken (L (locEnd loc) TokGuardBar) <$> preprocess xs 
                 else TsToken (L (locStart loc) TokNewline) <$> preprocess xs
-                
+
             -- the indentation is greater thab the current level
             GT -> do 
               -- insert a `indent` if the previous token is expecting one, 

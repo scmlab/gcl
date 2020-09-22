@@ -100,8 +100,10 @@ statement = do
 
 statements :: Parser [Stmt]
 statements = sepBy statement (symbol TokNewline)
-  
 
+statements1 :: Parser [Stmt]
+statements1 = sepBy1 statement (symbol TokNewline)
+  
 
 -- statements :: Parser [Stmt]
 -- statements = try statements1 <|> return []
@@ -177,7 +179,15 @@ selection =
     <*  (symbol TokFi <?> "fi")
 
 guardedCommands :: Parser [GdCmd]
-guardedCommands = sepBy1 guardedCommand (symbol TokGuardBar <?> "|")
+guardedCommands = sepBy1 guardedCommand $ do 
+  symbol TokNewline <?> "newline"
+  symbol TokGuardBar <?> "|"
+-- guardedCommands :: Parser [GdCmd]
+-- guardedCommands = sepBy1 guardedCommand $ do 
+--   -- newlines are optional before the bar "|", 
+--   -- to allow multiple guarded commands on a single line (e.g. "| True -> skip | False -> skip")
+--   optional (symbol TokNewline <?> "newline") 
+--   symbol TokGuardBar <?> "|"
 
 guardedCommand :: Parser GdCmd
 guardedCommand =
@@ -185,8 +195,7 @@ guardedCommand =
     $   GdCmd
     <$> predicate
     <*  ((symbol TokArrow <?> "->") <|> (symbol TokArrowU <?> "→"))
-    -- <*  ignoreNewlines
-    <*> some statement
+    <*> statements1
 
 hole :: Parser Stmt
 hole = withLoc $ SpecQM <$ (symbol TokQM <?> "?")
