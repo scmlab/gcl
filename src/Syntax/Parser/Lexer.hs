@@ -525,10 +525,16 @@ scan filepath = runPreprocess . preprocess . runLexer lexer filepath . Text.unpa
 
                     -- the indentation is lesser than the current level
                     LT -> do 
-                      tok' <- dedent previousToken 
 
-                      updateToken currentToken
-                      tok' <$> TsToken currentToken <$> preprocess xs
+                      if shouldDedent 
+                        then do 
+                          tok' <- dedent previousToken 
+
+                          updateToken currentToken
+                          tok' <$> TsToken currentToken <$> preprocess xs
+                        else do 
+                          tok' <- dedent previousToken 
+                          tok' <$> preprocess (TsToken currentToken xs)
 
                     -- the indentation is the same as the current level
                     EQ -> do
@@ -547,10 +553,24 @@ scan filepath = runPreprocess . preprocess . runLexer lexer filepath . Text.unpa
 
                     -- the indentation is greater than the current level
                     GT -> do 
-                      tok <- indent previousToken currentToken 
 
-                      updateToken currentToken
-                      tok <$> TsToken currentToken <$> preprocess xs
+                      if shouldIndent
+                        then do  
+                          -- error $ show (previousToken, currentToken)
+
+                          tok <- indent previousToken currentToken 
+
+                          updateToken currentToken
+                          tok <$> TsToken currentToken <$> preprocess xs
+                        else do
+
+                          tok <- indent previousToken currentToken 
+
+                          updateToken currentToken
+                          tok <$> TsToken currentToken <$> preprocess xs
+                          -- TsToken currentToken <$> preprocess xs
+                          -- tok' <$> preprocess (TsToken currentToken xs)
+                          -- tok' <- indent previousToken currentToken
 
                 Nothing -> do 
                   case (shouldIndent, shouldDedent) of 
@@ -579,10 +599,6 @@ scan filepath = runPreprocess . preprocess . runLexer lexer filepath . Text.unpa
                       -- return the current token and carry on
                       TsToken currentToken <$> preprocess xs
 
-          -- case indentedLevel of 
-          --   Just n -> TsToken currentToken <$> preprocess xs
-          --   Nothing -> do 
-          --     TsToken currentToken <$> preprocess xs
 
 
       -- -- see if the previous token is expecting an indent after it (e.g. TokDo)

@@ -43,10 +43,37 @@ indentation = testGroup "Indentation"
                             \od"
         let expected = Right [TokDo, TokIndent, TokSkip, TokNewline, TokSkip, TokDedent, TokOd]
         actual @?= expected
+    ,   testCase "indent but broken 1" $ do 
+        let actual = run    "do\n\
+                            \  skip\n\
+                            \ skip\n\
+                            \od"
+        let expected = Right [TokDo, TokIndent, TokSkip, TokDedent, TokIndent, TokSkip, TokDedent, TokOd]
+        actual @?= expected
+    ,   testCase "indent but broken 2" $ do 
+        let actual = run    "do\n\
+                            \  skip\n\
+                            \   skip\n\
+                            \od"
+        let expected = Right [TokDo, TokIndent, TokSkip, TokDedent, TokIndent, TokSkip, TokDedent, TokDedent, TokOd]
+        actual @?= expected
     ,   testCase "indent on the same line" $ do 
         let actual = run    "do skip\n\
+                            \   skip\n\
                             \od"
-        let expected = Right [TokDo, TokIndent, TokSkip, TokDedent, TokOd]
+        let expected = Right [TokDo, TokIndent, TokSkip, TokNewline, TokSkip, TokDedent, TokOd]
+        actual @?= expected
+    ,   testCase "indent on the same line but broken 1" $ do 
+        let actual = run    "do skip\n\
+                            \  skip\n\
+                            \od"
+        let expected = Right [TokDo, TokIndent, TokSkip, TokDedent, TokIndent, TokSkip, TokDedent, TokOd]
+        actual @?= expected
+    ,   testCase "indent on the same line but broken 2" $ do 
+        let actual = run    "do skip\n\
+                            \    skip\n\
+                            \od"
+        let expected = Right [TokDo, TokIndent, TokSkip, TokIndent, TokSkip, TokDedent, TokDedent, TokOd]
         actual @?= expected
     ,   testCase "dedent on the same line" $ do 
         let actual = run    "do\n\
@@ -57,25 +84,25 @@ indentation = testGroup "Indentation"
         let actual = run    "do skip od"
         let expected = Right [TokDo, TokIndent, TokSkip, TokDedent, TokOd]
         actual @?= expected
-    ,   testCase "indent and dedent on the same line" $ do 
-        let actual = run    "do  skip\n\
-                            \skip\n\
-                            \skip\n"
-        let expected = Right [TokDo, TokIndent, TokSkip, TokDedent, TokNewline, TokSkip, TokNewline, TokSkip, TokNewline]
+    ,   testCase "dangling dedent" $ do 
+        let actual = run    "do skip\n\
+                            \ od"
+        let expected = Right [TokDo, TokIndent, TokSkip, TokDedent, TokOd]
         actual @?= expected
     ,   testCase "nested" $ do 
         let actual = run    "do\n\
                             \  do\n\
                             \    skip\n\
-                            \  skip\n"
-        let expected = Right [TokDo, TokIndent, TokDo, TokIndent, TokSkip, TokDedent, TokNewline, TokSkip, TokDedent, TokNewline]
+                            \  skip\n\
+                            \skip\n"
+        let expected = Right [TokDo, TokIndent, TokDo, TokIndent, TokSkip, TokDedent, TokNewline, TokSkip, TokDedent, TokNewline, TokSkip]
         actual @?= expected
     ,   testCase "consecutive dedent" $ do 
         let actual = run    "do\n\
                             \  do\n\
                             \    skip\n\
                             \skip\n"
-        let expected = Right [TokDo, TokIndent, TokDo, TokIndent, TokSkip, TokDedent, TokDedent, TokNewline, TokSkip, TokNewline]
+        let expected = Right [TokDo, TokIndent, TokDo, TokIndent, TokSkip, TokDedent, TokDedent, TokNewline, TokSkip]
         actual @?= expected
     ]
 
