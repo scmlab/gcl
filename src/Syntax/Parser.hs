@@ -62,8 +62,8 @@ parse parser filepath tokenStream =
 
 program :: Parser Program
 program = withLoc $ do
-  decls <- many declaration <?> "declarations"
-  stmts <- many statement <?> "statements"
+  decls <- declarations <?> "declarations"
+  stmts <- statements <?> "statements"
   eof
   -- let construct
   let letBindings    = pickLetBindings decls

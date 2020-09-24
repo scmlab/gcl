@@ -36,8 +36,7 @@ import           Pretty
 tests :: TestTree
 tests = testGroup
     "Parser"
-    [expression, type', declaration, statement]
-    -- [expression, type', declaration, statement, statements, program]
+    [expression, type', declaration, statement, statements, program]
 
 --------------------------------------------------------------------------------
 -- | Helpers
@@ -395,7 +394,7 @@ at n = n <-> n
 
 statements :: TestTree
 statements = testGroup "Multiple statements" $ map
-    (toTestTree (many Parser.statement))
+    (toTestTree Parser.statements1)
     [ RightCase
         "separated by newlines 1"
         "skip\nskip"
@@ -421,21 +420,21 @@ statements = testGroup "Multiple statements" $ map
         $    pos 2 1 25
         <--> pos 2 6 30
         ]
-    , RightCase
-        "separated by semicolons 1"
-        "skip;skip"
-        [Skip $ pos 1 1 0 <--> pos 1 4 3, Skip $ pos 1 6 5 <--> pos 1 9 8]
-    , RightCase
-        "separated by semicolons 2"
-        "skip;\nskip"
-        [Skip $ pos 1 1 0 <--> pos 1 4 3, Skip $ pos 2 1 6 <--> pos 2 4 9]
-    , RightCase "separated by semicolons 4"
-                "skip;"
-                [Skip $ pos 1 1 0 <--> pos 1 4 3]
-    , RightCase
-        "separated by semicolons 3"
-        "skip;\nskip;"
-        [Skip $ pos 1 1 0 <--> pos 1 4 3, Skip $ pos 2 1 6 <--> pos 2 4 9]
+    -- , RightCase
+    --     "separated by semicolons 1"
+    --     "skip;skip"
+    --     [Skip $ pos 1 1 0 <--> pos 1 4 3, Skip $ pos 1 6 5 <--> pos 1 9 8]
+    -- , RightCase
+    --     "separated by semicolons 2"
+    --     "skip;\nskip"
+    --     [Skip $ pos 1 1 0 <--> pos 1 4 3, Skip $ pos 2 1 6 <--> pos 2 4 9]
+    -- , RightCase "separated by semicolons 4"
+    --             "skip;"
+    --             [Skip $ pos 1 1 0 <--> pos 1 4 3]
+    -- , RightCase
+    --     "separated by semicolons 3"
+    --     "skip;\nskip;"
+    --     [Skip $ pos 1 1 0 <--> pos 1 4 3, Skip $ pos 2 1 6 <--> pos 2 4 9]
     , LeftCase2 "separated by a space" "skip abort"
     ]
 
@@ -470,12 +469,13 @@ program = testGroup
     compare
         :: (FilePath, ByteString) -> (FilePath, ByteString) -> IO (Maybe String)
     compare (goldenFilePath, golden) (inputFilePath, input) = do
-        result <-
-            Text.encodeUtf8
-            .   renderLazy
-            .   layoutCompact
-            .   pretty
-            <$> parseProgram (inputFilePath, input)
+        program <- parseProgram (inputFilePath, input)
+        let result =
+                Text.encodeUtf8
+                .   renderLazy
+                .   layoutCompact
+                .   pretty
+                $   program
 
         case golden == result of
             True  -> return Nothing

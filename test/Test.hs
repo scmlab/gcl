@@ -10,7 +10,7 @@ main :: IO ()
 main = defaultMain tests
 
 tests :: TestTree
--- tests = testGroup "Tests" [Lexer.tests]
 tests = testGroup "Tests" [Lexer.tests, Parser.tests]
+-- tests = testGroup "Tests" [Lexer.tests, Parser.tests, Pretty.tests, WP2.tests]
 -- tests = testGroup "Tests" [Parser.tests, Pretty.tests, WP2.tests, WP.tests]
 -- tests = testGroup "Tests" [Parser.tests]
