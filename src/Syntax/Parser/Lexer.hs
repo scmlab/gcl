@@ -416,27 +416,28 @@ data PPState = PPState
   , ppIndentation :: Maybe Int
     -- set to True if expected to be followed by a `TokIndent` (e.g. `TokDo`)
   , ppExpectIndent :: Bool      
+    -- Loc of the previous token
+  , ppPrevLoc :: Loc      
   }
 
 type PreprocessM = ExceptT LexicalError (State PPState)
 
 runPreprocess :: PreprocessM a -> Either LexicalError a
-runPreprocess program = evalState (runExceptT program) (PPState [0] Nothing False)
+runPreprocess program = evalState (runExceptT program) (PPState [0] Nothing False NoLoc)
 
 setIdentation :: Maybe Int -> PreprocessM ()
-setIdentation i = modify (\(PPState xs _ b) -> PPState xs i b)
+setIdentation i = modify (\(PPState xs _ b l) -> PPState xs i b l)
 
 pushStack :: Int -> PreprocessM ()
-pushStack level = modify (\(PPState xs i b) -> PPState (level:xs) i b)
+pushStack level = modify (\(PPState xs i b l) -> PPState (level:xs) i b l)
 
 popStack :: PreprocessM ()
-popStack = modify $ \(PPState xs i b) -> 
+popStack = modify $ \(PPState xs i b l) -> 
   PPState (case xs of
             [] -> []
-            (_:ts) -> ts) i b
+            (_:ts) -> ts) i b l
 
-expectIndent :: Bool -> PreprocessM ()
-expectIndent b = modify $ \(PPState xs i _) -> PPState xs i b
+
 
 -- indent :: L Tok -> L Tok -> PreprocessM (TokStream -> TokStream)
 -- indent previousToken currentToken = do 
@@ -546,10 +547,11 @@ scan filepath = runPreprocess . preprocess . runLexer lexer filepath . Text.unpa
     preprocess :: TokenStream (L Tok) -> PreprocessM TokStream
     preprocess TsEof = do 
       stack <- gets ppIndentStack
+      loc <- locEnd <$> gets ppPrevLoc
       if length stack > 1
         then do 
           popStack 
-          TsToken (L NoLoc TokDedent) <$> preprocess TsEof
+          TsToken (L loc TokDedent) <$> preprocess TsEof
         else return TsEof
     preprocess (TsError (Lex.LexicalError pos)) = throwError pos
     preprocess (TsToken (L _ (TokNewlineAndWhitespace n)) xs) = do
@@ -572,30 +574,35 @@ scan filepath = runPreprocess . preprocess . runLexer lexer filepath . Text.unpa
         CmpIndent _ -> setIdentation Nothing 
         CmpNewline -> setIdentation Nothing 
         CmpDedent -> return ()
-        CmpNoop -> expectIndent $ expectingIndent (unLoc currentToken)
+        CmpNoop -> do 
+          PPState stack i _ _ <- get 
+          let b = expectingIndent (unLoc currentToken)
+          let l = locOf currentToken 
+          put $ PPState stack i b l
+
 
       -- interpret the Action
       case action of 
         Indent indentation -> do 
-          -- indent
           pushStack indentation
-          TsToken (L NoLoc TokIndent) <$> TsToken currentToken <$> preprocess xs 
+          loc <- locEnd <$> gets ppPrevLoc
+          TsToken (L loc TokIndent) <$> TsToken currentToken <$> preprocess xs 
 
         Newline -> do 
-          -- newline 
-          TsToken (L NoLoc TokNewline) <$> TsToken currentToken <$> preprocess xs 
+          loc <- locEnd <$> gets ppPrevLoc
+          TsToken (L loc TokNewline) <$> TsToken currentToken <$> preprocess xs 
 
         Dedent -> do 
-          -- dedent
           popStack 
-          TsToken (L NoLoc TokDedent) <$> TsToken currentToken <$> preprocess xs 
+          loc <- locEnd <$> gets ppPrevLoc
+          TsToken (L loc TokDedent) <$> TsToken currentToken <$> preprocess xs 
 
         DedentRepeat -> do 
           popStack
-          TsToken (L NoLoc TokDedent) <$> preprocess (TsToken currentToken xs)
+          loc <- locEnd <$> gets ppPrevLoc
+          TsToken (L loc TokDedent) <$> preprocess (TsToken currentToken xs)
           
         Noop -> do 
-          -- noop
           TsToken currentToken <$> preprocess xs 
 
 
