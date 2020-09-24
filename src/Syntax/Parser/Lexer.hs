@@ -489,6 +489,22 @@ data Action = Noop | Indent Int | Newline | Dedent | DedentRepeat
 
 data Comparison = CmpNoop | CmpIndent Int | CmpNewline | CmpDedent
 
+
+data Override = ShouldIndent Int | ShouldDedent | DontCare
+
+
+computeOverride :: L Tok -> PreprocessM Override
+computeOverride currentToken = do 
+  if expectingDedent (unLoc currentToken)  
+    then return ShouldDedent
+    else do 
+      expectsIndent <- gets ppExpectIndent
+      return $ if expectsIndent
+        then ShouldIndent $ case locOf currentToken of 
+                              NoLoc -> 0 
+                              Loc p _ -> posCol p - 1
+        else DontCare
+
 compareIndentation :: PreprocessM Comparison
 compareIndentation = do 
   indentation' <- gets ppIndentation
@@ -508,6 +524,21 @@ compareIndentation = do
         GT -> CmpIndent indentation
     Nothing -> return CmpNoop
 
+deviceAction :: Comparison -> Override -> Action 
+deviceAction (CmpIndent _)  ShouldDedent      = Dedent 
+deviceAction (CmpIndent i)  (ShouldIndent _)  = Indent i 
+deviceAction (CmpIndent _)  DontCare          = Noop 
+deviceAction CmpNewline     ShouldDedent      = Noop 
+deviceAction CmpNewline     (ShouldIndent _)  = Newline
+deviceAction CmpNewline     DontCare          = Newline 
+deviceAction CmpDedent      ShouldDedent      = Dedent 
+deviceAction CmpDedent      (ShouldIndent _)  = DedentRepeat
+deviceAction CmpDedent      DontCare          = DedentRepeat 
+deviceAction CmpNoop        ShouldDedent      = Dedent 
+deviceAction CmpNoop        (ShouldIndent i)  = Indent i 
+deviceAction CmpNoop        DontCare          = Noop 
+
+
 scan :: FilePath -> Text -> Either LexicalError TokStream
 scan filepath = runPreprocess . preprocess . runLexer lexer filepath . Text.unpack
 
@@ -521,8 +552,6 @@ scan filepath = runPreprocess . preprocess . runLexer lexer filepath . Text.unpa
           TsToken (L NoLoc TokDedent) <$> preprocess TsEof
         else return TsEof
     preprocess (TsError (Lex.LexicalError pos)) = throwError pos
-
-
     preprocess (TsToken (L _ (TokNewlineAndWhitespace n)) xs) = do
       setIdentation (Just n)
       preprocess xs
@@ -531,42 +560,22 @@ scan filepath = runPreprocess . preprocess . runLexer lexer filepath . Text.unpa
       preprocess xs
     preprocess (TsToken currentToken xs) = do 
 
-      expectsIndent <- gets ppExpectIndent
-      let expectsDedent = expectingDedent (unLoc currentToken)  
 
-      action <- compareIndentation
-      revised <- case action of 
-        CmpIndent indentation -> do 
-          setIdentation Nothing
-          return $ if expectsDedent
-                      then Dedent 
-                      else do 
-                        if expectsIndent
-                          then Indent indentation
-                          else Noop
 
-        CmpNewline -> do 
-          setIdentation Nothing 
-          return $ if expectsDedent
-                    then Noop 
-                    else Newline
-
-        CmpDedent -> do 
-          return $ if expectsDedent
-                    then Dedent 
-                    else DedentRepeat
-
-        CmpNoop -> do 
-          expectIndent $ expectingIndent (unLoc currentToken)
-          return $ if expectsDedent
-                    then Dedent 
-                    else if expectsIndent
-                            then Indent $ case locOf currentToken of 
-                                    NoLoc -> 0 
-                                    Loc p _ -> posCol p - 1
-                            else Noop 
+      -- devise the next Action
+      comparison <- compareIndentation
+      override <- computeOverride currentToken
+      let action = deviceAction comparison override
       
-      case revised of 
+      -- update state 
+      case comparison of 
+        CmpIndent _ -> setIdentation Nothing 
+        CmpNewline -> setIdentation Nothing 
+        CmpDedent -> return ()
+        CmpNoop -> expectIndent $ expectingIndent (unLoc currentToken)
+
+      -- interpret the Action
+      case action of 
         Indent indentation -> do 
           -- indent
           pushStack indentation
