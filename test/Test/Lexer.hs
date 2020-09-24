@@ -30,8 +30,9 @@ empty = testCase "empty source file" $ do
 indentation :: TestTree
 indentation = testGroup "Indentation" 
     [   simpleIndentation
-    ,   closingTokenIndentation
     ,   complexIndentation
+    ,   indentingTokens
+    ,   nonIndentingTokens
     ]
 
 simpleIndentation :: TestTree
@@ -63,12 +64,6 @@ simpleIndentation = testGroup "Simple"
                             \skip\n"
         let expected = Right [TokDo, TokIndent, TokDo, TokIndent, TokSkip, TokDedent, TokNewline, TokSkip, TokDedent, TokNewline, TokSkip]
         actual @?= expected
-    -- ,   testCase "indent 3" $ do 
-    --     let actual = run    "do\n\
-    --                         \  skip\n\
-    --                         \   skip"
-    --     let expected = Right [TokDo, TokIndent, TokSkip, TokSkip, TokDedent]
-    --     actual @?= expected
     ,   testCase "consecutive dedent before EOF" $ do 
         let actual = run    "do\n\
                             \  do\n\
@@ -77,8 +72,8 @@ simpleIndentation = testGroup "Simple"
         actual @?= expected
     ]
 
-closingTokenIndentation :: TestTree
-closingTokenIndentation = testGroup "Indent with closing tokens" 
+complexIndentation :: TestTree
+complexIndentation = testGroup "Complex"  
     [   testCase "indent" $ do 
         let actual = run    "do\n\
                             \  skip\n\
@@ -94,11 +89,7 @@ closingTokenIndentation = testGroup "Indent with closing tokens"
                             \od"
         let expected = Right [TokDo, TokIndent, TokDo, TokIndent, TokSkip, TokDedent, TokOd, TokDedent, TokOd]
         actual @?= expected
-    ]
-
-complexIndentation :: TestTree
-complexIndentation = testGroup "Complex"  
-    [   testCase "indent on the same line" $ do 
+    ,   testCase "indent on the same line" $ do 
         let actual = run    "do skip\n\
                             \   skip\n\
                             \od"
@@ -139,22 +130,19 @@ indentingTokens :: TestTree
 indentingTokens = testGroup "Tokens expecting indentation" 
     [   testCase "TokDo" $ do 
         let actual = run    "do\n\
-                            \  skip\n\
-                            \  skip\n"
-        let expected = Right [TokDo, TokIndent, TokSkip, TokNewline, TokSkip, TokDedent, TokNewline]
+                            \  skip"
+        let expected = Right [TokDo, TokIndent, TokSkip, TokDedent]
         actual @?= expected   
-    ,   testCase "TokIf" $ do 
+    ,      testCase "TokIf" $ do 
         let actual = run    "if\n\
-                            \  skip\n\
-                            \  skip\n"
-        let expected = Right [TokIf, TokIndent, TokSkip, TokNewline, TokSkip, TokDedent, TokNewline]
-        actual @?= expected  
-    ,   testCase "TokArror" $ do 
+                            \  skip"
+        let expected = Right [TokIf, TokIndent, TokSkip, TokDedent]
+        actual @?= expected   
+    ,      testCase "TokArror" $ do 
         let actual = run    "->\n\
-                            \  skip\n\
-                            \  skip\n"
-        let expected = Right [TokArrow, TokIndent, TokSkip, TokNewline, TokSkip, TokDedent, TokNewline]
-        actual @?= expected  
+                            \  skip"
+        let expected = Right [TokArrow, TokIndent, TokSkip, TokDedent]
+        actual @?= expected   
     ]
 
 nonIndentingTokens :: TestTree
@@ -163,7 +151,7 @@ nonIndentingTokens = testGroup "Tokens not expecting indentation"
         let actual = run    "a\n\
                             \    :=\n\
                             \  1\n"
-        let expected = Right [TokLowerName "a", TokAssign, TokInt 1, TokNewline]
+        let expected = Right [TokLowerName "a", TokAssign, TokInt 1]
         actual @?= expected   
     ]
 

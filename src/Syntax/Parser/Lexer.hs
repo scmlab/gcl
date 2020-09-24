@@ -437,44 +437,6 @@ popStack = modify $ \(PPState xs i b l) ->
             [] -> []
             (_:ts) -> ts) i b l
 
-
-
--- indent :: L Tok -> L Tok -> PreprocessM (TokStream -> TokStream)
--- indent previousToken currentToken = do 
---   levels <- gets fst
---   case indentedLevel (unLoc previousToken) of 
---     Nothing -> do 
---       -- the previous token is not `TokNewlineAndWhitespace` an such
---       -- calculate the indentation level, and push it into the stack
---       let level = case locOf currentToken of 
---                     NoLoc -> 0 
---                     Loc p _ -> posCol p - 1
---       let loc = locStart (locOf currentToken)
---       updateStack (level : levels)
---       return $ TsToken (L loc TokIndent)
---     Just level -> do 
---       let loc = locEnd (locOf previousToken)
---       updateStack (level : levels)
---       return $ TsToken (L loc TokIndent)
-
--- dedent :: L Tok -> PreprocessM (TokStream -> TokStream)
--- dedent previousToken = do 
---   levels <- gets fst
---   -- analyse the stack of indentation levels
---   let (_, lvls) = case uncons levels of 
---         Nothing -> (0, [])
---         Just pair -> pair
-
---   updateStack lvls
---   let loc = locEnd (locOf previousToken)
---   return $ TsToken (L loc TokDedent)
-
--- newline :: L Tok -> PreprocessM (TokStream -> TokStream)
--- newline previousToken = do 
---   -- insert a `newline`
---   let loc = locEnd $ locOf previousToken
---   return $ TsToken (L loc TokNewline)
-
 expectingIndent :: Tok -> Bool
 expectingIndent TokDo = True 
 expectingIndent TokIf = True 
@@ -485,27 +447,8 @@ expectingDedent :: Tok -> Bool
 expectingDedent TokOd = True 
 expectingDedent _ = False 
 
-data Action = Noop | Indent Int | Newline | Dedent | DedentRepeat
-
 
 data Comparison = CmpNoop | CmpIndent Int | CmpNewline | CmpDedent
-
-
-data Override = ShouldIndent Int | ShouldDedent | DontCare
-
-
-computeOverride :: L Tok -> PreprocessM Override
-computeOverride currentToken = do 
-  if expectingDedent (unLoc currentToken)  
-    then return ShouldDedent
-    else do 
-      expectsIndent <- gets ppExpectIndent
-      return $ if expectsIndent
-        then ShouldIndent $ case locOf currentToken of 
-                              NoLoc -> 0 
-                              Loc p _ -> posCol p - 1
-        else DontCare
-
 compareIndentation :: PreprocessM Comparison
 compareIndentation = do 
   indentation' <- gets ppIndentation
@@ -525,6 +468,20 @@ compareIndentation = do
         GT -> CmpIndent indentation
     Nothing -> return CmpNoop
 
+data Override = ShouldIndent Int | ShouldDedent | DontCare
+computeOverride :: L Tok -> PreprocessM Override
+computeOverride currentToken = do 
+  if expectingDedent (unLoc currentToken)  
+    then return ShouldDedent
+    else do 
+      expectsIndent <- gets ppExpectIndent
+      return $ if expectsIndent
+        then ShouldIndent $ case locOf currentToken of 
+                              NoLoc -> 0 
+                              Loc p _ -> posCol p - 1
+        else DontCare
+
+data Action = Noop | Indent Int | Newline | Dedent | DedentRepeat
 deviceAction :: Comparison -> Override -> Action 
 deviceAction (CmpIndent _)  ShouldDedent      = Dedent 
 deviceAction (CmpIndent i)  (ShouldIndent _)  = Indent i 
