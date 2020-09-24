@@ -540,25 +540,52 @@ scan filepath = runPreprocess . preprocess . runLexer lexer filepath . Text.unpa
       action <- compareIndentation
       case action of 
         Indent indentation -> do 
-          pushStack indentation
-          setIdentation Nothing 
-          TsToken (L NoLoc TokIndent) <$> TsToken currentToken <$> preprocess xs 
+          expectsIndent <- gets ppExpectIndent
+
+          if expectingDedent (unLoc currentToken)  
+            then do 
+              -- dedent
+              popStack
+              TsToken (L NoLoc TokDedent) <$> TsToken currentToken <$> preprocess xs
+            else do 
+              if expectsIndent
+                then do 
+                  -- indent
+                  pushStack indentation
+                  setIdentation Nothing 
+                  TsToken (L NoLoc TokIndent) <$> TsToken currentToken <$> preprocess xs 
+                else do 
+                  -- noop
+                  TsToken currentToken <$> preprocess xs 
 
         Newline -> do 
           setIdentation Nothing 
           if expectingDedent (unLoc currentToken)  
-            then TsToken currentToken <$> preprocess xs 
-            else TsToken (L NoLoc TokNewline) <$> TsToken currentToken <$> preprocess xs 
+            then 
+              -- noop
+              TsToken currentToken <$> preprocess xs 
+            else 
+              -- newline
+              TsToken (L NoLoc TokNewline) <$> TsToken currentToken <$> preprocess xs 
 
         Dedent -> do 
-          popStack
-          TsToken (L NoLoc TokDedent) <$> preprocess (TsToken currentToken xs)
+          if expectingDedent (unLoc currentToken)  
+            then do 
+              -- dedent
+              popStack
+              TsToken (L NoLoc TokDedent) <$> TsToken currentToken <$> preprocess xs 
+            else do 
+              -- dedent
+              popStack
+              TsToken (L NoLoc TokDedent) <$> preprocess (TsToken currentToken xs)
 
         Noop -> do 
           expectsIndent <- gets ppExpectIndent
           expectIndent $ expectingIndent (unLoc currentToken)
           if expectingDedent (unLoc currentToken)  
             then do 
+              -- dedent
+              popStack
               TsToken (L NoLoc TokDedent) <$> TsToken currentToken <$> preprocess xs 
             else do 
               if expectsIndent
@@ -569,7 +596,9 @@ scan filepath = runPreprocess . preprocess . runLexer lexer filepath . Text.unpa
                         Loc p _ -> posCol p - 1
                   pushStack indentation
                   TsToken (L NoLoc TokIndent) <$> TsToken currentToken <$> preprocess xs 
-                else TsToken currentToken <$> preprocess xs 
+                else
+                  -- noop
+                  TsToken currentToken <$> preprocess xs 
 
 
 

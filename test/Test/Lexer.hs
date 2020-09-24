@@ -90,8 +90,9 @@ closingTokenIndentation = testGroup "Indent with closing tokens"
         let actual = run    "do\n\
                             \  do\n\
                             \    skip\n\
+                            \  od\n\
                             \od"
-        let expected = Right [TokDo, TokIndent, TokDo, TokIndent, TokSkip, TokDedent, TokDedent, TokOd]
+        let expected = Right [TokDo, TokIndent, TokDo, TokIndent, TokSkip, TokDedent, TokOd, TokDedent, TokOd]
         actual @?= expected
     ]
 
@@ -103,32 +104,35 @@ complexIndentation = testGroup "Complex"
                             \od"
         let expected = Right [TokDo, TokIndent, TokSkip, TokNewline, TokSkip, TokDedent, TokOd]
         actual @?= expected
-    -- ,   testCase "indent on the same line but broken 1" $ do 
-    --     let actual = run    "do skip\n\
-    --                         \  skip\n\
-    --                         \od"
-    --     let expected = Right [TokDo, TokIndent, TokSkip, TokDedent, TokIndent, TokSkip, TokDedent, TokOd]
-    --     actual @?= expected
-    -- ,   testCase "indent on the same line but broken 2" $ do 
-    --     let actual = run    "do skip\n\
-    --                         \    skip\n\
-    --                         \od"
-    --     let expected = Right [TokDo, TokIndent, TokSkip, TokIndent, TokSkip, TokDedent, TokDedent, TokOd]
-    --     actual @?= expected
-    -- ,   testCase "dedent on the same line" $ do 
-    --     let actual = run    "do\n\
-    --                         \  skip od"
-    --     let expected = Right [TokDo, TokIndent, TokSkip, TokDedent, TokOd]
-    --     actual @?= expected
-    -- ,   testCase "indent and dedent on the same line" $ do 
-    --     let actual = run    "do skip od"
-    --     let expected = Right [TokDo, TokIndent, TokSkip, TokDedent, TokOd]
-    --     actual @?= expected
-    -- ,   testCase "dangling dedent" $ do 
-    --     let actual = run    "do skip\n\
-    --                         \ od"
-    --     let expected = Right [TokDo, TokIndent, TokSkip, TokDedent, TokOd]
-    --     actual @?= expected
+    ,   testCase "indent on the same line (with newline)" $ do 
+        let actual = run    "do skip\n\
+                            \    skip\n\
+                            \od"
+        let expected = Right [TokDo, TokIndent, TokSkip, TokSkip, TokDedent, TokOd]
+        actual @?= expected
+    ,   testCase "indent on the same line (broken)" $ do 
+        let actual = run    "do skip\n\
+                            \  skip\n\
+                            \od"
+        let expected = Right [TokDo, TokIndent, TokSkip, TokDedent, TokSkip, TokOd]
+        actual @?= expected
+    ,   testCase "dedent on the same line" $ do 
+        let actual = run    "do\n\
+                            \  skip od"
+        let expected = Right [TokDo, TokIndent, TokSkip, TokDedent, TokOd]
+        actual @?= expected
+    ,   testCase "dedent but in weird places 1" $ do 
+        let actual = run    "do\n\
+                            \  skip\n\
+                            \       od"
+        let expected = Right [TokDo, TokIndent, TokSkip, TokDedent, TokOd]
+        actual @?= expected
+    ,   testCase "dedent but in weird places 2" $ do 
+        let actual = run    "do\n\
+                            \  skip\n\
+                            \ od"
+        let expected = Right [TokDo, TokIndent, TokSkip, TokDedent, TokOd]
+        actual @?= expected
     ]
 
 indentingTokens :: TestTree
