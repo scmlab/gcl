@@ -8,6 +8,7 @@ module Syntax.Parser.Util
   , withLoc
   , symbol
   , ignore
+  , ignoreP
   , extract
   , between
   )
@@ -116,8 +117,15 @@ symbol t = do
 
 -- Create a parser of some symbol, that doesn't update source locations
 -- effectively excluding it from source location tracking
-ignore :: (Eq tok, Ord tok, Show tok, PrettyToken tok) => (tok -> Bool) -> P tok ()
-ignore p = do
+ignore :: (Eq tok, Ord tok, Show tok, PrettyToken tok) => tok -> P tok ()
+ignore t = do
+  L _ tok <- satisfy ((==) t . unLoc)
+  lift $ updateToken tok
+  return ()
+
+-- The predicate version of `ignore`
+ignoreP :: (Eq tok, Ord tok, Show tok, PrettyToken tok) => (tok -> Bool) -> P tok ()
+ignoreP p = do
   L _ tok <- satisfy (p . unLoc)
   lift $ updateToken tok
   return ()

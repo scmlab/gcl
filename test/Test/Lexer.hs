@@ -174,12 +174,12 @@ guardedCommands = testGroup "Guarded commands"
                                 ,   TokFi
                                 ]
         actual @?= expected
-    ,   testCase "single guarded command 2" $ do 
+    ,   testCase "single guarded command 2 (dubious)" $ do 
         let actual = run    "if True -> skip fi"
         let expected = Right    [   TokIf, TokIndent
                                     ,   TokTrue, TokArrow, TokIndent
-                                        , TokSkip, TokDedent, TokDedent
-                                ,   TokFi
+                                        , TokSkip, TokDedent
+                                ,   TokFi, TokDedent
                                 ]
         actual @?= expected
     ,   testCase "multiple guarded commands" $ do 

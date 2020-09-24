@@ -161,21 +161,18 @@ assign =
     <*> expressionList
 
 repetition :: Parser Stmt
-repetition =
-  withLoc
-    $   Do
-    <$  (symbol TokDo <?> "do")
-    <*  (symbol TokIndent <?> "indentation")
-    <*> guardedCommands
-    <*  (symbol TokOd <?> "od")
+repetition = withLoc $ Do <$> do 
+  block' 
+    (symbol TokDo <?> "do")
+    guardedCommands
+    (symbol TokOd <?> "od")
 
 selection :: Parser Stmt
-selection =
-  withLoc
-    $   If
-    <$  (symbol TokIf <?> "if")
-    <*> block guardedCommands
-    <*  (symbol TokFi <?> "fi")
+selection = withLoc $ If <$> do 
+  block' 
+    (symbol TokIf <?> "if")
+    guardedCommands
+    (symbol TokFi <?> "fi")
 
 guardedCommands :: Parser [GdCmd]
 guardedCommands = sepBy1 guardedCommand $ do 
@@ -439,16 +436,34 @@ variableList = sepBy1 lower (symbol TokComma <?> "comma") <?> "a list of variabl
 
 block :: Parser a -> Parser a
 block parser = do 
+  Util.ignore TokIndent <?> "indentation"
+  result <- parser
+  Util.ignore TokDedent <?> "dedentation"
+  return result
+
+block' :: Parser () -> Parser a -> Parser () -> Parser a
+block' open parser close = do 
+  open
   symbol TokIndent <?> "indentation"
   result <- parser
-  symbol TokDedent <?> "dedentation"
+  choice 
+    [ do -- the perfect case 
+        symbol TokDedent <?> "dedentation"
+        close 
+    , do 
+        -- the fucked up case:
+        --  because the lexer is not capable of handling cases like "if True -> skip fi"
+        --  where it's not possible to determine the number of `TokDedent` before `TokFi`
+        close 
+        symbol TokDedent <?> "dedentation"
+    ]
   return result
 
 -- consumes 0 or more newlines/indents/dedents
 ignoreIndentations :: Parser a -> Parser a
 ignoreIndentations parser = do 
   result <- parser
-  void $ many (Util.ignore indentationRelated)
+  void $ many (Util.ignoreP indentationRelated)
   return result
   where 
     indentationRelated TokNewline = True 
@@ -463,7 +478,7 @@ expectNewline = do
   t <- lift Util.getLastToken
   case t of
     Just TokNewline -> return ()
-    _               -> void $ some (Util.ignore ((==) TokNewline))
+    _               -> void $ some (Util.ignore TokNewline)
 
 symbol :: Tok -> Parser ()
 symbol = Util.symbol
