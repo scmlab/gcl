@@ -31,8 +31,9 @@ indentation :: TestTree
 indentation = testGroup "Indentation" 
     [   simpleIndentation
     ,   complexIndentation
-    ,   indentingTokens
+    ,   overridingTokens
     ,   nonIndentingTokens
+    ,   guardedCommands
     ]
 
 simpleIndentation :: TestTree
@@ -122,26 +123,29 @@ complexIndentation = testGroup "Complex"
         let actual = run    "do\n\
                             \  skip\n\
                             \ od"
-        let expected = Right [TokDo, TokIndent, TokSkip, TokDedent, TokOd]
+        let expected = Right [TokDo, TokIndent, TokSkip, TokDedent, TokDedent, TokOd]
         actual @?= expected
     ]
 
-indentingTokens :: TestTree
-indentingTokens = testGroup "Tokens expecting indentation" 
+overridingTokens :: TestTree
+overridingTokens = testGroup "Tokens asserting override" 
     [   testCase "TokDo" $ do 
         let actual = run    "do\n\
-                            \  skip"
-        let expected = Right [TokDo, TokIndent, TokSkip, TokDedent]
+                            \  skip\n\
+                            \od"
+        let expected = Right [TokDo, TokIndent, TokSkip, TokDedent, TokOd]
         actual @?= expected   
     ,      testCase "TokIf" $ do 
         let actual = run    "if\n\
-                            \  skip"
-        let expected = Right [TokIf, TokIndent, TokSkip, TokDedent]
+                            \  skip\n\
+                            \fi"
+        let expected = Right [TokIf, TokIndent, TokSkip, TokDedent, TokFi]
         actual @?= expected   
     ,      testCase "TokArror" $ do 
         let actual = run    "->\n\
-                            \  skip"
-        let expected = Right [TokArrow, TokIndent, TokSkip, TokDedent]
+                            \  skip\n\
+                            \|"
+        let expected = Right [TokArrow, TokIndent, TokSkip, TokDedent, TokGuardBar]
         actual @?= expected   
     ]
 
@@ -162,7 +166,7 @@ guardedCommands = testGroup "Guarded commands"
                             \fi"
         let expected = Right    [   TokIf, TokIndent
                                     ,   TokTrue, TokArrow, TokIndent
-                                        , TokSkip, TokDedent, TokDedent, TokNewline
+                                        , TokSkip, TokDedent, TokDedent
                                 ,   TokFi
                                 ]
         actual @?= expected
@@ -172,40 +176,57 @@ guardedCommands = testGroup "Guarded commands"
                             \fi"
         let expected = Right    [   TokIf, TokIndent
                                     ,   TokTrue, TokArrow, TokIndent
-                                        ,   TokSkip, TokDedent, TokNewline
-                                    ,   TokGuardBar, TokTrue, TokArrow, TokIndent
-                                        ,   TokSkip, TokDedent, TokDedent, TokNewline
+                                        ,   TokSkip, TokDedent, TokGuardBar
+                                    ,   TokTrue, TokArrow, TokIndent
+                                        ,   TokSkip, TokDedent, TokDedent
                                 ,   TokFi
                                 ]
         actual @?= expected     
-    -- ,   testCase "multiple guarded command on a single line" $ do 
-    --     let actual = run    "if True -> skip | True -> skip\n\
-    --                         \ | True -> skip\n\
-    --                         \fi"
-    --     let expected = Right    [   TokIf, TokIndent
-    --                                 ,   TokTrue, TokArrow, TokIndent
-    --                                     ,   TokSkip, TokDedent
-    --                                 ,   TokGuardBar, TokTrue, TokArrow, TokIndent
-    --                                     ,   TokSkip, TokDedent, TokNewline
-    --                                 ,   TokGuardBar, TokTrue, TokArrow, TokIndent
-    --                                     ,   TokSkip, TokDedent, TokDedent, TokNewline
-    --                             ,   TokFi
-    --                             ]
-    --     actual @?= expected      
+    ,   testCase "multiple guarded command on a single line" $ do 
+        let actual = run    "if True -> skip | True -> skip\n\
+                            \ | True -> skip\n\
+                            \fi"
+        let expected = Right    [   TokIf, TokIndent
+                                    ,   TokTrue, TokArrow, TokIndent
+                                        ,   TokSkip, TokDedent, TokGuardBar
+                                    ,   TokTrue, TokArrow, TokIndent
+                                        ,   TokSkip, TokDedent, TokGuardBar
+                                    ,   TokTrue, TokArrow, TokIndent
+                                        ,   TokSkip, TokDedent, TokDedent
+                                ,   TokFi
+                                ]
+        actual @?= expected      
     ,   testCase "nested nightmare" $ do 
         let actual = run    "if True -> do False -> skip\n\
                             \            | False -> skip\n\
+                            \           od\n\
                             \ | True -> skip\n\
                             \fi"
         let expected = Right    [   TokIf, TokIndent
                                     ,   TokTrue, TokArrow, TokIndent
                                         , TokDo, TokIndent
                                             ,   TokFalse, TokArrow, TokIndent
-                                                ,   TokSkip, TokDedent, TokNewline
-                                            ,   TokGuardBar, TokFalse, TokArrow, TokIndent
-                                                , TokSkip, TokDedent, TokDedent, TokDedent, TokNewline
-                                    ,   TokGuardBar, TokTrue, TokArrow, TokIndent
-                                        , TokSkip, TokDedent, TokDedent, TokNewline
+                                                ,   TokSkip, TokDedent, TokGuardBar
+                                            ,   TokFalse, TokArrow, TokIndent
+                                                , TokSkip, TokDedent, TokDedent, TokOd, TokDedent, TokGuardBar
+                                    ,   TokTrue, TokArrow, TokIndent
+                                        , TokSkip, TokDedent, TokDedent
+                                ,   TokFi]
+        actual @?= expected
+    ,   testCase "nested nightmare 2 (dubious)" $ do 
+        let actual = run    "if True -> do False -> skip\n\
+                            \            | False -> skip od\n\
+                            \ | True -> skip\n\
+                            \fi"
+        let expected = Right    [   TokIf, TokIndent
+                                    ,   TokTrue, TokArrow, TokIndent
+                                        , TokDo, TokIndent
+                                            ,   TokFalse, TokArrow, TokIndent
+                                                ,   TokSkip, TokDedent, TokGuardBar
+                                            ,   TokFalse, TokArrow, TokIndent
+                                                , TokSkip, TokDedent, TokOd, TokDedent, TokDedent, TokGuardBar
+                                    ,   TokTrue, TokArrow, TokIndent
+                                        , TokSkip, TokDedent, TokDedent
                                 ,   TokFi]
         actual @?= expected
     ,   testCase "multiple statements in side a guarded command" $ do 
@@ -216,9 +237,9 @@ guardedCommands = testGroup "Guarded commands"
         let expected = Right    [   TokIf, TokIndent
                                     ,   TokTrue, TokArrow, TokIndent
                                         ,   TokSkip, TokNewline, 
-                                            TokSkip, TokDedent, TokNewline
-                                    ,   TokGuardBar, TokTrue, TokArrow, TokIndent
-                                        ,   TokSkip, TokDedent, TokDedent, TokNewline
+                                            TokSkip, TokDedent, TokGuardBar
+                                    ,   TokTrue, TokArrow, TokIndent
+                                        ,   TokSkip, TokDedent, TokDedent
                                 ,   TokFi]
         actual @?= expected     
     

@@ -413,7 +413,8 @@ data PPState = PPState
   { -- stack of indentation levels
     ppIndentStack :: [Int]
     -- set as the number of indentation after processing tokens like `TokNewlineAndWhitespace`
-  , ppIndentation :: Maybe Int
+    -- the second field is set to True if it's `TokNewlineAndWhitespaceAndBar`
+  , ppIndentation :: Maybe (Int, Bool)
     -- set to True if expected to be followed by a `TokIndent` (e.g. `TokDo`)
   , ppExpectIndent :: Bool      
     -- Loc of the previous token
@@ -425,7 +426,7 @@ type PreprocessM = ExceptT LexicalError (State PPState)
 runPreprocess :: PreprocessM a -> Either LexicalError a
 runPreprocess program = evalState (runExceptT program) (PPState [0] Nothing False NoLoc)
 
-setIdentation :: Maybe Int -> PreprocessM ()
+setIdentation :: Maybe (Int, Bool) -> PreprocessM ()
 setIdentation i = modify (\(PPState xs _ b l) -> PPState xs i b l)
 
 pushStack :: Int -> PreprocessM ()
@@ -445,15 +446,17 @@ expectingIndent _ = False
 
 expectingDedent :: Tok -> Bool
 expectingDedent TokOd = True 
+expectingDedent TokFi = True 
+expectingDedent TokGuardBar = True 
 expectingDedent _ = False 
 
 
-data Comparison = CmpNoop | CmpIndent Int | CmpNewline | CmpDedent
+data Comparison = CmpNoop | CmpIndent Int | CmpNewline Bool | CmpDedent
 compareIndentation :: PreprocessM Comparison
 compareIndentation = do 
   indentation' <- gets ppIndentation
   case indentation' of 
-    Just indentation -> do
+    Just (indentation, hasBar) -> do
       -- analyse the stack of indentation levels
       stack <- gets ppIndentStack
       let level = case stack of 
@@ -463,7 +466,7 @@ compareIndentation = do
         -- the indentation is lesser than the current level
         LT -> CmpDedent 
         -- the indentation is the same as the current level
-        EQ -> CmpNewline
+        EQ -> CmpNewline hasBar
         -- the indentation is greater than the current level
         GT -> CmpIndent indentation
     Nothing -> return CmpNoop
@@ -481,20 +484,21 @@ computeOverride currentToken = do
                               Loc p _ -> posCol p - 1
         else DontCare
 
-data Action = Noop | Indent Int | Newline | Dedent | DedentRepeat
+data Action = Noop | Indent Int | Newline | Bar | Dedent | DedentRepeat
+
 deviceAction :: Comparison -> Override -> Action 
-deviceAction (CmpIndent _)  ShouldDedent      = Dedent 
-deviceAction (CmpIndent i)  (ShouldIndent _)  = Indent i 
-deviceAction (CmpIndent _)  DontCare          = Noop 
-deviceAction CmpNewline     ShouldDedent      = Noop 
-deviceAction CmpNewline     (ShouldIndent _)  = Newline
-deviceAction CmpNewline     DontCare          = Newline 
-deviceAction CmpDedent      ShouldDedent      = Dedent 
-deviceAction CmpDedent      (ShouldIndent _)  = DedentRepeat
-deviceAction CmpDedent      DontCare          = DedentRepeat 
-deviceAction CmpNoop        ShouldDedent      = Dedent 
-deviceAction CmpNoop        (ShouldIndent i)  = Indent i 
-deviceAction CmpNoop        DontCare          = Noop 
+deviceAction (CmpIndent _)    ShouldDedent      = Dedent 
+deviceAction (CmpIndent i)    (ShouldIndent _)  = Indent i 
+deviceAction (CmpIndent _)    DontCare          = Noop 
+deviceAction (CmpNewline _)   ShouldDedent      = Noop 
+deviceAction (CmpNewline b)   (ShouldIndent _)  = if b then Bar else Newline
+deviceAction (CmpNewline b)   DontCare          = if b then Bar else Newline 
+deviceAction CmpDedent        ShouldDedent      = DedentRepeat 
+deviceAction CmpDedent        (ShouldIndent _)  = DedentRepeat
+deviceAction CmpDedent        DontCare          = DedentRepeat 
+deviceAction CmpNoop          ShouldDedent      = Dedent 
+deviceAction CmpNoop          (ShouldIndent i)  = Indent i 
+deviceAction CmpNoop          DontCare          = Noop 
 
 
 scan :: FilePath -> Text -> Either LexicalError TokStream
@@ -512,10 +516,10 @@ scan filepath = runPreprocess . preprocess . runLexer lexer filepath . Text.unpa
         else return TsEof
     preprocess (TsError (Lex.LexicalError pos)) = throwError pos
     preprocess (TsToken (L _ (TokNewlineAndWhitespace n)) xs) = do
-      setIdentation (Just n)
+      setIdentation (Just (n, False))
       preprocess xs
     preprocess (TsToken (L _ (TokNewlineAndWhitespaceAndBar n)) xs) = do
-      setIdentation (Just n)
+      setIdentation (Just (n, True))
       preprocess xs
     preprocess (TsToken currentToken xs) = do 
 
@@ -529,7 +533,7 @@ scan filepath = runPreprocess . preprocess . runLexer lexer filepath . Text.unpa
       -- update state 
       case comparison of 
         CmpIndent _ -> setIdentation Nothing 
-        CmpNewline -> setIdentation Nothing 
+        CmpNewline _ -> setIdentation Nothing 
         CmpDedent -> return ()
         CmpNoop -> do 
           PPState stack i _ _ <- get 
@@ -548,6 +552,10 @@ scan filepath = runPreprocess . preprocess . runLexer lexer filepath . Text.unpa
         Newline -> do 
           loc <- locEnd <$> gets ppPrevLoc
           TsToken (L loc TokNewline) <$> TsToken currentToken <$> preprocess xs 
+
+        Bar -> do 
+          loc <- locEnd <$> gets ppPrevLoc
+          TsToken (L loc TokGuardBar) <$> TsToken currentToken <$> preprocess xs 
 
         Dedent -> do 
           popStack 
