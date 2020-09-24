@@ -36,7 +36,7 @@ import           Pretty
 tests :: TestTree
 tests = testGroup
     "Parser"
-    [expression, type']
+    [expression, type', declaration, statement]
     -- [expression, type', declaration, statement, statements, program]
 
 --------------------------------------------------------------------------------
@@ -322,6 +322,11 @@ declaration = testGroup "Declarations" $ map
     (toTestTree Parser.declaration)
     [ RightCase "variable" "var x : Int\n"
         $ VarDecl [Name "x" (at 5)] (TBase TInt (9 <-> 11)) Nothing (1 <-> 11)
+    , RightCase "variable (with newlines in between)" 
+        "var\n\
+        \ x \n\
+        \   : Int\n"
+        $ VarDecl [Name "x" (pos 2 2 5 <--> pos 2 2 5)] (TBase TInt (pos 3 6 13 <--> pos 3 8 15)) Nothing (pos 1 1 0 <--> pos 3 8 15)
     , RightCase "variable with properties" "var x : Int { True }\n" $ VarDecl
         [Name "x" (at 5)]
         (TBase TInt (9 <-> 11))
@@ -371,11 +376,11 @@ statement = testGroup "Single statement" $ map
               [ GdCmd (Lit (Bol True) (4 <-> 7)) [Skip (12 <-> 15)] (4 <-> 15)
               , GdCmd (Lit (Bol False) (pos 2 4 19 <--> pos 2 8 23)) [Abort (pos 2 13 28 <--> pos 2 17 32)] (pos 2 4 19 <--> pos 2 17 32)]
               (pos 1 1 0 <--> pos 2 20 35)
-    , RightCase "loop" "{ True , bnd: a }" $ LoopInvariant
+    , RightCase "loop 1" "{ True , bnd: a }" $ LoopInvariant
         (Lit (Bol True) (3 <-> 6))
         (Var (Name "a" (at 15)) (at 15))
         (1 <-> 17)
-    , RightCase "loop" "do True -> skip od"
+    , RightCase "loop 2" "do True -> skip od"
         $ Do
               [GdCmd (Lit (Bol True) (4 <-> 7)) [Skip (12 <-> 15)] (4 <-> 15)]
               (1 <-> 18)

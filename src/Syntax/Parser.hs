@@ -174,20 +174,12 @@ selection =
   withLoc
     $   If
     <$  (symbol TokIf <?> "if")
-    <*  (symbol TokIndent <?> "indentation")
-    <*> guardedCommands
+    <*> block guardedCommands
     <*  (symbol TokFi <?> "fi")
 
 guardedCommands :: Parser [GdCmd]
 guardedCommands = sepBy1 guardedCommand $ do 
-  symbol TokNewline <?> "newline"
   symbol TokGuardBar <?> "|"
--- guardedCommands :: Parser [GdCmd]
--- guardedCommands = sepBy1 guardedCommand $ do 
---   -- newlines are optional before the bar "|", 
---   -- to allow multiple guarded commands on a single line (e.g. "| True -> skip | False -> skip")
---   optional (symbol TokNewline <?> "newline") 
---   symbol TokGuardBar <?> "|"
 
 guardedCommand :: Parser GdCmd
 guardedCommand =
@@ -195,7 +187,7 @@ guardedCommand =
     $   GdCmd
     <$> predicate
     <*  ((symbol TokArrow <?> "->") <|> (symbol TokArrowU <?> "→"))
-    <*> statements1
+    <*> block statements1
 
 hole :: Parser Stmt
 hole = withLoc $ SpecQM <$ (symbol TokQM <?> "?")
@@ -395,11 +387,11 @@ type' = ignoreIndentations $ do
 -- | Declarations
 
 declaration :: Parser Declaration
-declaration = do 
-  decl <- choice [constantDecl, variableDecl, letDecl] <?> "declaration"
-  expectNewline <?> "<newline> after a declaration"
-  return decl
+declaration = choice [constantDecl, variableDecl, letDecl] <?> "declaration"
 
+declarations :: Parser [Declaration]
+declarations = sepBy declaration (symbol TokNewline) <?> "declaration seperated by newlines"
+  
 constantDecl :: Parser Declaration
 constantDecl = withLoc $ do
   symbol TokCon <?> "con"
@@ -444,7 +436,15 @@ variableList = sepBy1 lower (symbol TokComma <?> "comma") <?> "a list of variabl
 --------------------------------------------------------------------------------
 -- | Combinators
 
--- -- consumes 0 or more newlines
+
+block :: Parser a -> Parser a
+block parser = do 
+  symbol TokIndent <?> "indentation"
+  result <- parser
+  symbol TokDedent <?> "dedentation"
+  return result
+
+-- consumes 0 or more newlines/indents/dedents
 ignoreIndentations :: Parser a -> Parser a
 ignoreIndentations parser = do 
   result <- parser

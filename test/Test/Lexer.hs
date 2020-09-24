@@ -125,6 +125,10 @@ complexIndentation = testGroup "Complex"
                             \ od"
         let expected = Right [TokDo, TokIndent, TokSkip, TokDedent, TokDedent, TokOd]
         actual @?= expected
+    ,   testCase "indent and dedent on the same line" $ do 
+        let actual = run    "do skip od"
+        let expected = Right [TokDo, TokIndent, TokSkip, TokDedent, TokOd]
+        actual @?= expected
     ]
 
 overridingTokens :: TestTree
@@ -161,9 +165,17 @@ nonIndentingTokens = testGroup "Tokens not expecting indentation"
 
 guardedCommands :: TestTree
 guardedCommands = testGroup "Guarded commands" 
-    [   testCase "single guarded command" $ do 
+    [   testCase "single guarded command 1" $ do 
         let actual = run    "if True -> skip\n\
                             \fi"
+        let expected = Right    [   TokIf, TokIndent
+                                    ,   TokTrue, TokArrow, TokIndent
+                                        , TokSkip, TokDedent, TokDedent
+                                ,   TokFi
+                                ]
+        actual @?= expected
+    ,   testCase "single guarded command 2" $ do 
+        let actual = run    "if True -> skip fi"
         let expected = Right    [   TokIf, TokIndent
                                     ,   TokTrue, TokArrow, TokIndent
                                         , TokSkip, TokDedent, TokDedent
