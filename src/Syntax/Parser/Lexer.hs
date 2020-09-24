@@ -23,7 +23,6 @@ import qualified Language.Lexer.Applicative    as Lex
 import           Text.Regex.Applicative
 import Control.Monad.Except
 import Control.Monad.State.Lazy 
-import Data.List (uncons)
 
 --------------------------------------------------------------------------------
 -- | Tok & TokStream
@@ -439,9 +438,6 @@ popStack = modify $ \(PPState xs i b) ->
 expectIndent :: Bool -> PreprocessM ()
 expectIndent b = modify $ \(PPState xs i _) -> PPState xs i b
 
--- updateToken :: L Tok -> PreprocessM ()
--- updateToken tok = modify (\((s, _)) -> (s, Just tok))
-
 -- indent :: L Tok -> L Tok -> PreprocessM (TokStream -> TokStream)
 -- indent previousToken currentToken = do 
 --   levels <- gets fst
@@ -488,31 +484,29 @@ expectingDedent :: Tok -> Bool
 expectingDedent TokOd = True 
 expectingDedent _ = False 
 
--- indentedLevel :: Tok -> Maybe Int
--- indentedLevel (TokNewlineAndWhitespaceAndBar level) = Just level
--- indentedLevel (TokNewlineAndWhitespace level) = Just level
--- indentedLevel _ = Nothing
+data Action = Noop | Indent Int | Newline | Dedent | DedentRepeat
 
-data Action = Noop | Indent Int | Newline | Dedent 
 
-compareIndentation :: PreprocessM Action
+data Comparison = CmpNoop | CmpIndent Int | CmpNewline | CmpDedent
+
+compareIndentation :: PreprocessM Comparison
 compareIndentation = do 
   indentation' <- gets ppIndentation
   case indentation' of 
     Just indentation -> do
       -- analyse the stack of indentation levels
       stack <- gets ppIndentStack
-      let (level, _) = case uncons stack of 
-            Nothing -> (0, [])
-            Just pair -> pair
+      let level = case stack of 
+                    [] -> 0
+                    (x:_) -> x
       return $ case indentation `compare` level of 
         -- the indentation is lesser than the current level
-        LT -> Dedent 
+        LT -> CmpDedent 
         -- the indentation is the same as the current level
-        EQ -> Newline
+        EQ -> CmpNewline
         -- the indentation is greater than the current level
-        GT -> Indent indentation
-    Nothing -> return Noop
+        GT -> CmpIndent indentation
+    Nothing -> return CmpNoop
 
 scan :: FilePath -> Text -> Either LexicalError TokStream
 scan filepath = runPreprocess . preprocess . runLexer lexer filepath . Text.unpack
@@ -537,74 +531,65 @@ scan filepath = runPreprocess . preprocess . runLexer lexer filepath . Text.unpa
       preprocess xs
     preprocess (TsToken currentToken xs) = do 
 
-      action <- compareIndentation
-      case action of 
-        Indent indentation -> do 
-          expectsIndent <- gets ppExpectIndent
+      expectsIndent <- gets ppExpectIndent
+      let expectsDedent = expectingDedent (unLoc currentToken)  
 
-          if expectingDedent (unLoc currentToken)  
-            then do 
-              -- dedent
-              popStack
-              TsToken (L NoLoc TokDedent) <$> TsToken currentToken <$> preprocess xs
-            else do 
-              if expectsIndent
-                then do 
-                  -- indent
-                  pushStack indentation
-                  setIdentation Nothing 
-                  TsToken (L NoLoc TokIndent) <$> TsToken currentToken <$> preprocess xs 
-                else do 
-                  -- noop
-                  TsToken currentToken <$> preprocess xs 
+      action <- compareIndentation
+      revised <- case action of 
+        CmpIndent indentation -> do 
+          setIdentation Nothing
+          return $ if expectsDedent
+                      then Dedent 
+                      else do 
+                        if expectsIndent
+                          then Indent indentation
+                          else Noop
+
+        CmpNewline -> do 
+          setIdentation Nothing 
+          return $ if expectsDedent
+                    then Noop 
+                    else Newline
+
+        CmpDedent -> do 
+          return $ if expectsDedent
+                    then Dedent 
+                    else DedentRepeat
+
+        CmpNoop -> do 
+          expectIndent $ expectingIndent (unLoc currentToken)
+          return $ if expectsDedent
+                    then Dedent 
+                    else if expectsIndent
+                            then Indent $ case locOf currentToken of 
+                                    NoLoc -> 0 
+                                    Loc p _ -> posCol p - 1
+                            else Noop 
+      
+      case revised of 
+        Indent indentation -> do 
+          -- indent
+          pushStack indentation
+          TsToken (L NoLoc TokIndent) <$> TsToken currentToken <$> preprocess xs 
 
         Newline -> do 
-          setIdentation Nothing 
-          if expectingDedent (unLoc currentToken)  
-            then 
-              -- noop
-              TsToken currentToken <$> preprocess xs 
-            else 
-              -- newline
-              TsToken (L NoLoc TokNewline) <$> TsToken currentToken <$> preprocess xs 
+          -- newline 
+          TsToken (L NoLoc TokNewline) <$> TsToken currentToken <$> preprocess xs 
 
         Dedent -> do 
-          if expectingDedent (unLoc currentToken)  
-            then do 
-              -- dedent
-              popStack
-              TsToken (L NoLoc TokDedent) <$> TsToken currentToken <$> preprocess xs 
-            else do 
-              -- dedent
-              popStack
-              TsToken (L NoLoc TokDedent) <$> preprocess (TsToken currentToken xs)
+          -- dedent
+          popStack 
+          TsToken (L NoLoc TokDedent) <$> TsToken currentToken <$> preprocess xs 
 
-        Noop -> do 
-          expectsIndent <- gets ppExpectIndent
-          expectIndent $ expectingIndent (unLoc currentToken)
-          if expectingDedent (unLoc currentToken)  
-            then do 
-              -- dedent
-              popStack
-              TsToken (L NoLoc TokDedent) <$> TsToken currentToken <$> preprocess xs 
-            else do 
-              if expectsIndent
-                then do 
-                  -- indent
-                  let indentation = case locOf currentToken of 
-                        NoLoc -> 0 
-                        Loc p _ -> posCol p - 1
-                  pushStack indentation
-                  TsToken (L NoLoc TokIndent) <$> TsToken currentToken <$> preprocess xs 
-                else
-                  -- noop
-                  TsToken currentToken <$> preprocess xs 
-
-
-
-              
-
+        DedentRepeat -> do 
+          popStack
+          TsToken (L NoLoc TokDedent) <$> preprocess (TsToken currentToken xs)
           
+        Noop -> do 
+          -- noop
+          TsToken currentToken <$> preprocess xs 
+
+
 
       -- (levels, previous) <- get 
 
