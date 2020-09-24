@@ -450,6 +450,7 @@ program = testGroup
     "Program"
     [ golden "empty"   "./test/source/empty.gcl"
     , golden "quant 1" "./test/source/quant1.gcl"
+    , golden "2" "./test/source/2.gcl"
     ]
 
   where
@@ -470,16 +471,19 @@ program = testGroup
         :: (FilePath, ByteString) -> (FilePath, ByteString) -> IO (Maybe String)
     compare (goldenFilePath, golden) (inputFilePath, input) = do
         program <- parseProgram (inputFilePath, input)
-        let result =
-                Text.encodeUtf8
-                .   renderLazy
-                .   layoutCompact
-                .   pretty
-                $   program
+        case program of 
+            Left err -> return $ Just $ show err  
+            Right program -> do 
+                let result =
+                        Text.encodeUtf8
+                        .   renderLazy
+                        .   layoutCompact
+                        .   pretty
+                        $   program
 
-        case golden == result of
-            True  -> return Nothing
-            False -> return (Just $ unpack result)
+                case golden == result of
+                    True  -> return Nothing
+                    False -> return (Just $ unpack result ++ "\n\ngolden:\n" ++ unpack golden)
 
     update :: (FilePath, ByteString) -> IO ()
     update (inputFilePath, input) = do

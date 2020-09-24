@@ -60,9 +60,9 @@ instance Pretty Stmt where
   pretty (LoopInvariant p bnd _) =
     lbrace <+> pretty p <+> "bnd:" <+> pretty bnd <+> rbrace
   pretty (Do gdCmds _) =
-    "do" <+> align (encloseSep mempty mempty " |" (map pretty gdCmds)) <+> "od"
+    "do" <+> align (encloseSep mempty mempty " | " (map pretty gdCmds)) <+> "od"
   pretty (If gdCmds _) =
-    "if" <+> align (encloseSep mempty mempty " |" (map pretty gdCmds)) <+> "fi"
+    "if" <+> align (encloseSep mempty mempty " | " (map pretty gdCmds)) <+> "fi"
   pretty (SpecQM _) = "?"
   pretty (Spec   _) = "{!  !}"
 

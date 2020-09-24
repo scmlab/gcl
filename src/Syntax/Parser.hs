@@ -81,21 +81,18 @@ specContent = do
 -- | Stmts
 
 statement :: Parser Stmt
-statement = do
-  stmt <- choice
-      [ try assign
-      , abort
-      , try assertWithBnd
-      , spec
-      , assert
-      , skip
-      , repetition
-      , selection
-      , hole
-      ]
-    <?> "statement"
-  -- expectNewline <?> "<newline> after a statement"
-  return stmt
+statement = choice
+  [ try assign
+  , abort
+  , try assertWithBnd
+  , spec
+  , assert
+  , skip
+  , repetition
+  , selection
+  , hole
+  ]
+  <?> "statement"
 
 
 statements :: Parser [Stmt]
@@ -104,34 +101,6 @@ statements = sepBy statement (symbol TokNewline)
 statements1 :: Parser [Stmt]
 statements1 = sepBy1 statement (symbol TokNewline)
   
-
--- statements :: Parser [Stmt]
--- statements = try statements1 <|> return []
-
--- statements1 :: Parser [Stmt]
--- statements1 = do
---   stmt <- statement
---   rest <- choice
---     [ do
---       expectLineEnding <?> "a newline or a semicolon"
---       try statements <|> return []
---     , return []
---     ]
---   return (stmt : rest)
-
--- expectLineEnding :: Parser ()
--- expectLineEnding = choice [withoutSemicolon, withSemicolon]
---  where
---   withoutSemicolon = expectNewline
---   withSemicolon    = do
---     -- see if the latest accepcted token is TokSemi
---     t <- lift Util.getLastToken
---     case t of
---       Just TokSemi -> return ()
---       _            -> void $ do
---         Util.ignore TokSemi
---         void $ many (Util.ignore TokNewline)
-
 skip :: Parser Stmt
 skip = withLoc $ Skip <$ symbol TokSkip
 
