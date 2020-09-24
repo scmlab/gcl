@@ -82,12 +82,15 @@ expression = testGroup "Expressions" $ map
     , RightCase "literal (False)" "False" $ Lit (Bol False) (1 <-> 5)
     , RightCase "variable" "x" $ var "x" (at 1)
     , RightCase "conant" "X" $ con "X" (at 1)
-    , RightCase "numeric 1" "(1 + (1))" $ bin Add
-                                              (at 4)
+    , RightCase "numeric 1" "(1 \n\
+                            \ +\n\
+                            \ (\n\
+                            \   1))" $ bin Add
+                                              (pos 2 2 5 <--> pos 2 2 5)
                                               (Lit (Num 1) (at 2))
-                                              (2 <-> 4)
-                                              (Lit (Num 1) (6 <-> 8))
-                                              (1 <-> 9)
+                                              (pos 1 2 1 <--> pos 2 2 5)
+                                              (Lit (Num 1) (pos 3 2 8 <--> pos 4 5 14))
+                                              (pos 1 1 0 <--> pos 4 6 15)
     , RightCase "numeric 2" "A + X * Y" $ bin
         Add
         (at 3)
