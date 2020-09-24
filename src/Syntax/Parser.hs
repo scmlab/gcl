@@ -346,27 +346,26 @@ expression = makeExprParser term table <?> "expression"
 -- | Type
 
 type' :: Parser Type
-type' = makeExprParser term table <?> "type"
+type' = ignoreIndentations $ do 
+  makeExprParser term table <?> "type"
  where
   table :: [[Operator Parser Type]]
   table = [[InfixR function]]
 
   function :: Parser (Type -> Type -> Type)
-  function =
-    (do
-        symbol TokArrow <?> "->"
-        return $ \x y -> TFunc x y (x <--> y)
-      )
-      <|> (do
-            symbol TokArrowU <?> "→"
-            return $ \x y -> TFunc x y (x <--> y)
-          )
+  function = ignoreIndentations $ do 
+    choice [ symbol TokArrow <?> "->"
+           , symbol TokArrowU <?> "→"
+           ]
+    return $ \x y -> TFunc x y (x <--> y)
 
   term :: Parser Type
-  term = parens type' <|> array <|> base <?> "type term"
+  term = ignoreIndentations $ do 
+    parens type' <|> array <|> base <?> "type term"
 
   base :: Parser Type
-  base = withLoc (TBase <$> extract isBaseType) <?> "base type"
+  base = do 
+    withLoc (TBase <$> extract isBaseType) <?> "base type"
    where
     isBaseType (TokUpperName "Int" ) = Just TInt
     isBaseType (TokUpperName "Bool") = Just TBool
@@ -446,8 +445,16 @@ variableList = sepBy1 lower (symbol TokComma <?> "comma") <?> "a list of variabl
 -- | Combinators
 
 -- -- consumes 0 or more newlines
--- ignoreNewlines :: Parser ()
--- ignoreNewlines = void $ many (Util.ignore isIndentation)
+ignoreIndentations :: Parser a -> Parser a
+ignoreIndentations parser = do 
+  result <- parser
+  void $ many (Util.ignore indentationRelated)
+  return result
+  where 
+    indentationRelated TokNewline = True 
+    indentationRelated TokIndent = True 
+    indentationRelated TokDedent = True 
+    indentationRelated _ = False 
 
 -- consumes 1 or more newlines
 expectNewline :: Parser ()
@@ -456,7 +463,7 @@ expectNewline = do
   t <- lift Util.getLastToken
   case t of
     Just TokNewline -> return ()
-    _               -> void $ some (Util.ignore TokNewline)
+    _               -> void $ some (Util.ignore ((==) TokNewline))
 
 symbol :: Tok -> Parser ()
 symbol = Util.symbol

@@ -36,7 +36,8 @@ import           Pretty
 tests :: TestTree
 tests = testGroup
     "Parser"
-    [expression, type', declaration, statement, statements, program]
+    [expression, type']
+    -- [expression, type', declaration, statement, statements, program]
 
 --------------------------------------------------------------------------------
 -- | Helpers
@@ -296,6 +297,11 @@ type' = testGroup "Types" $ map
         (TFunc (TBase TChar (2 <-> 5)) (TBase TInt (10 <-> 12)) (1 <-> 13))
         (TBase TInt (18 <-> 20))
         (1 <-> 20)
+    , RightCase "function types (with newlines everywhere)" "(Char \n\
+                                                            \   ->\n\
+                                                            \   (\n\
+                                                            \           Int))"
+        $ TFunc (TBase TChar (2 <-> 5)) (TBase TInt (pos 3 4 16 <--> pos 4 15 32)) (pos 1 1 0 <--> pos 4 16 33)
     , RightCase "array" "array [0 .. N) of Int" $ TArray
         (Interval (Including (Lit (Num 0) (at 8)))
                   (Excluding (Const (Name "N" (at 13)) (at 13)))
