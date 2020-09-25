@@ -452,6 +452,7 @@ expectingDedent _ = False
 
 
 data Comparison = CmpNoop | CmpIndent Int | CmpNewline Bool | CmpDedent
+  deriving Show
 compareIndentation :: PreprocessM Comparison
 compareIndentation = do 
   indentation' <- gets ppIndentation
@@ -472,6 +473,7 @@ compareIndentation = do
     Nothing -> return CmpNoop
 
 data Override = ShouldIndent Int | ShouldDedent | DontCare
+  deriving Show
 computeOverride :: L Tok -> PreprocessM Override
 computeOverride currentToken = do 
   if expectingDedent (unLoc currentToken)  
@@ -484,7 +486,8 @@ computeOverride currentToken = do
                               Loc p _ -> posCol p - 1
         else DontCare
 
-data Action = Noop | Indent Int | Newline | Bar | Dedent | DedentRepeat
+data Action = Noop | Indent Int | Newline | Bar | Dedent | DedentRepeat 
+  deriving Show
 
 deviceAction :: Comparison -> Override -> Action 
 deviceAction (CmpIndent _)    ShouldDedent      = Dedent 
@@ -524,22 +527,20 @@ scan filepath = runPreprocess . preprocess . runLexer lexer filepath . Text.unpa
     preprocess (TsToken currentToken xs) = do 
 
 
-
       -- devise the next Action
       comparison <- compareIndentation
       override <- computeOverride currentToken
       let action = deviceAction comparison override
       
+
       -- update state 
+      PPState stack i _ _ <- get 
+      put $ PPState stack i (expectingIndent (unLoc currentToken)) (locOf currentToken)
       case comparison of 
         CmpIndent _ -> setIdentation Nothing 
         CmpNewline _ -> setIdentation Nothing 
         CmpDedent -> return ()
-        CmpNoop -> do 
-          PPState stack i _ _ <- get 
-          let b = expectingIndent (unLoc currentToken)
-          let l = locOf currentToken 
-          put $ PPState stack i b l
+        CmpNoop -> return ()
 
 
       -- interpret the Action

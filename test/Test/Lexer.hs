@@ -14,18 +14,12 @@ import Syntax.Parser.Lexer (Tok(..), LexicalError, scan)
 tests :: TestTree
 tests = testGroup
     "Lexer"
-    [indentation]
-    -- [indentation, indentingTokens, nonIndentingTokens, guardedCommands, empty]
+    -- [programs]
+    [indentation, empty, programs]
 
 -- helper function
 run :: Text -> Either LexicalError [Tok]
 run text = map unLoc  . streamToList <$> scan "<filepath>" text
-
-empty :: TestTree
-empty = testCase "empty source file" $ do 
-    let actual = run ""
-    let expected = Right []
-    actual @?= expected
 
 indentation :: TestTree
 indentation = testGroup "Indentation" 
@@ -256,3 +250,17 @@ guardedCommands = testGroup "Guarded commands"
         actual @?= expected     
     
     ]
+
+empty :: TestTree
+empty = testCase "empty source file" $ do 
+    let actual = run ""
+    let expected = Right []
+    actual @?= expected
+
+programs :: TestTree
+programs = testCase "programs" $ do 
+    let actual = run    "skip\n\
+                        \if True -> skip fi"
+    let expected = Right    [   TokSkip, TokNewline
+                            ,   TokIf, TokIndent, TokTrue, TokArrow, TokIndent, TokSkip, TokDedent, TokFi, TokDedent]
+    actual @?= expected
