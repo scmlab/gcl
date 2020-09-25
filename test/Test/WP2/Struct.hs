@@ -297,11 +297,11 @@ loop = testGroup
     actual <-
       run
         "{ 0 = 1 , bnd: A }       \n\
-                  \do 0 = 2 ->              \n\
-                  \   { 0 = 3 , bnd: A }    \n\
-                  \   do 0 = 4 -> abort od  \n\
-                  \od                       \n\
-                  \{ 0 = 0 }\n"
+        \do 0 = 2 ->              \n\
+        \     { 0 = 3 , bnd: A }    \n\
+        \     do 0 = 4 -> abort od  \n\
+        \od                       \n\
+        \{ 0 = 0 }\n"
     actual @?= Right
       ( Just $ Struct
           (loopInvariant (0 === 1) "A")

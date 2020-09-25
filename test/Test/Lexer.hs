@@ -15,7 +15,7 @@ tests :: TestTree
 tests = testGroup
     "Lexer"
     -- [programs]
-    [indentation, empty, programs]
+    [indentation, programs]
 
 -- helper function
 run :: Text -> Either LexicalError [Tok]
@@ -251,16 +251,26 @@ guardedCommands = testGroup "Guarded commands"
     
     ]
 
-empty :: TestTree
-empty = testCase "empty source file" $ do 
-    let actual = run ""
-    let expected = Right []
-    actual @?= expected
-
 programs :: TestTree
-programs = testCase "programs" $ do 
-    let actual = run    "skip\n\
-                        \if True -> skip fi"
-    let expected = Right    [   TokSkip, TokNewline
-                            ,   TokIf, TokIndent, TokTrue, TokArrow, TokIndent, TokSkip, TokDedent, TokFi, TokDedent]
-    actual @?= expected
+programs = testGroup "Programs commands" 
+    [   testCase "empty source file" $ do 
+        let actual = run ""
+        let expected = Right []
+        actual @?= expected
+    ,   testCase "programs 1" $ do 
+        let actual = run    "skip\n\
+                            \if True -> skip fi"
+        let expected = Right    [   TokSkip, TokNewline
+                                ,   TokIf, TokIndent, TokTrue, TokArrow, TokIndent, TokSkip, TokDedent, TokFi, TokDedent]
+        actual @?= expected
+    ,   testCase "programs 2" $ do 
+        let actual = run    "con A, B : Int\n\
+                            \var x, y : Int\n\
+                            \{ z = A * B }"
+        let expected = Right    [   TokCon, TokUpperName "A", TokComma, TokUpperName "B", TokColon, TokUpperName "Int", TokNewline
+                                ,   TokVar, TokLowerName "x", TokComma, TokLowerName "y", TokColon, TokUpperName "Int", TokNewline
+                                ,   TokBraceStart, TokLowerName "z", TokEQ, TokUpperName "A", TokMul, TokUpperName "B", TokBraceEnd ]
+        actual @?= expected
+    ]
+
+

@@ -62,7 +62,7 @@ parse parser filepath tokenStream =
 
 program :: Parser Program
 program = withLoc $ do
-  decls <- declarations <?> "declarations"
+  decls <- many (declaration <* symbol TokNewline) <?> "declarations"
   stmts <- statements <?> "statements"
   eof
   -- let construct
@@ -76,6 +76,56 @@ program = withLoc $ do
 specContent :: Parser [Stmt]
 specContent = do
   many statement <?> "statements"
+
+--------------------------------------------------------------------------------
+-- | Declarations
+
+declaration :: Parser Declaration
+declaration = choice [constantDecl, variableDecl, letDecl] <?> "declaration"
+
+declarations :: Parser [Declaration]
+declarations = sepBy declaration (symbol TokNewline) <?> "declaration seperated by newlines"
+  
+constantDecl :: Parser Declaration
+constantDecl = withLoc $ do
+  symbol TokCon <?> "con"
+  vars <- constList
+  symbol TokColon <?> "colon"
+  t         <- type'
+  assertion <- optional (braces predicate)
+  
+  return $ ConstDecl vars t assertion
+
+variableDecl :: Parser Declaration
+variableDecl = withLoc $ do
+  symbol TokVar <?> "var"
+  vars <- variableList
+  symbol TokColon <?> "colon"
+  t         <- type'
+  assertion <- optional (braces predicate)
+  return $ VarDecl vars t assertion
+
+letDecl :: Parser Declaration
+letDecl = withLoc $ do
+  symbol TokLet <?> "let"
+  name <- upper
+  args <- map nameToText <$> many lower
+  symbol TokEQ <?> "="
+  expr <- predicate
+  return $ LetDecl name args expr
+
+
+
+--------------------------------------------------------------------------------
+-- | Variables and stuff
+
+-- separated by commas
+constList :: Parser [Name]
+constList = sepBy1 upper (symbol TokComma <?> "comma") <?> "a list of constants separated by commas"
+
+-- separated by commas
+variableList :: Parser [Name]
+variableList = sepBy1 lower (symbol TokComma <?> "comma") <?> "a list of variables separated by commas"
 
 --------------------------------------------------------------------------------
 -- | Stmts
@@ -350,56 +400,6 @@ type' = ignoreIndentations $ do
     return $ Interval (start i) (end j)
 
 --------------------------------------------------------------------------------
--- | Declarations
-
-declaration :: Parser Declaration
-declaration = choice [constantDecl, variableDecl, letDecl] <?> "declaration"
-
-declarations :: Parser [Declaration]
-declarations = sepBy declaration (symbol TokNewline) <?> "declaration seperated by newlines"
-  
-constantDecl :: Parser Declaration
-constantDecl = withLoc $ do
-  symbol TokCon <?> "con"
-  vars <- constList
-  symbol TokColon <?> "colon"
-  t         <- type'
-  assertion <- optional (braces predicate)
-  
-  return $ ConstDecl vars t assertion
-
-variableDecl :: Parser Declaration
-variableDecl = withLoc $ do
-  symbol TokVar <?> "var"
-  vars <- variableList
-  symbol TokColon <?> "colon"
-  t         <- type'
-  assertion <- optional (braces predicate)
-  return $ VarDecl vars t assertion
-
-letDecl :: Parser Declaration
-letDecl = withLoc $ do
-  symbol TokLet <?> "let"
-  name <- upper
-  args <- map nameToText <$> many lower
-  symbol TokEQ <?> "="
-  expr <- predicate
-  return $ LetDecl name args expr
-
-
-
---------------------------------------------------------------------------------
--- | Variables and stuff
-
--- separated by commas
-constList :: Parser [Name]
-constList = sepBy1 upper (symbol TokComma <?> "comma") <?> "a list of constants separated by commas"
-
--- separated by commas
-variableList :: Parser [Name]
-variableList = sepBy1 lower (symbol TokComma <?> "comma") <?> "a list of variables separated by commas"
-
---------------------------------------------------------------------------------
 -- | Combinators
 
 
@@ -416,13 +416,13 @@ block' open parser close = do
   symbol TokIndent <?> "indentation"
   result <- parser
   choice 
-    [ do -- the perfect case 
+    [ do -- the ideal case 
         symbol TokDedent <?> "dedentation"
         close 
     , do 
         -- the fucked up case:
-        --  because the lexer is not capable of handling cases like "if True -> skip fi"
-        --  where it's not possible to determine the number of `TokDedent` before `TokFi`
+        --  the lexer is not capable of handling cases like "if True -> skip fi"
+        --  because it's not possible to determine the number of `TokDedent` before `TokFi`
         close 
         symbol TokDedent <?> "dedentation"
     ]
@@ -435,7 +435,6 @@ ignoreIndentations parser = do
   void $ many (Util.ignoreP indentationRelated)
   return result
   where 
-    indentationRelated TokNewline = True 
     indentationRelated TokIndent = True 
     indentationRelated TokDedent = True 
     indentationRelated _ = False 

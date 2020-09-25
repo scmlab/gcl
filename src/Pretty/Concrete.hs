@@ -30,7 +30,7 @@ instance Pretty Declaration where
       <+> pretty t
       <+> braces (pretty p)
   pretty (VarDecl names t Nothing _) =
-    "con" <+> hsep (punctuate comma (map pretty names)) <+> ":" <+> pretty t
+    "var" <+> hsep (punctuate comma (map pretty names)) <+> ":" <+> pretty t
   pretty (VarDecl names t (Just p) _) =
     "var"
       <+> hsep (punctuate comma (map pretty names))
