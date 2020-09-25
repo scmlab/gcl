@@ -451,6 +451,7 @@ program = testGroup
     [ golden "empty"   "./test/source/empty.gcl"
     , golden "quant 1" "./test/source/quant1.gcl"
     , golden "2" "./test/source/2.gcl"
+    , golden "issue 1" "./test/source/issue1.gcl"
     ]
 
   where

@@ -58,7 +58,7 @@ instance Pretty Stmt where
       (punctuate comma (map (pretty . depart) es))
   pretty (Assert p _) = lbrace <+> pretty p <+> rbrace
   pretty (LoopInvariant p bnd _) =
-    lbrace <+> pretty p <+> "bnd:" <+> pretty bnd <+> rbrace
+    lbrace <+> pretty p <+> ", bnd:" <+> pretty bnd <+> rbrace
   pretty (Do gdCmds _) =
     "do" <+> align (encloseSep mempty mempty " | " (map pretty gdCmds)) <+> "od"
   pretty (If gdCmds _) =
