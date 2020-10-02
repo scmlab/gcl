@@ -128,10 +128,10 @@ expand defs n (Lam x e l) = do
 expand _ _ h@(Hole _) = return h
 expand _ _ (Quant op ys r t l) =  --- SCM: deal with this later
   return $ Quant op ys r t l
-expand defs _ (Subst e env) = return $ Subst (Subst e env) defs
-     -- SCM: deal with this later
+expand _ _ (Subst e env) = return $ Subst e env
+     -- SCM: Is this right? deal with this later
 
--- Extend a `Subst` with a `Defns` 
+-- Extend a `Subst` with a `Defns`
 extendSubstWithDefns :: Subst -> Defns -> Subst
 extendSubstWithDefns env defns = env <> Map.mapMaybeWithKey substDefn defns
 

@@ -22,6 +22,7 @@ import           Control.Exception              ( IOException
 import           Error
 import           GCL.Expr                       ( runSubstM
                                                 , expand
+                                                , subst
                                                 )
 import           GCL.WP                         ( structProg
                                                 , runWP
@@ -111,7 +112,9 @@ handleRequest (ReqInsertAssertion i) = catchGlobalError $ do
   return $ Just $ ResInsert i expr
 handleRequest (ReqSubstitute i expr _subst) = catchGlobalError $ do
   Concrete.Program _ _ defns _ _ <- getProgram
-  let expr' = runSubstM (expand defns 1 expr)
+  let expr' = runSubstM (do
+                e' <- expand defns 1 expr
+                subst _subst e')
   return $ Just $ ResSubstitute i expr'
 handleRequest ReqDebug = error "crash!"
 handleRequest ReqQuit  = return Nothing
@@ -146,7 +149,7 @@ load2 filepath = do
                                                                      tokens
       persistProgram program
       struct <- toStruct program
-      case struct of 
+      case struct of
         Nothing -> return ([], [], globalProps)
         Just struct' -> do
           persistStruct struct'
