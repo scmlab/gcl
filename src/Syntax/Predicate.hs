@@ -15,7 +15,7 @@ import           Syntax.Concrete                ( Expr
                                                 , Name
                                                 , Subst
                                                 )
-import           Syntax.Abstract                ( Fresh )
+-- import           Syntax.Abstract                ( Fresh )
 import qualified GCL.Expr                      as E
 
 --------------------------------------------------------------------------------
@@ -56,7 +56,7 @@ toExpr (Conjunct xs        ) = C.conjunct (map toExpr xs)
 toExpr (Disjunct xs        ) = C.disjunct (map toExpr xs)
 toExpr (Negate   x         ) = C.neg (toExpr x)
 
-subst :: Fresh m => Subst -> Pred -> m Pred
+subst :: E.ExpandM m => Subst -> Pred -> m Pred
 subst env (Constant e   ) = Constant <$> E.subst env e
 subst env (Bound     e l) = Bound <$> E.subst env e <*> pure l
 subst env (Assertion e l) = Assertion <$> E.subst env e <*> pure l
