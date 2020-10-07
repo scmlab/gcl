@@ -76,26 +76,27 @@ subst env (  Lam x e l  ) = do
   let env' = if not conv then env else Map.filterWithKey (const . (x /=)) env
   Lam x' <$> subst env' e' <*> pure l
 subst env (Quant op xs range term l) = do
-  op'                  <- subst env op
-  (xs', range', term') <- subLocal xs range term
-  let env' = Map.filterWithKey (const . not . (`elem` map nameToText xs')) env
+  let fs = free (Quant op xs range term l)
+  let env' = Map.filterWithKey (const . (`elem` fs)) env
+  op'                  <- subst env' op
+  (xs', range', term') <- subLocal (freeSubst env') xs range term
   Quant op' xs' <$> subst env' range' <*> subst env' term' <*> pure l
  where
-  subLocal :: Fresh m => [Name] -> Expr -> Expr -> m ([Name], Expr, Expr)
-  subLocal [] r t = return ([], r, t)
-  subLocal (Name i ll : is) r t
-    | i `elem` freeInEnv = do
-        -- if `i` is a free variable of `env`
+  subLocal :: Fresh m => Set Text ->
+      [Name] -> Expr -> Expr -> m ([Name], Expr, Expr)
+  subLocal _ [] r t = return ([], r, t)
+  subLocal freeInEnv' (Name i ll : is) r t
+    | i `elem` freeInEnv' = do
+        -- if `i` is a free variable of `env'`
         -- instantiate a dummy varialbe `j`
       j  <- freshVar "dummy"
       -- substitute the variable `i` in `r` with the dummy variable
       r' <- subst (Map.singleton i (Var (Name j NoLoc) NoLoc)) r
       -- substitute the variable `i` in `t` with the dummy variable
       t' <- subst (Map.singleton i (Var (Name j NoLoc) NoLoc)) t
-      first3 ((Name j ll) :) <$> subLocal is r' t'
-    | otherwise = first3 (Name i l :) <$> subLocal is r t
+      first3 ((Name j ll) :) <$> subLocal freeInEnv' is r' t'
+    | otherwise = first3 (Name i ll :) <$> subLocal freeInEnv' is r t
 
-  freeInEnv = freeSubst env
   first3 f (x, y, z) = (f x, y, z)
 
 subst env (Subst e theta) = return $ Subst (Subst e theta) env
@@ -128,10 +129,10 @@ expand defs n (Lam x e l) = do
 expand _ _ h@(Hole _) = return h
 expand _ _ (Quant op ys r t l) =  --- SCM: deal with this later
   return $ Quant op ys r t l
-expand defs _ (Subst e env) = return $ Subst (Subst e env) defs
-     -- SCM: deal with this later
+expand _ _ (Subst e env) = return $ Subst e env
+     -- SCM: Is this right? deal with this later
 
--- Extend a `Subst` with a `Defns` 
+-- Extend a `Subst` with a `Defns`
 extendSubstWithDefns :: Subst -> Defns -> Subst
 extendSubstWithDefns env defns = env <> Map.mapMaybeWithKey substDefn defns
 
