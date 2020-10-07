@@ -124,7 +124,13 @@ subst env c@(Const (Name x _)  _) = do
     Nothing -> return $ fromMaybe c (Map.lookup x env)
 subst _   (Op    op l ) = return $ Op op l
 subst _   (Lit   n  l ) = return $ Lit n l
-subst env (App e1 e2 l) = App <$> subst env e1 <*> subst env e2 <*> pure l
+subst env (App e1 e2 l) = do
+    e1' <- subst env e1
+    e2' <- subst env e2
+    case e1' of
+      Lam x body _ -> subst (Map.singleton x e2') body
+      _ -> return $ App e1' e2' l
+  -- App <$> subst env e1 <*> subst env e2 <*> pure l
 subst _   (Hole l     ) = return $ Hole l
 subst env (Lam x e l  ) = do
   (x', e', conv) <- convLam (freeSubst env) x e
