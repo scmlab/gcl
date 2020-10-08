@@ -32,7 +32,7 @@ runtst filepath = do
        -- print program
        -- putStr "\n"
        -- Either StructError ((a, [Obligation]), [Specification])
-        case runSM (structProg Map.empty stmts) (0, 0, 0) of
+        case runSM (structProg stmts) Map.empty (0, 0, 0) of
           Left  err                        -> print err
           Right (((_, obs), specs), state) -> do
             putStrLn "== obligations"

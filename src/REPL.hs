@@ -29,7 +29,7 @@ import           GCL.WP                         ( structProg
                                                 )
 import           GCL.WP2
 import qualified GCL.WP2                       as WP2
--- import GCL.Type as Type
+import GCL.Type as Type
 import           Syntax.Parser.Lexer            ( TokStream )
 import qualified Syntax.Parser.Lexer           as Lexer
 import qualified Syntax.Parser                 as Parser
@@ -112,9 +112,7 @@ handleRequest (ReqInsertAssertion i) = catchGlobalError $ do
   return $ Just $ ResInsert i expr
 handleRequest (ReqSubstitute i expr _subst) = catchGlobalError $ do
   Concrete.Program _ _ defns _ _ <- getProgram
-  let expr' = runSubstM (do
-                e' <- expand defns 1 expr
-                subst _subst e')
+  let expr' = runSubstM (expand (Concrete.Subst expr _subst)) defns 1
   return $ Just $ ResSubstitute i expr'
 handleRequest ReqDebug = error "crash!"
 handleRequest ReqQuit  = return Nothing
@@ -218,8 +216,8 @@ parseSpec = parse Parser.specContent "<specification>"
 
 sweep1 :: Concrete.Program -> REPLM ([PO], [Spec])
 sweep1 (Concrete.Program _ _ ds statements _) = do
-  ((_, pos), specs) <- withExceptT StructError $ liftEither $ runWP
-    (structProg ds statements)
+  ((_, pos), specs) <- withExceptT StructError $ liftEither $
+                         runWP (structProg statements) ds
   return (pos, specs)
 
 sweep2 :: Predicate.Struct -> REPLM ([PO], [Spec])

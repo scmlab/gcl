@@ -189,8 +189,8 @@ instance ToJSON StructError2 where
 --------------------------------------------------------------------------------
 -- | Struct
 
-data ProgView 
-    = ProgViewEmpty 
+data ProgView
+    = ProgViewEmpty
     | ProgViewOkay Pred [C.Stmt] Pred
     | ProgViewMissingPrecondition [C.Stmt] Pred
     | ProgViewMissingPostcondition Pred [C.Stmt]
@@ -200,7 +200,7 @@ progView :: [C.Stmt] -> ProgView
 progView [] = ProgViewEmpty
 progView (C.Assert pre l:[]) = ProgViewMissingPrecondition [] (Assertion pre l)
 progView (C.LoopInvariant pre bnd l:[]) = ProgViewMissingPrecondition [] (LoopInvariant pre bnd l)
-progView stmts = case (head stmts, last stmts) of 
+progView stmts = case (head stmts, last stmts) of
   (C.Assert pre l, C.Assert post m) -> ProgViewOkay (Assertion pre l) (init (tail stmts)) (Assertion post m)
   (C.LoopInvariant pre bnd l, C.Assert post m) -> ProgViewOkay (LoopInvariant pre bnd l) (init (tail stmts)) (Assertion post m)
   (C.Assert pre l, _) -> ProgViewMissingPostcondition (Assertion pre l) (tail stmts)
@@ -209,10 +209,10 @@ progView stmts = case (head stmts, last stmts) of
   (_, _) -> ProgViewMissingBoth stmts
 
 programToStruct :: C.Program -> WPM (Maybe Struct)
-programToStruct (C.Program _ _ _ statements _) = case progView statements of 
+programToStruct (C.Program _ _ _ statements _) = case progView statements of
   ProgViewEmpty -> return Nothing
   ProgViewOkay pre stmts post -> Just <$> wpStmts [pre] stmts post
-  -- Missing precondition, insert { True } instead 
+  -- Missing precondition, insert { True } instead
   ProgViewMissingPrecondition stmts post ->Just <$> wpStmts [Constant C.true] stmts post
   ProgViewMissingPostcondition _pre stmts -> throwError (MissingPostcondition (locOf (last stmts)))
   ProgViewMissingBoth stmts -> throwError (MissingPostcondition (locOf (last stmts)))
@@ -247,7 +247,7 @@ wpStmts imposed stmts post = do
     C.Assert _ _            -> error "[ panic ] Assert in wp"
     C.LoopInvariant _  _  _ -> error "[ panic ] LoopInvariant in wp"
     C.Assign        xs es l -> do
-      pre <- subst (assignmentEnv xs es) post
+      pre <- undefined -- TO BE UPDATED. WAS: subst (assignmentEnv xs es) post
       return $ Assign (L l pre) xs es
 
     C.If gdCmds l -> do
@@ -304,7 +304,7 @@ updateStruct imposed (Struct _dumped stmts next) post = do
     Skip  l        -> return $ Skip (updateL l post)
     Abort l        -> return $ Abort l
     Assign l xs es -> do
-      pre <- subst (assignmentEnv xs es) post
+      pre <- undefined -- TO BE UPDATED. WAS: subst (assignmentEnv xs es) post
       return $ Assign (updateL l pre) xs es
     If l gdCmds -> do
       gdCmds' <- forM gdCmds $ \(GdCmd guard body) -> do
