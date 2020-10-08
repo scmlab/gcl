@@ -1,12 +1,10 @@
-con A, B : Int
+con A, B : Int { A > 0 ∧ B > 0}
 var gcd : Int -> Int -> Int
 var x, y : Int
 
-{ A = 21 && B = 49}
+x, y := A, B
 
-x, y := 21, 49
-
-{ gcd x y = gcd A B && x > 0 && y > 0, bnd: x + y }
+{ gcd x y = gcd A B ∧ x > 0 ∧ y > 0, bnd: x + y }
 do x < y -> y := y - x
  | x > y -> x := x - y
 od

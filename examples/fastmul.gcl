@@ -1,0 +1,15 @@
+con A, B : Int { A > 0 }
+var x, y, z : Int
+
+let INV = x * y + z = A * B
+
+x, y, z := A, B, 0
+{ INV ∧ x ≥ 0, bnd: x }
+do x /= 0 ->
+    if even x -> y := y * 2
+                 x := x / 2
+     | odd  x -> z := z + y
+                 x := x - 1
+    fi
+od
+{ z = A * B }

@@ -1,0 +1,10 @@
+con N : Int { N ≥ 0 }
+var x, y : Int
+
+x, y := 0, 0
+
+{ 0 ≤ x ≤ N ∧ 0 ≤ y ≤ N , bnd: (N + 1) * (N - y) + x }
+do x ≠ 0 -> x := x - 1
+ | y ≠ N -> x, y := N, y + 1
+od
+{ x = 0 ∧ y = N }

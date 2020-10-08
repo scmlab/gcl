@@ -1,0 +1,8 @@
+con N : Int { N ≥ 0 }
+var n, y : Int
+
+x, n := 1, N
+{ x = exp 2 n ∧ 0 ≤ n ≤ N, bnd : N - n}
+do n ≠ N -> x, y := x + 1, y + y
+od
+{ x = exp 2 N }
