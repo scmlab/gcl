@@ -2,24 +2,22 @@
 
 module Pretty.Concrete where
 
-import           Data.Text.Prettyprint.Doc
-
-import           Syntax.Location
-import           Syntax.Concrete
-import           Pretty.Abstract                ( )
-import           Pretty.Util
+import Data.Text.Prettyprint.Doc
+import Pretty.Abstract ()
+import Pretty.Util
+import Syntax.Concrete
+import Syntax.Location
 
 --------------------------------------------------------------------------------
--- | Program
 
+-- | Program
 instance Pretty Program where
   pretty (Program decls _ _ stmts _) =
     vsep (map pretty decls ++ map pretty stmts)
 
 --------------------------------------------------------------------------------
+
 -- | Declaration
-
-
 instance Pretty Declaration where
   pretty (ConstDecl names t Nothing _) =
     "con" <+> hsep (punctuate comma (map pretty names)) <+> ":" <+> pretty t
@@ -39,40 +37,42 @@ instance Pretty Declaration where
       <+> braces (pretty p)
   pretty (LetDecl name args expr _) =
     "let" <+> pretty name <+> hsep (map pretty args) <+> "=" <+> pretty expr
-    -- vsep (map pretty decls ++ map pretty stmts)
+
+-- vsep (map pretty decls ++ map pretty stmts)
 
 --------------------------------------------------------------------------------
--- | Name
 
+-- | Name
 instance Pretty Name where
   pretty (Name n _) = pretty n
 
 --------------------------------------------------------------------------------
--- | Stmt
 
+-- | Stmt
 instance Pretty Stmt where
-  pretty (Skip  _) = "skip"
+  pretty (Skip _) = "skip"
   pretty (Abort _) = "abort"
   pretty (Assign xs es _) =
-    hsep (punctuate comma (map (pretty . depart) xs)) <+> ":=" <+> hsep
-      (punctuate comma (map (pretty . depart) es))
+    hsep (punctuate comma (map (pretty . depart) xs)) <+> ":="
+      <+> hsep
+        (punctuate comma (map (pretty . depart) es))
   pretty (Assert p _) = lbrace <+> pretty p <+> rbrace
   pretty (LoopInvariant p bnd _) =
     lbrace <+> pretty p <+> ", bnd:" <+> pretty bnd <+> rbrace
   pretty (Do gdCmds _) =
-    "do" <+> align (encloseSep mempty mempty " | " (map pretty gdCmds)) <+> "od"
+    "do" <+> align (encloseSep mempty mempty " | " (map pretty gdCmds)) <> line <> "od"
   pretty (If gdCmds _) =
-    "if" <+> align (encloseSep mempty mempty " | " (map pretty gdCmds)) <+> "fi"
+    "if" <+> align (encloseSep mempty mempty " | " (map pretty gdCmds)) <> line <> "fi"
   pretty (SpecQM _) = "?"
-  pretty (Spec   _) = "{!  !}"
+  pretty (Spec _) = "{!  !}"
 
 instance Pretty GdCmd where
   pretty (GdCmd guard body _) =
     pretty guard <+> "->" <+> vsep (map pretty body)
 
 --------------------------------------------------------------------------------
--- | Expr
 
+-- | Expr
 instance PrettyPrec Expr where
   prettyPrec n = prettyPrec n . depart
 
@@ -80,6 +80,7 @@ instance Pretty Expr where
   pretty = pretty . depart
 
 --------------------------------------------------------------------------------
+
 -- | Type
 
 -- instance Pretty Endpoint where
