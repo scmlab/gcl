@@ -1,2 +1,3 @@
 { z + x * y = A * B ∧ y ≥ 0 , bnd: y }
-do y ≠ 0 -> x := x * 2 + y od
+do y ≠ 0 -> x := x * 2 + y
+od
