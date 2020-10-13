@@ -75,9 +75,11 @@ freeSubst = Set.unions . Map.map free
 freeDefns :: Defns -> Set Text
 freeDefns = Set.unions . Map.map free
 
-shrinkSubst :: Set Text -> Subst -> Subst
-shrinkSubst fs env =
-   Map.filterWithKey (const . (`elem` fs)) env
+intersectSubst :: Set Text -> Subst -> Subst
+intersectSubst fs = Map.filterWithKey (const . (`elem` fs))
+
+subtractSubst :: [Text] -> Subst -> Subst
+subtractSubst xs = Map.filterWithKey (const . not . (`elem` xs))
 
 applySubst :: Expr -> Subst -> Expr
 applySubst e env | null env = e
@@ -130,17 +132,16 @@ subst env (App e1 e2 l) = do
     case e1' of
       Lam x body _ -> subst (Map.singleton x e2') body
       _ -> return $ App e1' e2' l
-  -- App <$> subst env e1 <*> subst env e2 <*> pure l
 subst _   (Hole l     ) = return $ Hole l
 subst env (Lam x e l  ) = do
   (x', e', conv) <- convLam (freeSubst env) x e
-  let env' = if not conv then env else Map.filterWithKey (const . (x /=)) env
+  let env' = if conv then env else subtractSubst [x] env
   Lam x' <$> subst env' e' <*> pure l
 subst env (Quant op xs range term l) = do
-  -- let env' = shrinkSubst (free (Quant op xs range term l)) env
   op'                  <- subst env op
   (xs', range', term') <- subLocal (freeSubst env) xs range term
-  Quant op' xs' <$> subst env range' <*> subst env term' <*> pure l
+  let env' = subtractSubst (map nameToText xs') env
+  Quant op' xs' <$> subst env' range' <*> subst env' term' <*> pure l
  where
   subLocal :: ExpandM m => Set Text ->
       [Name] -> Expr -> Expr -> m ([Name], Expr, Expr)
