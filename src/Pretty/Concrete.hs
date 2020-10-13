@@ -59,16 +59,13 @@ instance Pretty Stmt where
   pretty (Assert p _) = lbrace <+> pretty p <+> rbrace
   pretty (LoopInvariant p bnd _) =
     lbrace <+> pretty p <+> ", bnd:" <+> pretty bnd <+> rbrace
-  pretty (Do gdCmds _) =
-    "do" <+> align (encloseSep mempty mempty " | " (map pretty gdCmds)) <> line <> "od"
-  pretty (If gdCmds _) =
-    "if" <+> align (encloseSep mempty mempty " | " (map pretty gdCmds)) <> line <> "fi"
+  pretty (Do gdCmds _) = "do" <+> align (encloseSep mempty mempty " | " (map pretty gdCmds)) <> line <> "od"
+  pretty (If gdCmds _) = "if" <+> align (encloseSep mempty mempty " | " (map pretty gdCmds)) <> line <> "fi"
   pretty (SpecQM _) = "?"
   pretty (Spec _) = "{!  !}"
 
 instance Pretty GdCmd where
-  pretty (GdCmd guard body _) =
-    pretty guard <+> "->" <+> vsep (map pretty body)
+  pretty (GdCmd guard body _) = pretty guard <+> "->" <+> align (vsep (map pretty body))
 
 --------------------------------------------------------------------------------
 

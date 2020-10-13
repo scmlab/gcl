@@ -374,7 +374,6 @@ whitespaceButNewlineRE = matchWhen
   matchWhen :: (Text -> Bool) -> Tok -> RE Text Tok
   matchWhen p symbol = msym (\t -> if p t then Just symbol else Nothing)
 
-
 commentStartRE :: RE Text Text
 commentStartRE = text "--"
 
@@ -383,11 +382,20 @@ commentEndRE prefix =
   TokComment <$> (pure prefix +++ (Text.concat <$> many anySym) +++ text "\n")
   where (+++) = liftA2 (<>)
 
+comment :: RE Text [Text] 
+comment = many (psym $ adapt isSpace) <* text "--" <* many (psym $ adapt (not . isNewline)) <* (psym $ adapt isNewline)
+
 newlineAndWhitespace :: RE Text Tok
-newlineAndWhitespace = TokNewlineAndWhitespace <$ psym (adapt isNewline) <*> reFoldl Greedy (\n _ -> succ n) 0 (psym $ adapt (\c -> isSpace c && not (isNewline c)))
+newlineAndWhitespace = TokNewlineAndWhitespace 
+  <$  psym (adapt isNewline)  -- matches a newline 
+  <*  many comment            -- skip lines of comments
+  <*> reFoldl Greedy (\n _ -> succ n) 0 (psym $ adapt (\c -> isSpace c && not (isNewline c)))
 
 newlineAndWhitespaceAndBar :: RE Text Tok
-newlineAndWhitespaceAndBar = TokNewlineAndWhitespaceAndBar <$ psym (adapt isNewline) <*> reFoldl Greedy (\n _ -> succ n) 2 (psym $ adapt (\c -> isSpace c && not (isNewline c))) <* text "| "
+newlineAndWhitespaceAndBar = TokNewlineAndWhitespaceAndBar 
+  <$  psym (adapt isNewline)  -- matches a newline 
+  <*  many comment            -- skip lines of comments
+  <*> reFoldl Greedy (\n _ -> succ n) 2 (psym $ adapt (\c -> isSpace c && not (isNewline c))) <* text "| "
 
 contra :: RE Text a -> RE Char a
 contra = comap Text.singleton
