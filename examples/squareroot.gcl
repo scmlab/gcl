@@ -1,0 +1,16 @@
+con N : Int { X > 0 }
+var x, y, k : Int
+
+y, k := 1, 0
+{ y = exp 2 k  ∧  0 ≤ k, bnd: N - exp y 2 }
+do exp y 2 ≤ N -> y, k := y * 2, k + 1
+od
+{ y = exp 2 k  ∧  0 ≤ k  ∧ exp y 2 > N }
+
+x := 0
+{ exp x 2 ≤ N  ∧  exp (x + y) 2 > N  ∧  y = exp 2 k  ∧  0 ≤ k, bnd: k }
+do y ≠ 1 -> if exp (x + y/2) 2 ≤ N -> x, y, k := x + y/2, y/2, k-1
+             | exp (x + y/2) 2 > N ->    y, k := y/2, k-1
+            fi
+od
+{ exp x 2 ≤ N  ∧  exp (x + 1) 2 > N }
