@@ -201,9 +201,14 @@ wp _ (C.Assign xs es _) post = do
   runReaderT (subst denv post :: SMSubst Pred) 0
 
 wp b (C.If gcmds _) post = do
-  forM_ gcmds $ \(C.GdCmd guard body _) ->
-    structStmts b (guardIf guard) Nothing body post
-  return (Disjunct (map guardIf (C.getGuards gcmds))) -- is this enough?
+  -- forM_ gcmds $ \(C.GdCmd guard body _) ->
+  --   structStmts b (guardIf guard) Nothing body post
+  -- return (Disjunct (map guardIf (C.getGuards gcmds))) -- is this enough?
+  let disGuards = disjunct (map guardIf (C.getGuards gcmds))
+  pres <- forM gcmds $ \(C.GdCmd guard body _) ->
+               (Constant . (guard `C.imply`) . toExpr) <$>
+                   wpStmts b body post
+  return (conjunct (disGuards : pres))
 
 wp _ (C.Do _ l  ) _    = throwError (MissingAssertion l)
 
