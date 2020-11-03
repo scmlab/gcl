@@ -10,7 +10,7 @@ od
 q, r := 0, A
 { A = q * b + r  ∧  b = B * exp 2 k  ∧  0 ≤ k  ∧  0 ≤ r < b, bnd: k }
 do b ≠ B -> q, b, k := q * 2, b / 2, k - 1
-            -- { A = q * b + r  ∧  b = B * exp 2 k  ∧  0 ≤ k  ∧  0 ≤ r < b * 2 }
+            { A = q * b + r  ∧  b = B * exp 2 k  ∧  0 ≤ k  ∧  0 ≤ r < b * 2 }
             if r < b -> skip
              | r ≥ b -> q, r := q + 1, r - b
             fi
