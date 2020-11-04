@@ -64,6 +64,7 @@ parse parser filepath tokenStream =
 
 program :: Parser Program
 program = withLoc $ do
+  skipMany (symbol TokNewline)
   decls <- many (declaration <* (choice [symbol TokNewline, eof])) <?> "declarations"
   skipMany (symbol TokNewline)
   stmts <- many (statement <* (choice [symbol TokNewline, eof])) <?> "statements"

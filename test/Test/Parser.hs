@@ -502,6 +502,7 @@ program =
       golden "no-stmt" "./test/source/no-stmt.gcl",
       golden "2" "./test/source/2.gcl",
       golden "issue 1" "./test/source/issue1.gcl",
+      golden "issue 14" "./test/source/issue14.gcl",
       golden "comment" "./test/source/comment.gcl"
     ]
   where
