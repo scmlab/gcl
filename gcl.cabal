@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: f060c6d0a4e6dc6cb4a248ce040bb6ff7b3c2e82a3ed7ee5e7e26cc6fe9f542c
+-- hash: 2cca32830d944b18b608bc36a6ea6c0fcd191d84b8bbb8609d4dd0333855ac84
 
 name:           gcl
 version:        0.1.0.0
@@ -61,6 +61,7 @@ library
     , containers
     , free
     , lexer-applicative
+    , lsp
     , megaparsec >=8.0
     , mtl
     , parser-combinators
@@ -86,6 +87,7 @@ executable gcl
     , free
     , gcl
     , lexer-applicative
+    , lsp
     , megaparsec >=8.0
     , mtl
     , parser-combinators
@@ -146,6 +148,7 @@ test-suite gcl-test
     , containers
     , free
     , lexer-applicative
+    , lsp
     , megaparsec >=8.0
     , mtl
     , parser-combinators

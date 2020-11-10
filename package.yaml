@@ -26,6 +26,7 @@ dependencies:
   - lexer-applicative
   - regex-applicative
   - random
+  - lsp 
 
 library:
   source-dirs: src
