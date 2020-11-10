@@ -37,7 +37,7 @@ library:
 
 executables:
   gcl:
-    main: Main.hs
+    main: Main2.hs
     source-dirs: app
     dependencies:
       - gcl

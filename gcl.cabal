@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 2cca32830d944b18b608bc36a6ea6c0fcd191d84b8bbb8609d4dd0333855ac84
+-- hash: 28d897c0c22ad88032b6293718d80017a3a537399fd38354ae05ebb0ab4b95bd
 
 name:           gcl
 version:        0.1.0.0
@@ -39,6 +39,7 @@ library
       Pretty.Variadic
       REPL
       SCM.Test
+      Simple
       Syntax.Abstract
       Syntax.Concrete
       Syntax.ConstExpr
@@ -73,8 +74,9 @@ library
   default-language: Haskell2010
 
 executable gcl
-  main-is: Main.hs
+  main-is: Main2.hs
   other-modules:
+      Main
       Paths_gcl
   hs-source-dirs:
       app
@@ -127,6 +129,7 @@ test-suite gcl-test
       Pretty.Variadic
       REPL
       SCM.Test
+      Simple
       Syntax.Abstract
       Syntax.Concrete
       Syntax.ConstExpr
