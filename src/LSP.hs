@@ -1,4 +1,6 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE PolyKinds #-}
 
 module LSP where
 
@@ -25,22 +27,14 @@ handlers :: Handlers (LspM ())
 handlers =
   mconcat
     [ requestHandler (SCustomMethod "guacamole") $ \req responder -> do
-        let RequestMessage _ _ _ params = req
-        response <- liftIO $ runREPLM (go params `catchError` handleError)
+        let RequestMessage _ i _ params = req
+        response <- liftIO $ runREPLM (go i params)
         case response of
-          Left _ -> error "???"
+          Left err -> responder (Right $ JSON.toJSON $ ResError [globalError err])
           Right x -> responder (Right $ JSON.toJSON x)
     ]
   where
-    go :: JSON.Value -> REPLM Response
-    go raw = do
-      case JSON.fromJSON raw of
-        JSON.Error msg -> throwError $ CannotDecodeRequest msg
-        JSON.Success x -> do
-          res <- handleRequest x
-          case res of
-            Nothing -> error "???"
-            Just x' -> return x'
-
-    handleError :: Error -> REPLM Response
-    handleError err = return $ ResError [globalError err]
+    go :: LspId ( 'CustomMethod :: Method 'FromClient 'Request) -> JSON.Value -> REPLM Response
+    go i raw = case JSON.fromJSON raw of
+      JSON.Error msg -> throwError $ CannotDecodeRequest msg
+      JSON.Success x -> handleRequest i x

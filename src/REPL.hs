@@ -1,4 +1,6 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module REPL where
@@ -12,8 +14,6 @@ import Control.Exception
 import Control.Monad.Except hiding (guard)
 import Control.Monad.State hiding (guard)
 import Data.Aeson hiding (Error)
-import qualified Data.ByteString.Char8 as Strict
-import qualified Data.ByteString.Lazy.Char8 as BS
 import Data.Loc
 import Data.Text.Lazy (Text)
 import qualified Data.Text.Lazy.IO as Text
@@ -35,9 +35,14 @@ import GCL.WP2
     runWPM,
   )
 import qualified GCL.WP2 as WP2
-import GHC.Generics
+import GHC.Generics (Generic)
+import Language.LSP.Types
+  ( From (FromClient),
+    LspId,
+    Method (CustomMethod),
+    MethodType (Request),
+  )
 import qualified Syntax.Concrete as Concrete
-import Syntax.Location ()
 import qualified Syntax.Parser as Parser
 import Syntax.Parser.Lexer (TokStream)
 import qualified Syntax.Parser.Lexer as Lexer
@@ -47,7 +52,8 @@ import Syntax.Predicate
     Spec,
   )
 import qualified Syntax.Predicate as Predicate
-import System.IO
+
+type ID = LspId ( 'CustomMethod :: Method 'FromClient 'Request)
 
 --------------------------------------------------------------------------------
 
@@ -57,12 +63,11 @@ import System.IO
 data REPLState = REPLState
   { replFilePath :: Maybe FilePath,
     replProgram :: Maybe Concrete.Program,
-    replStruct :: Maybe Predicate.Struct,
-    replID :: Int
+    replStruct :: Maybe Predicate.Struct
   }
 
 initREPLState :: REPLState
-initREPLState = REPLState Nothing Nothing Nothing 0
+initREPLState = REPLState Nothing Nothing Nothing
 
 -- Monad
 type REPLM = ExceptT Error (StateT REPLState IO)
@@ -72,59 +77,32 @@ runREPLM f = evalStateT (runExceptT f) initREPLState
 
 --------------------------------------------------------------------------------
 
-loop :: REPLM ()
-loop = go `catchError` handler
-  where
-    go :: REPLM ()
-    go = do
-      request <- recv
-      result <- handleRequest request
-      case result of
-        Just response -> do
-          send response
-          go
-        Nothing -> return ()
-    handler :: Error -> REPLM ()
-    handler err = do
-      send $ ResError [globalError err]
-      loop
-
-catchGlobalError :: REPLM (Maybe Response) -> REPLM (Maybe Response)
+catchGlobalError :: REPLM Response -> REPLM Response
 catchGlobalError program =
-  program `catchError` (\err -> return $ Just $ ResError [globalError err])
+  program `catchError` (\err -> return $ ResError [globalError err])
 
-catchLocalError :: Int -> REPLM (Maybe Response) -> REPLM (Maybe Response)
+catchLocalError :: Int -> REPLM Response -> REPLM Response
 catchLocalError i program =
-  program `catchError` (\err -> return $ Just $ ResError [localError i err])
+  program `catchError` (\err -> return $ ResError [localError i err])
 
-freshID :: REPLM Int
-freshID = do
-  i <- gets replID
-  modify $ \st -> st {replID = succ i}
-  return i
-
--- returns Nothing to break the REPL loop
-handleRequest :: Request -> REPLM (Maybe Response)
-handleRequest (ReqLoad filepath False) = catchGlobalError $ do
-  i <- freshID
+handleRequest :: ID -> Request -> REPLM Response
+handleRequest i (ReqLoad filepath False) = catchGlobalError $ do
   (pos, specs, globalProps) <- load filepath
-  return $ Just $ ResOK i pos specs globalProps
-handleRequest (ReqLoad filepath True) = catchGlobalError $ do
-  i <- freshID
+  return $ ResOK i pos specs globalProps
+handleRequest i (ReqLoad filepath True) = catchGlobalError $ do
   (pos, specs, globalProps) <- load2 filepath
-  return $ Just $ ResOK i pos specs globalProps
-handleRequest (ReqRefine i payload) = catchLocalError i $ do
+  return $ ResOK i pos specs globalProps
+handleRequest _ (ReqRefine i payload) = catchLocalError i $ do
   _ <- refine payload
-  return $ Just $ ResResolve i
-handleRequest (ReqInsertAssertion i) = catchGlobalError $ do
+  return $ ResResolve i
+handleRequest _ (ReqInsertAssertion i) = catchGlobalError $ do
   expr <- insertAssertion i
-  return $ Just $ ResInsert i expr
-handleRequest (ReqSubstitute i expr _subst) = catchGlobalError $ do
+  return $ ResInsert i expr
+handleRequest _ (ReqSubstitute i expr _subst) = catchGlobalError $ do
   Concrete.Program _ _ defns _ _ <- getProgram
   let expr' = runSubstM (expand (Concrete.Subst expr _subst)) defns 1
-  return $ Just $ ResSubstitute i expr'
-handleRequest ReqDebug = error "crash!"
-handleRequest ReqQuit = return Nothing
+  return $ ResSubstitute i expr'
+handleRequest _ ReqDebug = error "crash!"
 
 load :: FilePath -> REPLM ([PO], [Spec], [Concrete.Expr])
 load filepath = do
@@ -256,18 +234,6 @@ sweep2 struct = withExceptT StructError2 $
 --     errors = map ExecError $ lefts results
 --     (results, stores) = unzip $ Exec.runExNondet (Exec.execProg program) Exec.prelude
 
-recv :: FromJSON a => REPLM a
-recv = do
-  raw <- liftIO Strict.getLine
-  case eitherDecode (BS.fromStrict raw) of
-    Left msg -> throwError $ CannotDecodeRequest msg
-    Right x -> return x
-
-send :: ToJSON a => a -> REPLM ()
-send payload = liftIO $ do
-  Strict.putStrLn $ BS.toStrict $ encode payload
-  hFlush stdout
-
 --------------------------------------------------------------------------------
 
 -- | Request
@@ -277,7 +243,6 @@ data Request
   | ReqInsertAssertion Int
   | ReqSubstitute Int Concrete.Expr Concrete.Subst
   | ReqDebug
-  | ReqQuit
   deriving (Generic)
 
 instance FromJSON Request
@@ -285,8 +250,6 @@ instance FromJSON Request
 --------------------------------------------------------------------------------
 
 -- | Response
-type ID = Int
-
 data Response
   = ResOK ID [PO] [Spec] [Concrete.Expr]
   | ResError [(Site, Error)]
