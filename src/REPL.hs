@@ -49,37 +49,40 @@ type ID = LspId ( 'CustomMethod :: Method 'FromClient 'Request)
 -- | The REPL Monad
 
 -- State
-data REPLState = REPLState
-  { replProgram :: Maybe Concrete.Program
-  }
-
-initREPLState :: REPLState
-initREPLState = REPLState Nothing
+type REPLState = Maybe Concrete.Program
 
 -- Monad
 type REPLM = ExceptT Error (StateT REPLState IO)
 
 runREPLM :: REPLM a -> IO (Either Error a)
-runREPLM f = evalStateT (runExceptT f) initREPLState
+runREPLM f = evalStateT (runExceptT f) Nothing
 
 --------------------------------------------------------------------------------
 
-catchGlobalError :: REPLM Response -> REPLM Response
-catchGlobalError program =
-  program `catchError` (\err -> return $ ResError [globalError err])
+-- catches Error and convert it into a global ResError
+global :: REPLM Response -> IO Response
+global program = do
+  result <- runREPLM program
+  case result of
+    Left err -> return $ ResError [globalError err]
+    Right val -> return $ val
 
-catchLocalError :: Int -> REPLM Response -> REPLM Response
-catchLocalError i program =
-  program `catchError` (\err -> return $ ResError [localError i err])
+-- catches Error and convert it into a local ResError with Hole id
+local :: Int -> REPLM Response -> IO Response
+local i program = do
+  result <- runREPLM program
+  case result of
+    Left err -> return $ ResError [localError i err]
+    Right val -> return $ val
 
-handleRequest :: ID -> Request -> REPLM Response
-handleRequest i (ReqLoad filepath) = catchGlobalError $ do
+handleRequest :: ID -> Request -> IO Response
+handleRequest i (ReqLoad filepath) = global $ do
   (pos, specs, globalProps) <- load filepath
   return $ ResOK i pos specs globalProps
-handleRequest _ (ReqRefine i payload) = catchLocalError i $ do
+handleRequest _ (ReqRefine i payload) = local i $ do
   _ <- refine payload
   return $ ResResolve i
-handleRequest _ (ReqSubstitute i expr _subst) = catchGlobalError $ do
+handleRequest _ (ReqSubstitute i expr _subst) = global $ do
   Concrete.Program _ _ defns _ _ <- getProgram
   let expr' = runSubstM (expand (Concrete.Subst expr _subst)) defns 1
   return $ ResSubstitute i expr'
@@ -87,8 +90,7 @@ handleRequest _ ReqDebug = error "crash!"
 
 load :: FilePath -> REPLM ([PO], [Spec], [Concrete.Expr])
 load filepath = do
-  result <-
-    liftIO $ try $ Text.readFile filepath :: REPLM (Either IOException Text)
+  result <- liftIO $ try $ Text.readFile filepath :: REPLM (Either IOException Text)
   case result of
     Left _ -> throwError $ CannotReadFile filepath
     Right raw -> do
@@ -97,7 +99,7 @@ load filepath = do
         parseProgram
           filepath
           tokens
-      persistProgram program
+      put $ Just program
       (pos, specs) <- sweep program
       return (pos, specs, globalProps)
 
@@ -108,15 +110,9 @@ refine payload = do
 
 --------------------------------------------------------------------------------
 
--- persistFilePath :: FilePath -> REPLM ()
--- persistFilePath filepath = modify $ \s -> s {replFilePath = Just filepath}
-
-persistProgram :: Concrete.Program -> REPLM ()
-persistProgram program = modify $ \s -> s {replProgram = Just program}
-
 getProgram :: REPLM Concrete.Program
 getProgram = do
-  result <- gets replProgram
+  result <- get
   case result of
     Nothing -> throwError NotLoaded
     Just p -> return p
@@ -133,9 +129,6 @@ parse parser filepath =
 parseProgram :: FilePath -> TokStream -> REPLM Concrete.Program
 parseProgram = parse Parser.program
 
--- toStruct :: Concrete.Program -> REPLM (Maybe Predicate.Struct)
--- toStruct = withExceptT StructError2 . liftEither . runWPM . WP2.programToStruct
-
 parseSpec :: TokStream -> REPLM [Concrete.Stmt]
 parseSpec = parse Parser.specContent "<specification>"
 
@@ -146,14 +139,6 @@ sweep (Concrete.Program _ _ ds statements _) = do
       liftEither $
         runWP (structProg statements) ds
   return (pos, specs)
-
--- sweep2 :: Predicate.Struct -> REPLM ([PO], [Spec])
--- sweep2 struct = withExceptT StructError2 $
---   liftEither $
---     runWPM $ do
---       pos <- runPOM $ genPO struct
---       specs <- runSpecM $ genSpec struct
---       return (pos, specs)
 
 --------------------------------------------------------------------------------
 
@@ -198,7 +183,3 @@ instance ToJSON Origin
 instance ToJSON PO
 
 instance ToJSON Spec
-
--- instance FromJSON Loc where
--- instance Generic Loc where
--- instance GFromZero Zero (Rep Loc) where

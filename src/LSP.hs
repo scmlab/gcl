@@ -28,16 +28,10 @@ handlers =
   mconcat
     [ requestHandler (SCustomMethod "guacamole") $ \req responder -> do
         let RequestMessage _ i _ params = req
-        response <- liftIO $ runREPLM (go i params)
-        -- s <- getWorkspaceFolders
-        -- responder $ Left $ ResponseError ParseError (pack $ show s) Nothing
-        -- responder $ Left $ ResponseError ParseError "Cannot decode LSP request" Nothing
-        case response of
-          Left err -> responder (Right $ JSON.toJSON $ ResError [globalError err])
-          Right x -> responder (Right $ JSON.toJSON x)
+        -- JSON Value => Request => Response
+        response <- case JSON.fromJSON params of
+          JSON.Error msg -> return $ ResError [globalError (CannotDecodeRequest msg)]
+          JSON.Success request -> liftIO $ handleRequest i request
+        -- respond with the Response
+        responder $ Right $ JSON.toJSON response
     ]
-  where
-    go :: LspId ( 'CustomMethod :: Method 'FromClient 'Request) -> JSON.Value -> REPLM Response
-    go i raw = case JSON.fromJSON raw of
-      JSON.Error msg -> throwError $ CannotDecodeRequest msg
-      JSON.Success x -> handleRequest i x
