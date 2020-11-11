@@ -4,6 +4,7 @@ module Main where
 
 import qualified Data.Text.Lazy.IO as Text
 import Data.Text.Prettyprint.Doc
+import LSP (run)
 import Pretty ()
 import REPL
 import System.Console.GetOpt
@@ -15,8 +16,8 @@ main = do
   (opts, _) <- getArgs >>= parseOpts
   case optMode opts of
     ModeHelp -> putStrLn $ usageInfo usage options
-    ModeREPL -> do
-      _ <- runREPLM loop
+    ModeLSP -> do
+      _ <- run
       return ()
     ModeDev -> do
       let filepath = "examples/b.gcl"
@@ -52,14 +53,14 @@ main = do
 --------------------------------------------------------------------------------
 
 -- | Command-line arguments
-data Mode = ModeREPL | ModeHelp | ModeDev
+data Mode = ModeLSP | ModeHelp | ModeDev
 
 data Options = Options
   { optMode :: Mode
   }
 
 defaultOptions :: Options
-defaultOptions = Options {optMode = ModeREPL}
+defaultOptions = Options {optMode = ModeLSP}
 
 options :: [OptDescr (Options -> Options)]
 options =

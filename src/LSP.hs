@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Main where
+module LSP where
 
 import Control.Monad.Except hiding (guard)
 -- import Control.Monad.IO.Class
@@ -10,8 +10,8 @@ import Language.LSP.Server
 import Language.LSP.Types
 import REPL
 
-main :: IO Int
-main =
+run :: IO Int
+run =
   runServer $
     ServerDefinition
       { onConfigurationChange = const $ pure $ Right (),

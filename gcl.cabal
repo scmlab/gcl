@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 01f95c61837274df0aeccbde91be2790edf6a571e01931e720e1ef1f34e65c03
+-- hash: 4aab6c1c1361c3054b1a6e6ee818007122c28c3fb6151e529e01cdbaf9f9eac5
 
 name:           gcl
 version:        0.1.0.0
@@ -30,6 +30,7 @@ library
       GCL.Type
       GCL.WP
       GCL.WP2
+      LSP
       Pretty
       Pretty.Abstract
       Pretty.Concrete
@@ -73,9 +74,8 @@ library
   default-language: Haskell2010
 
 executable gcl
-  main-is: Main2.hs
+  main-is: Main.hs
   other-modules:
-      Main
       Paths_gcl
   hs-source-dirs:
       app
@@ -119,6 +119,7 @@ test-suite gcl-test
       GCL.Type
       GCL.WP
       GCL.WP2
+      LSP
       Pretty
       Pretty.Abstract
       Pretty.Concrete
