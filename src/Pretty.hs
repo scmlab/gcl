@@ -1,57 +1,53 @@
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Pretty
-  ( module Data.Text.Prettyprint.Doc
+  ( module Data.Text.Prettyprint.Doc,
   )
 where
 
-import           Data.Text.Prettyprint.Doc
-import           Prelude                 hiding ( Ordering(..) )
-import           Data.Loc
-
-import           Error
-import           Syntax.Parser.Lexer            ( LexicalError )
-import           GCL.WP                         ( StructError(..) )
-import           GCL.Type                       ( TypeError(..) )
-
-import           Pretty.Abstract                ( )
-import           Pretty.Concrete                ( )
-import           Pretty.GCL.WP2                 ( )
+import Data.Loc
+import Data.Text.Prettyprint.Doc
+import Error
+import GCL.Type (TypeError (..))
+import GCL.WP (StructError (..))
+import Pretty.Abstract ()
+import Pretty.Concrete ()
+import Pretty.Predicate ()
+import Syntax.Parser.Lexer (LexicalError)
+import Prelude hiding (Ordering (..))
 
 --------------------------------------------------------------------------------
--- | Misc
 
+-- | Misc
 instance (Pretty a, Pretty b) => Pretty (Either a b) where
-  pretty (Left  a) = "Error" <+> pretty a
+  pretty (Left a) = "Error" <+> pretty a
   pretty (Right b) = pretty b
 
 --------------------------------------------------------------------------------
--- | Error
 
+-- | Error
 instance Pretty Error where
-  pretty (LexicalError   err   ) = "Lexical Error" <+> pretty err
+  pretty (LexicalError err) = "Lexical Error" <+> pretty err
   pretty (SyntacticError errors) = "Syntactic Error" <+> prettyList errors
   pretty (TypeError err) =
     "Type Error" <+> pretty (locOf err) <> line <> pretty err
   pretty (StructError err) =
     "Struct Error" <+> pretty (locOf err) <> line <> pretty err
-  pretty (StructError2 err) =
-    "Struct Error" <+> pretty (locOf err) <> line <> pretty err
-  pretty (CannotReadFile      path) = "CannotReadFile" <+> pretty path
-  pretty (CannotDecodeRequest msg ) = "CannotDecodeRequest" <+> pretty msg
-  pretty NotLoaded                  = "NotLoaded"
+  pretty (CannotReadFile path) = "CannotReadFile" <+> pretty path
+  pretty (CannotDecodeRequest msg) = "CannotDecodeRequest" <+> pretty msg
+  pretty NotLoaded = "NotLoaded"
 
 instance Pretty LexicalError where
   pretty = pretty . show
 
 instance Pretty StructError where
-  pretty (MissingAssertion     loc) = "Missing Assertion" <+> pretty loc
-  pretty (MissingBound         loc) = "Missing Bound" <+> pretty loc
-  pretty (ExcessBound          loc) = "Excess Bound" <+> pretty loc
+  pretty (MissingAssertion loc) = "Missing Assertion" <+> pretty loc
+  pretty (MissingBound loc) = "Missing Bound" <+> pretty loc
+  pretty (ExcessBound loc) = "Excess Bound" <+> pretty loc
   pretty (MissingPostcondition loc) = "Missing Postcondition" <+> pretty loc
-  pretty (DigHole              loc) = "Dig Hole" <+> pretty loc
+  pretty (DigHole loc) = "Dig Hole" <+> pretty loc
 
 instance Pretty TypeError where
   pretty (NotInScope name _) =

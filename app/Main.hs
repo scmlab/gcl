@@ -27,7 +27,7 @@ main = do
         tokens <- scan filepath raw
         program <- parseProgram filepath tokens
         -- typeCheck program
-        (obligations, specifications) <- sweep1 program
+        (obligations, specifications) <- sweep program
         -- stores <- execute program
         return (tokens, program, obligations, specifications)
 

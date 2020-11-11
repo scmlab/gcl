@@ -14,7 +14,6 @@ import Control.Exception
 import Control.Monad.Except hiding (guard)
 import Control.Monad.State hiding (guard)
 import Data.Aeson hiding (Error)
-import Data.Loc
 import Data.Text.Lazy (Text)
 import qualified Data.Text.Lazy.IO as Text
 import Error
@@ -26,15 +25,6 @@ import GCL.WP
   ( runWP,
     structProg,
   )
-import GCL.WP2
-  ( StructError2 (PreconditionUnknown),
-    genPO,
-    genSpec,
-    runPOM,
-    runSpecM,
-    runWPM,
-  )
-import qualified GCL.WP2 as WP2
 import GHC.Generics (Generic)
 import Language.LSP.Types
   ( From (FromClient),
@@ -51,7 +41,6 @@ import Syntax.Predicate
     PO,
     Spec,
   )
-import qualified Syntax.Predicate as Predicate
 
 type ID = LspId ( 'CustomMethod :: Method 'FromClient 'Request)
 
@@ -61,13 +50,11 @@ type ID = LspId ( 'CustomMethod :: Method 'FromClient 'Request)
 
 -- State
 data REPLState = REPLState
-  { replFilePath :: Maybe FilePath,
-    replProgram :: Maybe Concrete.Program,
-    replStruct :: Maybe Predicate.Struct
+  { replProgram :: Maybe Concrete.Program
   }
 
 initREPLState :: REPLState
-initREPLState = REPLState Nothing Nothing Nothing
+initREPLState = REPLState Nothing
 
 -- Monad
 type REPLM = ExceptT Error (StateT REPLState IO)
@@ -86,18 +73,12 @@ catchLocalError i program =
   program `catchError` (\err -> return $ ResError [localError i err])
 
 handleRequest :: ID -> Request -> REPLM Response
-handleRequest i (ReqLoad filepath False) = catchGlobalError $ do
+handleRequest i (ReqLoad filepath) = catchGlobalError $ do
   (pos, specs, globalProps) <- load filepath
-  return $ ResOK i pos specs globalProps
-handleRequest i (ReqLoad filepath True) = catchGlobalError $ do
-  (pos, specs, globalProps) <- load2 filepath
   return $ ResOK i pos specs globalProps
 handleRequest _ (ReqRefine i payload) = catchLocalError i $ do
   _ <- refine payload
   return $ ResResolve i
-handleRequest _ (ReqInsertAssertion i) = catchGlobalError $ do
-  expr <- insertAssertion i
-  return $ ResInsert i expr
 handleRequest _ (ReqSubstitute i expr _subst) = catchGlobalError $ do
   Concrete.Program _ _ defns _ _ <- getProgram
   let expr' = runSubstM (expand (Concrete.Subst expr _subst)) defns 1
@@ -106,8 +87,6 @@ handleRequest _ ReqDebug = error "crash!"
 
 load :: FilePath -> REPLM ([PO], [Spec], [Concrete.Expr])
 load filepath = do
-  persistFilePath filepath
-
   result <-
     liftIO $ try $ Text.readFile filepath :: REPLM (Either IOException Text)
   case result of
@@ -119,72 +98,25 @@ load filepath = do
           filepath
           tokens
       persistProgram program
-      (pos, specs) <- sweep1 program
+      (pos, specs) <- sweep program
       return (pos, specs, globalProps)
-
-load2 :: FilePath -> REPLM ([PO], [Spec], [Concrete.Expr])
-load2 filepath = do
-  persistFilePath filepath
-
-  result <-
-    liftIO $ try $ Text.readFile filepath :: REPLM (Either IOException Text)
-  case result of
-    Left _ -> throwError $ CannotReadFile filepath
-    Right raw -> do
-      tokens <- scan filepath raw
-      program@(Concrete.Program _ globalProps _ _ _) <-
-        parseProgram
-          filepath
-          tokens
-      persistProgram program
-      struct <- toStruct program
-      case struct of
-        Nothing -> return ([], [], globalProps)
-        Just struct' -> do
-          persistStruct struct'
-          (pos, specs) <- sweep2 struct'
-          return (pos, specs, globalProps)
 
 refine :: Text -> REPLM ()
 refine payload = do
   _ <- scan "<spec>" payload >>= parseSpec
   return ()
 
-insertAssertion :: Int -> REPLM Concrete.Expr
-insertAssertion n = do
-  program <- getProgram
-  struct <- getStruct
-  withExceptT StructError2 $
-    liftEither $
-      runWPM $ do
-        let pos = case locOf program of
-              Loc p _ -> linePos (posFile p) n
-              NoLoc -> linePos "<untitled>" n
-        case Predicate.precondAtLine n struct of
-          Nothing -> throwError $ PreconditionUnknown (Loc pos pos)
-          Just x -> return $ Predicate.toExpr x
-
 --------------------------------------------------------------------------------
 
-persistFilePath :: FilePath -> REPLM ()
-persistFilePath filepath = modify $ \s -> s {replFilePath = Just filepath}
+-- persistFilePath :: FilePath -> REPLM ()
+-- persistFilePath filepath = modify $ \s -> s {replFilePath = Just filepath}
 
 persistProgram :: Concrete.Program -> REPLM ()
 persistProgram program = modify $ \s -> s {replProgram = Just program}
 
-persistStruct :: Predicate.Struct -> REPLM ()
-persistStruct struct = modify $ \s -> s {replStruct = Just struct}
-
 getProgram :: REPLM Concrete.Program
 getProgram = do
   result <- gets replProgram
-  case result of
-    Nothing -> throwError NotLoaded
-    Just p -> return p
-
-getStruct :: REPLM Predicate.Struct
-getStruct = do
-  result <- gets replStruct
   case result of
     Nothing -> throwError NotLoaded
     Just p -> return p
@@ -201,27 +133,27 @@ parse parser filepath =
 parseProgram :: FilePath -> TokStream -> REPLM Concrete.Program
 parseProgram = parse Parser.program
 
-toStruct :: Concrete.Program -> REPLM (Maybe Predicate.Struct)
-toStruct = withExceptT StructError2 . liftEither . runWPM . WP2.programToStruct
+-- toStruct :: Concrete.Program -> REPLM (Maybe Predicate.Struct)
+-- toStruct = withExceptT StructError2 . liftEither . runWPM . WP2.programToStruct
 
 parseSpec :: TokStream -> REPLM [Concrete.Stmt]
 parseSpec = parse Parser.specContent "<specification>"
 
-sweep1 :: Concrete.Program -> REPLM ([PO], [Spec])
-sweep1 (Concrete.Program _ _ ds statements _) = do
+sweep :: Concrete.Program -> REPLM ([PO], [Spec])
+sweep (Concrete.Program _ _ ds statements _) = do
   ((_, pos), specs) <-
     withExceptT StructError $
       liftEither $
         runWP (structProg statements) ds
   return (pos, specs)
 
-sweep2 :: Predicate.Struct -> REPLM ([PO], [Spec])
-sweep2 struct = withExceptT StructError2 $
-  liftEither $
-    runWPM $ do
-      pos <- runPOM $ genPO struct
-      specs <- runSpecM $ genSpec struct
-      return (pos, specs)
+-- sweep2 :: Predicate.Struct -> REPLM ([PO], [Spec])
+-- sweep2 struct = withExceptT StructError2 $
+--   liftEither $
+--     runWPM $ do
+--       pos <- runPOM $ genPO struct
+--       specs <- runSpecM $ genSpec struct
+--       return (pos, specs)
 
 --------------------------------------------------------------------------------
 
@@ -238,9 +170,8 @@ sweep2 struct = withExceptT StructError2 $
 
 -- | Request
 data Request
-  = ReqLoad FilePath Bool
+  = ReqLoad FilePath
   | ReqRefine Int Text
-  | ReqInsertAssertion Int
   | ReqSubstitute Int Concrete.Expr Concrete.Subst
   | ReqDebug
   deriving (Generic)
@@ -254,7 +185,6 @@ data Response
   = ResOK ID [PO] [Spec] [Concrete.Expr]
   | ResError [(Site, Error)]
   | ResResolve Int -- resolves some Spec
-  | ResInsert Int Concrete.Expr
   | ResSubstitute Int Concrete.Expr
   deriving (Generic)
 

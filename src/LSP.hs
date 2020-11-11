@@ -29,6 +29,9 @@ handlers =
     [ requestHandler (SCustomMethod "guacamole") $ \req responder -> do
         let RequestMessage _ i _ params = req
         response <- liftIO $ runREPLM (go i params)
+        -- s <- getWorkspaceFolders
+        -- responder $ Left $ ResponseError ParseError (pack $ show s) Nothing
+        -- responder $ Left $ ResponseError ParseError "Cannot decode LSP request" Nothing
         case response of
           Left err -> responder (Right $ JSON.toJSON $ ResError [globalError err])
           Right x -> responder (Right $ JSON.toJSON x)
