@@ -10,4 +10,6 @@ r, s, n := 0, 0, 0
 do n ≠ N -> r, s := max r (s - A n), max s (A n)
             n := n + 1
 od
+
+
 { r = ⟨ max i j : 0 ≤ i < j < N : A i - A j ⟩ }

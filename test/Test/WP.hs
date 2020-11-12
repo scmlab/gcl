@@ -2,102 +2,107 @@
 
 module Test.WP where
 
-import           Data.Text.Lazy          hiding ( map )
-import           Test.Tasty
-import           Test.Tasty.HUnit
-import           Prelude                 hiding ( Ordering(..) )
-
-import           Syntax.Predicate
-import           Syntax.Concrete
-import qualified REPL                          as REPL
-import           Syntax.Location
-import           Data.Loc
-import           Error
-import           Pretty                         ( )
+import Data.Loc
+import Data.Text.Lazy hiding (map)
+import Error
+import Pretty ()
+import qualified REPL
+import Syntax.Concrete
+import Syntax.Location
+import Syntax.Predicate
+import Test.Tasty
+import Test.Tasty.HUnit
+import Prelude hiding (Ordering (..))
 
 tests :: TestTree
 tests = testGroup "WP 1" [emptyProg, statements, issues]
 
 run :: Text -> IO (Either Error ([PO], [Spec]))
 run text =
-  REPL.runREPLM
-    $   (\(pos, specs) -> (map toNoLoc pos, map toNoLoc specs))
-    <$> (   REPL.scan "<test>" (text)
-        >>= REPL.parseProgram "<test>"
-        >>= REPL.sweep1
-        )
+  REPL.runREPLM $
+    (\(pos, specs) -> (map toNoLoc pos, map toNoLoc specs))
+      <$> ( REPL.scan "<test>" (text)
+              >>= REPL.parseProgram "<test>"
+              >>= REPL.sweep
+          )
 
 --------------------------------------------------------------------------------
--- | 
 
+-- |
 emptyProg :: TestTree
-emptyProg = testGroup
-  "empty" 
-  [ testCase "empty" $ do
-    actual <- run ""
-    actual @?= Right ([], []) 
-  ]
-  
+emptyProg =
+  testGroup
+    "empty"
+    [ testCase "empty" $ do
+        actual <- run ""
+        actual @?= Right ([], [])
+    ]
+
 --------------------------------------------------------------------------------
+
 -- | Expression
-
 statements :: TestTree
-statements = testGroup
-  "simple program"
-  [ testCase "skip" $ do
-    actual <-
-      run
-        "{ True }   \n\
-                  \skip       \n\
-                  \{ 0 = 0 }"
-    actual @?= Right
-      ( [ PO 0
-             (assertion true)
-             (assertion (number 0 `eqq` number 0))
-             (AtSkip NoLoc)
-        ]
-      , []
-      )
-  , testCase "abort" $ do
-    actual <-
-      run
-        "{ True }   \n\
-                  \abort      \n\
-                  \{ True }"
-    actual
-      @?= Right ([PO 0 (assertion true) (Constant false) (AtAbort NoLoc)], [])
-  , testCase "assignment" $ do
-    actual <-
-      run
-        "{ True }   \n\
-                  \x := 1     \n\
-                  \{ 0 = x }"
-    actual @?= Right
-      ( [ PO 0
-             (assertion true)
-             (assertion (number 0 `eqq` number 1))
-             (AtAssignment NoLoc)
-        ]
-      , []
-      )
-  , testCase "spec" $ do
-    actual <-
-      run
-        "{ True }   \n\
-                  \{!       \n\
-                  \!}       \n\
-                  \{ 0 = 0 }"
-    actual @?= Right
-      ( []
-      , [ Specification 0
-                        (Assertion true NoLoc)
-                        (assertion (number 0 `eqq` number 0))
-                        NoLoc
-        ]
-      )
-  ]
-
-
+statements =
+  testGroup
+    "simple program"
+    [ testCase "skip" $ do
+        actual <-
+          run
+            "{ True }   \n\
+            \skip       \n\
+            \{ 0 = 0 }"
+        actual
+          @?= Right
+            ( [ PO
+                  0
+                  (assertion true)
+                  (assertion (number 0 `eqq` number 0))
+                  (AtSkip NoLoc)
+              ],
+              []
+            ),
+      testCase "abort" $ do
+        actual <-
+          run
+            "{ True }   \n\
+            \abort      \n\
+            \{ True }"
+        actual
+          @?= Right ([PO 0 (assertion true) (Constant false) (AtAbort NoLoc)], []),
+      testCase "assignment" $ do
+        actual <-
+          run
+            "{ True }   \n\
+            \x := 1     \n\
+            \{ 0 = x }"
+        actual
+          @?= Right
+            ( [ PO
+                  0
+                  (assertion true)
+                  (assertion (number 0 `eqq` number 1))
+                  (AtAssignment NoLoc)
+              ],
+              []
+            ),
+      testCase "spec" $ do
+        actual <-
+          run
+            "{ True }   \n\
+            \{!       \n\
+            \!}       \n\
+            \{ 0 = 0 }"
+        actual
+          @?= Right
+            ( [],
+              [ Specification
+                  0
+                  (Assertion true NoLoc)
+                  (assertion (number 0 `eqq` number 0))
+                  NoLoc
+              ]
+            )
+    ]
 
 -- assertions :: TestTree
 -- assertions = testCase "assertions" $ do
@@ -139,6 +144,7 @@ statements = testGroup
 --   ]
 
 --------------------------------------------------------------------------------
+
 -- | Issues
 issues :: TestTree
 issues =
@@ -161,8 +167,8 @@ issue2 =
           @?= Right
             ( [PO 0 (Constant true) (assertion (variable "z" `eqq` binary Mul (constant "A") (constant "B"))) (AtAssertion NoLoc)],
               []
-            )
-    , testCase "Postcondition + precondition" $ do
+            ),
+      testCase "Postcondition + precondition" $ do
         actual <-
           run
             "con A, B : Int\n\
@@ -174,6 +180,4 @@ issue2 =
             ( [PO 0 (assertion true) (assertion (variable "z" `eqq` binary Mul (constant "A") (constant "B"))) (AtAssertion NoLoc)],
               []
             )
-   
     ]
-

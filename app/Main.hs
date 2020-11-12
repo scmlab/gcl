@@ -2,65 +2,59 @@
 
 module Main where
 
-import qualified Data.Text.Lazy.IO as Text
-import Data.Text.Prettyprint.Doc
 import LSP (run)
 import Pretty ()
-import REPL
 import System.Console.GetOpt
 import System.Environment
 import Prelude
 
 main :: IO ()
-main = do 
-  _ <- run 
-  return ()
-
-main' :: IO ()
-main' = do
+main = do
   (opts, _) <- getArgs >>= parseOpts
   case optMode opts of
     ModeHelp -> putStrLn $ usageInfo usage options
     ModeLSP -> do
       _ <- run
       return ()
-    ModeDev -> do
-      let filepath = "examples/b.gcl"
-      raw <- Text.readFile filepath
+    ModeDev -> return ()
 
-      result <- runREPLM $ do
-        tokens <- scan filepath raw
-        program <- parseProgram filepath tokens
-        -- typeCheck program
-        (obligations, specifications) <- sweep program
-        -- stores <- execute program
-        return (tokens, program, obligations, specifications)
+-- do
+--   let filepath = "examples/b.gcl"
+--   raw <- Text.readFile filepath
 
-      case result of
-        Right (tokens, program, obligations, specifications) -> do
-          putStrLn "\n=== tokens ==="
-          print tokens
+--   result <- runM $ do
+--     tokens <- scan filepath raw
+--     program <- parseProgram filepath tokens
+--     -- typeCheck program
+--     (obligations, specifications) <- sweep program
+--     -- stores <- execute program
+--     return (tokens, program, obligations, specifications)
 
-          putStrLn "\n=== AST ==="
-          print program
+--   case result of
+--     Right (tokens, program, obligations, specifications) -> do
+--       putStrLn "\n=== tokens ==="
+--       print tokens
 
-          putStrLn "\n=== proof obligations ==="
-          mapM_ (print . pretty) obligations
+--       putStrLn "\n=== AST ==="
+--       print program
 
-          putStrLn "\n=== specifications ==="
-          mapM_ (print . pretty) specifications
+--       putStrLn "\n=== proof obligations ==="
+--       mapM_ (print . pretty) obligations
 
-        -- putStrLn "\n=== execution (stores) ==="
-        -- mapM_ (print . pretty) stores
+--       putStrLn "\n=== specifications ==="
+--       mapM_ (print . pretty) specifications
 
-        Left err -> print $ pretty err
+--     -- putStrLn "\n=== execution (stores) ==="
+--     -- mapM_ (print . pretty) stores
+
+--     Left err -> print $ pretty err
 
 --------------------------------------------------------------------------------
 
 -- | Command-line arguments
 data Mode = ModeLSP | ModeHelp | ModeDev
 
-data Options = Options
+newtype Options = Options
   { optMode :: Mode
   }
 
