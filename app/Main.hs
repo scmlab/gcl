@@ -12,7 +12,12 @@ import System.Environment
 import Prelude
 
 main :: IO ()
-main = do
+main = do 
+  _ <- run 
+  return ()
+
+main' :: IO ()
+main' = do
   (opts, _) <- getArgs >>= parseOpts
   case optMode opts of
     ModeHelp -> putStrLn $ usageInfo usage options

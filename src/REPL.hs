@@ -12,7 +12,6 @@ import Control.Exception
     try,
   )
 import Control.Monad.Except hiding (guard)
-import Control.Monad.State hiding (guard)
 import Data.Aeson hiding (Error)
 import Data.Text.Lazy (Text)
 import qualified Data.Text.Lazy.IO as Text
@@ -46,26 +45,13 @@ type ID = LspId ( 'CustomMethod :: Method 'FromClient 'Request)
 
 --------------------------------------------------------------------------------
 
--- | The REPL Monad
-
--- State
-type REPLState = Maybe Concrete.Program
-
--- Monad
-type REPLM = ExceptT Error (StateT REPLState IO)
-
-runREPLM :: REPLM a -> IO (Either Error a)
-runREPLM f = evalStateT (runExceptT f) Nothing
-
---------------------------------------------------------------------------------
-
 -- catches Error and convert it into a global ResError
 global :: REPLM Response -> IO Response
 global program = do
   result <- runREPLM program
   case result of
     Left err -> return $ ResError [globalError err]
-    Right val -> return $ val
+    Right val -> return val
 
 -- catches Error and convert it into a local ResError with Hole id
 local :: Int -> REPLM Response -> IO Response
@@ -73,49 +59,44 @@ local i program = do
   result <- runREPLM program
   case result of
     Left err -> return $ ResError [localError i err]
-    Right val -> return $ val
+    Right val -> return val
 
 handleRequest :: ID -> Request -> IO Response
 handleRequest i (ReqLoad filepath) = global $ do
-  (pos, specs, globalProps) <- load filepath
+  program@(Concrete.Program _ globalProps _ _ _) <- readProgram filepath
+  (pos, specs) <- sweep program
   return $ ResOK i pos specs globalProps
-handleRequest _ (ReqRefine i payload) = local i $ do
+handleRequest _ (ReqRefine _ i payload) = local i $ do
   _ <- refine payload
   return $ ResResolve i
-handleRequest _ (ReqSubstitute i expr _subst) = global $ do
-  Concrete.Program _ _ defns _ _ <- getProgram
+handleRequest _ (ReqSubstitute filepath i expr _subst) = global $ do
+  Concrete.Program _ _ defns _ _ <- readProgram filepath
   let expr' = runSubstM (expand (Concrete.Subst expr _subst)) defns 1
   return $ ResSubstitute i expr'
 handleRequest _ ReqDebug = error "crash!"
 
-load :: FilePath -> REPLM ([PO], [Spec], [Concrete.Expr])
-load filepath = do
+--------------------------------------------------------------------------------
+
+type REPLM = ExceptT Error IO
+
+runREPLM :: REPLM a -> IO (Either Error a)
+runREPLM = runExceptT
+
+--------------------------------------------------------------------------------
+
+readProgram :: FilePath -> REPLM Concrete.Program
+readProgram filepath = do
   result <- liftIO $ try $ Text.readFile filepath :: REPLM (Either IOException Text)
   case result of
     Left _ -> throwError $ CannotReadFile filepath
     Right raw -> do
       tokens <- scan filepath raw
-      program@(Concrete.Program _ globalProps _ _ _) <-
-        parseProgram
-          filepath
-          tokens
-      put $ Just program
-      (pos, specs) <- sweep program
-      return (pos, specs, globalProps)
+      parseProgram filepath tokens
 
 refine :: Text -> REPLM ()
 refine payload = do
   _ <- scan "<spec>" payload >>= parseSpec
   return ()
-
---------------------------------------------------------------------------------
-
-getProgram :: REPLM Concrete.Program
-getProgram = do
-  result <- get
-  case result of
-    Nothing -> throwError NotLoaded
-    Just p -> return p
 
 --------------------------------------------------------------------------------
 
@@ -156,8 +137,8 @@ sweep (Concrete.Program _ _ ds statements _) = do
 -- | Request
 data Request
   = ReqLoad FilePath
-  | ReqRefine Int Text
-  | ReqSubstitute Int Concrete.Expr Concrete.Subst
+  | ReqRefine FilePath Int Text
+  | ReqSubstitute FilePath Int Concrete.Expr Concrete.Subst
   | ReqDebug
   deriving (Generic)
 
