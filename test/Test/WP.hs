@@ -5,8 +5,8 @@ module Test.WP where
 import Data.Loc
 import Data.Text.Lazy hiding (map)
 import Error
+import qualified LSP
 import Pretty ()
-import qualified REPL
 import Syntax.Concrete
 import Syntax.Location
 import Syntax.Predicate
@@ -19,11 +19,11 @@ tests = testGroup "WP 1" [emptyProg, statements, issues]
 
 run :: Text -> IO (Either Error ([PO], [Spec]))
 run text =
-  REPL.runREPLM $
+  LSP.runM $
     (\(pos, specs) -> (map toNoLoc pos, map toNoLoc specs))
-      <$> ( REPL.scan "<test>" (text)
-              >>= REPL.parseProgram "<test>"
-              >>= REPL.sweep
+      <$> ( LSP.scan "<test>" (text)
+              >>= LSP.parseProgram "<test>"
+              >>= LSP.sweep
           )
 
 --------------------------------------------------------------------------------

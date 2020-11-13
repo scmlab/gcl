@@ -16,8 +16,8 @@ import Data.Text.Prettyprint.Doc.Render.Text
   ( renderLazy,
   )
 import Error
+import qualified LSP
 import Pretty
-import qualified REPL as REPL
 import Syntax.Concrete
 import Syntax.Parser (Parser)
 import qualified Syntax.Parser as Parser
@@ -62,9 +62,9 @@ toTestTree _ (ReadFile name filepath expected) = testCase name $ do
 
 parse :: Parser a -> Text -> IO (Either Error a)
 parse parser text =
-  REPL.runREPLM $ REPL.scan "<test>" text >>= REPL.parse parser "<text>"
+  LSP.runM $ LSP.scan "<test>" text >>= LSP.parse parser "<text>"
 
--- >>= REPL.abstract
+-- >>= LSP.abstract
 
 --------------------------------------------------------------------------------
 
@@ -551,6 +551,6 @@ program =
 
     parseProgram :: (FilePath, ByteString) -> IO (Either Error Program)
     parseProgram (fileName, raw) =
-      REPL.runREPLM $
-        REPL.scan fileName (Text.decodeUtf8 raw)
-          >>= REPL.parse Parser.program fileName
+      LSP.runM $
+        LSP.scan fileName (Text.decodeUtf8 raw)
+          >>= LSP.parse Parser.program fileName

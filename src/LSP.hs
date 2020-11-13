@@ -11,6 +11,7 @@ import Control.Exception (IOException, try)
 import Control.Monad.Except hiding (guard)
 import Data.Aeson (FromJSON, ToJSON)
 import qualified Data.Aeson as JSON
+import Data.Text (pack)
 import Data.Text.Lazy (Text)
 import qualified Data.Text.Lazy.IO as Text
 import Error
@@ -18,7 +19,7 @@ import GCL.Expr (expand, runSubstM)
 import GCL.WP (runWP, structProg)
 import GHC.Generics (Generic)
 import Language.LSP.Server
-import Language.LSP.Types
+import Language.LSP.Types hiding (TextDocumentSyncClientCapabilities (..))
 import qualified Syntax.Concrete as Concrete
 import qualified Syntax.Parser as Parser
 import Syntax.Parser.Lexer (TokStream)
@@ -40,8 +41,25 @@ run =
         doInitialize = \env _req -> pure $ Right env,
         staticHandlers = handlers,
         interpretHandler = \env -> Iso (runLspT env) liftIO,
-        options = defaultOptions
+        options = lspOptions
       }
+  where
+    -- these `TextDocumentSyncOptions` are essential for receiving notifications like `STextDocumentDidChange`
+    syncOptions :: TextDocumentSyncOptions
+    syncOptions =
+      TextDocumentSyncOptions
+        { _openClose = Just True,
+          _change = Just TdSyncIncremental,
+          _willSave = Just False,
+          _willSaveWaitUntil = Just False,
+          _save = Just $ InR $ SaveOptions $ Just False
+        }
+
+    lspOptions :: Options
+    lspOptions =
+      defaultOptions
+        { textDocumentSync = Just syncOptions
+        }
 
 -- handlers of the LSP server
 handlers :: Handlers (LspM ())
@@ -54,7 +72,23 @@ handlers =
           JSON.Error msg -> return $ ResError [globalError (CannotDecodeRequest msg)]
           JSON.Success request -> liftIO $ handleRequest i request
         -- respond with the Response
-        responder $ Right $ JSON.toJSON response
+        responder $ Right $ JSON.toJSON response,
+      notificationHandler STextDocumentDidSave $ \ntf -> do
+        let NotificationMessage _ _ params = ntf
+        sendNotification SWindowShowMessage (ShowMessageParams MtWarning "DID SAVE!")
+        pure (),
+      notificationHandler STextDocumentDidOpen $ \ntf -> do
+        let NotificationMessage _ _ params = ntf
+        sendNotification SWindowShowMessage (ShowMessageParams MtWarning "DID OPEN!")
+        pure (),
+      notificationHandler STextDocumentDidChange $ \ntf -> do
+        let NotificationMessage _ _ params = ntf
+        sendNotification SWindowShowMessage (ShowMessageParams MtWarning "DID CHANGE!")
+        pure (),
+      notificationHandler STextDocumentDidClose $ \ntf -> do
+        let NotificationMessage _ _ params = ntf
+        sendNotification SWindowShowMessage (ShowMessageParams MtWarning "DID Close!")
+        pure ()
     ]
 
 --------------------------------------------------------------------------------
