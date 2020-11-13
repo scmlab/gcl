@@ -11,5 +11,6 @@ m, n := 0, 0
 do n ≠ N -> s := max (s + A n) 0
             m := max m s
             n := n + 1
+            
 od
 { m = ⟨ max i j : 0 ≤ i ≤ j ≤ N : Sum i j ⟩ }

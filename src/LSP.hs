@@ -1,5 +1,6 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DisambiguateRecordFields #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PolyKinds #-}
 
@@ -11,7 +12,9 @@ import Control.Exception (IOException, try)
 import Control.Monad.Except hiding (guard)
 import Data.Aeson (FromJSON, ToJSON)
 import qualified Data.Aeson as JSON
-import Data.Text (pack)
+import Data.Loc (Located (locOf))
+import Data.Text (pack, unpack)
+import qualified Data.Text as Text
 import Data.Text.Lazy (Text)
 import qualified Data.Text.Lazy.IO as Text
 import Error
@@ -49,7 +52,7 @@ run =
     syncOptions =
       TextDocumentSyncOptions
         { _openClose = Just True,
-          _change = Just TdSyncIncremental,
+          _change = Nothing,
           _willSave = Just False,
           _willSaveWaitUntil = Just False,
           _save = Just $ InR $ SaveOptions $ Just False
@@ -74,22 +77,32 @@ handlers =
         -- respond with the Response
         responder $ Right $ JSON.toJSON response,
       notificationHandler STextDocumentDidSave $ \ntf -> do
-        let NotificationMessage _ _ params = ntf
-        sendNotification SWindowShowMessage (ShowMessageParams MtWarning "DID SAVE!")
-        pure (),
+        let NotificationMessage _ _ (DidSaveTextDocumentParams uri _) = ntf
+
+        case fromTextDocumentIdentifier uri of
+          Nothing -> pure ()
+          Just path -> do
+            reuslt <- liftIO $
+              runM $ do
+                program <- readProgram path
+                (pos, _) <- sweep program
+                return pos
+            case reuslt of
+              Left _ -> pure ()
+              Right pos -> do
+                -- let locs = map locOf pos
+                sendNotification SWindowShowMessage (ShowMessageParams MtWarning $ pack $ show $ JSON.toJSON ("[1, 2, 3 :: Int]" :: String))
+                sendNotification (SCustomMethod "guacamole/pos") $ JSON.toJSON ("[1, 2, 3 :: Int]" :: String),
       notificationHandler STextDocumentDidOpen $ \ntf -> do
         let NotificationMessage _ _ params = ntf
-        sendNotification SWindowShowMessage (ShowMessageParams MtWarning "DID OPEN!")
-        pure (),
-      notificationHandler STextDocumentDidChange $ \ntf -> do
-        let NotificationMessage _ _ params = ntf
-        sendNotification SWindowShowMessage (ShowMessageParams MtWarning "DID CHANGE!")
-        pure (),
-      notificationHandler STextDocumentDidClose $ \ntf -> do
-        let NotificationMessage _ _ params = ntf
-        sendNotification SWindowShowMessage (ShowMessageParams MtWarning "DID Close!")
+        -- sendNotification SWindowShowMessage (ShowMessageParams MtWarning $ "DID OPEN!" <> pack (show $params))
         pure ()
     ]
+  where
+    fromTextDocumentIdentifier :: TextDocumentIdentifier -> Maybe FilePath
+    fromTextDocumentIdentifier (TextDocumentIdentifier uri) =
+      let (prefix, path) = Text.splitAt 7 (getUri uri)
+       in if prefix == "file://" then Just (unpack path) else Nothing
 
 --------------------------------------------------------------------------------
 
