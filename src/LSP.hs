@@ -69,7 +69,8 @@ run =
 handlers :: Handlers (LspM ())
 handlers =
   mconcat
-    [ requestHandler (SCustomMethod "guacamole") $ \req responder -> do
+    [ -- custom methods, not part of LSP
+      requestHandler (SCustomMethod "guacamole") $ \req responder -> do
         let RequestMessage _ i _ params = req
         -- JSON Value => Request => Response
         response <- case JSON.fromJSON params of
@@ -77,6 +78,7 @@ handlers =
           JSON.Success request -> liftIO $ handleRequest i request
         -- respond with the Response
         responder $ Right $ JSON.toJSON response,
+      -- when the client saved the document
       notificationHandler STextDocumentDidSave $ \ntf -> do
         let NotificationMessage _ _ (DidSaveTextDocumentParams uri _) = ntf
 
@@ -90,9 +92,10 @@ handlers =
             case reuslt of
               Left _ -> pure ()
               Right (pos, specs) -> do
-                -- let locs = map locOf pos
+                let locs = map locOf pos
                 -- sendNotification SWindowShowMessage (ShowMessageParams MtWarning $ pack $ show $ JSON.toJSON ("[1, 2, 3 :: Int]" :: String))
-                sendNotification (SCustomMethod "guacamole/pos") $ JSON.toJSON $ ResOK (IdInt 0) pos specs [],
+                sendNotification (SCustomMethod "guacamole") $ JSON.toJSON $ ResDecorate locs,
+      -- sendNotification (SCustomMethod "guacamole/pos") $ JSON.toJSON $ ResOK (IdInt 0) pos specs [],
       notificationHandler STextDocumentDidOpen $ \ntf -> do
         let NotificationMessage _ _ _params = ntf
         -- sendNotification SWindowShowMessage (ShowMessageParams MtWarning $ "DID OPEN!" <> pack (show $params))
@@ -221,6 +224,7 @@ instance FromJSON Request
 data Response
   = ResOK ID [PO] [Spec] [Concrete.Expr]
   | ResError [(Site, Error)]
+  | ResDecorate [Loc]
   | ResResolve Int -- resolves some Spec
   | ResSubstitute Int Concrete.Expr
   deriving (Generic)
