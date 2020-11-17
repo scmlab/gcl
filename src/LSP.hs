@@ -12,8 +12,9 @@ import Control.Exception (IOException, try)
 import Control.Monad.Except hiding (guard)
 import Data.Aeson (FromJSON, ToJSON)
 import qualified Data.Aeson as JSON
-import Data.Loc (Located (locOf))
-import Data.Text (pack, unpack)
+import Data.List (sort)
+import Data.Loc (Loc (..), Located (locOf), posCoff)
+import Data.Text (unpack)
 import qualified Data.Text as Text
 import Data.Text.Lazy (Text)
 import qualified Data.Text.Lazy.IO as Text
@@ -85,20 +86,20 @@ handlers =
             reuslt <- liftIO $
               runM $ do
                 program <- readProgram path
-                (pos, _) <- sweep program
-                return pos
+                sweep program
             case reuslt of
               Left _ -> pure ()
-              Right pos -> do
+              Right (pos, specs) -> do
                 -- let locs = map locOf pos
-                sendNotification SWindowShowMessage (ShowMessageParams MtWarning $ pack $ show $ JSON.toJSON ("[1, 2, 3 :: Int]" :: String))
-                sendNotification (SCustomMethod "guacamole/pos") $ JSON.toJSON ("[1, 2, 3 :: Int]" :: String),
+                -- sendNotification SWindowShowMessage (ShowMessageParams MtWarning $ pack $ show $ JSON.toJSON ("[1, 2, 3 :: Int]" :: String))
+                sendNotification (SCustomMethod "guacamole/pos") $ JSON.toJSON $ ResOK (IdInt 0) pos specs [],
       notificationHandler STextDocumentDidOpen $ \ntf -> do
-        let NotificationMessage _ _ params = ntf
+        let NotificationMessage _ _ _params = ntf
         -- sendNotification SWindowShowMessage (ShowMessageParams MtWarning $ "DID OPEN!" <> pack (show $params))
         pure ()
     ]
   where
+    -- removes the prefixing "file://"
     fromTextDocumentIdentifier :: TextDocumentIdentifier -> Maybe FilePath
     fromTextDocumentIdentifier (TextDocumentIdentifier uri) =
       let (prefix, path) = Text.splitAt 7 (getUri uri)
@@ -108,11 +109,28 @@ handlers =
 
 type ID = LspId ( 'CustomMethod :: Method 'FromClient 'Request)
 
+-- type ID = Int
+
 handleRequest :: ID -> Request -> IO Response
 handleRequest i (ReqLoad filepath) = global $ do
   program@(Concrete.Program _ globalProps _ _ _) <- readProgram filepath
   (pos, specs) <- sweep program
   return $ ResOK i pos specs globalProps
+handleRequest i (ReqInspect filepath selStart selEnd) = global $ do
+  program <- readProgram filepath
+  pos <- fst <$> sweep program
+  -- find the POs whose Range overlaps with the selection
+  let isOverlapped po = case locOf po of
+        NoLoc -> False
+        Loc start' end' ->
+          let start = posCoff start'
+              end = posCoff end' + 1
+           in (selStart <= start && selEnd >= start) -- the end of the selection overlaps with the start of PO
+                || (selStart <= end && selEnd >= end) -- the start of the selection overlaps with the end of PO
+                || (selStart <= start && selEnd >= end) -- the selection covers the PO
+                || (selStart >= start && selEnd <= end) -- the selection is within the PO
+  let overlapped = sort $ filter isOverlapped pos
+  return $ ResOK i overlapped [] []
 handleRequest _ (ReqRefine _ i payload) = local i $ do
   _ <- refine payload
   return $ ResResolve i
@@ -189,6 +207,7 @@ sweep (Concrete.Program _ _ ds statements _) = do
 -- | Request
 data Request
   = ReqLoad FilePath
+  | ReqInspect FilePath Int Int
   | ReqRefine FilePath Int Text
   | ReqSubstitute FilePath Int Concrete.Expr Concrete.Subst
   | ReqDebug

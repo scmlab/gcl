@@ -7,7 +7,6 @@ import Data.Loc
 import Data.Text.Lazy (Text)
 import qualified Syntax.Abstract as A
 import Syntax.Concrete
-import Syntax.Predicate (Origin (..), PO (..))
 import qualified Syntax.Predicate as P
 import Prelude hiding (Ordering (..))
 
@@ -43,21 +42,6 @@ instance Located Lit where
 
 instance Located Name where
   locOf (Name _ l) = l
-
-instance Located PO where
-  locOf (PO _ _ _ o) = locOf o
-
-instance Located Origin where
-  locOf (AtAbort l) = l
-  locOf (AtSkip l) = l
-  locOf (AtSpec l) = l
-  locOf (AtAssignment l) = l
-  locOf (AtAssertion l) = l
-  locOf (AtLoopInvariant l) = l
-  locOf (AtIf l) = l
-  locOf (AtLoop l) = l
-  locOf (AtTermination l) = l
-  locOf (AtBoundDecrement l) = l
 
 --------------------------------------------------------------------------------
 -- Relocatable
@@ -123,7 +107,7 @@ instance Departable Expr A.Expr where
   depart (Const x _) = A.Const $ depart x
   depart (Lit x _) = A.Lit x
   depart (App x y _) = A.App (depart x) (depart y)
-  depart (Lam _ _ _) = error "depart Lam to be implemented"
+  depart Lam {} = error "depart Lam to be implemented"
   depart (Op x _) = A.Op x
   depart (Hole _) = A.Hole 0 []
   depart (Quant op xs rng trm _) =
