@@ -74,7 +74,7 @@ handlers =
         let RequestMessage _ i _ params = req
         -- JSON Value => Request => Response
         response <- case JSON.fromJSON params of
-          JSON.Error msg -> return $ Res "<unknown>" $ ResError [globalError (CannotDecodeRequest msg)]
+          JSON.Error msg -> return $ CannotDecodeRequest msg
           JSON.Success request -> liftIO $ handleRequest i request
         -- respond with the Response
         responder $ Right $ JSON.toJSON response,
@@ -241,7 +241,7 @@ data ResKind
 
 instance ToJSON ResKind
 
-data Response = Res FilePath ResKind
+data Response = Res FilePath ResKind | CannotDecodeRequest String
   deriving (Generic)
 
 instance ToJSON Response

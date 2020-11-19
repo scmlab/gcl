@@ -34,7 +34,6 @@ data Error
   | SyntacticError [SyntacticError]
   | TypeError TypeError
   | StructError StructError
-  | CannotDecodeRequest String
   | CannotReadFile FilePath
   | NotLoaded
   deriving (Eq, Show, Generic)
@@ -44,7 +43,6 @@ instance Located Error where
   locOf (SyntacticError es) = foldl (\l (m, _) -> l <--> m) NoLoc es
   locOf (TypeError e) = locOf e
   locOf (StructError e) = locOf e
-  locOf (CannotDecodeRequest _) = NoLoc
   locOf (CannotReadFile _) = NoLoc
   locOf NotLoaded = NoLoc
 
