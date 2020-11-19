@@ -74,7 +74,7 @@ handlers =
         let RequestMessage _ i _ params = req
         -- JSON Value => Request => Response
         response <- case JSON.fromJSON params of
-          JSON.Error msg -> return $ ResError [globalError (CannotDecodeRequest msg)]
+          JSON.Error msg -> return $ Res "<unknown>" $ ResError [globalError (CannotDecodeRequest msg)]
           JSON.Success request -> liftIO $ handleRequest i request
         -- respond with the Response
         responder $ Right $ JSON.toJSON response,
@@ -84,17 +84,17 @@ handlers =
 
         case fromTextDocumentIdentifier uri of
           Nothing -> pure ()
-          Just path -> do
+          Just filepath -> do
             reuslt <- liftIO $
               runM $ do
-                program <- readProgram path
+                program <- readProgram filepath
                 sweep program
             case reuslt of
               Left _ -> pure ()
-              Right (pos, specs) -> do
+              Right (pos, _specs) -> do
                 let locs = map locOf pos
                 -- sendNotification SWindowShowMessage (ShowMessageParams MtWarning $ pack $ show $ JSON.toJSON ("[1, 2, 3 :: Int]" :: String))
-                sendNotification (SCustomMethod "guacamole") $ JSON.toJSON $ ResDecorate locs,
+                sendNotification (SCustomMethod "guacamole") $ JSON.toJSON $ Res filepath $ ResDecorate locs,
       -- sendNotification (SCustomMethod "guacamole/pos") $ JSON.toJSON $ ResOK (IdInt 0) pos specs [],
       notificationHandler STextDocumentDidOpen $ \ntf -> do
         let NotificationMessage _ _ _params = ntf
@@ -115,36 +115,41 @@ type ID = LspId ( 'CustomMethod :: Method 'FromClient 'Request)
 -- type ID = Int
 
 handleRequest :: ID -> Request -> IO Response
-handleRequest i (ReqLoad filepath) = global $ do
-  program@(Concrete.Program _ globalProps _ _ _) <- readProgram filepath
-  (pos, specs) <- sweep program
-  return $ ResOK i pos specs globalProps
-handleRequest i (ReqInspect filepath selStart selEnd) = global $ do
-  program <- readProgram filepath
-  pos <- fst <$> sweep program
-  -- find the POs whose Range overlaps with the selection
-  let isOverlapped po = case locOf po of
-        NoLoc -> False
-        Loc start' end' ->
-          let start = posCoff start'
-              end = posCoff end' + 1
-           in (selStart <= start && selEnd >= start) -- the end of the selection overlaps with the start of PO
-                || (selStart <= end && selEnd >= end) -- the start of the selection overlaps with the end of PO
-                || (selStart <= start && selEnd >= end) -- the selection covers the PO
-                || (selStart >= start && selEnd <= end) -- the selection is within the PO
-  let overlapped = sort $ filter isOverlapped pos
-  return $ ResOK i overlapped [] []
-handleRequest _ (ReqRefine _ i payload) = local i $ do
-  _ <- refine payload
-  return $ ResResolve i
-handleRequest _ (ReqSubstitute filepath i expr _subst) = global $ do
-  Concrete.Program _ _ defns _ _ <- readProgram filepath
-  let expr' = runSubstM (expand (Concrete.Subst expr _subst)) defns 1
-  return $ ResSubstitute i expr'
-handleRequest _ ReqDebug = error "crash!"
+handleRequest lspID (Req filepath kind) = do
+  res <- handle kind
+  return $ Res filepath res
+  where
+    handle :: ReqKind -> IO ResKind
+    handle ReqLoad = global $ do
+      program@(Concrete.Program _ globalProps _ _ _) <- readProgram filepath
+      (pos, specs) <- sweep program
+      return $ ResOK lspID pos specs globalProps
+    handle (ReqInspect selStart selEnd) = global $ do
+      program <- readProgram filepath
+      pos <- fst <$> sweep program
+      -- find the POs whose Range overlaps with the selection
+      let isOverlapped po = case locOf po of
+            NoLoc -> False
+            Loc start' end' ->
+              let start = posCoff start'
+                  end = posCoff end' + 1
+               in (selStart <= start && selEnd >= start) -- the end of the selection overlaps with the start of PO
+                    || (selStart <= end && selEnd >= end) -- the start of the selection overlaps with the end of PO
+                    || (selStart <= start && selEnd >= end) -- the selection covers the PO
+                    || (selStart >= start && selEnd <= end) -- the selection is within the PO
+      let overlapped = sort $ filter isOverlapped pos
+      return $ ResOK lspID overlapped [] []
+    handle (ReqRefine i payload) = local i $ do
+      _ <- refine payload
+      return $ ResResolve i
+    handle (ReqSubstitute i expr _subst) = global $ do
+      Concrete.Program _ _ defns _ _ <- readProgram filepath
+      let expr' = runSubstM (expand (Concrete.Subst expr _subst)) defns 1
+      return $ ResSubstitute i expr'
+    handle ReqDebug = error "crash!"
 
 -- catches Error and convert it into a global ResError
-global :: M Response -> IO Response
+global :: M ResKind -> IO ResKind
 global program = do
   result <- runM program
   case result of
@@ -152,7 +157,7 @@ global program = do
     Right val -> return val
 
 -- catches Error and convert it into a local ResError with Hole id
-local :: Int -> M Response -> IO Response
+local :: Int -> M ResKind -> IO ResKind
 local i program = do
   result <- runM program
   case result of
@@ -208,12 +213,17 @@ sweep (Concrete.Program _ _ ds statements _) = do
 --------------------------------------------------------------------------------
 
 -- | Request
-data Request
-  = ReqLoad FilePath
-  | ReqInspect FilePath Int Int
-  | ReqRefine FilePath Int Text
-  | ReqSubstitute FilePath Int Concrete.Expr Concrete.Subst
+data ReqKind
+  = ReqLoad
+  | ReqInspect Int Int
+  | ReqRefine Int Text
+  | ReqSubstitute Int Concrete.Expr Concrete.Subst
   | ReqDebug
+  deriving (Generic)
+
+instance FromJSON ReqKind
+
+data Request = Req FilePath ReqKind
   deriving (Generic)
 
 instance FromJSON Request
@@ -221,12 +231,17 @@ instance FromJSON Request
 --------------------------------------------------------------------------------
 
 -- | Response
-data Response
+data ResKind
   = ResOK ID [PO] [Spec] [Concrete.Expr]
   | ResError [(Site, Error)]
   | ResDecorate [Loc]
   | ResResolve Int -- resolves some Spec
   | ResSubstitute Int Concrete.Expr
+  deriving (Generic)
+
+instance ToJSON ResKind
+
+data Response = Res FilePath ResKind
   deriving (Generic)
 
 instance ToJSON Response
