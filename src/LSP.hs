@@ -120,7 +120,12 @@ proofObligationToDiagnostic :: PO -> Diagnostic
 proofObligationToDiagnostic (PO _i _pre _post origin) = Diagnostic range severity code source message tags infos
   where
     range :: Range
-    range = locToRange (locOf origin)
+    range = case origin of
+      -- we only mark the closing tokens ("od" and "fi") for loops & conditionals
+      AtLoop loc -> locToRange' loc
+      AtTermination loc -> locToRange' loc
+      AtIf loc -> locToRange' loc
+      others -> locToRange (locOf others)
 
     severity :: Maybe DiagnosticSeverity
     severity = Just DsWarning
@@ -149,11 +154,20 @@ proofObligationToDiagnostic (PO _i _pre _post origin) = Diagnostic range severit
     location = locToLocation $ locOf origin
 
     infos :: Maybe (List DiagnosticRelatedInformation)
+    -- infos = Nothing
     infos = Just $ List [DiagnosticRelatedInformation location ""]
 
     locToRange :: Loc -> Range
     locToRange NoLoc = Range (Position 0 0) (Position 0 0)
-    locToRange (Loc start end) = Range (posToPosition start) (posToPosition end)
+    locToRange (Loc start end) = Range (translate (-1) (posToPosition start)) (posToPosition end)
+
+    -- translate the Position along the same line
+    translate :: Int -> Position -> Position
+    translate n (Position line col) = Position line ((col + n) `max` 0)
+
+    locToRange' :: Loc -> Range
+    locToRange' NoLoc = Range (Position 0 0) (Position 0 0)
+    locToRange' (Loc _ end) = let pos = posToPosition end in Range (translate (-2) pos) pos
 
     posToPosition :: Pos -> Position
     posToPosition (Pos _path line col _offset) = Position (line - 1) col
