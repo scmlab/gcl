@@ -3,6 +3,7 @@
 {-# LANGUAGE DisambiguateRecordFields #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE TypeOperators #-}
 
 module LSP where
 
@@ -13,8 +14,7 @@ import Control.Monad.Except hiding (guard)
 import Data.Aeson (FromJSON, ToJSON)
 import qualified Data.Aeson as JSON
 import Data.List (sort)
-import Data.Loc (Loc (..), Located (locOf), posCoff)
-import Data.Text (unpack)
+import Data.Loc (Loc (..), Located (locOf), Pos (..), posCoff, posFile)
 import qualified Data.Text as Text
 import Data.Text.Lazy (Text)
 import qualified Data.Text.Lazy.IO as Text
@@ -22,6 +22,7 @@ import Error
 import GCL.Expr (expand, runSubstM)
 import GCL.WP (runWP, structProg)
 import GHC.Generics (Generic)
+import Language.LSP.Diagnostics (partitionBySource)
 import Language.LSP.Server
 import Language.LSP.Types hiding (TextDocumentSyncClientCapabilities (..))
 import qualified Syntax.Concrete as Concrete
@@ -29,8 +30,8 @@ import qualified Syntax.Parser as Parser
 import Syntax.Parser.Lexer (TokStream)
 import qualified Syntax.Parser.Lexer as Lexer
 import Syntax.Predicate
-  ( Origin,
-    PO,
+  ( Origin (..),
+    PO (..),
     Spec,
   )
 
@@ -79,34 +80,87 @@ handlers =
         -- respond with the Response
         responder $ Right $ JSON.toJSON response,
       -- when the client saved the document
-      notificationHandler STextDocumentDidSave $ \ntf -> do
-        let NotificationMessage _ _ (DidSaveTextDocumentParams uri _) = ntf
+      notificationHandler STextDocumentDidSave $ \ntf ->
+        do
+          let NotificationMessage _ _ (DidSaveTextDocumentParams (TextDocumentIdentifier uri) _) = ntf
+          pos <- uriToPOs uri
+          sendDiagnostics uri (Just 0) pos,
+      -- when the client opened the document
+      notificationHandler
+        STextDocumentDidOpen
+        $ \ntf -> do
+          let NotificationMessage _ _ (DidOpenTextDocumentParams (TextDocumentItem uri _ _ _)) = ntf
+          pos <- uriToPOs uri
+          sendDiagnostics uri (Just 0) pos
 
-        case fromTextDocumentIdentifier uri of
-          Nothing -> pure ()
-          Just filepath -> do
-            reuslt <- liftIO $
-              runM $ do
-                program <- readProgram filepath
-                sweep program
-            case reuslt of
-              Left _ -> pure ()
-              Right (pos, _specs) -> do
-                let locs = map locOf pos
-                -- sendNotification SWindowShowMessage (ShowMessageParams MtWarning $ pack $ show $ JSON.toJSON ("[1, 2, 3 :: Int]" :: String))
-                sendNotification (SCustomMethod "guacamole") $ JSON.toJSON $ Res filepath $ ResDecorate locs,
-      -- sendNotification (SCustomMethod "guacamole/pos") $ JSON.toJSON $ ResOK (IdInt 0) pos specs [],
-      notificationHandler STextDocumentDidOpen $ \ntf -> do
-        let NotificationMessage _ _ _params = ntf
-        -- sendNotification SWindowShowMessage (ShowMessageParams MtWarning $ "DID OPEN!" <> pack (show $params))
-        pure ()
+          -- sendNotification SWindowShowMessage (ShowMessageParams MtWarning $ pack $ show $ JSON.toJSON ("[1, 2, 3 :: Int]" :: String))
     ]
   where
-    -- removes the prefixing "file://"
-    fromTextDocumentIdentifier :: TextDocumentIdentifier -> Maybe FilePath
-    fromTextDocumentIdentifier (TextDocumentIdentifier uri) =
-      let (prefix, path) = Text.splitAt 7 (getUri uri)
-       in if prefix == "file://" then Just (unpack path) else Nothing
+    uriToPOs :: MonadIO m => Uri -> m [PO]
+    uriToPOs uri = case uriToFilePath uri of
+      Nothing -> return []
+      Just filepath -> do
+        reuslt <- liftIO $
+          runM $ do
+            program <- readProgram filepath
+            sweep program
+        case reuslt of
+          Left _ -> return []
+          Right (pos, _) -> return pos
+
+    -- Analyze the file and send any diagnostics to the client in a
+    -- "textDocument/publishDiagnostics" notification
+    sendDiagnostics :: Uri -> Maybe Int -> [PO] -> LspM () ()
+    sendDiagnostics uri version pos = do
+      let fileUri = toNormalizedUri uri
+      let diags = map proofObligationToDiagnostic pos
+      publishDiagnostics 100 fileUri version (partitionBySource diags)
+
+proofObligationToDiagnostic :: PO -> Diagnostic
+proofObligationToDiagnostic (PO _i _pre _post origin) = Diagnostic range severity code source message tags infos
+  where
+    range :: Range
+    range = locToRange (locOf origin)
+
+    severity :: Maybe DiagnosticSeverity
+    severity = Just DsWarning
+
+    code :: Maybe (Int |? String)
+    code = Nothing
+
+    source :: Maybe Text.Text
+    source = Nothing
+
+    message :: Text.Text
+    message = case origin of
+      AtAbort {} -> "Abort"
+      AtSpec {} -> "Spec"
+      AtAssignment {} -> "Assignment"
+      AtAssertion {} -> "Assertion"
+      AtIf {} -> "Conditional"
+      AtLoop {} -> "Loop Invariant"
+      AtTermination {} -> "Loop Termination"
+      AtSkip {} -> "Skip"
+
+    tags :: Maybe (List DiagnosticTag)
+    tags = Nothing
+
+    location :: Location
+    location = locToLocation $ locOf origin
+
+    infos :: Maybe (List DiagnosticRelatedInformation)
+    infos = Just $ List [DiagnosticRelatedInformation location ""]
+
+    locToRange :: Loc -> Range
+    locToRange NoLoc = Range (Position 0 0) (Position 0 0)
+    locToRange (Loc start end) = Range (posToPosition start) (posToPosition end)
+
+    posToPosition :: Pos -> Position
+    posToPosition (Pos _path line col _offset) = Position (line - 1) col
+
+    locToLocation :: Loc -> Location
+    locToLocation NoLoc = Location (Uri "") (locToRange NoLoc)
+    locToLocation (Loc start end) = Location (Uri $ Text.pack $ posFile start) (locToRange (Loc start end))
 
 --------------------------------------------------------------------------------
 
@@ -116,14 +170,15 @@ type ID = LspId ( 'CustomMethod :: Method 'FromClient 'Request)
 
 handleRequest :: ID -> Request -> IO Response
 handleRequest lspID (Req filepath kind) = do
-  res <- handle kind
-  return $ Res filepath res
+  responses <- handle kind
+  return $ Res filepath responses
   where
-    handle :: ReqKind -> IO ResKind
+    handle :: ReqKind -> IO [ResKind]
     handle ReqLoad = global $ do
       program@(Concrete.Program _ globalProps _ _ _) <- readProgram filepath
       (pos, specs) <- sweep program
-      return $ ResOK lspID pos specs globalProps
+      return [ResOK lspID pos specs globalProps]
+    -- return [ResOK lspID pos specs globalProps, ResDecorate (map locOf pos)]
     handle (ReqInspect selStart selEnd) = global $ do
       program <- readProgram filepath
       pos <- fst <$> sweep program
@@ -138,30 +193,31 @@ handleRequest lspID (Req filepath kind) = do
                     || (selStart <= start && selEnd >= end) -- the selection covers the PO
                     || (selStart >= start && selEnd <= end) -- the selection is within the PO
       let overlapped = sort $ filter isOverlapped pos
-      return $ ResOK lspID overlapped [] []
+      return [ResOK lspID overlapped [] []]
+    -- return [ResOK lspID overlapped [] [], ResDecorate (map locOf pos)]
     handle (ReqRefine i payload) = local i $ do
       _ <- refine payload
-      return $ ResResolve i
+      return [ResResolve i]
     handle (ReqSubstitute i expr _subst) = global $ do
       Concrete.Program _ _ defns _ _ <- readProgram filepath
       let expr' = runSubstM (expand (Concrete.Subst expr _subst)) defns 1
-      return $ ResSubstitute i expr'
+      return [ResSubstitute i expr']
     handle ReqDebug = error "crash!"
 
 -- catches Error and convert it into a global ResError
-global :: M ResKind -> IO ResKind
+global :: M [ResKind] -> IO [ResKind]
 global program = do
   result <- runM program
   case result of
-    Left err -> return $ ResError [globalError err]
+    Left err -> return [ResError [globalError err]]
     Right val -> return val
 
 -- catches Error and convert it into a local ResError with Hole id
-local :: Int -> M ResKind -> IO ResKind
+local :: Int -> M [ResKind] -> IO [ResKind]
 local i program = do
   result <- runM program
   case result of
-    Left err -> return $ ResError [localError i err]
+    Left err -> return [ResError [localError i err]]
     Right val -> return val
 
 --------------------------------------------------------------------------------
@@ -241,7 +297,7 @@ data ResKind
 
 instance ToJSON ResKind
 
-data Response = Res FilePath ResKind | CannotDecodeRequest String
+data Response = Res FilePath [ResKind] | CannotDecodeRequest String
   deriving (Generic)
 
 instance ToJSON Response

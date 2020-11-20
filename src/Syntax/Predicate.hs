@@ -215,11 +215,9 @@ data Origin
   | AtSpec Loc
   | AtAssignment Loc
   | AtAssertion Loc -- AssertSufficient
-  | AtLoopInvariant Loc
   | AtIf Loc
   | AtLoop Loc
   | AtTermination Loc
-  | AtBoundDecrement Loc
   deriving (Eq, Show, Generic)
 
 instance Located Origin where
@@ -228,11 +226,9 @@ instance Located Origin where
   locOf (AtSpec l) = l
   locOf (AtAssignment l) = l
   locOf (AtAssertion l) = l
-  locOf (AtLoopInvariant l) = l
   locOf (AtIf l) = l
   locOf (AtLoop l) = l
   locOf (AtTermination l) = l
-  locOf (AtBoundDecrement l) = l
 
 instance Ord Loc where
   compare NoLoc NoLoc = EQ

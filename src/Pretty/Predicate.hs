@@ -2,38 +2,38 @@
 
 module Pretty.Predicate where
 
-import           Data.Text.Prettyprint.Doc
-import           Data.Loc                       ( unLoc )
-import           Prelude                 hiding ( Ordering(..) )
-
-import           Syntax.Predicate
-import           Pretty.Concrete                ( )
-import           Pretty.Util
+import Data.Loc (unLoc)
+import Data.Text.Prettyprint.Doc
+import Pretty.Concrete ()
+import Pretty.Util
+import Syntax.Predicate
+import Prelude hiding (Ordering (..))
 
 --------------------------------------------------------------------------------
--- | Pred
 
+-- | Pred
 instance PrettyPrec Pred where
   prettyPrec n predicate = case predicate of
-    Constant p    -> "Constant" <+> prettyPrec n p
-    GuardIf   p _ -> "Guard IF" <+> prettyPrec n p
+    Constant p -> "Constant" <+> prettyPrec n p
+    GuardIf p _ -> "Guard IF" <+> prettyPrec n p
     GuardLoop p _ -> "Guard LOOP" <+> prettyPrec n p
     Assertion p _ -> "Assertion" <+> prettyPrec n p
     LoopInvariant p b _ ->
       "LoopInvariant" <+> prettyPrec n p <+> "bnd:" <+> prettyPrec n b
-    Bound p _   -> "Bound" <+> prettyPrec n p
+    Bound p _ -> "Bound" <+> prettyPrec n p
     Conjunct ps -> "Conjunct" <+> prettyList ps
     Disjunct ps -> "Disjunct" <+> prettyList ps
-    Negate   p  -> "Negate" <+> prettyPrec n p
+    Negate p -> "Negate" <+> prettyPrec n p
 
 instance Pretty Pred where
   pretty = prettyPrec 0
 
 --------------------------------------------------------------------------------
--- | Struct & Stmt
 
+-- | Struct & Stmt
 instance Show Struct where
   show = show . pretty
+
 instance Pretty Struct where
   pretty (Struct pre xs next) =
     "----------------------------------------------------------------"
@@ -50,9 +50,10 @@ instance Pretty Struct where
 
 instance Show Stmt where
   show = show . pretty
+
 instance Pretty Stmt where
-  pretty (Skip  l     ) = braces (pretty (unLoc l)) <> line <> "Skip"
-  pretty (Abort l     ) = braces (pretty (unLoc l)) <> line <> "Abort"
+  pretty (Skip l) = braces (pretty (unLoc l)) <> line <> "Skip"
+  pretty (Abort l) = braces (pretty (unLoc l)) <> line <> "Abort"
   pretty (Assign l _ _) = braces (pretty (unLoc l)) <> line <> "Assign"
   pretty (Do l _ xs) =
     braces (pretty (unLoc l)) <> line <> "Loop" <> line <> vsep (map pretty xs)
@@ -60,45 +61,41 @@ instance Pretty Stmt where
     braces (pretty (unLoc l)) <> line <> "If" <> line <> vsep (map pretty xs)
   pretty (Spec l _) = braces (pretty (unLoc l)) <> line <> "Spec"
 
-
 instance Show GdCmd where
   show = show . pretty
+
 instance Pretty GdCmd where
   pretty (GdCmd guard struct) =
     "  |" <+> pretty guard <+> "=>" <+> line <> "    " <> align (pretty struct)
 
-
 --------------------------------------------------------------------------------
+
 -- | ObliOrigin
-
 instance Pretty Origin where
-
-  pretty (AtAbort          l) = "Abort" <+> pretty l
-  pretty (AtSkip           l) = "Skip" <+> pretty l
-  pretty (AtSpec           l) = "Spec" <+> pretty l
-  pretty (AtAssignment     l) = "Assigment" <+> pretty l
-  pretty (AtAssertion      l) = "Assertion" <+> pretty l
-  pretty (AtLoopInvariant  l) = "LoopInvariant" <+> pretty l
-  pretty (AtIf             l) = "If" <+> pretty l
-  pretty (AtLoop           l) = "Loop" <+> pretty l
-  pretty (AtTermination    l) = "Termination" <+> pretty l
-  pretty (AtBoundDecrement l) = "BoundDecrement" <+> pretty l
+  pretty (AtAbort l) = "Abort" <+> pretty l
+  pretty (AtSkip l) = "Skip" <+> pretty l
+  pretty (AtSpec l) = "Spec" <+> pretty l
+  pretty (AtAssignment l) = "Assigment" <+> pretty l
+  pretty (AtAssertion l) = "Assertion" <+> pretty l
+  pretty (AtIf l) = "If" <+> pretty l
+  pretty (AtLoop l) = "Loop" <+> pretty l
+  pretty (AtTermination l) = "Termination" <+> pretty l
 
 --------------------------------------------------------------------------------
--- | Obligation & Specification
 
+-- | Obligation & Specification
 instance Pretty PO where
   pretty (PO i p q os) =
     lbracket
-      <>  pretty i
-      <>  rbracket
+      <> pretty i
+      <> rbracket
       <+> line
-      <>  indent 2 (pretty p)
-      <>  line
-      <>  indent 2 (pretty q)
-      <>  line
-      <>  indent 2 (pretty os)
-      <>  line
+      <> indent 2 (pretty p)
+      <> line
+      <> indent 2 (pretty q)
+      <> line
+      <> indent 2 (pretty os)
+      <> line
 
 instance Pretty Spec where
   pretty (Specification i p q _) =

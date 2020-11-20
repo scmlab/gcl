@@ -201,11 +201,9 @@ instance ToNoLoc P.Origin where
   toNoLoc (P.AtSpec _) = P.AtSpec NoLoc
   toNoLoc (P.AtAssignment _) = P.AtAssignment NoLoc
   toNoLoc (P.AtAssertion _) = P.AtAssertion NoLoc
-  toNoLoc (P.AtLoopInvariant _) = P.AtLoopInvariant NoLoc
   toNoLoc (P.AtIf _) = P.AtIf NoLoc
   toNoLoc (P.AtLoop _) = P.AtLoop NoLoc
   toNoLoc (P.AtTermination _) = P.AtTermination NoLoc
-  toNoLoc (P.AtBoundDecrement _) = P.AtBoundDecrement NoLoc
 
 instance ToNoLoc P.Spec where
   toNoLoc (P.Specification i p q _) =
