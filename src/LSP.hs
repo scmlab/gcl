@@ -83,38 +83,69 @@ handlers =
       notificationHandler STextDocumentDidSave $ \ntf ->
         do
           let NotificationMessage _ _ (DidSaveTextDocumentParams (TextDocumentIdentifier uri) _) = ntf
-          pos <- uriToPOs uri
-          sendDiagnostics uri (Just 0) pos,
+          diags <- uriToDiags uri
+          sendDiagnostics uri (Just 0) diags,
       -- when the client opened the document
       notificationHandler
         STextDocumentDidOpen
         $ \ntf -> do
           let NotificationMessage _ _ (DidOpenTextDocumentParams (TextDocumentItem uri _ _ _)) = ntf
-          pos <- uriToPOs uri
-          sendDiagnostics uri (Just 0) pos
+          diags <- uriToDiags uri
+          sendDiagnostics uri (Just 0) diags
 
           -- sendNotification SWindowShowMessage (ShowMessageParams MtWarning $ pack $ show $ JSON.toJSON ("[1, 2, 3 :: Int]" :: String))
     ]
   where
-    uriToPOs :: MonadIO m => Uri -> m [PO]
-    uriToPOs uri = case uriToFilePath uri of
+    uriToDiags :: MonadIO m => Uri -> m [Diagnostic]
+    uriToDiags uri = case uriToFilePath uri of
       Nothing -> return []
       Just filepath -> do
         reuslt <- liftIO $
           runM $ do
             program <- readProgram filepath
             sweep program
-        case reuslt of
-          Left _ -> return []
-          Right (pos, _) -> return pos
+        return $ case reuslt of
+          Left err -> errorToDiagnostics err
+          Right (pos, _) ->
+            map proofObligationToDiagnostic pos
 
     -- Analyze the file and send any diagnostics to the client in a
     -- "textDocument/publishDiagnostics" notification
-    sendDiagnostics :: Uri -> Maybe Int -> [PO] -> LspM () ()
-    sendDiagnostics uri version pos = do
+    sendDiagnostics :: Uri -> Maybe Int -> [Diagnostic] -> LspM () ()
+    sendDiagnostics uri version diags = do
       let fileUri = toNormalizedUri uri
-      let diags = map proofObligationToDiagnostic pos
       publishDiagnostics 100 fileUri version (partitionBySource diags)
+
+locToRange :: Loc -> Range
+locToRange NoLoc = Range (Position 0 0) (Position 0 0)
+locToRange (Loc start end) = Range (translate (-1) (posToPosition start)) (posToPosition end)
+
+posToRange :: Pos -> Range
+posToRange pos = locToRange (Loc pos pos)
+
+-- translate the Position along the same line
+translate :: Int -> Position -> Position
+translate n (Position line col) = Position line ((col + n) `max` 0)
+
+locToRange' :: Loc -> Range
+locToRange' NoLoc = Range (Position 0 0) (Position 0 0)
+locToRange' (Loc _ end) = let pos = posToPosition end in Range (translate (-2) pos) pos
+
+posToPosition :: Pos -> Position
+posToPosition (Pos _path line col _offset) = Position (line - 1) col
+
+locToLocation :: Loc -> Location
+locToLocation NoLoc = Location (Uri "") (locToRange NoLoc)
+locToLocation (Loc start end) = Location (Uri $ Text.pack $ posFile start) (locToRange (Loc start end))
+
+errorToDiagnostics :: Error -> [Diagnostic]
+errorToDiagnostics (LexicalError pos) = [Diagnostic (posToRange pos) (Just DsError) Nothing Nothing "Lexical error" Nothing (Just $ List [DiagnosticRelatedInformation (locToLocation (Loc pos pos)) ""])]
+errorToDiagnostics (SyntacticError errors) = map syntacticErrorToDiagnostics errors
+  where
+    syntacticErrorToDiagnostics (loc, msg) = Diagnostic (locToRange loc) (Just DsError) Nothing Nothing "Syntax error" Nothing (Just $ List [DiagnosticRelatedInformation (locToLocation loc) (Text.pack msg)])
+errorToDiagnostics _ = []
+
+-- errorToDiagnostic (SyntacticError errros) = []
 
 proofObligationToDiagnostic :: PO -> Diagnostic
 proofObligationToDiagnostic (PO _i _pre _post origin) = Diagnostic range severity code source message tags infos
@@ -156,25 +187,6 @@ proofObligationToDiagnostic (PO _i _pre _post origin) = Diagnostic range severit
     infos :: Maybe (List DiagnosticRelatedInformation)
     -- infos = Nothing
     infos = Just $ List [DiagnosticRelatedInformation location ""]
-
-    locToRange :: Loc -> Range
-    locToRange NoLoc = Range (Position 0 0) (Position 0 0)
-    locToRange (Loc start end) = Range (translate (-1) (posToPosition start)) (posToPosition end)
-
-    -- translate the Position along the same line
-    translate :: Int -> Position -> Position
-    translate n (Position line col) = Position line ((col + n) `max` 0)
-
-    locToRange' :: Loc -> Range
-    locToRange' NoLoc = Range (Position 0 0) (Position 0 0)
-    locToRange' (Loc _ end) = let pos = posToPosition end in Range (translate (-2) pos) pos
-
-    posToPosition :: Pos -> Position
-    posToPosition (Pos _path line col _offset) = Position (line - 1) col
-
-    locToLocation :: Loc -> Location
-    locToLocation NoLoc = Location (Uri "") (locToRange NoLoc)
-    locToLocation (Loc start end) = Location (Uri $ Text.pack $ posFile start) (locToRange (Loc start end))
 
 --------------------------------------------------------------------------------
 
