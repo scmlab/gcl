@@ -15,15 +15,17 @@ import qualified Data.Aeson as JSON
 import Data.List (sort)
 import Data.Loc (Loc (..), Located (locOf), Pos (..), posCoff, posFile)
 import qualified Data.Text as Text
-import Data.Text.Lazy (Text)
+import Data.Text.Lazy (Text, toStrict)
 import qualified Data.Text.Lazy.IO as Text
 import Error
 import GCL.Expr (expand, runSubstM)
+import GCL.Type (TypeError (..))
 import GCL.WP (StructError (..), runWP, structProg)
 import GHC.Generics (Generic)
 import Language.LSP.Diagnostics (partitionBySource)
 import Language.LSP.Server
 import Language.LSP.Types hiding (TextDocumentSyncClientCapabilities (..))
+import Pretty
 import qualified Syntax.Concrete as Concrete
 import qualified Syntax.Parser as Parser
 import Syntax.Parser.Lexer (TokStream)
@@ -115,12 +117,14 @@ handlers =
       let fileUri = toNormalizedUri uri
       publishDiagnostics 100 fileUri version (partitionBySource diags)
 
+-- TODO: refactor these functions
+
 -- translate a Pos along the same line
 translate :: Int -> Pos -> Pos
-translate n (Pos path line col offset) = Pos path line ((col + n) `max` 0) ((offset + n) `max` 0)
+translate n (Pos path ln col offset) = Pos path ln ((col + n) `max` 0) ((offset + n) `max` 0)
 
 posToPosition :: Pos -> Position
-posToPosition (Pos _path line col _offset) = Position ((line - 1) `max` 0) col
+posToPosition (Pos _path ln col _offset) = Position ((ln - 1) `max` 0) col
 
 locToLocation :: Loc -> Location
 locToLocation NoLoc = Location (Uri "") (locToRange NoLoc)
@@ -151,6 +155,26 @@ errorToDiagnostics (StructError err) = structErrorToDiagnostics err
     structErrorToDiagnostics (ExcessBound loc) = [makeError loc "Excess Bound" "Unnecessary bound annotation at this assertion"]
     structErrorToDiagnostics (MissingPostcondition loc) = [makeError loc "Postcondition Missing" "The last statement of the program should be an assertion"]
     structErrorToDiagnostics (DigHole _) = []
+errorToDiagnostics (TypeError err) = typeErrorToDiagnostics err
+  where
+    typeErrorToDiagnostics (NotInScope name loc) = [makeError loc "Not in scope" $ "The definition " <> toStrict name <> " is not in scope"]
+    typeErrorToDiagnostics (UnifyFailed s t loc) =
+      [ makeError loc "Cannot unify types" $
+          renderStrict $
+            "Cannot unify:" <+> pretty s <> line
+              <> "with        :" <+> pretty t
+      ]
+    typeErrorToDiagnostics (RecursiveType var t loc) =
+      [ makeError loc "Recursive type variable" $
+          renderStrict $
+            "Recursive type variable:" <+> pretty var <> line
+              <> "in type             :" <+> pretty t
+      ]
+    typeErrorToDiagnostics (NotFunction t loc) =
+      [ makeError loc "Not a function" $
+          renderStrict $
+            "The type" <+> pretty t <+> "is not a function type"
+      ]
 errorToDiagnostics _ = []
 
 proofObligationToDiagnostic :: PO -> Diagnostic

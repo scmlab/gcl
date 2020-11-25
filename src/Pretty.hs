@@ -4,11 +4,16 @@
 
 module Pretty
   ( module Data.Text.Prettyprint.Doc,
+    renderStrict,
+    renderLazy,
   )
 where
 
 import Data.Loc
+import Data.Text (Text)
+import qualified Data.Text.Lazy as Lazy
 import Data.Text.Prettyprint.Doc
+import qualified Data.Text.Prettyprint.Doc.Render.Text as Text
 import Error
 import GCL.Type (TypeError (..))
 import GCL.WP (StructError (..))
@@ -17,6 +22,12 @@ import Pretty.Concrete ()
 import Pretty.Predicate ()
 import Syntax.Parser.Lexer (LexicalError)
 import Prelude hiding (Ordering (..))
+
+renderStrict :: Doc ann -> Text
+renderStrict = Text.renderStrict . layoutPretty defaultLayoutOptions
+
+renderLazy :: Doc ann -> Lazy.Text
+renderLazy = Text.renderLazy . layoutPretty defaultLayoutOptions
 
 --------------------------------------------------------------------------------
 
