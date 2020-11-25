@@ -3,7 +3,6 @@
 {-# LANGUAGE DisambiguateRecordFields #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PolyKinds #-}
-{-# LANGUAGE TypeOperators #-}
 
 module LSP where
 
@@ -20,7 +19,7 @@ import Data.Text.Lazy (Text)
 import qualified Data.Text.Lazy.IO as Text
 import Error
 import GCL.Expr (expand, runSubstM)
-import GCL.WP (runWP, structProg)
+import GCL.WP (StructError (..), runWP, structProg)
 import GHC.Generics (Generic)
 import Language.LSP.Diagnostics (partitionBySource)
 import Language.LSP.Server
@@ -116,59 +115,62 @@ handlers =
       let fileUri = toNormalizedUri uri
       publishDiagnostics 100 fileUri version (partitionBySource diags)
 
-locToRange :: Loc -> Range
-locToRange NoLoc = Range (Position 0 0) (Position 0 0)
-locToRange (Loc start end) = Range (translate (-1) (posToPosition start)) (posToPosition end)
-
-posToRange :: Pos -> Range
-posToRange pos = locToRange (Loc pos pos)
-
--- translate the Position along the same line
-translate :: Int -> Position -> Position
-translate n (Position line col) = Position line ((col + n) `max` 0)
-
-locToRange' :: Loc -> Range
-locToRange' NoLoc = Range (Position 0 0) (Position 0 0)
-locToRange' (Loc _ end) = let pos = posToPosition end in Range (translate (-2) pos) pos
+-- translate a Pos along the same line
+translate :: Int -> Pos -> Pos
+translate n (Pos path line col offset) = Pos path line ((col + n) `max` 0) ((offset + n) `max` 0)
 
 posToPosition :: Pos -> Position
-posToPosition (Pos _path line col _offset) = Position (line - 1) col
+posToPosition (Pos _path line col _offset) = Position ((line - 1) `max` 0) col
 
 locToLocation :: Loc -> Location
 locToLocation NoLoc = Location (Uri "") (locToRange NoLoc)
 locToLocation (Loc start end) = Location (Uri $ Text.pack $ posFile start) (locToRange (Loc start end))
 
+locToRange :: Loc -> Range
+locToRange NoLoc = Range (Position 0 0) (Position 0 0)
+locToRange (Loc start end) = Range (posToPosition (translate (-1) start)) (posToPosition end)
+
+severityToDiagnostic :: Maybe DiagnosticSeverity -> Loc -> Text.Text -> Text.Text -> Diagnostic
+severityToDiagnostic severity loc title body = Diagnostic (locToRange loc) severity Nothing Nothing title Nothing (Just $ List [DiagnosticRelatedInformation (locToLocation loc) body])
+
+makeWarning :: Loc -> Text.Text -> Text.Text -> Diagnostic
+makeWarning = severityToDiagnostic (Just DsWarning)
+
+makeError :: Loc -> Text.Text -> Text.Text -> Diagnostic
+makeError = severityToDiagnostic (Just DsError)
+
 errorToDiagnostics :: Error -> [Diagnostic]
-errorToDiagnostics (LexicalError pos) = [Diagnostic (posToRange pos) (Just DsError) Nothing Nothing "Lexical error" Nothing (Just $ List [DiagnosticRelatedInformation (locToLocation (Loc pos pos)) ""])]
-errorToDiagnostics (SyntacticError errors) = map syntacticErrorToDiagnostics errors
+errorToDiagnostics (LexicalError pos) = [makeError (Loc pos pos) "Lexical error" ""]
+errorToDiagnostics (SyntacticError errs) = map syntacticErrorToDiagnostics errs
   where
-    syntacticErrorToDiagnostics (loc, msg) = Diagnostic (locToRange loc) (Just DsError) Nothing Nothing "Syntax error" Nothing (Just $ List [DiagnosticRelatedInformation (locToLocation loc) (Text.pack msg)])
+    syntacticErrorToDiagnostics (loc, msg) = makeError loc "Syntax error" (Text.pack msg)
+errorToDiagnostics (StructError err) = structErrorToDiagnostics err
+  where
+    structErrorToDiagnostics (MissingAssertion loc) = [makeError loc "Assertion Missing" "Assertion before the DO construct is missing"]
+    structErrorToDiagnostics (MissingBound loc) = [makeError loc "Bound Missing" "Bound missing at the end of the assertion before the DO construct \" , bnd : ... }\""]
+    structErrorToDiagnostics (ExcessBound loc) = [makeError loc "Excess Bound" "Unnecessary bound annotation at this assertion"]
+    structErrorToDiagnostics (MissingPostcondition loc) = [makeError loc "Postcondition Missing" "The last statement of the program should be an assertion"]
+    structErrorToDiagnostics (DigHole _) = []
 errorToDiagnostics _ = []
 
--- errorToDiagnostic (SyntacticError errros) = []
-
 proofObligationToDiagnostic :: PO -> Diagnostic
-proofObligationToDiagnostic (PO _i _pre _post origin) = Diagnostic range severity code source message tags infos
+proofObligationToDiagnostic (PO _i _pre _post origin) = makeWarning loc title ""
   where
-    range :: Range
-    range = case origin of
+    -- we only mark the closing tokens ("od" and "fi") for loops & conditionals
+    last2Char :: Loc -> Loc
+    last2Char NoLoc = NoLoc
+    last2Char (Loc _ end) = Loc (translate (-2) end) end
+
+    loc :: Loc
+    loc = case origin of
       -- we only mark the closing tokens ("od" and "fi") for loops & conditionals
-      AtLoop loc -> locToRange' loc
-      AtTermination loc -> locToRange' loc
-      AtIf loc -> locToRange' loc
-      others -> locToRange (locOf others)
+      AtLoop l -> last2Char l
+      AtTermination l -> last2Char l
+      AtIf l -> last2Char l
+      others -> locOf others
 
-    severity :: Maybe DiagnosticSeverity
-    severity = Just DsWarning
-
-    code :: Maybe (Int |? String)
-    code = Nothing
-
-    source :: Maybe Text.Text
-    source = Nothing
-
-    message :: Text.Text
-    message = case origin of
+    title :: Text.Text
+    title = case origin of
       AtAbort {} -> "Abort"
       AtSpec {} -> "Spec"
       AtAssignment {} -> "Assignment"
@@ -177,16 +179,6 @@ proofObligationToDiagnostic (PO _i _pre _post origin) = Diagnostic range severit
       AtLoop {} -> "Loop Invariant"
       AtTermination {} -> "Loop Termination"
       AtSkip {} -> "Skip"
-
-    tags :: Maybe (List DiagnosticTag)
-    tags = Nothing
-
-    location :: Location
-    location = locToLocation $ locOf origin
-
-    infos :: Maybe (List DiagnosticRelatedInformation)
-    -- infos = Nothing
-    infos = Just $ List [DiagnosticRelatedInformation location ""]
 
 --------------------------------------------------------------------------------
 
