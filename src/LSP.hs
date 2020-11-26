@@ -81,34 +81,36 @@ handlers =
         -- respond with the Response
         responder $ Right $ JSON.toJSON response,
       -- when the client saved the document
-      notificationHandler STextDocumentDidSave $ \ntf ->
-        do
-          let NotificationMessage _ _ (DidSaveTextDocumentParams (TextDocumentIdentifier uri) _) = ntf
-          diags <- uriToDiags uri
-          sendDiagnostics uri (Just 0) diags,
+      notificationHandler STextDocumentDidSave $ \ntf -> do
+        let NotificationMessage _ _ (DidSaveTextDocumentParams (TextDocumentIdentifier uri) _) = ntf
+        onNotification uri,
       -- when the client opened the document
-      notificationHandler
-        STextDocumentDidOpen
-        $ \ntf -> do
-          let NotificationMessage _ _ (DidOpenTextDocumentParams (TextDocumentItem uri _ _ _)) = ntf
-          diags <- uriToDiags uri
-          sendDiagnostics uri (Just 0) diags
-
-          -- sendNotification SWindowShowMessage (ShowMessageParams MtWarning $ pack $ show $ JSON.toJSON ("[1, 2, 3 :: Int]" :: String))
+      notificationHandler STextDocumentDidOpen $ \ntf -> do
+        let NotificationMessage _ _ (DidOpenTextDocumentParams (TextDocumentItem uri _ _ _)) = ntf
+        onNotification uri
     ]
   where
-    uriToDiags :: MonadIO m => Uri -> m [Diagnostic]
-    uriToDiags uri = case uriToFilePath uri of
-      Nothing -> return []
+    onNotification :: Uri -> LspM () ()
+    onNotification uri = case uriToFilePath uri of
+      Nothing -> pure ()
       Just filepath -> do
-        reuslt <- liftIO $
-          runM $ do
-            program <- readProgram filepath
-            sweep program
-        return $ case reuslt of
-          Left err -> errorToDiagnostics err
-          Right (pos, _) ->
-            map proofObligationToDiagnostic pos
+        -- send diagnostics
+        diags <- filepathToDiags filepath
+        sendDiagnostics uri (Just 0) diags
+        -- send responses
+        response <- liftIO $ handleRequest (IdInt 0) $ Req filepath ReqLoad
+        sendNotification (SCustomMethod "guacamole") $ JSON.toJSON response
+
+    filepathToDiags :: MonadIO m => FilePath -> m [Diagnostic]
+    filepathToDiags filepath = do
+      reuslt <- liftIO $
+        runM $ do
+          program <- readProgram filepath
+          sweep program
+      return $ case reuslt of
+        Left err -> errorToDiagnostics err
+        Right (pos, _) ->
+          map proofObligationToDiagnostic pos
 
     -- Analyze the file and send any diagnostics to the client in a
     -- "textDocument/publishDiagnostics" notification
@@ -220,10 +222,9 @@ handleRequest lspID (Req filepath kind) = do
       program@(Concrete.Program _ globalProps _ _ _) <- readProgram filepath
       (pos, specs) <- sweep program
       return [ResOK lspID pos specs globalProps]
-    -- return [ResOK lspID pos specs globalProps, ResDecorate (map locOf pos)]
     handle (ReqInspect selStart selEnd) = global $ do
-      program <- readProgram filepath
-      pos <- fst <$> sweep program
+      program@(Concrete.Program _ globalProps _ _ _) <- readProgram filepath
+      (pos, specs) <- sweep program
       -- find the POs whose Range overlaps with the selection
       let isOverlapped po = case locOf po of
             NoLoc -> False
@@ -235,8 +236,7 @@ handleRequest lspID (Req filepath kind) = do
                     || (selStart <= start && selEnd >= end) -- the selection covers the PO
                     || (selStart >= start && selEnd <= end) -- the selection is within the PO
       let overlapped = sort $ filter isOverlapped pos
-      return [ResOK lspID overlapped [] []]
-    -- return [ResOK lspID overlapped [] [], ResDecorate (map locOf pos)]
+      return [ResOK lspID overlapped specs globalProps]
     handle (ReqRefine i payload) = local i $ do
       _ <- refine payload
       return [ResResolve i]
@@ -332,7 +332,6 @@ instance FromJSON Request
 data ResKind
   = ResOK ID [PO] [Spec] [Concrete.Expr]
   | ResError [(Site, Error)]
-  | ResDecorate [Loc]
   | ResResolve Int -- resolves some Spec
   | ResSubstitute Int Concrete.Expr
   deriving (Generic)
