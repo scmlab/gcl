@@ -5,13 +5,12 @@
 module Pretty
   ( module Data.Text.Prettyprint.Doc,
     renderStrict,
-    renderLazy,
+    -- renderLazy,
   )
 where
 
 import Data.Loc
 import Data.Text (Text)
-import qualified Data.Text.Lazy as Lazy
 import Data.Text.Prettyprint.Doc
 import qualified Data.Text.Prettyprint.Doc.Render.Text as Text
 import Error
@@ -26,8 +25,8 @@ import Prelude hiding (Ordering (..))
 renderStrict :: Doc ann -> Text
 renderStrict = Text.renderStrict . layoutPretty defaultLayoutOptions
 
-renderLazy :: Doc ann -> Lazy.Text
-renderLazy = Text.renderLazy . layoutPretty defaultLayoutOptions
+-- renderLazy :: Doc ann -> Lazy.Text
+-- renderLazy = Text.renderLazy . layoutPretty defaultLayoutOptions
 
 --------------------------------------------------------------------------------
 

@@ -23,6 +23,7 @@ instance Located Stmt where
   locOf (If _ l) = l
   locOf (SpecQM l) = l
   locOf (Spec l) = l
+  locOf (Proof l) = l
 
 instance Located Type where
   locOf (TBase _ l) = l

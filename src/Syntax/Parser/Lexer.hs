@@ -74,6 +74,8 @@ data Tok
   | TokQuantEnd
   | TokQuantStartU
   | TokQuantEndU
+  | TokProofStart
+  | TokProofEnd
   | -- expression
 
     -- operators
@@ -149,6 +151,8 @@ instance Show Tok where
     TokQuantEnd -> "|>"
     TokQuantStartU -> "⟨"
     TokQuantEndU -> "⟩"
+    TokProofStart -> "{-"
+    TokProofEnd -> "-}"
     TokEQ -> "="
     TokNEQ -> "/="
     TokNEQU -> "≠"
@@ -251,6 +255,10 @@ tokRE =
     <$ string "⟨"
     <|> TokQuantEndU
     <$ string "⟩"
+    <|> TokProofStart
+    <$ string "{-"
+    <|> TokProofEnd
+    <$ string "-}"
     -- literals
     <|> TokEQ
     <$ string "="
@@ -301,10 +309,10 @@ tokRE =
     <|> TokFalse
     <$ string "False"
     <|> TokUpperName
-    <$> Text.pack
+      . Text.pack
     <$> upperNameRE
     <|> TokLowerName
-    <$> Text.pack
+      . Text.pack
     <$> lowerNameRE
     <|> TokInt
     <$> intRE
@@ -335,7 +343,7 @@ isNewline _ = False
 isNameChar :: Char -> Bool
 isNameChar c = isAlphaNum c || c == '_' || c == '\''
 
-isSpaceButNewline :: Char -> Bool 
+isSpaceButNewline :: Char -> Bool
 isSpaceButNewline c = isSpace c && not (isNewline c)
 
 -- for ignoring white spaces
@@ -354,7 +362,7 @@ comment =
     -- expects any chars but newline
     <* many (psym (not . isNewline))
     -- expects newline
-    <* (psym isNewline)
+    <* psym isNewline
 
 -- for indentation bookkeeping
 newlineAndWhitespace :: RE Char Tok
@@ -530,17 +538,17 @@ scan filepath = runPreprocess . preprocess . runLexer lexer filepath . Text.unpa
         Indent indentation -> do
           pushStack indentation
           loc <- locEnd <$> gets ppPrevLoc
-          TsToken (L loc TokIndent) <$> TsToken currentToken <$> preprocess xs
+          TsToken (L loc TokIndent) . TsToken currentToken <$> preprocess xs
         Newline -> do
           loc <- locEnd <$> gets ppPrevLoc
-          TsToken (L loc TokNewline) <$> TsToken currentToken <$> preprocess xs
+          TsToken (L loc TokNewline) . TsToken currentToken <$> preprocess xs
         Bar -> do
           loc <- locEnd <$> gets ppPrevLoc
-          TsToken (L loc TokGuardBar) <$> TsToken currentToken <$> preprocess xs
+          TsToken (L loc TokGuardBar) . TsToken currentToken <$> preprocess xs
         Dedent -> do
           popStack
           loc <- locEnd <$> gets ppPrevLoc
-          TsToken (L loc TokDedent) <$> TsToken currentToken <$> preprocess xs
+          TsToken (L loc TokDedent) . TsToken currentToken <$> preprocess xs
         DedentRepeat -> do
           popStack
           loc <- locEnd <$> gets ppPrevLoc

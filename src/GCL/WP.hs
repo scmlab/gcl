@@ -127,6 +127,8 @@ struct False inv _ (C.Do gcmds l) post = do
   obligate (Conjunct (inv : (map (Negate . guardLoop) guards))) post (AtLoop l)
 struct _ _ _ (C.SpecQM l) _ = throwError $ DigHole l
 struct b pre _ (C.Spec l) post = when b (tellSpec pre post l)
+-- banacorn: what to do about this?
+struct _ _ _ (C.Proof _) _ = return ()
 
 structStmts :: Bool -> Pred -> Maybe Expr -> [Stmt] -> Pred -> SM ()
 structStmts _ pre _ [] post = do
@@ -220,6 +222,8 @@ wp _ (C.SpecQM l) _ = throwError $ DigHole l
 wp b (C.Spec l) post = do
   when b (tellSpec post post l)
   return post -- not quite right
+wp _ (C.Proof _) post = do
+  return post -- banacorn: not sure if this is right
 
 assignmentEnv :: [Name] -> [Expr] -> C.Subst
 assignmentEnv xs es = Map.fromList (zip (map C.nameToText xs) es)

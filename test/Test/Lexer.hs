@@ -2,9 +2,9 @@
 
 module Test.Lexer where
 
-import Data.Loc (L, unLoc)
+import Data.Loc (unLoc)
 import Data.Text.Lazy (Text)
-import Language.Lexer.Applicative (TokenStream (TsEof), streamToList)
+import Language.Lexer.Applicative (streamToList)
 import Syntax.Parser.Lexer (LexicalError, Tok (..), scan)
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit (testCase, (@?=))
@@ -13,7 +13,6 @@ tests :: TestTree
 tests =
   testGroup
     "Lexer"
-    -- [programs]
     [indentation, programs]
 
 -- helper function

@@ -302,10 +302,10 @@ var :: Text -> Loc -> Expr
 var t l = Var (Name t l) l
 
 bin :: Op -> Loc -> Expr -> Loc -> Expr -> Loc -> Expr
-bin op opLoc a aLoc b bLoc = App (App (Op op opLoc) a aLoc) b bLoc
+bin op opLoc a aLoc = App (App (Op op opLoc) a aLoc)
 
 un :: Op -> Loc -> Expr -> Loc -> Expr
-un op opLoc a aLoc = App (Op op opLoc) a aLoc
+un op opLoc = App (Op op opLoc)
 
 --------------------------------------------------------------------------------
 
@@ -534,9 +534,9 @@ program =
                   . pretty
                   $ program
 
-          case golden == result of
-            True -> return Nothing
-            False -> return (Just $ unpack result ++ "\n\ngolden:\n" ++ unpack golden)
+          if golden == result
+            then return Nothing
+            else return (Just $ unpack result ++ "\n\ngolden:\n" ++ unpack golden)
 
     update :: (FilePath, ByteString) -> IO ()
     update (inputFilePath, input) = do

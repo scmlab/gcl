@@ -65,9 +65,9 @@ parse parser filepath tokenStream =
 program :: Parser Program
 program = withLoc $ do
   skipMany (symbol TokNewline)
-  decls <- many (declaration <* (choice [symbol TokNewline, eof])) <?> "declarations"
+  decls <- many (declaration <* choice [symbol TokNewline, eof]) <?> "declarations"
   skipMany (symbol TokNewline)
-  stmts <- many (statement <* (choice [symbol TokNewline, eof])) <?> "statements"
+  stmts <- many (statement <* choice [symbol TokNewline, eof]) <?> "statements"
   skipMany (symbol TokNewline)
 
   let letBindings = pickLetBindings decls
@@ -140,6 +140,7 @@ statement =
       abort,
       try assertWithBnd,
       spec,
+      proof,
       assert,
       skip,
       repetition,
@@ -224,11 +225,26 @@ spec = withLoc $ do
   symbol TokSpecEnd <?> "!}"
   -- expectNewline <?> "<newline> after a the end of a Spec"
 
-  return $ Spec
+  return Spec
   where
     isTokSpecEnd :: L Tok -> Bool
     isTokSpecEnd (L _ TokSpecEnd) = False
     isTokSpecEnd _ = True
+
+proof :: Parser Stmt
+proof = withLoc $ do
+  symbol TokProofStart <?> "{-"
+  -- expectNewline <?> "<newline> after a the start of a Proof"
+  _ <- specContent
+  _ <- takeWhileP (Just "anything other than '-}'") isTokProofEnd
+  symbol TokProofEnd <?> "-}"
+  -- expectNewline <?> "<newline> after a the end of a Proof"
+
+  return Spec
+  where
+    isTokProofEnd :: L Tok -> Bool
+    isTokProofEnd (L _ TokProofEnd) = False
+    isTokProofEnd _ = True
 
 --------------------------------------------------------------------------------
 

@@ -63,6 +63,7 @@ instance Pretty Stmt where
   pretty (If gdCmds _) = "if" <+> align (encloseSep mempty mempty " | " (map pretty gdCmds)) <> line <> "fi"
   pretty (SpecQM _) = "?"
   pretty (Spec _) = "{!  !}"
+  pretty (Proof _) = "{-  -}"
 
 instance Pretty GdCmd where
   pretty (GdCmd guard body _) = pretty guard <+> "->" <+> align (vsep (map pretty body))
