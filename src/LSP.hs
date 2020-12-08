@@ -210,8 +210,6 @@ proofObligationToDiagnostic (PO _i _pre _post origin) = makeWarning loc title ""
 
 type ID = LspId ( 'CustomMethod :: Method 'FromClient 'Request)
 
--- type ID = Int
-
 handleRequest :: ID -> Request -> IO Response
 handleRequest lspID (Req filepath kind) = do
   responses <- handle kind
@@ -235,8 +233,18 @@ handleRequest lspID (Req filepath kind) = do
                     || (selStart <= end && selEnd >= end) -- the start of the selection overlaps with the end of PO
                     || (selStart <= start && selEnd >= end) -- the selection covers the PO
                     || (selStart >= start && selEnd <= end) -- the selection is within the PO
-      let overlapped = sort $ filter isOverlapped pos
-      return [ResOK lspID overlapped specs globalProps]
+                    -- sort them by comparing their starting position
+      let overlapped = reverse $ sort $ filter isOverlapped pos
+      let nearest = reverse $ case overlapped of
+            [] -> []
+            (x : _) -> case locOf x of
+              NoLoc -> []
+              Loc start _ ->
+                let same y = case locOf y of
+                      NoLoc -> False
+                      Loc start' _ -> start == start'
+                 in filter same overlapped
+      return [ResOK lspID nearest specs globalProps]
     handle (ReqRefine i payload) = local i $ do
       _ <- refine payload
       return [ResResolve i]
