@@ -126,7 +126,7 @@ translate :: Int -> Pos -> Pos
 translate n (Pos path ln col offset) = Pos path ln ((col + n) `max` 0) ((offset + n) `max` 0)
 
 posToPosition :: Pos -> Position
-posToPosition (Pos _path ln col _offset) = Position ((ln - 1) `max` 0) col
+posToPosition (Pos _path ln col _offset) = Position ((ln - 1) `max` 0) ((col - 1) `max` 0)
 
 locToLocation :: Loc -> Location
 locToLocation NoLoc = Location (Uri "") (locToRange NoLoc)
@@ -134,7 +134,7 @@ locToLocation (Loc start end) = Location (Uri $ Text.pack $ posFile start) (locT
 
 locToRange :: Loc -> Range
 locToRange NoLoc = Range (Position 0 0) (Position 0 0)
-locToRange (Loc start end) = Range (posToPosition (translate (-1) start)) (posToPosition end)
+locToRange (Loc start end) = Range (posToPosition start) (posToPosition (translate 1 end))
 
 severityToDiagnostic :: Maybe DiagnosticSeverity -> Loc -> Text.Text -> Text.Text -> Diagnostic
 severityToDiagnostic severity loc title body = Diagnostic (locToRange loc) severity Nothing Nothing title Nothing (Just $ List [DiagnosticRelatedInformation (locToLocation loc) body])
@@ -182,17 +182,17 @@ errorToDiagnostics _ = []
 proofObligationToDiagnostic :: PO -> Diagnostic
 proofObligationToDiagnostic (PO _i _pre _post origin) = makeWarning loc title ""
   where
-    -- we only mark the closing tokens ("od" and "fi") for loops & conditionals
-    last2Char :: Loc -> Loc
-    last2Char NoLoc = NoLoc
-    last2Char (Loc _ end) = Loc (translate (-2) end) end
+    -- we only mark the opening tokens ("do" and "if") for loops & conditionals
+    first2Char :: Loc -> Loc
+    first2Char NoLoc = NoLoc
+    first2Char (Loc start _) = Loc start (translate 1 start)
 
     loc :: Loc
     loc = case origin of
       -- we only mark the closing tokens ("od" and "fi") for loops & conditionals
-      AtLoop l -> last2Char l
-      AtTermination l -> last2Char l
-      AtIf l -> last2Char l
+      AtLoop l -> first2Char l
+      AtTermination l -> first2Char l
+      AtIf l -> first2Char l
       others -> locOf others
 
     title :: Text.Text
