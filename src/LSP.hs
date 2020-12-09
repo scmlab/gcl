@@ -252,6 +252,8 @@ handleRequest lspID (Req filepath kind) = do
       Concrete.Program _ _ defns _ _ <- readProgram filepath
       let expr' = runSubstM (expand (Concrete.Subst expr _subst)) defns 1
       return [ResSubstitute i expr']
+    handle ReqExportProofObligations = do
+      return [ResConsoleLog "Export"]
     handle ReqDebug = error "crash!"
 
 -- catches Error and convert it into a global ResError
@@ -324,6 +326,7 @@ data ReqKind
   | ReqInspect Int Int
   | ReqRefine Int Text
   | ReqSubstitute Int Concrete.Expr Concrete.Subst
+  | ReqExportProofObligations
   | ReqDebug
   deriving (Generic)
 
@@ -342,6 +345,7 @@ data ResKind
   | ResError [(Site, Error)]
   | ResResolve Int -- resolves some Spec
   | ResSubstitute Int Concrete.Expr
+  | ResConsoleLog Text
   deriving (Generic)
 
 instance ToJSON ResKind
