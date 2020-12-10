@@ -17,11 +17,11 @@ packages:
     git: https://github.com/banacorn/lsp.git
     pantry-tree:
       size: 7223
-      sha256: 4399951112125424bce6197f4f522eee5ab78b6431420c6e8b84f67f101e9318
-    commit: 50b5571e16d7ce97f351d0f407ffe2ad4a5a3fba
+      sha256: 686e581c058504134f51904824d705a4f5c532bf4cf3ca07dee957aedd9f456a
+    commit: a1be3f35e8144032b5d57e5269a322c078a90a92
   original:
     git: https://github.com/banacorn/lsp.git
-    commit: 50b5571e16d7ce97f351d0f407ffe2ad4a5a3fba
+    commit: a1be3f35e8144032b5d57e5269a322c078a90a92
 - completed:
     subdir: lsp-types
     name: lsp-types
@@ -29,12 +29,12 @@ packages:
     git: https://github.com/banacorn/lsp.git
     pantry-tree:
       size: 4003
-      sha256: de928c0be515056d9a8499775022c3268c0b752cef5f47eed9934f0e88a809b6
-    commit: 50b5571e16d7ce97f351d0f407ffe2ad4a5a3fba
+      sha256: 032e147f729184521e36f9d33f66c5d679ffa212f47669d7e74841477024b57e
+    commit: a1be3f35e8144032b5d57e5269a322c078a90a92
   original:
     subdir: lsp-types
     git: https://github.com/banacorn/lsp.git
-    commit: 50b5571e16d7ce97f351d0f407ffe2ad4a5a3fba
+    commit: a1be3f35e8144032b5d57e5269a322c078a90a92
 - completed:
     hackage: dependent-map-0.4.0.0@sha256:ca2b131046f4340a1c35d138c5a003fe4a5be96b14efc26291ed35fd08c62221,1657
     pantry-tree:

@@ -46,9 +46,9 @@ extra-deps:
   # LSP
   - lexer-applicative-2.1.0.2
   - git: https://github.com/banacorn/lsp.git
-    commit: 50b5571e16d7ce97f351d0f407ffe2ad4a5a3fba
+    commit: a1be3f35e8144032b5d57e5269a322c078a90a92
   - git: https://github.com/banacorn/lsp.git
-    commit: 50b5571e16d7ce97f351d0f407ffe2ad4a5a3fba
+    commit: a1be3f35e8144032b5d57e5269a322c078a90a92
     subdirs:
       - lsp-types
   - dependent-map-0.4.0.0@sha256:ca2b131046f4340a1c35d138c5a003fe4a5be96b14efc26291ed35fd08c62221,1657

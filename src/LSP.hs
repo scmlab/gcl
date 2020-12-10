@@ -77,7 +77,12 @@ handlers =
         -- JSON Value => Request => Response
         response <- case JSON.fromJSON params of
           JSON.Error msg -> return $ CannotDecodeRequest msg
-          JSON.Success request -> liftIO $ handleRequest i request
+          JSON.Success request -> do
+            -- handle
+            handleRequestLSP i request
+            -- convert Request to Response
+            liftIO $ handleRequest i request
+
         -- respond with the Response
         responder $ Right $ JSON.toJSON response,
       -- when the client saved the document
@@ -255,6 +260,22 @@ handleRequest lspID (Req filepath kind) = do
     handle ReqExportProofObligations = do
       return [ResConsoleLog "Export"]
     handle ReqDebug = error "crash!"
+
+handleRequestLSP :: ID -> Request -> LspT () IO ()
+handleRequestLSP _lspID (Req _filepath kind) = handle kind
+  where
+    handle :: ReqKind -> LspT () IO ()
+    handle ReqExportProofObligations = do
+      let uri = Text.pack _filepath <> ".md"
+      let createFile = CreateFile FileResourceChangeCreate uri Nothing
+      let edit = WorkspaceEdit Nothing (Just (List [InR (InL createFile)]))
+      _ <- sendRequest SWorkspaceApplyEdit (ApplyWorkspaceEditParams (Just "create export file") edit) responseHandler
+      pure ()
+    handle _ = pure ()
+
+    responseHandler :: Either ResponseError ApplyWorkspaceEditResponseBody -> LspT () IO ()
+    responseHandler (Left err) = sendNotification SWindowShowMessage (ShowMessageParams MtError $ Text.pack $ show err)
+    responseHandler (Right body) = sendNotification SWindowShowMessage (ShowMessageParams MtInfo $ Text.pack $ show body)
 
 -- catches Error and convert it into a global ResError
 global :: M [ResKind] -> IO [ResKind]
