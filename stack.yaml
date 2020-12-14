@@ -45,17 +45,17 @@ ghc-options:
 extra-deps:
   # LSP
   - lexer-applicative-2.1.0.2
-  - git: https://github.com/banacorn/lsp.git
-    commit: a1be3f35e8144032b5d57e5269a322c078a90a92
-  - git: https://github.com/banacorn/lsp.git
-    commit: a1be3f35e8144032b5d57e5269a322c078a90a92
+  - git: https://github.com/alanz/lsp.git
+    commit: 36b655d9cc538f79b14c847ca383d97ffcc18162
+  - git: https://github.com/alanz/lsp.git
+    commit: 36b655d9cc538f79b14c847ca383d97ffcc18162
     subdirs:
       - lsp-types
   - dependent-map-0.4.0.0@sha256:ca2b131046f4340a1c35d138c5a003fe4a5be96b14efc26291ed35fd08c62221,1657
   - dependent-sum-template-0.1.0.3@sha256:0bbbacdfbd3abf2a15aaf0cf2c27e5bdd159b519441fec39e1e6f2f54424adde,1682
   - constraints-extras-0.3.0.2@sha256:013b8d0392582c6ca068e226718a4fe8be8e22321cc0634f6115505bf377ad26,1853
   - dependent-sum-0.7.1.0@sha256:5599aa89637db434431b1dd3fa7c34bc3d565ee44f0519bfbc877be1927c2531,2068
-  -  unliftio-core-0.2.0.1@sha256:9b3e44ea9aacacbfc35b3b54015af450091916ac3618a41868ebf6546977659a,1082
+  - unliftio-core-0.2.0.1@sha256:9b3e44ea9aacacbfc35b3b54015af450091916ac3618a41868ebf6546977659a,1082
 
 
 # Override default flag values for local packages and extra-deps

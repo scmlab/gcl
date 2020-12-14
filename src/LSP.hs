@@ -265,17 +265,24 @@ handleRequestLSP :: ID -> Request -> LspT () IO ()
 handleRequestLSP _lspID (Req _filepath kind) = handle kind
   where
     handle :: ReqKind -> LspT () IO ()
-    handle ReqExportProofObligations = do
-      let uri = Text.pack _filepath <> ".md"
-      let createFile = CreateFile FileResourceChangeCreate uri Nothing
-      let edit = WorkspaceEdit Nothing (Just (List [InR (InL createFile)]))
-      _ <- sendRequest SWorkspaceApplyEdit (ApplyWorkspaceEditParams (Just "create export file") edit) responseHandler
-      pure ()
+    handle ReqExportProofObligations = exportPOs
     handle _ = pure ()
 
-    responseHandler :: Either ResponseError ApplyWorkspaceEditResponseBody -> LspT () IO ()
-    responseHandler (Left err) = sendNotification SWindowShowMessage (ShowMessageParams MtError $ Text.pack $ show err)
-    responseHandler (Right body) = sendNotification SWindowShowMessage (ShowMessageParams MtInfo $ Text.pack $ show body)
+    filepath :: Text.Text
+    filepath = Text.pack _filepath <> ".md"
+
+    exportPOs :: LspT () IO () 
+    exportPOs = do
+      let uri = Uri filepath
+      let createFile = CreateFile uri Nothing
+      let edit = WorkspaceEdit Nothing (Just (List [InR (InL createFile)]))
+      _ <- sendRequest SWorkspaceApplyEdit (ApplyWorkspaceEditParams (Just "create export file") edit) handleExportPOs
+      pure ()
+
+    handleExportPOs :: Either ResponseError ApplyWorkspaceEditResponseBody -> LspT () IO ()
+    handleExportPOs (Left (ResponseError _ message _)) = sendNotification SWindowShowMessage (ShowMessageParams MtError $ "Failed to export proof obligations: \n" <> message)
+    handleExportPOs (Right (ApplyWorkspaceEditResponseBody False Nothing)) = sendNotification SWindowShowMessage (ShowMessageParams MtWarning $ filepath <> " already existed")
+    handleExportPOs (Right _) = pure () 
 
 -- catches Error and convert it into a global ResError
 global :: M [ResKind] -> IO [ResKind]
