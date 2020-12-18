@@ -11,6 +11,7 @@ module LSP where
 import Control.Exception (IOException, try)
 import Control.Monad.Except hiding (guard)
 import Data.Aeson (FromJSON, ToJSON)
+import qualified Data.Vector as Vec
 import qualified Data.Aeson as JSON
 import Data.List (sort)
 import Data.Loc (Loc (..), Located (locOf), Pos (..), posCoff, posFile)
@@ -75,13 +76,17 @@ handlers =
       requestHandler (SCustomMethod "guacamole") $ \req responder -> do
         let RequestMessage _ i _ params = req
         -- JSON Value => Request => Response
-        response <- case JSON.fromJSON params of
-          JSON.Error msg -> return $ CannotDecodeRequest msg
-          JSON.Success request -> do
-            -- handle
-            handleRequestLSP i request
-            -- convert Request to Response
-            liftIO $ handleRequest i request
+        response <- case params of 
+          JSON.Array array -> case Vec.toList array of 
+            (content : _) ->  case JSON.fromJSON content of
+              JSON.Error msg -> return $ CannotDecodeRequest $ show msg
+              JSON.Success request -> do
+                -- handle
+                handleRequestLSP i request
+                -- convert Request to Response
+                liftIO $ handleRequest i request
+            _ -> return $ CannotDecodeRequest "Panic: expecting an non-empty array, got an empty array"
+          _ -> return $ CannotDecodeRequest "Panic: expecting an non-empty array, got something else"
 
         -- respond with the Response
         responder $ Right $ JSON.toJSON response,
@@ -265,24 +270,58 @@ handleRequestLSP :: ID -> Request -> LspT () IO ()
 handleRequestLSP _lspID (Req _filepath kind) = handle kind
   where
     handle :: ReqKind -> LspT () IO ()
-    handle ReqExportProofObligations = exportPOs
+    handle ReqExportProofObligations = createPOFile
     handle _ = pure ()
 
     filepath :: Text.Text
     filepath = Text.pack _filepath <> ".md"
 
-    exportPOs :: LspT () IO () 
-    exportPOs = do
+    createPOFile :: LspT () IO () 
+    createPOFile = do
       let uri = Uri filepath
       let createFile = CreateFile uri Nothing
       let edit = WorkspaceEdit Nothing (Just (List [InR (InL createFile)]))
-      _ <- sendRequest SWorkspaceApplyEdit (ApplyWorkspaceEditParams (Just "create export file") edit) handleExportPOs
+      _ <- sendRequest SWorkspaceApplyEdit (ApplyWorkspaceEditParams (Just "create export file") edit) handleCreatePOFile
       pure ()
 
-    handleExportPOs :: Either ResponseError ApplyWorkspaceEditResponseBody -> LspT () IO ()
-    handleExportPOs (Left (ResponseError _ message _)) = sendNotification SWindowShowMessage (ShowMessageParams MtError $ "Failed to export proof obligations: \n" <> message)
-    handleExportPOs (Right (ApplyWorkspaceEditResponseBody False Nothing)) = sendNotification SWindowShowMessage (ShowMessageParams MtWarning $ filepath <> " already existed")
-    handleExportPOs (Right _) = pure () 
+    handleCreatePOFile :: Either ResponseError ApplyWorkspaceEditResponseBody -> LspT () IO ()
+    handleCreatePOFile (Left (ResponseError _ message _)) = sendNotification SWindowShowMessage (ShowMessageParams MtError $ "Failed to export proof obligations: \n" <> message)
+    handleCreatePOFile (Right (ApplyWorkspaceEditResponseBody False Nothing)) = sendNotification SWindowShowMessage (ShowMessageParams MtWarning $ filepath <> " already existed")
+    handleCreatePOFile (Right _) = exportPOs
+
+    exportPOs :: LspT () IO () 
+    exportPOs = do 
+      result <- liftIO $ runM $ do 
+        program <- readProgram _filepath
+        (pos, _) <- sweep program
+        return pos
+      case result of 
+        Left err -> do 
+          let message = Text.pack $ show err
+          sendNotification SWindowShowMessage (ShowMessageParams MtError $ "Failed calculate proof obligations: \n" <> message)
+        Right pos -> do 
+          let toMarkdown (PO i pre post _) = pretty i <> "." <+> pretty pre <+> "=>" <+> pretty post 
+          -- let content = renderStrict $ concatWith (\x y -> x <> line <> y) $ map toMarkdown pos
+          -- let content = renderStrict $ concatWith (\x y -> x <+> y) $ map toMarkdown pos
+          let identifier = VersionedTextDocumentIdentifier (Uri filepath) (Just 0)
+          let range = Range (Position 0 0) (Position 0 0)
+          let textEdits = [TextEdit range "line1\nline2"]
+              -- map (TextEdit range . renderStrict . toMarkdown) pos
+          -- let textEdits = map (TextEdit range . renderStrict . toMarkdown) pos
+          let textDocEdit = TextDocumentEdit identifier $ List textEdits
+          let edit = WorkspaceEdit Nothing (Just (List [InL textDocEdit]))
+          _ <- sendRequest SWorkspaceApplyEdit (ApplyWorkspaceEditParams (Just "writing proof obligations") edit) handleExportPos
+
+          -- sendNotification SWindowShowMessage (ShowMessageParams MtInfo $ "a\nb")
+          -- sendNotification SWindowLogMessage (LogMessageParams MtInfo $ "a\nb")
+
+          pure ()
+
+    handleExportPos :: Either ResponseError ApplyWorkspaceEditResponseBody -> LspT () IO ()
+    handleExportPos (Left (ResponseError _ message _)) = sendNotification SWindowShowMessage (ShowMessageParams MtError $ "Failed to write proof obligations: \n" <> message)
+    handleExportPos (Right message) = sendNotification SWindowShowMessage (ShowMessageParams MtWarning $ Text.pack $ show message)
+
+
 
 -- catches Error and convert it into a global ResError
 global :: M [ResKind] -> IO [ResKind]

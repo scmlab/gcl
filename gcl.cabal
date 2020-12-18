@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 5319d5ad3bd9ba64d3ca7531fd8bef448193164e5b99c8db5b9335ef4aa877c9
+-- hash: a622de8d1aa57dba3c9ab6702db1388c90d40097a6cb86f2145da9a4f64d0acf
 
 name:           gcl
 version:        0.1.0.0
@@ -68,6 +68,7 @@ library
     , regex-applicative
     , srcloc
     , text
+    , vector
   default-language: Haskell2010
 
 executable gcl
@@ -94,6 +95,7 @@ executable gcl
     , regex-applicative
     , srcloc
     , text
+    , vector
   default-language: Haskell2010
 
 test-suite gcl-test
@@ -154,4 +156,5 @@ test-suite gcl-test
     , tasty-hunit
     , tasty-quickcheck
     , text
+    , vector
   default-language: Haskell2010
