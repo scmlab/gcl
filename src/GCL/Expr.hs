@@ -155,7 +155,7 @@ subst env (Quant op xs range term l) = do
       r' <- subst (Map.singleton i (Var (Name j NoLoc) NoLoc)) r
       -- substitute the variable `i` in `t` with the dummy variable
       t' <- subst (Map.singleton i (Var (Name j NoLoc) NoLoc)) t
-      first3 ((Name j ll) :) <$> subLocal freeInEnv' is r' t'
+      first3 (Name j ll :) <$> subLocal freeInEnv' is r' t'
     | otherwise = first3 (Name i ll :) <$> subLocal freeInEnv' is r t
 
   first3 f (x, y, z) = (f x, y, z)

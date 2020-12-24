@@ -5,6 +5,9 @@ module Syntax.Abstract where
 import           Control.Monad                  ( liftM2 )
 
 import           Data.List                      ( (\\) )
+import           Data.Map (Map)
+import qualified Data.Map as Map
+
 import           Data.Aeson
 import           Data.Text.Lazy                 ( Text
                                                 , pack
@@ -13,6 +16,7 @@ import           GHC.Generics                   ( Generic )
 import           Prelude                 hiding ( Ordering(..) )
 
 import           Type                           ( )
+import Data.Maybe (fromMaybe)
 
 --------------------------------------------------------------------------------
 -- | Expressions
@@ -27,11 +31,12 @@ data Expr = Var    Var
           | Lit    Lit
           | Op     Op      --- built-in operators
           | App    Expr   Expr
-          | Quant  Expr [Var] Expr Expr -- (+ i : 0 <= i && i < N : f i)
+          | Quant  Expr   [Var] Expr Expr -- (+ i : 0 <= i && i < N : f i)
           | Hole   Index  [Subst]
+          | Subst  Expr    Subst
           deriving (Show, Eq, Generic)
 
-
+type Subst = Map Text Expr
 
 data Op = EQ | NEQ | LTE | GTE | LT | GT   -- binary relations
         | Implies | Conj | Disj | Neg  -- logic operators
@@ -95,11 +100,6 @@ predEq = (==)
 --------------------------------------------------------------------------------
 -- | Substitution
 
-  -- SCM: the substituion is generally not too large and
-  --      a list should be sufficient.
-
-type Subst = [(Text, Expr)]
-
   -- SCM: substituion needs fresh names. However, I don't
   --      want to move M into this module. Therefore I am
   --      using a type class.
@@ -116,8 +116,8 @@ class Monad m => Fresh m where
   freshVars pf n = liftM2 (:) (freshVar pf) (freshVars pf (n-1))
 
 subst :: Fresh m => Subst -> Expr -> m Expr
-subst env (Var   x               ) = return $ maybe (Var x) id (lookup x env)
-subst env (Const x               ) = return $ maybe (Const x) id (lookup x env)
+subst env (Var   x               ) = return $ fromMaybe (Var x) (Map.lookup x env)
+subst env (Const x               ) = return $ fromMaybe (Const x) (Map.lookup x env)
 subst _   (Op    op              ) = return $ Op op
 subst _   (Lit   n               ) = return $ Lit n
 subst env (App  e1  e2           ) = App <$> subst env e1 <*> subst env e2
@@ -125,7 +125,7 @@ subst env (Hole idx subs         ) = return $ Hole idx (env : subs)
 subst env (Quant op xs range term) = do
   op'                  <- subst env op
   (xs', range', term') <- subLocal xs range term
-  let env' = filter (not . (`elem` xs') . fst) env
+  let env' = Map.filterWithKey (\key expr -> key `notElem` xs') env
   Quant op' xs' <$> subst env' range' <*> subst env' term'
  where
   subLocal :: Fresh m => [Var] -> Expr -> Expr -> m ([Var], Expr, Expr)
@@ -133,8 +133,8 @@ subst env (Quant op xs range term) = do
   subLocal (i : is) r t
     | i `elem` fre = do
       j  <- freshVar "dm"    -- "dummy" variable
-      r' <- subst [(i, Var j)] r
-      t' <- subst [(i, Var j)] t
+      r' <- subst (Map.singleton i (Var j)) r
+      t' <- subst (Map.singleton i (Var j)) t
       first3 (j :) <$> subLocal is r' t'
     | otherwise = first3 (i :) <$> subLocal is r t
   fre = freeSubst env
@@ -147,10 +147,10 @@ free (Op    _               ) = []
 free (Lit   _               ) = []
 free (App e1 e2             ) = free e1 ++ free e2  -- not worrying about duplication
 free (Quant op xs range term) = (free op ++ free range ++ free term) \\ xs
-free (Hole _ subs           ) = concat (map freeSubst subs) -- correct?
+free (Hole _ subs           ) = subs >>= freeSubst -- correct?
 
 freeSubst :: Subst -> [Var]
-freeSubst = concat . map (free . snd)
+freeSubst env = Map.elems env >>= free 
 
 --------------------------------------------------------------------------------
 -- | Variables
