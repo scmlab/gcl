@@ -55,8 +55,8 @@ toTestTree parser (LeftCase2 name text) = testCase name $ do
   case actual of
     Left _ -> assertBool "" True
     _ -> assertFailure "expecting a Left value"
-toTestTree _ (ReadFile name filepath expected) = testCase name $ do
-  text <- Text.readFile filepath
+toTestTree _ (ReadFile name filePath expected) = testCase name $ do
+  text <- Text.readFile filePath
   actual <- parse Parser.program text
   actual @?= expected
 
@@ -491,66 +491,57 @@ pos = Pos "<test>"
 
 --------------------------------------------------------------------------------
 
+
 -- | Program
 program :: TestTree
 program =
   testGroup
     "Program"
-    [ golden "empty" "./test/source/empty.gcl",
-      golden "quant 1" "./test/source/quant1.gcl",
-      golden "no-decl" "./test/source/no-decl.gcl",
-      golden "no-stmt" "./test/source/no-stmt.gcl",
-      golden "2" "./test/source/2.gcl",
-      golden "issue 1" "./test/source/issue1.gcl",
-      golden "issue 14" "./test/source/issue14.gcl",
-      golden "comment" "./test/source/comment.gcl"
+    [ ast "empty" "./test/source/empty.gcl",
+      ast "quant 1" "./test/source/quant1.gcl",
+      ast "no-decl" "./test/source/no-decl.gcl",
+      ast "no-stmt" "./test/source/no-stmt.gcl",
+      ast "2" "./test/source/2.gcl",
+      ast "issue 1" "./test/source/issue1.gcl",
+      ast "issue 14" "./test/source/issue14.gcl",
+      ast "comment" "./test/source/comment.gcl"
     ]
   where
-    golden :: String -> FilePath -> TestTree
-    golden name path =
+    ast :: String -> FilePath -> TestTree
+    ast name filePath =
       goldenTest
         name
-        (readFile (path ++ ".golden"))
-        (readFile path)
+        (readFile (filePath ++ ".ast.golden"))
+        (readFile filePath)
         compare
         update
 
     readFile :: FilePath -> IO (FilePath, ByteString)
-    readFile path = do
-      raw <- Strict.readFile path
-      return (path, BS.fromStrict raw)
+    readFile filePath = do
+      raw <- BS.readFile filePath
+      return (filePath, raw)
 
     compare ::
       (FilePath, ByteString) -> (FilePath, ByteString) -> IO (Maybe String)
-    compare (_goldenFilePath, golden) (inputFilePath, input) = do
-      program <- parseProgram (inputFilePath, input)
-      case program of
-        Left err -> return $ Just $ show err
-        Right program -> do
-          let result =
-                Text.encodeUtf8
-                  . renderLazy
-                  . layoutCompact
-                  . pretty
-                  $ program
-
-          if golden == result
-            then return Nothing
-            else return (Just $ unpack result ++ "\n\ngolden:\n" ++ unpack golden)
+    compare (_, expected) (filePath, actual) = do
+      actual <- parseProgramAndRender (filePath, actual)
+      if expected == actual
+        then return Nothing
+        else return (Just $ "expected:\n" ++ unpack expected ++ "\n------------\nactual: \n" ++ unpack actual)
 
     update :: (FilePath, ByteString) -> IO ()
-    update (inputFilePath, input) = do
-      result <-
-        Text.encodeUtf8
+    update (filePath, input) = do
+      result <- parseProgramAndRender (filePath, input)
+      let newPath = filePath ++ ".golden"
+      createDirectoriesAndWriteFile newPath result
+
+    parseProgramAndRender :: (FilePath, ByteString) -> IO ByteString
+    parseProgramAndRender (filePath, input) =
+      Text.encodeUtf8
           . renderLazy
           . layoutCompact
           . pretty
-          <$> parseProgram (inputFilePath, input)
-      let newPath = inputFilePath ++ ".golden"
-      createDirectoriesAndWriteFile newPath result
+          <$> parseProgram (filePath, input)
 
     parseProgram :: (FilePath, ByteString) -> IO (Either Error Program)
-    parseProgram (fileName, raw) =
-      LSP.runM $
-        LSP.scan fileName (Text.decodeUtf8 raw)
-          >>= LSP.parse Parser.program fileName
+    parseProgram (filePath, raw) = LSP.runM $ LSP.scan filePath (Text.decodeUtf8 raw) >>= LSP.parse Parser.program filePath

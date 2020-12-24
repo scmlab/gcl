@@ -301,12 +301,11 @@ handleRequestLSP _lspID (Req _filepath kind) = handle kind
           sendNotification SWindowShowMessage (ShowMessageParams MtError $ "Failed calculate proof obligations: \n" <> message)
         Right pos -> do 
           let toMarkdown (PO i pre post _) = pretty i <> "." <+> pretty pre <+> "=>" <+> pretty post 
-          -- let content = renderStrict $ concatWith (\x y -> x <> line <> y) $ map toMarkdown pos
-          -- let content = renderStrict $ concatWith (\x y -> x <+> y) $ map toMarkdown pos
+          let content = renderStrict $ concatWith (\x y -> x <> line <> y) $ map toMarkdown pos
+
           let identifier = VersionedTextDocumentIdentifier (Uri filepath) (Just 0)
           let range = Range (Position 0 0) (Position 0 0)
-          let textEdits = [TextEdit range "line1\nline2"]
-              -- map (TextEdit range . renderStrict . toMarkdown) pos
+          let textEdits = [TextEdit range content]
           -- let textEdits = map (TextEdit range . renderStrict . toMarkdown) pos
           let textDocEdit = TextDocumentEdit identifier $ List textEdits
           let edit = WorkspaceEdit Nothing (Just (List [InL textDocEdit]))
