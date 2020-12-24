@@ -8,6 +8,13 @@ import           Prelude                 hiding ( Ordering(..) )
 import           Pretty.Variadic
 import           Syntax.Abstract         hiding ( var )
 import           Pretty.Util
+import qualified Data.Map as Map
+
+--------------------------------------------------------------------------------
+-- | Helper functions 
+
+prettySubst :: Subst -> Doc ann
+prettySubst = encloseSep lbracket rbracket comma  . map (\(k, v) -> pretty k <> "/" <> pretty v) . Map.toList
 
 --------------------------------------------------------------------------------
 -- | Expr
@@ -70,6 +77,7 @@ handleExpr _ (Quant op xs r t) =
     <>  "⟩"
 
 handleExpr _ (Hole i _) = return $ "[" <> pretty i <> "]"
+handleExpr _ (Subst expr env) = return $ pretty expr <> prettySubst env 
 
 instance PrettyPrec Expr where
   prettyPrec n expr = case handleExpr n expr of

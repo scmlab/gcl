@@ -113,7 +113,7 @@ instance Departable Expr A.Expr where
   depart (Hole _) = A.Hole 0 []
   depart (Quant op xs rng trm _) =
     A.Quant (depart op) (map depart xs) (depart rng) (depart trm)
-  depart (Subst _ _) = error "depart Subst to be implemented"
+  depart (Subst expr env) = A.Subst (depart expr) (fmap depart env)
 
 --------------------------------------------------------------------------------
 -- Add locations
