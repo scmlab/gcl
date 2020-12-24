@@ -1,0 +1,18 @@
+con A, B : Int { A ≥ 0 ∧ B > 0 }
+var q, b, r, k : Int
+
+b, k := B, 0
+{ b = B * exp 2 k  ∧  0 ≤ k, bnd: A - b }
+do b ≤ A -> b, k := b * 2, k + 1
+od
+{ b = B * exp 2 k  ∧  0 ≤ k  ∧  b > A }
+
+q, r := 0, A
+{ A = q * b + r  ∧  b = B * exp 2 k  ∧  0 ≤ k  ∧  0 ≤ r < b, bnd: k }
+do b ≠ B -> q, b, k := q * 2, b / 2, k - 1
+            { A = q * b + r  ∧  b = B * exp 2 k  ∧  0 ≤ k  ∧  0 ≤ r < b * 2 }
+            if r < b -> skip
+             | r ≥ b -> q, r := q + 1, r - b
+            fi
+od
+{ A = q * B + r  ∧  0 ≤ r < B }

@@ -1,0 +1,8 @@
+con X, Y : Bool
+var x, y : Bool
+
+{ x = X ∧ y = Y }
+x := x ≠ y
+y := x ≠ y
+x := x ≠ y
+{ x = Y ∧ y = X }

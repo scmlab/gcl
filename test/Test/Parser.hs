@@ -32,7 +32,7 @@ tests :: TestTree
 tests =
   testGroup
     "Parser"
-    [expression, type', declaration, statement, statements, program]
+    [expression, type', declaration, statement, statements, programGolden]
 
 --------------------------------------------------------------------------------
 
@@ -492,9 +492,9 @@ pos = Pos "<test>"
 --------------------------------------------------------------------------------
 
 
--- | Program
-program :: TestTree
-program =
+-- | Golden tests for programs 
+programGolden :: TestTree
+programGolden =
   testGroup
     "Program"
     [ ast "empty" "./test/source/empty.gcl",
@@ -507,11 +507,14 @@ program =
       ast "comment" "./test/source/comment.gcl"
     ]
   where
+    sufffixGolden :: FilePath -> FilePath
+    sufffixGolden filePath = filePath ++ ".ast.golden"
+
     ast :: String -> FilePath -> TestTree
     ast name filePath =
       goldenTest
         name
-        (readFile (filePath ++ ".ast.golden"))
+        (readFile (sufffixGolden filePath))
         (readFile filePath)
         compare
         update
@@ -524,19 +527,18 @@ program =
     compare ::
       (FilePath, ByteString) -> (FilePath, ByteString) -> IO (Maybe String)
     compare (_, expected) (filePath, actual) = do
-      actual <- parseProgramAndRender (filePath, actual)
+      actual <- run (filePath, actual)
       if expected == actual
         then return Nothing
         else return (Just $ "expected:\n" ++ unpack expected ++ "\n------------\nactual: \n" ++ unpack actual)
 
     update :: (FilePath, ByteString) -> IO ()
     update (filePath, input) = do
-      result <- parseProgramAndRender (filePath, input)
-      let newPath = filePath ++ ".golden"
-      createDirectoriesAndWriteFile newPath result
+      result <- run (filePath, input)
+      createDirectoriesAndWriteFile (sufffixGolden filePath) result
 
-    parseProgramAndRender :: (FilePath, ByteString) -> IO ByteString
-    parseProgramAndRender (filePath, input) =
+    run :: (FilePath, ByteString) -> IO ByteString
+    run (filePath, input) =
       Text.encodeUtf8
           . renderLazy
           . layoutCompact
