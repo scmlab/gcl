@@ -76,17 +76,23 @@ handlers =
       requestHandler (SCustomMethod "guacamole") $ \req responder -> do
         let RequestMessage _ i _ params = req
         -- JSON Value => Request => Response
-        response <- case params of 
-          JSON.Array array -> case Vec.toList array of 
-            (content : _) ->  case JSON.fromJSON content of
-              JSON.Error msg -> return $ CannotDecodeRequest $ show msg
-              JSON.Success request -> do
-                -- handle
-                handleRequestLSP i request
-                -- convert Request to Response
-                liftIO $ handleRequest i request
-            _ -> return $ CannotDecodeRequest "Panic: expecting an non-empty array, got an empty array"
-          _ -> return $ CannotDecodeRequest "Panic: expecting an non-empty array, got something else"
+        response <- case JSON.fromJSON params of
+          JSON.Error msg -> return $ CannotDecodeRequest $ show msg ++ "\n" ++ show params 
+          JSON.Success request -> do
+            -- handle
+            handleRequestLSP i request
+            -- convert Request to Response
+            liftIO $ handleRequest i request
+          -- JSON.Array array -> case Vec.toList array of 
+          --   (content : _) ->  case JSON.fromJSON content of
+          --     JSON.Error msg -> return $ CannotDecodeRequest $ show msg ++ "\n" ++ show content 
+          --     JSON.Success request -> do
+          --       -- handle
+          --       handleRequestLSP i request
+          --       -- convert Request to Response
+          --       liftIO $ handleRequest i request
+          --   _ -> return $ CannotDecodeRequest "Panic: expecting an non-empty array, got an empty array"
+          -- _ -> return $ CannotDecodeRequest "Panic: expecting an non-empty array, got something else"
 
         -- respond with the Response
         responder $ Right $ JSON.toJSON response,
