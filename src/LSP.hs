@@ -8,15 +8,14 @@ module LSP where
 
 -- import Control.Monad.IO.Class
 
-import Control.Exception (IOException, try)
 import Control.Monad.Except hiding (guard)
 import Data.Aeson (FromJSON, ToJSON)
 import qualified Data.Aeson as JSON
 import Data.List (sort)
 import Data.Loc (Loc (..), Located (locOf), Pos (..), posCoff, posFile)
 import qualified Data.Text as Text
-import Data.Text.Lazy (Text, toStrict)
-import qualified Data.Text.Lazy.IO as Text
+import Data.Text (Text)
+import qualified Data.Text.Lazy as TextLazy
 import Error
 import GCL.Expr (expand, runSubstM)
 import GCL.Type (TypeError (..))
@@ -50,22 +49,26 @@ run =
         options = lspOptions
       }
   where
-    -- these `TextDocumentSyncOptions` are essential for receiving notifications like `STextDocumentDidChange`
-    syncOptions :: TextDocumentSyncOptions
-    syncOptions =
-      TextDocumentSyncOptions
-        { _openClose = Just True,
-          _change = Nothing,
-          _willSave = Just False,
-          _willSaveWaitUntil = Just False,
-          _save = Just $ InR $ SaveOptions $ Just False
-        }
-
     lspOptions :: Options
     lspOptions =
       defaultOptions
         { textDocumentSync = Just syncOptions
         }
+
+    -- these `TextDocumentSyncOptions` are essential for receiving notifications from the client
+    syncOptions :: TextDocumentSyncOptions
+    syncOptions =
+      TextDocumentSyncOptions
+        { _openClose = Just True, -- receive open and close notifications from the client
+          _change = Nothing, -- receive change notifications from the client
+          _willSave = Just False, -- receive willSave notifications from the client
+          _willSaveWaitUntil = Just False, -- receive willSave notifications from the client
+          _save = Just $ InR saveOptions
+        }
+
+    -- includes the document content on save, so that we don't have to read it from the disk 
+    saveOptions :: SaveOptions
+    saveOptions = SaveOptions (Just True)
 
 -- handlers of the LSP server
 handlers :: Handlers (LspM ())
@@ -82,20 +85,24 @@ handlers =
         responder $ Right $ JSON.toJSON response,
       -- when the client saved the document
       notificationHandler STextDocumentDidSave $ \ntf -> do
-        let NotificationMessage _ _ (DidSaveTextDocumentParams (TextDocumentIdentifier uri) _) = ntf
-        case uriToFilePath uri of
+        let NotificationMessage _ _ (DidSaveTextDocumentParams (TextDocumentIdentifier uri) text) = ntf
+        case text of 
+          Just source -> 
+            case uriToFilePath uri of
+              Nothing -> pure ()
+              Just filepath -> do
+                response <- handleRequest (IdInt 0) (Req filepath source ReqLoad)
+                sendNotification (SCustomMethod "guacamole") $ JSON.toJSON response
           Nothing -> pure ()
-          Just filepath -> do
-            response <- handleRequest (IdInt 0) (Req filepath ReqLoad)
-            sendNotification (SCustomMethod "guacamole") $ JSON.toJSON response
         ,
       -- when the client opened the document
       notificationHandler STextDocumentDidOpen $ \ntf -> do
-        let NotificationMessage _ _ (DidOpenTextDocumentParams (TextDocumentItem uri _ _ _)) = ntf
+        let NotificationMessage _ _ (DidOpenTextDocumentParams (TextDocumentItem uri _ _ source)) = ntf
         case uriToFilePath uri of
           Nothing -> pure ()
           Just filepath -> do
-            response <- handleRequest (IdInt 0) (Req filepath ReqLoad)
+            response <- handleRequest (IdInt 0) (Req filepath source ReqLoad)
+            sendNotification SWindowShowMessage (ShowMessageParams MtInfo source)
             sendNotification (SCustomMethod "guacamole") $ JSON.toJSON response
     ]
 
@@ -104,24 +111,24 @@ handleRequest i request = do
   -- convert Request to LSP side effects 
   toLSPSideEffects i request
   -- convert Request to Response
-  liftIO $ toResponse i request
+  return $ toResponse i request
 
 --------------------------------------------------------------------------------
 
 type ID = LspId ( 'CustomMethod :: Method 'FromClient 'Request)
 
-toResponse :: ID -> Request -> IO Response
-toResponse lspID (Req filepath kind) = do
-  responses <- handle kind
-  return $ Res filepath responses
+toResponse :: ID -> Request -> Response
+toResponse lspID (Req filepath source kind) = 
+  let responses = handle kind in
+  Res filepath responses
   where
-    handle :: ReqKind -> IO [ResKind]
+    handle :: ReqKind -> [ResKind]
     handle ReqLoad = global $ do
-      program@(Concrete.Program _ globalProps _ _ _) <- readProgram filepath
+      program@(Concrete.Program _ globalProps _ _ _) <- parseProgram filepath source
       (pos, specs) <- sweep program
       return [ResOK lspID pos specs globalProps]
     handle (ReqInspect selStart selEnd) = global $ do
-      program@(Concrete.Program _ globalProps _ _ _) <- readProgram filepath
+      program@(Concrete.Program _ globalProps _ _ _) <- parseProgram filepath source
       (pos, specs) <- sweep program
       -- find the POs whose Range overlaps with the selection
       let isOverlapped po = case locOf po of
@@ -149,23 +156,21 @@ toResponse lspID (Req filepath kind) = do
       _ <- refine payload
       return [ResResolve i]
     handle (ReqSubstitute i expr _subst) = global $ do
-      Concrete.Program _ _ defns _ _ <- readProgram filepath
+      Concrete.Program _ _ defns _ _ <- parseProgram filepath source
       let expr' = runSubstM (expand (Concrete.Subst expr _subst)) defns 1
       return [ResSubstitute i expr']
-    handle ReqExportProofObligations = do
+    handle ReqExportProofObligations = global $ do
       return [ResConsoleLog "Export"]
     handle ReqDebug = error "crash!"
 
 toLSPSideEffects :: ID -> Request -> LspT () IO ()
-toLSPSideEffects _lspID (Req filepath kind) = handle kind
+toLSPSideEffects _lspID (Req filepath source kind) = handle kind
   where
     handle :: ReqKind -> LspT () IO ()
     handle ReqLoad = do
         -- send diagnostics
         diags <- do 
-          reuslt <- liftIO $ runM $ do
-              program <- readProgram filepath
-              sweep program
+          let reuslt = runM $ parseProgram filepath source >>= sweep
           return $ case reuslt of
             Left err -> errorToDiagnostics err
             Right (pos, _) ->
@@ -176,7 +181,7 @@ toLSPSideEffects _lspID (Req filepath kind) = handle kind
         publishDiagnostics 100 fileUri version (partitionBySource diags)
 
         -- send response
-        response <- liftIO $ toResponse (IdInt 0) $ Req filepath ReqLoad
+        let response = toResponse (IdInt 0) $ Req filepath source ReqLoad
         sendNotification (SCustomMethod "guacamole") $ JSON.toJSON response
       where 
         errorToDiagnostics :: Error -> [Diagnostic]
@@ -193,7 +198,7 @@ toLSPSideEffects _lspID (Req filepath kind) = handle kind
             structErrorToDiagnostics (DigHole _) = []
         errorToDiagnostics (TypeError err) = typeErrorToDiagnostics err
           where
-            typeErrorToDiagnostics (NotInScope name loc) = [makeError loc "Not in scope" $ "The definition " <> toStrict name <> " is not in scope"]
+            typeErrorToDiagnostics (NotInScope name loc) = [makeError loc "Not in scope" $ "The definition " <> TextLazy.toStrict name <> " is not in scope"]
             typeErrorToDiagnostics (UnifyFailed s t loc) =
               [ makeError loc "Cannot unify types" $
                   renderStrict $
@@ -284,10 +289,10 @@ toLSPSideEffects _lspID (Req filepath kind) = handle kind
 
         exportPOs :: LspT () IO () 
         exportPOs = do 
-          result <- liftIO $ runM $ do 
-            program <- readProgram filepath
-            (pos, _) <- sweep program
-            return pos
+          let result = runM $ do 
+                program <- parseProgram filepath source
+                (pos, _) <- sweep program
+                return pos
           case result of 
             Left err -> do 
               let message = Text.pack $ show err
@@ -317,58 +322,44 @@ toLSPSideEffects _lspID (Req filepath kind) = handle kind
     handle _ = pure ()
 
 -- catches Error and convert it into a global ResError
-global :: M [ResKind] -> IO [ResKind]
-global program = do
-  result <- runM program
-  case result of
-    Left err -> return [ResError [globalError err]]
-    Right val -> return val
+global :: M [ResKind] -> [ResKind]
+global program =
+  case runM program of
+    Left err -> [ResError [globalError err]]
+    Right val -> val
 
 -- catches Error and convert it into a local ResError with Hole id
-local :: Int -> M [ResKind] -> IO [ResKind]
-local i program = do
-  result <- runM program
-  case result of
-    Left err -> return [ResError [localError i err]]
-    Right val -> return val
+local :: Int -> M [ResKind] -> [ResKind]
+local i program = 
+  case runM program of
+    Left err -> [ResError [localError i err]]
+    Right val -> val
 
 --------------------------------------------------------------------------------
 
-type M = ExceptT Error IO
+type M = Except Error
 
-runM :: M a -> IO (Either Error a)
-runM = runExceptT
-
---------------------------------------------------------------------------------
-
-readProgram :: FilePath -> M Concrete.Program
-readProgram filepath = do
-  result <- liftIO $ try $ Text.readFile filepath :: M (Either IOException Text)
-  case result of
-    Left _ -> throwError $ CannotReadFile filepath
-    Right raw -> do
-      tokens <- scan filepath raw
-      parseProgram filepath tokens
-
-refine :: Text -> M ()
-refine payload = do
-  _ <- scan "<spec>" payload >>= parseSpec
-  return ()
+runM :: M a -> Either Error a
+runM = runExcept
 
 --------------------------------------------------------------------------------
 
 scan :: FilePath -> Text -> M TokStream
-scan filepath = withExceptT LexicalError . liftEither . Lexer.scan filepath
+scan filepath = withExceptT LexicalError . liftEither . Lexer.scan filepath . TextLazy.fromStrict
 
 parse :: Parser.Parser a -> FilePath -> TokStream -> M a
 parse parser filepath =
   withExceptT SyntacticError . liftEither . Parser.parse parser filepath
 
-parseProgram :: FilePath -> TokStream -> M Concrete.Program
-parseProgram = parse Parser.program
+parseProgram :: FilePath -> Text -> M Concrete.Program
+parseProgram filepath source = do
+  tokens <- scan filepath source
+  parse Parser.program filepath tokens
 
-parseSpec :: TokStream -> M [Concrete.Stmt]
-parseSpec = parse Parser.specContent "<specification>"
+refine :: Text -> M ()
+refine payload = do
+  _ <- scan "<spec>" payload >>= parse Parser.specContent "<specification>"
+  return ()
 
 sweep :: Concrete.Program -> M ([PO], [Spec])
 sweep (Concrete.Program _ _ ds statements _) = do
@@ -392,7 +383,7 @@ data ReqKind
 
 instance FromJSON ReqKind
 
-data Request = Req FilePath ReqKind
+data Request = Req FilePath Text ReqKind
   deriving (Generic)
 
 instance FromJSON Request
