@@ -11,7 +11,6 @@ module LSP where
 import Control.Exception (IOException, try)
 import Control.Monad.Except hiding (guard)
 import Data.Aeson (FromJSON, ToJSON)
-import qualified Data.Vector as Vec
 import qualified Data.Aeson as JSON
 import Data.List (sort)
 import Data.Loc (Loc (..), Located (locOf), Pos (..), posCoff, posFile)
@@ -78,156 +77,41 @@ handlers =
         -- JSON Value => Request => Response
         response <- case JSON.fromJSON params of
           JSON.Error msg -> return $ CannotDecodeRequest $ show msg ++ "\n" ++ show params 
-          JSON.Success request -> do
-            -- handle
-            handleRequestLSP i request
-            -- convert Request to Response
-            liftIO $ handleRequest i request
-          -- JSON.Array array -> case Vec.toList array of 
-          --   (content : _) ->  case JSON.fromJSON content of
-          --     JSON.Error msg -> return $ CannotDecodeRequest $ show msg ++ "\n" ++ show content 
-          --     JSON.Success request -> do
-          --       -- handle
-          --       handleRequestLSP i request
-          --       -- convert Request to Response
-          --       liftIO $ handleRequest i request
-          --   _ -> return $ CannotDecodeRequest "Panic: expecting an non-empty array, got an empty array"
-          -- _ -> return $ CannotDecodeRequest "Panic: expecting an non-empty array, got something else"
-
+          JSON.Success request -> handleRequest i request 
         -- respond with the Response
         responder $ Right $ JSON.toJSON response,
       -- when the client saved the document
       notificationHandler STextDocumentDidSave $ \ntf -> do
         let NotificationMessage _ _ (DidSaveTextDocumentParams (TextDocumentIdentifier uri) _) = ntf
-        onNotification uri,
+        case uriToFilePath uri of
+          Nothing -> pure ()
+          Just filepath -> do
+            response <- handleRequest (IdInt 0) (Req filepath ReqLoad)
+            sendNotification (SCustomMethod "guacamole") $ JSON.toJSON response
+        ,
       -- when the client opened the document
       notificationHandler STextDocumentDidOpen $ \ntf -> do
         let NotificationMessage _ _ (DidOpenTextDocumentParams (TextDocumentItem uri _ _ _)) = ntf
-        onNotification uri
+        case uriToFilePath uri of
+          Nothing -> pure ()
+          Just filepath -> do
+            response <- handleRequest (IdInt 0) (Req filepath ReqLoad)
+            sendNotification (SCustomMethod "guacamole") $ JSON.toJSON response
     ]
-  where
-    onNotification :: Uri -> LspM () ()
-    onNotification uri = case uriToFilePath uri of
-      Nothing -> pure ()
-      Just filepath -> do
-        -- send diagnostics
-        diags <- filepathToDiags filepath
-        sendDiagnostics uri (Just 0) diags
-        -- send responses
-        response <- liftIO $ handleRequest (IdInt 0) $ Req filepath ReqLoad
-        sendNotification (SCustomMethod "guacamole") $ JSON.toJSON response
 
-    filepathToDiags :: MonadIO m => FilePath -> m [Diagnostic]
-    filepathToDiags filepath = do
-      reuslt <- liftIO $
-        runM $ do
-          program <- readProgram filepath
-          sweep program
-      return $ case reuslt of
-        Left err -> errorToDiagnostics err
-        Right (pos, _) ->
-          map proofObligationToDiagnostic pos
-
-    -- Analyze the file and send any diagnostics to the client in a
-    -- "textDocument/publishDiagnostics" notification
-    sendDiagnostics :: Uri -> Maybe Int -> [Diagnostic] -> LspM () ()
-    sendDiagnostics uri version diags = do
-      let fileUri = toNormalizedUri uri
-      publishDiagnostics 100 fileUri version (partitionBySource diags)
-
--- TODO: refactor these functions
-
--- translate a Pos along the same line
-translate :: Int -> Pos -> Pos
-translate n (Pos path ln col offset) = Pos path ln ((col + n) `max` 0) ((offset + n) `max` 0)
-
-posToPosition :: Pos -> Position
-posToPosition (Pos _path ln col _offset) = Position ((ln - 1) `max` 0) ((col - 1) `max` 0)
-
-locToLocation :: Loc -> Location
-locToLocation NoLoc = Location (Uri "") (locToRange NoLoc)
-locToLocation (Loc start end) = Location (Uri $ Text.pack $ posFile start) (locToRange (Loc start end))
-
-locToRange :: Loc -> Range
-locToRange NoLoc = Range (Position 0 0) (Position 0 0)
-locToRange (Loc start end) = Range (posToPosition start) (posToPosition (translate 1 end))
-
-severityToDiagnostic :: Maybe DiagnosticSeverity -> Loc -> Text.Text -> Text.Text -> Diagnostic
-severityToDiagnostic severity loc title body = Diagnostic (locToRange loc) severity Nothing Nothing title Nothing (Just $ List [DiagnosticRelatedInformation (locToLocation loc) body])
-
-makeWarning :: Loc -> Text.Text -> Text.Text -> Diagnostic
-makeWarning = severityToDiagnostic (Just DsWarning)
-
-makeError :: Loc -> Text.Text -> Text.Text -> Diagnostic
-makeError = severityToDiagnostic (Just DsError)
-
-errorToDiagnostics :: Error -> [Diagnostic]
-errorToDiagnostics (LexicalError pos) = [makeError (Loc pos pos) "Lexical error" ""]
-errorToDiagnostics (SyntacticError errs) = map syntacticErrorToDiagnostics errs
-  where
-    syntacticErrorToDiagnostics (loc, msg) = makeError loc "Syntax error" (Text.pack msg)
-errorToDiagnostics (StructError err) = structErrorToDiagnostics err
-  where
-    structErrorToDiagnostics (MissingAssertion loc) = [makeError loc "Assertion Missing" "Assertion before the DO construct is missing"]
-    structErrorToDiagnostics (MissingBound loc) = [makeError loc "Bound Missing" "Bound missing at the end of the assertion before the DO construct \" , bnd : ... }\""]
-    structErrorToDiagnostics (ExcessBound loc) = [makeError loc "Excess Bound" "Unnecessary bound annotation at this assertion"]
-    structErrorToDiagnostics (MissingPostcondition loc) = [makeError loc "Postcondition Missing" "The last statement of the program should be an assertion"]
-    structErrorToDiagnostics (DigHole _) = []
-errorToDiagnostics (TypeError err) = typeErrorToDiagnostics err
-  where
-    typeErrorToDiagnostics (NotInScope name loc) = [makeError loc "Not in scope" $ "The definition " <> toStrict name <> " is not in scope"]
-    typeErrorToDiagnostics (UnifyFailed s t loc) =
-      [ makeError loc "Cannot unify types" $
-          renderStrict $
-            "Cannot unify:" <+> pretty s <> line
-              <> "with        :" <+> pretty t
-      ]
-    typeErrorToDiagnostics (RecursiveType var t loc) =
-      [ makeError loc "Recursive type variable" $
-          renderStrict $
-            "Recursive type variable:" <+> pretty var <> line
-              <> "in type             :" <+> pretty t
-      ]
-    typeErrorToDiagnostics (NotFunction t loc) =
-      [ makeError loc "Not a function" $
-          renderStrict $
-            "The type" <+> pretty t <+> "is not a function type"
-      ]
-errorToDiagnostics _ = []
-
-proofObligationToDiagnostic :: PO -> Diagnostic
-proofObligationToDiagnostic (PO _i _pre _post origin) = makeWarning loc title ""
-  where
-    -- we only mark the opening tokens ("do" and "if") for loops & conditionals
-    first2Char :: Loc -> Loc
-    first2Char NoLoc = NoLoc
-    first2Char (Loc start _) = Loc start (translate 1 start)
-
-    loc :: Loc
-    loc = case origin of
-      -- we only mark the closing tokens ("od" and "fi") for loops & conditionals
-      AtLoop l -> first2Char l
-      AtTermination l -> first2Char l
-      AtIf l -> first2Char l
-      others -> locOf others
-
-    title :: Text.Text
-    title = case origin of
-      AtAbort {} -> "Abort"
-      AtSpec {} -> "Spec"
-      AtAssignment {} -> "Assignment"
-      AtAssertion {} -> "Assertion"
-      AtIf {} -> "Conditional"
-      AtLoop {} -> "Loop Invariant"
-      AtTermination {} -> "Loop Termination"
-      AtSkip {} -> "Skip"
+handleRequest :: ID -> Request -> LspM () Response
+handleRequest i request = do 
+  -- convert Request to LSP side effects 
+  toLSPSideEffects i request
+  -- convert Request to Response
+  liftIO $ toResponse i request
 
 --------------------------------------------------------------------------------
 
 type ID = LspId ( 'CustomMethod :: Method 'FromClient 'Request)
 
-handleRequest :: ID -> Request -> IO Response
-handleRequest lspID (Req filepath kind) = do
+toResponse :: ID -> Request -> IO Response
+toResponse lspID (Req filepath kind) = do
   responses <- handle kind
   return $ Res filepath responses
   where
@@ -272,61 +156,165 @@ handleRequest lspID (Req filepath kind) = do
       return [ResConsoleLog "Export"]
     handle ReqDebug = error "crash!"
 
-handleRequestLSP :: ID -> Request -> LspT () IO ()
-handleRequestLSP _lspID (Req _filepath kind) = handle kind
+toLSPSideEffects :: ID -> Request -> LspT () IO ()
+toLSPSideEffects _lspID (Req filepath kind) = handle kind
   where
     handle :: ReqKind -> LspT () IO ()
+    handle ReqLoad = do
+        -- send diagnostics
+        diags <- do 
+          reuslt <- liftIO $ runM $ do
+              program <- readProgram filepath
+              sweep program
+          return $ case reuslt of
+            Left err -> errorToDiagnostics err
+            Right (pos, _) ->
+              map proofObligationToDiagnostic pos
+        let fileUri = toNormalizedUri (filePathToUri filepath)
+        let version = Just 0
+
+        publishDiagnostics 100 fileUri version (partitionBySource diags)
+
+        -- send response
+        response <- liftIO $ toResponse (IdInt 0) $ Req filepath ReqLoad
+        sendNotification (SCustomMethod "guacamole") $ JSON.toJSON response
+      where 
+        errorToDiagnostics :: Error -> [Diagnostic]
+        errorToDiagnostics (LexicalError pos) = [makeError (Loc pos pos) "Lexical error" ""]
+        errorToDiagnostics (SyntacticError errs) = map syntacticErrorToDiagnostics errs
+          where
+            syntacticErrorToDiagnostics (loc, msg) = makeError loc "Syntax error" (Text.pack msg)
+        errorToDiagnostics (StructError err) = structErrorToDiagnostics err
+          where
+            structErrorToDiagnostics (MissingAssertion loc) = [makeError loc "Assertion Missing" "Assertion before the DO construct is missing"]
+            structErrorToDiagnostics (MissingBound loc) = [makeError loc "Bound Missing" "Bound missing at the end of the assertion before the DO construct \" , bnd : ... }\""]
+            structErrorToDiagnostics (ExcessBound loc) = [makeError loc "Excess Bound" "Unnecessary bound annotation at this assertion"]
+            structErrorToDiagnostics (MissingPostcondition loc) = [makeError loc "Postcondition Missing" "The last statement of the program should be an assertion"]
+            structErrorToDiagnostics (DigHole _) = []
+        errorToDiagnostics (TypeError err) = typeErrorToDiagnostics err
+          where
+            typeErrorToDiagnostics (NotInScope name loc) = [makeError loc "Not in scope" $ "The definition " <> toStrict name <> " is not in scope"]
+            typeErrorToDiagnostics (UnifyFailed s t loc) =
+              [ makeError loc "Cannot unify types" $
+                  renderStrict $
+                    "Cannot unify:" <+> pretty s <> line
+                      <> "with        :" <+> pretty t
+              ]
+            typeErrorToDiagnostics (RecursiveType var t loc) =
+              [ makeError loc "Recursive type variable" $
+                  renderStrict $
+                    "Recursive type variable:" <+> pretty var <> line
+                      <> "in type             :" <+> pretty t
+              ]
+            typeErrorToDiagnostics (NotFunction t loc) =
+              [ makeError loc "Not a function" $
+                  renderStrict $
+                    "The type" <+> pretty t <+> "is not a function type"
+              ]
+        errorToDiagnostics _ = []
+
+        proofObligationToDiagnostic :: PO -> Diagnostic
+        proofObligationToDiagnostic (PO _i _pre _post origin) = makeWarning loc title ""
+          where
+            -- we only mark the opening tokens ("do" and "if") for loops & conditionals
+            first2Char :: Loc -> Loc
+            first2Char NoLoc = NoLoc
+            first2Char (Loc start _) = Loc start (translate 1 start)
+
+            loc :: Loc
+            loc = case origin of
+              -- we only mark the closing tokens ("od" and "fi") for loops & conditionals
+              AtLoop l -> first2Char l
+              AtTermination l -> first2Char l
+              AtIf l -> first2Char l
+              others -> locOf others
+
+            title :: Text.Text
+            title = case origin of
+              AtAbort {} -> "Abort"
+              AtSpec {} -> "Spec"
+              AtAssignment {} -> "Assignment"
+              AtAssertion {} -> "Assertion"
+              AtIf {} -> "Conditional"
+              AtLoop {} -> "Loop Invariant"
+              AtTermination {} -> "Loop Termination"
+              AtSkip {} -> "Skip"
+
+        -- translate a Pos along the same line
+        translate :: Int -> Pos -> Pos
+        translate n (Pos path ln col offset) = Pos path ln ((col + n) `max` 0) ((offset + n) `max` 0)
+
+        posToPosition :: Pos -> Position
+        posToPosition (Pos _path ln col _offset) = Position ((ln - 1) `max` 0) ((col - 1) `max` 0)
+
+        locToRange :: Loc -> Range
+        locToRange NoLoc = Range (Position 0 0) (Position 0 0)
+        locToRange (Loc start end) = Range (posToPosition start) (posToPosition (translate 1 end))
+
+        locToLocation :: Loc -> Location
+        locToLocation NoLoc = Location (Uri "") (locToRange NoLoc)
+        locToLocation (Loc start end) = Location (Uri $ Text.pack $ posFile start) (locToRange (Loc start end))
+
+        severityToDiagnostic :: Maybe DiagnosticSeverity -> Loc -> Text.Text -> Text.Text -> Diagnostic
+        severityToDiagnostic severity loc title body = Diagnostic (locToRange loc) severity Nothing Nothing title Nothing (Just $ List [DiagnosticRelatedInformation (locToLocation loc) body])
+
+        makeWarning :: Loc -> Text.Text -> Text.Text -> Diagnostic
+        makeWarning = severityToDiagnostic (Just DsWarning)
+
+        makeError :: Loc -> Text.Text -> Text.Text -> Diagnostic
+        makeError = severityToDiagnostic (Just DsError)
+
     handle ReqExportProofObligations = createPOFile
-    handle _ = pure ()
+      where 
+        exportFilepath :: Text.Text
+        exportFilepath = Text.pack filepath <> ".md"
 
-    filepath :: Text.Text
-    filepath = Text.pack _filepath <> ".md"
-
-    createPOFile :: LspT () IO () 
-    createPOFile = do
-      let uri = Uri filepath
-      let createFile = CreateFile uri Nothing
-      let edit = WorkspaceEdit Nothing (Just (List [InR (InL createFile)]))
-      _ <- sendRequest SWorkspaceApplyEdit (ApplyWorkspaceEditParams (Just "create export file") edit) handleCreatePOFile
-      pure ()
-
-    handleCreatePOFile :: Either ResponseError ApplyWorkspaceEditResponseBody -> LspT () IO ()
-    handleCreatePOFile (Left (ResponseError _ message _)) = sendNotification SWindowShowMessage (ShowMessageParams MtError $ "Failed to export proof obligations: \n" <> message)
-    handleCreatePOFile (Right (ApplyWorkspaceEditResponseBody False Nothing)) = sendNotification SWindowShowMessage (ShowMessageParams MtWarning $ filepath <> " already existed")
-    handleCreatePOFile (Right _) = exportPOs
-
-    exportPOs :: LspT () IO () 
-    exportPOs = do 
-      result <- liftIO $ runM $ do 
-        program <- readProgram _filepath
-        (pos, _) <- sweep program
-        return pos
-      case result of 
-        Left err -> do 
-          let message = Text.pack $ show err
-          sendNotification SWindowShowMessage (ShowMessageParams MtError $ "Failed calculate proof obligations: \n" <> message)
-        Right pos -> do 
-          let toMarkdown (PO i pre post _) = pretty i <> "." <+> pretty pre <+> "=>" <+> pretty post 
-          let content = renderStrict $ concatWith (\x y -> x <> line <> y) $ map toMarkdown pos
-
-          let identifier = VersionedTextDocumentIdentifier (Uri filepath) (Just 0)
-          let range = Range (Position 0 0) (Position 0 0)
-          let textEdits = [TextEdit range content]
-          -- let textEdits = map (TextEdit range . renderStrict . toMarkdown) pos
-          let textDocEdit = TextDocumentEdit identifier $ List textEdits
-          let edit = WorkspaceEdit Nothing (Just (List [InL textDocEdit]))
-          _ <- sendRequest SWorkspaceApplyEdit (ApplyWorkspaceEditParams (Just "writing proof obligations") edit) handleExportPos
-
-          -- sendNotification SWindowShowMessage (ShowMessageParams MtInfo $ "a\nb")
-          -- sendNotification SWindowLogMessage (LogMessageParams MtInfo $ "a\nb")
-
+        createPOFile :: LspT () IO () 
+        createPOFile = do
+          let uri = Uri exportFilepath
+          let createFile = CreateFile uri Nothing
+          let edit = WorkspaceEdit Nothing (Just (List [InR (InL createFile)]))
+          _ <- sendRequest SWorkspaceApplyEdit (ApplyWorkspaceEditParams (Just "create export file") edit) handleCreatePOFile
           pure ()
 
-    handleExportPos :: Either ResponseError ApplyWorkspaceEditResponseBody -> LspT () IO ()
-    handleExportPos (Left (ResponseError _ message _)) = sendNotification SWindowShowMessage (ShowMessageParams MtError $ "Failed to write proof obligations: \n" <> message)
-    handleExportPos (Right message) = sendNotification SWindowShowMessage (ShowMessageParams MtWarning $ Text.pack $ show message)
+        handleCreatePOFile :: Either ResponseError ApplyWorkspaceEditResponseBody -> LspT () IO ()
+        handleCreatePOFile (Left (ResponseError _ message _)) = sendNotification SWindowShowMessage (ShowMessageParams MtError $ "Failed to export proof obligations: \n" <> message)
+        handleCreatePOFile (Right (ApplyWorkspaceEditResponseBody False Nothing)) = sendNotification SWindowShowMessage (ShowMessageParams MtWarning $ exportFilepath <> " already existed")
+        handleCreatePOFile (Right _) = exportPOs
+
+        exportPOs :: LspT () IO () 
+        exportPOs = do 
+          result <- liftIO $ runM $ do 
+            program <- readProgram filepath
+            (pos, _) <- sweep program
+            return pos
+          case result of 
+            Left err -> do 
+              let message = Text.pack $ show err
+              sendNotification SWindowShowMessage (ShowMessageParams MtError $ "Failed calculate proof obligations: \n" <> message)
+            Right pos -> do 
+              let toMarkdown (PO i pre post _) = pretty i <> "." <+> pretty pre <+> "=>" <+> pretty post 
+              let content = renderStrict $ concatWith (\x y -> x <> line <> y) $ map toMarkdown pos
+
+              let identifier = VersionedTextDocumentIdentifier (Uri exportFilepath) (Just 0)
+              let range = Range (Position 0 0) (Position 0 0)
+              let textEdits = [TextEdit range content]
+              -- let textEdits = map (TextEdit range . renderStrict . toMarkdown) pos
+              let textDocEdit = TextDocumentEdit identifier $ List textEdits
+              let edit = WorkspaceEdit Nothing (Just (List [InL textDocEdit]))
+              _ <- sendRequest SWorkspaceApplyEdit (ApplyWorkspaceEditParams (Just "writing proof obligations") edit) handleExportPos
+
+              -- sendNotification SWindowShowMessage (ShowMessageParams MtInfo $ "a\nb")
+              -- sendNotification SWindowLogMessage (LogMessageParams MtInfo $ "a\nb")
+
+              pure ()
+
+        handleExportPos :: Either ResponseError ApplyWorkspaceEditResponseBody -> LspT () IO ()
+        handleExportPos (Left (ResponseError _ message _)) = sendNotification SWindowShowMessage (ShowMessageParams MtError $ "Failed to write proof obligations: \n" <> message)
+        handleExportPos (Right message) = sendNotification SWindowShowMessage (ShowMessageParams MtWarning $ Text.pack $ show message)
 
 
+    handle _ = pure ()
 
 -- catches Error and convert it into a global ResError
 global :: M [ResKind] -> IO [ResKind]

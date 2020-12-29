@@ -42,6 +42,7 @@ tests =
       -- ast "issue 1" "./test/source/issue1.gcl",
       -- ast "issue 14" "./test/source/issue14.gcl",
       -- ast "comment" "./test/source/comment.gcl"
+    , ast "spec" "./test/source/spec.gcl"
     ]
   where
     sufffixGolden :: FilePath -> FilePath
