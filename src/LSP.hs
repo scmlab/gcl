@@ -102,7 +102,6 @@ handlers =
           Nothing -> pure ()
           Just filepath -> do
             response <- handleRequest (IdInt 0) (Req filepath source ReqLoad)
-            sendNotification SWindowShowMessage (ShowMessageParams MtInfo source)
             sendNotification (SCustomMethod "guacamole") $ JSON.toJSON response
     ]
 
