@@ -3,7 +3,11 @@
 module Test.WP where
 
 import Data.Loc
-import Data.Text.Lazy hiding (map)
+import qualified Data.Text as Text
+import qualified Data.Text.IO as Text
+import Data.Text (Text)
+import Data.Text.Lazy (toStrict, fromStrict)
+import qualified Data.Text.Lazy.Encoding as LazyText
 import Error
 import qualified LSP
 import Pretty ()
@@ -17,14 +21,10 @@ import Prelude hiding (Ordering (..))
 tests :: TestTree
 tests = testGroup "WP 1" [emptyProg, statements, issues]
 
-run :: Text -> IO (Either Error ([PO], [Spec]))
-run text =
-  LSP.runM $
-    (\(pos, specs) -> (map toNoLoc pos, map toNoLoc specs))
-      <$> ( LSP.scan "<test>" (text)
-              >>= LSP.parseProgram "<test>"
-              >>= LSP.sweep
-          )
+run :: Text -> Either Error ([PO], [Spec])
+run text = LSP.runM $ do 
+  (pos, specs) <- LSP.parseProgram "<test>" text >>= LSP.sweep
+  return (map toNoLoc pos, map toNoLoc specs)            
 
 --------------------------------------------------------------------------------
 
@@ -34,7 +34,7 @@ emptyProg =
   testGroup
     "empty"
     [ testCase "empty" $ do
-        actual <- run ""
+        let actual = run ""
         actual @?= Right ([], [])
     ]
 
@@ -46,11 +46,10 @@ statements =
   testGroup
     "simple program"
     [ testCase "skip" $ do
-        actual <-
-          run
-            "{ True }   \n\
-            \skip       \n\
-            \{ 0 = 0 }"
+        let actual = run
+              "{ True }   \n\
+              \skip       \n\
+              \{ 0 = 0 }"
         actual
           @?= Right
             ( [ PO
@@ -62,19 +61,17 @@ statements =
               []
             ),
       testCase "abort" $ do
-        actual <-
-          run
-            "{ True }   \n\
-            \abort      \n\
-            \{ True }"
+        let actual = run
+              "{ True }   \n\
+              \abort      \n\
+              \{ True }"
         actual
           @?= Right ([PO 0 (assertion true) (Constant false) (AtAbort NoLoc)], []),
       testCase "assignment" $ do
-        actual <-
-          run
-            "{ True }   \n\
-            \x := 1     \n\
-            \{ 0 = x }"
+        let actual = run
+              "{ True }   \n\
+              \x := 1     \n\
+              \{ 0 = x }"
         actual
           @?= Right
             ( [ PO
@@ -86,12 +83,11 @@ statements =
               []
             ),
       testCase "spec" $ do
-        actual <-
-          run
-            "{ True }   \n\
-            \{!       \n\
-            \!}       \n\
-            \{ 0 = 0 }"
+        let actual = run
+              "{ True }   \n\
+              \{!       \n\
+              \!}       \n\
+              \{ 0 = 0 }"
         actual
           @?= Right
             ( [],
@@ -158,23 +154,21 @@ issue2 =
   testGroup
     "Issue #2"
     [ testCase "Postcondition only" $ do
-        actual <-
-          run
-            "con A, B : Int\n\
-            \var x, y, z : Int\n\
-            \{ z = A * B }"
+        let actual = run
+              "con A, B : Int\n\
+              \var x, y, z : Int\n\
+              \{ z = A * B }"
         actual
           @?= Right
             ( [PO 0 (Constant true) (assertion (variable "z" `eqq` binary Mul (constant "A") (constant "B"))) (AtAssertion NoLoc)],
               []
             ),
       testCase "Postcondition + precondition" $ do
-        actual <-
-          run
-            "con A, B : Int\n\
-            \var x, y, z : Int\n\
-            \{ True }\n\
-            \{ z = A * B }"
+        let actual = run 
+              "con A, B : Int\n\
+              \var x, y, z : Int\n\
+              \{ True }\n\
+              \{ z = A * B }"
         actual
           @?= Right
             ( [PO 0 (assertion true) (assertion (variable "z" `eqq` binary Mul (constant "A") (constant "B"))) (AtAssertion NoLoc)],

@@ -9,9 +9,11 @@ import Data.ByteString.Lazy.Char8
   ( unpack,
   )
 import Data.Loc
-import Data.Text.Lazy (Text)
-import qualified Data.Text.Lazy.Encoding as Text
-import qualified Data.Text.Lazy.IO as Text
+import qualified Data.Text as Text
+import qualified Data.Text.IO as Text
+import Data.Text (Text)
+import Data.Text.Lazy (toStrict, fromStrict)
+import qualified Data.Text.Lazy.Encoding as LazyText
 import Data.Text.Prettyprint.Doc.Render.Text
   ( renderLazy,
   )
@@ -65,30 +67,28 @@ tests =
     compare ::
       (FilePath, ByteString) -> (FilePath, ByteString) -> IO (Maybe String)
     compare (_, expected) (filePath, actual) = do
-      actual <- run (filePath, actual)
+      let result = run (filePath, actual)
       if expected == actual
         then return Nothing
         else return (Just $ "expected:\n" ++ unpack expected ++ "\n------------\nactual: \n" ++ unpack actual)
 
     update :: (FilePath, ByteString) -> IO ()
     update (filePath, input) = do
-      result <- run (filePath, input)
+      let result = run (filePath, input)
       createDirectoriesAndWriteFile (sufffixGolden filePath) result
 
-    run :: (FilePath, ByteString) -> IO ByteString
-    run (filePath, raw) = do 
-      result <- LSP.runM $ do 
-        tokens <- LSP.scan filePath (Text.decodeUtf8 raw)
-        program <- LSP.parse Parser.program filePath tokens
-        (pos, _) <- LSP.sweep program
-        return pos
-      
-      let render = Text.encodeUtf8
+    run :: (FilePath, ByteString) -> ByteString
+    run (filePath, raw) = 
+      let result = LSP.runM $ do 
+            tokens <- LSP.scan filePath (toStrict $ LazyText.decodeUtf8 raw)
+            program <- LSP.parse Parser.program filePath tokens
+            (pos, _) <- LSP.sweep program
+            return pos
+          render = LazyText.encodeUtf8
                     . renderLazy
                     . layoutCompact
                     . pretty
+      in render result
 
-      return $ render result
-
-    parseProgram :: (FilePath, ByteString) -> IO (Either Error Program)
-    parseProgram (filePath, raw) = LSP.runM $ LSP.scan filePath (Text.decodeUtf8 raw) >>= LSP.parse Parser.program filePath
+    parseProgram :: (FilePath, ByteString) -> Either Error Program
+    parseProgram (filePath, raw) = LSP.runM $ LSP.scan filePath (toStrict $ LazyText.decodeUtf8 raw) >>= LSP.parse Parser.program filePath

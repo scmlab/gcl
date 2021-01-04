@@ -9,9 +9,13 @@ import Data.ByteString.Lazy.Char8
   ( unpack,
   )
 import Data.Loc
-import Data.Text.Lazy (Text)
-import qualified Data.Text.Lazy.Encoding as Text
-import qualified Data.Text.Lazy.IO as Text
+import qualified Data.Text as Text
+import qualified Data.Text.IO as Text
+import Data.Text (Text)
+import Data.Text.Lazy (toStrict, fromStrict)
+import qualified Data.Text.Lazy.Encoding as LazyText
+
+-- import Data.Text.Lazy (Text)
 import Data.Text.Prettyprint.Doc.Render.Text
   ( renderLazy,
   )
@@ -45,22 +49,22 @@ data TestCase b
 
 toTestTree :: (Eq a, Show a) => Parser a -> TestCase a -> TestTree
 toTestTree parser (RightCase name text expected) = testCase name $ do
-  actual <- parse (parser <* eof) text
+  let actual = parse (parser <* eof) text
   actual @?= Right expected
 toTestTree parser (LeftCase name text expected) = testCase name $ do
-  actual <- parse (parser <* eof) text
+  let actual = parse (parser <* eof) text
   actual @?= Left expected
 toTestTree parser (LeftCase2 name text) = testCase name $ do
-  actual <- parse (parser <* eof) text
+  let actual = parse (parser <* eof) text
   case actual of
     Left _ -> assertBool "" True
     _ -> assertFailure "expecting a Left value"
 toTestTree _ (ReadFile name filePath expected) = testCase name $ do
   text <- Text.readFile filePath
-  actual <- parse Parser.program text
+  let actual = parse Parser.program text
   actual @?= expected
 
-parse :: Parser a -> Text -> IO (Either Error a)
+parse :: Parser a -> Text -> Either Error a
 parse parser text =
   LSP.runM $ LSP.scan "<test>" text >>= LSP.parse parser "<text>"
 
@@ -296,10 +300,10 @@ expression =
       ]
 
 con :: Text -> Loc -> Expr
-con t l = Const (Name t l) l
+con t l = Const (Name (fromStrict t) l) l
 
 var :: Text -> Loc -> Expr
-var t l = Var (Name t l) l
+var t l = Var (Name (fromStrict t) l) l
 
 bin :: Op -> Loc -> Expr -> Loc -> Expr -> Loc -> Expr
 bin op opLoc a aLoc = App (App (Op op opLoc) a aLoc)
@@ -528,23 +532,22 @@ programGolden =
     compare ::
       (FilePath, ByteString) -> (FilePath, ByteString) -> IO (Maybe String)
     compare (_, expected) (filePath, actual) = do
-      actual <- run (filePath, actual)
+      let actual = run (filePath, actual)
       if expected == actual
         then return Nothing
         else return (Just $ "expected:\n" ++ unpack expected ++ "\n------------\nactual: \n" ++ unpack actual)
 
     update :: (FilePath, ByteString) -> IO ()
-    update (filePath, input) = do
-      result <- run (filePath, input)
-      createDirectoriesAndWriteFile (sufffixGolden filePath) result
+    update (filePath, input) = 
+      createDirectoriesAndWriteFile (sufffixGolden filePath) (run (filePath, input))
 
-    run :: (FilePath, ByteString) -> IO ByteString
+    run :: (FilePath, ByteString) -> ByteString
     run (filePath, input) =
-      Text.encodeUtf8
-          . renderLazy
+      LazyText.encodeUtf8
+          . renderLazy 
           . layoutCompact
           . pretty
-          <$> parseProgram (filePath, input)
+          $ parseProgram (filePath, input)
 
-    parseProgram :: (FilePath, ByteString) -> IO (Either Error Program)
-    parseProgram (filePath, raw) = LSP.runM $ LSP.scan filePath (Text.decodeUtf8 raw) >>= LSP.parse Parser.program filePath
+    parseProgram :: (FilePath, ByteString) -> Either Error Program
+    parseProgram (filePath, raw) = LSP.runM $ LSP.scan filePath (toStrict $ LazyText.decodeUtf8 raw) >>= LSP.parse Parser.program filePath
