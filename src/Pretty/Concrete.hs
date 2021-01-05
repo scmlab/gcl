@@ -7,6 +7,28 @@ import Pretty.Abstract ()
 import Pretty.Util
 import Syntax.Concrete
 import Syntax.Location
+import Data.Loc
+
+-- Prettifier that respects Locs
+-- adds space and newlines in between the Docs 
+-- so that their relative position respects the Locations
+prettyWithLocs :: [(Doc ann, Loc)] -> Doc ann 
+prettyWithLocs [] = mempty 
+prettyWithLocs [(x, _)] = x
+prettyWithLocs ((x, loc1):(y, loc2):xs) = x <> fillGap loc1 loc2 <> prettyWithLocs ((y, loc2):xs)
+    where 
+      fillGap :: Loc -> Loc -> Doc ann 
+      fillGap NoLoc _ = mempty
+      fillGap _ NoLoc = mempty
+      fillGap (Loc _ this) (Loc next _) = 
+        let lineDiff = posLine next - posLine this 
+        in if lineDiff == 0 
+           -- on the same line, just pad them with spaces
+           then let offsetDiff = posCoff next - posCoff this 
+                in  mconcat (replicate offsetDiff space) 
+           -- on different lines
+           else mconcat (replicate lineDiff "\n" ++ replicate (posCol next) space)
+
 
 --------------------------------------------------------------------------------
 
