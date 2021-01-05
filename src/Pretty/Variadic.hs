@@ -25,5 +25,6 @@ parensIf :: Int -> Int -> Doc ann -> Doc ann
 parensIf n m | n > m     = parens
              | otherwise = id
 
+
 var :: Variadic a a
 var = Expect Complete

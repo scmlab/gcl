@@ -5,42 +5,11 @@ module Pretty.Concrete where
 import Data.Text.Prettyprint.Doc
 import Pretty.Abstract ()
 import Pretty.Util
-import Syntax.Concrete
+import Syntax.Concrete hiding (GT)
 import Syntax.Location
 import Data.Loc
-import Data.List (sortBy)
-import Data.Function (on)
-
-
-
--- Prettifier that respects Locs
--- adds space and newlines in between the Docs 
--- so that their relative position respects the Locations
-prettyWithLocs :: [(Doc ann, Loc)] -> Doc ann 
-prettyWithLocs = prettyWithLocs' . sortBy cmpLoc
-  where 
-    cmpLoc :: (Doc ann, Loc) -> (Doc ann, Loc) -> Ordering
-    cmpLoc = compare `on` snd
-
-    prettyWithLocs' :: [(Doc ann, Loc)] -> Doc ann 
-    prettyWithLocs' [] = mempty 
-    prettyWithLocs' [(x, _)] = x
-    prettyWithLocs' ((x, loc1):(y, loc2):xs) = x <> fillGapWithLoc loc1 loc2 <> prettyWithLocs ((y, loc2):xs)
-
-fillGap :: Pos -> Pos -> Doc ann 
-fillGap this next = 
-  let lineDiff = posLine next - posLine this 
-  in if lineDiff == 0 
-      -- on the same line, just pad them with spaces
-      then let offsetDiff = posCoff next - posCoff this 
-          in  mconcat (replicate offsetDiff space) 
-      -- on different lines
-      else mconcat (replicate lineDiff "\n" ++ replicate (posCol next) space)
-
-fillGapWithLoc :: Loc -> Loc -> Doc ann 
-fillGapWithLoc NoLoc _ = mempty
-fillGapWithLoc _ NoLoc = mempty
-fillGapWithLoc (Loc _ this) (Loc next _) = fillGap this next 
+import Pretty.Variadic
+import Syntax.Abstract (Fixity(..), classify)
 
 --------------------------------------------------------------------------------
 
@@ -105,41 +74,106 @@ instance Pretty GdCmd where
 --------------------------------------------------------------------------------
 
 -- | Expr
-instance PrettyPrec Expr where
-  prettyPrec n = prettyPrec n . depart
+instance Pretty Expr where
+  pretty = toDoc . prettyWithLoc
 
-prettyHole :: Loc -> Doc ann 
+instance PrettyPrec Expr where
+  prettyPrec _ = toDoc . prettyPrecWithLoc 0
+
+instance PrettyWithLoc Expr where
+  prettyWithLoc = prettyPrecWithLoc 0
+
+instance PrettyPrecWithLoc Expr where
+  prettyPrecWithLoc n expr = case handleExpr n expr of
+    Expect   _ -> mempty
+    Complete s -> s
+
+handleExpr :: Int -> Expr -> Variadic Expr (DocWithLoc ann)
+handleExpr _ (Var   x l) = return $ fromPretty x l
+handleExpr _ (Const x l) = return $ fromPretty x l
+handleExpr _ (Lit   x l) = return $ fromPretty x l
+handleExpr n (Op    x l) = handleOp n x l
+handleExpr n (App p q _) = case handleExpr n p of
+  Expect   f -> f q
+  Complete s -> do
+    t <- handleExpr n q
+    -- see if the second argument is an application, apply parenthesis when needed
+    return $ case q of
+      App {} -> s <> parensIf' n 0 t
+      _      -> s <> t
+handleExpr _ (Lam p q l) = return $ overrideLoc l $ "λ " <> fromPretty p noLoc <> " → " <> prettyWithLoc q
+handleExpr _ (Hole l) = return $ fromPretty'' (prettyHole l) l
+handleExpr _ (Quant op xs r t l) = return "Quant"
+handleExpr _ (Subst x _) = return "Subst"
+  -- return
+  --   $   "⟨"
+  --   <>  fromPretty (prettyQuantOp op) (locOf op)
+  --   <>  mconcat (map prettyWithLoc xs)
+  --   <> " : "
+  --   <+> pretty r
+  --   <+> ":"
+  --   <+> pretty t
+  --   <>  "⟩"
+
+
+
+handleOp :: Int -> Op -> Loc -> Variadic Expr (DocWithLoc ann)
+handleOp n op loc = case classify op of
+  Infix m -> do
+    p <- var
+    q <- var
+    return  $ parensIf' n m
+            $  prettyPrecWithLoc (succ m) p
+            <> fromPretty op loc
+            <> prettyPrecWithLoc (succ m) q
+  InfixL m -> do
+    p <- var
+    q <- var
+    return  $ parensIf' n m
+            $  prettyPrecWithLoc m p
+            <> fromPretty op loc
+            <> prettyPrecWithLoc (succ m) q
+  InfixR m -> do
+    p <- var
+    q <- var
+    return  $ parensIf' n m
+            $  prettyPrecWithLoc (succ m) p
+            <> fromPretty op loc
+            <> prettyPrecWithLoc m q
+  Prefix m -> do
+    p <- var
+    return $ parensIf' n m $ fromPretty op loc <> prettyPrecWithLoc m p
+  Postfix m -> do
+    p <- var
+    return $ parensIf' n m $ prettyPrecWithLoc m p <> fromPretty op loc
+
+prettyHole :: Loc -> Doc ann
 prettyHole loc = case loc of 
     NoLoc -> "{!!}"
-    Loc (Pos p1 l1 c1 o1) (Pos p2 l2 c2 o2) -> 
-      let start' = Pos p1 l1 (c1 + 2) (o1 + 2)
-          end' = Pos p2 l2 (c2 - 2) (o2 - 2)
-      in  "{!" <> fillGap start' end' <> "!}"
+    Loc start end -> "{!" <> fillGap (translate 2 start) (translate (-2) end) <> "!}"
 
-instance Pretty Expr where
-  pretty = pretty . depart 
-  -- pretty (Lit x _) = pretty x
-  -- pretty (Var x _) = pretty x 
-  -- pretty (Const x _) = pretty x 
-  -- pretty (Op x _) = pretty x 
-  -- pretty (App x y _) = prettyWithLocs [(pretty x, locOf x), (pretty y, locOf y)]
-  -- pretty (Lam x y _) = prettyWithLocs [(pretty x, locOf x), (pretty y, locOf y)]
-  -- pretty (Hole loc) = case loc of 
-  --   NoLoc -> "{!!}"
-  --   Loc (Pos p1 l1 c1 o1) (Pos p2 l2 c2 o2) -> 
-  --     let start' = Pos p1 l1 (c1 + 2) (o1 + 2)
-  --         end' = Pos p2 l2 (c2 - 2) (o1 - 2)
-  --     in  "{!" <> fillGap start' end' <> "!}"
-  -- pretty (Quant a b c d) = 
-  -- | Quant Expr [Name] Expr Expr Loc
-  -- | Subst Expr Subst -- internal. Location not necessary?
+-- instance Pretty Expr where
+-- pretty = pretty . depart 
+-- pretty (Lit x _) = pretty x
+-- pretty (Var x _) = pretty x 
+-- pretty (Const x _) = pretty x 
+-- pretty (Op x _) = pretty x 
+-- pretty (App x y _) = prettyWithLocs [(pretty x, locOf x), (pretty y, locOf y)]
+-- pretty (Lam x y _) = prettyWithLocs [(pretty x, locOf x), (pretty y, locOf y)]
+-- pretty (Hole loc) = case loc of 
+--   NoLoc -> "{!!}"
+--   Loc (Pos p1 l1 c1 o1) (Pos p2 l2 c2 o2) -> 
+--     let start' = Pos p1 l1 (c1 + 2) (o1 + 2)
+--         end' = Pos p2 l2 (c2 - 2) (o1 - 2)
+--     in  "{!" <> fillGap start' end' <> "!}"
+-- pretty (Quant a b c d) = 
+-- | Quant Expr [Name] Expr Expr Loc
+-- | Subst Expr Subst -- internal. Location not necessary?
 
 --------------------------------------------------------------------------------
 
 -- | Type
 
--- instance Pretty Endpoint where
---   pretty (Including e) = ""
 instance Pretty Interval where
   pretty = pretty . depart
 
