@@ -36,7 +36,7 @@ tests :: TestTree
 tests =
   testGroup
     "Parser"
-    [expression, type', declaration, statement, statements, programGolden]
+    [expression, type', declaration, statement, statements,   programGolden]
 
 --------------------------------------------------------------------------------
 
@@ -494,7 +494,6 @@ pos :: Int -> Int -> Int -> Pos
 pos = Pos "<test>"
 
 --------------------------------------------------------------------------------
-
 
 -- | Golden tests for programs 
 programGolden :: TestTree
