@@ -125,6 +125,7 @@ toResponse lspID (Req filepath source kind) =
     handle ReqLoad = global $ do
       program@(Concrete.Program _ globalProps _ _ _) <- parseProgram filepath source
       (pos, specs) <- sweep program
+
       return [ResOK lspID pos specs globalProps]
     handle (ReqInspect selStart selEnd) = global $ do
       program@(Concrete.Program _ globalProps _ _ _) <- parseProgram filepath source

@@ -501,7 +501,8 @@ programGolden :: TestTree
 programGolden =
   testGroup
     "Program"
-    [ ast "empty" "./test/source/empty.gcl",
+    [ 
+      ast "empty" "./test/source/empty.gcl",
       ast "quant 1" "./test/source/quant1.gcl",
       ast "no-decl" "./test/source/no-decl.gcl",
       ast "no-stmt" "./test/source/no-stmt.gcl",
@@ -512,14 +513,14 @@ programGolden =
       ast "spec" "./test/source/spec.gcl"
     ]
   where
-    sufffixGolden :: FilePath -> FilePath
-    sufffixGolden filePath = filePath ++ ".ast.golden"
+    suffixGolden :: FilePath -> FilePath
+    suffixGolden filePath = filePath ++ ".ast.golden"
 
     ast :: String -> FilePath -> TestTree
     ast name filePath =
       goldenTest
         name
-        (readFile (sufffixGolden filePath))
+        (readFile (suffixGolden filePath))
         (readFile filePath)
         compare
         update
@@ -532,14 +533,14 @@ programGolden =
     compare ::
       (FilePath, ByteString) -> (FilePath, ByteString) -> IO (Maybe String)
     compare (_, expected) (filePath, actual) = do
-      let actual = run (filePath, actual)
-      if expected == actual
+      let result = run (filePath, actual)
+      if expected == result
         then return Nothing
         else return (Just $ "expected:\n" ++ unpack expected ++ "\n------------\nactual: \n" ++ unpack actual)
 
     update :: (FilePath, ByteString) -> IO ()
-    update (filePath, input) = 
-      createDirectoriesAndWriteFile (sufffixGolden filePath) (run (filePath, input))
+    update (filePath, input) = do 
+      createDirectoriesAndWriteFile (suffixGolden filePath) (run (filePath, input))
 
     run :: (FilePath, ByteString) -> ByteString
     run (filePath, input) =

@@ -47,14 +47,14 @@ tests =
     , ast "spec" "./test/source/spec.gcl"
     ]
   where
-    sufffixGolden :: FilePath -> FilePath
-    sufffixGolden filePath = filePath ++ ".po.golden"
+    suffixGolden :: FilePath -> FilePath
+    suffixGolden filePath = filePath ++ ".po.golden"
 
     ast :: String -> FilePath -> TestTree
     ast name filePath =
       goldenTest
         name
-        (readFile (sufffixGolden filePath))
+        (readFile (suffixGolden filePath))
         (readFile filePath)
         compare
         update
@@ -66,8 +66,8 @@ tests =
 
     compare ::
       (FilePath, ByteString) -> (FilePath, ByteString) -> IO (Maybe String)
-    compare (_, expected) (filePath, actual) = do
-      let result = run (filePath, actual)
+    compare (_, expected) (filePath, source) = do
+      let actual = run (filePath, source)
       if expected == actual
         then return Nothing
         else return (Just $ "expected:\n" ++ unpack expected ++ "\n------------\nactual: \n" ++ unpack actual)
@@ -75,7 +75,7 @@ tests =
     update :: (FilePath, ByteString) -> IO ()
     update (filePath, input) = do
       let result = run (filePath, input)
-      createDirectoriesAndWriteFile (sufffixGolden filePath) result
+      createDirectoriesAndWriteFile (suffixGolden filePath) result
 
     run :: (FilePath, ByteString) -> ByteString
     run (filePath, raw) = 
