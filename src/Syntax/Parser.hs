@@ -312,7 +312,7 @@ expression = makeExprParser term table <?> "expression"
                   Op <$ symbol TokParenStart <*> operator <* symbol TokParenEnd,
                   Quant
                     <$ symbol TokQuantStart
-                    <*> term
+                    <*> quantOp
                     <*> some lower
                     <* symbol TokColon
                     <*> expression
@@ -321,7 +321,7 @@ expression = makeExprParser term table <?> "expression"
                     <* symbol TokQuantEnd,
                   Quant
                     <$ symbol TokQuantStartU
-                    <*> term
+                    <*> quantOp
                     <*> some lower
                     <* symbol TokColon
                     <*> expression
@@ -332,6 +332,17 @@ expression = makeExprParser term table <?> "expression"
                 ]
             )
             <?> "term"
+        
+        -- replace "+", "∧", and "∨" in Quant with "Σ", "∀", and "∃"
+        quantOp :: Parser Expr 
+        quantOp = do 
+          op <- term
+          return $ case op of 
+            Op Add  loc -> Op Sum loc
+            Op Conj loc -> Op Forall loc
+            Op Disj loc -> Op Exists loc
+            others      -> others
+
 
     literal :: Parser Lit
     literal =

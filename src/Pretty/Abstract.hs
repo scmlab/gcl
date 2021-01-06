@@ -117,6 +117,9 @@ instance Pretty Op where
   pretty Mul     = "*"
   pretty Div     = "/"
   pretty Mod     = "%"
+  pretty Sum     = "Σ"
+  pretty Forall  = "∀"
+  pretty Exists  = "∃"
 
 --------------------------------------------------------------------------------
 -- | Type

@@ -38,9 +38,10 @@ data Expr = Var    Var
 
 type Subst = Map Text Expr
 
-data Op = EQ | NEQ | LTE | GTE | LT | GT   -- binary relations
-        | Implies | Conj | Disj | Neg  -- logic operators
+data Op = EQ | NEQ | LTE | GTE | LT | GT    -- binary relations
+        | Implies | Conj | Disj | Neg       -- logic operators
         | Add | Sub | Mul | Div | Mod       -- arithmetics
+        | Sum | Forall | Exists             -- For Quant
      deriving (Show, Eq, Generic)
 
 instance FromJSON Op
@@ -139,6 +140,7 @@ subst env (Quant op xs range term) = do
     | otherwise = first3 (i :) <$> subLocal is r t
   fre = freeSubst env
   first3 f (x, y, z) = (f x, y, z)
+subst env (Subst _ _) = error "subst on Subst not defined"
 
 free :: Expr -> [Var]
 free (Var   x               ) = [x]
@@ -148,6 +150,7 @@ free (Lit   _               ) = []
 free (App e1 e2             ) = free e1 ++ free e2  -- not worrying about duplication
 free (Quant op xs range term) = (free op ++ free range ++ free term) \\ xs
 free (Hole _ subs           ) = subs >>= freeSubst -- correct?
+free (Subst _ _           )   = error "free on Subst not defined"
 
 freeSubst :: Subst -> [Var]
 freeSubst env = Map.elems env >>= free 
