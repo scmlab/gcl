@@ -37,8 +37,7 @@ tests :: TestTree
 tests =
   testGroup
     "Parser"
-    [programGolden]
-    -- [expression, type', declaration, statement, statements,   programGolden]
+    [expression, type', declaration, statement, statements, programGolden]
 
 --------------------------------------------------------------------------------
 
@@ -503,14 +502,14 @@ programGolden =
   testGroup
     "Program"
     [ 
-      -- ast "empty" "./test/source/empty.gcl",
-      -- ast "quant 1" "./test/source/quant1.gcl",
-      -- ast "no-decl" "./test/source/no-decl.gcl",
-      -- ast "no-stmt" "./test/source/no-stmt.gcl",
-      -- ast "2" "./test/source/2.gcl",
+      ast "empty" "./test/source/empty.gcl",
+      ast "2" "./test/source/2.gcl",
+      ast "comment" "./test/source/comment.gcl",
       ast "issue 1" "./test/source/issue1.gcl",
       ast "issue 14" "./test/source/issue14.gcl",
-      ast "comment" "./test/source/comment.gcl",
+      ast "no-decl" "./test/source/no-decl.gcl",
+      ast "no-stmt" "./test/source/no-stmt.gcl",
+      ast "quant 1" "./test/source/quant1.gcl",
       ast "spec" "./test/source/spec.gcl"
     ]
   where
@@ -538,8 +537,8 @@ programGolden =
       if expected == actual
         then return Nothing
         else do 
-          BS8.putStrLn expected
-          BS8.putStrLn actual
+          -- BS8.putStrLn expected
+          -- BS8.putStrLn actual
           return $ Just $ 
                 "expected (" ++ expectedPath ++ ", " ++ show (length (unpack expected)) ++ " chars):\n" ++ unpack expected ++ "\n------------\n" 
                 ++ "actual (" ++ actualPath ++ ", " ++ show (length (unpack actual)) ++ " chars): \n" ++ unpack actual

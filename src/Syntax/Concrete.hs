@@ -32,6 +32,10 @@ data Program
       Loc
   deriving (Eq, Show)
 
+instance Located Program where
+  locOf (Program _ _ _ _ l) = l
+
+
 type Defns = Map Text Expr
 
 data Declaration
@@ -52,6 +56,18 @@ data Stmt
   | Spec Loc
   | Proof Loc
   deriving (Eq, Show)
+
+instance Located Stmt where
+  locOf (Skip l) = l
+  locOf (Abort l) = l
+  locOf (Assign _ _ l) = l
+  locOf (Assert _ l) = l
+  locOf (LoopInvariant _ _ l) = l
+  locOf (Do _ l) = l
+  locOf (If _ l) = l
+  locOf (SpecQM l) = l
+  locOf (Spec l) = l
+  locOf (Proof l) = l
 
 data GdCmd = GdCmd Expr [Stmt] Loc deriving (Eq, Show)
 
@@ -76,7 +92,14 @@ unzipGdCmds = unzip . map (\(GdCmd x y _) -> (x, y))
 -- | Types
 data Endpoint = Including Expr | Excluding Expr deriving (Eq, Show)
 
+instance Located Endpoint where
+  locOf (Including e) = locOf e
+  locOf (Excluding e) = locOf e
+
 data Interval = Interval Endpoint Endpoint Loc deriving (Eq, Show)
+
+instance Located Interval where
+  locOf (Interval _ _ l) = l
 
 data Type
   = TBase TBase Loc
@@ -84,6 +107,12 @@ data Type
   | TFunc Type Type Loc
   | TVar Name Loc
   deriving (Eq, Show)
+
+instance Located Type where
+  locOf (TBase _ l) = l
+  locOf (TArray _ _ l) = l
+  locOf (TFunc _ _ l) = l
+  locOf (TVar _ l) = l
 
 --------------------------------------------------------------------------------
 
@@ -116,6 +145,9 @@ wrapLam (x : xs) body = Lam x (wrapLam xs body) NoLoc
 data Name = Name Text Loc
   deriving (Eq, Show, Generic)
 
+instance Located Name where
+  locOf (Name _ l) = l
+  
 instance ToJSON Name
 
 instance FromJSON Name

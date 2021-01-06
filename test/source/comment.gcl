@@ -1,11 +1,11 @@
 do True ->
-  -- comment 
+  -- comment
     skip
     skip
-    skip  
+    skip
   -- hey
  | True ->
     skip
     skip
-    skip 
+    skip
 od

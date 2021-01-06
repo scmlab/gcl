@@ -59,40 +59,37 @@ instance Monoid (DocWithLoc ann) where
 instance IsString (DocWithLoc ann) where 
   fromString s = StringLiteral (pack s)
 
-fromPretty' :: (Pretty a, Located a) => a -> DocWithLoc ann
-fromPretty' x = case locOf x of 
-  NoLoc   -> StringLiteral (renderStrict (pretty x))
-  Loc a b -> DocWithLoc (pretty x) a b
+fromDoc :: Doc ann -> DocWithLoc ann
+fromDoc x = StringLiteral (renderStrict x)
 
-fromPretty :: Pretty a => a -> Loc -> DocWithLoc ann
-fromPretty x NoLoc      = StringLiteral (renderStrict (pretty x))
-fromPretty x (Loc a b)  = DocWithLoc (pretty x) a b
-
-fromPretty'' :: Doc ann -> Loc -> DocWithLoc ann
-fromPretty'' x NoLoc      = StringLiteral (renderStrict x)
-fromPretty'' x (Loc a b)  = DocWithLoc x a b
-
+fromLocAndDoc :: Loc -> Doc ann -> DocWithLoc ann
+fromLocAndDoc NoLoc     x = fromDoc x
+fromLocAndDoc (Loc a b) x = DocWithLoc x a b
 
 toDoc :: DocWithLoc ann -> Doc ann 
-toDoc (DocWithLoc d _ _) = d
+toDoc (DocWithLoc d a _) = fillGap (Pos (posFile a) 1 1 1) a <> d
 toDoc (StringLiteral s) = pretty s
 
-overrideLoc :: Loc -> DocWithLoc ann -> DocWithLoc ann
-overrideLoc NoLoc     (DocWithLoc x _ _) = StringLiteral (renderStrict x)
-overrideLoc (Loc a b) (DocWithLoc x _ _) = DocWithLoc x a b
-overrideLoc _         (StringLiteral s)  = StringLiteral s
+setLoc :: Loc -> DocWithLoc ann -> DocWithLoc ann
+setLoc NoLoc     (DocWithLoc x _ _) = StringLiteral (renderStrict x)
+setLoc (Loc a b) (DocWithLoc x _ _) = DocWithLoc x a b
+setLoc NoLoc     (StringLiteral s)  = StringLiteral s
+setLoc (Loc a b) (StringLiteral s)  = DocWithLoc (pretty s) a b
 
 -- generates newlines and spaces to fill the gap between to Pos
 fillGap :: Pos -> Pos -> Doc ann 
-fillGap this next = 
+fillGap this next =
   let lineDiff = posLine next - posLine this
   in if lineDiff == 0 
       -- on the same line, just pad them with spaces
-      then let offsetDiff = (posCoff next - posCoff this) - 1
+      then let offsetDiff = posCoff next - 1 - posCoff this
           in  mconcat (replicate offsetDiff space) 
       -- on different lines
-      else mconcat (replicate lineDiff "\n" ++ replicate (posCol next) space)
+      else mconcat (replicate lineDiff "\n" ++ replicate (posCol next - 1) space)
 
+
+--------------------------------------------------------------------------------
+-- | Handy combinators
 
 parensIf' :: Int -> Int -> DocWithLoc ann -> DocWithLoc ann 
 parensIf' n m doc 
@@ -102,6 +99,10 @@ parensIf' n m doc
                   StringLiteral  s -> StringLiteral ("(" <> s <> ")")
   | otherwise = doc
 
+sepBy :: DocWithLoc ann -> [DocWithLoc ann] -> DocWithLoc ann 
+sepBy _    []       = mempty 
+sepBy _    [x]      = x
+sepBy deli (x:y:xs) = x <> deli <> sepBy deli (y:xs)
 
 --------------------------------------------------------------------------------
 -- | Pretty print with Precedence

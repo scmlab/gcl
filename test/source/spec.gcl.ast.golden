@@ -1,4 +1,6 @@
-con A, B : Int {A > 0}
+con A, B : Int { A > 0 }
 var x, y, z : Int
+
 ?
+
 { z = A * B }

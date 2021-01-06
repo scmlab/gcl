@@ -63,19 +63,20 @@ parse parser filepath tokenStream =
         getLoc _ = mempty
 
 program :: Parser Program
-program = withLoc $ do
+program = do 
   skipMany (symbol TokNewline)
-  decls <- many (declaration <* choice [symbol TokNewline, eof]) <?> "declarations"
-  skipMany (symbol TokNewline)
-  stmts <- many (statement <* choice [symbol TokNewline, eof]) <?> "statements"
-  skipMany (symbol TokNewline)
+  withLoc $ do
+    decls <- many (declaration <* choice [symbol TokNewline, eof]) <?> "declarations"
+    skipMany (symbol TokNewline)
+    stmts <- many (statement <* choice [symbol TokNewline, eof]) <?> "statements"
+    skipMany (symbol TokNewline)
 
-  let letBindings = pickLetBindings decls
+    let letBindings = pickLetBindings decls
 
-  -- globals and precondition
-  let (glob, asrts') = pickGlobals decls
-  let pre = if null asrts' then [] else [Assert (conjunct asrts') NoLoc]
-  return $ Program decls glob letBindings (pre ++ stmts)
+    -- globals and precondition
+    let (glob, asrts') = pickGlobals decls
+    let pre = if null asrts' then [] else [Assert (conjunct asrts') NoLoc]
+    return $ Program decls glob letBindings (pre ++ stmts)
 
 specContent :: Parser [Stmt]
 specContent = do

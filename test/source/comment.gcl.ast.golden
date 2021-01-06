@@ -1,7 +1,11 @@
-do True -> skip
-skip
-skip
- | True -> skip
-skip
-skip
+do True
+
+  ->skip
+    skip
+    skip
+
+ | True
+  ->skip
+    skip
+    skip
 od
