@@ -11,6 +11,8 @@ import Data.Loc
 import Pretty.Variadic
 import Syntax.Abstract (Fixity(..), classify)
 
+
+
 --------------------------------------------------------------------------------
 
 -- | Program
@@ -56,9 +58,9 @@ instance Pretty Stmt where
   pretty (Skip _) = "skip"
   pretty (Abort _) = "abort"
   pretty (Assign xs es _) =
-    hsep (punctuate comma (map (pretty . depart) xs)) <+> ":="
+    hsep (punctuate comma (map pretty xs)) <+> ":="
       <+> hsep
-        (punctuate comma (map (pretty . depart) es))
+        (punctuate comma (map pretty es))
   pretty (Assert p _) = lbrace <+> pretty p <+> rbrace
   pretty (LoopInvariant p bnd _) =
     lbrace <+> pretty p <+> ", bnd:" <+> pretty bnd <+> rbrace
@@ -103,19 +105,16 @@ handleExpr n (App p q _) = case handleExpr n p of
       _      -> s <> t
 handleExpr _ (Lam p q l) = return $ overrideLoc l $ "λ " <> fromPretty p noLoc <> " → " <> prettyWithLoc q
 handleExpr _ (Hole l) = return $ fromPretty'' (prettyHole l) l
-handleExpr _ (Quant op xs r t l) = return "Quant"
-handleExpr _ (Subst x _) = return "Subst"
-  -- return
-  --   $   "⟨"
-  --   <>  fromPretty (prettyQuantOp op) (locOf op)
-  --   <>  mconcat (map prettyWithLoc xs)
-  --   <> " : "
-  --   <+> pretty r
-  --   <+> ":"
-  --   <+> pretty t
-  --   <>  "⟩"
-
-
+handleExpr _ (Quant op xs r t l) = return $ overrideLoc l
+    $   "⟨"
+    <>  fromPretty' op 
+    <>  mconcat (map fromPretty' xs)
+    <>  " : "
+    <>  fromPretty' r
+    <>  " : "
+    <>  fromPretty' t
+    <>  " ⟩"
+handleExpr _ (Subst _ _) = return "Subst"
 
 handleOp :: Int -> Op -> Loc -> Variadic Expr (DocWithLoc ann)
 handleOp n op loc = case classify op of

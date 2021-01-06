@@ -68,7 +68,7 @@ handleExpr n (App p q  ) = case handleExpr n p of
 handleExpr _ (Quant op xs r t) =
   return
     $   "⟨"
-    <>  prettyQuantOp op
+    <>  pretty op
     <+> hsep (map pretty xs)
     <+> ":"
     <+> pretty r
@@ -83,14 +83,6 @@ instance PrettyPrec Expr where
   prettyPrec n expr = case handleExpr n expr of
     Expect   _ -> mempty
     Complete s -> s
-
--- SCM: used for printing the operator in quantifier. Temporary.
-prettyQuantOp :: Expr -> Doc ann
-prettyQuantOp (Op Add ) = "Σ"
-prettyQuantOp (Op Conj) = "∀"
-prettyQuantOp (Op Disj) = "∃"
-prettyQuantOp (Op op  ) = pretty op
-prettyQuantOp other     = pretty other
 
 instance Pretty Expr where
   pretty = prettyPrec 0

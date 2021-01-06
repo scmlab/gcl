@@ -209,3 +209,6 @@ classify Sub     = InfixL 7
 classify Mul     = InfixL 8
 classify Div     = InfixL 8
 classify Mod     = InfixL 9
+classify Sum     = Prefix 5
+classify Exists  = Prefix 6
+classify Forall  = Prefix 7

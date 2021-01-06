@@ -88,7 +88,7 @@ fillGap this next =
   let lineDiff = posLine next - posLine this
   in if lineDiff == 0 
       -- on the same line, just pad them with spaces
-      then let offsetDiff = posCoff next - posCoff this
+      then let offsetDiff = (posCoff next - posCoff this) - 1
           in  mconcat (replicate offsetDiff space) 
       -- on different lines
       else mconcat (replicate lineDiff "\n" ++ replicate (posCol next) space)
@@ -98,6 +98,7 @@ parensIf' :: Int -> Int -> DocWithLoc ann -> DocWithLoc ann
 parensIf' n m doc 
   | n > m     = case doc of 
                   DocWithLoc x a b -> DocWithLoc (parens x) (translate (-1) a) (translate 1 b)
+                  -- DocWithLoc x a b -> DocWithLoc (parens x) a b
                   StringLiteral  s -> StringLiteral ("(" <> s <> ")")
   | otherwise = doc
 
