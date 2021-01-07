@@ -39,9 +39,8 @@ instance PrettyWithLoc Declaration where
   prettyWithLoc (LetDecl name args expr l) = setLoc l $
     "let " 
       <> prettyWithLoc name 
-      <> " "
       <> fromDoc (hsep (map pretty args)) 
-      <> " =" 
+      <> " = " 
       <> prettyWithLoc expr 
 
 --------------------------------------------------------------------------------
@@ -64,9 +63,9 @@ instance PrettyWithLoc Stmt where
   prettyWithLoc (Abort l) = setLoc l "abort"
   prettyWithLoc (Assign xs es l) =
     setLoc l $
-      mconcat (map prettyWithLoc xs)
+      sepBy ", " (map prettyWithLoc xs)
         <> ":= "
-        <> mconcat (map prettyWithLoc es)
+        <> sepBy ", " (map prettyWithLoc es)
   prettyWithLoc (Assert p l) = setLoc l $ 
     "{ " <> prettyWithLoc p <> " }"
   prettyWithLoc (LoopInvariant p bnd l) = setLoc l $ 
@@ -181,9 +180,9 @@ instance PrettyWithLoc Type where
   prettyWithLoc (TBase TInt  l) = setLoc l $ "Int"
   prettyWithLoc (TBase TBool l) = setLoc l $ "Bool"
   prettyWithLoc (TBase TChar l) = setLoc l $ "Char"
-  prettyWithLoc (TFunc a b   l) = setLoc l $ prettyWithLoc a <> " ->" <> prettyWithLoc b
-  prettyWithLoc (TArray i b  l) = setLoc l $ "array" <> prettyWithLoc i <> " of" <> prettyWithLoc b
-  prettyWithLoc (TVar i      l) = setLoc l $ "TVar" <> prettyWithLoc i
+  prettyWithLoc (TFunc a b   l) = setLoc l $ prettyWithLoc a <> "→ " <> prettyWithLoc b
+  prettyWithLoc (TArray i b  l) = setLoc l $ "array " <> prettyWithLoc i <> "of " <> prettyWithLoc b
+  prettyWithLoc (TVar i      l) = setLoc l $ "TVar " <> prettyWithLoc i
 
 --------------------------------------------------------------------------------
 -- | Interval
@@ -193,10 +192,10 @@ instance Pretty Interval where
 
 instance PrettyWithLoc Interval where
   prettyWithLoc (Interval (Including a) (Including b) l) = setLoc l $ 
-    "[" <> prettyWithLoc a <> ".." <> prettyWithLoc b <> " ]"
+    "[" <> prettyWithLoc a <> ".. " <> prettyWithLoc b <> "]"
   prettyWithLoc (Interval (Including a) (Excluding b) l) = setLoc l $ 
-    "[" <> prettyWithLoc a <> ".." <> prettyWithLoc b <> " )"
+    "[" <> prettyWithLoc a <> ".. " <> prettyWithLoc b <> ")"
   prettyWithLoc (Interval (Excluding a) (Including b) l) = setLoc l $ 
-    "(" <> prettyWithLoc a <> ".." <> prettyWithLoc b <> " ]"
+    "(" <> prettyWithLoc a <> ".. " <> prettyWithLoc b <> "]"
   prettyWithLoc (Interval (Excluding a) (Excluding b) l) = setLoc l $ 
-    "(" <> prettyWithLoc a <> ".." <> prettyWithLoc b <> " )"
+    "(" <> prettyWithLoc a <> ".. " <> prettyWithLoc b <> ")"
