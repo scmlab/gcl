@@ -1,3 +1,4 @@
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
 
@@ -9,7 +10,7 @@ import Control.Monad.State hiding (guard)
 import Data.Aeson (ToJSON)
 import Data.Loc
 import Data.Text.Lazy (Text)
-import Data.Functor ((<&>))
+import Data.Bifunctor (second)
 import GHC.Generics (Generic)
 import Syntax.Abstract
 import Syntax.Concrete hiding
@@ -20,6 +21,7 @@ import Syntax.Concrete hiding
 import qualified Syntax.Concrete as C
 import Syntax.Location (depart)
 import Prelude hiding (Ordering (..))
+import Data.Traversable (foldMapDefault)
 
 type TCxt = [(Text, Type)]
 
@@ -117,13 +119,14 @@ checkGdCmd cxt (GdCmd g cmds _) = do
   checkSs cxt cmds
 
 checkProg :: Program -> TM ()
-checkProg (Program decls _ _ stmts _) = checkSs cxt stmts
+checkProg (Program decls _ _ stmts _) = do
+  cxt <- foldl (>>=) (return ([] :: TCxt)) (map f decls)
+  checkSs cxt stmts
   where
-    cxt = concatMap f decls
-    f (ConstDecl cs t _ _) = [(c, depart t) | Name c _ <- cs]
-    f (VarDecl vs t _ _) = [(v, depart t) | Name v _ <- vs]
-    f (LetDecl _c _ _ _) = [] -- TODO: check the { let ... } constructs
-
+    f :: Declaration -> TCxt -> TM TCxt
+    f (ConstDecl cs t _ _) cxt' = return ([(c, depart t) | Name c _ <- cs] ++ cxt')
+    f (VarDecl vs t _ _) cxt' = return ([(v, depart t) | Name v _ <- vs] ++ cxt')
+    f (LetDecl (Name c _) _ e _) cxt' = inferE cxt' e >>= \t -> return ((c,t) : cxt')
 -- substitution
 
 substT :: SubstT -> Type -> Type
@@ -132,7 +135,7 @@ substT _ (TBase t) = TBase t
 substT theta (TArray interval t) = TArray interval (substT theta t)
 substT theta (TFunc t1 t2) = TFunc (substT theta t1) (substT theta t2)
 substT theta (TVar x) = case lookup x theta of
-  Just t -> substT theta t
+  Just t -> t
   Nothing -> TVar x
 
 substTM :: Type -> TM Type
@@ -163,14 +166,14 @@ unify l (TFunc t1 t2) (TFunc t3 t4) =
 unify l (TVar x) t = do
   ty <- substTM t
   tx <- substTM (TVar x)
-  case (ty, tx) of 
-    (TVar y, TVar x') -> extSubstM x' (TVar y)
-    (TVar y, _) 
-      | occursT y tx -> throwError (UnifyFailed (TVar y) tx l)
-      | otherwise -> extSubstM y tx
-    (_, TVar x')
-      | occursT x' ty -> throwError (UnifyFailed (TVar x') ty l)
+  case (tx, ty) of 
+    (TVar x', TVar y) -> extSubstM x' (TVar y)
+    (TVar x', _)
+      | occursT x' ty -> throwError (RecursiveType x' ty l)
       | otherwise -> extSubstM x' ty
+    (_, TVar y) 
+      | occursT y tx -> throwError (RecursiveType y tx l)
+      | otherwise -> extSubstM y tx
     _ -> unify l tx ty
 unify l t (TVar x) = unify l (TVar x) t
 unify l t1 t2 = throwError (UnifyFailed t1 t2 l)
@@ -178,7 +181,8 @@ unify l t1 t2 = throwError (UnifyFailed t1 t2 l)
 extSubstM :: TVar -> Type -> TM Type
 extSubstM x t = do
   (theta, i) <- get
-  put ((x, t) : theta, i)
+  let theta' = map (second $ substT ((x, t) : theta)) theta
+  put (theta', i)
   return t
 
 -- -- types of built-in operators
