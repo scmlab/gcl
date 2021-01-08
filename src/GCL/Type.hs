@@ -5,9 +5,11 @@ module GCL.Type where
 
 import Control.Monad.Except
 import Control.Monad.State hiding (guard)
+-- import Control.Monad (when)
 import Data.Aeson (ToJSON)
 import Data.Loc
 import Data.Text.Lazy (Text)
+import Data.Functor ((<&>))
 import GHC.Generics (Generic)
 import Syntax.Abstract
 import Syntax.Concrete hiding
@@ -70,7 +72,7 @@ inferE cxt (C.App e1 e2 l) = do
       unify_ l t1 t1'
       substTM t2
     _ -> throwError (NotFunction t l)
-inferE _ (C.Lam _ _ _) = error "to be implemented" -- SCM
+inferE _ C.Lam {} = error "to be implemented" -- SCM
 inferE _ (C.Hole _) = TVar <$> freshVar "t"
 inferE cxt (C.Quant op xs rng trm l) = do
   tOp <- inferE cxt op
@@ -125,13 +127,19 @@ checkProg (Program decls _ _ stmts _) = checkSs cxt stmts
 -- substitution
 
 substT :: SubstT -> Type -> Type
-substT _ (TBase t) = (TBase t)
+substT _ (TBase t) = TBase t
 -- NOTE: banacorn: I've added `interval` to the AST
 substT theta (TArray interval t) = TArray interval (substT theta t)
 substT theta (TFunc t1 t2) = TFunc (substT theta t1) (substT theta t2)
 substT theta (TVar x) = case lookup x theta of
-  Just t -> t
+  Just t -> substT theta t
   Nothing -> TVar x
+
+substTM :: Type -> TM Type
+substTM t = gets $ flip substT t . fst
+  -- do
+  -- (theta, _) <- get
+  -- return (substT theta t)
 
 occursT :: TVar -> Type -> Bool
 occursT _ (TBase _) = False
@@ -140,44 +148,38 @@ occursT x (TFunc t1 t2) = occursT x t1 || occursT x t2
 occursT x (TVar y) = x == y
 
 -- unification
-
 unify_ :: Loc -> Type -> Type -> TM ()
-unify_ l t1 t2 = unify l t1 t2 >> return ()
+unify_ l t1 t2 = void $ unify l t1 t2
 
 unify :: Loc -> Type -> Type -> TM Type
 unify l (TBase t1) (TBase t2)
   | t1 == t2 = return (TBase t1)
   | otherwise = throwError (UnifyFailed (TBase t1) (TBase t2) l)
-unify l (TFunc t1 t2) (TFunc t3 t4) = do
-  t1' <- unify l t1 t3
-  t2' <- unify l t2 t4
-  return (TFunc t1' t2')
+unify l (TArray i1 t1) (TArray i2 t2)
+  | i1 == i2 = TArray i1 <$> unify l t1 t2
+  | otherwise = throwError (UnifyFailed (TArray i1 t1) (TArray i2 t2) l)
+unify l (TFunc t1 t2) (TFunc t3 t4) = 
+  TFunc <$> unify l t1 t3 <*> unify l t2 t4
 unify l (TVar x) t = do
-  t' <- substTM t
-  if occursT x t'
-    then throwError (RecursiveType x t' l)
-    else do
-      extSubstM x t'
-      return t'
+  ty <- substTM t
+  tx <- substTM (TVar x)
+  case (ty, tx) of 
+    (TVar y, TVar x') -> extSubstM x' (TVar y)
+    (TVar y, _) 
+      | occursT y tx -> throwError (UnifyFailed (TVar y) tx l)
+      | otherwise -> extSubstM y tx
+    (_, TVar x')
+      | occursT x' ty -> throwError (UnifyFailed (TVar x') ty l)
+      | otherwise -> extSubstM x' ty
+    _ -> unify l tx ty
 unify l t (TVar x) = unify l (TVar x) t
 unify l t1 t2 = throwError (UnifyFailed t1 t2 l)
 
--- monad operations
-
-substTM :: Type -> TM Type
-substTM t = do
-  (theta, _) <- get
-  return (substT theta t)
-
-extSubstM :: TVar -> Type -> TM ()
+extSubstM :: TVar -> Type -> TM Type
 extSubstM x t = do
   (theta, i) <- get
-  case lookup x theta of
-    Nothing -> put ((x, t) : theta, i)
-    Just t' ->
-      if t == t'
-        then return ()
-        else error "SCM: duplicated entry in unification. Fix this."
+  put ((x, t) : theta, i)
+  return t
 
 -- -- types of built-in operators
 
