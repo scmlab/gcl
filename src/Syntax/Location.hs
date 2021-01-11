@@ -10,39 +10,7 @@ import Syntax.Concrete
 import qualified Syntax.Predicate as P
 import Prelude hiding (Ordering (..))
 
-instance Located Program where
-  locOf (Program _ _ _ _ l) = l
 
-instance Located Stmt where
-  locOf (Skip l) = l
-  locOf (Abort l) = l
-  locOf (Assign _ _ l) = l
-  locOf (Assert _ l) = l
-  locOf (LoopInvariant _ _ l) = l
-  locOf (Do _ l) = l
-  locOf (If _ l) = l
-  locOf (SpecQM l) = l
-  locOf (Spec l) = l
-  locOf (Proof l) = l
-
-instance Located Type where
-  locOf (TBase _ l) = l
-  locOf (TArray _ _ l) = l
-  locOf (TFunc _ _ l) = l
-  locOf (TVar _ l) = l
-
-instance Located Interval where
-  locOf (Interval _ _ l) = l
-
-instance Located Endpoint where
-  locOf (Including e) = locOf e
-  locOf (Excluding e) = locOf e
-
-instance Located Lit where
-  locOf _ = NoLoc
-
-instance Located Name where
-  locOf (Name _ l) = l
 
 --------------------------------------------------------------------------------
 -- Relocatable

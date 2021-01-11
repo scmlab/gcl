@@ -63,19 +63,20 @@ parse parser filepath tokenStream =
         getLoc _ = mempty
 
 program :: Parser Program
-program = withLoc $ do
+program = do 
   skipMany (symbol TokNewline)
-  decls <- many (declaration <* choice [symbol TokNewline, eof]) <?> "declarations"
-  skipMany (symbol TokNewline)
-  stmts <- many (statement <* choice [symbol TokNewline, eof]) <?> "statements"
-  skipMany (symbol TokNewline)
+  withLoc $ do
+    decls <- many (declaration <* choice [symbol TokNewline, eof]) <?> "declarations"
+    skipMany (symbol TokNewline)
+    stmts <- many (statement <* choice [symbol TokNewline, eof]) <?> "statements"
+    skipMany (symbol TokNewline)
 
-  let letBindings = pickLetBindings decls
+    let letBindings = pickLetBindings decls
 
-  -- globals and precondition
-  let (glob, asrts') = pickGlobals decls
-  let pre = if null asrts' then [] else [Assert (conjunct asrts') NoLoc]
-  return $ Program decls glob letBindings (pre ++ stmts)
+    -- globals and precondition
+    let (glob, asrts') = pickGlobals decls
+    let pre = if null asrts' then [] else [Assert (conjunct asrts') NoLoc]
+    return $ Program decls glob letBindings (pre ++ stmts)
 
 specContent :: Parser [Stmt]
 specContent = do
@@ -312,7 +313,7 @@ expression = makeExprParser term table <?> "expression"
                   Op <$ symbol TokParenStart <*> operator <* symbol TokParenEnd,
                   Quant
                     <$ symbol TokQuantStart
-                    <*> term
+                    <*> quantOp
                     <*> some lower
                     <* symbol TokColon
                     <*> expression
@@ -321,7 +322,7 @@ expression = makeExprParser term table <?> "expression"
                     <* symbol TokQuantEnd,
                   Quant
                     <$ symbol TokQuantStartU
-                    <*> term
+                    <*> quantOp
                     <*> some lower
                     <* symbol TokColon
                     <*> expression
@@ -332,6 +333,17 @@ expression = makeExprParser term table <?> "expression"
                 ]
             )
             <?> "term"
+        
+        -- replace "+", "∧", and "∨" in Quant with "Σ", "∀", and "∃"
+        quantOp :: Parser Expr 
+        quantOp = do 
+          op <- term
+          return $ case op of 
+            Op Add  loc -> Op Sum loc
+            Op Conj loc -> Op Forall loc
+            Op Disj loc -> Op Exists loc
+            others      -> others
+
 
     literal :: Parser Lit
     literal =
