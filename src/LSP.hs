@@ -122,12 +122,12 @@ toResponse lspID (Req filepath source kind) =
   Res filepath responses
   where
     handle :: ReqKind -> [ResKind]
-    handle ReqLoad = global $ do
+    handle ReqLoad = asGlobalError $ do
       program@(Concrete.Program _ globalProps _ _ _) <- parseProgram filepath source
       (pos, specs) <- sweep program
 
       return [ResOK lspID pos specs globalProps]
-    handle (ReqInspect selStart selEnd) = global $ do
+    handle (ReqInspect selStart selEnd) = ignoreError $ do
       program@(Concrete.Program _ globalProps _ _ _) <- parseProgram filepath source
       (pos, specs) <- sweep program
       -- find the POs whose Range overlaps with the selection
@@ -152,14 +152,14 @@ toResponse lspID (Req filepath source kind) =
                       Loc start' _ -> start == start'
                  in filter same overlapped
       return [ResOK lspID nearest specs globalProps]
-    handle (ReqRefine i payload) = local i $ do
+    handle (ReqRefine i payload) = asLocalError i $ do
       _ <- refine payload
       return [ResResolve i]
-    handle (ReqSubstitute i expr _subst) = global $ do
+    handle (ReqSubstitute i expr _subst) = asGlobalError $ do
       Concrete.Program _ _ defns _ _ <- parseProgram filepath source
       let expr' = runSubstM (expand (Concrete.Subst expr _subst)) defns 1
       return [ResSubstitute i expr']
-    handle ReqExportProofObligations = global $ do
+    handle ReqExportProofObligations = asGlobalError $ do
       return [ResConsoleLog "Export"]
     handle ReqDebug = error "crash!"
 
@@ -321,26 +321,32 @@ toLSPSideEffects _lspID (Req filepath source kind) = handle kind
 
     handle _ = pure ()
 
--- catches Error and convert it into a global ResError
-global :: M [ResKind] -> [ResKind]
-global program =
-  case runM program of
-    Left err -> [ResError [globalError err]]
-    Right val -> val
-
--- catches Error and convert it into a local ResError with Hole id
-local :: Int -> M [ResKind] -> [ResKind]
-local i program = 
-  case runM program of
-    Left err -> [ResError [localError i err]]
-    Right val -> val
-
 --------------------------------------------------------------------------------
 
 type M = Except Error
 
 runM :: M a -> Either Error a
 runM = runExcept
+
+ignoreError :: M [ResKind] -> [ResKind]
+ignoreError program =
+  case runM program of
+    Left _err -> []
+    Right val -> val
+
+-- catches Error and convert it into a global ResError
+asGlobalError :: M [ResKind] -> [ResKind]
+asGlobalError program =
+  case runM program of
+    Left err -> [ResError [globalError err]]
+    Right val -> val
+
+-- catches Error and convert it into a local ResError with Hole id
+asLocalError :: Int -> M [ResKind] -> [ResKind]
+asLocalError i program = 
+  case runM program of
+    Left err -> [ResError [localError i err]]
+    Right val -> val
 
 --------------------------------------------------------------------------------
 
