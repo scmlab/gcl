@@ -21,6 +21,8 @@ dependencies:
   - parser-combinators
   - prettyprinter
   - mtl
+  - network
+  - network-simple
   - srcloc
   - text
   - lexer-applicative

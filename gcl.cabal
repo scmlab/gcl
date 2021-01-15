@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: ccd6f9a61ebcf32aaa2697a66ad42de130416cfe4fcc97f266161d64e90aa3b8
+-- hash: d90a5957cd304057545d0c1fb964929ae7d93bc177a9c9d58bf86267339a4b67
 
 name:           gcl
 version:        0.1.0.0
@@ -62,6 +62,8 @@ library
     , lsp
     , megaparsec >=8.0
     , mtl
+    , network
+    , network-simple
     , parser-combinators
     , prettyprinter
     , random
@@ -89,6 +91,8 @@ executable gcl
     , lsp
     , megaparsec >=8.0
     , mtl
+    , network
+    , network-simple
     , parser-combinators
     , prettyprinter
     , random
@@ -147,6 +151,8 @@ test-suite gcl-test
     , lsp
     , megaparsec >=8.0
     , mtl
+    , network
+    , network-simple
     , parser-combinators
     , prettyprinter
     , random

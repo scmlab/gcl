@@ -14,40 +14,11 @@ main = do
   case optMode opts of
     ModeHelp -> putStrLn $ usageInfo usage options
     ModeLSP -> do
-      _ <- run
+      _ <- run False 
       return ()
-    ModeDev -> return ()
-
--- do
---   let filepath = "examples/b.gcl"
---   raw <- Text.readFile filepath
-
---   result <- runM $ do
---     tokens <- scan filepath raw
---     program <- parseProgram filepath tokens
---     -- typeCheck program
---     (obligations, specifications) <- sweep program
---     -- stores <- execute program
---     return (tokens, program, obligations, specifications)
-
---   case result of
---     Right (tokens, program, obligations, specifications) -> do
---       putStrLn "\n=== tokens ==="
---       print tokens
-
---       putStrLn "\n=== AST ==="
---       print program
-
---       putStrLn "\n=== proof obligations ==="
---       mapM_ (print . pretty) obligations
-
---       putStrLn "\n=== specifications ==="
---       mapM_ (print . pretty) specifications
-
---     -- putStrLn "\n=== execution (stores) ==="
---     -- mapM_ (print . pretty) stores
-
---     Left err -> print $ pretty err
+    ModeDev -> do 
+      _ <- run True 
+      return ()
 
 --------------------------------------------------------------------------------
 

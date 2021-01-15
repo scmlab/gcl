@@ -35,20 +35,29 @@ import Syntax.Predicate
     Spec,
   )
 
+import Network.Simple.TCP ( HostPreference(Host), serve )
+import Network.Socket (socketToHandle)
+import System.IO (IOMode(ReadMode, WriteMode))
+
 --------------------------------------------------------------------------------
 
 -- entry point of the LSP server
-run :: IO Int
-run =
-  runServer $
-    ServerDefinition
-      { onConfigurationChange = const $ pure $ Right (),
+run :: Bool -> IO Int
+run devMode = if devMode
+                then serve (Host "localhost") "3000" $ \(sock, _remoteAddr) -> do
+                  input <- socketToHandle sock ReadMode
+                  output <- socketToHandle sock WriteMode
+                  _ <- runServerWithHandles input output serverDefn
+                  return ()
+                else runServer serverDefn
+  where
+    serverDefn = ServerDefinition { onConfigurationChange = const $ pure $ Right (),
         doInitialize = \env _req -> pure $ Right env,
         staticHandlers = handlers,
         interpretHandler = \env -> Iso (runLspT env) liftIO,
         options = lspOptions
       }
-  where
+
     lspOptions :: Options
     lspOptions =
       defaultOptions
