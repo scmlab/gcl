@@ -34,21 +34,22 @@ import Syntax.Predicate
     PO (..),
     Spec,
   )
-
 import Network.Simple.TCP ( HostPreference(Host), serve )
 import Network.Socket (socketToHandle)
-import System.IO (IOMode(ReadMode, WriteMode))
+import GHC.IO.IOMode (IOMode(ReadWriteMode))
 
 --------------------------------------------------------------------------------
 
 -- entry point of the LSP server
 run :: Bool -> IO Int
 run devMode = if devMode
-                then serve (Host "localhost") "3000" $ \(sock, _remoteAddr) -> do
-                  input <- socketToHandle sock ReadMode
-                  output <- socketToHandle sock WriteMode
-                  _ <- runServerWithHandles input output serverDefn
-                  return ()
+                then do 
+                  let port = "3000"
+                  serve (Host "localhost") port $ \(sock, _remoteAddr) -> do
+                    putStrLn $ "== dev server up and running on port " ++ port ++ " =="
+                    handle <- socketToHandle sock ReadWriteMode
+                    _ <- runServerWithHandles handle handle serverDefn
+                    putStrLn "== dev server closed =="
                 else runServer serverDefn
   where
     serverDefn = ServerDefinition { onConfigurationChange = const $ pure $ Right (),
