@@ -29,6 +29,7 @@ import Test.Tasty.Golden.Advanced
 import Test.Tasty.HUnit
 import Text.Megaparsec (eof)
 import Prelude hiding (Ordering (..))
+import Syntax.Concrete2 (ToConcrete(toConcrete))
 
 -- | Golden tests for programs 
 tests :: TestTree
@@ -82,7 +83,7 @@ tests =
       let result = LSP.runM $ do 
             tokens <- LSP.scan filePath (toStrict $ LazyText.decodeUtf8 raw)
             program <- LSP.parse Parser.program filePath tokens
-            (pos, _) <- LSP.sweep program
+            (pos, _) <- LSP.sweep $ toConcrete program
             return pos
           render = LazyText.encodeUtf8
                     . renderLazy
@@ -91,4 +92,4 @@ tests =
       in render result
 
     parseProgram :: (FilePath, ByteString) -> Either Error Program
-    parseProgram (filePath, raw) = LSP.runM $ LSP.scan filePath (toStrict $ LazyText.decodeUtf8 raw) >>= LSP.parse Parser.program filePath
+    parseProgram (filePath, raw) = LSP.runM $ LSP.scan filePath (toStrict $ LazyText.decodeUtf8 raw) >>= LSP.parse Parser.program filePath >>= return . toConcrete

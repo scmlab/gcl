@@ -167,7 +167,8 @@ instance Relocatable Type where
 
 -- | Expressions
 data Expr
-  = Lit Lit Loc
+  = Paren Expr Loc
+  | Lit Lit Loc
   | Var Name Loc
   | Const Name Loc
   | Op Op Loc
@@ -178,7 +179,20 @@ data Expr
   | Subst Expr Subst -- internal. Location not necessary?
   deriving (Eq, Show, Generic)
 
+instance Located Expr where
+  locOf (Paren _ l) = l
+  locOf (Var _ l) = l
+  locOf (Const _ l) = l
+  locOf (Lit _ l) = l
+  locOf (Op _ l) = l
+  locOf (App _ _ l) = l
+  locOf (Lam _ _ l) = l
+  locOf (Hole l) = l
+  locOf (Quant _ _ _ _ l) = l
+  locOf (Subst _ _) = NoLoc
+
 instance ToConcrete Expr C.Expr where
+  toConcrete (Paren a _) = toConcrete a
   toConcrete (Lit a l) = C.Lit (toConcrete a) l
   toConcrete (Var a l) = C.Var (toConcrete a) l
   toConcrete (Const a l) = C.Const (toConcrete a) l
@@ -190,6 +204,7 @@ instance ToConcrete Expr C.Expr where
   toConcrete (Subst a b) = C.Subst (toConcrete a) (fmap toConcrete b)
 
 instance Relocatable Expr where
+  reloc l (Paren x _) = Paren x l
   reloc l (Var x _) = Var x l
   reloc l (Const x _) = Const x l
   reloc l (Lit x _) = Lit x l
@@ -302,17 +317,3 @@ variable x = Var (Name x NoLoc) NoLoc
 
 number :: Int -> Expr
 number n = Lit (LitInt n NoLoc) NoLoc
-
---------------------------------------------------------------------------------
-
--- | Instance of Located
-instance Located Expr where
-  locOf (Var _ l) = l
-  locOf (Const _ l) = l
-  locOf (Lit _ l) = l
-  locOf (Op _ l) = l
-  locOf (App _ _ l) = l
-  locOf (Lam _ _ l) = l
-  locOf (Hole l) = l
-  locOf (Quant _ _ _ _ l) = l
-  locOf (Subst _ _) = NoLoc

@@ -300,8 +300,16 @@ expression = makeExprParser term table <?> "expression"
       (op, loc) <- Util.getLoc (operator' <$ symbol tok)
       return $ \x y -> App (App (Op op loc) x (x <--> loc)) y (x <--> y)
 
+    parenExpr :: Parser Expr
+    parenExpr = do 
+      (_, start) <- Util.getLoc (symbol TokParenStart <?> "left parenthesis") 
+      result <- expression
+      (_, end) <- Util.getLoc (symbol TokParenEnd <?> "right parenthesis")
+      let loc = start <--> end 
+      return $ Paren result loc
+
     term :: Parser Expr
-    term = try term' <|> parens expression
+    term = try term' <|> parenExpr
       where
         term' :: Parser Expr
         term' =
@@ -490,8 +498,9 @@ symbol = Util.symbol
 withLoc :: Parser (Loc -> a) -> Parser a
 withLoc = Util.withLoc
 
+
 parens :: Relocatable a => Parser a -> Parser a
-parens =
+parens = 
   Util.between
     (symbol TokParenStart <?> "left parenthesis")
     (symbol TokParenEnd <?> "right parenthesis")
