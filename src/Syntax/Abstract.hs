@@ -15,7 +15,6 @@ import           Data.Text.Lazy                 ( Text
 import           GHC.Generics                   ( Generic )
 import           Prelude                 hiding ( Ordering(..) )
 
-import           Type                           ( )
 import Data.Maybe (fromMaybe)
 import Data.Loc 
 

@@ -13,6 +13,7 @@ import Data.Loc
 import Data.Map (Map)
 import Data.Text.Lazy (Text)
 import GHC.Generics (Generic)
+import Syntax.Common ()
 import Syntax.Abstract
   ( Lit (..),
     Op (..),
