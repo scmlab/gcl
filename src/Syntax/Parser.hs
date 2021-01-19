@@ -63,7 +63,7 @@ parse parser filepath tokenStream =
         getLoc _ = mempty
 
 program :: Parser Program
-program = do 
+program = do
   skipMany (symbol TokNewline)
   withLoc $ do
     decls <- many (declaration <* choice [symbol TokNewline, eof]) <?> "declarations"
@@ -333,25 +333,26 @@ expression = makeExprParser term table <?> "expression"
                 ]
             )
             <?> "term"
-        
+
         -- replace "+", "∧", and "∨" in Quant with "Σ", "∀", and "∃"
-        quantOp :: Parser Expr 
-        quantOp = do 
+        quantOp :: Parser Expr
+        quantOp = do
           op <- term
-          return $ case op of 
-            Op Add  loc -> Op Sum loc
+          return $ case op of
+            Op Add loc -> Op Sum loc
             Op Conj loc -> Op Forall loc
             Op Disj loc -> Op Exists loc
-            others      -> others
-
+            others -> others
 
     literal :: Parser Lit
     literal =
-      choice
-        [ Bol True <$ symbol TokTrue,
-          Bol False <$ symbol TokFalse,
-          Num <$> integer
-        ]
+      withLoc
+        ( choice
+            [ LitBool True <$ symbol TokTrue,
+              LitBool False <$ symbol TokTrue,
+              LitInt <$> integer
+            ]
+        )
         <?> "literal"
 
     operator :: Parser Op

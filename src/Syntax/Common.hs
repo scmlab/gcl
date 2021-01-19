@@ -4,7 +4,6 @@ module Syntax.Common where
 
 import Data.Aeson
 import Data.Loc
-import Data.Vector ((!), fromList)
 import Data.Aeson.Types (Parser)
 
 --------------------------------------------------------------------------------

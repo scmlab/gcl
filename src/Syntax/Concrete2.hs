@@ -1,25 +1,24 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FunctionalDependencies #-}
 
-module Syntax.Concrete2 
+module Syntax.Concrete2
   ( module Syntax.Concrete2,
     Op (..),
-    TBase (..),
-    Lit (..), -- re-exporting from Syntax.Abstract
+    TBase (..), -- re-exporting from Syntax.Abstract
   )
 where
 
-import Data.Aeson
+import Data.Aeson ( FromJSON, ToJSON )
 import Data.Loc
 import Data.Map (Map)
 import Data.Text.Lazy (Text)
 import GHC.Generics (Generic)
 import Syntax.Abstract
-  ( Lit (..),
-    Op (..),
+  ( Op (..),
     TBase (..),
   )
 import qualified Syntax.Concrete as C
+import qualified Syntax.Abstract as A
 import Prelude hiding (Ordering (..))
 
 --------------------------------------------------------------------------------
@@ -101,7 +100,7 @@ data GdCmd = GdCmd Expr [Stmt] Loc deriving (Eq, Show)
 
 instance ToConcrete GdCmd C.GdCmd where
   toConcrete (GdCmd a b l) = C.GdCmd (toConcrete a) (fmap toConcrete b) l
-  
+
 extractAssertion :: Declaration -> Maybe Expr
 extractAssertion (ConstDecl _ _ e _) = e
 extractAssertion (VarDecl _ _ e _) = e
@@ -126,7 +125,7 @@ data Endpoint = Including Expr | Excluding Expr deriving (Eq, Show)
 instance ToConcrete Endpoint C.Endpoint where
   toConcrete (Including a) = C.Including (toConcrete a)
   toConcrete (Excluding a) = C.Excluding (toConcrete a)
-  
+
 instance Located Endpoint where
   locOf (Including e) = locOf e
   locOf (Excluding e) = locOf e
@@ -151,7 +150,7 @@ instance ToConcrete Type C.Type where
   toConcrete (TArray a b l) = C.TArray (toConcrete a) (toConcrete b) l
   toConcrete (TFunc a b l) = C.TFunc (toConcrete a) (toConcrete b) l
   toConcrete (TVar a l) = C.TVar (toConcrete a) l
-  
+
 instance Located Type where
   locOf (TBase _ l) = l
   locOf (TArray _ _ l) = l
@@ -180,7 +179,7 @@ data Expr
   deriving (Eq, Show, Generic)
 
 instance ToConcrete Expr C.Expr where
-  toConcrete (Lit a l) = C.Lit a l
+  toConcrete (Lit a l) = C.Lit (toConcrete a) l
   toConcrete (Var a l) = C.Var (toConcrete a) l
   toConcrete (Const a l) = C.Const (toConcrete a) l
   toConcrete (Op a l) = C.Op a l
@@ -201,8 +200,6 @@ instance Relocatable Expr where
   reloc l (Quant op xs r t _) = Quant op xs r t l
   reloc _ (Subst e s) = Subst e s
 
-
-
 type Subst = Map Text Expr
 
 instance ToJSON Expr
@@ -215,13 +212,30 @@ wrapLam (x : xs) body = Lam x (wrapLam xs body) NoLoc
 
 --------------------------------------------------------------------------------
 
--- | Variables and stuff
+-- | Literals (Integer / Boolean / Character)
+data Lit = LitInt Int Loc | LitBool Bool Loc | LitChar Char Loc
+  deriving (Show, Eq, Generic)
+
+instance ToConcrete Lit A.Lit where
+  toConcrete (LitInt a _) = A.Num a
+  toConcrete (LitBool a _) = A.Bol a
+  toConcrete (LitChar a _) = A.Chr a
+  
+instance Located Lit where
+  locOf (LitInt _ l) = l
+  locOf (LitBool _ l) = l
+  locOf (LitChar _ l) = l
+
+instance ToJSON Lit
+
+instance FromJSON Lit
+
+--------------------------------------------------------------------------------
+
+-- | Names (both UPPER and LOWER cases)
 data Name = Name Text Loc
   deriving (Eq, Show, Generic)
 
-instance ToConcrete Name C.Name where
-  toConcrete (Name a l) = C.Name a l
-  
 instance Located Name where
   locOf (Name _ l) = l
 
@@ -232,12 +246,17 @@ instance FromJSON Name
 instance Ord Name where
   compare (Name a _) (Name b _) = compare a b
 
+-- temp
+instance ToConcrete Name C.Name where
+  toConcrete (Name a l) = C.Name a l
+
 nameToText :: Name -> Text
 nameToText (Name x _) = x
 
 --------------------------------------------------------------------------------
+-- | Smart Constructors
 
--- | Constructors
+-- operators 
 unary :: Op -> Expr -> Expr
 unary op x = App (Op op NoLoc) x NoLoc
 
@@ -254,15 +273,6 @@ conj = binary Conj
 disj = binary Disj
 implies = binary Implies
 
-neg :: Expr -> Expr
-neg = unary Neg
-
-true :: Expr
-true = Lit (Bol True) NoLoc
-
-false :: Expr
-false = Lit (Bol False) NoLoc
-
 conjunct :: [Expr] -> Expr
 conjunct [] = true
 conjunct xs = foldl1 conj xs
@@ -277,6 +287,13 @@ imply p q = App (App (Op Implies NoLoc) p NoLoc) q NoLoc
 predEq :: Expr -> Expr -> Bool
 predEq = (==)
 
+-- literals 
+true :: Expr
+true = Lit (LitBool True NoLoc) NoLoc
+
+false :: Expr
+false = Lit (LitBool False NoLoc) NoLoc
+
 constant :: Text -> Expr
 constant x = Const (Name x NoLoc) NoLoc
 
@@ -284,7 +301,7 @@ variable :: Text -> Expr
 variable x = Var (Name x NoLoc) NoLoc
 
 number :: Int -> Expr
-number n = Lit (Num n) NoLoc
+number n = Lit (LitInt n NoLoc) NoLoc
 
 --------------------------------------------------------------------------------
 
