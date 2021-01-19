@@ -15,6 +15,7 @@ import           Syntax.Concrete
 import           GCL.WP
 
 import           Pretty
+import Syntax.Concrete2 (ToConcrete(toConcrete))
 
 runtst :: String -> IO ()
 runtst filepath = do
@@ -76,4 +77,4 @@ parse
 parse parser filepath = Parser.parse parser filepath
 
 parseProgram :: FilePath -> TokStream -> Either [Parser.SyntacticError] Program
-parseProgram = parse Parser.program
+parseProgram filePath tokStream = toConcrete <$> parse Parser.program filePath tokStream

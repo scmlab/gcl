@@ -1,7 +1,13 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FunctionalDependencies #-}
 
-module Syntax.Concrete2 where
+module Syntax.Concrete2 
+  ( module Syntax.Concrete2,
+    Op (..),
+    TBase (..),
+    Lit (..), -- re-exporting from Syntax.Abstract
+  )
+where
 
 import Data.Aeson
 import Data.Loc
@@ -152,6 +158,12 @@ instance Located Type where
   locOf (TFunc _ _ l) = l
   locOf (TVar _ l) = l
 
+instance Relocatable Type where
+  reloc l (TBase base _) = TBase base l
+  reloc l (TArray i s _) = TArray i s l
+  reloc l (TFunc s t _) = TFunc s t l
+  reloc l (TVar x _) = TVar x l
+
 --------------------------------------------------------------------------------
 
 -- | Expressions
@@ -177,7 +189,20 @@ instance ToConcrete Expr C.Expr where
   toConcrete (Hole l) = C.Hole l
   toConcrete (Quant a b c d l) = C.Quant (toConcrete a) (fmap toConcrete b) (toConcrete c) (toConcrete d) l
   toConcrete (Subst a b) = C.Subst (toConcrete a) (fmap toConcrete b)
-  
+
+instance Relocatable Expr where
+  reloc l (Var x _) = Var x l
+  reloc l (Const x _) = Const x l
+  reloc l (Lit x _) = Lit x l
+  reloc l (App x y _) = App x y l
+  reloc l (Lam x e _) = Lam x e l
+  reloc l (Op x _) = Op x l
+  reloc l (Hole _) = Hole l
+  reloc l (Quant op xs r t _) = Quant op xs r t l
+  reloc _ (Subst e s) = Subst e s
+
+
+
 type Subst = Map Text Expr
 
 instance ToJSON Expr

@@ -8,11 +8,11 @@ import Control.Monad.State (lift)
 import Data.Loc
 import Data.Text.Lazy (Text)
 import Data.Void
-import Syntax.Concrete hiding
+import Syntax.Concrete2 hiding
   ( binary,
     unary,
   )
-import Syntax.ConstExpr
+import Syntax.ConstExpr2
 import Syntax.Location ()
 import Syntax.Parser.Lexer
 import Syntax.Parser.Util
