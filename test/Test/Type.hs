@@ -53,7 +53,9 @@ typeCheckTests :: TestTree
 typeCheckTests = 
   testGroup "Type Check" 
     [
-      typeCheckGolden "2" "./test/source/2.gcl"
+      typeCheckGolden "2" "./test/source/2.gcl",
+      typeCheckGolden "let binding" "./test/source/let.gcl",
+      typeCheckGolden "factor" "./test/source/examples/factor.gcl"
     ]
 
 typeCheckGolden :: String -> FilePath -> TestTree 

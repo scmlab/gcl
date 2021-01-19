@@ -17,6 +17,7 @@ import Syntax.Concrete hiding
   ( Expr (..),
     Lit (..),
     Type (..),
+    TVar
   )
 import qualified Syntax.Concrete as C
 import Syntax.Location (depart)

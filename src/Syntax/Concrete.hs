@@ -105,7 +105,7 @@ data Type
   = TBase TBase Loc
   | TArray Interval Type Loc
   | TFunc Type Type Loc
-  | TVar Name Loc
+  | TVar TVar Loc
   deriving (Eq, Show)
 
 instance Located Type where

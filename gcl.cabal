@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 556ac78b9f54ed91eb19405fb8a107fc1089eb1ec293a7c495db3be4fb87256d
+-- hash: d096e98401a825da689448016bf12f184c4b63d637930dcb3230841a6edb997e
 
 name:           gcl
 version:        0.1.0.0
@@ -27,6 +27,7 @@ library
       GCL.Exec.ExNondet
       GCL.Exec.ExRand
       GCL.Expr
+      GCL.HMConGenType
       GCL.Type
       GCL.WP
       LSP
@@ -62,12 +63,14 @@ library
     , lsp
     , megaparsec >=8.0
     , mtl
+    , multiset
     , parser-combinators
     , prettyprinter
     , random
     , regex-applicative
     , srcloc
     , text
+    , transformers
     , vector
   default-language: Haskell2010
 
@@ -89,12 +92,14 @@ executable gcl
     , lsp
     , megaparsec >=8.0
     , mtl
+    , multiset
     , parser-combinators
     , prettyprinter
     , random
     , regex-applicative
     , srcloc
     , text
+    , transformers
     , vector
   default-language: Haskell2010
 
@@ -113,6 +118,7 @@ test-suite gcl-test
       GCL.Exec.ExNondet
       GCL.Exec.ExRand
       GCL.Expr
+      GCL.HMConGenType
       GCL.Type
       GCL.WP
       LSP
@@ -147,6 +153,7 @@ test-suite gcl-test
     , lsp
     , megaparsec >=8.0
     , mtl
+    , multiset
     , parser-combinators
     , prettyprinter
     , random
@@ -157,5 +164,6 @@ test-suite gcl-test
     , tasty-hunit
     , tasty-quickcheck
     , text
+    , transformers
     , vector
   default-language: Haskell2010
