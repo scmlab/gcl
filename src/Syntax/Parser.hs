@@ -79,6 +79,32 @@ specContent = do
 
 --------------------------------------------------------------------------------
 
+-- | Parser for SepByComma
+sepByComma :: Parser a -> Parser (SepByComma a)
+sepByComma parser = do
+  x <- parser
+
+  let f = return (Head x)
+  let g = do
+        comma <- Util.withLoc (id <$ symbol TokComma <?> "comma")
+        let pos = case comma of
+              NoLoc -> error "NoLoc in sepByComma"
+              Loc p _ -> p
+        xs <- sepByComma parser
+        return $ Comma x pos xs
+  try g <|> f
+
+-- | Parser for EnclosedByBraces
+enclosedByBraces :: Parser a -> Parser (EnclosedByBraces a)
+enclosedByBraces parser = do
+  (x, loc) <- braces parser
+  let (l, m) = case loc of 
+                NoLoc -> error "NoLoc in enclosedByBraces"
+                Loc a b -> (a, b)
+  return $ EnclosedByBraces l x m
+
+--------------------------------------------------------------------------------
+
 -- | Declarations
 declaration :: Parser Declaration
 declaration = choice [constantDecl, variableDecl, letDecl] <?> "declaration"
@@ -92,8 +118,7 @@ constantDecl = withLoc $ do
   vars <- constList
   symbol TokColon <?> "colon"
   t <- type'
-  assertion <- optional (braces predicate)
-
+  assertion <- optional (enclosedByBraces predicate)
   return $ ConstDecl c vars t assertion
 
 variableDecl :: Parser Declaration
@@ -102,7 +127,7 @@ variableDecl = withLoc $ do
   vars <- variableList
   symbol TokColon <?> "colon"
   t <- type'
-  assertion <- optional (braces predicate)
+  assertion <- optional (enclosedByBraces predicate)
   return $ VarDecl v vars t assertion
 
 letDecl :: Parser Declaration
@@ -117,19 +142,6 @@ letDecl = withLoc $ do
 --------------------------------------------------------------------------------
 
 -- | Variables and stuff
-sepByComma :: Parser a -> Parser (SepByComma a)
-sepByComma parser = do
-  x <- parser
-
-  let f = return (Head x)
-  let g = do
-        comma <- Util.withLoc (id <$ symbol TokComma <?> "comma")
-        let pos = case comma of
-              NoLoc -> error "NoLoc in sepByComma"
-              Loc p _ -> p
-        xs <- sepByComma parser
-        return $ Comma x pos xs
-  try g <|> f
 
 -- separated by commas
 constList :: Parser (SepByComma Name)
@@ -171,18 +183,21 @@ abort :: Parser Stmt
 abort = withLoc $ Abort <$ symbol TokAbort
 
 assert :: Parser Stmt
-assert = withLoc $ Assert <$> braces predicate
+assert = do 
+  p <- enclosedByBraces expression
+  return $ Assert p (locOf p)
 
 assertWithBnd :: Parser Stmt
-assertWithBnd =
-  withLoc $
-    braces $
-      LoopInvariant
-        <$> predicate
-        <* (symbol TokComma <?> "comma")
-        <* (symbol TokBnd <?> "bnd")
-        <* (symbol TokColon <?> "colon")
-        <*> expression
+assertWithBnd = do 
+  EnclosedByBraces l (p, e) m <- enclosedByBraces $ do 
+    p <- predicate
+    symbol TokComma <?> "comma"
+    symbol TokBnd <?> "bnd"
+    symbol TokColon <?> "colon"
+    e <- expression
+    return (p, e)
+
+  return $ LoopInvariant p e (l <--> m)
 
 assign :: Parser Stmt
 assign =
@@ -314,9 +329,9 @@ expression = makeExprParser term table <?> "expression"
 
     parensExpr :: Parser Expr
     parensExpr = do
-      (_, start) <- Util.getLoc (symbol TokParenStart <?> "left parenthesis")
+      (_, start) <- Util.getLoc (symbol TokParenStart <?> "opening parenthesis")
       result <- expression
-      (_, end) <- Util.getLoc (symbol TokParenEnd <?> "right parenthesis")
+      (_, end) <- Util.getLoc (symbol TokParenEnd <?> "closing parenthesis")
       let loc = start <--> end
       return $ Paren result loc
 
@@ -346,15 +361,15 @@ expression = makeExprParser term table <?> "expression"
 
         -- quantOp :: Parser Op
         -- quantOp = operator <|> do
-        --                           (_, _start) <- Util.getLoc (symbol TokParenStart <?> "left parenthesis")
+        --                           (_, _start) <- Util.getLoc (symbol TokParenStart <?> "opening parenthesis")
         --                           op <- operator
-        --                           (_, _end) <- Util.getLoc (symbol TokParenEnd <?> "right parenthesis")
+        --                           (_, _end) <- Util.getLoc (symbol TokParenEnd <?> "closing parenthesis")
         --                           return op
         -- choice
         --   [ do
-        --       -- (_, start) <- Util.getLoc (symbol TokParenStart <?> "left parenthesis")
+        --       -- (_, start) <- Util.getLoc (symbol TokParenStart <?> "opening parenthesis")
         --       -- (op, loc) <- Util.getLoc operator
-        --       -- (_, end) <- Util.getLoc (symbol TokParenEnd <?> "right parenthesis")
+        --       -- (_, end) <- Util.getLoc (symbol TokParenEnd <?> "closing parenthesis")
         --       return $ op
         --     -- do
         --     --   op <- term
@@ -459,9 +474,9 @@ type' = ignoreIndentations $ do
 
     parensType :: Parser Type
     parensType = do
-      (_, start) <- Util.getLoc (symbol TokParenStart <?> "left parenthesis")
+      (_, start) <- Util.getLoc (symbol TokParenStart <?> "opening parenthesis")
       result <- type'
-      (_, end) <- Util.getLoc (symbol TokParenEnd <?> "right parenthesis")
+      (_, end) <- Util.getLoc (symbol TokParenEnd <?> "closing parenthesis")
       let loc = start <--> end
       return $ TParen result loc
 
@@ -547,15 +562,17 @@ withLoc = Util.withLoc
 
 parens :: Relocatable a => Parser a -> Parser a
 parens =
-  Util.between
-    (symbol TokParenStart <?> "left parenthesis")
-    (symbol TokParenEnd <?> "right parenthesis")
+  Util.between 
+    (symbol TokParenStart <?> "opening parenthesis")
+    (symbol TokParenEnd <?> "closing parenthesis")
 
-braces :: Parser a -> Parser a
-braces =
-  between
-    (symbol TokBraceStart <?> "left brace")
-    (symbol TokBraceEnd <?> "right brace")
+braces :: Parser a -> Parser (a, Loc)
+braces parser = do 
+  (_, start) <- Util.getLoc (symbol TokBraceStart <?> "opening braces")
+  result <- parser
+  (_, end) <- Util.getLoc (symbol TokBraceEnd <?> "closing braces")
+  let loc = start <--> end
+  return (result, loc)
 
 upperName :: Parser Text
 upperName = extract p

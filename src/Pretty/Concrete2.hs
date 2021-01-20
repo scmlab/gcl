@@ -16,7 +16,12 @@ import Prelude hiding (Ordering (..))
 -- | SepByComma
 instance PrettyWithLoc a => PrettyWithLoc (SepByComma a) where
   prettyWithLoc (Head x) = prettyWithLoc x
-  prettyWithLoc (Comma x p xs) = prettyWithLoc x <> DocWithLoc comma p p <> prettyWithLoc xs
+  prettyWithLoc (Comma x p xs) =
+    prettyWithLoc x <> DocWithLoc comma p p <> prettyWithLoc xs
+
+instance PrettyWithLoc a => PrettyWithLoc (EnclosedByBraces a) where
+  prettyWithLoc (EnclosedByBraces l x m) =
+    DocWithLoc "{" l l <> prettyWithLoc x <> DocWithLoc "}" m m
 
 --------------------------------------------------------------------------------
 
@@ -47,18 +52,14 @@ instance PrettyWithLoc Declaration where
         <> prettyWithLoc names
         <> ": "
         <> prettyWithLoc t
-        <> "{ "
         <> prettyWithLoc p
-        <> " }"
   prettyWithLoc (VarDecl v names t Nothing l) =
     setLoc l $
       fromLocAndDoc v "var" <> prettyWithLoc names <> ": " <> prettyWithLoc t
   prettyWithLoc (VarDecl v names t (Just p) l) =
     setLoc l $
       fromLocAndDoc v "var" <> prettyWithLoc names <> ": " <> prettyWithLoc t
-        <> "{ "
         <> prettyWithLoc p
-        <> " }"
   prettyWithLoc (LetDecl m name args n expr l) =
     setLoc l $
       fromLocAndDoc m "let"
@@ -119,16 +120,15 @@ instance PrettyWithLoc Op where
 --------------------------------------------------------------------------------
 
 -- | Stmt
--- instance Pretty Stmt where
---   pretty = toDoc . prettyWithLoc
+instance Pretty Stmt where
+  pretty = toDoc . prettyWithLoc
+
 instance PrettyWithLoc Stmt where
   prettyWithLoc (Skip l) = setLoc l "skip"
   prettyWithLoc (Abort l) = setLoc l "abort"
   prettyWithLoc (Assign xs es l) =
     setLoc l $ prettyWithLoc xs <> ":= " <> sepBy ", " (map prettyWithLoc es)
-  prettyWithLoc (Assert p l) =
-    setLoc l $
-      "{ " <> prettyWithLoc p <> " }"
+  prettyWithLoc (Assert p l) = prettyWithLoc p
   prettyWithLoc (LoopInvariant p bnd l) =
     setLoc l $
       "{ " <> prettyWithLoc p <> " , bnd: " <> prettyWithLoc bnd <> " }"
@@ -249,8 +249,6 @@ instance PrettyWithLoc Type where
 --------------------------------------------------------------------------------
 
 -- | Interval
--- instance Pretty Interval where
---   pretty = toDoc . prettyWithLoc
 instance PrettyWithLoc Interval where
   prettyWithLoc (Interval (Including a) (Including b) l) =
     setLoc l $

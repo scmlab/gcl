@@ -22,7 +22,7 @@ import Test.Tasty.HUnit
 import Prelude hiding (Ordering (..), lines)
 
 tests :: TestTree
-tests = testGroup "Prettifier" [expression, type', declaration]
+tests = testGroup "Prettifier" [expression, type', declaration, statement]
 
 --------------------------------------------------------------------------------
 
@@ -117,9 +117,28 @@ declaration =
           "var\n\
           \ x \n\
           \   : Int\n", 
-      testCase "variable with properties" $ run "var x : Int { True }",
+      testCase "variable with properties" $ run "var x : Int  {    True \n }",
       testCase "constant" $ run "con X , Z,B, Y : Int",
       testCase "let binding" $ run " let  X   i  =  N  >   (0)  "
     ]
   where
     run = isomorphic Parser.declaration
+
+--------------------------------------------------------------------------------
+
+-- | Statements
+statement :: TestTree
+statement =
+  testGroup "Single statement"
+    [ testCase "abort" $ run "     abort",
+      testCase "skip" $ run "  skip",
+      testCase "assertion" $ run "{ \n True   }",
+      testCase "assignment" $ run "x := 0",
+      testCase "assignment (parallel)" $ run "x, y := 0, 1",
+      testCase "conditional 1" $ run "if True -> skip fi",
+      testCase "conditional 2" $ run "if True -> skip\n | False -> abort fi",
+      testCase "loop invariant" $ run "{ True , bnd: a }",
+      testCase "loop body" $ run "do True -> skip od"
+    ]
+  where
+    run = isomorphic Parser.statement
