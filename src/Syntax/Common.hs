@@ -1,5 +1,5 @@
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Syntax.Common where
 
@@ -39,32 +39,6 @@ instance FromJSON Loc where
 
 --------------------------------------------------------------------------------
 
--- | Operators
-data Op
-   -- binary relations
-  = EQ
-  | NEQ
-  | LTE
-  | GTE
-  | LT
-  | GT
-  -- logic operators
-  | Implies
-  | Conj
-  | Disj
-  -- arithmetics
-  | Neg 
-  | Add
-  | Sub
-  | Mul
-  | Div
-  | Mod 
-   -- For Quant
-  | Sum
-  | Forall
-  | Exists
-  deriving (Show, Eq, Generic)
-
-
-instance ToJSON Op
-instance FromJSON Op
+-- | Fixity & Precedence
+data Fixity = Infix Int | InfixR Int | InfixL Int | Prefix Int | Postfix Int
+  deriving (Show, Eq)

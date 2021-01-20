@@ -3,7 +3,6 @@
 
 module Syntax.Concrete2
   ( module Syntax.Concrete2,
-    Op (..),
     TBase (..), -- re-exporting from Syntax.Abstract
   )
 where
@@ -17,7 +16,7 @@ import Syntax.Abstract
   ( TBase (..),
   )
 import qualified Syntax.Abstract as A
-import Syntax.Common
+import Syntax.Common (Fixity(..))
 import qualified Syntax.Concrete as C
 import Prelude hiding (Ordering (..))
 
@@ -196,7 +195,7 @@ instance ToConcrete Expr C.Expr where
   toConcrete (Lit a l) = C.Lit (toConcrete a) l
   toConcrete (Var a l) = C.Var (toConcrete a) l
   toConcrete (Const a l) = C.Const (toConcrete a) l
-  toConcrete (Op a l) = C.Op a l
+  toConcrete (Op a l) = C.Op (toConcrete a) l
   toConcrete (App a b l) = C.App (toConcrete a) (toConcrete b) l
   toConcrete (Lam a b l) = C.Lam a (toConcrete b) l
   toConcrete (Hole l) = C.Hole l
@@ -267,6 +266,99 @@ instance ToConcrete Name C.Name where
 
 nameToText :: Name -> Text
 nameToText (Name x _) = x
+
+--------------------------------------------------------------------------------
+
+-- | Operators
+data Op
+  = -- binary relations
+    EQ
+  | NEQ
+  | NEQU
+  | LTE
+  | LTEU
+  | GTE
+  | GTEU
+  | LT
+  | GT
+  | -- logic operators
+    Implies
+  | ImpliesU
+  | Conj
+  | ConjU
+  | Disj
+  | DisjU
+  | -- arithmetics
+    Neg
+  | NegU
+  | Add
+  | Sub
+  | Mul
+  | Div
+  | Mod
+  | -- For Quant
+    Sum
+  | Forall
+  | Exists
+  deriving (Show, Eq, Generic)
+
+instance ToConcrete Op C.Op where
+  toConcrete EQ = C.EQ
+  toConcrete NEQ = C.NEQ
+  toConcrete NEQU = C.NEQ
+  toConcrete LTE = C.LTE
+  toConcrete LTEU = C.LTE
+  toConcrete GTE = C.GTE
+  toConcrete GTEU = C.GTE
+  toConcrete LT = C.LT
+  toConcrete GT = C.GT
+  toConcrete Implies = C.Implies
+  toConcrete ImpliesU = C.Implies
+  toConcrete Conj = C.Conj
+  toConcrete ConjU = C.Conj
+  toConcrete Disj = C.Disj
+  toConcrete DisjU = C.Disj
+  toConcrete Neg = C.Neg
+  toConcrete NegU = C.Neg
+  toConcrete Add = C.Add
+  toConcrete Sub = C.Sub
+  toConcrete Mul = C.Mul
+  toConcrete Div = C.Div
+  toConcrete Mod = C.Mod
+  toConcrete Sum = C.Sum
+  toConcrete Forall = C.Forall
+  toConcrete Exists = C.Exists
+
+instance ToJSON Op
+
+instance FromJSON Op
+
+classify :: Op -> Fixity
+classify Implies = InfixR 1
+classify ImpliesU = InfixR 1
+classify Disj = InfixL 2
+classify DisjU = InfixL 2
+classify Conj = InfixL 3
+classify ConjU = InfixL 3
+classify Neg = Prefix 4
+classify NegU = Prefix 4
+classify EQ = Infix 5
+classify NEQ = Infix 6
+classify NEQU = Infix 6
+classify LTE = Infix 6
+classify LTEU = Infix 6
+classify GTE = Infix 6
+classify GTEU = Infix 6
+classify LT = Infix 6
+classify GT = Infix 6
+classify Add = InfixL 7
+classify Sub = InfixL 7
+classify Mul = InfixL 8
+classify Div = InfixL 8
+classify Mod = InfixL 9
+classify Sum = Prefix 5
+classify Exists = Prefix 6
+classify Forall = Prefix 7
 
 --------------------------------------------------------------------------------
 

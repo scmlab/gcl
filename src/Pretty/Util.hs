@@ -95,7 +95,6 @@ parensIf' :: Int -> Int -> DocWithLoc ann -> DocWithLoc ann
 parensIf' n m doc 
   | n > m     = case doc of 
                   DocWithLoc x a b -> DocWithLoc (parens x) (translate (-1) a) (translate 1 b)
-                  -- DocWithLoc x a b -> DocWithLoc (parens x) a b
                   StringLiteral  s -> StringLiteral ("(" <> s <> ")")
   | otherwise = doc
 

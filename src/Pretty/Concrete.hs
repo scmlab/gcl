@@ -7,7 +7,8 @@ import Data.Text.Prettyprint.Doc
 import Pretty.Abstract ()
 import Pretty.Util
 import Pretty.Variadic
-import Syntax.Abstract (Fixity (..), classify)
+import Syntax.Abstract (classify)
+import Syntax.Common (Fixity (..))
 import Syntax.Concrete hiding (GT)
 
 --------------------------------------------------------------------------------
@@ -15,33 +16,44 @@ import Syntax.Concrete hiding (GT)
 -- | Program
 instance Pretty Program where
   pretty = toDoc . prettyWithLoc
+
 instance PrettyWithLoc Program where
-  prettyWithLoc (Program decls _ _ stmts l) = setLoc l $ 
-    mconcat (map prettyWithLoc decls) <> mconcat (map prettyWithLoc stmts)
+  prettyWithLoc (Program decls _ _ stmts l) =
+    setLoc l $
+      mconcat (map prettyWithLoc decls) <> mconcat (map prettyWithLoc stmts)
 
 --------------------------------------------------------------------------------
--- | Declaration
 
+-- | Declaration
 instance Pretty Declaration where
   pretty = toDoc . prettyWithLoc
 
 instance PrettyWithLoc Declaration where
-  prettyWithLoc (ConstDecl names t Nothing l) = setLoc l $
-    "con " <> sepBy ", " (map prettyWithLoc names) <> ": " <> prettyWithLoc t 
-  prettyWithLoc (ConstDecl names t (Just p) l) = setLoc l $
-    "con " <> sepBy ", " (map prettyWithLoc names) <> ": " <> prettyWithLoc t 
-      <> "{ " <> prettyWithLoc p <> " }"
-  prettyWithLoc (VarDecl names t Nothing l) = setLoc l $
-    "var " <> sepBy ", " (map prettyWithLoc names) <> ": " <> prettyWithLoc t 
-  prettyWithLoc (VarDecl names t (Just p) l) = setLoc l $
-    "var " <> sepBy ", " (map prettyWithLoc names) <> ": " <> prettyWithLoc t 
-      <> "{ " <> prettyWithLoc p <> " }"
-  prettyWithLoc (LetDecl name args expr l) = setLoc l $
-    "let " 
-      <> prettyWithLoc name 
-      <> fromDoc (hsep (map pretty args)) 
-      <> " = " 
-      <> prettyWithLoc expr 
+  prettyWithLoc (ConstDecl names t Nothing l) =
+    setLoc l $
+      "con " <> sepBy ", " (map prettyWithLoc names) <> ": " <> prettyWithLoc t
+  prettyWithLoc (ConstDecl names t (Just p) l) =
+    setLoc l $
+      "con " <> sepBy ", " (map prettyWithLoc names) <> ": " <> prettyWithLoc t
+        <> "{ "
+        <> prettyWithLoc p
+        <> " }"
+  prettyWithLoc (VarDecl names t Nothing l) =
+    setLoc l $
+      "var " <> sepBy ", " (map prettyWithLoc names) <> ": " <> prettyWithLoc t
+  prettyWithLoc (VarDecl names t (Just p) l) =
+    setLoc l $
+      "var " <> sepBy ", " (map prettyWithLoc names) <> ": " <> prettyWithLoc t
+        <> "{ "
+        <> prettyWithLoc p
+        <> " }"
+  prettyWithLoc (LetDecl name args expr l) =
+    setLoc l $
+      "let "
+        <> prettyWithLoc name
+        <> fromDoc (hsep (map pretty args))
+        <> " = "
+        <> prettyWithLoc expr
 
 --------------------------------------------------------------------------------
 
@@ -66,12 +78,15 @@ instance PrettyWithLoc Stmt where
       sepBy ", " (map prettyWithLoc xs)
         <> ":= "
         <> sepBy ", " (map prettyWithLoc es)
-  prettyWithLoc (Assert p l) = setLoc l $ 
-    "{ " <> prettyWithLoc p <> " }"
-  prettyWithLoc (LoopInvariant p bnd l) = setLoc l $ 
-    "{ " <> prettyWithLoc p <> " , bnd: " <> prettyWithLoc bnd <> " }"
-  prettyWithLoc (Do gdCmds l) = setLoc l $ 
-    "do " <> sepBy "| " (map prettyWithLoc gdCmds) <> "\nod"
+  prettyWithLoc (Assert p l) =
+    setLoc l $
+      "{ " <> prettyWithLoc p <> " }"
+  prettyWithLoc (LoopInvariant p bnd l) =
+    setLoc l $
+      "{ " <> prettyWithLoc p <> " , bnd: " <> prettyWithLoc bnd <> " }"
+  prettyWithLoc (Do gdCmds l) =
+    setLoc l $
+      "do " <> sepBy "| " (map prettyWithLoc gdCmds) <> "\nod"
   prettyWithLoc (If gdCmds _) =
     "if " <> sepBy "| " (map prettyWithLoc gdCmds) <> "\nfi"
   prettyWithLoc (SpecQM l) = setLoc l "?"
@@ -82,10 +97,11 @@ instance Pretty GdCmd where
   pretty = toDoc . prettyWithLoc
 
 instance PrettyWithLoc GdCmd where
-  prettyWithLoc (GdCmd guard body l) = setLoc l $ 
-    prettyWithLoc guard 
-    <> " ->" 
-    <> mconcat (map prettyWithLoc body)
+  prettyWithLoc (GdCmd guard body l) =
+    setLoc l $
+      prettyWithLoc guard
+        <> " ->"
+        <> mconcat (map prettyWithLoc body)
 
 --------------------------------------------------------------------------------
 
@@ -171,31 +187,35 @@ prettyHole left right loc = case loc of
   Loc start end -> fromLocAndDoc loc $ left <> fillGap (translate 2 start) (translate (-2) end) <> right
 
 --------------------------------------------------------------------------------
--- | Type
 
+-- | Type
 instance Pretty Type where
   pretty = toDoc . prettyWithLoc
 
 instance PrettyWithLoc Type where
-  prettyWithLoc (TBase TInt  l) = setLoc l $ "Int"
+  prettyWithLoc (TBase TInt l) = setLoc l $ "Int"
   prettyWithLoc (TBase TBool l) = setLoc l $ "Bool"
   prettyWithLoc (TBase TChar l) = setLoc l $ "Char"
-  prettyWithLoc (TFunc a b   l) = setLoc l $ prettyWithLoc a <> "→ " <> prettyWithLoc b
-  prettyWithLoc (TArray i b  l) = setLoc l $ "array " <> prettyWithLoc i <> "of " <> prettyWithLoc b
-  prettyWithLoc (TVar i      l) = setLoc l $ "TVar " <> prettyWithLoc i
+  prettyWithLoc (TFunc a b l) = setLoc l $ prettyWithLoc a <> "→ " <> prettyWithLoc b
+  prettyWithLoc (TArray i b l) = setLoc l $ "array " <> prettyWithLoc i <> "of " <> prettyWithLoc b
+  prettyWithLoc (TVar i l) = setLoc l $ "TVar " <> prettyWithLoc i
 
 --------------------------------------------------------------------------------
--- | Interval
 
+-- | Interval
 instance Pretty Interval where
   pretty = toDoc . prettyWithLoc
 
 instance PrettyWithLoc Interval where
-  prettyWithLoc (Interval (Including a) (Including b) l) = setLoc l $ 
-    "[" <> prettyWithLoc a <> ".. " <> prettyWithLoc b <> "]"
-  prettyWithLoc (Interval (Including a) (Excluding b) l) = setLoc l $ 
-    "[" <> prettyWithLoc a <> ".. " <> prettyWithLoc b <> ")"
-  prettyWithLoc (Interval (Excluding a) (Including b) l) = setLoc l $ 
-    "(" <> prettyWithLoc a <> ".. " <> prettyWithLoc b <> "]"
-  prettyWithLoc (Interval (Excluding a) (Excluding b) l) = setLoc l $ 
-    "(" <> prettyWithLoc a <> ".. " <> prettyWithLoc b <> ")"
+  prettyWithLoc (Interval (Including a) (Including b) l) =
+    setLoc l $
+      "[" <> prettyWithLoc a <> ".. " <> prettyWithLoc b <> "]"
+  prettyWithLoc (Interval (Including a) (Excluding b) l) =
+    setLoc l $
+      "[" <> prettyWithLoc a <> ".. " <> prettyWithLoc b <> ")"
+  prettyWithLoc (Interval (Excluding a) (Including b) l) =
+    setLoc l $
+      "(" <> prettyWithLoc a <> ".. " <> prettyWithLoc b <> "]"
+  prettyWithLoc (Interval (Excluding a) (Excluding b) l) =
+    setLoc l $
+      "(" <> prettyWithLoc a <> ".. " <> prettyWithLoc b <> ")"

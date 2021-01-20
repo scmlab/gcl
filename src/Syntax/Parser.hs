@@ -265,22 +265,26 @@ expression = makeExprParser term table <?> "expression"
     table =
       [ [Postfix application],
         [InfixL $ binary Mod TokMod],
-        [InfixL $ binary Mul TokMul, InfixL $ binary Div TokDiv],
-        [InfixL $ binary Add TokAdd, InfixL $ binary Sub TokSub],
+        [ InfixL $ binary Mul TokMul,
+          InfixL $ binary Div TokDiv
+        ],
+        [ InfixL $ binary Add TokAdd,
+          InfixL $ binary Sub TokSub
+        ],
         [ InfixL $ binary NEQ TokNEQ,
-          InfixL $ binary NEQ TokNEQU,
+          InfixL $ binary NEQU TokNEQU,
           InfixL $ binary LT TokLT,
           InfixL $ binary LTE TokLTE,
-          InfixL $ binary LTE TokLTEU,
+          InfixL $ binary LTEU TokLTEU,
           InfixL $ binary GT TokGT,
           InfixL $ binary GTE TokGTE,
-          InfixL $ binary GTE TokGTEU
+          InfixL $ binary GTEU TokGTEU
         ],
         [InfixL $ binary EQ TokEQ],
-        [Prefix $ unary Neg TokNeg, Prefix $ unary Neg TokNegU],
-        [InfixL $ binary Conj TokConj, InfixL $ binary Conj TokConjU],
-        [InfixL $ binary Disj TokDisj, InfixL $ binary Disj TokDisjU],
-        [InfixR $ binary Implies TokImpl, InfixR $ binary Implies TokImplU]
+        [Prefix $ unary Neg TokNeg, Prefix $ unary NegU TokNegU],
+        [InfixL $ binary Conj TokConj, InfixL $ binary ConjU TokConjU],
+        [InfixL $ binary Disj TokDisj, InfixL $ binary DisjU TokDisjU],
+        [InfixR $ binary Implies TokImpl, InfixR $ binary ImpliesU TokImplU]
       ]
 
     application :: Parser (Expr -> Expr)
@@ -301,11 +305,11 @@ expression = makeExprParser term table <?> "expression"
       return $ \x y -> App (App (Op op loc) x (x <--> loc)) y (x <--> y)
 
     parensExpr :: Parser Expr
-    parensExpr = do 
-      (_, start) <- Util.getLoc (symbol TokParenStart <?> "left parenthesis") 
+    parensExpr = do
+      (_, start) <- Util.getLoc (symbol TokParenStart <?> "left parenthesis")
       result <- expression
       (_, end) <- Util.getLoc (symbol TokParenEnd <?> "right parenthesis")
-      let loc = start <--> end 
+      let loc = start <--> end
       return $ Paren result loc
 
     term :: Parser Expr
@@ -498,9 +502,8 @@ symbol = Util.symbol
 withLoc :: Parser (Loc -> a) -> Parser a
 withLoc = Util.withLoc
 
-
 parens :: Relocatable a => Parser a -> Parser a
-parens = 
+parens =
   Util.between
     (symbol TokParenStart <?> "left parenthesis")
     (symbol TokParenEnd <?> "right parenthesis")
