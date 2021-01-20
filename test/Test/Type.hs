@@ -13,13 +13,14 @@ import Data.Text.Prettyprint.Doc.Internal
 import Data.Text.Prettyprint.Doc.Render.Text
 import GCL.Type
 import LSP
-import Syntax.Abstract
+import Syntax.Concrete
 import Test.Tasty
 import Test.Tasty.Golden
 import Test.Tasty.Golden.Advanced
 import Test.Tasty.HUnit
 
 tests :: TestTree
+-- tests = testGroup "Type" [unifyTests]
 tests = testGroup "Type" [unifyTests, typeCheckTests]
 
 
@@ -29,33 +30,21 @@ unifyTests =
     "unify" 
     [ 
       testCase "TBase 1" $ 
-        mapM_ (\t -> actual t t @?= Right t) [TBase TInt, TBase TBool, TBase TChar],
+        mapM_ (\t -> actual t t @?= Right emptySubstT) [TBase TInt NoLoc, TBase TBool NoLoc, TBase TChar NoLoc],
       testCase "TBase 2" $
-        mapM_ (\(t1, t2) -> actual t1 t2 @?= Left (UnifyFailed t1 t2 NoLoc)) [(TBase TInt, TBase TBool), (TBase TInt, TBase TChar), (TBase TBool, TBase TChar)],
-      testCase "TFunc 1" $
-        actual' [("x", TBase TInt), ("y", TBase TBool)] (TFunc (TBase TInt) (TBase TBool)) (TFunc (TVar "x") (TVar "y")) @?= Right (TFunc (TBase TInt) (TBase TBool)),
-      testCase "TVar 1" $
-        actual (TVar "x") (TVar "y") @?= Right (TVar "y"),
-      testCase "TVar 2" $
-        actual' [("x", TBase TInt)] (TVar "x") (TBase TInt) @?= Right (TBase TInt)
+        mapM_ (\(t1, t2) -> actual t1 t2 @?= Left (UnifyFailed t1 t2 NoLoc)) [(TBase TInt NoLoc, TBase TBool NoLoc), (TBase TInt NoLoc, TBase TChar NoLoc), (TBase TBool NoLoc, TBase TChar NoLoc)]
     ]
 
-actual :: Type -> Type -> Either TypeError Type
-actual t1 t2 = runTM $ unify NoLoc t1 t2
-
-actual' :: SubstT -> Type -> Type -> Either TypeError Type 
-actual' sub t1 t2 = runTM $ do
-  (theta, i) <- get
-  put (sub ++ theta, i)
-  unify NoLoc t1 t2
+actual :: Type -> Type -> Either TypeError SubstT
+actual t1 t2 = runSolver [(t1, t2)]
 
 typeCheckTests :: TestTree
 typeCheckTests = 
   testGroup "Type Check" 
     [
-      typeCheckGolden "2" "./test/source/2.gcl",
-      typeCheckGolden "let binding" "./test/source/let.gcl",
-      typeCheckGolden "factor" "./test/source/examples/factor.gcl"
+      typeCheckGolden "2" "./test/source/2.gcl"
+--       typeCheckGolden "let binding" "./test/source/let.gcl",
+--       typeCheckGolden "factor" "./test/source/examples/factor.gcl"
     ]
 
 typeCheckGolden :: String -> FilePath -> TestTree 
@@ -72,12 +61,10 @@ typeCheckGolden name filePath =
 typeCheck :: (FilePath, Text) -> Text
 typeCheck (filepath, source) = renderStrict . layoutCompact . pretty $ result
   where 
-    result = runTM $ do
+    result = 
       case runM (parseProgram filepath source) of
-        Left err -> return Nothing
-        Right prog -> Just <$> checkProg prog
-          -- (theta, i) <- get
-          -- return (Just (theta, i))
+        Left err -> return ()
+        Right prog -> checkProg prog
 
 compareAndReport :: (FilePath, Text) -> (FilePath, Text) -> IO (Maybe String)
 compareAndReport (expectedPath, expectedRes) (actualPath, actualRaw) = do

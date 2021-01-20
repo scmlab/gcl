@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: d096e98401a825da689448016bf12f184c4b63d637930dcb3230841a6edb997e
+-- hash: aca216c3566dc97bfabc52c8d1c7c8cc8dac0f0f5942431ce357286c9037f450
 
 name:           gcl
 version:        0.1.0.0
@@ -27,7 +27,6 @@ library
       GCL.Exec.ExNondet
       GCL.Exec.ExRand
       GCL.Expr
-      GCL.HMConGenType
       GCL.Type
       GCL.WP
       LSP
@@ -118,7 +117,6 @@ test-suite gcl-test
       GCL.Exec.ExNondet
       GCL.Exec.ExRand
       GCL.Expr
-      GCL.HMConGenType
       GCL.Type
       GCL.WP
       LSP
