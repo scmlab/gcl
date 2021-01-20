@@ -24,7 +24,7 @@ tests = testGroup "WP 1" [emptyProg, statements, issues]
 run :: Text -> Either Error ([PO], [Spec])
 run text = LSP.runM $ do 
   (pos, specs) <- LSP.parseProgram "<test>" text >>= LSP.sweep
-  return (map toNoLoc pos, map toNoLoc specs)            
+  return (pos, specs)            
 
 --------------------------------------------------------------------------------
 

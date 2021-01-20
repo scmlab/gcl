@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Pretty.Concrete2 where
@@ -19,9 +20,13 @@ instance PrettyWithLoc a => PrettyWithLoc (SepByComma a) where
   prettyWithLoc (Comma x p xs) =
     prettyWithLoc x <> DocWithLoc comma p p <> prettyWithLoc xs
 
-instance PrettyWithLoc a => PrettyWithLoc (EnclosedByBraces a) where
-  prettyWithLoc (EnclosedByBraces l x m) =
+instance PrettyWithLoc a => PrettyWithLoc (EnclosedBy Braces a) where
+  prettyWithLoc (EnclosedBy l x m) =
     DocWithLoc "{" l l <> prettyWithLoc x <> DocWithLoc "}" m m
+
+instance PrettyWithLoc a => PrettyWithLoc (EnclosedBy Parens a) where
+  prettyWithLoc (EnclosedBy l x m) =
+    DocWithLoc "(" l l <> prettyWithLoc x <> DocWithLoc ")" m m
 
 --------------------------------------------------------------------------------
 
@@ -128,7 +133,7 @@ instance PrettyWithLoc Stmt where
   prettyWithLoc (Abort l) = setLoc l "abort"
   prettyWithLoc (Assign xs es l) =
     setLoc l $ prettyWithLoc xs <> ":= " <> sepBy ", " (map prettyWithLoc es)
-  prettyWithLoc (Assert p l) = prettyWithLoc p
+  prettyWithLoc (Assert p) = prettyWithLoc p
   prettyWithLoc (LoopInvariant p bnd l) =
     setLoc l $
       "{ " <> prettyWithLoc p <> " , bnd: " <> prettyWithLoc bnd <> " }"
@@ -230,9 +235,8 @@ instance Pretty Type where
   pretty = toDoc . prettyWithLoc
 
 instance PrettyWithLoc Type where
-  prettyWithLoc (TParen _ NoLoc) = error "NoLoc in Type.TParen"
-  prettyWithLoc (TParen t (Loc l m)) =
-    DocWithLoc "(" l l <> prettyWithLoc t <> DocWithLoc ")" m m
+  prettyWithLoc (TParen t) = prettyWithLoc t
+    -- DocWithLoc "(" l l <> prettyWithLoc t <> DocWithLoc ")" m m
   prettyWithLoc (TBase TInt l) = setLoc l "Int"
   prettyWithLoc (TBase TBool l) = setLoc l "Bool"
   prettyWithLoc (TBase TChar l) = setLoc l "Char"

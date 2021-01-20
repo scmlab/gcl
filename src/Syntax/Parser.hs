@@ -94,14 +94,23 @@ sepByComma parser = do
         return $ Comma x pos xs
   try g <|> f
 
--- | Parser for EnclosedByBraces
-enclosedByBraces :: Parser a -> Parser (EnclosedByBraces a)
+-- | Parser for EnclosedBy Braces
+enclosedByBraces :: Parser a -> Parser (EnclosedBy Braces a)
 enclosedByBraces parser = do
   (x, loc) <- braces parser
   let (l, m) = case loc of 
                 NoLoc -> error "NoLoc in enclosedByBraces"
                 Loc a b -> (a, b)
-  return $ EnclosedByBraces l x m
+  return $ EnclosedBy l x m
+
+-- | Parser for EnclosedBy Parens
+enclosedByParens :: Parser a -> Parser (EnclosedBy Parens a)
+enclosedByParens parser = do
+  (x, loc) <- parens parser
+  let (l, m) = case loc of 
+                NoLoc -> error "NoLoc in enclosedByParens"
+                Loc a b -> (a, b)
+  return $ EnclosedBy l x m
 
 --------------------------------------------------------------------------------
 
@@ -183,13 +192,11 @@ abort :: Parser Stmt
 abort = withLoc $ Abort <$ symbol TokAbort
 
 assert :: Parser Stmt
-assert = do 
-  p <- enclosedByBraces expression
-  return $ Assert p (locOf p)
+assert = Assert <$> enclosedByBraces expression
 
 assertWithBnd :: Parser Stmt
 assertWithBnd = do 
-  EnclosedByBraces l (p, e) m <- enclosedByBraces $ do 
+  EnclosedBy l (p, e) m <- enclosedByBraces $ do 
     p <- predicate
     symbol TokComma <?> "comma"
     symbol TokBnd <?> "bnd"
@@ -473,12 +480,7 @@ type' = ignoreIndentations $ do
       parensType <|> array <|> base <?> "type term"
 
     parensType :: Parser Type
-    parensType = do
-      (_, start) <- Util.getLoc (symbol TokParenStart <?> "opening parenthesis")
-      result <- type'
-      (_, end) <- Util.getLoc (symbol TokParenEnd <?> "closing parenthesis")
-      let loc = start <--> end
-      return $ TParen result loc
+    parensType = TParen <$> enclosedByParens type'
 
     base :: Parser Type
     base = do
@@ -560,11 +562,13 @@ symbol = Util.symbol
 withLoc :: Parser (Loc -> a) -> Parser a
 withLoc = Util.withLoc
 
-parens :: Relocatable a => Parser a -> Parser a
-parens =
-  Util.between 
-    (symbol TokParenStart <?> "opening parenthesis")
-    (symbol TokParenEnd <?> "closing parenthesis")
+parens :: Parser a -> Parser (a, Loc)
+parens parser = do 
+  (_, start) <- Util.getLoc (symbol TokParenStart <?> "opening parenthesis")
+  result <- parser
+  (_, end) <- Util.getLoc (symbol TokParenEnd <?> "closing parenthesis")
+  let loc = start <--> end
+  return (result, loc)
 
 braces :: Parser a -> Parser (a, Loc)
 braces parser = do 

@@ -10,7 +10,6 @@ module Syntax.Parser.Util
   , ignore
   , ignoreP
   , extract
-  , between
   )
 where
 
@@ -143,17 +142,3 @@ extract f = do
   p (L loc tok') = case f tok' of
     Just result -> Just (result, tok', loc)
     Nothing     -> Nothing
-
--- Adjust source location of the result from the given parser to include the enclosing tokens
-between
-  :: (Ord tok, Show tok, PrettyToken tok, Relocatable a)
-  => P tok b
-  -> P tok c
-  -> P tok a
-  -> P tok a
-between left right p = do
-  (_, start) <- getLoc left
-  result     <- p
-  (_, end)   <- getLoc right
-  let newLoc = start <--> end
-  return $ reloc newLoc result

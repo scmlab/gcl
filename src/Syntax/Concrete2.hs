@@ -39,14 +39,17 @@ fromSepByComma (Head a) = [a]
 fromSepByComma (Comma a _ as) = a : fromSepByComma as
 
 -- | Something enclosed by a pair of curly braces
-data EnclosedByBraces a = EnclosedByBraces Pos a Pos 
+data EnclosedBy b a = EnclosedBy Pos a Pos 
   deriving (Eq, Show)
 
-instance Located (EnclosedByBraces a) where 
-  locOf (EnclosedByBraces l _ m) = l <--> m
+instance Located (EnclosedBy b a) where 
+  locOf (EnclosedBy l _ m) = l <--> m
 
-fromEnclosedByBraces :: EnclosedByBraces a -> a 
-fromEnclosedByBraces (EnclosedByBraces _ a _) = a
+fromEnclosedBy :: EnclosedBy b a -> a 
+fromEnclosedBy (EnclosedBy _ a _) = a
+
+data Braces 
+data Parens 
 
 --------------------------------------------------------------------------------
 
@@ -71,21 +74,21 @@ instance Located Program where
 type Defns = Map Text Expr
 
 data Declaration
-  = ConstDecl Loc (SepByComma Name) Type (Maybe (EnclosedByBraces Expr)) Loc
-  | VarDecl Loc (SepByComma Name) Type (Maybe (EnclosedByBraces Expr)) Loc
+  = ConstDecl Loc (SepByComma Name) Type (Maybe (EnclosedBy Braces Expr)) Loc
+  | VarDecl Loc (SepByComma Name) Type (Maybe (EnclosedBy Braces Expr)) Loc
   | LetDecl Loc Name [Name] Loc Expr Loc
   deriving (Eq, Show)
 
 instance ToConcrete Declaration C.Declaration where
-  toConcrete (ConstDecl _ a b c l) = C.ConstDecl (toConcrete <$> fromSepByComma a) (toConcrete b) (fmap (toConcrete . fromEnclosedByBraces) c) l
-  toConcrete (VarDecl _ a b c l) = C.VarDecl (toConcrete <$> fromSepByComma a) (toConcrete b) (fmap (toConcrete . fromEnclosedByBraces) c) l
+  toConcrete (ConstDecl _ a b c l) = C.ConstDecl (toConcrete <$> fromSepByComma a) (toConcrete b) (fmap (toConcrete . fromEnclosedBy) c) l
+  toConcrete (VarDecl _ a b c l) = C.VarDecl (toConcrete <$> fromSepByComma a) (toConcrete b) (fmap (toConcrete . fromEnclosedBy) c) l
   toConcrete (LetDecl _ a b _ c l) = C.LetDecl (toConcrete a) (fmap nameToText b) (toConcrete c) l
 
 data Stmt
   = Skip Loc
   | Abort Loc
   | Assign (SepByComma Name) [Expr] Loc
-  | Assert (EnclosedByBraces Expr) Loc
+  | Assert (EnclosedBy Braces Expr)
   | LoopInvariant Expr Expr Loc
   | Do [GdCmd] Loc
   | If [GdCmd] Loc
@@ -98,7 +101,7 @@ instance ToConcrete Stmt C.Stmt where
   toConcrete (Skip l) = C.Skip l
   toConcrete (Abort l) = C.Abort l
   toConcrete (Assign a b l) = C.Assign (toConcrete <$> fromSepByComma a) (fmap toConcrete b) l
-  toConcrete (Assert a l) = C.Assert (toConcrete $ fromEnclosedByBraces a) l
+  toConcrete (Assert a) = C.Assert (toConcrete $ fromEnclosedBy a) (locOf a)
   toConcrete (LoopInvariant a b l) = C.LoopInvariant (toConcrete a) (toConcrete b) l
   toConcrete (Do a l) = C.Do (fmap toConcrete a) l
   toConcrete (If a l) = C.If (fmap toConcrete a) l
@@ -110,7 +113,7 @@ instance Located Stmt where
   locOf (Skip l) = l
   locOf (Abort l) = l
   locOf (Assign _ _ l) = l
-  locOf (Assert _ l) = l
+  locOf (Assert x) = locOf x
   locOf (LoopInvariant _ _ l) = l
   locOf (Do _ l) = l
   locOf (If _ l) = l
@@ -124,8 +127,8 @@ instance ToConcrete GdCmd C.GdCmd where
   toConcrete (GdCmd a b l) = C.GdCmd (toConcrete a) (fmap toConcrete b) l
 
 extractAssertion :: Declaration -> Maybe Expr
-extractAssertion (ConstDecl _ _ _ e _) = fromEnclosedByBraces <$> e
-extractAssertion (VarDecl _ _ _ e _) = fromEnclosedByBraces <$> e
+extractAssertion (ConstDecl _ _ _ e _) = fromEnclosedBy <$> e
+extractAssertion (VarDecl _ _ _ e _) = fromEnclosedBy <$> e
 extractAssertion LetDecl {} = Nothing
 
 extractLetBinding :: Declaration -> Maybe (Text, Expr)
@@ -161,7 +164,7 @@ instance Located Interval where
   locOf (Interval _ _ l) = l
 
 data Type
-  = TParen Type Loc
+  = TParen (EnclosedBy Parens Type)
   | TBase TBase Loc
   | TArray Interval Type Loc
   | TFunc Type (Bool, Loc) Type Loc
@@ -169,21 +172,21 @@ data Type
   deriving (Eq, Show)
 
 instance ToConcrete Type C.Type where
-  toConcrete (TParen a _) = toConcrete a
+  toConcrete (TParen a) = toConcrete (fromEnclosedBy a)
   toConcrete (TBase a l) = C.TBase a l
   toConcrete (TArray a b l) = C.TArray (toConcrete a) (toConcrete b) l
   toConcrete (TFunc a _ b l) = C.TFunc (toConcrete a) (toConcrete b) l
   toConcrete (TVar a l) = C.TVar (toConcrete a) l
 
 instance Located Type where
-  locOf (TParen _ l) = l
+  locOf (TParen x) = locOf x
   locOf (TBase _ l) = l
   locOf (TArray _ _ l) = l
   locOf (TFunc _ _ _ l) = l
   locOf (TVar _ l) = l
 
 instance Relocatable Type where
-  reloc l (TParen a _) = TParen a l
+  reloc l (TParen a) = undefined
   reloc l (TBase base _) = TBase base l
   reloc l (TArray i s _) = TArray i s l
   reloc l (TFunc s b t _) = TFunc s b t l
