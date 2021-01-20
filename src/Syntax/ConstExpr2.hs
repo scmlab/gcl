@@ -19,8 +19,8 @@ constExpr _     (Const _ _  ) = True
 constExpr _     (Op    _ _  ) = True
 constExpr bvars (App e1 e2 _) = constExpr bvars e1 && constExpr bvars e2
 constExpr bvars (Lam x  e  _) = constExpr (x : bvars) e
-constExpr _     (Hole _     ) = True  --- is this right?
-constExpr bvars (Quant op bvs range body _) =
+-- constExpr _     (Hole _     ) = True  --- is this right?
+constExpr bvars (Quant _ op bvs _ range _ body _ _) =
   constExpr bvars op
     && constExpr (bvs' ++ bvars) range
     && constExpr (bvs' ++ bvars) body

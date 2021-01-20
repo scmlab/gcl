@@ -16,7 +16,7 @@ import Syntax.Abstract
   ( TBase (..),
   )
 import qualified Syntax.Abstract as A
-import Syntax.Common (Fixity(..))
+import Syntax.Common
 import qualified Syntax.Concrete as C
 import Prelude hiding (Ordering (..))
 
@@ -173,8 +173,7 @@ data Expr
   | Op Op Loc
   | App Expr Expr Loc
   | Lam Text Expr Loc
-  | Hole Loc
-  | Quant Expr [Name] Expr Expr Loc
+  | Quant (Bool, Loc) Expr [Name] Loc Expr Loc Expr (Bool, Loc) Loc
   | Subst Expr Subst -- internal. Location not necessary?
   deriving (Eq, Show, Generic)
 
@@ -186,8 +185,8 @@ instance Located Expr where
   locOf (Op _ l) = l
   locOf (App _ _ l) = l
   locOf (Lam _ _ l) = l
-  locOf (Hole l) = l
-  locOf (Quant _ _ _ _ l) = l
+  -- locOf (Hole l) = l
+  locOf (Quant _ _ _ _ _ _ _ _ l) = l
   locOf (Subst _ _) = NoLoc
 
 instance ToConcrete Expr C.Expr where
@@ -198,8 +197,8 @@ instance ToConcrete Expr C.Expr where
   toConcrete (Op a l) = C.Op (toConcrete a) l
   toConcrete (App a b l) = C.App (toConcrete a) (toConcrete b) l
   toConcrete (Lam a b l) = C.Lam a (toConcrete b) l
-  toConcrete (Hole l) = C.Hole l
-  toConcrete (Quant a b c d l) = C.Quant (toConcrete a) (fmap toConcrete b) (toConcrete c) (toConcrete d) l
+  -- toConcrete (Hole l) = C.Hole l
+  toConcrete (Quant _ a b _ c _ d _ l) = C.Quant (toConcrete a) (fmap toConcrete b) (toConcrete c) (toConcrete d) l
   toConcrete (Subst a b) = C.Subst (toConcrete a) (fmap toConcrete b)
 
 instance Relocatable Expr where
@@ -210,8 +209,8 @@ instance Relocatable Expr where
   reloc l (App x y _) = App x y l
   reloc l (Lam x e _) = Lam x e l
   reloc l (Op x _) = Op x l
-  reloc l (Hole _) = Hole l
-  reloc l (Quant op xs r t _) = Quant op xs r t l
+  -- reloc l (Hole _) = Hole l
+  reloc l (Quant a op xs b r c t d _) = Quant a op xs b r c t d l
   reloc _ (Subst e s) = Subst e s
 
 type Subst = Map Text Expr

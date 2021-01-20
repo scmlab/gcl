@@ -42,3 +42,15 @@ instance FromJSON Loc where
 -- | Fixity & Precedence
 data Fixity = Infix Int | InfixR Int | InfixL Int | Prefix Int | Postfix Int
   deriving (Show, Eq)
+
+-- --------------------------------------------------------------------------------
+
+-- -- | For annotating the usage of unicode symbols in some constructs
+
+-- type UseUnicodeSymbol = Bool
+
+-- useUnicodeSymbol :: UseUnicodeSymbol
+-- useUnicodeSymbol = True 
+
+-- usePlainSymbol :: UseUnicodeSymbol
+-- usePlainSymbol = False

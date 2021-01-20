@@ -1,3 +1,4 @@
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Syntax.Parser where
@@ -14,6 +15,7 @@ import Syntax.Concrete2 hiding
   )
 import Syntax.ConstExpr2
 import Syntax.Location ()
+import Syntax.Common hiding (Fixity(..))
 import Syntax.Parser.Lexer
 import Syntax.Parser.Util
   ( PosLog,
@@ -324,24 +326,14 @@ expression = makeExprParser term table <?> "expression"
                   Lit <$> literal,
                   Op <$ symbol TokParenStart <*> operator <* symbol TokParenEnd,
                   Quant
-                    <$ symbol TokQuantStart
+                    <$> quantStart
                     <*> quantOp
                     <*> some lower
-                    <* symbol TokColon
+                    <*> withLoc (id <$ symbol TokColon)
                     <*> expression
-                    <* symbol TokColon
+                    <*> withLoc (id <$ symbol TokColon)
                     <*> expression
-                    <* symbol TokQuantEnd,
-                  Quant
-                    <$ symbol TokQuantStartU
-                    <*> quantOp
-                    <*> some lower
-                    <* symbol TokColon
-                    <*> expression
-                    <* symbol TokColon
-                    <*> expression
-                    <* symbol TokQuantEndU,
-                  Hole <$ symbol TokQM
+                    <*> quantEnd
                 ]
             )
             <?> "term"
@@ -356,12 +348,24 @@ expression = makeExprParser term table <?> "expression"
             Op Disj loc -> Op Exists loc
             others -> others
 
+        quantStart :: Parser (Bool, Loc) 
+        quantStart = withLoc $ choice 
+          [ (True,) <$ symbol TokQuantStartU
+          , (False,) <$ symbol TokQuantStart
+          ]
+            
+        quantEnd :: Parser (Bool, Loc) 
+        quantEnd = withLoc $ choice 
+          [ (True,) <$ symbol TokQuantEndU
+          , (False,) <$ symbol TokQuantEnd
+          ]
+
     literal :: Parser Lit
     literal =
       withLoc
         ( choice
             [ LitBool True <$ symbol TokTrue,
-              LitBool False <$ symbol TokTrue,
+              LitBool False <$ symbol TokFalse,
               LitInt <$> integer
             ]
         )
@@ -372,21 +376,21 @@ expression = makeExprParser term table <?> "expression"
       choice
         [ EQ <$ symbol TokEQ,
           NEQ <$ symbol TokNEQ,
-          NEQ <$ symbol TokNEQU,
+          NEQU <$ symbol TokNEQU,
           LTE <$ symbol TokLTE,
-          LTE <$ symbol TokLTEU,
+          LTEU <$ symbol TokLTEU,
           GTE <$ symbol TokGTE,
-          GTE <$ symbol TokGTEU,
+          GTEU <$ symbol TokGTEU,
           LT <$ symbol TokLT,
           GT <$ symbol TokGT,
           Implies <$ symbol TokImpl,
-          Implies <$ symbol TokImplU,
+          ImpliesU <$ symbol TokImplU,
           Conj <$ symbol TokConj,
-          Conj <$ symbol TokConjU,
+          ConjU <$ symbol TokConjU,
           Disj <$ symbol TokDisj,
-          Disj <$ symbol TokDisjU,
+          DisjU <$ symbol TokDisjU,
           Neg <$ symbol TokNeg,
-          Neg <$ symbol TokNegU,
+          NegU <$ symbol TokNegU,
           Add <$ symbol TokAdd,
           Sub <$ symbol TokSub,
           Mul <$ symbol TokMul,

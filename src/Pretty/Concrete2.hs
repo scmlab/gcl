@@ -8,8 +8,8 @@ import Pretty.Abstract ()
 import Pretty.Util
 import Pretty.Variadic
 import Syntax.Common (Fixity (..))
-import Syntax.Concrete2 
-import Prelude hiding (Ordering(..))
+import Syntax.Concrete2
+import Prelude hiding (Ordering (..))
 
 --------------------------------------------------------------------------------
 
@@ -27,7 +27,6 @@ instance PrettyWithLoc Program where
 -- | Declaration
 -- instance Pretty Declaration where
 --   pretty = toDoc . prettyWithLoc
-
 instance PrettyWithLoc Declaration where
   prettyWithLoc (ConstDecl names t Nothing l) =
     setLoc l $
@@ -60,7 +59,6 @@ instance PrettyWithLoc Declaration where
 -- | Name
 -- instance Pretty Name where
 --   pretty = toDoc . prettyWithLoc
-
 instance PrettyWithLoc Name where
   prettyWithLoc (Name n l) = fromLocAndDoc l (pretty n)
 
@@ -69,7 +67,6 @@ instance PrettyWithLoc Name where
 -- | Literals
 -- instance Pretty Lit where
 --   pretty = toDoc . prettyWithLoc
-
 instance PrettyWithLoc Lit where
   prettyWithLoc (LitBool True l) = fromLocAndDoc l "True"
   prettyWithLoc (LitBool False l) = fromLocAndDoc l "False"
@@ -79,11 +76,10 @@ instance PrettyWithLoc Lit where
 --------------------------------------------------------------------------------
 
 -- | Operators
-
 instance Pretty Op where
   pretty EQ = "="
-  pretty NEQ = "≠"
-  pretty NEQU = "/="
+  pretty NEQ = "/="
+  pretty NEQU = "≠"
   pretty LTE = "<="
   pretty LTEU = "≤"
   pretty GTE = ">="
@@ -106,7 +102,6 @@ instance Pretty Op where
   pretty Sum = "Σ"
   pretty Forall = "∀"
   pretty Exists = "∃"
-
 
 -- data Op
 --   = -- binary relations
@@ -132,13 +127,11 @@ instance Pretty Op where
 --   | Forall
 --   | Exists
 
-
 --------------------------------------------------------------------------------
 
 -- | Stmt
 -- instance Pretty Stmt where
 --   pretty = toDoc . prettyWithLoc
-
 instance PrettyWithLoc Stmt where
   prettyWithLoc (Skip l) = setLoc l "skip"
   prettyWithLoc (Abort l) = setLoc l "abort"
@@ -196,18 +189,17 @@ handleExpr (App p q _) = case handleExpr p of
     t <- handleExpr q
     return $ s <> t
 handleExpr (Lam p q l) = return $ setLoc l $ "λ " <> fromLocAndDoc NoLoc (pretty p) <> " → " <> prettyWithLoc q
-handleExpr (Hole l) = return $ prettyHole "{!" "!}" l
-handleExpr (Quant op xs r t l) =
+handleExpr (Quant (s, l) op xs m r n t (e, o) p) =
   return $
-    setLoc l $
-      "⟨"
+    setLoc p $
+      fromLocAndDoc l (if s then "⟨" else "<|")
         <> prettyWithLoc op
         <> mconcat (map prettyWithLoc xs)
-        <> " : "
+        <> fromLocAndDoc m ":"
         <> prettyWithLoc r
-        <> " : "
+        <> fromLocAndDoc n ":"
         <> prettyWithLoc t
-        <> " ⟩"
+        <> fromLocAndDoc o (if e then "⟩" else "|>")
 handleExpr (Subst _ _) = return "Subst"
 
 handleOp :: Op -> Loc -> Variadic Expr (DocWithLoc ann)
@@ -251,7 +243,6 @@ prettyHole left right loc = case loc of
 -- | Type
 -- instance Pretty Type where
 --   pretty = toDoc . prettyWithLoc
-
 instance PrettyWithLoc Type where
   prettyWithLoc (TBase TInt l) = setLoc l $ "Int"
   prettyWithLoc (TBase TBool l) = setLoc l $ "Bool"
@@ -265,7 +256,6 @@ instance PrettyWithLoc Type where
 -- | Interval
 -- instance Pretty Interval where
 --   pretty = toDoc . prettyWithLoc
-
 instance PrettyWithLoc Interval where
   prettyWithLoc (Interval (Including a) (Including b) l) =
     setLoc l $
