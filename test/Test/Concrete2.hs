@@ -22,7 +22,7 @@ import Test.Tasty.HUnit
 import Prelude hiding (Ordering (..), lines)
 
 tests :: TestTree
-tests = testGroup "Prettifier" [expression]
+tests = testGroup "Prettifier" [expression, type']
 
 --------------------------------------------------------------------------------
 
@@ -81,3 +81,26 @@ expression =
     ]
   where
     run = isomorphic Parser.expression
+
+--------------------------------------------------------------------------------
+
+-- | Type
+type' :: TestTree
+type' =
+  testGroup
+    "Types"
+    [ testCase "base types (Int)" $ run "Int",
+      testCase "base types (Bool)" $ run "  ((Bool))",
+      testCase "base types (Char)" $ run "Char",
+      testCase "function types 1" $ run "(Char -> (Int))",
+      testCase "function types 2" $ run "( Char ->      Int) -> Int",
+      testCase "function types (with newlines everywhere)" $
+        run
+          "(Char \n\
+          \   ->\n\
+          \   (\n\
+          \           Int))",
+      testCase "array" $ run "array [0 .. N) of Int"
+    ]  
+  where
+    run = isomorphic Parser.type'

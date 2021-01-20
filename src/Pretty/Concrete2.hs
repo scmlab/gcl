@@ -215,14 +215,24 @@ prettyHole left right loc = case loc of
 --------------------------------------------------------------------------------
 
 -- | Type
--- instance Pretty Type where
---   pretty = toDoc . prettyWithLoc
+instance Pretty Type where
+  pretty = toDoc . prettyWithLoc
+
 instance PrettyWithLoc Type where
+  prettyWithLoc (TParen _ NoLoc) = error "NoLoc in Type.TParen"
+  prettyWithLoc (TParen t (Loc l m)) =
+    DocWithLoc "(" l l <> prettyWithLoc t <> DocWithLoc ")" m m
   prettyWithLoc (TBase TInt l) = setLoc l "Int"
   prettyWithLoc (TBase TBool l) = setLoc l "Bool"
   prettyWithLoc (TBase TChar l) = setLoc l "Char"
-  prettyWithLoc (TFunc a b l) = setLoc l $ prettyWithLoc a <> "→ " <> prettyWithLoc b
-  prettyWithLoc (TArray i b l) = setLoc l $ "array " <> prettyWithLoc i <> "of " <> prettyWithLoc b
+  prettyWithLoc (TFunc a (u, m) b l) =
+    setLoc l $
+      prettyWithLoc a
+        <> fromLocAndDoc m (if u then "→" else "->")
+        <> prettyWithLoc b
+  prettyWithLoc (TArray i b l) =
+    setLoc l $
+      "array " <> prettyWithLoc i <> "of " <> prettyWithLoc b
   prettyWithLoc (TVar i l) = setLoc l $ "TVar " <> prettyWithLoc i
 
 --------------------------------------------------------------------------------

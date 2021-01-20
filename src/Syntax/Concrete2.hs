@@ -140,28 +140,32 @@ instance Located Interval where
   locOf (Interval _ _ l) = l
 
 data Type
-  = TBase TBase Loc
+  = TParen Type Loc
+  | TBase TBase Loc
   | TArray Interval Type Loc
-  | TFunc Type Type Loc
+  | TFunc Type (Bool, Loc) Type Loc
   | TVar Name Loc
   deriving (Eq, Show)
 
 instance ToConcrete Type C.Type where
+  toConcrete (TParen a _) = toConcrete a
   toConcrete (TBase a l) = C.TBase a l
   toConcrete (TArray a b l) = C.TArray (toConcrete a) (toConcrete b) l
-  toConcrete (TFunc a b l) = C.TFunc (toConcrete a) (toConcrete b) l
+  toConcrete (TFunc a _ b l) = C.TFunc (toConcrete a) (toConcrete b) l
   toConcrete (TVar a l) = C.TVar (toConcrete a) l
 
 instance Located Type where
+  locOf (TParen _ l) = l
   locOf (TBase _ l) = l
   locOf (TArray _ _ l) = l
-  locOf (TFunc _ _ l) = l
+  locOf (TFunc _ _ _ l) = l
   locOf (TVar _ l) = l
 
 instance Relocatable Type where
+  reloc l (TParen a _) = TParen a l
   reloc l (TBase base _) = TBase base l
   reloc l (TArray i s _) = TArray i s l
-  reloc l (TFunc s t _) = TFunc s t l
+  reloc l (TFunc s b t _) = TFunc s b t l
   reloc l (TVar x _) = TVar x l
 
 --------------------------------------------------------------------------------

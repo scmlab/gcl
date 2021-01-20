@@ -332,26 +332,26 @@ expression = makeExprParser term table <?> "expression"
             <?> "term"
 
         -- quantOp :: Parser Op
-        -- quantOp = operator <|> do 
+        -- quantOp = operator <|> do
         --                           (_, _start) <- Util.getLoc (symbol TokParenStart <?> "left parenthesis")
         --                           op <- operator
         --                           (_, _end) <- Util.getLoc (symbol TokParenEnd <?> "right parenthesis")
         --                           return op
-          -- choice
-          --   [ do
-          --       -- (_, start) <- Util.getLoc (symbol TokParenStart <?> "left parenthesis")
-          --       -- (op, loc) <- Util.getLoc operator
-          --       -- (_, end) <- Util.getLoc (symbol TokParenEnd <?> "right parenthesis")
-          --       return $ op
-          --     -- do
-          --     --   op <- term
-          --     --   return $ case op of
-          --     --     Op (Add l) loc -> Op (Sum l) loc
-          --     --     Op (Conj l) loc -> Op (Forall l) loc
-          --     --     Op (Disj l) loc -> Op (Exists l) loc
-          --     --     others -> others,
-          --     -- parensExpr
-          --   ]
+        -- choice
+        --   [ do
+        --       -- (_, start) <- Util.getLoc (symbol TokParenStart <?> "left parenthesis")
+        --       -- (op, loc) <- Util.getLoc operator
+        --       -- (_, end) <- Util.getLoc (symbol TokParenEnd <?> "right parenthesis")
+        --       return $ op
+        --     -- do
+        --     --   op <- term
+        --     --   return $ case op of
+        --     --     Op (Add l) loc -> Op (Sum l) loc
+        --     --     Op (Conj l) loc -> Op (Forall l) loc
+        --     --     Op (Disj l) loc -> Op (Exists l) loc
+        --     --     others -> others,
+        --     -- parensExpr
+        --   ]
 
         -- -- replace "+", "∧", and "∨" in Quant with "Σ", "∀", and "∃"
         -- quantOp :: Parser Expr
@@ -432,15 +432,23 @@ type' = ignoreIndentations $ do
 
     function :: Parser (Type -> Type -> Type)
     function = ignoreIndentations $ do
-      choice
-        [ symbol TokArrow <?> "->",
-          symbol TokArrowU <?> "→"
-        ]
-      return $ \x y -> TFunc x y (x <--> y)
+      arrow <- withLoc $ choice
+                [ (False,) <$ symbol TokArrow <?> "->",
+                  (True,) <$ symbol TokArrowU <?> "→"
+                ]
+      return $ \x y -> TFunc x arrow y (x <--> y)
 
     term :: Parser Type
     term = ignoreIndentations $ do
-      parens type' <|> array <|> base <?> "type term"
+      parensType <|> array <|> base <?> "type term"
+
+    parensType :: Parser Type
+    parensType = do
+      (_, start) <- Util.getLoc (symbol TokParenStart <?> "left parenthesis")
+      result <- type'
+      (_, end) <- Util.getLoc (symbol TokParenEnd <?> "right parenthesis")
+      let loc = start <--> end
+      return $ TParen result loc
 
     base :: Parser Type
     base = do
@@ -452,12 +460,7 @@ type' = ignoreIndentations $ do
         isBaseType _ = Nothing
 
     array :: Parser Type
-    array = withLoc $ do
-      symbol TokArray
-      i <- interval
-      symbol TokOf
-      t <- type'
-      return $ TArray i t
+    array = withLoc $ TArray <$ symbol TokArray <*> interval <* symbol TokOf <*> type'
 
     interval :: Parser Interval
     interval = withLoc $ do
