@@ -18,9 +18,8 @@ instance Pretty Program where
   pretty = toDoc . prettyWithLoc
 
 instance PrettyWithLoc Program where
-  prettyWithLoc (Program decls _ _ stmts l) =
-    setLoc l $
-      mconcat (map prettyWithLoc decls) <> mconcat (map prettyWithLoc stmts)
+  prettyWithLoc (Program decls stmts l) =
+    setLoc l $ mconcat (map prettyWithLoc decls) <> mconcat (map prettyWithLoc stmts)
 
 --------------------------------------------------------------------------------
 
@@ -76,56 +75,32 @@ instance PrettyWithLoc Lit where
 --------------------------------------------------------------------------------
 
 -- | Operators
-instance Pretty Op where
-  pretty EQ = "="
-  pretty NEQ = "/="
-  pretty NEQU = "≠"
-  pretty LTE = "<="
-  pretty LTEU = "≤"
-  pretty GTE = ">="
-  pretty GTEU = "≥"
-  pretty LT = "<"
-  pretty GT = ">"
-  pretty Implies = "=>"
-  pretty ImpliesU = "→"
-  pretty Conj = "&&"
-  pretty ConjU = "∧"
-  pretty Disj = "||"
-  pretty DisjU = "∨"
-  pretty Neg = "~"
-  pretty NegU = "¬"
-  pretty Add = "+"
-  pretty Sub = "-"
-  pretty Mul = "*"
-  pretty Div = "/"
-  pretty Mod = "%"
-  pretty Sum = "Σ"
-  pretty Forall = "∀"
-  pretty Exists = "∃"
-
--- data Op
---   = -- binary relations
---     EQ
---   | NEQ
---   | LTE
---   | GTE
---   | LT
---   | GT
---   | -- logic operators
---     Implies
---   | Conj
---   | Disj
---   | -- arithmetics
---     Neg
---   | Add
---   | Sub
---   | Mul
---   | Div
---   | Mod
---   | -- For Quant
---     Sum
---   | Forall
---   | Exists
+instance PrettyWithLoc Op where
+  prettyWithLoc (EQ l) = fromLocAndDoc l "="
+  prettyWithLoc (NEQ l) = fromLocAndDoc l "/="
+  prettyWithLoc (NEQU l) = fromLocAndDoc l "≠"
+  prettyWithLoc (LTE l) = fromLocAndDoc l "<="
+  prettyWithLoc (LTEU l) = fromLocAndDoc l "≤"
+  prettyWithLoc (GTE l) = fromLocAndDoc l ">="
+  prettyWithLoc (GTEU l) = fromLocAndDoc l "≥"
+  prettyWithLoc (LT l) = fromLocAndDoc l "<"
+  prettyWithLoc (GT l) = fromLocAndDoc l ">"
+  prettyWithLoc (Implies l) = fromLocAndDoc l "=>"
+  prettyWithLoc (ImpliesU l) = fromLocAndDoc l "→"
+  prettyWithLoc (Conj l) = fromLocAndDoc l "&&"
+  prettyWithLoc (ConjU l) = fromLocAndDoc l "∧"
+  prettyWithLoc (Disj l) = fromLocAndDoc l "||"
+  prettyWithLoc (DisjU l) = fromLocAndDoc l "∨"
+  prettyWithLoc (Neg l) = fromLocAndDoc l "~"
+  prettyWithLoc (NegU l) = fromLocAndDoc l "¬"
+  prettyWithLoc (Add l) = fromLocAndDoc l "+"
+  prettyWithLoc (Sub l) = fromLocAndDoc l "-"
+  prettyWithLoc (Mul l) = fromLocAndDoc l "*"
+  prettyWithLoc (Div l) = fromLocAndDoc l "/"
+  prettyWithLoc (Mod l) = fromLocAndDoc l "%"
+  prettyWithLoc (Sum l) = fromLocAndDoc l "Σ"
+  prettyWithLoc (Forall l) = fromLocAndDoc l "∀"
+  prettyWithLoc (Exists l) = fromLocAndDoc l "∃"
 
 --------------------------------------------------------------------------------
 
@@ -182,7 +157,7 @@ handleExpr (Paren x (Loc l m)) = return $ DocWithLoc "(" l (translate 1 l) <> pr
 handleExpr (Var x _) = return $ prettyWithLoc x
 handleExpr (Const x _) = return $ prettyWithLoc x
 handleExpr (Lit x _) = return $ prettyWithLoc x
-handleExpr (Op x l) = handleOp x l
+handleExpr (Op x _) = handleOp x
 handleExpr (App p q _) = case handleExpr p of
   Expect f -> f q
   Complete s -> do
@@ -202,36 +177,35 @@ handleExpr (Quant (s, l) op xs m r n t (e, o) p) =
         <> fromLocAndDoc o (if e then "⟩" else "|>")
 handleExpr (Subst _ _) = return "Subst"
 
-handleOp :: Op -> Loc -> Variadic Expr (DocWithLoc ann)
-handleOp _op NoLoc = error "NoLoc in Expr.Op"
-handleOp op (Loc l m) = case classify op of
+handleOp :: Op -> Variadic Expr (DocWithLoc ann)
+handleOp op = case classify op of
   Infix _ -> do
     p <- var
     q <- var
     return $
       prettyWithLoc p
-        <> DocWithLoc (pretty op) l m
+        <> prettyWithLoc op
         <> prettyWithLoc q
   InfixL _ -> do
     p <- var
     q <- var
     return $
       prettyWithLoc p
-        <> DocWithLoc (pretty op) l m
+        <> prettyWithLoc op
         <> prettyWithLoc q
   InfixR _ -> do
     p <- var
     q <- var
     return $
       prettyWithLoc p
-        <> DocWithLoc (pretty op) l m
+        <> prettyWithLoc op
         <> prettyWithLoc q
   Prefix _ -> do
     p <- var
-    return $ DocWithLoc (pretty op) l m <> prettyWithLoc p
+    return $ prettyWithLoc op <> prettyWithLoc p
   Postfix _ -> do
     p <- var
-    return $ prettyWithLoc p <> DocWithLoc (pretty op) l m
+    return $ prettyWithLoc p <> prettyWithLoc op
 
 prettyHole :: Doc ann -> Doc ann -> Loc -> DocWithLoc ann
 prettyHole left right loc = case loc of

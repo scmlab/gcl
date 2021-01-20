@@ -1,5 +1,5 @@
-{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TupleSections #-}
 
 module Syntax.Parser where
 
@@ -13,9 +13,8 @@ import Syntax.Concrete2 hiding
   ( binary,
     unary,
   )
-import Syntax.ConstExpr2
+-- import Syntax.ConstExpr2
 import Syntax.Location ()
-import Syntax.Common hiding (Fixity(..))
 import Syntax.Parser.Lexer
 import Syntax.Parser.Util
   ( PosLog,
@@ -72,13 +71,7 @@ program = do
     skipMany (symbol TokNewline)
     stmts <- many (statement <* choice [symbol TokNewline, eof]) <?> "statements"
     skipMany (symbol TokNewline)
-
-    let letBindings = pickLetBindings decls
-
-    -- globals and precondition
-    let (glob, asrts') = pickGlobals decls
-    let pre = if null asrts' then [] else [Assert (conjunct asrts') NoLoc]
-    return $ Program decls glob letBindings (pre ++ stmts)
+    return $ Program decls stmts
 
 specContent :: Parser [Stmt]
 specContent = do
@@ -296,15 +289,15 @@ expression = makeExprParser term table <?> "expression"
         let app inner t = App inner t (func <--> t)
         foldl app func terms
 
-    unary :: Op -> Tok -> Parser (Expr -> Expr)
+    unary :: (Loc -> Op) -> Tok -> Parser (Expr -> Expr)
     unary operator' tok = do
       (op, loc) <- Util.getLoc (operator' <$ symbol tok)
-      return $ \result -> App (Op op loc) result (loc <--> result)
+      return $ \result -> App (Op (op loc) loc) result (loc <--> result)
 
-    binary :: Op -> Tok -> Parser (Expr -> Expr -> Expr)
+    binary :: (Loc -> Op) -> Tok -> Parser (Expr -> Expr -> Expr)
     binary operator' tok = do
       (op, loc) <- Util.getLoc (operator' <$ symbol tok)
-      return $ \x y -> App (App (Op op loc) x (x <--> loc)) y (x <--> y)
+      return $ \x y -> App (App (Op (op loc) loc) x (x <--> loc)) y (x <--> y)
 
     parensExpr :: Parser Expr
     parensExpr = do
@@ -327,7 +320,7 @@ expression = makeExprParser term table <?> "expression"
                   Op <$ symbol TokParenStart <*> operator <* symbol TokParenEnd,
                   Quant
                     <$> quantStart
-                    <*> quantOp
+                    <*> operator
                     <*> some lower
                     <*> withLoc (id <$ symbol TokColon)
                     <*> expression
@@ -338,27 +331,53 @@ expression = makeExprParser term table <?> "expression"
             )
             <?> "term"
 
-        -- replace "+", "∧", and "∨" in Quant with "Σ", "∀", and "∃"
-        quantOp :: Parser Expr
-        quantOp = do
-          op <- term
-          return $ case op of
-            Op Add loc -> Op Sum loc
-            Op Conj loc -> Op Forall loc
-            Op Disj loc -> Op Exists loc
-            others -> others
+        -- quantOp :: Parser Op
+        -- quantOp = operator <|> do 
+        --                           (_, _start) <- Util.getLoc (symbol TokParenStart <?> "left parenthesis")
+        --                           op <- operator
+        --                           (_, _end) <- Util.getLoc (symbol TokParenEnd <?> "right parenthesis")
+        --                           return op
+          -- choice
+          --   [ do
+          --       -- (_, start) <- Util.getLoc (symbol TokParenStart <?> "left parenthesis")
+          --       -- (op, loc) <- Util.getLoc operator
+          --       -- (_, end) <- Util.getLoc (symbol TokParenEnd <?> "right parenthesis")
+          --       return $ op
+          --     -- do
+          --     --   op <- term
+          --     --   return $ case op of
+          --     --     Op (Add l) loc -> Op (Sum l) loc
+          --     --     Op (Conj l) loc -> Op (Forall l) loc
+          --     --     Op (Disj l) loc -> Op (Exists l) loc
+          --     --     others -> others,
+          --     -- parensExpr
+          --   ]
 
-        quantStart :: Parser (Bool, Loc) 
-        quantStart = withLoc $ choice 
-          [ (True,) <$ symbol TokQuantStartU
-          , (False,) <$ symbol TokQuantStart
-          ]
-            
-        quantEnd :: Parser (Bool, Loc) 
-        quantEnd = withLoc $ choice 
-          [ (True,) <$ symbol TokQuantEndU
-          , (False,) <$ symbol TokQuantEnd
-          ]
+        -- -- replace "+", "∧", and "∨" in Quant with "Σ", "∀", and "∃"
+        -- quantOp :: Parser Expr
+        -- quantOp = do
+        --   op <- term
+        --   return $ case op of
+        --     Op Add loc -> Op Sum loc
+        --     Op Conj loc -> Op Forall loc
+        --     Op Disj loc -> Op Exists loc
+        --     others -> others
+
+        quantStart :: Parser (Bool, Loc)
+        quantStart =
+          withLoc $
+            choice
+              [ (True,) <$ symbol TokQuantStartU,
+                (False,) <$ symbol TokQuantStart
+              ]
+
+        quantEnd :: Parser (Bool, Loc)
+        quantEnd =
+          withLoc $
+            choice
+              [ (True,) <$ symbol TokQuantEndU,
+                (False,) <$ symbol TokQuantEnd
+              ]
 
     literal :: Parser Lit
     literal =
@@ -373,30 +392,32 @@ expression = makeExprParser term table <?> "expression"
 
     operator :: Parser Op
     operator =
-      choice
-        [ EQ <$ symbol TokEQ,
-          NEQ <$ symbol TokNEQ,
-          NEQU <$ symbol TokNEQU,
-          LTE <$ symbol TokLTE,
-          LTEU <$ symbol TokLTEU,
-          GTE <$ symbol TokGTE,
-          GTEU <$ symbol TokGTEU,
-          LT <$ symbol TokLT,
-          GT <$ symbol TokGT,
-          Implies <$ symbol TokImpl,
-          ImpliesU <$ symbol TokImplU,
-          Conj <$ symbol TokConj,
-          ConjU <$ symbol TokConjU,
-          Disj <$ symbol TokDisj,
-          DisjU <$ symbol TokDisjU,
-          Neg <$ symbol TokNeg,
-          NegU <$ symbol TokNegU,
-          Add <$ symbol TokAdd,
-          Sub <$ symbol TokSub,
-          Mul <$ symbol TokMul,
-          Div <$ symbol TokDiv,
-          Mod <$ symbol TokMod
-        ]
+      withLoc
+        ( choice
+            [ EQ <$ symbol TokEQ,
+              NEQ <$ symbol TokNEQ,
+              NEQU <$ symbol TokNEQU,
+              LTE <$ symbol TokLTE,
+              LTEU <$ symbol TokLTEU,
+              GTE <$ symbol TokGTE,
+              GTEU <$ symbol TokGTEU,
+              LT <$ symbol TokLT,
+              GT <$ symbol TokGT,
+              Implies <$ symbol TokImpl,
+              ImpliesU <$ symbol TokImplU,
+              Conj <$ symbol TokConj,
+              ConjU <$ symbol TokConjU,
+              Disj <$ symbol TokDisj,
+              DisjU <$ symbol TokDisjU,
+              Neg <$ symbol TokNeg,
+              NegU <$ symbol TokNegU,
+              Add <$ symbol TokAdd,
+              Sub <$ symbol TokSub,
+              Mul <$ symbol TokMul,
+              Div <$ symbol TokDiv,
+              Mod <$ symbol TokMod
+            ]
+        )
         <?> "operator"
 
 --------------------------------------------------------------------------------

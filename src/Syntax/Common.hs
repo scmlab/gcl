@@ -1,4 +1,3 @@
-{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Syntax.Common where
@@ -6,7 +5,6 @@ module Syntax.Common where
 import Data.Aeson
 import Data.Aeson.Types (Parser)
 import Data.Loc
-import GHC.Generics (Generic)
 
 --------------------------------------------------------------------------------
 

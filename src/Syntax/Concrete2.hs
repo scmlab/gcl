@@ -19,6 +19,7 @@ import qualified Syntax.Abstract as A
 import Syntax.Common
 import qualified Syntax.Concrete as C
 import Prelude hiding (Ordering (..))
+import qualified Syntax.ConstExpr as ConstExpr
 
 --------------------------------------------------------------------------------
 
@@ -32,18 +33,19 @@ class ToConcrete a b | a -> b where
 data Program
   = Program
       [Declaration] -- constant and variable declarations
-      [Expr] -- global properties
-      Defns -- let bindings
       [Stmt] -- main program
       Loc
   deriving (Eq, Show)
 
 instance ToConcrete Program C.Program where
-  toConcrete (Program a b c d l) =
-    C.Program (map toConcrete a) (fmap toConcrete b) (fmap toConcrete c) (fmap toConcrete d) l
-
+  toConcrete (Program decls' stmts l) =
+    let decls = map toConcrete decls'
+        letBindings = ConstExpr.pickLetBindings decls
+        (globProps, assertions) = ConstExpr.pickGlobals decls
+        pre = if null assertions then [] else [C.Assert (C.conjunct assertions) NoLoc]
+    in  C.Program decls globProps letBindings (pre ++ fmap toConcrete stmts) l
 instance Located Program where
-  locOf (Program _ _ _ _ l) = l
+  locOf (Program _ _ l) = l
 
 type Defns = Map Text Expr
 
@@ -173,7 +175,7 @@ data Expr
   | Op Op Loc
   | App Expr Expr Loc
   | Lam Text Expr Loc
-  | Quant (Bool, Loc) Expr [Name] Loc Expr Loc Expr (Bool, Loc) Loc
+  | Quant (Bool, Loc) Op [Name] Loc Expr Loc Expr (Bool, Loc) Loc
   | Subst Expr Subst -- internal. Location not necessary?
   deriving (Eq, Show, Generic)
 
@@ -198,7 +200,7 @@ instance ToConcrete Expr C.Expr where
   toConcrete (App a b l) = C.App (toConcrete a) (toConcrete b) l
   toConcrete (Lam a b l) = C.Lam a (toConcrete b) l
   -- toConcrete (Hole l) = C.Hole l
-  toConcrete (Quant _ a b _ c _ d _ l) = C.Quant (toConcrete a) (fmap toConcrete b) (toConcrete c) (toConcrete d) l
+  toConcrete (Quant _ a b _ c _ d _ l) = C.Quant (C.Op (toConcrete a) (locOf a)) (fmap toConcrete b) (toConcrete c) (toConcrete d) l
   toConcrete (Subst a b) = C.Subst (toConcrete a) (fmap toConcrete b)
 
 instance Relocatable Expr where
@@ -271,93 +273,120 @@ nameToText (Name x _) = x
 -- | Operators
 data Op
   = -- binary relations
-    EQ
-  | NEQ
-  | NEQU
-  | LTE
-  | LTEU
-  | GTE
-  | GTEU
-  | LT
-  | GT
+    EQ Loc
+  | NEQ Loc
+  | NEQU Loc
+  | LTE Loc
+  | LTEU Loc
+  | GTE Loc
+  | GTEU Loc
+  | LT Loc
+  | GT Loc
   | -- logic operators
-    Implies
-  | ImpliesU
-  | Conj
-  | ConjU
-  | Disj
-  | DisjU
+    Implies Loc
+  | ImpliesU Loc
+  | Conj Loc
+  | ConjU Loc
+  | Disj Loc
+  | DisjU Loc
   | -- arithmetics
-    Neg
-  | NegU
-  | Add
-  | Sub
-  | Mul
-  | Div
-  | Mod
+    Neg Loc
+  | NegU Loc
+  | Add Loc
+  | Sub Loc
+  | Mul Loc
+  | Div Loc
+  | Mod Loc
   | -- For Quant
-    Sum
-  | Forall
-  | Exists
+    Sum Loc
+  | Forall Loc
+  | Exists Loc
   deriving (Show, Eq, Generic)
 
 instance ToConcrete Op C.Op where
-  toConcrete EQ = C.EQ
-  toConcrete NEQ = C.NEQ
-  toConcrete NEQU = C.NEQ
-  toConcrete LTE = C.LTE
-  toConcrete LTEU = C.LTE
-  toConcrete GTE = C.GTE
-  toConcrete GTEU = C.GTE
-  toConcrete LT = C.LT
-  toConcrete GT = C.GT
-  toConcrete Implies = C.Implies
-  toConcrete ImpliesU = C.Implies
-  toConcrete Conj = C.Conj
-  toConcrete ConjU = C.Conj
-  toConcrete Disj = C.Disj
-  toConcrete DisjU = C.Disj
-  toConcrete Neg = C.Neg
-  toConcrete NegU = C.Neg
-  toConcrete Add = C.Add
-  toConcrete Sub = C.Sub
-  toConcrete Mul = C.Mul
-  toConcrete Div = C.Div
-  toConcrete Mod = C.Mod
-  toConcrete Sum = C.Sum
-  toConcrete Forall = C.Forall
-  toConcrete Exists = C.Exists
+  toConcrete (EQ _) = C.EQ
+  toConcrete (NEQ _) = C.NEQ
+  toConcrete (NEQU _) = C.NEQ
+  toConcrete (LTE _) = C.LTE
+  toConcrete (LTEU _) = C.LTE
+  toConcrete (GTE _) = C.GTE
+  toConcrete (GTEU _) = C.GTE
+  toConcrete (LT _) = C.LT
+  toConcrete (GT _) = C.GT
+  toConcrete (Implies _) = C.Implies
+  toConcrete (ImpliesU _) = C.Implies
+  toConcrete (Conj _) = C.Conj
+  toConcrete (ConjU _) = C.Conj
+  toConcrete (Disj _) = C.Disj
+  toConcrete (DisjU _) = C.Disj
+  toConcrete (Neg _) = C.Neg
+  toConcrete (NegU _) = C.Neg
+  toConcrete (Add _) = C.Add
+  toConcrete (Sub _) = C.Sub
+  toConcrete (Mul _) = C.Mul
+  toConcrete (Div _) = C.Div
+  toConcrete (Mod _) = C.Mod
+  toConcrete (Sum _) = C.Sum
+  toConcrete (Forall _) = C.Forall
+  toConcrete (Exists _) = C.Exists
 
 instance ToJSON Op
 
 instance FromJSON Op
 
+instance Located Op where
+  locOf (Implies l) = l
+  locOf (ImpliesU l) = l
+  locOf (Disj l) = l
+  locOf (DisjU l) = l
+  locOf (Conj l) = l
+  locOf (ConjU l) = l
+  locOf (Neg l) = l
+  locOf (NegU l) = l
+  locOf (EQ l) = l
+  locOf (NEQ l) = l
+  locOf (NEQU l) = l
+  locOf (LTE l) = l
+  locOf (LTEU l) = l
+  locOf (GTE l) = l
+  locOf (GTEU l) = l
+  locOf (LT l) = l
+  locOf (GT l) = l
+  locOf (Add l) = l
+  locOf (Sub l) = l
+  locOf (Mul l) = l
+  locOf (Div l) = l
+  locOf (Mod l) = l
+  locOf (Sum l) = l
+  locOf (Exists l) = l
+  locOf (Forall l) = l
+
 classify :: Op -> Fixity
-classify Implies = InfixR 1
-classify ImpliesU = InfixR 1
-classify Disj = InfixL 2
-classify DisjU = InfixL 2
-classify Conj = InfixL 3
-classify ConjU = InfixL 3
-classify Neg = Prefix 4
-classify NegU = Prefix 4
-classify EQ = Infix 5
-classify NEQ = Infix 6
-classify NEQU = Infix 6
-classify LTE = Infix 6
-classify LTEU = Infix 6
-classify GTE = Infix 6
-classify GTEU = Infix 6
-classify LT = Infix 6
-classify GT = Infix 6
-classify Add = InfixL 7
-classify Sub = InfixL 7
-classify Mul = InfixL 8
-classify Div = InfixL 8
-classify Mod = InfixL 9
-classify Sum = Prefix 5
-classify Exists = Prefix 6
-classify Forall = Prefix 7
+classify (Implies _) = InfixR 1
+classify (ImpliesU _) = InfixR 1
+classify (Disj _) = InfixL 2
+classify (DisjU _) = InfixL 2
+classify (Conj _) = InfixL 3
+classify (ConjU _) = InfixL 3
+classify (Neg _) = Prefix 4
+classify (NegU _) = Prefix 4
+classify (EQ _) = Infix 5
+classify (NEQ _) = Infix 6
+classify (NEQU _) = Infix 6
+classify (LTE _) = Infix 6
+classify (LTEU _) = Infix 6
+classify (GTE _) = Infix 6
+classify (GTEU _) = Infix 6
+classify (LT _) = Infix 6
+classify (GT _) = Infix 6
+classify (Add _) = InfixL 7
+classify (Sub _) = InfixL 7
+classify (Mul _) = InfixL 8
+classify (Div _) = InfixL 8
+classify (Mod _) = InfixL 9
+classify (Sum _) = Prefix 5
+classify (Exists _) = Prefix 6
+classify (Forall _) = Prefix 7
 
 --------------------------------------------------------------------------------
 
@@ -371,14 +400,14 @@ binary :: Op -> Expr -> Expr -> Expr
 binary op x y = App (App (Op op NoLoc) x NoLoc) y (x <--> y)
 
 lt, gt, gte, lte, eqq, conj, disj, implies :: Expr -> Expr -> Expr
-lt = binary LT
-gt = binary GT
-gte = binary GTE
-lte = binary LTE
-eqq = binary EQ
-conj = binary Conj
-disj = binary Disj
-implies = binary Implies
+lt = binary (LT NoLoc)
+gt = binary (GT NoLoc)
+gte = binary (GTE NoLoc)
+lte = binary (LTE NoLoc)
+eqq = binary (EQ NoLoc)
+conj = binary (Conj NoLoc)
+disj = binary (Disj NoLoc)
+implies = binary (Implies NoLoc)
 
 conjunct :: [Expr] -> Expr
 conjunct [] = true
@@ -389,7 +418,7 @@ disjunct [] = false
 disjunct xs = foldl1 disj xs
 
 imply :: Expr -> Expr -> Expr
-imply p q = App (App (Op Implies NoLoc) p NoLoc) q NoLoc
+imply p q = App (App (Op (Implies NoLoc) NoLoc) p NoLoc) q NoLoc
 
 predEq :: Expr -> Expr -> Bool
 predEq = (==)
