@@ -38,7 +38,7 @@ fromSepByComma :: SepByComma a -> [a]
 fromSepByComma (Head a) = [a]
 fromSepByComma (Comma a _ as) = a : fromSepByComma as
 
--- | Something enclosed by a pair of curly braces
+-- | Something enclosed by a pair of tokens
 data EnclosedBy b a = EnclosedBy Pos a Pos 
   deriving (Eq, Show)
 
@@ -48,8 +48,18 @@ instance Located (EnclosedBy b a) where
 fromEnclosedBy :: EnclosedBy b a -> a 
 fromEnclosedBy (EnclosedBy _ a _) = a
 
+-- | Phantoms types for annotating `EnclosedBy`
 data Braces 
 data Parens 
+
+newtype Token a = Token Loc
+  deriving (Eq, Show)
+
+instance Located (Token a) where 
+  locOf (Token l) = l
+
+-- | Phantoms types for annotating `Token`
+data Colon
 
 --------------------------------------------------------------------------------
 
@@ -74,14 +84,14 @@ instance Located Program where
 type Defns = Map Text Expr
 
 data Declaration
-  = ConstDecl Loc (SepByComma Name) Type (Maybe (EnclosedBy Braces Expr)) Loc
-  | VarDecl Loc (SepByComma Name) Type (Maybe (EnclosedBy Braces Expr)) Loc
+  = ConstDecl Loc (SepByComma Name) (Token Colon) Type (Maybe (EnclosedBy Braces Expr)) Loc
+  | VarDecl Loc (SepByComma Name) (Token Colon) Type (Maybe (EnclosedBy Braces Expr)) Loc
   | LetDecl Loc Name [Name] Loc Expr Loc
   deriving (Eq, Show)
 
 instance ToConcrete Declaration C.Declaration where
-  toConcrete (ConstDecl _ a b c l) = C.ConstDecl (toConcrete <$> fromSepByComma a) (toConcrete b) (fmap (toConcrete . fromEnclosedBy) c) l
-  toConcrete (VarDecl _ a b c l) = C.VarDecl (toConcrete <$> fromSepByComma a) (toConcrete b) (fmap (toConcrete . fromEnclosedBy) c) l
+  toConcrete (ConstDecl _ a _ b c l) = C.ConstDecl (toConcrete <$> fromSepByComma a) (toConcrete b) (fmap (toConcrete . fromEnclosedBy) c) l
+  toConcrete (VarDecl _ a _ b c l) = C.VarDecl (toConcrete <$> fromSepByComma a) (toConcrete b) (fmap (toConcrete . fromEnclosedBy) c) l
   toConcrete (LetDecl _ a b _ c l) = C.LetDecl (toConcrete a) (fmap nameToText b) (toConcrete c) l
 
 data Stmt
@@ -127,8 +137,8 @@ instance ToConcrete GdCmd C.GdCmd where
   toConcrete (GdCmd a b l) = C.GdCmd (toConcrete a) (fmap toConcrete b) l
 
 extractAssertion :: Declaration -> Maybe Expr
-extractAssertion (ConstDecl _ _ _ e _) = fromEnclosedBy <$> e
-extractAssertion (VarDecl _ _ _ e _) = fromEnclosedBy <$> e
+extractAssertion (ConstDecl _ _ _ _ e _) = fromEnclosedBy <$> e
+extractAssertion (VarDecl _ _ _ _ e _) = fromEnclosedBy <$> e
 extractAssertion LetDecl {} = Nothing
 
 extractLetBinding :: Declaration -> Maybe (Text, Expr)
@@ -196,7 +206,7 @@ instance Relocatable Type where
 
 -- | Expressions
 data Expr
-  = Paren Expr Loc
+  = Paren (EnclosedBy Parens Expr)
   | Lit Lit Loc
   | Var Name Loc
   | Const Name Loc
@@ -208,7 +218,7 @@ data Expr
   deriving (Eq, Show, Generic)
 
 instance Located Expr where
-  locOf (Paren _ l) = l
+  locOf (Paren x) = locOf x
   locOf (Var _ l) = l
   locOf (Const _ l) = l
   locOf (Lit _ l) = l
@@ -220,7 +230,7 @@ instance Located Expr where
   locOf (Subst _ _) = NoLoc
 
 instance ToConcrete Expr C.Expr where
-  toConcrete (Paren a _) = toConcrete a
+  toConcrete (Paren a) = toConcrete (fromEnclosedBy a)
   toConcrete (Lit a l) = C.Lit (toConcrete a) l
   toConcrete (Var a l) = C.Var (toConcrete a) l
   toConcrete (Const a l) = C.Const (toConcrete a) l
@@ -231,23 +241,11 @@ instance ToConcrete Expr C.Expr where
   toConcrete (Quant _ a b _ c _ d _ l) = C.Quant (C.Op (toConcrete a) (locOf a)) (fmap toConcrete b) (toConcrete c) (toConcrete d) l
   toConcrete (Subst a b) = C.Subst (toConcrete a) (fmap toConcrete b)
 
-instance Relocatable Expr where
-  reloc l (Paren x _) = Paren x l
-  reloc l (Var x _) = Var x l
-  reloc l (Const x _) = Const x l
-  reloc l (Lit x _) = Lit x l
-  reloc l (App x y _) = App x y l
-  reloc l (Lam x e _) = Lam x e l
-  reloc l (Op x _) = Op x l
-  -- reloc l (Hole _) = Hole l
-  reloc l (Quant a op xs b r c t d _) = Quant a op xs b r c t d l
-  reloc _ (Subst e s) = Subst e s
-
 type Subst = Map Text Expr
 
-instance ToJSON Expr
+-- instance ToJSON Expr
 
-instance FromJSON Expr
+-- instance FromJSON Expr
 
 wrapLam :: [Text] -> Expr -> Expr
 wrapLam [] body = body

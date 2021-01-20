@@ -111,7 +111,7 @@ type' =
 declaration :: TestTree
 declaration =
   testGroup "Declarations"
-    [ testCase "variable" $ run "var   x    : ( Int)",
+    [ testCase "variable" $ run "var   x     :   ( Int)",
       testCase "variable (with newlines in between)" $
         run
           "var\n\

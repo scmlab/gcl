@@ -26,6 +26,7 @@ import Text.Megaparsec hiding
     Pos,
     State,
     parse,
+    Token
   )
 import qualified Text.Megaparsec as Mega
 import Prelude hiding (Ordering (..))
@@ -118,26 +119,23 @@ enclosedByParens parser = do
 declaration :: Parser Declaration
 declaration = choice [constantDecl, variableDecl, letDecl] <?> "declaration"
 
--- declarations :: Parser [Declaration]
--- declarations = many (declaration <* symbol TokNewline) <?> "declaration seperated by newlines"
-
 constantDecl :: Parser Declaration
 constantDecl = withLoc $ do
   (_, c) <- Util.getLoc (id <$ symbol TokCon <?> "con")
   vars <- constList
-  symbol TokColon <?> "colon"
+  colon' <- colon 
   t <- type'
   assertion <- optional (enclosedByBraces predicate)
-  return $ ConstDecl c vars t assertion
+  return $ ConstDecl c vars colon' t assertion
 
 variableDecl :: Parser Declaration
 variableDecl = withLoc $ do
   (_, v) <- Util.getLoc (id <$ symbol TokVar <?> "var")
   vars <- variableList
-  symbol TokColon <?> "colon"
+  colon' <- colon 
   t <- type'
   assertion <- optional (enclosedByBraces predicate)
-  return $ VarDecl v vars t assertion
+  return $ VarDecl v vars colon' t assertion
 
 letDecl :: Parser Declaration
 letDecl = withLoc $ do
@@ -335,12 +333,7 @@ expression = makeExprParser term table <?> "expression"
       return $ \x y -> App (App (Op (op loc) loc) x (x <--> loc)) y (x <--> y)
 
     parensExpr :: Parser Expr
-    parensExpr = do
-      (_, start) <- Util.getLoc (symbol TokParenStart <?> "opening parenthesis")
-      result <- expression
-      (_, end) <- Util.getLoc (symbol TokParenEnd <?> "closing parenthesis")
-      let loc = start <--> end
-      return $ Paren result loc
+    parensExpr = Paren <$> enclosedByParens expression
 
     term :: Parser Expr
     term = try term' <|> parensExpr
@@ -605,3 +598,8 @@ integer = extract p <?> "integer"
   where
     p (TokInt s) = Just s
     p _ = Nothing
+
+colon :: Parser (Token Colon)
+colon = do 
+  (_, l) <- Util.getLoc (symbol TokColon <?> "colon")
+  return $ Token l

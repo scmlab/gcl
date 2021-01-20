@@ -28,6 +28,10 @@ instance PrettyWithLoc a => PrettyWithLoc (EnclosedBy Parens a) where
   prettyWithLoc (EnclosedBy l x m) =
     DocWithLoc "(" l l <> prettyWithLoc x <> DocWithLoc ")" m m
 
+instance PrettyWithLoc (Token Colon) where
+  prettyWithLoc (Token NoLoc) = error "NoLoc in Token"
+  prettyWithLoc (Token (Loc l m)) = DocWithLoc ":" l m
+
 --------------------------------------------------------------------------------
 
 -- | Program
@@ -45,25 +49,25 @@ instance Pretty Declaration where
   pretty = toDoc . prettyWithLoc
 
 instance PrettyWithLoc Declaration where
-  prettyWithLoc (ConstDecl c names t Nothing l) =
+  prettyWithLoc (ConstDecl c names colon t Nothing l) =
     setLoc l $
       fromLocAndDoc c "con"
         <> prettyWithLoc names
-        <> ": "
+        <> prettyWithLoc colon
         <> prettyWithLoc t
-  prettyWithLoc (ConstDecl c names t (Just p) l) =
+  prettyWithLoc (ConstDecl c names colon t (Just p) l) =
     setLoc l $
       fromLocAndDoc c "con"
         <> prettyWithLoc names
-        <> ": "
+        <> prettyWithLoc colon
         <> prettyWithLoc t
         <> prettyWithLoc p
-  prettyWithLoc (VarDecl v names t Nothing l) =
+  prettyWithLoc (VarDecl v names colon t Nothing l) =
     setLoc l $
-      fromLocAndDoc v "var" <> prettyWithLoc names <> ": " <> prettyWithLoc t
-  prettyWithLoc (VarDecl v names t (Just p) l) =
+      fromLocAndDoc v "var" <> prettyWithLoc names <> prettyWithLoc colon <> prettyWithLoc t
+  prettyWithLoc (VarDecl v names colon t (Just p) l) =
     setLoc l $
-      fromLocAndDoc v "var" <> prettyWithLoc names <> ": " <> prettyWithLoc t
+      fromLocAndDoc v "var" <> prettyWithLoc names <> prettyWithLoc colon <> prettyWithLoc t
         <> prettyWithLoc p
   prettyWithLoc (LetDecl m name args n expr l) =
     setLoc l $
@@ -168,8 +172,7 @@ instance PrettyWithLoc Expr where
     Complete s -> s
 
 handleExpr :: Expr -> Variadic Expr (DocWithLoc ann)
-handleExpr (Paren _ NoLoc) = error "NoLoc in Expr.Paren"
-handleExpr (Paren x (Loc l m)) = return $ DocWithLoc "(" l l <> prettyWithLoc x <> DocWithLoc ")" m m
+handleExpr (Paren x) = return $ prettyWithLoc x 
 handleExpr (Var x _) = return $ prettyWithLoc x
 handleExpr (Const x _) = return $ prettyWithLoc x
 handleExpr (Lit x _) = return $ prettyWithLoc x
