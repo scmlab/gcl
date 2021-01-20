@@ -153,7 +153,7 @@ instance PrettyWithLoc Expr where
 
 handleExpr :: Expr -> Variadic Expr (DocWithLoc ann)
 handleExpr (Paren _ NoLoc) = error "NoLoc in Expr.Paren"
-handleExpr (Paren x (Loc l m)) = return $ DocWithLoc "(" l (translate 1 l) <> prettyWithLoc x <> DocWithLoc ")" (translate (-1) m) m
+handleExpr (Paren x (Loc l m)) = return $ DocWithLoc "(" l l <> prettyWithLoc x <> DocWithLoc ")" m m
 handleExpr (Var x _) = return $ prettyWithLoc x
 handleExpr (Const x _) = return $ prettyWithLoc x
 handleExpr (Lit x _) = return $ prettyWithLoc x
@@ -218,9 +218,9 @@ prettyHole left right loc = case loc of
 -- instance Pretty Type where
 --   pretty = toDoc . prettyWithLoc
 instance PrettyWithLoc Type where
-  prettyWithLoc (TBase TInt l) = setLoc l $ "Int"
-  prettyWithLoc (TBase TBool l) = setLoc l $ "Bool"
-  prettyWithLoc (TBase TChar l) = setLoc l $ "Char"
+  prettyWithLoc (TBase TInt l) = setLoc l "Int"
+  prettyWithLoc (TBase TBool l) = setLoc l "Bool"
+  prettyWithLoc (TBase TChar l) = setLoc l "Char"
   prettyWithLoc (TFunc a b l) = setLoc l $ prettyWithLoc a <> "→ " <> prettyWithLoc b
   prettyWithLoc (TArray i b l) = setLoc l $ "array " <> prettyWithLoc i <> "of " <> prettyWithLoc b
   prettyWithLoc (TVar i l) = setLoc l $ "TVar " <> prettyWithLoc i

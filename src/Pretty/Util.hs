@@ -67,7 +67,7 @@ fromLocAndDoc NoLoc     x = fromDoc x
 fromLocAndDoc (Loc a b) x = DocWithLoc x a b
 
 toDoc :: DocWithLoc ann -> Doc ann 
-toDoc (DocWithLoc d a _) = fillGap (Pos (posFile a) 1 1 1) a <> d
+toDoc (DocWithLoc d a _) = fillGap (Pos (posFile a) 1 0 0) a <> d
 toDoc (StringLiteral s) = pretty s
 
 setLoc :: Loc -> DocWithLoc ann -> DocWithLoc ann
@@ -82,8 +82,8 @@ fillGap this next =
   let lineDiff = posLine next - posLine this
   in if lineDiff == 0 
       -- on the same line, just pad them with spaces
-      then let offsetDiff = posCoff next - 1 - posCoff this
-          in  mconcat (replicate offsetDiff space) 
+      then let colDiff = posCol next - 1 - posCol this
+            in mconcat (replicate colDiff space) 
       -- on different lines
       else mconcat (replicate lineDiff "\n" ++ replicate (posCol next - 1) space)
 

@@ -317,7 +317,7 @@ expression = makeExprParser term table <?> "expression"
                 [ Var <$> lower,
                   Const <$> upper,
                   Lit <$> literal,
-                  Op <$ symbol TokParenStart <*> operator <* symbol TokParenEnd,
+                  -- Op <$ symbol TokParenStart <*> operator <* symbol TokParenEnd,
                   Quant
                     <$> quantStart
                     <*> operator
