@@ -17,6 +17,7 @@ import           Prelude                 hiding ( Ordering(..) )
 
 import Data.Maybe (fromMaybe)
 import Data.Loc 
+import Syntax.Common 
 
 --------------------------------------------------------------------------------
 -- | Expressions
@@ -40,14 +41,6 @@ data Expr = Var    Var
           deriving (Show, Eq, Generic)
 
 type Subst = Map Text Expr
-
-data Op = EQ | NEQ | LTE | GTE | LT | GT    -- binary relations
-        | Implies | Conj | Disj | Neg       -- logic operators
-        | Add | Sub | Mul | Div | Mod       -- arithmetics
-        | Sum | Forall | Exists             -- For Quant
-     deriving (Show, Eq, Generic)
-
-instance FromJSON Op
 
 -- convenient constructors
 lt, gt, gte, lte, eqq, conj, disj, implies :: Expr -> Expr -> Expr
@@ -94,7 +87,6 @@ imply p q = App (App (Op Implies) p) q
 neg :: Expr -> Expr
 neg x = App (Op Neg) x
 
-instance ToJSON Op where
 instance ToJSON Lit where
 instance ToJSON Expr where
 

@@ -7,6 +7,7 @@ import           Prelude                 hiding ( Ordering(..) )
 
 import           Pretty.Variadic
 import           Syntax.Abstract         hiding ( var )
+import           Syntax.Common
 import           Pretty.Util
 import qualified Data.Map as Map
 

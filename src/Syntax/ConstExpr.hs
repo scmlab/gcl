@@ -5,6 +5,7 @@ module Syntax.ConstExpr where
 import           Data.List                      ( partition )
 import           Data.Text.Lazy                 ( Text )
 
+
 import           Syntax.Concrete         hiding ( unary
                                                 , binary
                                                 )

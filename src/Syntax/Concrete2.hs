@@ -8,17 +8,17 @@ module Syntax.Concrete2
   )
 where
 
-import Data.Aeson ( FromJSON, ToJSON )
+import Data.Aeson (FromJSON, ToJSON)
 import Data.Loc
 import Data.Map (Map)
 import Data.Text.Lazy (Text)
 import GHC.Generics (Generic)
 import Syntax.Abstract
-  ( Op (..),
-    TBase (..),
+  ( TBase (..),
   )
-import qualified Syntax.Concrete as C
 import qualified Syntax.Abstract as A
+import Syntax.Common
+import qualified Syntax.Concrete as C
 import Prelude hiding (Ordering (..))
 
 --------------------------------------------------------------------------------
@@ -235,7 +235,7 @@ instance ToConcrete Lit A.Lit where
   toConcrete (LitInt a _) = A.Num a
   toConcrete (LitBool a _) = A.Bol a
   toConcrete (LitChar a _) = A.Chr a
-  
+
 instance Located Lit where
   locOf (LitInt _ l) = l
   locOf (LitBool _ l) = l
@@ -269,9 +269,10 @@ nameToText :: Name -> Text
 nameToText (Name x _) = x
 
 --------------------------------------------------------------------------------
+
 -- | Smart Constructors
 
--- operators 
+-- operators
 unary :: Op -> Expr -> Expr
 unary op x = App (Op op NoLoc) x NoLoc
 
@@ -302,7 +303,7 @@ imply p q = App (App (Op Implies NoLoc) p NoLoc) q NoLoc
 predEq :: Expr -> Expr -> Bool
 predEq = (==)
 
--- literals 
+-- literals
 true :: Expr
 true = Lit (LitBool True NoLoc) NoLoc
 
