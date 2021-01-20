@@ -88,43 +88,56 @@ declaration = choice [constantDecl, variableDecl, letDecl] <?> "declaration"
 
 constantDecl :: Parser Declaration
 constantDecl = withLoc $ do
-  symbol TokCon <?> "con"
+  (_, c) <- Util.getLoc (id <$ symbol TokCon <?> "con")
   vars <- constList
   symbol TokColon <?> "colon"
   t <- type'
   assertion <- optional (braces predicate)
 
-  return $ ConstDecl vars t assertion
+  return $ ConstDecl c vars t assertion
 
 variableDecl :: Parser Declaration
 variableDecl = withLoc $ do
-  symbol TokVar <?> "var"
+  (_, v) <- Util.getLoc (id <$ symbol TokVar <?> "var")
   vars <- variableList
   symbol TokColon <?> "colon"
   t <- type'
   assertion <- optional (braces predicate)
-  return $ VarDecl vars t assertion
+  return $ VarDecl v vars t assertion
 
 letDecl :: Parser Declaration
 letDecl = withLoc $ do
-  symbol TokLet <?> "let"
+  (_, l) <- Util.getLoc (id <$ symbol TokLet <?> "let")
   name <- upper
-  args <- map nameToText <$> many lower
-  symbol TokEQ <?> "="
+  args <- many lower
+  (_, m) <- Util.getLoc (id <$ symbol TokEQ <?> "=")
   expr <- predicate
-  return $ LetDecl name args expr
+  return $ LetDecl l name args m expr
 
 --------------------------------------------------------------------------------
 
 -- | Variables and stuff
+sepByComma :: Parser a -> Parser (SepByComma a)
+sepByComma parser = do
+  x <- parser
+
+  let f = return (Head x)
+  let g = do
+        comma <- Util.withLoc (id <$ symbol TokComma <?> "comma")
+        let pos = case comma of
+              NoLoc -> error "NoLoc in sepByComma"
+              Loc p _ -> p
+        xs <- sepByComma parser
+        return $ Comma x pos xs
+  try g <|> f
 
 -- separated by commas
-constList :: Parser [Name]
-constList = sepBy1 upper (symbol TokComma <?> "comma") <?> "a list of constants separated by commas"
+constList :: Parser (SepByComma Name)
+constList = sepByComma upper <?> "a list of constants separated by commas"
 
 -- separated by commas
-variableList :: Parser [Name]
-variableList = sepBy1 lower (symbol TokComma <?> "comma") <?> "a list of variables separated by commas"
+variableList :: Parser (SepByComma Name)
+variableList = sepByComma lower <?> "a list of variables separated by commas"
 
 --------------------------------------------------------------------------------
 
@@ -432,10 +445,12 @@ type' = ignoreIndentations $ do
 
     function :: Parser (Type -> Type -> Type)
     function = ignoreIndentations $ do
-      arrow <- withLoc $ choice
-                [ (False,) <$ symbol TokArrow <?> "->",
-                  (True,) <$ symbol TokArrowU <?> "→"
-                ]
+      arrow <-
+        withLoc $
+          choice
+            [ (False,) <$ symbol TokArrow <?> "->",
+              (True,) <$ symbol TokArrowU <?> "→"
+            ]
       return $ \x y -> TFunc x arrow y (x <--> y)
 
     term :: Parser Type

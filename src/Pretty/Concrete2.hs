@@ -13,6 +13,13 @@ import Prelude hiding (Ordering (..))
 
 --------------------------------------------------------------------------------
 
+-- | SepByComma
+instance PrettyWithLoc a => PrettyWithLoc (SepByComma a) where
+  prettyWithLoc (Head x) = prettyWithLoc x
+  prettyWithLoc (Comma x p xs) = prettyWithLoc x <> DocWithLoc comma p p <> prettyWithLoc xs
+
+--------------------------------------------------------------------------------
+
 -- | Program
 instance Pretty Program where
   pretty = toDoc . prettyWithLoc
@@ -24,33 +31,40 @@ instance PrettyWithLoc Program where
 --------------------------------------------------------------------------------
 
 -- | Declaration
--- instance Pretty Declaration where
---   pretty = toDoc . prettyWithLoc
+instance Pretty Declaration where
+  pretty = toDoc . prettyWithLoc
+
 instance PrettyWithLoc Declaration where
-  prettyWithLoc (ConstDecl names t Nothing l) =
+  prettyWithLoc (ConstDecl c names t Nothing l) =
     setLoc l $
-      "con " <> sepBy ", " (map prettyWithLoc names) <> ": " <> prettyWithLoc t
-  prettyWithLoc (ConstDecl names t (Just p) l) =
+      fromLocAndDoc c "con"
+        <> prettyWithLoc names
+        <> ": "
+        <> prettyWithLoc t
+  prettyWithLoc (ConstDecl c names t (Just p) l) =
     setLoc l $
-      "con " <> sepBy ", " (map prettyWithLoc names) <> ": " <> prettyWithLoc t
+      fromLocAndDoc c "con"
+        <> prettyWithLoc names
+        <> ": "
+        <> prettyWithLoc t
         <> "{ "
         <> prettyWithLoc p
         <> " }"
-  prettyWithLoc (VarDecl names t Nothing l) =
+  prettyWithLoc (VarDecl v names t Nothing l) =
     setLoc l $
-      "var " <> sepBy ", " (map prettyWithLoc names) <> ": " <> prettyWithLoc t
-  prettyWithLoc (VarDecl names t (Just p) l) =
+      fromLocAndDoc v "var" <> prettyWithLoc names <> ": " <> prettyWithLoc t
+  prettyWithLoc (VarDecl v names t (Just p) l) =
     setLoc l $
-      "var " <> sepBy ", " (map prettyWithLoc names) <> ": " <> prettyWithLoc t
+      fromLocAndDoc v "var" <> prettyWithLoc names <> ": " <> prettyWithLoc t
         <> "{ "
         <> prettyWithLoc p
         <> " }"
-  prettyWithLoc (LetDecl name args expr l) =
+  prettyWithLoc (LetDecl m name args n expr l) =
     setLoc l $
-      "let "
+      fromLocAndDoc m "let"
         <> prettyWithLoc name
-        <> fromDoc (hsep (map pretty args))
-        <> " = "
+        <> mconcat (map prettyWithLoc args)
+        <> fromLocAndDoc n "="
         <> prettyWithLoc expr
 
 --------------------------------------------------------------------------------
@@ -111,10 +125,7 @@ instance PrettyWithLoc Stmt where
   prettyWithLoc (Skip l) = setLoc l "skip"
   prettyWithLoc (Abort l) = setLoc l "abort"
   prettyWithLoc (Assign xs es l) =
-    setLoc l $
-      sepBy ", " (map prettyWithLoc xs)
-        <> ":= "
-        <> sepBy ", " (map prettyWithLoc es)
+    setLoc l $ prettyWithLoc xs <> ":= " <> sepBy ", " (map prettyWithLoc es)
   prettyWithLoc (Assert p l) =
     setLoc l $
       "{ " <> prettyWithLoc p <> " }"

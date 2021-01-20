@@ -22,7 +22,7 @@ import Test.Tasty.HUnit
 import Prelude hiding (Ordering (..), lines)
 
 tests :: TestTree
-tests = testGroup "Prettifier" [expression, type']
+tests = testGroup "Prettifier" [expression, type', declaration]
 
 --------------------------------------------------------------------------------
 
@@ -104,3 +104,22 @@ type' =
     ]  
   where
     run = isomorphic Parser.type'
+
+--------------------------------------------------------------------------------
+
+-- | Declaration
+declaration :: TestTree
+declaration =
+  testGroup "Declarations"
+    [ testCase "variable" $ run "var   x    : ( Int)",
+      testCase "variable (with newlines in between)" $
+        run
+          "var\n\
+          \ x \n\
+          \   : Int\n", 
+      testCase "variable with properties" $ run "var x : Int { True }",
+      testCase "constant" $ run "con X , Z,B, Y : Int",
+      testCase "let binding" $ run " let  X   i  =  N  >   (0)  "
+    ]
+  where
+    run = isomorphic Parser.declaration

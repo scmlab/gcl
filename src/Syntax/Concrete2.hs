@@ -27,6 +27,18 @@ import qualified Syntax.ConstExpr as ConstExpr
 class ToConcrete a b | a -> b where
   toConcrete :: a -> b
 
+
+--------------------------------------------------------------------------------
+
+-- | A non-empty list of stuff seperated by commas
+data SepByComma a = Head a | Comma a Pos (SepByComma a)
+  deriving (Eq, Show)
+
+
+fromSepByComma :: SepByComma a -> [a]
+fromSepByComma (Head a) = [a]
+fromSepByComma (Comma a _ as) = a : fromSepByComma as
+
 --------------------------------------------------------------------------------
 
 -- | Program / Declaration / Statement
@@ -50,20 +62,20 @@ instance Located Program where
 type Defns = Map Text Expr
 
 data Declaration
-  = ConstDecl [Name] Type (Maybe Expr) Loc
-  | VarDecl [Name] Type (Maybe Expr) Loc
-  | LetDecl Name [Text] Expr Loc
+  = ConstDecl Loc (SepByComma Name) Type (Maybe Expr) Loc
+  | VarDecl Loc (SepByComma Name) Type (Maybe Expr) Loc
+  | LetDecl Loc Name [Name] Loc Expr Loc
   deriving (Eq, Show)
 
 instance ToConcrete Declaration C.Declaration where
-  toConcrete (ConstDecl a b c l) = C.ConstDecl (fmap toConcrete a) (toConcrete b) (fmap toConcrete c) l
-  toConcrete (VarDecl a b c l) = C.VarDecl (fmap toConcrete a) (toConcrete b) (fmap toConcrete c) l
-  toConcrete (LetDecl a b c l) = C.LetDecl (toConcrete a) b (toConcrete c) l
+  toConcrete (ConstDecl _ a b c l) = C.ConstDecl (toConcrete <$> fromSepByComma a) (toConcrete b) (fmap toConcrete c) l
+  toConcrete (VarDecl _ a b c l) = C.VarDecl (toConcrete <$> fromSepByComma a) (toConcrete b) (fmap toConcrete c) l
+  toConcrete (LetDecl _ a b _ c l) = C.LetDecl (toConcrete a) (fmap nameToText b) (toConcrete c) l
 
 data Stmt
   = Skip Loc
   | Abort Loc
-  | Assign [Name] [Expr] Loc
+  | Assign (SepByComma Name) [Expr] Loc
   | Assert Expr Loc
   | LoopInvariant Expr Expr Loc
   | Do [GdCmd] Loc
@@ -76,7 +88,7 @@ data Stmt
 instance ToConcrete Stmt C.Stmt where
   toConcrete (Skip l) = C.Skip l
   toConcrete (Abort l) = C.Abort l
-  toConcrete (Assign a b l) = C.Assign (fmap toConcrete a) (fmap toConcrete b) l
+  toConcrete (Assign a b l) = C.Assign (toConcrete <$> fromSepByComma a) (fmap toConcrete b) l
   toConcrete (Assert a l) = C.Assert (toConcrete a) l
   toConcrete (LoopInvariant a b l) = C.LoopInvariant (toConcrete a) (toConcrete b) l
   toConcrete (Do a l) = C.Do (fmap toConcrete a) l
@@ -103,14 +115,14 @@ instance ToConcrete GdCmd C.GdCmd where
   toConcrete (GdCmd a b l) = C.GdCmd (toConcrete a) (fmap toConcrete b) l
 
 extractAssertion :: Declaration -> Maybe Expr
-extractAssertion (ConstDecl _ _ e _) = e
-extractAssertion (VarDecl _ _ e _) = e
+extractAssertion (ConstDecl _ _ _ e _) = e
+extractAssertion (VarDecl _ _ _ e _) = e
 extractAssertion LetDecl {} = Nothing
 
 extractLetBinding :: Declaration -> Maybe (Text, Expr)
 extractLetBinding ConstDecl {} = Nothing
 extractLetBinding VarDecl {} = Nothing
-extractLetBinding (LetDecl c a e _) = Just (nameToText c, wrapLam a e)
+extractLetBinding (LetDecl _ c as _ e _) = Just (nameToText c, wrapLam (map nameToText as) e)
 
 getGuards :: [GdCmd] -> [Expr]
 getGuards = fst . unzipGdCmds
