@@ -172,9 +172,9 @@ toLSPSideEffects _lspID (Req filepath source kind) = handle kind
         -- send diagnostics
         diags <- do 
           let reuslt = runM $ do
-              program <- parseProgram filepath source
-              withExcept TypeError (checkProg program)
-              sweep program
+                program <- parseProgram filepath source
+                withExcept TypeError (checkProg program)
+                sweep program
           return $ case reuslt of
             Left err -> errorToDiagnostics err
             Right (pos, _) ->

@@ -3,6 +3,7 @@
 module Test.Type where
 
 import Control.Monad.State hiding (guard)
+import Control.Monad.Except
 import Data.Loc ( Loc(NoLoc) )
 import qualified Data.ByteString.Lazy as BS
 import qualified Data.Text as Text
@@ -12,6 +13,7 @@ import Data.Text (Text)
 import Data.Text.Prettyprint.Doc.Internal
 import Data.Text.Prettyprint.Doc.Render.Text
 import GCL.Type
+import Error
 import LSP
 import Syntax.Concrete
 import Test.Tasty
@@ -36,7 +38,7 @@ unifyTests =
     ]
 
 actual :: Type -> Type -> Either TypeError SubstT
-actual t1 t2 = runSolver [(t1, t2)]
+actual t1 t2 = runSolver' [(t1, t2)]
 
 typeCheckTests :: TestTree
 typeCheckTests = 
@@ -64,7 +66,7 @@ typeCheck (filepath, source) = renderStrict . layoutCompact . pretty $ result
     result = 
       case runM (parseProgram filepath source) of
         Left err -> return ()
-        Right prog -> runM $ checkProg prog
+        Right prog -> runM . withExcept TypeError $ checkProg prog
 
 compareAndReport :: (FilePath, Text) -> (FilePath, Text) -> IO (Maybe String)
 compareAndReport (expectedPath, expectedRes) (actualPath, actualRaw) = do
