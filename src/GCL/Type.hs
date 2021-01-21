@@ -33,11 +33,11 @@ emptyEnv = TypeEnv Map.empty
 extend :: TypeEnv -> (TVar, Scheme) -> TypeEnv
 extend (TypeEnv env) (x, s) = TypeEnv (Map.insert x s env)
 
-extend' :: TypeEnv -> (TVar, Scheme) -> Either TypeError TypeEnv
+extend' :: TypeEnv -> (TVar, Scheme) -> Except TypeError TypeEnv
 extend' e@(TypeEnv env) (x, s) =
   case Map.lookup x env of
-    Nothing -> Right $ e `extend` (x, s)
-    Just (ForallV _ t) -> Left $ RecursiveType x t (locOf t)
+    Nothing -> return $ e `extend` (x, s)
+    Just (ForallV _ t) -> throwError $ RecursiveType x t (locOf t)
 
 ------------------------------------------
 -- Substitution
@@ -101,13 +101,19 @@ data TypeError
 instance ToJSON TypeError
 
 instance Located TypeError where
-  locOf _ = NoLoc
+  locOf (NotInScope _ l) = l
+  locOf (UnifyFailed _ _ l) = l
+  locOf (RecursiveType _ _ l) = l
+  locOf (NotFunction _ l) = l
 
 initInfer :: InferState
 initInfer = 0
 
-runInfer :: TypeEnv -> Infer Type -> Either TypeError (Type, [Constraint])
-runInfer env m = runExcept $ evalRWST m env initInfer
+runInfer' :: TypeEnv -> Infer Type -> Either TypeError (Type, [Constraint])
+runInfer' env m = runExcept $ evalRWST m env initInfer
+
+runInfer :: TypeEnv -> Infer Type -> Except TypeError (Type, [Constraint])
+runInfer env m = evalRWST m env initInfer
 
 infer :: Expr -> Infer Type
 infer (Lit lit l) = return (litTypes lit l)
@@ -139,30 +145,35 @@ infer (Subst expr sub) = do
   s <- mapM infer sub
   return $ apply s t
 
-inferExpr :: TypeEnv -> Expr -> Either TypeError Scheme
-inferExpr env e = 
-  case runInfer env (infer e) of
-    Left err -> Left err
-    Right (t, cs) -> 
-      case runSolver cs of
-        Left err -> Left err
-        Right s -> Right $ closeOver s t
+inferExpr :: TypeEnv -> Expr -> Except TypeError Scheme
+inferExpr env e = do
+  (t, cs) <- runInfer env (infer e)
+  s <- runSolver cs
+  return $ closeOver s t
+  -- case runInfer env (infer e) of
+  --   Left err -> Left err
+  --   Right (t, cs) -> 
+  --     case runSolver cs of
+  --       Left err -> Left err
+  --       Right s -> Right $ closeOver s t
 
-inferDecl :: Declaration -> TypeEnv -> Either TypeError TypeEnv
-inferDecl (ConstDecl ns t _ _) env = 
-  foldl f (Right env) [n | Name n _ <- ns]
+inferDecl :: TypeEnv -> Declaration -> Except TypeError TypeEnv
+inferDecl env (ConstDecl ns t _ _) = 
+  foldM f env [n | Name n _ <- ns]
   where
-    f (Left err) _ = Left err
-    f (Right env') n = env' `extend'` (n, generalize env' t)
-inferDecl (VarDecl ns t _ _) env = 
-  foldl f (Right env) [n | Name n _ <- ns]
+    -- f (Left err) _ = Left err
+    f env' n = env' `extend'` (n, generalize env' t)
+inferDecl env (VarDecl ns t _ _) = 
+  foldM f env [n | Name n _ <- ns]
   where
-    f (Left err) _ = Left err
-    f (Right env') n = env' `extend'` (n, generalize env' t)
-inferDecl (LetDecl (Name n _) args expr _) env = 
-  case inferExpr env expr' of
-    Left err -> Left err
-    Right s -> env `extend'` (n, s)
+    -- f (Left err) _ = Left err
+    f env' n = env' `extend'` (n, generalize env' t)
+inferDecl env (LetDecl (Name n _) args expr _) = do
+  s <- inferExpr env expr'
+  env `extend'` (n, s)
+  -- case inferExpr env expr' of
+  --   Left err -> Left err
+  --   Right s -> env `extend'` (n, s)
   where
     expr' = foldr (\a e' -> Lam a e' NoLoc) expr args
 
@@ -204,23 +215,28 @@ fresh l = flip TVar l . flip Name l <$> freshTVar
 -- type check
 ------------------------------------------
 
-checkName :: TypeEnv -> (Text, Expr) -> Either TypeError ()
+checkName :: TypeEnv -> (Text, Expr) -> Except TypeError ()
 checkName env@(TypeEnv envM) (n, expr) = 
-  case (Map.lookup n envM, inferExpr env expr) of
-    (Nothing, _) -> throwError $ NotInScope n NoLoc
-    (_, Left err) -> throwError err
-    (Just (ForallV _ t), Right (ForallV _ t')) -> void $ runSolver [(t, t')] 
+  case Map.lookup n envM of
+    Nothing -> throwError $ NotInScope n NoLoc
+    Just (ForallV _ t) -> do
+      (ForallV _ t') <- inferExpr env expr
+      void $ runSolver [(t, t')]
+  -- case (Map.lookup n envM, inferExpr env expr) of
+  --   (Nothing, _) -> throwError $ NotInScope n NoLoc
+  --   (_, Left err) -> throwError err
+  --   (Just (ForallV _ t), Right (ForallV _ t')) -> void $ runSolver [(t, t')] 
 
-checkExpr :: TypeEnv -> Expr -> Either TypeError ()
+checkExpr :: TypeEnv -> Expr -> Except TypeError ()
 checkExpr env expr = void $ inferExpr env expr
 
-checkGdCmd :: TypeEnv -> GdCmd -> Either TypeError ()
+checkGdCmd :: TypeEnv -> GdCmd -> Except TypeError ()
 checkGdCmd env (GdCmd expr stmts _) = 
   inferExpr env expr >> mapM_ (checkStmt env) stmts
 
-checkStmt :: TypeEnv -> Stmt -> Either TypeError ()
-checkStmt _ (Skip _) = Right ()
-checkStmt _ (Abort _) = Right ()
+checkStmt :: TypeEnv -> Stmt -> Except TypeError ()
+checkStmt _ (Skip _) = return ()
+checkStmt _ (Abort _) = return ()
 checkStmt env (Assign ns es _)
   | length ns > length es = throwError $ error "Missing Expression"
   | length ns < length es = throwError $ error "Duplicated Assignment"
@@ -229,13 +245,13 @@ checkStmt env (Assert expr _) = void $ inferExpr env expr
 checkStmt env (LoopInvariant e1 e2 _) = void $ inferExpr env e1 >> inferExpr env e2
 checkStmt env (Do gdcmds _) = mapM_ (checkGdCmd env) gdcmds
 checkStmt env (If gdcmds _) = mapM_ (checkGdCmd env) gdcmds
-checkStmt _ (SpecQM _) = Right ()
-checkStmt _ (Spec _) = Right ()
-checkStmt _ (Proof _) = Right ()
+checkStmt _ (SpecQM _) = return ()
+checkStmt _ (Spec _) = return ()
+checkStmt _ (Proof _) = return ()
 
-checkProg :: Program -> Either TypeError ()
+checkProg :: Program -> Except TypeError ()
 checkProg (Program decls exprs defs stmts _) = do
-  env <- foldM (flip inferDecl) emptyEnv decls
+  env <- foldM inferDecl emptyEnv decls
   mapM_ (checkExpr env) exprs
   mapM_ (checkName env) (Map.toList defs)
   mapM_ (checkStmt env) stmts
@@ -269,8 +285,11 @@ unifies (TVar (Name x _) _) t = x `bind` t
 unifies t (TVar (Name x _) _) = x `bind` t
 unifies t1 t2 = throwError $ UnifyFailed t1 t2 (locOf t1)
 
-runSolver :: [Constraint] -> Either TypeError SubstT
-runSolver cs = runExcept . solver $ (emptySubstT, cs)
+runSolver' :: [Constraint] -> Either TypeError SubstT
+runSolver' cs = runExcept . solver $ (emptySubstT, cs)
+
+runSolver :: [Constraint] -> Except TypeError SubstT
+runSolver cs = solver (emptySubstT, cs)
 
 solver :: Unifier -> Solve SubstT
 solver (s, []) = return s

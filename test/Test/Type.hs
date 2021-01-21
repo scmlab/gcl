@@ -64,7 +64,7 @@ typeCheck (filepath, source) = renderStrict . layoutCompact . pretty $ result
     result = 
       case runM (parseProgram filepath source) of
         Left err -> return ()
-        Right prog -> checkProg prog
+        Right prog -> runM $ checkProg prog
 
 compareAndReport :: (FilePath, Text) -> (FilePath, Text) -> IO (Maybe String)
 compareAndReport (expectedPath, expectedRes) (actualPath, actualRaw) = do

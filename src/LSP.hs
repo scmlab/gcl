@@ -18,7 +18,7 @@ import Data.Text (Text)
 import qualified Data.Text.Lazy as TextLazy
 import Error
 import GCL.Expr (expand, runSubstM)
-import GCL.Type (TypeError (..))
+import GCL.Type (TypeError (..), checkProg)
 import GCL.WP (StructError (..), runWP, structProg)
 import GHC.Generics (Generic)
 import Language.LSP.Diagnostics (partitionBySource)
@@ -124,6 +124,7 @@ toResponse lspID (Req filepath source kind) =
     handle :: ReqKind -> [ResKind]
     handle ReqLoad = global $ do
       program@(Concrete.Program _ globalProps _ _ _) <- parseProgram filepath source
+      withExcept TypeError (checkProg program)
       (pos, specs) <- sweep program
 
       return [ResOK lspID pos specs globalProps]
@@ -170,7 +171,10 @@ toLSPSideEffects _lspID (Req filepath source kind) = handle kind
     handle ReqLoad = do
         -- send diagnostics
         diags <- do 
-          let reuslt = runM $ parseProgram filepath source >>= sweep
+          let reuslt = runM $ do
+              program <- parseProgram filepath source
+              withExcept TypeError (checkProg program)
+              sweep program
           return $ case reuslt of
             Left err -> errorToDiagnostics err
             Right (pos, _) ->
