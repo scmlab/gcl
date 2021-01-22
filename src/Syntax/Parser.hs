@@ -93,24 +93,6 @@ sepByComma parser = do
         return $ Delim x start xs
   try g <|> f
 
--- | Parser for EnclosedBy Braces
-enclosedByBraces :: Parser a -> Parser (EnclosedBy Braces a)
-enclosedByBraces parser = do
-  (x, loc) <- braces parser
-  let (l, m) = case loc of
-        NoLoc -> error "NoLoc in enclosedByBraces"
-        Loc a b -> (a, b)
-  return $ EnclosedBy l x m
-
--- | Parser for EnclosedBy Parens
-enclosedByParens :: Parser a -> Parser (EnclosedBy Parens a)
-enclosedByParens parser = do
-  (x, loc) <- parens parser
-  let (l, m) = case loc of
-        NoLoc -> error "NoLoc in enclosedByParens"
-        Loc a b -> (a, b)
-  return $ EnclosedBy l x m
-
 -- for building parsers for tokens
 adapt :: Tok -> String -> Parser (Token a)
 adapt t errMsg = do
@@ -184,7 +166,6 @@ constDeclWithProp =
     <*> tokenBraceStart
     <*> expression
     <*> tokenBraceEnd
-
 
 varDecl :: Parser Declaration
 varDecl =
@@ -405,7 +386,11 @@ expression = makeExprParser term table <?> "expression"
       return $ \x y -> App (App (Op (op loc) loc) x (x <--> loc)) y (x <--> y)
 
     parensExpr :: Parser Expr
-    parensExpr = Paren <$> enclosedByParens expression
+    parensExpr =
+      Paren
+        <$> tokenParenStart
+          <*> expression
+          <*> tokenParenEnd
 
     term :: Parser Expr
     term = try term' <|> parensExpr
@@ -545,7 +530,7 @@ type' = ignoreIndentations $ do
       parensType <|> array <|> base <?> "type term"
 
     parensType :: Parser Type
-    parensType = TParen <$> enclosedByParens type'
+    parensType = TParen <$> tokenParenStart <*> type' <*> tokenParenEnd
 
     base :: Parser Type
     base = do

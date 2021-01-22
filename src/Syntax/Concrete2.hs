@@ -1,7 +1,7 @@
-{-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE KindSignatures #-}
 
 module Syntax.Concrete2
   ( module Syntax.Concrete2,
@@ -20,16 +20,15 @@ import Syntax.Abstract
 import qualified Syntax.Abstract as A
 import Syntax.Common
 import qualified Syntax.Concrete as C
-import Prelude hiding (Ordering (..))
 import qualified Syntax.ConstExpr as ConstExpr
-import Syntax.Parser.Lexer (Tok(..))
+import Syntax.Parser.Lexer (Tok (..))
+import Prelude hiding (Ordering (..))
 
 --------------------------------------------------------------------------------
 
 -- | Temporary Typeclass for converting from Syntax.Concrete2 to Syntax.Concrete
 class ToConcrete a b | a -> b where
   toConcrete :: a -> b
-
 
 --------------------------------------------------------------------------------
 
@@ -41,24 +40,10 @@ fromSepBy :: SepBy sep a -> [a]
 fromSepBy (Head a) = [a]
 fromSepBy (Delim a _ as) = a : fromSepBy as
 
--- | Something enclosed by a pair of tokens
-data EnclosedBy b a = EnclosedBy Pos a Pos 
-  deriving (Eq, Show)
-
-instance Located (EnclosedBy b a) where 
-  locOf (EnclosedBy l _ m) = l <--> m
-
-fromEnclosedBy :: EnclosedBy b a -> a 
-fromEnclosedBy (EnclosedBy _ a _) = a
-
--- | Phantoms types for annotating `EnclosedBy`
-data Braces 
-data Parens 
-
 data Token (a :: Tok) = Token Pos Pos
   deriving (Eq, Show)
 
-instance Located (Token a) where 
+instance Located (Token a) where
   locOf (Token l r) = Loc l r
 
 --------------------------------------------------------------------------------
@@ -77,7 +62,8 @@ instance ToConcrete Program C.Program where
         letBindings = ConstExpr.pickLetBindings decls
         (globProps, assertions) = ConstExpr.pickGlobals decls
         pre = if null assertions then [] else [C.Assert (C.conjunct assertions) NoLoc]
-    in  C.Program decls globProps letBindings (pre ++ fmap toConcrete stmts) l
+     in C.Program decls globProps letBindings (pre ++ fmap toConcrete stmts) l
+
 instance Located Program where
   locOf (Program _ _ l) = l
 
@@ -86,7 +72,7 @@ type Defns = Map Text Expr
 data Declaration
   = ConstDecl (Token 'TokCon) (SepBy 'TokComma Name) (Token 'TokColon) Type
   | ConstDeclWithProp (Token 'TokCon) (SepBy 'TokComma Name) (Token 'TokColon) Type (Token 'TokBraceStart) Expr (Token 'TokBraceEnd)
-  | VarDecl (Token 'TokVar) (SepBy 'TokComma Name) (Token 'TokColon) Type 
+  | VarDecl (Token 'TokVar) (SepBy 'TokComma Name) (Token 'TokColon) Type
   | VarDeclWithProp (Token 'TokVar) (SepBy 'TokComma Name) (Token 'TokColon) Type (Token 'TokBraceStart) Expr (Token 'TokBraceEnd)
   | LetDecl (Token 'TokLet) Name [Name] (Token 'TokEQ) Expr Loc
   deriving (Eq, Show)
@@ -149,7 +135,7 @@ extractAssertion LetDecl {} = Nothing
 
 extractLetBinding :: Declaration -> Maybe (Text, Expr)
 extractLetBinding (LetDecl _ c as _ e _) = Just (nameToText c, wrapLam (map nameToText as) e)
-extractLetBinding _ = Nothing 
+extractLetBinding _ = Nothing
 
 getGuards :: [GdCmd] -> [Expr]
 getGuards = fst . unzipGdCmds
@@ -179,7 +165,7 @@ instance Located Interval where
   locOf (Interval _ _ l) = l
 
 data Type
-  = TParen (EnclosedBy Parens Type)
+  = TParen (Token 'TokParenStart) Type (Token 'TokParenEnd)
   | TBase TBase Loc
   | TArray Interval Type Loc
   | TFunc Type (Bool, Loc) Type Loc
@@ -187,14 +173,14 @@ data Type
   deriving (Eq, Show)
 
 instance ToConcrete Type C.Type where
-  toConcrete (TParen a) = toConcrete (fromEnclosedBy a)
+  toConcrete (TParen _ a _) = toConcrete a
   toConcrete (TBase a l) = C.TBase a l
   toConcrete (TArray a b l) = C.TArray (toConcrete a) (toConcrete b) l
   toConcrete (TFunc a _ b l) = C.TFunc (toConcrete a) (toConcrete b) l
   toConcrete (TVar a l) = C.TVar (toConcrete a) l
 
 instance Located Type where
-  locOf (TParen x) = locOf x
+  locOf (TParen l _ r) = l <--> r
   locOf (TBase _ l) = l
   locOf (TArray _ _ l) = l
   locOf (TFunc _ _ _ l) = l
@@ -204,7 +190,7 @@ instance Located Type where
 
 -- | Expressions
 data Expr
-  = Paren (EnclosedBy Parens Expr)
+  = Paren (Token 'TokParenStart) Expr (Token 'TokParenEnd)
   | Lit Lit Loc
   | Var Name Loc
   | Const Name Loc
@@ -216,7 +202,7 @@ data Expr
   deriving (Eq, Show, Generic)
 
 instance Located Expr where
-  locOf (Paren x) = locOf x
+  locOf (Paren l _ r) = l <--> r
   locOf (Var _ l) = l
   locOf (Const _ l) = l
   locOf (Lit _ l) = l
@@ -228,7 +214,7 @@ instance Located Expr where
   locOf (Subst _ _) = NoLoc
 
 instance ToConcrete Expr C.Expr where
-  toConcrete (Paren a) = toConcrete (fromEnclosedBy a)
+  toConcrete (Paren _ a _) = toConcrete a
   toConcrete (Lit a l) = C.Lit (toConcrete a) l
   toConcrete (Var a l) = C.Var (toConcrete a) l
   toConcrete (Const a l) = C.Const (toConcrete a) l

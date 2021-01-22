@@ -22,14 +22,6 @@ instance PrettyWithLoc a => PrettyWithLoc (SepBy 'TokComma a) where
   prettyWithLoc (Delim x p xs) =
     prettyWithLoc x <> DocWithLoc comma p p <> prettyWithLoc xs
 
-instance PrettyWithLoc a => PrettyWithLoc (EnclosedBy Braces a) where
-  prettyWithLoc (EnclosedBy l x m) =
-    DocWithLoc "{" l l <> prettyWithLoc x <> DocWithLoc "}" m m
-
-instance PrettyWithLoc a => PrettyWithLoc (EnclosedBy Parens a) where
-  prettyWithLoc (EnclosedBy l x m) =
-    DocWithLoc "(" l l <> prettyWithLoc x <> DocWithLoc ")" m m
-
 instance PrettyWithLoc (Token 'TokCon) where
   prettyWithLoc (Token l r) = DocWithLoc "con" l r
 
@@ -211,7 +203,11 @@ instance PrettyWithLoc Expr where
     Complete s -> s
 
 handleExpr :: Expr -> Variadic Expr (DocWithLoc ann)
-handleExpr (Paren x) = return $ prettyWithLoc x
+handleExpr (Paren l x r) =
+  return $
+    prettyWithLoc l
+      <> prettyWithLoc x
+      <> prettyWithLoc r
 handleExpr (Var x _) = return $ prettyWithLoc x
 handleExpr (Const x _) = return $ prettyWithLoc x
 handleExpr (Lit x _) = return $ prettyWithLoc x
@@ -277,7 +273,7 @@ instance Pretty Type where
   pretty = toDoc . prettyWithLoc
 
 instance PrettyWithLoc Type where
-  prettyWithLoc (TParen t) = prettyWithLoc t
+  prettyWithLoc (TParen l t r) = prettyWithLoc l <> prettyWithLoc t <> prettyWithLoc r
   -- DocWithLoc "(" l l <> prettyWithLoc t <> DocWithLoc ")" m m
   prettyWithLoc (TBase TInt l) = setLoc l "Int"
   prettyWithLoc (TBase TBool l) = setLoc l "Bool"
