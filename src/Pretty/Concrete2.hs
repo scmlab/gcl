@@ -17,9 +17,9 @@ import Prelude hiding (Ordering (..))
 --------------------------------------------------------------------------------
 
 -- | SepByComma
-instance PrettyWithLoc a => PrettyWithLoc (SepByComma a) where
+instance PrettyWithLoc a => PrettyWithLoc (SepBy 'TokComma a) where
   prettyWithLoc (Head x) = prettyWithLoc x
-  prettyWithLoc (Comma x p xs) =
+  prettyWithLoc (Delim x p xs) =
     prettyWithLoc x <> DocWithLoc comma p p <> prettyWithLoc xs
 
 instance PrettyWithLoc a => PrettyWithLoc (EnclosedBy Braces a) where
@@ -30,25 +30,38 @@ instance PrettyWithLoc a => PrettyWithLoc (EnclosedBy Parens a) where
   prettyWithLoc (EnclosedBy l x m) =
     DocWithLoc "(" l l <> prettyWithLoc x <> DocWithLoc ")" m m
 
-instance PrettyWithLoc (Token 'TokColon) where
-  prettyWithLoc (Token NoLoc) = error "NoLoc in Token"
-  prettyWithLoc (Token (Loc l m)) = DocWithLoc ":" l m
-
 instance PrettyWithLoc (Token 'TokCon) where
-  prettyWithLoc (Token NoLoc) = error "NoLoc in Token"
-  prettyWithLoc (Token (Loc l m)) = DocWithLoc "con" l m
+  prettyWithLoc (Token l r) = DocWithLoc "con" l r
 
 instance PrettyWithLoc (Token 'TokVar) where
-  prettyWithLoc (Token NoLoc) = error "NoLoc in Token"
-  prettyWithLoc (Token (Loc l m)) = DocWithLoc "var" l m
+  prettyWithLoc (Token l r) = DocWithLoc "var" l r
 
 instance PrettyWithLoc (Token 'TokLet) where
-  prettyWithLoc (Token NoLoc) = error "NoLoc in Token"
-  prettyWithLoc (Token (Loc l m)) = DocWithLoc "let" l m
+  prettyWithLoc (Token l r) = DocWithLoc "let" l r
+
+instance PrettyWithLoc (Token 'TokBraceStart) where
+  prettyWithLoc (Token l r) = DocWithLoc "{" l r
+
+instance PrettyWithLoc (Token 'TokBraceEnd) where
+  prettyWithLoc (Token l r) = DocWithLoc "}" l r
+
+instance PrettyWithLoc (Token 'TokParenStart) where
+  prettyWithLoc (Token l r) = DocWithLoc "(" l r
+
+instance PrettyWithLoc (Token 'TokParenEnd) where
+  prettyWithLoc (Token l r) = DocWithLoc ")" l r
+
+instance PrettyWithLoc (Token 'TokColon) where
+  prettyWithLoc (Token l r) = DocWithLoc ":" l r
+
+instance PrettyWithLoc (Token 'TokComma) where
+  prettyWithLoc (Token l r) = DocWithLoc "," l r
+
+instance PrettyWithLoc (Token 'TokBnd) where
+  prettyWithLoc (Token l r) = DocWithLoc "bnd" l r
 
 instance PrettyWithLoc (Token 'TokEQ) where
-  prettyWithLoc (Token NoLoc) = error "NoLoc in Token"
-  prettyWithLoc (Token (Loc l m)) = DocWithLoc "=" l m
+  prettyWithLoc (Token l r) = DocWithLoc "=" l r
 
 --------------------------------------------------------------------------------
 
@@ -156,9 +169,14 @@ instance PrettyWithLoc Stmt where
   prettyWithLoc (Assign xs es l) =
     setLoc l $ prettyWithLoc xs <> ":= " <> sepBy ", " (map prettyWithLoc es)
   prettyWithLoc (Assert p) = prettyWithLoc p
-  prettyWithLoc (LoopInvariant p bnd l) =
-    setLoc l $
-      "{ " <> prettyWithLoc p <> " , bnd: " <> prettyWithLoc bnd <> " }"
+  prettyWithLoc (LoopInvariant l p c b bnd d r) =
+    prettyWithLoc l
+      <> prettyWithLoc p
+      <> prettyWithLoc c
+      <> prettyWithLoc b
+      <> prettyWithLoc bnd
+      <> prettyWithLoc d
+      <> prettyWithLoc r
   prettyWithLoc (Do gdCmds l) =
     setLoc l $
       "do " <> sepBy "| " (map prettyWithLoc gdCmds) <> "\nod"

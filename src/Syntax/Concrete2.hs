@@ -34,12 +34,12 @@ class ToConcrete a b | a -> b where
 --------------------------------------------------------------------------------
 
 -- | A non-empty list of stuff seperated by commas
-data SepByComma a = Head a | Comma a Pos (SepByComma a)
+data SepBy (sep :: Tok) a = Head a | Delim a Pos (SepBy sep a)
   deriving (Eq, Show)
 
-fromSepByComma :: SepByComma a -> [a]
-fromSepByComma (Head a) = [a]
-fromSepByComma (Comma a _ as) = a : fromSepByComma as
+fromSepBy :: SepBy sep a -> [a]
+fromSepBy (Head a) = [a]
+fromSepBy (Delim a _ as) = a : fromSepBy as
 
 -- | Something enclosed by a pair of tokens
 data EnclosedBy b a = EnclosedBy Pos a Pos 
@@ -55,11 +55,11 @@ fromEnclosedBy (EnclosedBy _ a _) = a
 data Braces 
 data Parens 
 
-newtype Token (a :: Tok) = Token Loc
+data Token (a :: Tok) = Token Pos Pos
   deriving (Eq, Show)
 
 instance Located (Token a) where 
-  locOf (Token l) = l
+  locOf (Token l r) = Loc l r
 
 --------------------------------------------------------------------------------
 
@@ -84,22 +84,22 @@ instance Located Program where
 type Defns = Map Text Expr
 
 data Declaration
-  = ConstDecl (Token 'TokCon) (SepByComma Name) (Token 'TokColon) Type (Maybe (EnclosedBy Braces Expr)) Loc
-  | VarDecl (Token 'TokVar) (SepByComma Name) (Token 'TokColon) Type (Maybe (EnclosedBy Braces Expr)) Loc
+  = ConstDecl (Token 'TokCon) (SepBy 'TokComma Name) (Token 'TokColon) Type (Maybe (EnclosedBy Braces Expr)) Loc
+  | VarDecl (Token 'TokVar) (SepBy 'TokComma Name) (Token 'TokColon) Type (Maybe (EnclosedBy Braces Expr)) Loc
   | LetDecl (Token 'TokLet) Name [Name] (Token 'TokEQ) Expr Loc
   deriving (Eq, Show)
 
 instance ToConcrete Declaration C.Declaration where
-  toConcrete (ConstDecl _ a _ b c l) = C.ConstDecl (toConcrete <$> fromSepByComma a) (toConcrete b) (fmap (toConcrete . fromEnclosedBy) c) l
-  toConcrete (VarDecl _ a _ b c l) = C.VarDecl (toConcrete <$> fromSepByComma a) (toConcrete b) (fmap (toConcrete . fromEnclosedBy) c) l
+  toConcrete (ConstDecl _ a _ b c l) = C.ConstDecl (toConcrete <$> fromSepBy a) (toConcrete b) (fmap (toConcrete . fromEnclosedBy) c) l
+  toConcrete (VarDecl _ a _ b c l) = C.VarDecl (toConcrete <$> fromSepBy a) (toConcrete b) (fmap (toConcrete . fromEnclosedBy) c) l
   toConcrete (LetDecl _ a b _ c l) = C.LetDecl (toConcrete a) (fmap nameToText b) (toConcrete c) l
 
 data Stmt
   = Skip Loc
   | Abort Loc
-  | Assign (SepByComma Name) [Expr] Loc
+  | Assign (SepBy 'TokComma Name) [Expr] Loc
   | Assert (EnclosedBy Braces Expr)
-  | LoopInvariant Expr Expr Loc
+  | LoopInvariant (Token 'TokBraceStart) Expr (Token 'TokComma) (Token 'TokBnd) (Token 'TokColon) Expr (Token 'TokBraceEnd)
   | Do [GdCmd] Loc
   | If [GdCmd] Loc
   | SpecQM Loc -- ? to be rewritten as {!!} by the frontend
@@ -110,9 +110,9 @@ data Stmt
 instance ToConcrete Stmt C.Stmt where
   toConcrete (Skip l) = C.Skip l
   toConcrete (Abort l) = C.Abort l
-  toConcrete (Assign a b l) = C.Assign (toConcrete <$> fromSepByComma a) (fmap toConcrete b) l
+  toConcrete (Assign a b l) = C.Assign (toConcrete <$> fromSepBy a) (fmap toConcrete b) l
   toConcrete (Assert a) = C.Assert (toConcrete $ fromEnclosedBy a) (locOf a)
-  toConcrete (LoopInvariant a b l) = C.LoopInvariant (toConcrete a) (toConcrete b) l
+  toConcrete (LoopInvariant l a _ _ _ b r) = C.LoopInvariant (toConcrete a) (toConcrete b) (l <--> r)
   toConcrete (Do a l) = C.Do (fmap toConcrete a) l
   toConcrete (If a l) = C.If (fmap toConcrete a) l
   toConcrete (SpecQM l) = C.SpecQM l
@@ -124,7 +124,7 @@ instance Located Stmt where
   locOf (Abort l) = l
   locOf (Assign _ _ l) = l
   locOf (Assert x) = locOf x
-  locOf (LoopInvariant _ _ l) = l
+  locOf (LoopInvariant l _ _ _ _ _ r) = l <--> r
   locOf (Do _ l) = l
   locOf (If _ l) = l
   locOf (SpecQM l) = l

@@ -82,18 +82,15 @@ specContent = do
 --------------------------------------------------------------------------------
 
 -- | Parser for SepByComma
-sepByComma :: Parser a -> Parser (SepByComma a)
+sepByComma :: Parser a -> Parser (SepBy 'TokComma a)
 sepByComma parser = do
   x <- parser
 
   let f = return (Head x)
   let g = do
-        comma <- Util.withLoc (id <$ symbol TokComma <?> "comma")
-        let pos = case comma of
-              NoLoc -> error "NoLoc in sepByComma"
-              Loc p _ -> p
+        Token start _end <- tokenComma
         xs <- sepByComma parser
-        return $ Comma x pos xs
+        return $ Delim x start xs
   try g <|> f
 
 -- | Parser for EnclosedBy Braces
@@ -114,20 +111,46 @@ enclosedByParens parser = do
         Loc a b -> (a, b)
   return $ EnclosedBy l x m
 
+-- for building parsers for tokens
+adapt :: Tok -> String -> Parser (Token a)
+adapt t errMsg = do
+  (_, loc) <- Util.getLoc (symbol t <?> errMsg)
+  case loc of
+    NoLoc -> error "NoLoc when parsing token"
+    Loc l r -> return $ Token l r 
+
 tokenConst :: Parser (Token 'TokCon)
-tokenConst = Token . snd <$> Util.getLoc (symbol TokCon <?> "reserved word \"con\"")
+tokenConst = adapt TokCon "reserved word \"con\""
 
 tokenVar :: Parser (Token 'TokVar)
-tokenVar = Token . snd <$> Util.getLoc (symbol TokVar <?> "reserved word \"var\"")
+tokenVar = adapt TokVar "reserved word \"var\""
 
 tokenLet :: Parser (Token 'TokLet)
-tokenLet = Token . snd <$> Util.getLoc (symbol TokLet <?> "reserved word \"let\"")
+tokenLet = adapt TokLet "reserved word \"let\""
+
+tokenBraceStart :: Parser (Token 'TokBraceStart)
+tokenBraceStart = adapt TokBraceStart "opening curly bracket"
+
+tokenBraceEnd :: Parser (Token 'TokBraceEnd)
+tokenBraceEnd = adapt TokBraceEnd "closing curly bracket"
+
+tokenParenStart :: Parser (Token 'TokParenStart)
+tokenParenStart = adapt TokParenStart "opening parenthesis"
+
+tokenParenEnd :: Parser (Token 'TokParenEnd)
+tokenParenEnd = adapt TokParenEnd "closing parenthesis"
 
 tokenColon :: Parser (Token 'TokColon)
-tokenColon = Token . snd <$> Util.getLoc (symbol TokColon <?> "colon")
+tokenColon = adapt TokColon "colon"
+
+tokenComma :: Parser (Token 'TokComma)
+tokenComma = adapt TokComma "comma"
+
+tokenBnd :: Parser (Token 'TokBnd)
+tokenBnd = adapt TokBnd "reserved word \"bnd\""
 
 tokenEQ :: Parser (Token 'TokEQ)
-tokenEQ = Token . snd <$> Util.getLoc (symbol TokEQ <?> "=")
+tokenEQ = adapt TokEQ "="
 
 --------------------------------------------------------------------------------
 
@@ -168,11 +191,11 @@ letDecl =
 -- | Variables and stuff
 
 -- separated by commas
-constList :: Parser (SepByComma Name)
+constList :: Parser (SepBy 'TokComma Name)
 constList = sepByComma upper <?> "a list of constants separated by commas"
 
 -- separated by commas
-variableList :: Parser (SepByComma Name)
+variableList :: Parser (SepBy 'TokComma Name)
 variableList = sepByComma lower <?> "a list of variables separated by commas"
 
 --------------------------------------------------------------------------------
@@ -211,15 +234,14 @@ assert = Assert <$> enclosedByBraces expression
 
 assertWithBnd :: Parser Stmt
 assertWithBnd = do
-  EnclosedBy l (p, e) m <- enclosedByBraces $ do
-    p <- predicate
-    symbol TokComma <?> "comma"
-    symbol TokBnd <?> "bnd"
-    symbol TokColon <?> "colon"
-    e <- expression
-    return (p, e)
-
-  return $ LoopInvariant p e (l <--> m)
+  LoopInvariant
+    <$> tokenBraceStart
+    <*> predicate
+    <*> tokenComma
+    <*> tokenBnd
+    <*> tokenColon
+    <*> expression
+    <*> tokenBraceEnd
 
 assign :: Parser Stmt
 assign =
