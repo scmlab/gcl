@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections #-}
 
@@ -25,8 +26,8 @@ import Text.Megaparsec hiding
   ( ParseError,
     Pos,
     State,
+    Token,
     parse,
-    Token
   )
 import qualified Text.Megaparsec as Mega
 import Prelude hiding (Ordering (..))
@@ -99,19 +100,34 @@ sepByComma parser = do
 enclosedByBraces :: Parser a -> Parser (EnclosedBy Braces a)
 enclosedByBraces parser = do
   (x, loc) <- braces parser
-  let (l, m) = case loc of 
-                NoLoc -> error "NoLoc in enclosedByBraces"
-                Loc a b -> (a, b)
+  let (l, m) = case loc of
+        NoLoc -> error "NoLoc in enclosedByBraces"
+        Loc a b -> (a, b)
   return $ EnclosedBy l x m
 
 -- | Parser for EnclosedBy Parens
 enclosedByParens :: Parser a -> Parser (EnclosedBy Parens a)
 enclosedByParens parser = do
   (x, loc) <- parens parser
-  let (l, m) = case loc of 
-                NoLoc -> error "NoLoc in enclosedByParens"
-                Loc a b -> (a, b)
+  let (l, m) = case loc of
+        NoLoc -> error "NoLoc in enclosedByParens"
+        Loc a b -> (a, b)
   return $ EnclosedBy l x m
+
+tokenConst :: Parser (Token 'TokCon)
+tokenConst = Token . snd <$> Util.getLoc (symbol TokCon <?> "reserved word \"con\"")
+
+tokenVar :: Parser (Token 'TokVar)
+tokenVar = Token . snd <$> Util.getLoc (symbol TokVar <?> "reserved word \"var\"")
+
+tokenLet :: Parser (Token 'TokLet)
+tokenLet = Token . snd <$> Util.getLoc (symbol TokLet <?> "reserved word \"let\"")
+
+tokenColon :: Parser (Token 'TokColon)
+tokenColon = Token . snd <$> Util.getLoc (symbol TokColon <?> "colon")
+
+tokenEQ :: Parser (Token 'TokEQ)
+tokenEQ = Token . snd <$> Util.getLoc (symbol TokEQ <?> "=")
 
 --------------------------------------------------------------------------------
 
@@ -121,30 +137,31 @@ declaration = choice [constantDecl, variableDecl, letDecl] <?> "declaration"
 
 constantDecl :: Parser Declaration
 constantDecl = withLoc $ do
-  (_, c) <- Util.getLoc (id <$ symbol TokCon <?> "con")
+  con <- tokenConst
   vars <- constList
-  colon' <- colon 
+  colon <- tokenColon
   t <- type'
   assertion <- optional (enclosedByBraces predicate)
-  return $ ConstDecl c vars colon' t assertion
+  return $ ConstDecl con vars colon t assertion
 
 variableDecl :: Parser Declaration
 variableDecl = withLoc $ do
-  (_, v) <- Util.getLoc (id <$ symbol TokVar <?> "var")
+  v <- tokenVar
   vars <- variableList
-  colon' <- colon 
+  colon <- tokenColon
   t <- type'
   assertion <- optional (enclosedByBraces predicate)
-  return $ VarDecl v vars colon' t assertion
+  return $ VarDecl v vars colon t assertion
 
 letDecl :: Parser Declaration
-letDecl = withLoc $ do
-  (_, l) <- Util.getLoc (id <$ symbol TokLet <?> "let")
-  name <- upper
-  args <- many lower
-  (_, m) <- Util.getLoc (id <$ symbol TokEQ <?> "=")
-  expr <- predicate
-  return $ LetDecl l name args m expr
+letDecl =
+  withLoc $
+    LetDecl
+      <$> tokenLet
+      <*> upper
+      <*> many lower
+      <*> tokenEQ
+      <*> predicate
 
 --------------------------------------------------------------------------------
 
@@ -193,8 +210,8 @@ assert :: Parser Stmt
 assert = Assert <$> enclosedByBraces expression
 
 assertWithBnd :: Parser Stmt
-assertWithBnd = do 
-  EnclosedBy l (p, e) m <- enclosedByBraces $ do 
+assertWithBnd = do
+  EnclosedBy l (p, e) m <- enclosedByBraces $ do
     p <- predicate
     symbol TokComma <?> "comma"
     symbol TokBnd <?> "bnd"
@@ -556,7 +573,7 @@ withLoc :: Parser (Loc -> a) -> Parser a
 withLoc = Util.withLoc
 
 parens :: Parser a -> Parser (a, Loc)
-parens parser = do 
+parens parser = do
   (_, start) <- Util.getLoc (symbol TokParenStart <?> "opening parenthesis")
   result <- parser
   (_, end) <- Util.getLoc (symbol TokParenEnd <?> "closing parenthesis")
@@ -564,7 +581,7 @@ parens parser = do
   return (result, loc)
 
 braces :: Parser a -> Parser (a, Loc)
-braces parser = do 
+braces parser = do
   (_, start) <- Util.getLoc (symbol TokBraceStart <?> "opening braces")
   result <- parser
   (_, end) <- Util.getLoc (symbol TokBraceEnd <?> "closing braces")
@@ -598,8 +615,3 @@ integer = extract p <?> "integer"
   where
     p (TokInt s) = Just s
     p _ = Nothing
-
-colon :: Parser (Token Colon)
-colon = do 
-  (_, l) <- Util.getLoc (symbol TokColon <?> "colon")
-  return $ Token l

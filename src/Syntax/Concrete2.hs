@@ -1,3 +1,5 @@
+{-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FunctionalDependencies #-}
 
@@ -20,6 +22,7 @@ import Syntax.Common
 import qualified Syntax.Concrete as C
 import Prelude hiding (Ordering (..))
 import qualified Syntax.ConstExpr as ConstExpr
+import Syntax.Parser.Lexer (Tok(..))
 
 --------------------------------------------------------------------------------
 
@@ -52,14 +55,11 @@ fromEnclosedBy (EnclosedBy _ a _) = a
 data Braces 
 data Parens 
 
-newtype Token a = Token Loc
+newtype Token (a :: Tok) = Token Loc
   deriving (Eq, Show)
 
 instance Located (Token a) where 
   locOf (Token l) = l
-
--- | Phantoms types for annotating `Token`
-data Colon
 
 --------------------------------------------------------------------------------
 
@@ -84,9 +84,9 @@ instance Located Program where
 type Defns = Map Text Expr
 
 data Declaration
-  = ConstDecl Loc (SepByComma Name) (Token Colon) Type (Maybe (EnclosedBy Braces Expr)) Loc
-  | VarDecl Loc (SepByComma Name) (Token Colon) Type (Maybe (EnclosedBy Braces Expr)) Loc
-  | LetDecl Loc Name [Name] Loc Expr Loc
+  = ConstDecl (Token 'TokCon) (SepByComma Name) (Token 'TokColon) Type (Maybe (EnclosedBy Braces Expr)) Loc
+  | VarDecl (Token 'TokVar) (SepByComma Name) (Token 'TokColon) Type (Maybe (EnclosedBy Braces Expr)) Loc
+  | LetDecl (Token 'TokLet) Name [Name] (Token 'TokEQ) Expr Loc
   deriving (Eq, Show)
 
 instance ToConcrete Declaration C.Declaration where
@@ -194,13 +194,6 @@ instance Located Type where
   locOf (TArray _ _ l) = l
   locOf (TFunc _ _ _ l) = l
   locOf (TVar _ l) = l
-
-instance Relocatable Type where
-  reloc l (TParen a) = undefined
-  reloc l (TBase base _) = TBase base l
-  reloc l (TArray i s _) = TArray i s l
-  reloc l (TFunc s b t _) = TFunc s b t l
-  reloc l (TVar x _) = TVar x l
 
 --------------------------------------------------------------------------------
 

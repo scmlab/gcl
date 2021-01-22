@@ -1,15 +1,17 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Pretty.Concrete2 where
 
 import Data.Loc
-import Data.Text.Prettyprint.Doc
+import Data.Text.Prettyprint.Doc (Doc, Pretty (pretty), comma)
 import Pretty.Abstract ()
 import Pretty.Util
 import Pretty.Variadic
 import Syntax.Common (Fixity (..))
 import Syntax.Concrete2
+import Syntax.Parser.Lexer (Tok (..))
 import Prelude hiding (Ordering (..))
 
 --------------------------------------------------------------------------------
@@ -28,9 +30,25 @@ instance PrettyWithLoc a => PrettyWithLoc (EnclosedBy Parens a) where
   prettyWithLoc (EnclosedBy l x m) =
     DocWithLoc "(" l l <> prettyWithLoc x <> DocWithLoc ")" m m
 
-instance PrettyWithLoc (Token Colon) where
+instance PrettyWithLoc (Token 'TokColon) where
   prettyWithLoc (Token NoLoc) = error "NoLoc in Token"
   prettyWithLoc (Token (Loc l m)) = DocWithLoc ":" l m
+
+instance PrettyWithLoc (Token 'TokCon) where
+  prettyWithLoc (Token NoLoc) = error "NoLoc in Token"
+  prettyWithLoc (Token (Loc l m)) = DocWithLoc "con" l m
+
+instance PrettyWithLoc (Token 'TokVar) where
+  prettyWithLoc (Token NoLoc) = error "NoLoc in Token"
+  prettyWithLoc (Token (Loc l m)) = DocWithLoc "var" l m
+
+instance PrettyWithLoc (Token 'TokLet) where
+  prettyWithLoc (Token NoLoc) = error "NoLoc in Token"
+  prettyWithLoc (Token (Loc l m)) = DocWithLoc "let" l m
+
+instance PrettyWithLoc (Token 'TokEQ) where
+  prettyWithLoc (Token NoLoc) = error "NoLoc in Token"
+  prettyWithLoc (Token (Loc l m)) = DocWithLoc "=" l m
 
 --------------------------------------------------------------------------------
 
@@ -49,32 +67,32 @@ instance Pretty Declaration where
   pretty = toDoc . prettyWithLoc
 
 instance PrettyWithLoc Declaration where
-  prettyWithLoc (ConstDecl c names colon t Nothing l) =
+  prettyWithLoc (ConstDecl con names colon t Nothing l) =
     setLoc l $
-      fromLocAndDoc c "con"
+      prettyWithLoc con
         <> prettyWithLoc names
         <> prettyWithLoc colon
         <> prettyWithLoc t
-  prettyWithLoc (ConstDecl c names colon t (Just p) l) =
+  prettyWithLoc (ConstDecl con names colon t (Just p) l) =
     setLoc l $
-      fromLocAndDoc c "con"
+      prettyWithLoc con
         <> prettyWithLoc names
         <> prettyWithLoc colon
         <> prettyWithLoc t
         <> prettyWithLoc p
   prettyWithLoc (VarDecl v names colon t Nothing l) =
     setLoc l $
-      fromLocAndDoc v "var" <> prettyWithLoc names <> prettyWithLoc colon <> prettyWithLoc t
+      prettyWithLoc v <> prettyWithLoc names <> prettyWithLoc colon <> prettyWithLoc t
   prettyWithLoc (VarDecl v names colon t (Just p) l) =
     setLoc l $
-      fromLocAndDoc v "var" <> prettyWithLoc names <> prettyWithLoc colon <> prettyWithLoc t
+      prettyWithLoc v <> prettyWithLoc names <> prettyWithLoc colon <> prettyWithLoc t
         <> prettyWithLoc p
-  prettyWithLoc (LetDecl m name args n expr l) =
+  prettyWithLoc (LetDecl a name args e expr l) =
     setLoc l $
-      fromLocAndDoc m "let"
+      prettyWithLoc a
         <> prettyWithLoc name
         <> mconcat (map prettyWithLoc args)
-        <> fromLocAndDoc n "="
+        <> prettyWithLoc e
         <> prettyWithLoc expr
 
 --------------------------------------------------------------------------------
@@ -172,7 +190,7 @@ instance PrettyWithLoc Expr where
     Complete s -> s
 
 handleExpr :: Expr -> Variadic Expr (DocWithLoc ann)
-handleExpr (Paren x) = return $ prettyWithLoc x 
+handleExpr (Paren x) = return $ prettyWithLoc x
 handleExpr (Var x _) = return $ prettyWithLoc x
 handleExpr (Const x _) = return $ prettyWithLoc x
 handleExpr (Lit x _) = return $ prettyWithLoc x
@@ -239,7 +257,7 @@ instance Pretty Type where
 
 instance PrettyWithLoc Type where
   prettyWithLoc (TParen t) = prettyWithLoc t
-    -- DocWithLoc "(" l l <> prettyWithLoc t <> DocWithLoc ")" m m
+  -- DocWithLoc "(" l l <> prettyWithLoc t <> DocWithLoc ")" m m
   prettyWithLoc (TBase TInt l) = setLoc l "Int"
   prettyWithLoc (TBase TBool l) = setLoc l "Bool"
   prettyWithLoc (TBase TChar l) = setLoc l "Char"
