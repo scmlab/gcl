@@ -82,16 +82,22 @@ specContent = do
 --------------------------------------------------------------------------------
 
 -- | Parser for SepByComma
-sepByComma :: Parser a -> Parser (SepBy 'TokComma a)
-sepByComma parser = do
+sepBy' :: Parser (Token sep) -> Parser a -> Parser (SepBy sep a)
+sepBy' delim parser = do
   x <- parser
 
   let f = return (Head x)
   let g = do
-        Token start _end <- tokenComma
-        xs <- sepByComma parser
+        Token start _end <- delim
+        xs <- sepBy' delim parser
         return $ Delim x start xs
   try g <|> f
+
+sepByComma :: Parser a -> Parser (SepBy 'TokComma a)
+sepByComma = sepBy' tokenComma
+
+sepByGuardBar :: Parser a -> Parser (SepBy 'TokGuardBar a)
+sepByGuardBar = sepBy' tokenGuardBar
 
 -- for building parsers for tokens
 adapt :: Tok -> String -> Parser (Token a)
@@ -131,11 +137,32 @@ tokenComma = adapt TokComma "comma"
 tokenBnd :: Parser (Token 'TokBnd)
 tokenBnd = adapt TokBnd "reserved word \"bnd\""
 
+tokenIf :: Parser (Token 'TokIf)
+tokenIf = adapt TokIf "reserved word \"if\""
+
+tokenFi :: Parser (Token 'TokFi)
+tokenFi = adapt TokFi "reserved word \"fi\""
+
+tokenDo :: Parser (Token 'TokDo)
+tokenDo = adapt TokDo "reserved word \"do\""
+
+tokenOd :: Parser (Token 'TokOd)
+tokenOd = adapt TokOd "reserved word \"od\""
+
 tokenAssign :: Parser (Token 'TokAssign)
 tokenAssign = adapt TokAssign ":="
 
 tokenEQ :: Parser (Token 'TokEQ)
 tokenEQ = adapt TokEQ "="
+
+tokenGuardBar :: Parser (Token 'TokGuardBar)
+tokenGuardBar = adapt TokGuardBar "|"
+
+tokenArrow :: Parser (Token 'TokArrow)
+tokenArrow = adapt TokArrow "->"
+
+tokenArrowU :: Parser (Token 'TokArrowU)
+tokenArrowU = adapt TokArrowU "→"
 
 --------------------------------------------------------------------------------
 
@@ -261,19 +288,17 @@ assertWithBnd = do
 
 assign :: Parser Stmt
 assign =
-    Assign
-      <$> sepByComma lower
-      <*> tokenAssign
-      <*> sepByComma expression
+  Assign
+    <$> sepByComma lower
+    <*> tokenAssign
+    <*> sepByComma expression
 
 repetition :: Parser Stmt
 repetition =
-  withLoc $
-    Do <$> do
-      block'
-        (symbol TokDo <?> "do")
-        guardedCommands
-        (symbol TokOd <?> "od")
+  Do
+    <$> tokenDo
+    <*> sepByGuardBar guardedCommand
+    <*> tokenOd
 
 selection :: Parser Stmt
 selection =
@@ -290,11 +315,10 @@ guardedCommands = sepBy1 guardedCommand $ do
 
 guardedCommand :: Parser GdCmd
 guardedCommand =
-  withLoc $
-    GdCmd
-      <$> predicate
-      <* ((symbol TokArrow <?> "->") <|> (symbol TokArrowU <?> "→"))
-      <*> block statements1
+  GdCmd
+    <$> predicate
+    <*> ((Left <$> tokenArrow) <|> (Right <$> tokenArrowU))
+    <*> block statements1
 
 hole :: Parser Stmt
 hole = withLoc $ SpecQM <$ (symbol TokQM <?> "?")

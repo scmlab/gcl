@@ -5,7 +5,7 @@
 module Pretty.Concrete2 where
 
 import Data.Loc
-import Data.Text.Prettyprint.Doc (Doc, Pretty (pretty), comma)
+import Data.Text.Prettyprint.Doc (Doc, Pretty (pretty))
 import Pretty.Abstract ()
 import Pretty.Util
 import Pretty.Variadic
@@ -16,12 +16,22 @@ import Prelude hiding (Ordering (..))
 
 --------------------------------------------------------------------------------
 
--- | SepByComma
+instance (PrettyWithLoc a, PrettyWithLoc b) => PrettyWithLoc (Either a b) where
+  prettyWithLoc (Left x) = prettyWithLoc x
+  prettyWithLoc (Right x) = prettyWithLoc x
+
+-- | SepBy
 instance PrettyWithLoc a => PrettyWithLoc (SepBy 'TokComma a) where
   prettyWithLoc (Head x) = prettyWithLoc x
   prettyWithLoc (Delim x p xs) =
-    prettyWithLoc x <> DocWithLoc comma p p <> prettyWithLoc xs
+    prettyWithLoc x <> DocWithLoc "," p p <> prettyWithLoc xs
 
+instance PrettyWithLoc a => PrettyWithLoc (SepBy 'TokGuardBar a) where
+  prettyWithLoc (Head x) = prettyWithLoc x
+  prettyWithLoc (Delim x p xs) =
+    prettyWithLoc x <> DocWithLoc "|" p p <> prettyWithLoc xs
+
+-- | Tokens
 instance PrettyWithLoc (Token 'TokCon) where
   prettyWithLoc (Token l r) = DocWithLoc "con" l r
 
@@ -52,11 +62,32 @@ instance PrettyWithLoc (Token 'TokComma) where
 instance PrettyWithLoc (Token 'TokBnd) where
   prettyWithLoc (Token l r) = DocWithLoc "bnd" l r
 
+instance PrettyWithLoc (Token 'TokIf) where
+  prettyWithLoc (Token l r) = DocWithLoc "if" l r
+
+instance PrettyWithLoc (Token 'TokFi) where
+  prettyWithLoc (Token l r) = DocWithLoc "fi" l r
+
+instance PrettyWithLoc (Token 'TokDo) where
+  prettyWithLoc (Token l r) = DocWithLoc "do" l r
+
+instance PrettyWithLoc (Token 'TokOd) where
+  prettyWithLoc (Token l r) = DocWithLoc "od" l r
+
 instance PrettyWithLoc (Token 'TokAssign) where
   prettyWithLoc (Token l r) = DocWithLoc ":=" l r
 
 instance PrettyWithLoc (Token 'TokEQ) where
   prettyWithLoc (Token l r) = DocWithLoc "=" l r
+
+instance PrettyWithLoc (Token 'TokGuardBar) where
+  prettyWithLoc (Token l r) = DocWithLoc "|" l r
+
+instance PrettyWithLoc (Token 'TokArrow) where
+  prettyWithLoc (Token l r) = DocWithLoc "->" l r
+
+instance PrettyWithLoc (Token 'TokArrowU) where
+  prettyWithLoc (Token l r) = DocWithLoc "→" l r
 
 --------------------------------------------------------------------------------
 
@@ -174,9 +205,13 @@ instance PrettyWithLoc Stmt where
       <> prettyWithLoc bnd
       <> prettyWithLoc d
       <> prettyWithLoc r
-  prettyWithLoc (Do gdCmds l) =
-    setLoc l $
-      "do " <> sepBy "| " (map prettyWithLoc gdCmds) <> "\nod"
+  prettyWithLoc (Do l gdCmds r) =
+    prettyWithLoc l
+      <> prettyWithLoc gdCmds
+      <> prettyWithLoc r
+
+    -- setLoc l $
+    --   "do " <> sepBy "| " (map prettyWithLoc gdCmds) <> "\nod"
   prettyWithLoc (If gdCmds _) =
     "if " <> sepBy "| " (map prettyWithLoc gdCmds) <> "\nfi"
   prettyWithLoc (SpecQM l) = setLoc l "?"
@@ -187,10 +222,9 @@ instance Pretty GdCmd where
   pretty = toDoc . prettyWithLoc
 
 instance PrettyWithLoc GdCmd where
-  prettyWithLoc (GdCmd guard body l) =
-    setLoc l $
+  prettyWithLoc (GdCmd guard a body) =
       prettyWithLoc guard
-        <> " ->"
+      <> prettyWithLoc a
         <> mconcat (map prettyWithLoc body)
 
 --------------------------------------------------------------------------------

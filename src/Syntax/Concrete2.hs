@@ -94,7 +94,7 @@ data Stmt
   | Assign (SepBy 'TokComma Name) (Token 'TokAssign) (SepBy 'TokComma Expr) 
   | Assert (Token 'TokBraceStart) Expr (Token 'TokBraceEnd)
   | LoopInvariant (Token 'TokBraceStart) Expr (Token 'TokComma) (Token 'TokBnd) (Token 'TokColon) Expr (Token 'TokBraceEnd)
-  | Do [GdCmd] Loc
+  | Do (Token 'TokDo) (SepBy 'TokGuardBar GdCmd) (Token 'TokOd)
   | If [GdCmd] Loc
   | SpecQM Loc -- ? to be rewritten as {!!} by the frontend
   | Spec Loc
@@ -107,7 +107,7 @@ instance ToConcrete Stmt C.Stmt where
   toConcrete (Assign a _ b) = C.Assign (toConcrete <$> fromSepBy a) (toConcrete <$> fromSepBy b) (a <--> b)
   toConcrete (Assert l a r) = C.Assert (toConcrete a) (l <--> r)
   toConcrete (LoopInvariant l a _ _ _ b r) = C.LoopInvariant (toConcrete a) (toConcrete b) (l <--> r)
-  toConcrete (Do a l) = C.Do (fmap toConcrete a) l
+  toConcrete (Do l a r) = C.Do (toConcrete <$> fromSepBy a) (l <--> r)
   toConcrete (If a l) = C.If (fmap toConcrete a) l
   toConcrete (SpecQM l) = C.SpecQM l
   toConcrete (Spec l) = C.Spec l
@@ -119,33 +119,16 @@ instance Located Stmt where
   locOf (Assign l _ r) = l <--> r
   locOf (Assert l _ r) = l <--> r
   locOf (LoopInvariant l _ _ _ _ _ r) = l <--> r
-  locOf (Do _ l) = l
+  locOf (Do l _ r) = l <--> r
   locOf (If _ l) = l
   locOf (SpecQM l) = l
   locOf (Spec l) = l
   locOf (Proof l) = l
 
-data GdCmd = GdCmd Expr [Stmt] Loc deriving (Eq, Show)
+data GdCmd = GdCmd Expr (Either (Token 'TokArrow) (Token 'TokArrowU)) [Stmt] deriving (Eq, Show)
 
 instance ToConcrete GdCmd C.GdCmd where
-  toConcrete (GdCmd a b l) = C.GdCmd (toConcrete a) (fmap toConcrete b) l
-
-extractAssertion :: Declaration -> Maybe Expr
-extractAssertion ConstDecl {} = Nothing
-extractAssertion (ConstDeclWithProp _ _ _ _ _ e _) = Just e
-extractAssertion VarDecl {} = Nothing
-extractAssertion (VarDeclWithProp _ _ _ _ _ e _) = Just e
-extractAssertion LetDecl {} = Nothing
-
-extractLetBinding :: Declaration -> Maybe (Text, Expr)
-extractLetBinding (LetDecl _ c as _ e) = Just (nameToText c, wrapLam (map nameToText as) e)
-extractLetBinding _ = Nothing
-
-getGuards :: [GdCmd] -> [Expr]
-getGuards = fst . unzipGdCmds
-
-unzipGdCmds :: [GdCmd] -> ([Expr], [[Stmt]])
-unzipGdCmds = unzip . map (\(GdCmd x y _) -> (x, y))
+  toConcrete (GdCmd a _ b) = C.GdCmd (toConcrete a) (fmap toConcrete b) (a <--> b)
 
 --------------------------------------------------------------------------------
 

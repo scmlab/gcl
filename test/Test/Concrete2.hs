@@ -31,10 +31,10 @@ render parser raw =
   let expr = LSP.runM $ LSP.scan "<test>" raw >>= LSP.parse parser "<test>"
    in renderStrict $ pretty expr
 
-isomorphic :: Pretty a => Parser a -> Text -> Assertion 
+isomorphic :: Pretty a => Parser a -> Text -> Assertion
 isomorphic parser raw = removeTrailingWhitespace (render parser raw) @?= removeTrailingWhitespace raw
-  where 
-    removeTrailingWhitespace :: Text -> Text 
+  where
+    removeTrailingWhitespace :: Text -> Text
     removeTrailingWhitespace = Text.unlines . map Text.stripEnd . Text.lines
 
 -- | Expression
@@ -101,7 +101,7 @@ type' =
           \   (\n\
           \           Int))",
       testCase "array" $ run "array [0 .. N) of Int"
-    ]  
+    ]
   where
     run = isomorphic Parser.type'
 
@@ -110,13 +110,14 @@ type' =
 -- | Declaration
 declaration :: TestTree
 declaration =
-  testGroup "Declarations"
+  testGroup
+    "Declarations"
     [ testCase "variable" $ run "var   x     :   ( Int)",
       testCase "variable (with newlines in between)" $
         run
           "var\n\
           \ x \n\
-          \   : Int\n", 
+          \   : Int\n",
       testCase "variable with properties" $ run "var x : Int  {    True \n }",
       testCase "constant" $ run "con X , Z,B, Y : Int",
       testCase "let binding" $ run " let  X   i  =  N  >   (0)  "
@@ -129,7 +130,8 @@ declaration =
 -- | Statements
 statement :: TestTree
 statement =
-  testGroup "Single statement"
+  testGroup
+    "Single statement"
     [ testCase "abort" $ run "     abort",
       testCase "skip" $ run "  skip",
       testCase "assertion" $ run "{ \n True   }",
@@ -138,7 +140,8 @@ statement =
       testCase "conditional 1" $ run "if True -> skip fi",
       testCase "conditional 2" $ run "if True -> skip\n | False -> abort fi",
       testCase "loop invariant" $ run "    { True    ,     bnd      : a \n }",
-      testCase "loop body" $ run "do True -> skip od"
+      testCase "loop body 1" $ run "do True -> skip od",
+      testCase "loop body 2" $ run "do True → skip od"
     ]
   where
     run = isomorphic Parser.statement
