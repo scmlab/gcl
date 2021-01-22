@@ -40,6 +40,10 @@ fromSepBy :: SepBy sep a -> [a]
 fromSepBy (Head a) = [a]
 fromSepBy (Delim a _ as) = a : fromSepBy as
 
+instance Located a => Located (SepBy sep a) where
+  locOf (Head a) = locOf a
+  locOf (Delim a _ as) = a <--> locOf as
+
 data Token (a :: Tok) = Token Pos Pos
   deriving (Eq, Show)
 
@@ -74,7 +78,7 @@ data Declaration
   | ConstDeclWithProp (Token 'TokCon) (SepBy 'TokComma Name) (Token 'TokColon) Type (Token 'TokBraceStart) Expr (Token 'TokBraceEnd)
   | VarDecl (Token 'TokVar) (SepBy 'TokComma Name) (Token 'TokColon) Type
   | VarDeclWithProp (Token 'TokVar) (SepBy 'TokComma Name) (Token 'TokColon) Type (Token 'TokBraceStart) Expr (Token 'TokBraceEnd)
-  | LetDecl (Token 'TokLet) Name [Name] (Token 'TokEQ) Expr Loc
+  | LetDecl (Token 'TokLet) Name [Name] (Token 'TokEQ) Expr
   deriving (Eq, Show)
 
 instance ToConcrete Declaration C.Declaration where
@@ -82,12 +86,12 @@ instance ToConcrete Declaration C.Declaration where
   toConcrete (ConstDeclWithProp x a _ b _ c r) = C.ConstDecl (toConcrete <$> fromSepBy a) (toConcrete b) (Just $ toConcrete c) (x <--> r)
   toConcrete (VarDecl l a _ b) = C.VarDecl (toConcrete <$> fromSepBy a) (toConcrete b) Nothing (l <--> b)
   toConcrete (VarDeclWithProp x a _ b _ c r) = C.VarDecl (toConcrete <$> fromSepBy a) (toConcrete b) (Just $ toConcrete c) (x <--> r)
-  toConcrete (LetDecl _ a b _ c l) = C.LetDecl (toConcrete a) (fmap nameToText b) (toConcrete c) l
+  toConcrete (LetDecl l a b _ c) = C.LetDecl (toConcrete a) (fmap nameToText b) (toConcrete c) (l <--> c)
 
 data Stmt
   = Skip Loc
   | Abort Loc
-  | Assign (SepBy 'TokComma Name) [Expr] Loc
+  | Assign (SepBy 'TokComma Name) (Token 'TokAssign) (SepBy 'TokComma Expr) 
   | Assert (Token 'TokBraceStart) Expr (Token 'TokBraceEnd)
   | LoopInvariant (Token 'TokBraceStart) Expr (Token 'TokComma) (Token 'TokBnd) (Token 'TokColon) Expr (Token 'TokBraceEnd)
   | Do [GdCmd] Loc
@@ -100,7 +104,7 @@ data Stmt
 instance ToConcrete Stmt C.Stmt where
   toConcrete (Skip l) = C.Skip l
   toConcrete (Abort l) = C.Abort l
-  toConcrete (Assign a b l) = C.Assign (toConcrete <$> fromSepBy a) (fmap toConcrete b) l
+  toConcrete (Assign a _ b) = C.Assign (toConcrete <$> fromSepBy a) (toConcrete <$> fromSepBy b) (a <--> b)
   toConcrete (Assert l a r) = C.Assert (toConcrete a) (l <--> r)
   toConcrete (LoopInvariant l a _ _ _ b r) = C.LoopInvariant (toConcrete a) (toConcrete b) (l <--> r)
   toConcrete (Do a l) = C.Do (fmap toConcrete a) l
@@ -112,7 +116,7 @@ instance ToConcrete Stmt C.Stmt where
 instance Located Stmt where
   locOf (Skip l) = l
   locOf (Abort l) = l
-  locOf (Assign _ _ l) = l
+  locOf (Assign l _ r) = l <--> r
   locOf (Assert l _ r) = l <--> r
   locOf (LoopInvariant l _ _ _ _ _ r) = l <--> r
   locOf (Do _ l) = l
@@ -134,7 +138,7 @@ extractAssertion (VarDeclWithProp _ _ _ _ _ e _) = Just e
 extractAssertion LetDecl {} = Nothing
 
 extractLetBinding :: Declaration -> Maybe (Text, Expr)
-extractLetBinding (LetDecl _ c as _ e _) = Just (nameToText c, wrapLam (map nameToText as) e)
+extractLetBinding (LetDecl _ c as _ e) = Just (nameToText c, wrapLam (map nameToText as) e)
 extractLetBinding _ = Nothing
 
 getGuards :: [GdCmd] -> [Expr]

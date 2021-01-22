@@ -134,7 +134,7 @@ statement =
       testCase "skip" $ run "  skip",
       testCase "assertion" $ run "{ \n True   }",
       testCase "assignment" $ run "x := 0",
-      testCase "assignment (parallel)" $ run "x, y := 0, 1",
+      testCase "assignment (parallel)" $ run "x   , y  := 0    ,    1",
       testCase "conditional 1" $ run "if True -> skip fi",
       testCase "conditional 2" $ run "if True -> skip\n | False -> abort fi",
       testCase "loop invariant" $ run "    { True    ,     bnd      : a \n }",

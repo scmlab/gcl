@@ -52,6 +52,9 @@ instance PrettyWithLoc (Token 'TokComma) where
 instance PrettyWithLoc (Token 'TokBnd) where
   prettyWithLoc (Token l r) = DocWithLoc "bnd" l r
 
+instance PrettyWithLoc (Token 'TokAssign) where
+  prettyWithLoc (Token l r) = DocWithLoc ":=" l r
+
 instance PrettyWithLoc (Token 'TokEQ) where
   prettyWithLoc (Token l r) = DocWithLoc "=" l r
 
@@ -92,13 +95,12 @@ instance PrettyWithLoc Declaration where
       <> prettyWithLoc l
       <> prettyWithLoc p
       <> prettyWithLoc r
-  prettyWithLoc (LetDecl a name args e expr l) =
-    setLoc l $
-      prettyWithLoc a
-        <> prettyWithLoc name
-        <> mconcat (map prettyWithLoc args)
-        <> prettyWithLoc e
-        <> prettyWithLoc expr
+  prettyWithLoc (LetDecl a name args e expr) =
+    prettyWithLoc a
+      <> prettyWithLoc name
+      <> mconcat (map prettyWithLoc args)
+      <> prettyWithLoc e
+      <> prettyWithLoc expr
 
 --------------------------------------------------------------------------------
 
@@ -158,8 +160,8 @@ instance Pretty Stmt where
 instance PrettyWithLoc Stmt where
   prettyWithLoc (Skip l) = setLoc l "skip"
   prettyWithLoc (Abort l) = setLoc l "abort"
-  prettyWithLoc (Assign xs es l) =
-    setLoc l $ prettyWithLoc xs <> ":= " <> sepBy ", " (map prettyWithLoc es)
+  prettyWithLoc (Assign xs a es) =
+    prettyWithLoc xs <> prettyWithLoc a <> prettyWithLoc es
   prettyWithLoc (Assert l p r) =
     prettyWithLoc l
       <> prettyWithLoc p

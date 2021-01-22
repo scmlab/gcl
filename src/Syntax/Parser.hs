@@ -131,6 +131,9 @@ tokenComma = adapt TokComma "comma"
 tokenBnd :: Parser (Token 'TokBnd)
 tokenBnd = adapt TokBnd "reserved word \"bnd\""
 
+tokenAssign :: Parser (Token 'TokAssign)
+tokenAssign = adapt TokAssign ":="
+
 tokenEQ :: Parser (Token 'TokEQ)
 tokenEQ = adapt TokEQ "="
 
@@ -188,13 +191,12 @@ varDeclWithProp =
 
 letDecl :: Parser Declaration
 letDecl =
-  withLoc $
-    LetDecl
-      <$> tokenLet
-      <*> upper
-      <*> many lower
-      <*> tokenEQ
-      <*> predicate
+  LetDecl
+    <$> tokenLet
+    <*> upper
+    <*> many lower
+    <*> tokenEQ
+    <*> predicate
 
 --------------------------------------------------------------------------------
 
@@ -259,11 +261,10 @@ assertWithBnd = do
 
 assign :: Parser Stmt
 assign =
-  withLoc $
     Assign
-      <$> variableList
-      <* (symbol TokAssign <?> ":=")
-      <*> expressionList
+      <$> sepByComma lower
+      <*> tokenAssign
+      <*> sepByComma expression
 
 repetition :: Parser Stmt
 repetition =
