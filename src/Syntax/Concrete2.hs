@@ -84,21 +84,25 @@ instance Located Program where
 type Defns = Map Text Expr
 
 data Declaration
-  = ConstDecl (Token 'TokCon) (SepBy 'TokComma Name) (Token 'TokColon) Type (Maybe (EnclosedBy Braces Expr)) Loc
-  | VarDecl (Token 'TokVar) (SepBy 'TokComma Name) (Token 'TokColon) Type (Maybe (EnclosedBy Braces Expr)) Loc
+  = ConstDecl (Token 'TokCon) (SepBy 'TokComma Name) (Token 'TokColon) Type
+  | ConstDeclWithProp (Token 'TokCon) (SepBy 'TokComma Name) (Token 'TokColon) Type (Token 'TokBraceStart) Expr (Token 'TokBraceEnd)
+  | VarDecl (Token 'TokVar) (SepBy 'TokComma Name) (Token 'TokColon) Type 
+  | VarDeclWithProp (Token 'TokVar) (SepBy 'TokComma Name) (Token 'TokColon) Type (Token 'TokBraceStart) Expr (Token 'TokBraceEnd)
   | LetDecl (Token 'TokLet) Name [Name] (Token 'TokEQ) Expr Loc
   deriving (Eq, Show)
 
 instance ToConcrete Declaration C.Declaration where
-  toConcrete (ConstDecl _ a _ b c l) = C.ConstDecl (toConcrete <$> fromSepBy a) (toConcrete b) (fmap (toConcrete . fromEnclosedBy) c) l
-  toConcrete (VarDecl _ a _ b c l) = C.VarDecl (toConcrete <$> fromSepBy a) (toConcrete b) (fmap (toConcrete . fromEnclosedBy) c) l
+  toConcrete (ConstDecl l a _ b) = C.ConstDecl (toConcrete <$> fromSepBy a) (toConcrete b) Nothing (l <--> b)
+  toConcrete (ConstDeclWithProp x a _ b _ c r) = C.ConstDecl (toConcrete <$> fromSepBy a) (toConcrete b) (Just $ toConcrete c) (x <--> r)
+  toConcrete (VarDecl l a _ b) = C.VarDecl (toConcrete <$> fromSepBy a) (toConcrete b) Nothing (l <--> b)
+  toConcrete (VarDeclWithProp x a _ b _ c r) = C.VarDecl (toConcrete <$> fromSepBy a) (toConcrete b) (Just $ toConcrete c) (x <--> r)
   toConcrete (LetDecl _ a b _ c l) = C.LetDecl (toConcrete a) (fmap nameToText b) (toConcrete c) l
 
 data Stmt
   = Skip Loc
   | Abort Loc
   | Assign (SepBy 'TokComma Name) [Expr] Loc
-  | Assert (EnclosedBy Braces Expr)
+  | Assert (Token 'TokBraceStart) Expr (Token 'TokBraceEnd)
   | LoopInvariant (Token 'TokBraceStart) Expr (Token 'TokComma) (Token 'TokBnd) (Token 'TokColon) Expr (Token 'TokBraceEnd)
   | Do [GdCmd] Loc
   | If [GdCmd] Loc
@@ -111,7 +115,7 @@ instance ToConcrete Stmt C.Stmt where
   toConcrete (Skip l) = C.Skip l
   toConcrete (Abort l) = C.Abort l
   toConcrete (Assign a b l) = C.Assign (toConcrete <$> fromSepBy a) (fmap toConcrete b) l
-  toConcrete (Assert a) = C.Assert (toConcrete $ fromEnclosedBy a) (locOf a)
+  toConcrete (Assert l a r) = C.Assert (toConcrete a) (l <--> r)
   toConcrete (LoopInvariant l a _ _ _ b r) = C.LoopInvariant (toConcrete a) (toConcrete b) (l <--> r)
   toConcrete (Do a l) = C.Do (fmap toConcrete a) l
   toConcrete (If a l) = C.If (fmap toConcrete a) l
@@ -123,7 +127,7 @@ instance Located Stmt where
   locOf (Skip l) = l
   locOf (Abort l) = l
   locOf (Assign _ _ l) = l
-  locOf (Assert x) = locOf x
+  locOf (Assert l _ r) = l <--> r
   locOf (LoopInvariant l _ _ _ _ _ r) = l <--> r
   locOf (Do _ l) = l
   locOf (If _ l) = l
@@ -137,14 +141,15 @@ instance ToConcrete GdCmd C.GdCmd where
   toConcrete (GdCmd a b l) = C.GdCmd (toConcrete a) (fmap toConcrete b) l
 
 extractAssertion :: Declaration -> Maybe Expr
-extractAssertion (ConstDecl _ _ _ _ e _) = fromEnclosedBy <$> e
-extractAssertion (VarDecl _ _ _ _ e _) = fromEnclosedBy <$> e
+extractAssertion ConstDecl {} = Nothing
+extractAssertion (ConstDeclWithProp _ _ _ _ _ e _) = Just e
+extractAssertion VarDecl {} = Nothing
+extractAssertion (VarDeclWithProp _ _ _ _ _ e _) = Just e
 extractAssertion LetDecl {} = Nothing
 
 extractLetBinding :: Declaration -> Maybe (Text, Expr)
-extractLetBinding ConstDecl {} = Nothing
-extractLetBinding VarDecl {} = Nothing
 extractLetBinding (LetDecl _ c as _ e _) = Just (nameToText c, wrapLam (map nameToText as) e)
+extractLetBinding _ = Nothing 
 
 getGuards :: [GdCmd] -> [Expr]
 getGuards = fst . unzipGdCmds

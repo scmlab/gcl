@@ -80,26 +80,26 @@ instance Pretty Declaration where
   pretty = toDoc . prettyWithLoc
 
 instance PrettyWithLoc Declaration where
-  prettyWithLoc (ConstDecl con names colon t Nothing l) =
-    setLoc l $
-      prettyWithLoc con
-        <> prettyWithLoc names
-        <> prettyWithLoc colon
-        <> prettyWithLoc t
-  prettyWithLoc (ConstDecl con names colon t (Just p) l) =
-    setLoc l $
-      prettyWithLoc con
-        <> prettyWithLoc names
-        <> prettyWithLoc colon
-        <> prettyWithLoc t
-        <> prettyWithLoc p
-  prettyWithLoc (VarDecl v names colon t Nothing l) =
-    setLoc l $
-      prettyWithLoc v <> prettyWithLoc names <> prettyWithLoc colon <> prettyWithLoc t
-  prettyWithLoc (VarDecl v names colon t (Just p) l) =
-    setLoc l $
-      prettyWithLoc v <> prettyWithLoc names <> prettyWithLoc colon <> prettyWithLoc t
-        <> prettyWithLoc p
+  prettyWithLoc (ConstDecl con names colon t) =
+    prettyWithLoc con
+      <> prettyWithLoc names
+      <> prettyWithLoc colon
+      <> prettyWithLoc t
+  prettyWithLoc (ConstDeclWithProp con names colon t l p r) =
+    prettyWithLoc con
+      <> prettyWithLoc names
+      <> prettyWithLoc colon
+      <> prettyWithLoc t
+      <> prettyWithLoc l
+      <> prettyWithLoc p
+      <> prettyWithLoc r
+  prettyWithLoc (VarDecl v names colon t) =
+    prettyWithLoc v <> prettyWithLoc names <> prettyWithLoc colon <> prettyWithLoc t
+  prettyWithLoc (VarDeclWithProp v names colon t l p r) =
+    prettyWithLoc v <> prettyWithLoc names <> prettyWithLoc colon <> prettyWithLoc t
+      <> prettyWithLoc l
+      <> prettyWithLoc p
+      <> prettyWithLoc r
   prettyWithLoc (LetDecl a name args e expr l) =
     setLoc l $
       prettyWithLoc a
@@ -168,7 +168,10 @@ instance PrettyWithLoc Stmt where
   prettyWithLoc (Abort l) = setLoc l "abort"
   prettyWithLoc (Assign xs es l) =
     setLoc l $ prettyWithLoc xs <> ":= " <> sepBy ", " (map prettyWithLoc es)
-  prettyWithLoc (Assert p) = prettyWithLoc p
+  prettyWithLoc (Assert l p r) =
+    prettyWithLoc l
+      <> prettyWithLoc p
+      <> prettyWithLoc r
   prettyWithLoc (LoopInvariant l p c b bnd d r) =
     prettyWithLoc l
       <> prettyWithLoc p

@@ -117,7 +117,7 @@ adapt t errMsg = do
   (_, loc) <- Util.getLoc (symbol t <?> errMsg)
   case loc of
     NoLoc -> error "NoLoc when parsing token"
-    Loc l r -> return $ Token l r 
+    Loc l r -> return $ Token l r
 
 tokenConst :: Parser (Token 'TokCon)
 tokenConst = adapt TokCon "reserved word \"con\""
@@ -156,25 +156,54 @@ tokenEQ = adapt TokEQ "="
 
 -- | Declarations
 declaration :: Parser Declaration
-declaration = choice [constantDecl, variableDecl, letDecl] <?> "declaration"
+declaration =
+  choice
+    [ try constDeclWithProp,
+      constDecl,
+      try varDeclWithProp,
+      varDecl,
+      letDecl
+    ]
+    <?> "declaration"
 
-constantDecl :: Parser Declaration
-constantDecl = withLoc $ do
-  con <- tokenConst
-  vars <- constList
-  colon <- tokenColon
-  t <- type'
-  assertion <- optional (enclosedByBraces predicate)
-  return $ ConstDecl con vars colon t assertion
+constDecl :: Parser Declaration
+constDecl =
+  ConstDecl
+    <$> tokenConst
+    <*> constList
+    <*> tokenColon
+    <*> type'
 
-variableDecl :: Parser Declaration
-variableDecl = withLoc $ do
-  v <- tokenVar
-  vars <- variableList
-  colon <- tokenColon
-  t <- type'
-  assertion <- optional (enclosedByBraces predicate)
-  return $ VarDecl v vars colon t assertion
+constDeclWithProp :: Parser Declaration
+constDeclWithProp =
+  ConstDeclWithProp
+    <$> tokenConst
+    <*> constList
+    <*> tokenColon
+    <*> type'
+    <*> tokenBraceStart
+    <*> expression
+    <*> tokenBraceEnd
+
+
+varDecl :: Parser Declaration
+varDecl =
+  VarDecl
+    <$> tokenVar
+    <*> variableList
+    <*> tokenColon
+    <*> type'
+
+varDeclWithProp :: Parser Declaration
+varDeclWithProp =
+  VarDeclWithProp
+    <$> tokenVar
+    <*> variableList
+    <*> tokenColon
+    <*> type'
+    <*> tokenBraceStart
+    <*> expression
+    <*> tokenBraceEnd
 
 letDecl :: Parser Declaration
 letDecl =
@@ -230,7 +259,11 @@ abort :: Parser Stmt
 abort = withLoc $ Abort <$ symbol TokAbort
 
 assert :: Parser Stmt
-assert = Assert <$> enclosedByBraces expression
+assert =
+  Assert
+    <$> tokenBraceStart
+    <*> expression
+    <*> tokenBraceEnd
 
 assertWithBnd :: Parser Stmt
 assertWithBnd = do
