@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -21,15 +22,10 @@ instance (PrettyWithLoc a, PrettyWithLoc b) => PrettyWithLoc (Either a b) where
   prettyWithLoc (Right x) = prettyWithLoc x
 
 -- | SepBy
-instance PrettyWithLoc a => PrettyWithLoc (SepBy 'TokComma a) where
+instance (PrettyWithLoc (Token sep), PrettyWithLoc a) => PrettyWithLoc (SepBy sep a) where
   prettyWithLoc (Head x) = prettyWithLoc x
-  prettyWithLoc (Delim x p xs) =
-    prettyWithLoc x <> DocWithLoc "," p p <> prettyWithLoc xs
-
-instance PrettyWithLoc a => PrettyWithLoc (SepBy 'TokGuardBar a) where
-  prettyWithLoc (Head x) = prettyWithLoc x
-  prettyWithLoc (Delim x p xs) =
-    prettyWithLoc x <> DocWithLoc "|" p p <> prettyWithLoc xs
+  prettyWithLoc (Delim x sep xs) =
+    prettyWithLoc x <> prettyWithLoc sep <> prettyWithLoc xs
 
 -- | Tokens
 instance PrettyWithLoc (Token 'TokCon) where
@@ -209,11 +205,10 @@ instance PrettyWithLoc Stmt where
     prettyWithLoc l
       <> prettyWithLoc gdCmds
       <> prettyWithLoc r
-
-    -- setLoc l $
-    --   "do " <> sepBy "| " (map prettyWithLoc gdCmds) <> "\nod"
-  prettyWithLoc (If gdCmds _) =
-    "if " <> sepBy "| " (map prettyWithLoc gdCmds) <> "\nfi"
+  prettyWithLoc (If l gdCmds r) =
+    prettyWithLoc l
+      <> prettyWithLoc gdCmds
+      <> prettyWithLoc r
   prettyWithLoc (SpecQM l) = setLoc l "?"
   prettyWithLoc (Spec l) = prettyHole "{!" "!}" l
   prettyWithLoc (Proof l) = prettyHole "{-" "-}" l

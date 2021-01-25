@@ -31,9 +31,15 @@ class ToConcrete a b | a -> b where
   toConcrete :: a -> b
 
 --------------------------------------------------------------------------------
+-- | A Token with start & ending Pos
+data Token (a :: Tok) = Token Pos Pos
+  deriving (Eq, Show)
+
+instance Located (Token a) where
+  locOf (Token l r) = Loc l r
 
 -- | A non-empty list of stuff seperated by commas
-data SepBy (sep :: Tok) a = Head a | Delim a Pos (SepBy sep a)
+data SepBy (sep :: Tok) a = Head a | Delim a (Token sep) (SepBy sep a)
   deriving (Eq, Show)
 
 fromSepBy :: SepBy sep a -> [a]
@@ -44,11 +50,6 @@ instance Located a => Located (SepBy sep a) where
   locOf (Head a) = locOf a
   locOf (Delim a _ as) = a <--> locOf as
 
-data Token (a :: Tok) = Token Pos Pos
-  deriving (Eq, Show)
-
-instance Located (Token a) where
-  locOf (Token l r) = Loc l r
 
 --------------------------------------------------------------------------------
 
@@ -95,7 +96,7 @@ data Stmt
   | Assert (Token 'TokBraceStart) Expr (Token 'TokBraceEnd)
   | LoopInvariant (Token 'TokBraceStart) Expr (Token 'TokComma) (Token 'TokBnd) (Token 'TokColon) Expr (Token 'TokBraceEnd)
   | Do (Token 'TokDo) (SepBy 'TokGuardBar GdCmd) (Token 'TokOd)
-  | If [GdCmd] Loc
+  | If (Token 'TokIf) (SepBy 'TokGuardBar GdCmd) (Token 'TokFi)
   | SpecQM Loc -- ? to be rewritten as {!!} by the frontend
   | Spec Loc
   | Proof Loc
@@ -108,7 +109,7 @@ instance ToConcrete Stmt C.Stmt where
   toConcrete (Assert l a r) = C.Assert (toConcrete a) (l <--> r)
   toConcrete (LoopInvariant l a _ _ _ b r) = C.LoopInvariant (toConcrete a) (toConcrete b) (l <--> r)
   toConcrete (Do l a r) = C.Do (toConcrete <$> fromSepBy a) (l <--> r)
-  toConcrete (If a l) = C.If (fmap toConcrete a) l
+  toConcrete (If l a r) = C.If (toConcrete <$> fromSepBy a) (l <--> r)
   toConcrete (SpecQM l) = C.SpecQM l
   toConcrete (Spec l) = C.Spec l
   toConcrete (Proof l) = C.Proof l
@@ -120,7 +121,7 @@ instance Located Stmt where
   locOf (Assert l _ r) = l <--> r
   locOf (LoopInvariant l _ _ _ _ _ r) = l <--> r
   locOf (Do l _ r) = l <--> r
-  locOf (If _ l) = l
+  locOf (If l _ r) = l <--> r
   locOf (SpecQM l) = l
   locOf (Spec l) = l
   locOf (Proof l) = l

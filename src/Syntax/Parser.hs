@@ -88,9 +88,9 @@ sepBy' delim parser = do
 
   let f = return (Head x)
   let g = do
-        Token start _end <- delim
+        sep <- delim
         xs <- sepBy' delim parser
-        return $ Delim x start xs
+        return $ Delim x sep xs
   try g <|> f
 
 sepByComma :: Parser a -> Parser (SepBy 'TokComma a)
@@ -251,7 +251,7 @@ statement =
       assert,
       skip,
       loop,
-      selection,
+      conditional,
       hole
     ]
     <?> "statement"
@@ -294,28 +294,27 @@ assign =
     <*> sepByComma expression
 
 loop :: Parser Stmt
-loop = do 
-  (a, b, c) <- block''
-                tokenDo
-                (sepByGuardBar guardedCommand)
-                tokenOd
-  return $ Do a b c
+loop =
+  block'
+    Do
+    tokenDo
+    (sepByGuardBar guardedCommand)
+    tokenOd
 
-selection :: Parser Stmt
-selection =
-  withLoc $
-    If <$> do
-      block'
-        (symbol TokIf <?> "if")
-        guardedCommands
-        (symbol TokFi <?> "fi")
+conditional :: Parser Stmt
+conditional =
+  block'
+    If
+    tokenIf
+    (sepByGuardBar guardedCommand)
+    tokenFi
 
 guardedCommands :: Parser [GdCmd]
 guardedCommands = sepBy1 guardedCommand $ do
   symbol TokGuardBar <?> "|"
 
 guardedCommand :: Parser GdCmd
-guardedCommand = 
+guardedCommand =
   GdCmd
     <$> predicate
     <*> ((Left <$> tokenArrow) <|> (Right <$> tokenArrowU))
@@ -593,44 +592,26 @@ block parser = do
   Util.ignore TokDedent <?> "dedentation"
   return result
 
-block' :: Parser () -> Parser a -> Parser () -> Parser a
-block' open parser close = do
-  open
-  symbol TokIndent <?> "indentation"
-  result <- parser
-  choice
-    [ do
-        -- the ideal case
-        symbol TokDedent <?> "dedentation"
-        close,
-      do
-        -- the fucked up case:
-        --  the lexer is not capable of handling cases like "if True -> skip fi"
-        --  because it's not possible to determine the number of `TokDedent` before `TokFi`
-        close
-        symbol TokDedent <?> "dedentation"
-    ]
-  return result
-
-block'' :: Parser a -> Parser b -> Parser c -> Parser (a, b, c)
-block'' open parser close = do
+block' :: (l -> x -> r -> y) -> Parser l -> Parser x -> Parser r -> Parser y
+block' constructor open parser close = do
   a <- open
   symbol TokIndent <?> "indentation"
   b <- parser
-  c <- choice
-    [ do
-        -- the ideal case
-        symbol TokDedent <?> "dedentation"
-        close,
-      do
-        -- the fucked up case:
-        --  the lexer is not capable of handling cases like "if True -> skip fi"
-        --  because it's not possible to determine the number of `TokDedent` before `TokFi`
-        c <- close
-        symbol TokDedent <?> "dedentation"
-        return c 
-    ]
-  return (a, b, c)
+  c <-
+    choice
+      [ do
+          -- the ideal case
+          symbol TokDedent <?> "dedentation"
+          close,
+        do
+          -- the fucked up case:
+          --  the lexer is not capable of handling cases like "if True -> skip fi"
+          --  because it's not possible to determine the number of `TokDedent` before `TokFi`
+          c <- close
+          symbol TokDedent <?> "dedentation"
+          return c
+      ]
+  return $ constructor a b c
 
 -- consumes 0 or more newlines/indents/dedents
 ignoreIndentations :: Parser a -> Parser a

@@ -17,7 +17,7 @@ import qualified Syntax.Concrete2 as Concrete2
 import Syntax.Location
 import Syntax.Parser (Parser)
 import qualified Syntax.Parser as Parser
-import Test.Tasty
+import Test.Tasty ( TestTree, testGroup )
 import Test.Tasty.HUnit
 import Prelude hiding (Ordering (..), lines)
 
