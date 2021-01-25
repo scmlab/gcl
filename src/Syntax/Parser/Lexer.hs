@@ -110,11 +110,11 @@ data Tok
 
 instance Show Tok where
   show tok = case tok of
-    TokNewlineAndWhitespace n -> "\\n + " ++ show n ++ " \n"
-    TokNewlineAndWhitespaceAndBar n -> "\\n + " ++ show n ++ " | \n"
-    TokIndent -> " >>\n"
-    TokDedent -> " <<\n"
-    TokNewline -> "\\n\n"
+    TokNewlineAndWhitespace n -> "newline + " ++ show n ++ " whitespaces"
+    TokNewlineAndWhitespaceAndBar n -> "newline + " ++ show n ++ " whitespaces and a guard bar"
+    TokIndent -> "indent"
+    TokDedent -> "dedent"
+    TokNewline -> "newline"
     TokWhitespace -> " "
     TokEOF -> ""
     TokComment s -> "-- " ++ Text.unpack s
@@ -436,6 +436,7 @@ expectingIndent :: Tok -> Bool
 expectingIndent TokDo = True
 expectingIndent TokIf = True
 expectingIndent TokArrow = True
+expectingIndent TokArrowU = True
 expectingIndent _ = False
 
 expectingDedent :: Tok -> Bool
