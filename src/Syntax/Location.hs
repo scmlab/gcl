@@ -7,7 +7,6 @@ import Data.Loc
 import Data.Text.Lazy (Text)
 import qualified Syntax.Abstract as A
 import Syntax.Concrete
-import qualified Syntax.Predicate as P
 import Prelude hiding (Ordering (..))
 
 
@@ -20,19 +19,6 @@ class Located a => Departable a b | a -> b where
 
 instance Departable Name Text where
   depart (Name x _) = x
-
-instance Departable Interval A.Interval where
-  depart (Interval a b _) = A.Interval (depart a) (depart b)
-
-instance Departable Endpoint A.Endpoint where
-  depart (Including e) = A.Including (depart e)
-  depart (Excluding e) = A.Excluding (depart e)
-
-instance Departable Type A.Type where
-  depart (TBase base _) = A.TBase base
-  depart (TArray i s _) = A.TArray (depart i) (depart s)
-  depart (TFunc s t _) = A.TFunc (depart s) (depart t)
-  depart (TVar x _) = A.TVar $ depart x
 
 instance Departable Expr A.Expr where
   depart (Var x _) = A.Var $ depart x
@@ -54,19 +40,6 @@ class Located b => Hydratable a b | b -> a where
 
 instance Hydratable Text Name where
   hydrate x = Name x NoLoc
-
-instance Hydratable A.Interval Interval where
-  hydrate (A.Interval a b) = Interval (hydrate a) (hydrate b) NoLoc
-
-instance Hydratable A.Endpoint Endpoint where
-  hydrate (A.Including e) = Including (hydrate e)
-  hydrate (A.Excluding e) = Excluding (hydrate e)
-
-instance Hydratable A.Type Type where
-  hydrate (A.TBase base) = TBase base NoLoc
-  hydrate (A.TArray i s) = TArray (hydrate i) (hydrate s) NoLoc
-  hydrate (A.TFunc s t) = TFunc (hydrate s) (hydrate t) NoLoc
-  hydrate (A.TVar x) = TVar (hydrate x) NoLoc
 
 instance Hydratable A.Expr Expr where
   hydrate (A.Var x) = Var (hydrate x) NoLoc

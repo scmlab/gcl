@@ -117,20 +117,20 @@ instance Pretty Op where
 
 -- instance Pretty Endpoint where
 --   pretty (Including e) = ""
-instance Pretty Interval where
-  pretty (Interval (Including a) (Including b)) =
-    "[" <+> pretty a <+> ".." <+> pretty b <+> "]"
-  pretty (Interval (Including a) (Excluding b)) =
-    "[" <+> pretty a <+> ".." <+> pretty b <+> ")"
-  pretty (Interval (Excluding a) (Including b)) =
-    "(" <+> pretty a <+> ".." <+> pretty b <+> "]"
-  pretty (Interval (Excluding a) (Excluding b)) =
-    "(" <+> pretty a <+> ".." <+> pretty b <+> ")"
+-- instance Pretty Interval where
+--   pretty (Interval (Including a) (Including b)) =
+--     "[" <+> pretty a <+> ".." <+> pretty b <+> "]"
+--   pretty (Interval (Including a) (Excluding b)) =
+--     "[" <+> pretty a <+> ".." <+> pretty b <+> ")"
+--   pretty (Interval (Excluding a) (Including b)) =
+--     "(" <+> pretty a <+> ".." <+> pretty b <+> "]"
+--   pretty (Interval (Excluding a) (Excluding b)) =
+--     "(" <+> pretty a <+> ".." <+> pretty b <+> ")"
 
-instance Pretty Type where
-  pretty (TBase TInt) = "Int"
-  pretty (TBase TBool) = "Bool"
-  pretty (TBase TChar) = "Char"
-  pretty (TFunc a b) = pretty a <+> "->" <+> pretty b
-  pretty (TArray i b) = "array" <+> pretty i <+> "of" <+> pretty b
-  pretty (TVar i) = "TVar" <+> pretty i
+-- instance Pretty Type where
+--   pretty (TBase TInt) = "Int"
+--   pretty (TBase TBool) = "Bool"
+--   pretty (TBase TChar) = "Char"
+--   pretty (TFunc a b) = pretty a <+> "->" <+> pretty b
+--   pretty (TArray i b) = "array" <+> pretty i <+> "of" <+> pretty b
+--   pretty (TVar i) = "TVar" <+> pretty i

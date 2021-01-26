@@ -87,10 +87,6 @@ type Infer = RWST TypeEnv [Constraint] InferState (Except TypeError)
 
 type InferState = Int
 
-instance ToJSON Type where
-instance ToJSON Interval where
-instance ToJSON Endpoint where
-
 data TypeError
   = NotInScope Text Loc
   | UnifyFailed Type Type Loc

@@ -82,10 +82,10 @@ disjunct :: [Expr] -> Expr
 disjunct = foldl disj true
 
 imply :: Expr -> Expr -> Expr
-imply p q = App (App (Op Implies) p) q
+imply = App . App (Op Implies)
 
 neg :: Expr -> Expr
-neg x = App (Op Neg) x
+neg = App (Op Neg)
 
 instance ToJSON Lit where
 instance ToJSON Expr where
@@ -121,7 +121,7 @@ subst env (Hole idx subs         ) = return $ Hole idx (env : subs)
 subst env (Quant op xs range term) = do
   op'                  <- subst env op
   (xs', range', term') <- subLocal xs range term
-  let env' = Map.filterWithKey (\key expr -> key `notElem` xs') env
+  let env' = Map.filterWithKey (\key _expr -> key `notElem` xs') env
   Quant op' xs' <$> subst env' range' <*> subst env' term'
  where
   subLocal :: Fresh m => [Var] -> Expr -> Expr -> m ([Var], Expr, Expr)
@@ -135,7 +135,7 @@ subst env (Quant op xs range term) = do
     | otherwise = first3 (i :) <$> subLocal is r t
   fre = freeSubst env
   first3 f (x, y, z) = (f x, y, z)
-subst env (Subst _ _) = error "subst on Subst not defined"
+subst _env (Subst _ _) = error "subst on Subst not defined"
 
 free :: Expr -> [Var]
 free (Var   x               ) = [x]
@@ -156,31 +156,6 @@ freeSubst env = Map.elems env >>= free
 type Const = Text
 type Var = Text
 type TVar = Text
-
---------------------------------------------------------------------------------
--- | Types
-
-data Endpoint = Including Expr | Excluding Expr deriving (Show, Eq, Generic)
-data Interval = Interval Endpoint Endpoint deriving (Show, Eq, Generic)
-
-data TBase = TInt | TBool | TChar
-      deriving (Show, Eq, Generic)
-
-data Type = TBase TBase
-          | TArray Interval Type
-          | TFunc Type Type
-          | TVar TVar
-      deriving (Show, Eq, Generic)
-
-tInt, tBool, tChar :: Type
-tInt = TBase TInt
-tBool = TBase TBool
-tChar = TBase TChar
-
-instance ToJSON Endpoint where
-instance ToJSON Interval where
-instance ToJSON TBase where
-instance ToJSON Type where
 
 --------------------------------------------------------------------------------
 

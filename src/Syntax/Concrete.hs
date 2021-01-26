@@ -16,7 +16,6 @@ import GHC.Generics (Generic)
 import Syntax.Common ()
 import Syntax.Abstract
   ( Lit (..),
-    TBase (..),
     Op(..)
   )
 import Prelude hiding (Ordering (..))
@@ -90,18 +89,28 @@ unzipGdCmds = unzip . map (\(GdCmd x y _) -> (x, y))
 
 --------------------------------------------------------------------------------
 
--- | Types
+-- | Endpoint
 data Endpoint = Including Expr | Excluding Expr deriving (Eq, Show, Generic)
 
+instance ToJSON Endpoint where
 instance Located Endpoint where
   locOf (Including e) = locOf e
   locOf (Excluding e) = locOf e
 
+-- | Interval
 data Interval = Interval Endpoint Endpoint Loc deriving (Eq, Show, Generic)
 
+instance ToJSON Interval where
 instance Located Interval where
   locOf (Interval _ _ l) = l
 
+-- | Base Types
+data TBase = TInt | TBool | TChar
+      deriving (Show, Eq, Generic)
+
+instance ToJSON TBase 
+
+-- | Types
 data Type
   = TBase TBase Loc
   | TArray Interval Type Loc
@@ -109,6 +118,7 @@ data Type
   | TVar Name Loc
   deriving (Eq, Show, Generic)
 
+instance ToJSON Type where
 instance Located Type where
   locOf (TBase _ l) = l
   locOf (TArray _ _ l) = l

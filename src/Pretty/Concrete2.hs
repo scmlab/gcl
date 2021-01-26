@@ -336,9 +336,9 @@ instance Pretty Type where
 instance PrettyWithLoc Type where
   prettyWithLoc (TParen l t r) = prettyWithLoc l <> prettyWithLoc t <> prettyWithLoc r
   -- DocWithLoc "(" l l <> prettyWithLoc t <> DocWithLoc ")" m m
-  prettyWithLoc (TBase TInt l) = fromDoc l "Int"
-  prettyWithLoc (TBase TBool l) = fromDoc l "Bool"
-  prettyWithLoc (TBase TChar l) = fromDoc l "Char"
+  prettyWithLoc (TBase (TInt l)) = fromDoc l "Int"
+  prettyWithLoc (TBase (TBool l)) = fromDoc l "Bool"
+  prettyWithLoc (TBase (TChar l)) = fromDoc l "Char"
   prettyWithLoc (TFunc a l b) = prettyWithLoc a <> prettyWithLoc l <> prettyWithLoc b
   prettyWithLoc (TArray l a r b) =
     prettyWithLoc l <> prettyWithLoc a <> prettyWithLoc r
@@ -347,7 +347,7 @@ instance PrettyWithLoc Type where
 
 --------------------------------------------------------------------------------
 
--- | Closepoint & Interval
+-- | Endpoint & Interval
 instance PrettyWithLoc EndpointOpen where
   prettyWithLoc (IncludingOpening l e) = prettyWithLoc l <> prettyWithLoc e
   prettyWithLoc (ExcludingOpening l e) = prettyWithLoc l <> prettyWithLoc e

@@ -566,9 +566,9 @@ type' = ignoreIndentations $ do
     parensType = TParen <$> tokenParenOpen <*> type' <*> tokenParenClose
 
     base :: Parser Type
-    base = do
-      withLoc (TBase <$> extract isBaseType) <?> "base type"
+    base = TBase <$> withLoc (extract isBaseType)
       where
+        isBaseType :: Tok -> Maybe (Loc -> TBase)
         isBaseType (TokUpperName "Int") = Just TInt
         isBaseType (TokUpperName "Bool") = Just TBool
         isBaseType (TokUpperName "Char") = Just TChar

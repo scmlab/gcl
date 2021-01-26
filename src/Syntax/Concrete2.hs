@@ -14,9 +14,6 @@ import Data.Loc
 import Data.Map (Map)
 import Data.Text.Lazy (Text)
 import GHC.Generics (Generic)
-import Syntax.Abstract
-  ( TBase (..),
-  )
 import qualified Syntax.Abstract as A
 import Syntax.Common
 import qualified Syntax.Concrete as C
@@ -143,7 +140,7 @@ instance ToConcrete GdCmd C.GdCmd where
 
 --------------------------------------------------------------------------------
 
--- | Endpoint & Interval
+-- | Interval
 data EndpointOpen
   = IncludingOpening (Token 'TokBracketOpen) Expr
   | ExcludingOpening (Token 'TokParenOpen) Expr
@@ -170,6 +167,7 @@ instance Located EndpointClose where
   locOf (IncludingClosing e l) = e <--> l
   locOf (ExcludingClosing e l) = e <--> l
 
+-- | Interval
 data Interval = Interval EndpointOpen (Token 'TokRange) EndpointClose deriving (Eq, Show)
 
 instance ToConcrete Interval C.Interval where
@@ -178,9 +176,27 @@ instance ToConcrete Interval C.Interval where
 instance Located Interval where
   locOf (Interval l _ r) = l <--> r
 
+-- | Base Type
+data TBase 
+  = TInt Loc
+  | TBool Loc 
+  | TChar Loc 
+  deriving (Eq, Show)
+
+instance Located TBase where
+  locOf (TInt l) = l
+  locOf (TBool l) = l
+  locOf (TChar l) = l
+
+instance ToConcrete TBase C.TBase where
+  toConcrete (TInt _) = C.TInt
+  toConcrete (TBool _) = C.TBool
+  toConcrete (TChar _) = C.TChar
+
+-- | Type
 data Type
   = TParen (Token 'TokParenOpen) Type (Token 'TokParenClose)
-  | TBase TBase Loc
+  | TBase TBase
   | TArray (Token 'TokArray) Interval (Token 'TokOf) Type
   | TFunc Type (Either (Token 'TokArrow) (Token 'TokArrowU)) Type
   | TVar Name
@@ -188,14 +204,14 @@ data Type
 
 instance ToConcrete Type C.Type where
   toConcrete (TParen _ a _) = toConcrete a
-  toConcrete (TBase a l) = C.TBase a l
+  toConcrete (TBase a) = C.TBase (toConcrete a) (locOf a)
   toConcrete (TArray l a _ b) = C.TArray (toConcrete a) (toConcrete b) (l <--> b)
   toConcrete (TFunc a _ b) = C.TFunc (toConcrete a) (toConcrete b) (a <--> b)
   toConcrete (TVar a) = C.TVar (toConcrete a) (locOf a)
 
 instance Located Type where
   locOf (TParen l _ r) = l <--> r
-  locOf (TBase _ l) = l
+  locOf (TBase a) = locOf a
   locOf (TArray l _ _ r) = l <--> r
   locOf (TFunc l _ r) = l <--> r
   locOf (TVar x) = locOf x
