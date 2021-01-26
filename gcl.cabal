@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: a9c6e7b056c4383159a4673c01318c8b506d9b8b25d8cf4f4e5acb1ccc399f12
+-- hash: c2f2b24d85925e4a0c9b284dc3225297f49fd9ea2426a85ef6bb1e1f3d658195
 
 name:           gcl
 version:        0.1.0.0
@@ -33,7 +33,6 @@ library
       Pretty
       Pretty.Abstract
       Pretty.Concrete
-      Pretty.Concrete2
       Pretty.Predicate
       Pretty.Util
       Pretty.Variadic
@@ -41,9 +40,7 @@ library
       Syntax.Abstract
       Syntax.Common
       Syntax.Concrete
-      Syntax.Concrete2
       Syntax.ConstExpr
-      Syntax.Location
       Syntax.Parser
       Syntax.Parser.Lexer
       Syntax.Parser.TokenStream
@@ -64,6 +61,7 @@ library
     , lsp
     , megaparsec >=8.0
     , mtl
+    , multiset
     , network
     , network-simple
     , parser-combinators
@@ -94,6 +92,7 @@ executable gcl
     , lsp
     , megaparsec >=8.0
     , mtl
+    , multiset
     , network
     , network-simple
     , parser-combinators
@@ -110,7 +109,7 @@ test-suite gcl-test
   type: exitcode-stdio-1.0
   main-is: Test.hs
   other-modules:
-      Test.Concrete2
+      Test.Concrete
       Test.Lexer
       Test.Parser
       Test.ProofObligation
@@ -128,7 +127,6 @@ test-suite gcl-test
       Pretty
       Pretty.Abstract
       Pretty.Concrete
-      Pretty.Concrete2
       Pretty.Predicate
       Pretty.Util
       Pretty.Variadic
@@ -136,9 +134,7 @@ test-suite gcl-test
       Syntax.Abstract
       Syntax.Common
       Syntax.Concrete
-      Syntax.Concrete2
       Syntax.ConstExpr
-      Syntax.Location
       Syntax.Parser
       Syntax.Parser.Lexer
       Syntax.Parser.TokenStream
@@ -158,6 +154,7 @@ test-suite gcl-test
     , lsp
     , megaparsec >=8.0
     , mtl
+    , multiset
     , network
     , network-simple
     , parser-combinators
