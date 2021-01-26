@@ -37,7 +37,7 @@ import Syntax.Predicate
 import Network.Simple.TCP ( HostPreference(Host), serve )
 import Network.Socket (socketToHandle)
 import GHC.IO.IOMode (IOMode(ReadWriteMode))
-import Syntax.Concrete (ToConcrete(toConcrete))
+import Syntax.Concrete (ToAbstract(toAbstract))
 
 --------------------------------------------------------------------------------
 
@@ -375,7 +375,7 @@ parse parser filepath =
 parseProgram :: FilePath -> Text -> M A.Program
 parseProgram filepath source = do
   tokens <- scan filepath source
-  toConcrete <$> parse Parser.program filepath tokens
+  toAbstract <$> parse Parser.program filepath tokens
 
 refine :: Text -> M ()
 refine payload = do
