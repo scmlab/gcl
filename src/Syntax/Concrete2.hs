@@ -39,6 +39,10 @@ data Token (a :: Tok) = Token Pos Pos
 instance Located (Token a) where
   locOf (Token l r) = Loc l r
 
+instance (Located a, Located b) => Located (Either a b) where
+  locOf (Left x) = locOf x
+  locOf (Right x) = locOf x
+
 -- | A non-empty list of stuff seperated by commas
 data SepBy (sep :: Tok) a = Head a | Delim a (Token sep) (SepBy sep a)
   deriving (Eq, Show)
@@ -76,9 +80,9 @@ type Defns = Map Text Expr
 
 data Declaration
   = ConstDecl (Token 'TokCon) (SepBy 'TokComma Name) (Token 'TokColon) Type
-  | ConstDeclWithProp (Token 'TokCon) (SepBy 'TokComma Name) (Token 'TokColon) Type (Token 'TokBraceStart) Expr (Token 'TokBraceEnd)
+  | ConstDeclWithProp (Token 'TokCon) (SepBy 'TokComma Name) (Token 'TokColon) Type (Token 'TokBraceOpen) Expr (Token 'TokBraceClose)
   | VarDecl (Token 'TokVar) (SepBy 'TokComma Name) (Token 'TokColon) Type
-  | VarDeclWithProp (Token 'TokVar) (SepBy 'TokComma Name) (Token 'TokColon) Type (Token 'TokBraceStart) Expr (Token 'TokBraceEnd)
+  | VarDeclWithProp (Token 'TokVar) (SepBy 'TokComma Name) (Token 'TokColon) Type (Token 'TokBraceOpen) Expr (Token 'TokBraceClose)
   | LetDecl (Token 'TokLet) Name [Name] (Token 'TokEQ) Expr
   deriving (Eq, Show)
 
@@ -93,8 +97,8 @@ data Stmt
   = Skip Loc
   | Abort Loc
   | Assign (SepBy 'TokComma Name) (Token 'TokAssign) (SepBy 'TokComma Expr)
-  | Assert (Token 'TokBraceStart) Expr (Token 'TokBraceEnd)
-  | LoopInvariant (Token 'TokBraceStart) Expr (Token 'TokComma) (Token 'TokBnd) (Token 'TokColon) Expr (Token 'TokBraceEnd)
+  | Assert (Token 'TokBraceOpen) Expr (Token 'TokBraceClose)
+  | LoopInvariant (Token 'TokBraceOpen) Expr (Token 'TokComma) (Token 'TokBnd) (Token 'TokColon) Expr (Token 'TokBraceClose)
   | Do (Token 'TokDo) (SepBy 'TokGuardBar GdCmd) (Token 'TokOd)
   | If (Token 'TokIf) (SepBy 'TokGuardBar GdCmd) (Token 'TokFi)
   | SpecQM Loc -- ? to be rewritten as {!!} by the frontend
@@ -134,32 +138,33 @@ instance ToConcrete GdCmd C.GdCmd where
 --------------------------------------------------------------------------------
 
 -- | Endpoint & Interval
-data EndpointOpening 
-  = IncludingOpening (Token 'TokBracketStart) Expr
-  | ExcludingOpening (Token 'TokParenStart) Expr
+data EndpointOpen
+  = IncludingOpening (Token 'TokBracketOpen) Expr
+  | ExcludingOpening (Token 'TokParenOpen) Expr
   deriving (Eq, Show)
 
-data EndpointClosing
-  = IncludingClosing Expr (Token 'TokBracketEnd) 
-  | ExcludingClosing Expr (Token 'TokParenEnd) 
+data EndpointClose
+  = IncludingClosing Expr (Token 'TokBracketClose)
+  | ExcludingClosing Expr (Token 'TokParenClose)
   deriving (Eq, Show)
 
-instance ToConcrete EndpointOpening C.Endpoint where
+instance ToConcrete EndpointOpen C.Endpoint where
   toConcrete (IncludingOpening _ a) = C.Including (toConcrete a)
   toConcrete (ExcludingOpening _ a) = C.Excluding (toConcrete a)
 
-instance ToConcrete EndpointClosing C.Endpoint where
+instance ToConcrete EndpointClose C.Endpoint where
   toConcrete (IncludingClosing a _) = C.Including (toConcrete a)
   toConcrete (ExcludingClosing a _) = C.Excluding (toConcrete a)
 
-instance Located EndpointOpening where
+instance Located EndpointOpen where
   locOf (IncludingOpening l e) = l <--> e
   locOf (ExcludingOpening l e) = l <--> e
-instance Located EndpointClosing where
+
+instance Located EndpointClose where
   locOf (IncludingClosing e l) = e <--> l
   locOf (ExcludingClosing e l) = e <--> l
 
-data Interval = Interval EndpointOpening (Token 'TokRange) EndpointClosing deriving (Eq, Show)
+data Interval = Interval EndpointOpen (Token 'TokRange) EndpointClose deriving (Eq, Show)
 
 instance ToConcrete Interval C.Interval where
   toConcrete (Interval a _ b) = C.Interval (toConcrete a) (toConcrete b) (a <--> b)
@@ -168,7 +173,7 @@ instance Located Interval where
   locOf (Interval l _ r) = l <--> r
 
 data Type
-  = TParen (Token 'TokParenStart) Type (Token 'TokParenEnd)
+  = TParen (Token 'TokParenOpen) Type (Token 'TokParenClose)
   | TBase TBase Loc
   | TArray (Token 'TokArray) Interval (Token 'TokOf) Type
   | TFunc Type (Either (Token 'TokArrow) (Token 'TokArrowU)) Type
@@ -193,13 +198,21 @@ instance Located Type where
 
 -- | Expressions
 data Expr
-  = Paren (Token 'TokParenStart) Expr (Token 'TokParenEnd)
+  = Paren (Token 'TokParenOpen) Expr (Token 'TokParenClose)
   | Lit Lit
   | Var Name
   | Const Name
   | Op Op
   | App Expr Expr
-  | Quant (Bool, Loc) Op [Name] Loc Expr Loc Expr (Bool, Loc) Loc
+  | Quant
+      (Either (Token 'TokQuantOpen) (Token 'TokQuantOpenU))
+      Op              
+      [Name]
+      (Token 'TokColon)
+      Expr
+      (Token 'TokColon)
+      Expr
+      (Either (Token 'TokQuantClose) (Token 'TokQuantCloseU))
   deriving (Eq, Show, Generic)
 
 instance Located Expr where
@@ -209,17 +222,17 @@ instance Located Expr where
   locOf (Const x) = locOf x
   locOf (Op x) = locOf x
   locOf (App x y) = x <--> y
-  locOf (Quant _ _ _ _ _ _ _ _ l) = l
+  locOf (Quant l _ _ _ _ _ _ r) = l <--> r
 
 instance ToConcrete Expr C.Expr where
-  toConcrete x = case x of 
+  toConcrete x = case x of
     Paren _ a _ -> toConcrete a
     Lit a -> C.Lit (toConcrete a) (locOf x)
     Var a -> C.Var (toConcrete a) (locOf x)
     Const a -> C.Const (toConcrete a) (locOf x)
     Op a -> C.Op (toConcrete a) (locOf x)
     App a b -> C.App (toConcrete a) (toConcrete b) (locOf x)
-    Quant _ a b _ c _ d _ _ -> C.Quant (C.Op (toConcrete a) (locOf a)) (fmap toConcrete b) (toConcrete c) (toConcrete d) (locOf x)
+    Quant _ a b _ c _ d _ -> C.Quant (C.Op (toConcrete a) (locOf a)) (fmap toConcrete b) (toConcrete c) (toConcrete d) (locOf x)
 
 type Subst = Map Text Expr
 

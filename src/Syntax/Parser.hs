@@ -1,6 +1,5 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TupleSections #-}
 
 module Syntax.Parser where
 
@@ -116,23 +115,35 @@ tokenVar = adapt TokVar "reserved word \"var\""
 tokenLet :: Parser (Token 'TokLet)
 tokenLet = adapt TokLet "reserved word \"let\""
 
-tokenBraceStart :: Parser (Token 'TokBraceStart)
-tokenBraceStart = adapt TokBraceStart "opening curly bracket"
+tokenBraceOpen :: Parser (Token 'TokBraceOpen)
+tokenBraceOpen = adapt TokBraceOpen "opening curly bracket"
 
-tokenBraceEnd :: Parser (Token 'TokBraceEnd)
-tokenBraceEnd = adapt TokBraceEnd "closing curly bracket"
+tokenBraceClose :: Parser (Token 'TokBraceClose)
+tokenBraceClose = adapt TokBraceClose "closing curly bracket"
 
-tokenBracketStart :: Parser (Token 'TokBracketStart)
-tokenBracketStart = adapt TokBracketStart "opening square bracket"
+tokenBracketOpen :: Parser (Token 'TokBracketOpen)
+tokenBracketOpen = adapt TokBracketOpen "opening square bracket"
 
-tokenBracketEnd :: Parser (Token 'TokBracketEnd)
-tokenBracketEnd = adapt TokBracketEnd "closing square bracket"
+tokenBracketClose :: Parser (Token 'TokBracketClose)
+tokenBracketClose = adapt TokBracketClose "closing square bracket"
 
-tokenParenStart :: Parser (Token 'TokParenStart)
-tokenParenStart = adapt TokParenStart "opening parenthesis"
+tokenParenOpen :: Parser (Token 'TokParenOpen)
+tokenParenOpen = adapt TokParenOpen "opening parenthesis"
 
-tokenParenEnd :: Parser (Token 'TokParenEnd)
-tokenParenEnd = adapt TokParenEnd "closing parenthesis"
+tokenParenClose :: Parser (Token 'TokParenClose)
+tokenParenClose = adapt TokParenClose "closing parenthesis"
+
+tokenQuantOpen :: Parser (Token 'TokQuantOpen)
+tokenQuantOpen = adapt TokQuantOpen "<|"
+
+tokenQuantOpenU :: Parser (Token 'TokQuantOpenU)
+tokenQuantOpenU = adapt TokQuantOpenU "⟨"
+
+tokenQuantClose :: Parser (Token 'TokQuantClose)
+tokenQuantClose = adapt TokQuantClose "|>"
+
+tokenQuantCloseU :: Parser (Token 'TokQuantCloseU)
+tokenQuantCloseU = adapt TokQuantCloseU "⟩"
 
 tokenColon :: Parser (Token 'TokColon)
 tokenColon = adapt TokColon "colon"
@@ -179,8 +190,6 @@ tokenArrow = adapt TokArrow "->"
 tokenArrowU :: Parser (Token 'TokArrowU)
 tokenArrowU = adapt TokArrowU "→"
 
--- eitherP :: Parser a -> Parser b -> Parser (Either a b)
-
 --------------------------------------------------------------------------------
 
 -- | Declarations
@@ -210,9 +219,9 @@ constDeclWithProp =
     <*> constList
     <*> tokenColon
     <*> type'
-    <*> tokenBraceStart
+    <*> tokenBraceOpen
     <*> expression
-    <*> tokenBraceEnd
+    <*> tokenBraceClose
 
 varDecl :: Parser Declaration
 varDecl =
@@ -229,9 +238,9 @@ varDeclWithProp =
     <*> variableList
     <*> tokenColon
     <*> type'
-    <*> tokenBraceStart
+    <*> tokenBraceOpen
     <*> expression
-    <*> tokenBraceEnd
+    <*> tokenBraceClose
 
 letDecl :: Parser Declaration
 letDecl =
@@ -288,20 +297,20 @@ abort = withLoc $ Abort <$ symbol TokAbort
 assert :: Parser Stmt
 assert =
   Assert
-    <$> tokenBraceStart
+    <$> tokenBraceOpen
     <*> expression
-    <*> tokenBraceEnd
+    <*> tokenBraceClose
 
 assertWithBnd :: Parser Stmt
 assertWithBnd = do
   LoopInvariant
-    <$> tokenBraceStart
+    <$> tokenBraceOpen
     <*> predicate
     <*> tokenComma
     <*> tokenBnd
     <*> tokenColon
     <*> expression
-    <*> tokenBraceEnd
+    <*> tokenBraceClose
 
 assign :: Parser Stmt
 assign =
@@ -342,33 +351,33 @@ hole = withLoc $ SpecQM <$ (symbol TokQM <?> "?")
 
 spec :: Parser Stmt
 spec = withLoc $ do
-  symbol TokSpecStart <?> "{!"
+  symbol TokSpecOpen <?> "{!"
   -- expectNewline <?> "<newline> after a the start of a Spec"
   _ <- specContent
-  _ <- takeWhileP (Just "anything other than '!}'") isTokSpecEnd
-  symbol TokSpecEnd <?> "!}"
+  _ <- takeWhileP (Just "anything other than '!}'") isTokSpecClose
+  symbol TokSpecClose <?> "!}"
   -- expectNewline <?> "<newline> after a the end of a Spec"
 
   return Spec
   where
-    isTokSpecEnd :: L Tok -> Bool
-    isTokSpecEnd (L _ TokSpecEnd) = False
-    isTokSpecEnd _ = True
+    isTokSpecClose :: L Tok -> Bool
+    isTokSpecClose (L _ TokSpecClose) = False
+    isTokSpecClose _ = True
 
 proof :: Parser Stmt
 proof = withLoc $ do
-  symbol TokProofStart <?> "{-"
+  symbol TokProofOpen <?> "{-"
   -- expectNewline <?> "<newline> after a the start of a Proof"
   _ <- specContent
-  _ <- takeWhileP (Just "anything other than '-}'") isTokProofEnd
-  symbol TokProofEnd <?> "-}"
+  _ <- takeWhileP (Just "anything other than '-}'") isTokProofClose
+  symbol TokProofClose <?> "-}"
   -- expectNewline <?> "<newline> after a the end of a Proof"
 
   return Spec
   where
-    isTokProofEnd :: L Tok -> Bool
-    isTokProofEnd (L _ TokProofEnd) = False
-    isTokProofEnd _ = True
+    isTokProofClose :: L Tok -> Bool
+    isTokProofClose (L _ TokProofClose) = False
+    isTokProofClose _ = True
 
 --------------------------------------------------------------------------------
 
@@ -430,9 +439,9 @@ expression = makeExprParser term table <?> "expression"
     parensExpr :: Parser Expr
     parensExpr =
       Paren
-        <$> tokenParenStart
+        <$> tokenParenOpen
           <*> expression
-          <*> tokenParenEnd
+          <*> tokenParenClose
 
     term :: Parser Expr
     term = try term' <|> parensExpr
@@ -443,67 +452,50 @@ expression = makeExprParser term table <?> "expression"
             [ Var <$> lower,
               Const <$> upper,
               Lit <$> literal,
-              -- Op <$ symbol TokParenStart <*> operator <* symbol TokParenEnd,
-              withLoc $
-                Quant
-                  <$> quantStart
-                  <*> operator
-                  <*> some lower
-                  <*> withLoc (id <$ symbol TokColon)
-                  <*> expression
-                  <*> withLoc (id <$ symbol TokColon)
-                  <*> expression
-                  <*> quantEnd
+              -- Op <$ symbol TokParenOpen <*> operator <* symbol TokParenClose,
+              Quant
+                <$> choice [Left <$> tokenQuantOpen, Right <$> tokenQuantOpenU]
+                <*> operator
+                <*> some lower
+                <*> tokenColon
+                <*> expression
+                <*> tokenColon
+                <*> expression
+                <*> choice [Left <$> tokenQuantClose, Right <$> tokenQuantCloseU]
             ]
             <?> "term"
 
-        -- quantOp :: Parser Op
-        -- quantOp = operator <|> do
-        --                           (_, _start) <- Util.getLoc (symbol TokParenStart <?> "opening parenthesis")
-        --                           op <- operator
-        --                           (_, _end) <- Util.getLoc (symbol TokParenEnd <?> "closing parenthesis")
-        --                           return op
-        -- choice
-        --   [ do
-        --       -- (_, start) <- Util.getLoc (symbol TokParenStart <?> "opening parenthesis")
-        --       -- (op, loc) <- Util.getLoc operator
-        --       -- (_, end) <- Util.getLoc (symbol TokParenEnd <?> "closing parenthesis")
-        --       return $ op
-        --     -- do
-        --     --   op <- term
-        --     --   return $ case op of
-        --     --     Op (Add l) loc -> Op (Sum l) loc
-        --     --     Op (Conj l) loc -> Op (Forall l) loc
-        --     --     Op (Disj l) loc -> Op (Exists l) loc
-        --     --     others -> others,
-        --     -- parensExpr
-        --   ]
+    -- quantOp :: Parser Op
+    -- quantOp = operator <|> do
+    --                           (_, _start) <- Util.getLoc (symbol TokParenOpen <?> "opening parenthesis")
+    --                           op <- operator
+    --                           (_, _end) <- Util.getLoc (symbol TokParenClose <?> "closing parenthesis")
+    --                           return op
+    -- choice
+    --   [ do
+    --       -- (_, start) <- Util.getLoc (symbol TokParenOpen <?> "opening parenthesis")
+    --       -- (op, loc) <- Util.getLoc operator
+    --       -- (_, end) <- Util.getLoc (symbol TokParenClose <?> "closing parenthesis")
+    --       return $ op
+    --     -- do
+    --     --   op <- term
+    --     --   return $ case op of
+    --     --     Op (Add l) loc -> Op (Sum l) loc
+    --     --     Op (Conj l) loc -> Op (Forall l) loc
+    --     --     Op (Disj l) loc -> Op (Exists l) loc
+    --     --     others -> others,
+    --     -- parensExpr
+    --   ]
 
-        -- -- replace "+", "∧", and "∨" in Quant with "Σ", "∀", and "∃"
-        -- quantOp :: Parser Expr
-        -- quantOp = do
-        --   op <- term
-        --   return $ case op of
-        --     Op Add loc -> Op Sum loc
-        --     Op Conj loc -> Op Forall loc
-        --     Op Disj loc -> Op Exists loc
-        --     others -> others
-
-        quantStart :: Parser (Bool, Loc)
-        quantStart =
-          withLoc $
-            choice
-              [ (True,) <$ symbol TokQuantStartU,
-                (False,) <$ symbol TokQuantStart
-              ]
-
-        quantEnd :: Parser (Bool, Loc)
-        quantEnd =
-          withLoc $
-            choice
-              [ (True,) <$ symbol TokQuantEndU,
-                (False,) <$ symbol TokQuantEnd
-              ]
+    -- -- replace "+", "∧", and "∨" in Quant with "Σ", "∀", and "∃"
+    -- quantOp :: Parser Expr
+    -- quantOp = do
+    --   op <- term
+    --   return $ case op of
+    --     Op Add loc -> Op Sum loc
+    --     Op Conj loc -> Op Forall loc
+    --     Op Disj loc -> Op Exists loc
+    --     others -> others
 
     literal :: Parser Lit
     literal =
@@ -566,7 +558,7 @@ type' = ignoreIndentations $ do
       parensType <|> array <|> base <?> "type term"
 
     parensType :: Parser Type
-    parensType = TParen <$> tokenParenStart <*> type' <*> tokenParenEnd
+    parensType = TParen <$> tokenParenOpen <*> type' <*> tokenParenClose
 
     base :: Parser Type
     base = do
@@ -580,19 +572,19 @@ type' = ignoreIndentations $ do
     array :: Parser Type
     array = TArray <$> tokenArray <*> interval <*> tokenOf <*> type'
 
-    endpointOpening :: Parser EndpointOpening
+    endpointOpening :: Parser EndpointOpen
     endpointOpening =
       choice
-        [ IncludingOpening <$> tokenBracketStart <*> expression,
-          ExcludingOpening <$> tokenParenStart <*> expression
+        [ IncludingOpening <$> tokenBracketOpen <*> expression,
+          ExcludingOpening <$> tokenParenOpen <*> expression
         ]
 
-    endpointClosing :: Parser EndpointClosing
+    endpointClosing :: Parser EndpointClose
     endpointClosing = do
       expr <- expression
       choice
-        [ IncludingClosing expr <$> tokenBracketEnd,
-          ExcludingClosing expr <$> tokenParenEnd
+        [ IncludingClosing expr <$> tokenBracketClose,
+          ExcludingClosing expr <$> tokenParenClose
         ]
 
     interval :: Parser Interval
@@ -605,13 +597,13 @@ type' = ignoreIndentations $ do
 -- withLoc $ do
 -- start <-
 --   choice
---     [Excluding <$ symbol TokParenStart, Including <$ symbol TokBracketStart]
+--     [Excluding <$ symbol TokParenOpen, Including <$ symbol TokBracketOpen]
 -- i <- expression
 -- symbol TokRange
 -- j <- expression
 -- end <-
 --   choice
---     [Excluding <$ symbol TokParenEnd, Including <$ symbol TokBracketEnd]
+--     [Excluding <$ symbol TokParenClose, Including <$ symbol TokBracketClose]
 -- return $ Interval (start i) (end j)
 
 --------------------------------------------------------------------------------
@@ -673,17 +665,17 @@ withLoc = Util.withLoc
 
 parens :: Parser a -> Parser (a, Loc)
 parens parser = do
-  (_, start) <- Util.getLoc (symbol TokParenStart <?> "opening parenthesis")
+  (_, start) <- Util.getLoc (symbol TokParenOpen <?> "opening parenthesis")
   result <- parser
-  (_, end) <- Util.getLoc (symbol TokParenEnd <?> "closing parenthesis")
+  (_, end) <- Util.getLoc (symbol TokParenClose <?> "closing parenthesis")
   let loc = start <--> end
   return (result, loc)
 
 braces :: Parser a -> Parser (a, Loc)
 braces parser = do
-  (_, start) <- Util.getLoc (symbol TokBraceStart <?> "opening braces")
+  (_, start) <- Util.getLoc (symbol TokBraceOpen <?> "opening braces")
   result <- parser
-  (_, end) <- Util.getLoc (symbol TokBraceEnd <?> "closing braces")
+  (_, end) <- Util.getLoc (symbol TokBraceClose <?> "closing braces")
   let loc = start <--> end
   return (result, loc)
 

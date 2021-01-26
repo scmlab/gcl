@@ -37,23 +37,35 @@ instance PrettyWithLoc (Token 'TokVar) where
 instance PrettyWithLoc (Token 'TokLet) where
   prettyWithLoc (Token l r) = DocWithLoc "let" l r
 
-instance PrettyWithLoc (Token 'TokBraceStart) where
+instance PrettyWithLoc (Token 'TokBraceOpen) where
   prettyWithLoc (Token l r) = DocWithLoc "{" l r
 
-instance PrettyWithLoc (Token 'TokBraceEnd) where
+instance PrettyWithLoc (Token 'TokBraceClose) where
   prettyWithLoc (Token l r) = DocWithLoc "}" l r
 
-instance PrettyWithLoc (Token 'TokBracketStart) where
+instance PrettyWithLoc (Token 'TokBracketOpen) where
   prettyWithLoc (Token l r) = DocWithLoc "[" l r
 
-instance PrettyWithLoc (Token 'TokBracketEnd) where
+instance PrettyWithLoc (Token 'TokBracketClose) where
   prettyWithLoc (Token l r) = DocWithLoc "]" l r
 
-instance PrettyWithLoc (Token 'TokParenStart) where
+instance PrettyWithLoc (Token 'TokParenOpen) where
   prettyWithLoc (Token l r) = DocWithLoc "(" l r
 
-instance PrettyWithLoc (Token 'TokParenEnd) where
+instance PrettyWithLoc (Token 'TokParenClose) where
   prettyWithLoc (Token l r) = DocWithLoc ")" l r
+
+instance PrettyWithLoc (Token 'TokQuantOpen) where
+  prettyWithLoc (Token l r) = DocWithLoc "<|" l r
+
+instance PrettyWithLoc (Token 'TokQuantOpenU) where
+  prettyWithLoc (Token l r) = DocWithLoc "⟨" l r
+
+instance PrettyWithLoc (Token 'TokQuantClose) where
+  prettyWithLoc (Token l r) = DocWithLoc "|>" l r
+
+instance PrettyWithLoc (Token 'TokQuantCloseU) where
+  prettyWithLoc (Token l r) = DocWithLoc "⟩" l r
 
 instance PrettyWithLoc (Token 'TokColon) where
   prettyWithLoc (Token l r) = DocWithLoc ":" l r
@@ -263,17 +275,16 @@ handleExpr (App p q) = case handleExpr p of
   Complete s -> do
     t <- handleExpr q
     return $ s <> t
-handleExpr (Quant (s, l) op xs m r n t (e, o) p) =
+handleExpr (Quant open op xs m r n t close) =
   return $
-    setLoc p $
-      fromLocAndDoc l (if s then "⟨" else "<|")
-        <> prettyWithLoc op
-        <> mconcat (map prettyWithLoc xs)
-        <> fromLocAndDoc m ":"
-        <> prettyWithLoc r
-        <> fromLocAndDoc n ":"
-        <> prettyWithLoc t
-        <> fromLocAndDoc o (if e then "⟩" else "|>")
+    prettyWithLoc open
+      <> prettyWithLoc op
+      <> mconcat (map prettyWithLoc xs)
+      <> prettyWithLoc m
+      <> prettyWithLoc r
+      <> prettyWithLoc n
+      <> prettyWithLoc t
+      <> prettyWithLoc close
 
 handleOp :: Op -> Variadic Expr (DocWithLoc ann)
 handleOp op = case classify op of
@@ -322,7 +333,7 @@ instance PrettyWithLoc Type where
   prettyWithLoc (TBase TInt l) = setLoc l "Int"
   prettyWithLoc (TBase TBool l) = setLoc l "Bool"
   prettyWithLoc (TBase TChar l) = setLoc l "Char"
-  prettyWithLoc (TFunc a l b) = prettyWithLoc a <> prettyWithLoc l <> prettyWithLoc b 
+  prettyWithLoc (TFunc a l b) = prettyWithLoc a <> prettyWithLoc l <> prettyWithLoc b
   prettyWithLoc (TArray l a r b) =
     prettyWithLoc l <> prettyWithLoc a <> prettyWithLoc r
       <> prettyWithLoc b
@@ -330,12 +341,12 @@ instance PrettyWithLoc Type where
 
 --------------------------------------------------------------------------------
 
--- | Endpoint & Interval
-instance PrettyWithLoc EndpointOpening where
+-- | Closepoint & Interval
+instance PrettyWithLoc EndpointOpen where
   prettyWithLoc (IncludingOpening l e) = prettyWithLoc l <> prettyWithLoc e
   prettyWithLoc (ExcludingOpening l e) = prettyWithLoc l <> prettyWithLoc e
 
-instance PrettyWithLoc EndpointClosing where
+instance PrettyWithLoc EndpointClose where
   prettyWithLoc (IncludingClosing e l) = prettyWithLoc e <> prettyWithLoc l
   prettyWithLoc (ExcludingClosing e l) = prettyWithLoc e <> prettyWithLoc l
 

@@ -453,13 +453,13 @@ programs =
                   TokColon,
                   TokUpperName "Int",
                   TokNewline,
-                  TokBraceStart,
+                  TokBraceOpen,
                   TokLowerName "z",
                   TokEQ,
                   TokUpperName "A",
                   TokMul,
                   TokUpperName "B",
-                  TokBraceEnd
+                  TokBraceClose
                 ]
         actual @?= expected
     ]

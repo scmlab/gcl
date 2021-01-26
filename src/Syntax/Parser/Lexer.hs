@@ -62,20 +62,20 @@ data Tok
   | TokColon
   | TokSemi
   | TokAssign
-  | TokSpecStart
-  | TokSpecEnd
-  | TokParenStart
-  | TokParenEnd
-  | TokBracketStart
-  | TokBracketEnd
-  | TokBraceStart
-  | TokBraceEnd
-  | TokQuantStart
-  | TokQuantEnd
-  | TokQuantStartU
-  | TokQuantEndU
-  | TokProofStart
-  | TokProofEnd
+  | TokSpecOpen
+  | TokSpecClose
+  | TokParenOpen
+  | TokParenClose
+  | TokBracketOpen
+  | TokBracketClose
+  | TokBraceOpen
+  | TokBraceClose
+  | TokQuantOpen
+  | TokQuantClose
+  | TokQuantOpenU
+  | TokQuantCloseU
+  | TokProofOpen
+  | TokProofClose
   | -- expression
 
     -- operators
@@ -139,20 +139,20 @@ instance Show Tok where
     TokColon -> ":"
     TokSemi -> ";"
     TokAssign -> ":="
-    TokSpecStart -> "{!"
-    TokSpecEnd -> "!}"
-    TokParenStart -> "("
-    TokParenEnd -> ")"
-    TokBracketStart -> "["
-    TokBracketEnd -> "]"
-    TokBraceStart -> "{"
-    TokBraceEnd -> "}"
-    TokQuantStart -> "<|"
-    TokQuantEnd -> "|>"
-    TokQuantStartU -> "⟨"
-    TokQuantEndU -> "⟩"
-    TokProofStart -> "{-"
-    TokProofEnd -> "-}"
+    TokSpecOpen -> "{!"
+    TokSpecClose -> "!}"
+    TokParenOpen -> "("
+    TokParenClose -> ")"
+    TokBracketOpen -> "["
+    TokBracketClose -> "]"
+    TokBraceOpen -> "{"
+    TokBraceClose -> "}"
+    TokQuantOpen -> "<|"
+    TokQuantClose -> "|>"
+    TokQuantOpenU -> "⟨"
+    TokQuantCloseU -> "⟩"
+    TokProofOpen -> "{-"
+    TokProofClose -> "-}"
     TokEQ -> "="
     TokNEQ -> "/="
     TokNEQU -> "≠"
@@ -231,33 +231,33 @@ tokRE =
     <$ string ";"
     <|> TokAssign
     <$ string ":="
-    <|> TokSpecStart
+    <|> TokSpecOpen
     <$ string "{!"
-    <|> TokSpecEnd
+    <|> TokSpecClose
     <$ string "!}"
-    <|> TokParenStart
+    <|> TokParenOpen
     <$ string "("
-    <|> TokParenEnd
+    <|> TokParenClose
     <$ string ")"
-    <|> TokBracketStart
+    <|> TokBracketOpen
     <$ string "["
-    <|> TokBracketEnd
+    <|> TokBracketClose
     <$ string "]"
-    <|> TokBraceStart
+    <|> TokBraceOpen
     <$ string "{"
-    <|> TokBraceEnd
+    <|> TokBraceClose
     <$ string "}"
-    <|> TokQuantStart
+    <|> TokQuantOpen
     <$ string "<|"
-    <|> TokQuantEnd
+    <|> TokQuantClose
     <$ string "|>"
-    <|> TokQuantStartU
+    <|> TokQuantOpenU
     <$ string "⟨"
-    <|> TokQuantEndU
+    <|> TokQuantCloseU
     <$ string "⟩"
-    <|> TokProofStart
+    <|> TokProofOpen
     <$ string "{-"
-    <|> TokProofEnd
+    <|> TokProofClose
     <$ string "-}"
     -- literals
     <|> TokEQ
