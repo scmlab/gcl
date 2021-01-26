@@ -274,7 +274,6 @@ handleExpr (Quant (s, l) op xs m r n t (e, o) p) =
         <> fromLocAndDoc n ":"
         <> prettyWithLoc t
         <> fromLocAndDoc o (if e then "⟩" else "|>")
-handleExpr (Subst _ _) = return "Subst"
 
 handleOp :: Op -> Variadic Expr (DocWithLoc ann)
 handleOp op = case classify op of

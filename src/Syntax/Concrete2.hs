@@ -199,9 +199,7 @@ data Expr
   | Const Name
   | Op Op
   | App Expr Expr
-  -- | Lam Text Expr Loc
   | Quant (Bool, Loc) Op [Name] Loc Expr Loc Expr (Bool, Loc) Loc
-  | Subst Expr Subst -- internal. Location not necessary?
   deriving (Eq, Show, Generic)
 
 instance Located Expr where
@@ -211,10 +209,7 @@ instance Located Expr where
   locOf (Const x) = locOf x
   locOf (Op x) = locOf x
   locOf (App x y) = x <--> y
-  -- locOf (Lam _ _ l) = l
-  -- locOf (Hole l) = l
   locOf (Quant _ _ _ _ _ _ _ _ l) = l
-  locOf (Subst _ _) = NoLoc
 
 instance ToConcrete Expr C.Expr where
   toConcrete x = case x of 
@@ -224,9 +219,7 @@ instance ToConcrete Expr C.Expr where
     Const a -> C.Const (toConcrete a) (locOf x)
     Op a -> C.Op (toConcrete a) (locOf x)
     App a b -> C.App (toConcrete a) (toConcrete b) (locOf x)
-    -- Lam a b _ -> C.Lam a (toConcrete b) (locOf x)
     Quant _ a b _ c _ d _ _ -> C.Quant (C.Op (toConcrete a) (locOf a)) (fmap toConcrete b) (toConcrete c) (toConcrete d) (locOf x)
-    Subst a b -> C.Subst (toConcrete a) (fmap toConcrete b)
 
 type Subst = Map Text Expr
 
