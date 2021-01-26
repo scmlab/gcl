@@ -31,6 +31,7 @@ class ToConcrete a b | a -> b where
   toConcrete :: a -> b
 
 --------------------------------------------------------------------------------
+
 -- | A Token with start & ending Pos
 data Token (a :: Tok) = Token Pos Pos
   deriving (Eq, Show)
@@ -49,7 +50,6 @@ fromSepBy (Delim a _ as) = a : fromSepBy as
 instance Located a => Located (SepBy sep a) where
   locOf (Head a) = locOf a
   locOf (Delim a _ as) = a <--> locOf as
-
 
 --------------------------------------------------------------------------------
 
@@ -92,7 +92,7 @@ instance ToConcrete Declaration C.Declaration where
 data Stmt
   = Skip Loc
   | Abort Loc
-  | Assign (SepBy 'TokComma Name) (Token 'TokAssign) (SepBy 'TokComma Expr) 
+  | Assign (SepBy 'TokComma Name) (Token 'TokAssign) (SepBy 'TokComma Expr)
   | Assert (Token 'TokBraceStart) Expr (Token 'TokBraceEnd)
   | LoopInvariant (Token 'TokBraceStart) Expr (Token 'TokComma) (Token 'TokBnd) (Token 'TokColon) Expr (Token 'TokBraceEnd)
   | Do (Token 'TokDo) (SepBy 'TokGuardBar GdCmd) (Token 'TokOd)
@@ -133,24 +133,39 @@ instance ToConcrete GdCmd C.GdCmd where
 
 --------------------------------------------------------------------------------
 
--- | Types
-data Endpoint = Including Expr | Excluding Expr deriving (Eq, Show)
+-- | Endpoint & Interval
+data EndpointOpening 
+  = IncludingOpening (Token 'TokBracketStart) Expr
+  | ExcludingOpening (Token 'TokParenStart) Expr
+  deriving (Eq, Show)
 
-instance ToConcrete Endpoint C.Endpoint where
-  toConcrete (Including a) = C.Including (toConcrete a)
-  toConcrete (Excluding a) = C.Excluding (toConcrete a)
+data EndpointClosing
+  = IncludingClosing Expr (Token 'TokBracketEnd) 
+  | ExcludingClosing Expr (Token 'TokParenEnd) 
+  deriving (Eq, Show)
 
-instance Located Endpoint where
-  locOf (Including e) = locOf e
-  locOf (Excluding e) = locOf e
+instance ToConcrete EndpointOpening C.Endpoint where
+  toConcrete (IncludingOpening _ a) = C.Including (toConcrete a)
+  toConcrete (ExcludingOpening _ a) = C.Excluding (toConcrete a)
 
-data Interval = Interval Endpoint Endpoint Loc deriving (Eq, Show)
+instance ToConcrete EndpointClosing C.Endpoint where
+  toConcrete (IncludingClosing a _) = C.Including (toConcrete a)
+  toConcrete (ExcludingClosing a _) = C.Excluding (toConcrete a)
+
+instance Located EndpointOpening where
+  locOf (IncludingOpening l e) = l <--> e
+  locOf (ExcludingOpening l e) = l <--> e
+instance Located EndpointClosing where
+  locOf (IncludingClosing e l) = e <--> l
+  locOf (ExcludingClosing e l) = e <--> l
+
+data Interval = Interval EndpointOpening (Token 'TokRange) EndpointClosing deriving (Eq, Show)
 
 instance ToConcrete Interval C.Interval where
-  toConcrete (Interval a b l) = C.Interval (toConcrete a) (toConcrete b) l
+  toConcrete (Interval a _ b) = C.Interval (toConcrete a) (toConcrete b) (a <--> b)
 
 instance Located Interval where
-  locOf (Interval _ _ l) = l
+  locOf (Interval l _ r) = l <--> r
 
 data Type
   = TParen (Token 'TokParenStart) Type (Token 'TokParenEnd)

@@ -43,6 +43,12 @@ instance PrettyWithLoc (Token 'TokBraceStart) where
 instance PrettyWithLoc (Token 'TokBraceEnd) where
   prettyWithLoc (Token l r) = DocWithLoc "}" l r
 
+instance PrettyWithLoc (Token 'TokBracketStart) where
+  prettyWithLoc (Token l r) = DocWithLoc "[" l r
+
+instance PrettyWithLoc (Token 'TokBracketEnd) where
+  prettyWithLoc (Token l r) = DocWithLoc "]" l r
+
 instance PrettyWithLoc (Token 'TokParenStart) where
   prettyWithLoc (Token l r) = DocWithLoc "(" l r
 
@@ -54,6 +60,9 @@ instance PrettyWithLoc (Token 'TokColon) where
 
 instance PrettyWithLoc (Token 'TokComma) where
   prettyWithLoc (Token l r) = DocWithLoc "," l r
+
+instance PrettyWithLoc (Token 'TokRange) where
+  prettyWithLoc (Token l r) = DocWithLoc ".." l r
 
 instance PrettyWithLoc (Token 'TokBnd) where
   prettyWithLoc (Token l r) = DocWithLoc "bnd" l r
@@ -321,17 +330,16 @@ instance PrettyWithLoc Type where
 
 --------------------------------------------------------------------------------
 
--- | Interval
+-- | Endpoint & Interval
+
+instance PrettyWithLoc EndpointOpening where
+  prettyWithLoc (IncludingOpening l e) = prettyWithLoc l <> prettyWithLoc e
+  prettyWithLoc (ExcludingOpening l e) = prettyWithLoc l <> prettyWithLoc e
+
+instance PrettyWithLoc EndpointClosing where
+  prettyWithLoc (IncludingClosing e l) = prettyWithLoc e <> prettyWithLoc l
+  prettyWithLoc (ExcludingClosing e l) = prettyWithLoc e <> prettyWithLoc l
+
 instance PrettyWithLoc Interval where
-  prettyWithLoc (Interval (Including a) (Including b) l) =
-    setLoc l $
-      "[" <> prettyWithLoc a <> ".. " <> prettyWithLoc b <> "]"
-  prettyWithLoc (Interval (Including a) (Excluding b) l) =
-    setLoc l $
-      "[" <> prettyWithLoc a <> ".. " <> prettyWithLoc b <> ")"
-  prettyWithLoc (Interval (Excluding a) (Including b) l) =
-    setLoc l $
-      "(" <> prettyWithLoc a <> ".. " <> prettyWithLoc b <> "]"
-  prettyWithLoc (Interval (Excluding a) (Excluding b) l) =
-    setLoc l $
-      "(" <> prettyWithLoc a <> ".. " <> prettyWithLoc b <> ")"
+  prettyWithLoc (Interval a b c) = prettyWithLoc a <> prettyWithLoc b <> prettyWithLoc c
+  

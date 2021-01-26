@@ -122,6 +122,12 @@ tokenBraceStart = adapt TokBraceStart "opening curly bracket"
 tokenBraceEnd :: Parser (Token 'TokBraceEnd)
 tokenBraceEnd = adapt TokBraceEnd "closing curly bracket"
 
+tokenBracketStart :: Parser (Token 'TokBracketStart)
+tokenBracketStart = adapt TokBracketStart "opening square bracket"
+
+tokenBracketEnd :: Parser (Token 'TokBracketEnd)
+tokenBracketEnd = adapt TokBracketEnd "closing square bracket"
+
 tokenParenStart :: Parser (Token 'TokParenStart)
 tokenParenStart = adapt TokParenStart "opening parenthesis"
 
@@ -133,6 +139,9 @@ tokenColon = adapt TokColon "colon"
 
 tokenComma :: Parser (Token 'TokComma)
 tokenComma = adapt TokComma "comma"
+
+tokenRange :: Parser (Token 'TokRange)
+tokenRange = adapt TokRange ".."
 
 tokenBnd :: Parser (Token 'TokBnd)
 tokenBnd = adapt TokBnd "reserved word \"bnd\""
@@ -569,18 +578,39 @@ type' = ignoreIndentations $ do
     array :: Parser Type
     array = withLoc $ TArray <$ symbol TokArray <*> interval <* symbol TokOf <*> type'
 
+    endpointOpening :: Parser EndpointOpening
+    endpointOpening =
+      choice
+        [ IncludingOpening <$> tokenBracketStart <*> expression,
+          ExcludingOpening <$> tokenParenStart <*> expression
+        ]
+
+    endpointClosing :: Parser EndpointClosing
+    endpointClosing = do
+      expr <- expression
+      choice
+        [ IncludingClosing expr <$> tokenBracketEnd,
+          ExcludingClosing expr <$> tokenParenEnd
+        ]
+
     interval :: Parser Interval
-    interval = withLoc $ do
-      start <-
-        choice
-          [Excluding <$ symbol TokParenStart, Including <$ symbol TokBracketStart]
-      i <- expression
-      symbol TokRange
-      j <- expression
-      end <-
-        choice
-          [Excluding <$ symbol TokParenEnd, Including <$ symbol TokBracketEnd]
-      return $ Interval (start i) (end j)
+    interval =
+      Interval
+        <$> endpointOpening
+        <*> tokenRange
+        <*> endpointClosing
+
+-- withLoc $ do
+-- start <-
+--   choice
+--     [Excluding <$ symbol TokParenStart, Including <$ symbol TokBracketStart]
+-- i <- expression
+-- symbol TokRange
+-- j <- expression
+-- end <-
+--   choice
+--     [Excluding <$ symbol TokParenEnd, Including <$ symbol TokBracketEnd]
+-- return $ Interval (start i) (end j)
 
 --------------------------------------------------------------------------------
 

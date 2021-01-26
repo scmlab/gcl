@@ -100,7 +100,10 @@ type' =
           \   ->\n\
           \   (\n\
           \           Int))",
-      testCase "array" $ run "array [0 .. N) of Int"
+      testCase "array 1" $ run "array [0 .. N  ) of Int",
+      testCase "array 2" $ run "array (   0   ..  N   ] of Int",
+      testCase "array 3" $ run "array [  0 .. N  ] of Int",
+      testCase "array 4" $ run "array (  0 .. (Int) ) of Int"
     ]
   where
     run = isomorphic Parser.type'
@@ -138,10 +141,19 @@ statement =
       testCase "assignment" $ run "x := 0",
       testCase "assignment (parallel)" $ run "x   , y  := 0    ,    1",
       testCase "conditional 1" $ run "if True -> skip fi",
-      testCase "conditional 2" $ run "if True -> skip\n | False -> abort fi",
+      testCase "conditional 2" $ run "if True ->    skip   \n | False -> abort fi",
       testCase "loop invariant" $ run "    { True    ,     bnd      : a \n }",
       testCase "loop body 1" $ run "do True -> skip od",
-      testCase "loop body 2" $ run "do True → skip od"
+      testCase "loop body 2" $ run "do True    →       skip od"
     ]
   where
     run = isomorphic Parser.statement
+
+-- statements :: TestTree
+-- statements =
+--   testGroup
+--     "Multiple statement"
+--     [ testCase "skips" $ run "skip\nskip\n"
+--     ]
+--   where
+--     run = isomorphic Parser.statements
