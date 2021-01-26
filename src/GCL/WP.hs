@@ -19,7 +19,6 @@ import qualified Data.Map as Map
 
 import qualified GCL.Expr as E
 import GHC.Generics
-import Syntax.Abstract (Fresh (..))
 import Syntax.Concrete
   ( Defns,
     Expr,
@@ -27,8 +26,8 @@ import Syntax.Concrete
     Stmt,
   )
 import qualified Syntax.Concrete as C
-import Syntax.Location (Hydratable (..))
 import Syntax.Predicate hiding (Stmt)
+import GCL.Expr (Fresh(freshVar))
 
 type SM =
   ReaderT
@@ -115,13 +114,13 @@ struct True inv (Just bnd) (C.Do gcmds l) post = do
       False
       ( Conjunct
           [ inv,
-            Bound (bnd `C.eqq` C.Var (hydrate oldbnd) NoLoc) NoLoc,
+            Bound (bnd `C.eqq` C.Var (C.Name oldbnd NoLoc) NoLoc) NoLoc,
             guardLoop guard
           ]
       )
       Nothing
       body
-      (Bound (bnd `C.lt` C.Var (hydrate oldbnd) NoLoc) NoLoc)
+      (Bound (bnd `C.lt` C.Var (C.Name oldbnd NoLoc) NoLoc) NoLoc)
 struct False inv _ (C.Do gcmds l) post = do
   let guards = C.getGuards gcmds
   obligate (Conjunct (inv : (map (Negate . guardLoop) guards))) post (AtLoop l)

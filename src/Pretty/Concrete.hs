@@ -3,12 +3,11 @@
 module Pretty.Concrete where
 
 import Data.Text.Prettyprint.Doc
-import Pretty.Abstract ()
 import Pretty.Util
 import Pretty.Variadic
-import Syntax.Abstract (classify)
 import Syntax.Common (Fixity (..))
-import Syntax.Concrete hiding (GT)
+import Syntax.Concrete
+import Prelude hiding (Ordering (..))
 
 --------------------------------------------------------------------------------
 
@@ -94,7 +93,14 @@ instance Pretty GdCmd where
       <+> vsep (map pretty body)
 
 --------------------------------------------------------------------------------
+-- | Literals
 
+instance Pretty Lit where
+  pretty (Num i) = pretty $ show i
+  pretty (Bol b) = pretty $ show b
+  pretty (Chr c) = pretty $ show c
+
+--------------------------------------------------------------------------------
 -- | Expr
 instance Pretty Expr where
   pretty = prettyPrec 0
@@ -130,6 +136,29 @@ handleExpr _ (Quant op xs r t _) =
         <> pretty t
         <> " ⟩"
 handleExpr _ (Subst _ _) = return "Subst"
+
+--------------------------------------------------------------------------------
+
+-- | Operators
+instance Pretty Op where
+  pretty EQ = "="
+  pretty NEQ = "≠"
+  pretty LTE = "≤"
+  pretty GTE = "≥"
+  pretty LT = "<"
+  pretty GT = ">"
+  pretty Implies = "→"
+  pretty Conj = "∧"
+  pretty Disj = "∨"
+  pretty Neg = "¬"
+  pretty Add = "+"
+  pretty Sub = "-"
+  pretty Mul = "*"
+  pretty Div = "/"
+  pretty Mod = "%"
+  pretty Sum = "Σ"
+  pretty Forall = "∀"
+  pretty Exists = "∃"
 
 handleOp :: Int -> Op -> Variadic Expr (Doc ann)
 handleOp n op = case classify op of

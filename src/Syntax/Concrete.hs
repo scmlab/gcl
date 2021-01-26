@@ -13,12 +13,14 @@ import Data.Loc
 import Data.Map (Map)
 import Data.Text.Lazy (Text)
 import GHC.Generics (Generic)
-import Syntax.Common ()
-import Syntax.Abstract
-  ( Lit (..),
-    Op(..)
-  )
 import Prelude hiding (Ordering (..))
+import Syntax.Common (Fixity(..))
+
+--------------------------------------------------------------------------------
+
+type Const = Text
+type Var = Text
+type TypeVar = Text
 
 --------------------------------------------------------------------------------
 
@@ -169,7 +171,69 @@ instance Ord Name where
 nameToText :: Name -> Text
 nameToText (Name x _) = x
 
---------------------------------------------------------------------------------
+----------------------------------------------------------------
+
+-- | Literals
+data Lit  = Num Int | Bol Bool | Chr Char
+          deriving (Show, Eq, Generic)
+
+instance Located Lit where
+  locOf _ = NoLoc
+
+instance FromJSON Lit
+instance ToJSON Lit
+
+----------------------------------------------------------------
+
+-- | Operators
+data Op
+   -- binary relations
+  = EQ
+  | NEQ
+  | LTE
+  | GTE
+  | LT
+  | GT
+  -- logic operators
+  | Implies
+  | Conj
+  | Disj
+  -- arithmetics
+  | Neg 
+  | Add
+  | Sub
+  | Mul
+  | Div
+  | Mod 
+   -- For Quant
+  | Sum
+  | Forall
+  | Exists
+  deriving (Show, Eq, Generic)
+
+
+instance ToJSON Op
+instance FromJSON Op
+
+classify :: Op -> Fixity
+classify Implies = InfixR 1
+classify Disj    = InfixL 2
+classify Conj    = InfixL 3
+classify Neg     = Prefix 4
+classify EQ      = Infix 5
+classify NEQ     = Infix 6
+classify LTE     = Infix 6
+classify GTE     = Infix 6
+classify LT      = Infix 6
+classify GT      = Infix 6
+classify Add     = InfixL 7
+classify Sub     = InfixL 7
+classify Mul     = InfixL 8
+classify Div     = InfixL 8
+classify Mod     = InfixL 9
+classify Sum     = Prefix 5
+classify Exists  = Prefix 6
+classify Forall  = Prefix 7
 
 -- | Constructors
 unary :: Op -> Expr -> Expr

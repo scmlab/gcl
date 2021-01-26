@@ -6,7 +6,6 @@
 module Pretty.Concrete2 where
 
 import Data.Text.Prettyprint.Doc (Pretty (pretty))
-import Pretty.Abstract ()
 import Pretty.Util
 import Pretty.Variadic
 import Syntax.Common (Fixity (..))

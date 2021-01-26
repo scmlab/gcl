@@ -14,8 +14,7 @@ import Data.Loc
 import Data.Map (Map)
 import Data.Text.Lazy (Text)
 import GHC.Generics (Generic)
-import qualified Syntax.Abstract as A
-import Syntax.Common
+import Syntax.Common (Fixity(..))
 import qualified Syntax.Concrete as C
 import qualified Syntax.ConstExpr as ConstExpr
 import Syntax.Parser.Lexer (Tok (..))
@@ -268,10 +267,10 @@ type Subst = Map Text Expr
 data Lit = LitInt Int Loc | LitBool Bool Loc | LitChar Char Loc
   deriving (Show, Eq, Generic)
 
-instance ToConcrete Lit A.Lit where
-  toConcrete (LitInt a _) = A.Num a
-  toConcrete (LitBool a _) = A.Bol a
-  toConcrete (LitChar a _) = A.Chr a
+instance ToConcrete Lit C.Lit where
+  toConcrete (LitInt a _) = C.Num a
+  toConcrete (LitBool a _) = C.Bol a
+  toConcrete (LitChar a _) = C.Chr a
 
 instance Located Lit where
   locOf (LitInt _ l) = l
