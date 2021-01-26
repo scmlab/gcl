@@ -194,49 +194,45 @@ instance Located Type where
 -- | Expressions
 data Expr
   = Paren (Token 'TokParenStart) Expr (Token 'TokParenEnd)
-  | Lit Lit Loc
-  | Var Name Loc
-  | Const Name Loc
-  | Op Op Loc
-  | App Expr Expr Loc
-  | Lam Text Expr Loc
+  | Lit Lit
+  | Var Name
+  | Const Name
+  | Op Op
+  | App Expr Expr
+  -- | Lam Text Expr Loc
   | Quant (Bool, Loc) Op [Name] Loc Expr Loc Expr (Bool, Loc) Loc
   | Subst Expr Subst -- internal. Location not necessary?
   deriving (Eq, Show, Generic)
 
 instance Located Expr where
   locOf (Paren l _ r) = l <--> r
-  locOf (Var _ l) = l
-  locOf (Const _ l) = l
-  locOf (Lit _ l) = l
-  locOf (Op _ l) = l
-  locOf (App _ _ l) = l
-  locOf (Lam _ _ l) = l
+  locOf (Lit x) = locOf x
+  locOf (Var x) = locOf x
+  locOf (Const x) = locOf x
+  locOf (Op x) = locOf x
+  locOf (App x y) = x <--> y
+  -- locOf (Lam _ _ l) = l
   -- locOf (Hole l) = l
   locOf (Quant _ _ _ _ _ _ _ _ l) = l
   locOf (Subst _ _) = NoLoc
 
 instance ToConcrete Expr C.Expr where
-  toConcrete (Paren _ a _) = toConcrete a
-  toConcrete (Lit a l) = C.Lit (toConcrete a) l
-  toConcrete (Var a l) = C.Var (toConcrete a) l
-  toConcrete (Const a l) = C.Const (toConcrete a) l
-  toConcrete (Op a l) = C.Op (toConcrete a) l
-  toConcrete (App a b l) = C.App (toConcrete a) (toConcrete b) l
-  toConcrete (Lam a b l) = C.Lam a (toConcrete b) l
-  -- toConcrete (Hole l) = C.Hole l
-  toConcrete (Quant _ a b _ c _ d _ l) = C.Quant (C.Op (toConcrete a) (locOf a)) (fmap toConcrete b) (toConcrete c) (toConcrete d) l
-  toConcrete (Subst a b) = C.Subst (toConcrete a) (fmap toConcrete b)
+  toConcrete x = case x of 
+    Paren _ a _ -> toConcrete a
+    Lit a -> C.Lit (toConcrete a) (locOf x)
+    Var a -> C.Var (toConcrete a) (locOf x)
+    Const a -> C.Const (toConcrete a) (locOf x)
+    Op a -> C.Op (toConcrete a) (locOf x)
+    App a b -> C.App (toConcrete a) (toConcrete b) (locOf x)
+    -- Lam a b _ -> C.Lam a (toConcrete b) (locOf x)
+    Quant _ a b _ c _ d _ _ -> C.Quant (C.Op (toConcrete a) (locOf a)) (fmap toConcrete b) (toConcrete c) (toConcrete d) (locOf x)
+    Subst a b -> C.Subst (toConcrete a) (fmap toConcrete b)
 
 type Subst = Map Text Expr
 
 -- instance ToJSON Expr
 
 -- instance FromJSON Expr
-
-wrapLam :: [Text] -> Expr -> Expr
-wrapLam [] body = body
-wrapLam (x : xs) body = Lam x (wrapLam xs body) NoLoc
 
 --------------------------------------------------------------------------------
 
@@ -407,10 +403,10 @@ classify (Forall _) = Prefix 7
 
 -- operators
 unary :: Op -> Expr -> Expr
-unary op x = App (Op op NoLoc) x NoLoc
+unary op = App (Op op)
 
 binary :: Op -> Expr -> Expr -> Expr
-binary op x y = App (App (Op op NoLoc) x NoLoc) y (x <--> y)
+binary op x = App (App (Op op) x)
 
 lt, gt, gte, lte, eqq, conj, disj, implies :: Expr -> Expr -> Expr
 lt = binary (LT NoLoc)
@@ -431,23 +427,23 @@ disjunct [] = false
 disjunct xs = foldl1 disj xs
 
 imply :: Expr -> Expr -> Expr
-imply p q = App (App (Op (Implies NoLoc) NoLoc) p NoLoc) q NoLoc
+imply p = App (App (Op (Implies NoLoc)) p)
 
 predEq :: Expr -> Expr -> Bool
 predEq = (==)
 
 -- literals
 true :: Expr
-true = Lit (LitBool True NoLoc) NoLoc
+true = Lit (LitBool True NoLoc)
 
 false :: Expr
-false = Lit (LitBool False NoLoc) NoLoc
+false = Lit (LitBool False NoLoc)
 
 constant :: Text -> Expr
-constant x = Const (Name x NoLoc) NoLoc
+constant x = Const (Name x NoLoc)
 
 variable :: Text -> Expr
-variable x = Var (Name x NoLoc) NoLoc
+variable x = Var (Name x NoLoc)
 
 number :: Int -> Expr
-number n = Lit (LitInt n NoLoc) NoLoc
+number n = Lit (LitInt n NoLoc)

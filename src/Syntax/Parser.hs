@@ -414,18 +414,18 @@ expression = makeExprParser term table <?> "expression"
     application = do
       terms <- many term
       return $ \func -> do
-        let app inner t = App inner t (func <--> t)
+        let app inner t = App inner t
         foldl app func terms
 
     unary :: (Loc -> Op) -> Tok -> Parser (Expr -> Expr)
     unary operator' tok = do
       (op, loc) <- Util.getLoc (operator' <$ symbol tok)
-      return $ \result -> App (Op (op loc) loc) result (loc <--> result)
+      return $ \result -> App (Op (op loc)) result
 
     binary :: (Loc -> Op) -> Tok -> Parser (Expr -> Expr -> Expr)
     binary operator' tok = do
       (op, loc) <- Util.getLoc (operator' <$ symbol tok)
-      return $ \x y -> App (App (Op (op loc) loc) x (x <--> loc)) y (x <--> y)
+      return $ \x y -> App (App (Op (op loc)) x) y
 
     parensExpr :: Parser Expr
     parensExpr =
@@ -439,23 +439,22 @@ expression = makeExprParser term table <?> "expression"
       where
         term' :: Parser Expr
         term' =
-          withLoc
-            ( choice
-                [ Var <$> lower,
-                  Const <$> upper,
-                  Lit <$> literal,
-                  -- Op <$ symbol TokParenStart <*> operator <* symbol TokParenEnd,
-                  Quant
-                    <$> quantStart
-                    <*> operator
-                    <*> some lower
-                    <*> withLoc (id <$ symbol TokColon)
-                    <*> expression
-                    <*> withLoc (id <$ symbol TokColon)
-                    <*> expression
-                    <*> quantEnd
-                ]
-            )
+          choice
+            [ Var <$> lower,
+              Const <$> upper,
+              Lit <$> literal,
+              -- Op <$ symbol TokParenStart <*> operator <* symbol TokParenEnd,
+              withLoc $
+                Quant
+                  <$> quantStart
+                  <*> operator
+                  <*> some lower
+                  <*> withLoc (id <$ symbol TokColon)
+                  <*> expression
+                  <*> withLoc (id <$ symbol TokColon)
+                  <*> expression
+                  <*> quantEnd
+            ]
             <?> "term"
 
         -- quantOp :: Parser Op

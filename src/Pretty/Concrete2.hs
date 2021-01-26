@@ -254,16 +254,15 @@ handleExpr (Paren l x r) =
     prettyWithLoc l
       <> prettyWithLoc x
       <> prettyWithLoc r
-handleExpr (Var x _) = return $ prettyWithLoc x
-handleExpr (Const x _) = return $ prettyWithLoc x
-handleExpr (Lit x _) = return $ prettyWithLoc x
-handleExpr (Op x _) = handleOp x
-handleExpr (App p q _) = case handleExpr p of
+handleExpr (Var x) = return $ prettyWithLoc x
+handleExpr (Const x) = return $ prettyWithLoc x
+handleExpr (Lit x) = return $ prettyWithLoc x
+handleExpr (Op x) = handleOp x
+handleExpr (App p q) = case handleExpr p of
   Expect f -> f q
   Complete s -> do
     t <- handleExpr q
     return $ s <> t
-handleExpr (Lam p q l) = return $ setLoc l $ "λ " <> fromLocAndDoc NoLoc (pretty p) <> " → " <> prettyWithLoc q
 handleExpr (Quant (s, l) op xs m r n t (e, o) p) =
   return $
     setLoc p $
