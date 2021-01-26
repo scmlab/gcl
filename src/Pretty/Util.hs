@@ -7,8 +7,6 @@ module Pretty.Util
     DocWithLoc (..),
     toDoc,
     fromDoc,
-    fillGap,
-    translate,
   )
 where
 
@@ -23,12 +21,6 @@ instance Pretty Loc where
 
 renderStrict :: Doc ann -> Text
 renderStrict = Text.renderStrict . layoutPretty defaultLayoutOptions
-
---------------------------------------------------------------------------------
-
--- | srcloc related
-translate :: Int -> Pos -> Pos
-translate n (Pos p l c o) = Pos p l (c + n) (o + n)
 
 --------------------------------------------------------------------------------
 

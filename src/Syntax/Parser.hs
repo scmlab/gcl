@@ -144,6 +144,18 @@ tokenQuantClose = adapt TokQuantClose "|>"
 tokenQuantCloseU :: Parser (Token 'TokQuantCloseU)
 tokenQuantCloseU = adapt TokQuantCloseU "⟩"
 
+tokenSpecOpen :: Parser (Token 'TokSpecOpen)
+tokenSpecOpen = adapt TokSpecOpen "{!"
+
+tokenSpecClose :: Parser (Token 'TokSpecClose)
+tokenSpecClose = adapt TokSpecClose "!}"
+
+tokenProofOpen :: Parser (Token 'TokProofOpen)
+tokenProofOpen = adapt TokProofOpen "{-"
+
+tokenProofClose :: Parser (Token 'TokProofClose)
+tokenProofClose = adapt TokProofClose "-}"
+
 tokenColon :: Parser (Token 'TokColon)
 tokenColon = adapt TokColon "colon"
 
@@ -349,30 +361,24 @@ hole :: Parser Stmt
 hole = withLoc $ SpecQM <$ (symbol TokQM <?> "?")
 
 spec :: Parser Stmt
-spec = withLoc $ do
-  symbol TokSpecOpen <?> "{!"
-  -- expectNewline <?> "<newline> after a the start of a Spec"
-  _ <- specContent
-  _ <- takeWhileP (Just "anything other than '!}'") isTokSpecClose
-  symbol TokSpecClose <?> "!}"
-  -- expectNewline <?> "<newline> after a the end of a Spec"
-
-  return Spec
+spec =
+  Spec
+    <$> tokenSpecOpen
+    <* specContent
+    <* takeWhileP (Just "anything other than '!}'") isTokSpecClose
+    <*> tokenSpecClose
   where
     isTokSpecClose :: L Tok -> Bool
     isTokSpecClose (L _ TokSpecClose) = False
     isTokSpecClose _ = True
 
 proof :: Parser Stmt
-proof = withLoc $ do
-  symbol TokProofOpen <?> "{-"
-  -- expectNewline <?> "<newline> after a the start of a Proof"
-  _ <- specContent
-  _ <- takeWhileP (Just "anything other than '-}'") isTokProofClose
-  symbol TokProofClose <?> "-}"
-  -- expectNewline <?> "<newline> after a the end of a Proof"
-
-  return Spec
+proof =
+  Proof
+    <$> tokenProofOpen
+    <* specContent
+    <* takeWhileP (Just "anything other than '-}'") isTokProofClose
+      <*> tokenProofClose
   where
     isTokProofClose :: L Tok -> Bool
     isTokProofClose (L _ TokProofClose) = False

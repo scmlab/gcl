@@ -5,8 +5,7 @@
 
 module Pretty.Concrete2 where
 
-import Data.Loc
-import Data.Text.Prettyprint.Doc (Doc, Pretty (pretty))
+import Data.Text.Prettyprint.Doc (Pretty (pretty))
 import Pretty.Abstract ()
 import Pretty.Util
 import Pretty.Variadic
@@ -67,6 +66,18 @@ instance PrettyWithLoc (Token 'TokQuantClose) where
 instance PrettyWithLoc (Token 'TokQuantCloseU) where
   prettyWithLoc (Token l r) = DocWithLoc "⟩" l r
 
+instance PrettyWithLoc (Token 'TokSpecOpen) where
+  prettyWithLoc (Token l r) = DocWithLoc "{!" l r
+
+instance PrettyWithLoc (Token 'TokSpecClose) where
+  prettyWithLoc (Token l r) = DocWithLoc "!}" l r
+
+instance PrettyWithLoc (Token 'TokProofOpen) where
+  prettyWithLoc (Token l r) = DocWithLoc "{-" l r
+
+instance PrettyWithLoc (Token 'TokProofClose) where
+  prettyWithLoc (Token l r) = DocWithLoc "-}" l r
+  
 instance PrettyWithLoc (Token 'TokColon) where
   prettyWithLoc (Token l r) = DocWithLoc ":" l r
 
@@ -237,8 +248,8 @@ instance PrettyWithLoc Stmt where
       <> prettyWithLoc gdCmds
       <> prettyWithLoc r
   prettyWithLoc (SpecQM l) = fromDoc l "?"
-  prettyWithLoc (Spec l) = prettyHole "{!" "!}" l
-  prettyWithLoc (Proof l) = prettyHole "{-" "-}" l
+  prettyWithLoc (Spec l r) = prettyWithLoc l <> prettyWithLoc r
+  prettyWithLoc (Proof l r) = prettyWithLoc l <> prettyWithLoc r
 
 instance Pretty GdCmd where
   pretty = toDoc . prettyWithLoc
@@ -315,11 +326,6 @@ handleOp op = case classify op of
   Postfix _ -> do
     p <- var
     return $ prettyWithLoc p <> prettyWithLoc op
-
-prettyHole :: Doc ann -> Doc ann -> Loc -> DocWithLoc ann
-prettyHole left right loc = case loc of
-  NoLoc -> fromDoc loc $ left <> right
-  Loc start end -> fromDoc loc $ left <> fillGap (translate 2 start) (translate (-2) end) <> right
 
 --------------------------------------------------------------------------------
 

@@ -108,8 +108,8 @@ data Stmt
   | Do (Token 'TokDo) (SepBy 'TokGuardBar GdCmd) (Token 'TokOd)
   | If (Token 'TokIf) (SepBy 'TokGuardBar GdCmd) (Token 'TokFi)
   | SpecQM Loc -- ? to be rewritten as {!!} by the frontend
-  | Spec Loc
-  | Proof Loc
+  | Spec (Token 'TokSpecOpen) (Token 'TokSpecClose)
+  | Proof (Token 'TokProofOpen) (Token 'TokProofClose)
   deriving (Eq, Show)
 
 instance ToConcrete Stmt C.Stmt where
@@ -121,8 +121,8 @@ instance ToConcrete Stmt C.Stmt where
   toConcrete (Do l a r) = C.Do (toConcrete <$> fromSepBy a) (l <--> r)
   toConcrete (If l a r) = C.If (toConcrete <$> fromSepBy a) (l <--> r)
   toConcrete (SpecQM l) = C.SpecQM l
-  toConcrete (Spec l) = C.Spec l
-  toConcrete (Proof l) = C.Proof l
+  toConcrete (Spec l r) = C.Spec (l <--> r)
+  toConcrete (Proof l r) = C.Proof (l <--> r)
 
 instance Located Stmt where
   locOf (Skip l) = l
@@ -133,8 +133,8 @@ instance Located Stmt where
   locOf (Do l _ r) = l <--> r
   locOf (If l _ r) = l <--> r
   locOf (SpecQM l) = l
-  locOf (Spec l) = l
-  locOf (Proof l) = l
+  locOf (Spec l r) = l <--> r
+  locOf (Proof l r) = l <--> r
 
 data GdCmd = GdCmd Expr (Either (Token 'TokArrow) (Token 'TokArrowU)) [Stmt] deriving (Eq, Show)
 
