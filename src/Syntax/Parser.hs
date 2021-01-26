@@ -9,7 +9,7 @@ import Control.Monad.State (lift)
 import Data.Loc
 import Data.Text.Lazy (Text)
 import Data.Void
-import Syntax.Concrete2 hiding
+import Syntax.Concrete hiding
   ( binary,
     unary,
   )

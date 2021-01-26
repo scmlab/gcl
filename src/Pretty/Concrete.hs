@@ -3,13 +3,13 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module Pretty.Concrete2 where
+module Pretty.Concrete where
 
 import Data.Text.Prettyprint.Doc (Pretty (pretty))
 import Pretty.Util
 import Pretty.Variadic
 import Syntax.Common (Fixity (..))
-import Syntax.Concrete2
+import Syntax.Concrete
 import Syntax.Parser.Lexer (Tok (..))
 import Prelude hiding (Ordering (..))
 

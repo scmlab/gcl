@@ -37,7 +37,7 @@ import Syntax.Predicate
 import Network.Simple.TCP ( HostPreference(Host), serve )
 import Network.Socket (socketToHandle)
 import GHC.IO.IOMode (IOMode(ReadWriteMode))
-import Syntax.Concrete2 (ToConcrete(toConcrete))
+import Syntax.Concrete (ToConcrete(toConcrete))
 
 --------------------------------------------------------------------------------
 

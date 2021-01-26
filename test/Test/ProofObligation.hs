@@ -29,7 +29,7 @@ import Test.Tasty.Golden.Advanced
 import Test.Tasty.HUnit
 import Text.Megaparsec (eof)
 import Prelude hiding (Ordering (..))
-import Syntax.Concrete2 (ToConcrete(toConcrete))
+import Syntax.Concrete (ToConcrete(toConcrete))
 
 -- | Golden tests for programs 
 tests :: TestTree

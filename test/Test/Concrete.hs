@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Test.Concrete2 where
+module Test.Concrete where
 
 import Data.Text (Text)
 import qualified Data.Text as Text
@@ -13,7 +13,7 @@ import Error
 import qualified LSP
 import Pretty (renderStrict)
 import Pretty.Util (PrettyWithLoc (prettyWithLoc))
-import qualified Syntax.Concrete2 as Concrete2
+import qualified Syntax.Concrete as Concrete
 import Syntax.Location
 import Syntax.Parser (Parser)
 import qualified Syntax.Parser as Parser

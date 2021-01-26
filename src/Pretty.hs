@@ -17,7 +17,7 @@ import Error
 import GCL.Type (TypeError (..))
 import GCL.WP (StructError (..))
 import Pretty.Abstract ()
-import Pretty.Concrete2 ()
+import Pretty.Concrete ()
 import Pretty.Predicate ()
 import Syntax.Parser.Lexer (LexicalError)
 import Prelude hiding (Ordering (..))

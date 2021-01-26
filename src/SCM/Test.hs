@@ -15,7 +15,7 @@ import           Syntax.Abstract
 import           GCL.WP
 
 import           Pretty
-import Syntax.Concrete2 (ToConcrete(toConcrete))
+import Syntax.Concrete (ToConcrete(toConcrete))
 
 runtst :: String -> IO ()
 runtst filepath = do

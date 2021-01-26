@@ -3,8 +3,8 @@
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE KindSignatures #-}
 
-module Syntax.Concrete2
-  ( module Syntax.Concrete2,
+module Syntax.Concrete
+  ( module Syntax.Concrete,
     TBase (..), -- re-exporting from Syntax.Abstract
   )
 where
@@ -22,7 +22,7 @@ import Prelude hiding (Ordering (..))
 
 --------------------------------------------------------------------------------
 
--- | Temporary Typeclass for converting from Syntax.Concrete2 to Syntax.Abstract
+-- | Temporary Typeclass for converting from Syntax.Concrete to Syntax.Abstract
 class ToConcrete a b | a -> b where
   toConcrete :: a -> b
 
