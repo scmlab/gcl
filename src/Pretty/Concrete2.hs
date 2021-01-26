@@ -162,7 +162,7 @@ instance PrettyWithLoc Declaration where
 -- instance Pretty Name where
 --   pretty = toDoc . prettyWithLoc
 instance PrettyWithLoc Name where
-  prettyWithLoc (Name n l) = fromLocAndDoc l (pretty n)
+  prettyWithLoc (Name n l) = fromDoc l (pretty n)
 
 --------------------------------------------------------------------------------
 
@@ -170,40 +170,40 @@ instance PrettyWithLoc Name where
 -- instance Pretty Lit where
 --   pretty = toDoc . prettyWithLoc
 instance PrettyWithLoc Lit where
-  prettyWithLoc (LitBool True l) = fromLocAndDoc l "True"
-  prettyWithLoc (LitBool False l) = fromLocAndDoc l "False"
-  prettyWithLoc (LitInt n l) = fromLocAndDoc l (pretty n)
-  prettyWithLoc (LitChar c l) = fromLocAndDoc l (pretty [c])
+  prettyWithLoc (LitBool True l) = fromDoc l "True"
+  prettyWithLoc (LitBool False l) = fromDoc l "False"
+  prettyWithLoc (LitInt n l) = fromDoc l (pretty n)
+  prettyWithLoc (LitChar c l) = fromDoc l (pretty [c])
 
 --------------------------------------------------------------------------------
 
 -- | Operators
 instance PrettyWithLoc Op where
-  prettyWithLoc (EQ l) = fromLocAndDoc l "="
-  prettyWithLoc (NEQ l) = fromLocAndDoc l "/="
-  prettyWithLoc (NEQU l) = fromLocAndDoc l "≠"
-  prettyWithLoc (LTE l) = fromLocAndDoc l "<="
-  prettyWithLoc (LTEU l) = fromLocAndDoc l "≤"
-  prettyWithLoc (GTE l) = fromLocAndDoc l ">="
-  prettyWithLoc (GTEU l) = fromLocAndDoc l "≥"
-  prettyWithLoc (LT l) = fromLocAndDoc l "<"
-  prettyWithLoc (GT l) = fromLocAndDoc l ">"
-  prettyWithLoc (Implies l) = fromLocAndDoc l "=>"
-  prettyWithLoc (ImpliesU l) = fromLocAndDoc l "→"
-  prettyWithLoc (Conj l) = fromLocAndDoc l "&&"
-  prettyWithLoc (ConjU l) = fromLocAndDoc l "∧"
-  prettyWithLoc (Disj l) = fromLocAndDoc l "||"
-  prettyWithLoc (DisjU l) = fromLocAndDoc l "∨"
-  prettyWithLoc (Neg l) = fromLocAndDoc l "~"
-  prettyWithLoc (NegU l) = fromLocAndDoc l "¬"
-  prettyWithLoc (Add l) = fromLocAndDoc l "+"
-  prettyWithLoc (Sub l) = fromLocAndDoc l "-"
-  prettyWithLoc (Mul l) = fromLocAndDoc l "*"
-  prettyWithLoc (Div l) = fromLocAndDoc l "/"
-  prettyWithLoc (Mod l) = fromLocAndDoc l "%"
-  prettyWithLoc (Sum l) = fromLocAndDoc l "Σ"
-  prettyWithLoc (Forall l) = fromLocAndDoc l "∀"
-  prettyWithLoc (Exists l) = fromLocAndDoc l "∃"
+  prettyWithLoc (EQ l) = fromDoc l "="
+  prettyWithLoc (NEQ l) = fromDoc l "/="
+  prettyWithLoc (NEQU l) = fromDoc l "≠"
+  prettyWithLoc (LTE l) = fromDoc l "<="
+  prettyWithLoc (LTEU l) = fromDoc l "≤"
+  prettyWithLoc (GTE l) = fromDoc l ">="
+  prettyWithLoc (GTEU l) = fromDoc l "≥"
+  prettyWithLoc (LT l) = fromDoc l "<"
+  prettyWithLoc (GT l) = fromDoc l ">"
+  prettyWithLoc (Implies l) = fromDoc l "=>"
+  prettyWithLoc (ImpliesU l) = fromDoc l "→"
+  prettyWithLoc (Conj l) = fromDoc l "&&"
+  prettyWithLoc (ConjU l) = fromDoc l "∧"
+  prettyWithLoc (Disj l) = fromDoc l "||"
+  prettyWithLoc (DisjU l) = fromDoc l "∨"
+  prettyWithLoc (Neg l) = fromDoc l "~"
+  prettyWithLoc (NegU l) = fromDoc l "¬"
+  prettyWithLoc (Add l) = fromDoc l "+"
+  prettyWithLoc (Sub l) = fromDoc l "-"
+  prettyWithLoc (Mul l) = fromDoc l "*"
+  prettyWithLoc (Div l) = fromDoc l "/"
+  prettyWithLoc (Mod l) = fromDoc l "%"
+  prettyWithLoc (Sum l) = fromDoc l "Σ"
+  prettyWithLoc (Forall l) = fromDoc l "∀"
+  prettyWithLoc (Exists l) = fromDoc l "∃"
 
 --------------------------------------------------------------------------------
 
@@ -212,8 +212,8 @@ instance Pretty Stmt where
   pretty = toDoc . prettyWithLoc
 
 instance PrettyWithLoc Stmt where
-  prettyWithLoc (Skip l) = setLoc l "skip"
-  prettyWithLoc (Abort l) = setLoc l "abort"
+  prettyWithLoc (Skip l) = fromDoc l "skip"
+  prettyWithLoc (Abort l) = fromDoc l "abort"
   prettyWithLoc (Assign xs a es) =
     prettyWithLoc xs <> prettyWithLoc a <> prettyWithLoc es
   prettyWithLoc (Assert l p r) =
@@ -236,7 +236,7 @@ instance PrettyWithLoc Stmt where
     prettyWithLoc l
       <> prettyWithLoc gdCmds
       <> prettyWithLoc r
-  prettyWithLoc (SpecQM l) = setLoc l "?"
+  prettyWithLoc (SpecQM l) = fromDoc l "?"
   prettyWithLoc (Spec l) = prettyHole "{!" "!}" l
   prettyWithLoc (Proof l) = prettyHole "{-" "-}" l
 
@@ -318,8 +318,8 @@ handleOp op = case classify op of
 
 prettyHole :: Doc ann -> Doc ann -> Loc -> DocWithLoc ann
 prettyHole left right loc = case loc of
-  NoLoc -> fromLocAndDoc loc $ left <> right
-  Loc start end -> fromLocAndDoc loc $ left <> fillGap (translate 2 start) (translate (-2) end) <> right
+  NoLoc -> fromDoc loc $ left <> right
+  Loc start end -> fromDoc loc $ left <> fillGap (translate 2 start) (translate (-2) end) <> right
 
 --------------------------------------------------------------------------------
 
@@ -330,14 +330,14 @@ instance Pretty Type where
 instance PrettyWithLoc Type where
   prettyWithLoc (TParen l t r) = prettyWithLoc l <> prettyWithLoc t <> prettyWithLoc r
   -- DocWithLoc "(" l l <> prettyWithLoc t <> DocWithLoc ")" m m
-  prettyWithLoc (TBase TInt l) = setLoc l "Int"
-  prettyWithLoc (TBase TBool l) = setLoc l "Bool"
-  prettyWithLoc (TBase TChar l) = setLoc l "Char"
+  prettyWithLoc (TBase TInt l) = fromDoc l "Int"
+  prettyWithLoc (TBase TBool l) = fromDoc l "Bool"
+  prettyWithLoc (TBase TChar l) = fromDoc l "Char"
   prettyWithLoc (TFunc a l b) = prettyWithLoc a <> prettyWithLoc l <> prettyWithLoc b
   prettyWithLoc (TArray l a r b) =
     prettyWithLoc l <> prettyWithLoc a <> prettyWithLoc r
       <> prettyWithLoc b
-  prettyWithLoc (TVar i) = "TVar " <> prettyWithLoc i
+  prettyWithLoc (TVar i) = prettyWithLoc i
 
 --------------------------------------------------------------------------------
 
