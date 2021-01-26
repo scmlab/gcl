@@ -90,13 +90,13 @@ unzipGdCmds = unzip . map (\(GdCmd x y _) -> (x, y))
 --------------------------------------------------------------------------------
 
 -- | Types
-data Endpoint = Including Expr | Excluding Expr deriving (Eq, Show)
+data Endpoint = Including Expr | Excluding Expr deriving (Eq, Show, Generic)
 
 instance Located Endpoint where
   locOf (Including e) = locOf e
   locOf (Excluding e) = locOf e
 
-data Interval = Interval Endpoint Endpoint Loc deriving (Eq, Show)
+data Interval = Interval Endpoint Endpoint Loc deriving (Eq, Show, Generic)
 
 instance Located Interval where
   locOf (Interval _ _ l) = l
@@ -106,7 +106,7 @@ data Type
   | TArray Interval Type Loc
   | TFunc Type Type Loc
   | TVar Name Loc
-  deriving (Eq, Show)
+  deriving (Eq, Show, Generic)
 
 instance Located Type where
   locOf (TBase _ l) = l

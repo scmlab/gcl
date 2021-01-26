@@ -30,6 +30,8 @@ dependencies:
   - random
   - vector
   - lsp 
+  - multiset
+  - transformers
 
 library:
   source-dirs: src

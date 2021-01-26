@@ -70,6 +70,7 @@ library
     , regex-applicative
     , srcloc
     , text
+    , transformers
     , vector
   default-language: Haskell2010
 
@@ -99,6 +100,7 @@ executable gcl
     , regex-applicative
     , srcloc
     , text
+    , transformers
     , vector
   default-language: Haskell2010
 
@@ -106,10 +108,10 @@ test-suite gcl-test
   type: exitcode-stdio-1.0
   main-is: Test.hs
   other-modules:
-      Test.Lexer
       Test.Parser
       Test.Pretty
       Test.ProofObligation
+      Test.Type
       Test.WP
       Error
       GCL.Exec
@@ -163,5 +165,6 @@ test-suite gcl-test
     , tasty-hunit
     , tasty-quickcheck
     , text
+    , transformers
     , vector
   default-language: Haskell2010
