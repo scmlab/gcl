@@ -62,19 +62,18 @@ data Program
   = Program
       [Declaration] -- constant and variable declarations
       [Stmt] -- main program
-      Loc
   deriving (Eq, Show)
 
 instance ToConcrete Program C.Program where
-  toConcrete (Program decls' stmts l) =
+  toConcrete (Program decls' stmts) =
     let decls = map toConcrete decls'
         letBindings = ConstExpr.pickLetBindings decls
         (globProps, assertions) = ConstExpr.pickGlobals decls
         pre = if null assertions then [] else [C.Assert (C.conjunct assertions) NoLoc]
-     in C.Program decls globProps letBindings (pre ++ fmap toConcrete stmts) l
+     in C.Program decls globProps letBindings (pre ++ fmap toConcrete stmts) (decls' <--> stmts)
 
 instance Located Program where
-  locOf (Program _ _ l) = l
+  locOf (Program a b) = a <--> b
 
 type Defns = Map Text Expr
 
@@ -92,6 +91,13 @@ instance ToConcrete Declaration C.Declaration where
   toConcrete (VarDecl l a _ b) = C.VarDecl (toConcrete <$> fromSepBy a) (toConcrete b) Nothing (l <--> b)
   toConcrete (VarDeclWithProp x a _ b _ c r) = C.VarDecl (toConcrete <$> fromSepBy a) (toConcrete b) (Just $ toConcrete c) (x <--> r)
   toConcrete (LetDecl l a b _ c) = C.LetDecl (toConcrete a) (fmap nameToText b) (toConcrete c) (l <--> c)
+
+instance Located Declaration where
+  locOf (ConstDecl l _ _ r) = l <--> r
+  locOf (ConstDeclWithProp l _ _ _ _ _ r) = l <--> r
+  locOf (VarDecl l _ _ r) = l <--> r
+  locOf (VarDeclWithProp l _ _ _ _ _ r) = l <--> r
+  locOf (LetDecl l _ _ _ r) = l <--> r
 
 data Stmt
   = Skip Loc
@@ -206,7 +212,7 @@ data Expr
   | App Expr Expr
   | Quant
       (Either (Token 'TokQuantOpen) (Token 'TokQuantOpenU))
-      Op              
+      Op
       [Name]
       (Token 'TokColon)
       Expr

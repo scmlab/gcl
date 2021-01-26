@@ -119,8 +119,8 @@ instance Pretty Program where
   pretty = toDoc . prettyWithLoc
 
 instance PrettyWithLoc Program where
-  prettyWithLoc (Program decls stmts l) =
-    setLoc l $ mconcat (map prettyWithLoc decls) <> mconcat (map prettyWithLoc stmts)
+  prettyWithLoc (Program decls stmts) =
+    mconcat (map prettyWithLoc decls) <> mconcat (map prettyWithLoc stmts)
 
 --------------------------------------------------------------------------------
 
