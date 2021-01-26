@@ -6,7 +6,7 @@ import           Data.List                      ( partition )
 import           Data.Text.Lazy                 ( Text )
 
 
-import           Syntax.Concrete         hiding ( unary
+import           Syntax.Abstract         hiding ( unary
                                                 , binary
                                                 )
 import           Syntax.Location                ( )

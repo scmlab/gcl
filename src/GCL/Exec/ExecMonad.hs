@@ -9,7 +9,7 @@ import           Control.Monad.Except
 import           Control.Monad.State     hiding ( guard )
 import           GHC.Generics
 
-import           Syntax.Concrete        
+import           Syntax.Abstract        
 
 type Store = [(Var, Val)]
 

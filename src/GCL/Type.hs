@@ -2,7 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module GCL.Type where
-import Syntax.Concrete
+import Syntax.Abstract
 import GHC.Generics (Generic)
 import Data.Map (Map)
 import qualified Data.Map as Map

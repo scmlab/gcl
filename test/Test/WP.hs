@@ -11,7 +11,7 @@ import qualified Data.Text.Lazy.Encoding as LazyText
 import Error
 import qualified LSP
 import Pretty ()
-import Syntax.Concrete
+import Syntax.Abstract
 import Syntax.Location
 import Syntax.Predicate
 import Test.Tasty

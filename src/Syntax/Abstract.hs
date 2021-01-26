@@ -1,25 +1,21 @@
 {-# LANGUAGE DeriveGeneric #-}
 
-module Syntax.Concrete
-  ( module Syntax.Concrete,
-    Op (..),
-    TBase (..),
-    Lit (..), -- re-exporting from Syntax.Abstract
-  )
-where
+module Syntax.Abstract where
 
 import Data.Aeson
 import Data.Loc
 import Data.Map (Map)
 import Data.Text.Lazy (Text)
 import GHC.Generics (Generic)
+import Syntax.Common (Fixity (..))
 import Prelude hiding (Ordering (..))
-import Syntax.Common (Fixity(..))
 
 --------------------------------------------------------------------------------
 
 type Const = Text
+
 type Var = Text
+
 type TypeVar = Text
 
 --------------------------------------------------------------------------------
@@ -36,7 +32,6 @@ data Program
 
 instance Located Program where
   locOf (Program _ _ _ _ l) = l
-
 
 type Defns = Map Text Expr
 
@@ -94,7 +89,8 @@ unzipGdCmds = unzip . map (\(GdCmd x y _) -> (x, y))
 -- | Endpoint
 data Endpoint = Including Expr | Excluding Expr deriving (Eq, Show, Generic)
 
-instance ToJSON Endpoint where
+instance ToJSON Endpoint
+
 instance Located Endpoint where
   locOf (Including e) = locOf e
   locOf (Excluding e) = locOf e
@@ -102,15 +98,16 @@ instance Located Endpoint where
 -- | Interval
 data Interval = Interval Endpoint Endpoint Loc deriving (Eq, Show, Generic)
 
-instance ToJSON Interval where
+instance ToJSON Interval
+
 instance Located Interval where
   locOf (Interval _ _ l) = l
 
 -- | Base Types
 data TBase = TInt | TBool | TChar
-      deriving (Show, Eq, Generic)
+  deriving (Show, Eq, Generic)
 
-instance ToJSON TBase 
+instance ToJSON TBase
 
 -- | Types
 data Type
@@ -120,7 +117,8 @@ data Type
   | TVar Name Loc
   deriving (Eq, Show, Generic)
 
-instance ToJSON Type where
+instance ToJSON Type
+
 instance Located Type where
   locOf (TBase _ l) = l
   locOf (TArray _ _ l) = l
@@ -160,7 +158,7 @@ data Name = Name Text Loc
 
 instance Located Name where
   locOf (Name _ l) = l
-  
+
 instance ToJSON Name
 
 instance FromJSON Name
@@ -174,66 +172,67 @@ nameToText (Name x _) = x
 ----------------------------------------------------------------
 
 -- | Literals
-data Lit  = Num Int | Bol Bool | Chr Char
-          deriving (Show, Eq, Generic)
+data Lit = Num Int | Bol Bool | Chr Char
+  deriving (Show, Eq, Generic)
 
 instance Located Lit where
   locOf _ = NoLoc
 
 instance FromJSON Lit
+
 instance ToJSON Lit
 
 ----------------------------------------------------------------
 
 -- | Operators
 data Op
-   -- binary relations
-  = EQ
+  = -- binary relations
+    EQ
   | NEQ
   | LTE
   | GTE
   | LT
   | GT
-  -- logic operators
-  | Implies
+  | -- logic operators
+    Implies
   | Conj
   | Disj
-  -- arithmetics
-  | Neg 
+  | -- arithmetics
+    Neg
   | Add
   | Sub
   | Mul
   | Div
-  | Mod 
-   -- For Quant
-  | Sum
+  | Mod
+  | -- For Quant
+    Sum
   | Forall
   | Exists
   deriving (Show, Eq, Generic)
 
-
 instance ToJSON Op
+
 instance FromJSON Op
 
 classify :: Op -> Fixity
 classify Implies = InfixR 1
-classify Disj    = InfixL 2
-classify Conj    = InfixL 3
-classify Neg     = Prefix 4
-classify EQ      = Infix 5
-classify NEQ     = Infix 6
-classify LTE     = Infix 6
-classify GTE     = Infix 6
-classify LT      = Infix 6
-classify GT      = Infix 6
-classify Add     = InfixL 7
-classify Sub     = InfixL 7
-classify Mul     = InfixL 8
-classify Div     = InfixL 8
-classify Mod     = InfixL 9
-classify Sum     = Prefix 5
-classify Exists  = Prefix 6
-classify Forall  = Prefix 7
+classify Disj = InfixL 2
+classify Conj = InfixL 3
+classify Neg = Prefix 4
+classify EQ = Infix 5
+classify NEQ = Infix 6
+classify LTE = Infix 6
+classify GTE = Infix 6
+classify LT = Infix 6
+classify GT = Infix 6
+classify Add = InfixL 7
+classify Sub = InfixL 7
+classify Mul = InfixL 8
+classify Div = InfixL 8
+classify Mod = InfixL 9
+classify Sum = Prefix 5
+classify Exists = Prefix 6
+classify Forall = Prefix 7
 
 -- | Constructors
 unary :: Op -> Expr -> Expr

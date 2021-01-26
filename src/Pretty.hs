@@ -16,7 +16,7 @@ import qualified Data.Text.Prettyprint.Doc.Render.Text as Text
 import Error
 import GCL.Type (TypeError (..))
 import GCL.WP (StructError (..))
-import Pretty.Concrete ()
+import Pretty.Abstract ()
 import Pretty.Concrete2 ()
 import Pretty.Predicate ()
 import Syntax.Parser.Lexer (LexicalError)

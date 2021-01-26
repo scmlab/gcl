@@ -1,12 +1,12 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Pretty.Concrete where
+module Pretty.Abstract where
 
 import Data.Text.Prettyprint.Doc
 import Pretty.Util
 import Pretty.Variadic
 import Syntax.Common (Fixity (..))
-import Syntax.Concrete
+import Syntax.Abstract
 import Prelude hiding (Ordering (..))
 
 --------------------------------------------------------------------------------

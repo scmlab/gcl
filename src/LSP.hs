@@ -25,7 +25,7 @@ import Language.LSP.Diagnostics (partitionBySource)
 import Language.LSP.Server
 import Language.LSP.Types hiding (TextDocumentSyncClientCapabilities (..))
 import Pretty
-import qualified Syntax.Concrete as Concrete
+import qualified Syntax.Abstract as A
 import qualified Syntax.Parser as Parser
 import Syntax.Parser.Lexer (TokStream)
 import qualified Syntax.Parser.Lexer as Lexer
@@ -134,13 +134,13 @@ toResponse lspID (Req filepath source kind) =
   where
     handle :: ReqKind -> [ResKind]
     handle ReqLoad = asGlobalError $ do
-      program@(Concrete.Program _ globalProps _ _ _) <- parseProgram filepath source
+      program@(A.Program _ globalProps _ _ _) <- parseProgram filepath source
       withExcept TypeError (checkProg program)
       (pos, specs) <- sweep program
 
       return [ResOK lspID pos specs globalProps]
     handle (ReqInspect selStart selEnd) = ignoreError $ do
-      program@(Concrete.Program _ globalProps _ _ _) <- parseProgram filepath source
+      program@(A.Program _ globalProps _ _ _) <- parseProgram filepath source
       (pos, specs) <- sweep program
       -- find the POs whose Range overlaps with the selection
       let isOverlapped po = case locOf po of
@@ -168,8 +168,8 @@ toResponse lspID (Req filepath source kind) =
       _ <- refine payload
       return [ResResolve i]
     handle (ReqSubstitute i expr _subst) = asGlobalError $ do
-      Concrete.Program _ _ defns _ _ <- parseProgram filepath source
-      let expr' = runSubstM (expand (Concrete.Subst expr _subst)) defns 1
+      A.Program _ _ defns _ _ <- parseProgram filepath source
+      let expr' = runSubstM (expand (A.Subst expr _subst)) defns 1
       return [ResSubstitute i expr']
     handle ReqExportProofObligations = asGlobalError $ do
       return [ResConsoleLog "Export"]
@@ -372,7 +372,7 @@ parse :: Parser.Parser a -> FilePath -> TokStream -> M a
 parse parser filepath =
   withExceptT SyntacticError . liftEither . Parser.parse parser filepath
 
-parseProgram :: FilePath -> Text -> M Concrete.Program
+parseProgram :: FilePath -> Text -> M A.Program
 parseProgram filepath source = do
   tokens <- scan filepath source
   toConcrete <$> parse Parser.program filepath tokens
@@ -382,8 +382,8 @@ refine payload = do
   _ <- scan "<spec>" payload >>= parse Parser.specContent "<specification>"
   return ()
 
-sweep :: Concrete.Program -> M ([PO], [Spec])
-sweep (Concrete.Program _ _ ds statements _) = do
+sweep :: A.Program -> M ([PO], [Spec])
+sweep (A.Program _ _ ds statements _) = do
   ((_, pos), specs) <-
     withExceptT StructError $
       liftEither $
@@ -397,7 +397,7 @@ data ReqKind
   = ReqLoad
   | ReqInspect Int Int
   | ReqRefine Int Text
-  | ReqSubstitute Int Concrete.Expr Concrete.Subst
+  | ReqSubstitute Int A.Expr A.Subst
   | ReqExportProofObligations
   | ReqDebug
   deriving (Generic)
@@ -413,10 +413,10 @@ instance FromJSON Request
 
 -- | Response
 data ResKind
-  = ResOK ID [PO] [Spec] [Concrete.Expr]
+  = ResOK ID [PO] [Spec] [A.Expr]
   | ResError [(Site, Error)]
   | ResResolve Int -- resolves some Spec
-  | ResSubstitute Int Concrete.Expr
+  | ResSubstitute Int A.Expr
   | ResConsoleLog Text
   deriving (Generic)
 

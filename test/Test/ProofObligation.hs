@@ -20,7 +20,7 @@ import Data.Text.Prettyprint.Doc.Render.Text
 import Error
 import qualified LSP
 import Pretty
-import Syntax.Concrete
+import Syntax.Abstract
 import Syntax.Parser (Parser)
 import qualified Syntax.Parser as Parser
 import Test.Tasty

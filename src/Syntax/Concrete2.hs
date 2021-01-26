@@ -15,14 +15,14 @@ import Data.Map (Map)
 import Data.Text.Lazy (Text)
 import GHC.Generics (Generic)
 import Syntax.Common (Fixity(..))
-import qualified Syntax.Concrete as C
+import qualified Syntax.Abstract as A
 import qualified Syntax.ConstExpr as ConstExpr
 import Syntax.Parser.Lexer (Tok (..))
 import Prelude hiding (Ordering (..))
 
 --------------------------------------------------------------------------------
 
--- | Temporary Typeclass for converting from Syntax.Concrete2 to Syntax.Concrete
+-- | Temporary Typeclass for converting from Syntax.Concrete2 to Syntax.Abstract
 class ToConcrete a b | a -> b where
   toConcrete :: a -> b
 
@@ -60,13 +60,13 @@ data Program
       [Stmt] -- main program
   deriving (Eq, Show)
 
-instance ToConcrete Program C.Program where
+instance ToConcrete Program A.Program where
   toConcrete (Program decls' stmts) =
     let decls = map toConcrete decls'
         letBindings = ConstExpr.pickLetBindings decls
         (globProps, assertions) = ConstExpr.pickGlobals decls
-        pre = if null assertions then [] else [C.Assert (C.conjunct assertions) NoLoc]
-     in C.Program decls globProps letBindings (pre ++ fmap toConcrete stmts) (decls' <--> stmts)
+        pre = if null assertions then [] else [A.Assert (A.conjunct assertions) NoLoc]
+     in A.Program decls globProps letBindings (pre ++ fmap toConcrete stmts) (decls' <--> stmts)
 
 instance Located Program where
   locOf (Program a b) = a <--> b
@@ -81,12 +81,12 @@ data Declaration
   | LetDecl (Token 'TokLet) Name [Name] (Token 'TokEQ) Expr
   deriving (Eq, Show)
 
-instance ToConcrete Declaration C.Declaration where
-  toConcrete (ConstDecl l a _ b) = C.ConstDecl (toConcrete <$> fromSepBy a) (toConcrete b) Nothing (l <--> b)
-  toConcrete (ConstDeclWithProp x a _ b _ c r) = C.ConstDecl (toConcrete <$> fromSepBy a) (toConcrete b) (Just $ toConcrete c) (x <--> r)
-  toConcrete (VarDecl l a _ b) = C.VarDecl (toConcrete <$> fromSepBy a) (toConcrete b) Nothing (l <--> b)
-  toConcrete (VarDeclWithProp x a _ b _ c r) = C.VarDecl (toConcrete <$> fromSepBy a) (toConcrete b) (Just $ toConcrete c) (x <--> r)
-  toConcrete (LetDecl l a b _ c) = C.LetDecl (toConcrete a) (fmap nameToText b) (toConcrete c) (l <--> c)
+instance ToConcrete Declaration A.Declaration where
+  toConcrete (ConstDecl l a _ b) = A.ConstDecl (toConcrete <$> fromSepBy a) (toConcrete b) Nothing (l <--> b)
+  toConcrete (ConstDeclWithProp x a _ b _ c r) = A.ConstDecl (toConcrete <$> fromSepBy a) (toConcrete b) (Just $ toConcrete c) (x <--> r)
+  toConcrete (VarDecl l a _ b) = A.VarDecl (toConcrete <$> fromSepBy a) (toConcrete b) Nothing (l <--> b)
+  toConcrete (VarDeclWithProp x a _ b _ c r) = A.VarDecl (toConcrete <$> fromSepBy a) (toConcrete b) (Just $ toConcrete c) (x <--> r)
+  toConcrete (LetDecl l a b _ c) = A.LetDecl (toConcrete a) (fmap nameToText b) (toConcrete c) (l <--> c)
 
 instance Located Declaration where
   locOf (ConstDecl l _ _ r) = l <--> r
@@ -108,17 +108,17 @@ data Stmt
   | Proof (Token 'TokProofOpen) (Token 'TokProofClose)
   deriving (Eq, Show)
 
-instance ToConcrete Stmt C.Stmt where
-  toConcrete (Skip l) = C.Skip l
-  toConcrete (Abort l) = C.Abort l
-  toConcrete (Assign a _ b) = C.Assign (toConcrete <$> fromSepBy a) (toConcrete <$> fromSepBy b) (a <--> b)
-  toConcrete (Assert l a r) = C.Assert (toConcrete a) (l <--> r)
-  toConcrete (LoopInvariant l a _ _ _ b r) = C.LoopInvariant (toConcrete a) (toConcrete b) (l <--> r)
-  toConcrete (Do l a r) = C.Do (toConcrete <$> fromSepBy a) (l <--> r)
-  toConcrete (If l a r) = C.If (toConcrete <$> fromSepBy a) (l <--> r)
-  toConcrete (SpecQM l) = C.SpecQM l
-  toConcrete (Spec l r) = C.Spec (l <--> r)
-  toConcrete (Proof l r) = C.Proof (l <--> r)
+instance ToConcrete Stmt A.Stmt where
+  toConcrete (Skip l) = A.Skip l
+  toConcrete (Abort l) = A.Abort l
+  toConcrete (Assign a _ b) = A.Assign (toConcrete <$> fromSepBy a) (toConcrete <$> fromSepBy b) (a <--> b)
+  toConcrete (Assert l a r) = A.Assert (toConcrete a) (l <--> r)
+  toConcrete (LoopInvariant l a _ _ _ b r) = A.LoopInvariant (toConcrete a) (toConcrete b) (l <--> r)
+  toConcrete (Do l a r) = A.Do (toConcrete <$> fromSepBy a) (l <--> r)
+  toConcrete (If l a r) = A.If (toConcrete <$> fromSepBy a) (l <--> r)
+  toConcrete (SpecQM l) = A.SpecQM l
+  toConcrete (Spec l r) = A.Spec (l <--> r)
+  toConcrete (Proof l r) = A.Proof (l <--> r)
 
 instance Located Stmt where
   locOf (Skip l) = l
@@ -134,8 +134,8 @@ instance Located Stmt where
 
 data GdCmd = GdCmd Expr (Either (Token 'TokArrow) (Token 'TokArrowU)) [Stmt] deriving (Eq, Show)
 
-instance ToConcrete GdCmd C.GdCmd where
-  toConcrete (GdCmd a _ b) = C.GdCmd (toConcrete a) (fmap toConcrete b) (a <--> b)
+instance ToConcrete GdCmd A.GdCmd where
+  toConcrete (GdCmd a _ b) = A.GdCmd (toConcrete a) (fmap toConcrete b) (a <--> b)
 
 --------------------------------------------------------------------------------
 
@@ -150,13 +150,13 @@ data EndpointClose
   | ExcludingClosing Expr (Token 'TokParenClose)
   deriving (Eq, Show)
 
-instance ToConcrete EndpointOpen C.Endpoint where
-  toConcrete (IncludingOpening _ a) = C.Including (toConcrete a)
-  toConcrete (ExcludingOpening _ a) = C.Excluding (toConcrete a)
+instance ToConcrete EndpointOpen A.Endpoint where
+  toConcrete (IncludingOpening _ a) = A.Including (toConcrete a)
+  toConcrete (ExcludingOpening _ a) = A.Excluding (toConcrete a)
 
-instance ToConcrete EndpointClose C.Endpoint where
-  toConcrete (IncludingClosing a _) = C.Including (toConcrete a)
-  toConcrete (ExcludingClosing a _) = C.Excluding (toConcrete a)
+instance ToConcrete EndpointClose A.Endpoint where
+  toConcrete (IncludingClosing a _) = A.Including (toConcrete a)
+  toConcrete (ExcludingClosing a _) = A.Excluding (toConcrete a)
 
 instance Located EndpointOpen where
   locOf (IncludingOpening l e) = l <--> e
@@ -169,8 +169,8 @@ instance Located EndpointClose where
 -- | Interval
 data Interval = Interval EndpointOpen (Token 'TokRange) EndpointClose deriving (Eq, Show)
 
-instance ToConcrete Interval C.Interval where
-  toConcrete (Interval a _ b) = C.Interval (toConcrete a) (toConcrete b) (a <--> b)
+instance ToConcrete Interval A.Interval where
+  toConcrete (Interval a _ b) = A.Interval (toConcrete a) (toConcrete b) (a <--> b)
 
 instance Located Interval where
   locOf (Interval l _ r) = l <--> r
@@ -187,10 +187,10 @@ instance Located TBase where
   locOf (TBool l) = l
   locOf (TChar l) = l
 
-instance ToConcrete TBase C.TBase where
-  toConcrete (TInt _) = C.TInt
-  toConcrete (TBool _) = C.TBool
-  toConcrete (TChar _) = C.TChar
+instance ToConcrete TBase A.TBase where
+  toConcrete (TInt _) = A.TInt
+  toConcrete (TBool _) = A.TBool
+  toConcrete (TChar _) = A.TChar
 
 -- | Type
 data Type
@@ -201,12 +201,12 @@ data Type
   | TVar Name
   deriving (Eq, Show)
 
-instance ToConcrete Type C.Type where
+instance ToConcrete Type A.Type where
   toConcrete (TParen _ a _) = toConcrete a
-  toConcrete (TBase a) = C.TBase (toConcrete a) (locOf a)
-  toConcrete (TArray l a _ b) = C.TArray (toConcrete a) (toConcrete b) (l <--> b)
-  toConcrete (TFunc a _ b) = C.TFunc (toConcrete a) (toConcrete b) (a <--> b)
-  toConcrete (TVar a) = C.TVar (toConcrete a) (locOf a)
+  toConcrete (TBase a) = A.TBase (toConcrete a) (locOf a)
+  toConcrete (TArray l a _ b) = A.TArray (toConcrete a) (toConcrete b) (l <--> b)
+  toConcrete (TFunc a _ b) = A.TFunc (toConcrete a) (toConcrete b) (a <--> b)
+  toConcrete (TVar a) = A.TVar (toConcrete a) (locOf a)
 
 instance Located Type where
   locOf (TParen l _ r) = l <--> r
@@ -245,15 +245,15 @@ instance Located Expr where
   locOf (App x y) = x <--> y
   locOf (Quant l _ _ _ _ _ _ r) = l <--> r
 
-instance ToConcrete Expr C.Expr where
+instance ToConcrete Expr A.Expr where
   toConcrete x = case x of
     Paren _ a _ -> toConcrete a
-    Lit a -> C.Lit (toConcrete a) (locOf x)
-    Var a -> C.Var (toConcrete a) (locOf x)
-    Const a -> C.Const (toConcrete a) (locOf x)
-    Op a -> C.Op (toConcrete a) (locOf x)
-    App a b -> C.App (toConcrete a) (toConcrete b) (locOf x)
-    Quant _ a b _ c _ d _ -> C.Quant (C.Op (toConcrete a) (locOf a)) (fmap toConcrete b) (toConcrete c) (toConcrete d) (locOf x)
+    Lit a -> A.Lit (toConcrete a) (locOf x)
+    Var a -> A.Var (toConcrete a) (locOf x)
+    Const a -> A.Const (toConcrete a) (locOf x)
+    Op a -> A.Op (toConcrete a) (locOf x)
+    App a b -> A.App (toConcrete a) (toConcrete b) (locOf x)
+    Quant _ a b _ c _ d _ -> A.Quant (A.Op (toConcrete a) (locOf a)) (fmap toConcrete b) (toConcrete c) (toConcrete d) (locOf x)
 
 type Subst = Map Text Expr
 
@@ -267,10 +267,10 @@ type Subst = Map Text Expr
 data Lit = LitInt Int Loc | LitBool Bool Loc | LitChar Char Loc
   deriving (Show, Eq, Generic)
 
-instance ToConcrete Lit C.Lit where
-  toConcrete (LitInt a _) = C.Num a
-  toConcrete (LitBool a _) = C.Bol a
-  toConcrete (LitChar a _) = C.Chr a
+instance ToConcrete Lit A.Lit where
+  toConcrete (LitInt a _) = A.Num a
+  toConcrete (LitBool a _) = A.Bol a
+  toConcrete (LitChar a _) = A.Chr a
 
 instance Located Lit where
   locOf (LitInt _ l) = l
@@ -298,8 +298,8 @@ instance Ord Name where
   compare (Name a _) (Name b _) = compare a b
 
 -- temp
-instance ToConcrete Name C.Name where
-  toConcrete (Name a l) = C.Name a l
+instance ToConcrete Name A.Name where
+  toConcrete (Name a l) = A.Name a l
 
 nameToText :: Name -> Text
 nameToText (Name x _) = x
@@ -339,32 +339,32 @@ data Op
   | Exists Loc
   deriving (Show, Eq, Generic)
 
-instance ToConcrete Op C.Op where
-  toConcrete (EQ _) = C.EQ
-  toConcrete (NEQ _) = C.NEQ
-  toConcrete (NEQU _) = C.NEQ
-  toConcrete (LTE _) = C.LTE
-  toConcrete (LTEU _) = C.LTE
-  toConcrete (GTE _) = C.GTE
-  toConcrete (GTEU _) = C.GTE
-  toConcrete (LT _) = C.LT
-  toConcrete (GT _) = C.GT
-  toConcrete (Implies _) = C.Implies
-  toConcrete (ImpliesU _) = C.Implies
-  toConcrete (Conj _) = C.Conj
-  toConcrete (ConjU _) = C.Conj
-  toConcrete (Disj _) = C.Disj
-  toConcrete (DisjU _) = C.Disj
-  toConcrete (Neg _) = C.Neg
-  toConcrete (NegU _) = C.Neg
-  toConcrete (Add _) = C.Add
-  toConcrete (Sub _) = C.Sub
-  toConcrete (Mul _) = C.Mul
-  toConcrete (Div _) = C.Div
-  toConcrete (Mod _) = C.Mod
-  toConcrete (Sum _) = C.Sum
-  toConcrete (Forall _) = C.Forall
-  toConcrete (Exists _) = C.Exists
+instance ToConcrete Op A.Op where
+  toConcrete (EQ _) = A.EQ
+  toConcrete (NEQ _) = A.NEQ
+  toConcrete (NEQU _) = A.NEQ
+  toConcrete (LTE _) = A.LTE
+  toConcrete (LTEU _) = A.LTE
+  toConcrete (GTE _) = A.GTE
+  toConcrete (GTEU _) = A.GTE
+  toConcrete (LT _) = A.LT
+  toConcrete (GT _) = A.GT
+  toConcrete (Implies _) = A.Implies
+  toConcrete (ImpliesU _) = A.Implies
+  toConcrete (Conj _) = A.Conj
+  toConcrete (ConjU _) = A.Conj
+  toConcrete (Disj _) = A.Disj
+  toConcrete (DisjU _) = A.Disj
+  toConcrete (Neg _) = A.Neg
+  toConcrete (NegU _) = A.Neg
+  toConcrete (Add _) = A.Add
+  toConcrete (Sub _) = A.Sub
+  toConcrete (Mul _) = A.Mul
+  toConcrete (Div _) = A.Div
+  toConcrete (Mod _) = A.Mod
+  toConcrete (Sum _) = A.Sum
+  toConcrete (Forall _) = A.Forall
+  toConcrete (Exists _) = A.Exists
 
 instance ToJSON Op
 

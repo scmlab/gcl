@@ -4,7 +4,7 @@ module Syntax.Location where
 
 -- import Data.Loc
 -- import Data.Text.Lazy (Text)
--- import Syntax.Concrete
+-- import Syntax.Abstract
 -- import Prelude hiding (Ordering (..))
 
 

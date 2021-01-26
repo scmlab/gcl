@@ -10,7 +10,7 @@ import qualified Data.Map                      as Map
 import           Syntax.Parser.Lexer            ( TokStream )
 import qualified Syntax.Parser.Lexer           as Lexer
 import qualified Syntax.Parser                 as Parser
-import           Syntax.Concrete
+import           Syntax.Abstract
 
 import           GCL.WP
 

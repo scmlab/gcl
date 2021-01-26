@@ -11,7 +11,7 @@ import           Data.Set                       ( Set
 import qualified Data.Set                      as Set
 import           Data.Text.Lazy                 (pack,  Text )
 import           Data.Maybe                     ( fromMaybe )
-import           Syntax.Concrete
+import           Syntax.Abstract
 import           Control.Monad.State
 import           Control.Monad.Reader
 

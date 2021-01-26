@@ -13,12 +13,12 @@ import Data.Text.Lazy (Text)
 import qualified Data.Text.Lazy as Text
 import qualified GCL.Expr as E
 import GHC.Generics
-import Syntax.Concrete
+import Syntax.Abstract
   ( Expr,
     Name,
     Subst,
   )
-import qualified Syntax.Concrete as C
+import qualified Syntax.Abstract as A
 
 --------------------------------------------------------------------------------
 
@@ -55,9 +55,9 @@ toExpr (Assertion e _) = e
 toExpr (LoopInvariant e _ _) = e
 toExpr (GuardIf e _) = e
 toExpr (GuardLoop e _) = e
-toExpr (Conjunct xs) = C.conjunct (map toExpr xs)
-toExpr (Disjunct xs) = C.disjunct (map toExpr xs)
-toExpr (Negate x) = C.neg (toExpr x)
+toExpr (Conjunct xs) = A.conjunct (map toExpr xs)
+toExpr (Disjunct xs) = A.disjunct (map toExpr xs)
+toExpr (Negate x) = A.neg (toExpr x)
 
 subst :: E.ExpandM m => Subst -> Pred -> m Pred
 subst env (Constant e) = Constant <$> E.subst env e
@@ -82,8 +82,8 @@ loopInvariant x b = LoopInvariant x (bnd b) NoLoc
   where
     bnd =
       if Text.null b
-        then C.variable
-        else if isUpper (Text.head b) then C.constant else C.variable
+        then A.variable
+        else if isUpper (Text.head b) then A.constant else A.variable
 
 guardIf :: Expr -> Pred
 guardIf x = GuardIf x NoLoc
@@ -92,24 +92,24 @@ guardLoop :: Expr -> Pred
 guardLoop x = GuardLoop x NoLoc
 
 boundEq :: Expr -> Expr -> Pred
-boundEq x var = Bound (x `C.eqq` var) NoLoc
+boundEq x var = Bound (x `A.eqq` var) NoLoc
 
 boundLT :: Expr -> Expr -> Pred
-boundLT x var = Bound (x `C.lt` var) NoLoc
+boundLT x var = Bound (x `A.lt` var) NoLoc
 
 boundGTE :: Expr -> Expr -> Pred
-boundGTE x var = Bound (x `C.gte` var) NoLoc
+boundGTE x var = Bound (x `A.gte` var) NoLoc
 
 (===) :: Int -> Int -> Expr
-x === y = C.number x `C.eqq` C.number y
+x === y = A.number x `A.eqq` A.number y
 
 conjunct :: [Pred] -> Pred
-conjunct [] = Constant C.true
+conjunct [] = Constant A.true
 conjunct [x] = x
 conjunct xs = Conjunct xs
 
 disjunct :: [Pred] -> Pred
-disjunct [] = Constant C.false
+disjunct [] = Constant A.false
 disjunct [x] = x
 disjunct xs = Disjunct xs
 
