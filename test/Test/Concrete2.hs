@@ -92,18 +92,18 @@ type' =
     [ testCase "base types (Int)" $ run "Int",
       testCase "base types (Bool)" $ run "  ((Bool))",
       testCase "base types (Char)" $ run "Char",
-      testCase "function types 1" $ run "(Char -> (Int))",
-      testCase "function types 2" $ run "( Char ->      Int) -> Int",
+      testCase "function types 1" $ run "(Char -> (Int   ))",
+      testCase "function types 2" $ run "( Char →      Int) -> Int",
       testCase "function types (with newlines everywhere)" $
         run
           "(Char \n\
           \   ->\n\
           \   (\n\
           \           Int))",
-      testCase "array 1" $ run "array [0 .. N  ) of Int",
+      testCase "array 1" $ run "array [0 .. N  )   of    Int",
       testCase "array 2" $ run "array (   0   ..  N   ] of Int",
-      testCase "array 3" $ run "array [  0 .. N  ] of Int",
-      testCase "array 4" $ run "array (  0 .. (Int) ) of Int"
+      testCase "array 3" $ run "array [  0 .. N  ] of     Int",
+      testCase "array 4" $ run "array (  0 .. (Int) ) of \n Int"
     ]
   where
     run = isomorphic Parser.type'

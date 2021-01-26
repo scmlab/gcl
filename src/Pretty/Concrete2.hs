@@ -1,5 +1,5 @@
-{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 
@@ -63,6 +63,12 @@ instance PrettyWithLoc (Token 'TokComma) where
 
 instance PrettyWithLoc (Token 'TokRange) where
   prettyWithLoc (Token l r) = DocWithLoc ".." l r
+
+instance PrettyWithLoc (Token 'TokArray) where
+  prettyWithLoc (Token l r) = DocWithLoc "array" l r
+
+instance PrettyWithLoc (Token 'TokOf) where
+  prettyWithLoc (Token l r) = DocWithLoc "of" l r
 
 instance PrettyWithLoc (Token 'TokBnd) where
   prettyWithLoc (Token l r) = DocWithLoc "bnd" l r
@@ -227,9 +233,9 @@ instance Pretty GdCmd where
 
 instance PrettyWithLoc GdCmd where
   prettyWithLoc (GdCmd guard a body) =
-      prettyWithLoc guard
+    prettyWithLoc guard
       <> prettyWithLoc a
-        <> mconcat (map prettyWithLoc body)
+      <> mconcat (map prettyWithLoc body)
 
 --------------------------------------------------------------------------------
 
@@ -318,20 +324,15 @@ instance PrettyWithLoc Type where
   prettyWithLoc (TBase TInt l) = setLoc l "Int"
   prettyWithLoc (TBase TBool l) = setLoc l "Bool"
   prettyWithLoc (TBase TChar l) = setLoc l "Char"
-  prettyWithLoc (TFunc a (u, m) b l) =
-    setLoc l $
-      prettyWithLoc a
-        <> fromLocAndDoc m (if u then "→" else "->")
-        <> prettyWithLoc b
-  prettyWithLoc (TArray i b l) =
-    setLoc l $
-      "array " <> prettyWithLoc i <> "of " <> prettyWithLoc b
-  prettyWithLoc (TVar i l) = setLoc l $ "TVar " <> prettyWithLoc i
+  prettyWithLoc (TFunc a l b) = prettyWithLoc a <> prettyWithLoc l <> prettyWithLoc b 
+  prettyWithLoc (TArray l a r b) =
+    prettyWithLoc l <> prettyWithLoc a <> prettyWithLoc r
+      <> prettyWithLoc b
+  prettyWithLoc (TVar i) = "TVar " <> prettyWithLoc i
 
 --------------------------------------------------------------------------------
 
 -- | Endpoint & Interval
-
 instance PrettyWithLoc EndpointOpening where
   prettyWithLoc (IncludingOpening l e) = prettyWithLoc l <> prettyWithLoc e
   prettyWithLoc (ExcludingOpening l e) = prettyWithLoc l <> prettyWithLoc e
@@ -342,4 +343,3 @@ instance PrettyWithLoc EndpointClosing where
 
 instance PrettyWithLoc Interval where
   prettyWithLoc (Interval a b c) = prettyWithLoc a <> prettyWithLoc b <> prettyWithLoc c
-  

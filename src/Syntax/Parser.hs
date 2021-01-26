@@ -143,6 +143,12 @@ tokenComma = adapt TokComma "comma"
 tokenRange :: Parser (Token 'TokRange)
 tokenRange = adapt TokRange ".."
 
+tokenArray :: Parser (Token 'TokArray)
+tokenArray = adapt TokArray "reserved word \"array\""
+
+tokenOf :: Parser (Token 'TokOf)
+tokenOf = adapt TokOf "reserved word \"of\""
+
 tokenBnd :: Parser (Token 'TokBnd)
 tokenBnd = adapt TokBnd "reserved word \"bnd\""
 
@@ -172,6 +178,8 @@ tokenArrow = adapt TokArrow "->"
 
 tokenArrowU :: Parser (Token 'TokArrowU)
 tokenArrowU = adapt TokArrowU "→"
+
+-- eitherP :: Parser a -> Parser b -> Parser (Either a b)
 
 --------------------------------------------------------------------------------
 
@@ -551,13 +559,8 @@ type' = ignoreIndentations $ do
 
     function :: Parser (Type -> Type -> Type)
     function = ignoreIndentations $ do
-      arrow <-
-        withLoc $
-          choice
-            [ (False,) <$ symbol TokArrow <?> "->",
-              (True,) <$ symbol TokArrowU <?> "→"
-            ]
-      return $ \x y -> TFunc x arrow y (x <--> y)
+      arrow <- choice [Left <$> tokenArrow, Right <$> tokenArrowU]
+      return $ \x y -> TFunc x arrow y
 
     term :: Parser Type
     term = ignoreIndentations $ do
@@ -576,7 +579,7 @@ type' = ignoreIndentations $ do
         isBaseType _ = Nothing
 
     array :: Parser Type
-    array = withLoc $ TArray <$ symbol TokArray <*> interval <* symbol TokOf <*> type'
+    array = TArray <$> tokenArray <*> interval <*> tokenOf <*> type'
 
     endpointOpening :: Parser EndpointOpening
     endpointOpening =
@@ -643,7 +646,7 @@ block' constructor open parser close = do
       ]
   return $ constructor a b c
 
--- consumes 0 or more newlines/indents/dedents
+-- consumes 0 or more newlines/indents/dedents afterwards
 ignoreIndentations :: Parser a -> Parser a
 ignoreIndentations parser = do
   result <- parser

@@ -170,24 +170,24 @@ instance Located Interval where
 data Type
   = TParen (Token 'TokParenStart) Type (Token 'TokParenEnd)
   | TBase TBase Loc
-  | TArray Interval Type Loc
-  | TFunc Type (Bool, Loc) Type Loc
-  | TVar Name Loc
+  | TArray (Token 'TokArray) Interval (Token 'TokOf) Type
+  | TFunc Type (Either (Token 'TokArrow) (Token 'TokArrowU)) Type
+  | TVar Name
   deriving (Eq, Show)
 
 instance ToConcrete Type C.Type where
   toConcrete (TParen _ a _) = toConcrete a
   toConcrete (TBase a l) = C.TBase a l
-  toConcrete (TArray a b l) = C.TArray (toConcrete a) (toConcrete b) l
-  toConcrete (TFunc a _ b l) = C.TFunc (toConcrete a) (toConcrete b) l
-  toConcrete (TVar a l) = C.TVar (toConcrete a) l
+  toConcrete (TArray l a _ b) = C.TArray (toConcrete a) (toConcrete b) (l <--> b)
+  toConcrete (TFunc a _ b) = C.TFunc (toConcrete a) (toConcrete b) (a <--> b)
+  toConcrete (TVar a) = C.TVar (toConcrete a) (locOf a)
 
 instance Located Type where
   locOf (TParen l _ r) = l <--> r
   locOf (TBase _ l) = l
-  locOf (TArray _ _ l) = l
-  locOf (TFunc _ _ _ l) = l
-  locOf (TVar _ l) = l
+  locOf (TArray l _ _ r) = l <--> r
+  locOf (TFunc l _ r) = l <--> r
+  locOf (TVar x) = locOf x
 
 --------------------------------------------------------------------------------
 
