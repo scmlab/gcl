@@ -14,7 +14,6 @@ import qualified LSP
 import Pretty (renderStrict)
 import Pretty.Util (PrettyWithLoc (prettyWithLoc))
 import qualified Syntax.Concrete as Concrete
-import Syntax.Location
 import Syntax.Parser (Parser)
 import qualified Syntax.Parser as Parser
 import Test.Tasty ( TestTree, testGroup )

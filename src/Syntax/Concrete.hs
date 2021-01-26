@@ -3,14 +3,9 @@
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE KindSignatures #-}
 
-module Syntax.Concrete
-  ( module Syntax.Concrete,
-    TBase (..), -- re-exporting from Syntax.Abstract
-  )
-where
+module Syntax.Concrete where
 
-import Data.Aeson (FromJSON, ToJSON)
-import Data.Loc
+import Data.Loc ( Loc(..), Pos, (<-->), Located(locOf) )
 import Data.Map (Map)
 import Data.Text.Lazy (Text)
 import GHC.Generics (Generic)
@@ -255,12 +250,6 @@ instance ToAbstract Expr A.Expr where
     App a b -> A.App (toAbstract a) (toAbstract b) (locOf x)
     Quant _ a b _ c _ d _ -> A.Quant (A.Op (toAbstract a) (locOf a)) (fmap toAbstract b) (toAbstract c) (toAbstract d) (locOf x)
 
-type Subst = Map Text Expr
-
--- instance ToJSON Expr
-
--- instance FromJSON Expr
-
 --------------------------------------------------------------------------------
 
 -- | Literals (Integer / Boolean / Character)
@@ -277,10 +266,6 @@ instance Located Lit where
   locOf (LitBool _ l) = l
   locOf (LitChar _ l) = l
 
-instance ToJSON Lit
-
-instance FromJSON Lit
-
 --------------------------------------------------------------------------------
 
 -- | Names (both UPPER and LOWER cases)
@@ -290,14 +275,6 @@ data Name = Name Text Loc
 instance Located Name where
   locOf (Name _ l) = l
 
-instance ToJSON Name
-
-instance FromJSON Name
-
-instance Ord Name where
-  compare (Name a _) (Name b _) = compare a b
-
--- temp
 instance ToAbstract Name A.Name where
   toAbstract (Name a l) = A.Name a l
 
@@ -366,10 +343,6 @@ instance ToAbstract Op A.Op where
   toAbstract (Forall _) = A.Forall
   toAbstract (Exists _) = A.Exists
 
-instance ToJSON Op
-
-instance FromJSON Op
-
 instance Located Op where
   locOf (Implies l) = l
   locOf (ImpliesU l) = l
@@ -423,54 +396,3 @@ classify (Mod _) = InfixL 9
 classify (Sum _) = Prefix 5
 classify (Exists _) = Prefix 6
 classify (Forall _) = Prefix 7
-
---------------------------------------------------------------------------------
-
--- | Smart Constructors
-
--- operators
-unary :: Op -> Expr -> Expr
-unary op = App (Op op)
-
-binary :: Op -> Expr -> Expr -> Expr
-binary op x = App (App (Op op) x)
-
-lt, gt, gte, lte, eqq, conj, disj, implies :: Expr -> Expr -> Expr
-lt = binary (LT NoLoc)
-gt = binary (GT NoLoc)
-gte = binary (GTE NoLoc)
-lte = binary (LTE NoLoc)
-eqq = binary (EQ NoLoc)
-conj = binary (Conj NoLoc)
-disj = binary (Disj NoLoc)
-implies = binary (Implies NoLoc)
-
-conjunct :: [Expr] -> Expr
-conjunct [] = true
-conjunct xs = foldl1 conj xs
-
-disjunct :: [Expr] -> Expr
-disjunct [] = false
-disjunct xs = foldl1 disj xs
-
-imply :: Expr -> Expr -> Expr
-imply p = App (App (Op (Implies NoLoc)) p)
-
-predEq :: Expr -> Expr -> Bool
-predEq = (==)
-
--- literals
-true :: Expr
-true = Lit (LitBool True NoLoc)
-
-false :: Expr
-false = Lit (LitBool False NoLoc)
-
-constant :: Text -> Expr
-constant x = Const (Name x NoLoc)
-
-variable :: Text -> Expr
-variable x = Var (Name x NoLoc)
-
-number :: Int -> Expr
-number n = Lit (LitInt n NoLoc)

@@ -9,12 +9,7 @@ import Control.Monad.State (lift)
 import Data.Loc
 import Data.Text.Lazy (Text)
 import Data.Void
-import Syntax.Concrete hiding
-  ( binary,
-    unary,
-  )
--- import Syntax.ConstExpr2
-import Syntax.Location ()
+import Syntax.Concrete
 import Syntax.Parser.Lexer
 import Syntax.Parser.Util
   ( PosLog,

@@ -6,10 +6,7 @@ import           Data.List                      ( partition )
 import           Data.Text.Lazy                 ( Text )
 
 
-import           Syntax.Abstract         hiding ( unary
-                                                , binary
-                                                )
-import           Syntax.Location                ( )
+import           Syntax.Abstract         
 import           Data.Maybe                     ( mapMaybe )
 import qualified Data.Map                      as Map
 

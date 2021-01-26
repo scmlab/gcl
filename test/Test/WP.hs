@@ -12,7 +12,6 @@ import Error
 import qualified LSP
 import Pretty ()
 import Syntax.Abstract
-import Syntax.Location
 import Syntax.Predicate
 import Test.Tasty
 import Test.Tasty.HUnit
