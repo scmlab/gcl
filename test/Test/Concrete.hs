@@ -65,6 +65,7 @@ expression =
       testCase "boolean 4" $ run "B && C || A",
       testCase "quant 1" $ run "<| + i : i > 0 : f i |>",
       testCase "quant 2" $ run "⟨     + i :   i > 0   : f i ⟩",
+      testCase "quant 3" $ run "⟨ max i j : 0 ≤ i < j < n : A i - A j ⟩",
       testCase "function application 1" $ run "(f   (  x      )) y",
       testCase "function application 2" $ run "f (x y)",
       testCase "mixed 1" $ run "X * Y = N",

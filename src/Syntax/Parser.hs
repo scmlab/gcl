@@ -455,7 +455,7 @@ expression = makeExprParser term table <?> "expression"
               -- Op <$ symbol TokParenOpen <*> operator <* symbol TokParenClose,
               Quant
                 <$> choice [Left <$> tokenQuantOpen, Right <$> tokenQuantOpenU]
-                <*> operator
+                <*> choice [Left <$> operator, Right <$> term']
                 <*> some lower
                 <*> tokenColon
                 <*> expression

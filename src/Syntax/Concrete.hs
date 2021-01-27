@@ -222,7 +222,7 @@ data Expr
   | App Expr Expr
   | Quant
       (Either (Token 'TokQuantOpen) (Token 'TokQuantOpenU))
-      Op
+      (Either Op Expr)
       [Name]
       (Token 'TokColon)
       Expr
@@ -248,7 +248,7 @@ instance ToAbstract Expr A.Expr where
     Const a -> A.Const (toAbstract a) (locOf x)
     Op a -> A.Op (toAbstract a) (locOf x)
     App a b -> A.App (toAbstract a) (toAbstract b) (locOf x)
-    Quant _ a b _ c _ d _ -> A.Quant (A.Op (toAbstract a) (locOf a)) (fmap toAbstract b) (toAbstract c) (toAbstract d) (locOf x)
+    Quant _ a b _ c _ d _ -> A.Quant (either (toAbstract . Op) toAbstract a) (fmap toAbstract b) (toAbstract c) (toAbstract d) (locOf x)
 
 --------------------------------------------------------------------------------
 
