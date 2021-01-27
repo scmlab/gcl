@@ -26,8 +26,10 @@ import Test.Tasty.HUnit
 import Data.Char (isSpace)
 import Data.Int (Int64)
 
+import Prelude hiding (compare)
+
 tests :: TestTree
-tests = testGroup "Prettifier" [expression, type', declaration, statement, golden]
+tests = testGroup "Prettifier" [expression, type', declaration, statement, parseError, golden]
 
 --------------------------------------------------------------------------------
 
@@ -37,8 +39,16 @@ parse parser raw = LSP.runM $ LSP.scanLazy "<test>" raw >>= LSP.parse parser "<t
 render :: Pretty a => Either Error a -> Text
 render = renderLazy . layoutPretty defaultLayoutOptions . pretty
 
+
 isomorphic :: Pretty a => Parser a -> Text -> Assertion
 isomorphic parser raw = removeTrailingWhitespace (render (parse parser raw)) @?= removeTrailingWhitespace raw
+  where
+    removeTrailingWhitespace :: Text -> Text
+    removeTrailingWhitespace = Text.unlines . map Text.stripEnd . Text.lines
+
+
+compare :: Pretty a => Parser a -> Text -> Text -> Assertion
+compare parser actual expected = removeTrailingWhitespace (render (parse parser actual)) @?= removeTrailingWhitespace expected
   where
     removeTrailingWhitespace :: Text -> Text
     removeTrailingWhitespace = Text.unlines . map Text.stripEnd . Text.lines
@@ -156,6 +166,18 @@ statement =
     ]
   where
     run = isomorphic Parser.statement
+
+--------------------------------------------------------------------------------
+
+-- | Parse Error
+parseError :: TestTree
+parseError =
+  testGroup
+    "Parse error"
+    [ testCase "quant with parentheses" $ run "<| (+) i : i > 0 : f i |>" "Error Syntactic Error [(<test>:1:4, unexpected '(' expecting expression )]\n"
+    ]
+  where
+    run = compare Parser.expression 
 
 --------------------------------------------------------------------------------
 
