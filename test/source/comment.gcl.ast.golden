@@ -1,11 +1,11 @@
-do True
+do True ->
 
-  ->skip
     skip
     skip
+    skip
 
- | True
-  ->skip
+ | True ->
+    skip
     skip
     skip
 od

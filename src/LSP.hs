@@ -15,7 +15,7 @@ import Data.List (sort)
 import Data.Loc (Loc (..), Located (locOf), Pos (..), posCoff, posFile)
 import qualified Data.Text as Text
 import Data.Text (Text)
-import qualified Data.Text.Lazy as TextLazy
+import qualified Data.Text.Lazy as LazyText
 import Error
 import GCL.Expr (expand, runSubstM)
 import GCL.Type (TypeError (..), checkProg)
@@ -213,7 +213,7 @@ toLSPSideEffects _lspID (Req filepath source kind) = handle kind
             structErrorToDiagnostics (DigHole _) = []
         errorToDiagnostics (TypeError err) = typeErrorToDiagnostics err
           where
-            typeErrorToDiagnostics (NotInScope name loc) = [makeError loc "Not in scope" $ "The definition " <> TextLazy.toStrict name <> " is not in scope"]
+            typeErrorToDiagnostics (NotInScope name loc) = [makeError loc "Not in scope" $ "The definition " <> LazyText.toStrict name <> " is not in scope"]
             typeErrorToDiagnostics (UnifyFailed s t loc) =
               [ makeError loc "Cannot unify types" $
                   renderStrict $
@@ -366,7 +366,10 @@ asLocalError i program =
 --------------------------------------------------------------------------------
 
 scan :: FilePath -> Text -> M TokStream
-scan filepath = withExceptT LexicalError . liftEither . Lexer.scan filepath . TextLazy.fromStrict
+scan filepath = withExceptT LexicalError . liftEither . Lexer.scan filepath . LazyText.fromStrict
+
+scanLazy :: FilePath -> LazyText.Text -> M TokStream
+scanLazy filepath = withExceptT LexicalError . liftEither . Lexer.scan filepath
 
 parse :: Parser.Parser a -> FilePath -> TokStream -> M a
 parse parser filepath =
