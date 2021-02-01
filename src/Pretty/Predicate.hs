@@ -4,7 +4,7 @@ module Pretty.Predicate where
 
 import Data.Loc (unLoc)
 import Data.Text.Prettyprint.Doc
-import Pretty.Concrete ()
+import Pretty.Abstract ()
 import Pretty.Util
 import Syntax.Predicate
 import Prelude hiding (Ordering (..))

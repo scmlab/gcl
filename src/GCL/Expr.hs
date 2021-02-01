@@ -9,12 +9,25 @@ import           Data.Set                       ( Set
                                                 , (\\)
                                                 )
 import qualified Data.Set                      as Set
-import           Data.Text.Lazy                 ( Text )
+import           Data.Text.Lazy                 (pack,  Text )
 import           Data.Maybe                     ( fromMaybe )
-import           Syntax.Abstract                ( Fresh(..) )
-import           Syntax.Concrete
+import           Syntax.Abstract
 import           Control.Monad.State
 import           Control.Monad.Reader
+
+--------------------------------------------------------------------------------
+-- | Fresh Monad
+
+class Monad m => Fresh m where
+  fresh :: m Int
+  freshVar :: String -> m Var
+  freshVars :: String -> Int -> m [Var]
+
+  freshVar prefix =
+    (\i -> pack ("_" ++ prefix ++ show i)) <$> fresh
+
+  freshVars _  0 = return []
+  freshVars pf n = liftM2 (:) (freshVar pf) (freshVars pf (n-1))
 
 --------------------------------------------------------------------------------
 -- | Subst Monad

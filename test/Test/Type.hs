@@ -15,7 +15,7 @@ import Data.Text.Prettyprint.Doc.Render.Text
 import GCL.Type
 import Error
 import LSP
-import Syntax.Concrete
+import Syntax.Abstract
 import Test.Tasty
 import Test.Tasty.Golden
 import Test.Tasty.Golden.Advanced

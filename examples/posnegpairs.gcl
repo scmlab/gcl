@@ -4,9 +4,9 @@ con N : Int { 0 ≤ N }
 con F : array [0..N) of Int
 var r, s, n : Int
 
-let P0 = r = ⟨ (+) i j : 0 ≤ i < j < n : F i ≤ 0 ∧ F j ≥ 0 ⟩
+let P0 = r = ⟨ + i j : 0 ≤ i < j < n : F i ≤ 0 ∧ F j ≥ 0 ⟩
 let P1 = 0 ≤ n ≤ N
-let Q = s = ⟨ (+) i : 0 ≤ i < n : F i ≤ 0 ⟩
+let Q = s = ⟨ + i : 0 ≤ i < n : F i ≤ 0 ⟩
 
 n, r, s := 0, 0, 0
 { P0 ∧ P1 ∧ Q, bnd: N - n }
@@ -14,10 +14,10 @@ do n ≠ N ->
     if F n < 0 -> skip
      | F n ≥ 0 -> r := r + s
     fi
-    { r = ⟨ (+) i j : 0 ≤ i < j < n+1 : F i ≤ 0 ∧ F j ≥ 0 ⟩ ∧ P1 ∧ Q ∧ n ≠ N }
+    { r = ⟨ + i j : 0 ≤ i < j < n+1 : F i ≤ 0 ∧ F j ≥ 0 ⟩ ∧ P1 ∧ Q ∧ n ≠ N }
     if F n > 0 -> skip
      | F n ≤ 0 -> s := s + 1
     fi
     n := n + 1
 od
-{ r = ⟨ (+) i j : 0 ≤ i < j < N : F i ≤ 0 ∧ F j ≥ 0 ⟩ }
+{ r = ⟨ + i j : 0 ≤ i < j < N : F i ≤ 0 ∧ F j ≥ 0 ⟩ }

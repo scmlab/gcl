@@ -10,11 +10,12 @@ import qualified Data.Map                      as Map
 import           Syntax.Parser.Lexer            ( TokStream )
 import qualified Syntax.Parser.Lexer           as Lexer
 import qualified Syntax.Parser                 as Parser
-import           Syntax.Concrete
+import           Syntax.Abstract
 
 import           GCL.WP
 
 import           Pretty
+import Syntax.Concrete (ToAbstract(toAbstract))
 
 runtst :: String -> IO ()
 runtst filepath = do
@@ -76,4 +77,4 @@ parse
 parse parser filepath = Parser.parse parser filepath
 
 parseProgram :: FilePath -> TokStream -> Either [Parser.SyntacticError] Program
-parseProgram = parse Parser.program
+parseProgram filePath tokStream = toAbstract <$> parse Parser.program filePath tokStream

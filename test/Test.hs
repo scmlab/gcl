@@ -1,3 +1,6 @@
+import qualified Test.Lexer as Lexer
+import qualified Test.Parser as Parser
+import qualified Test.ProofObligation as PO
 import qualified Test.Type as Type
 import Test.Tasty (TestTree, defaultMain, testGroup)
 
@@ -5,5 +8,5 @@ main :: IO ()
 main = defaultMain tests
 
 tests :: TestTree
-tests = testGroup "Tests" [Type.tests]
--- tests = testGroup "Tests" [Lexer.tests, Parser.tests, Pretty.tests, WP.tests]
+tests = testGroup "Tests" [Type.tests, Lexer.tests, Parser.tests]
+    -- [Lexer.tests, Parser.tests, Concrete.tests, WP.tests]

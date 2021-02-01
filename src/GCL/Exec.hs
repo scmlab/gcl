@@ -12,7 +12,7 @@ where
 import Control.Monad.Except
 import Data.Loc
 import GCL.Exec.ExecMonad
-import Syntax.Concrete
+import Syntax.Abstract
 import Prelude hiding (Ordering (..))
 
 -- make evalExpr monadic for now,

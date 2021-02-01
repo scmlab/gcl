@@ -62,20 +62,20 @@ data Tok
   | TokColon
   | TokSemi
   | TokAssign
-  | TokSpecStart
-  | TokSpecEnd
-  | TokParenStart
-  | TokParenEnd
-  | TokBracketStart
-  | TokBracketEnd
-  | TokBraceStart
-  | TokBraceEnd
-  | TokQuantStart
-  | TokQuantEnd
-  | TokQuantStartU
-  | TokQuantEndU
-  | TokProofStart
-  | TokProofEnd
+  | TokSpecOpen
+  | TokSpecClose
+  | TokParenOpen
+  | TokParenClose
+  | TokBracketOpen
+  | TokBracketClose
+  | TokBraceOpen
+  | TokBraceClose
+  | TokQuantOpen
+  | TokQuantClose
+  | TokQuantOpenU
+  | TokQuantCloseU
+  | TokProofOpen
+  | TokProofClose
   | -- expression
 
     -- operators
@@ -110,11 +110,11 @@ data Tok
 
 instance Show Tok where
   show tok = case tok of
-    TokNewlineAndWhitespace n -> "\\n + " ++ show n ++ " \n"
-    TokNewlineAndWhitespaceAndBar n -> "\\n + " ++ show n ++ " | \n"
-    TokIndent -> " >>\n"
-    TokDedent -> " <<\n"
-    TokNewline -> "\\n\n"
+    TokNewlineAndWhitespace n -> "newline + " ++ show n ++ " whitespaces"
+    TokNewlineAndWhitespaceAndBar n -> "newline + " ++ show n ++ " whitespaces and a guard bar"
+    TokIndent -> "indent"
+    TokDedent -> "dedent"
+    TokNewline -> "newline"
     TokWhitespace -> " "
     TokEOF -> ""
     TokComment s -> "-- " ++ Text.unpack s
@@ -139,20 +139,20 @@ instance Show Tok where
     TokColon -> ":"
     TokSemi -> ";"
     TokAssign -> ":="
-    TokSpecStart -> "{!"
-    TokSpecEnd -> "!}"
-    TokParenStart -> "("
-    TokParenEnd -> ")"
-    TokBracketStart -> "["
-    TokBracketEnd -> "]"
-    TokBraceStart -> "{"
-    TokBraceEnd -> "}"
-    TokQuantStart -> "<|"
-    TokQuantEnd -> "|>"
-    TokQuantStartU -> "⟨"
-    TokQuantEndU -> "⟩"
-    TokProofStart -> "{-"
-    TokProofEnd -> "-}"
+    TokSpecOpen -> "{!"
+    TokSpecClose -> "!}"
+    TokParenOpen -> "("
+    TokParenClose -> ")"
+    TokBracketOpen -> "["
+    TokBracketClose -> "]"
+    TokBraceOpen -> "{"
+    TokBraceClose -> "}"
+    TokQuantOpen -> "<|"
+    TokQuantClose -> "|>"
+    TokQuantOpenU -> "⟨"
+    TokQuantCloseU -> "⟩"
+    TokProofOpen -> "{-"
+    TokProofClose -> "-}"
     TokEQ -> "="
     TokNEQ -> "/="
     TokNEQU -> "≠"
@@ -231,33 +231,33 @@ tokRE =
     <$ string ";"
     <|> TokAssign
     <$ string ":="
-    <|> TokSpecStart
+    <|> TokSpecOpen
     <$ string "{!"
-    <|> TokSpecEnd
+    <|> TokSpecClose
     <$ string "!}"
-    <|> TokParenStart
+    <|> TokParenOpen
     <$ string "("
-    <|> TokParenEnd
+    <|> TokParenClose
     <$ string ")"
-    <|> TokBracketStart
+    <|> TokBracketOpen
     <$ string "["
-    <|> TokBracketEnd
+    <|> TokBracketClose
     <$ string "]"
-    <|> TokBraceStart
+    <|> TokBraceOpen
     <$ string "{"
-    <|> TokBraceEnd
+    <|> TokBraceClose
     <$ string "}"
-    <|> TokQuantStart
+    <|> TokQuantOpen
     <$ string "<|"
-    <|> TokQuantEnd
+    <|> TokQuantClose
     <$ string "|>"
-    <|> TokQuantStartU
+    <|> TokQuantOpenU
     <$ string "⟨"
-    <|> TokQuantEndU
+    <|> TokQuantCloseU
     <$ string "⟩"
-    <|> TokProofStart
+    <|> TokProofOpen
     <$ string "{-"
-    <|> TokProofEnd
+    <|> TokProofClose
     <$ string "-}"
     -- literals
     <|> TokEQ
@@ -403,7 +403,7 @@ data PPState = PPState
     ppIndentStack :: [Int],
     -- set as the number of indentation after processing tokens like `TokNewlineAndWhitespace`
     -- the second field is set to True if it's `TokNewlineAndWhitespaceAndBar`
-    ppIndentation :: Maybe (Int, Bool),
+    ppIndentation :: Maybe (Int, Maybe Loc),
     -- set to True if expected to be followed by a `TokIndent` (e.g. `TokDo`)
     ppExpectIndent :: Bool,
     -- Loc of the previous token
@@ -415,7 +415,7 @@ type PreprocessM = ExceptT LexicalError (State PPState)
 runPreprocess :: PreprocessM a -> Either LexicalError a
 runPreprocess program = evalState (runExceptT program) (PPState [0] Nothing False NoLoc)
 
-setIdentation :: Maybe (Int, Bool) -> PreprocessM ()
+setIdentation :: Maybe (Int, Maybe Loc) -> PreprocessM ()
 setIdentation i = modify (\(PPState xs _ b l) -> PPState xs i b l)
 
 pushStack :: Int -> PreprocessM ()
@@ -436,6 +436,7 @@ expectingIndent :: Tok -> Bool
 expectingIndent TokDo = True
 expectingIndent TokIf = True
 expectingIndent TokArrow = True
+expectingIndent TokArrowU = True
 expectingIndent _ = False
 
 expectingDedent :: Tok -> Bool
@@ -444,7 +445,7 @@ expectingDedent TokFi = True
 expectingDedent TokGuardBar = True
 expectingDedent _ = False
 
-data Comparison = CmpNoop | CmpIndent Int | CmpNewline Bool | CmpDedent
+data Comparison = CmpNoop | CmpIndent Int | CmpNewline (Maybe Loc) | CmpDedent
   deriving (Show)
 
 compareIndentation :: PreprocessM Comparison
@@ -482,7 +483,7 @@ computeOverride currentToken = do
             Loc p _ -> posCol p - 1
           else DontCare
 
-data Action = Noop | Indent Int | Newline | Bar | Dedent | DedentRepeat
+data Action = Noop | Indent Int | Newline | Bar Loc | Dedent | DedentRepeat
   deriving (Show)
 
 deviceAction :: Comparison -> Override -> Action
@@ -490,8 +491,10 @@ deviceAction (CmpIndent _) ShouldDedent = Dedent
 deviceAction (CmpIndent i) (ShouldIndent _) = Indent i
 deviceAction (CmpIndent _) DontCare = Noop
 deviceAction (CmpNewline _) ShouldDedent = Noop
-deviceAction (CmpNewline b) (ShouldIndent _) = if b then Bar else Newline
-deviceAction (CmpNewline b) DontCare = if b then Bar else Newline
+deviceAction (CmpNewline Nothing) (ShouldIndent _) = Newline
+deviceAction (CmpNewline (Just loc)) (ShouldIndent _) = Bar loc
+deviceAction (CmpNewline Nothing) DontCare = Newline
+deviceAction (CmpNewline (Just loc)) DontCare = Bar loc
 deviceAction CmpDedent ShouldDedent = DedentRepeat
 deviceAction CmpDedent (ShouldIndent _) = DedentRepeat
 deviceAction CmpDedent DontCare = DedentRepeat
@@ -513,10 +516,14 @@ scan filepath = runPreprocess . preprocess . runLexer lexer filepath . Text.unpa
         else return TsEof
     preprocess (TsError (Lex.LexicalError pos)) = throwError pos
     preprocess (TsToken (L _ (TokNewlineAndWhitespace n)) xs) = do
-      setIdentation (Just (n, False))
+      setIdentation (Just (n, Nothing))
       preprocess xs
-    preprocess (TsToken (L _ (TokNewlineAndWhitespaceAndBar n)) xs) = do
-      setIdentation (Just (n, True))
+    preprocess (TsToken (L loc (TokNewlineAndWhitespaceAndBar n)) xs) = do
+      let loc' = case loc of 
+                  NoLoc -> NoLoc
+                  Loc _ (Pos f l c o) -> Loc (Pos f l (c - 1) (o - 1)) (Pos f l (c - 1) (o - 1))
+      
+      setIdentation (Just (n, Just loc'))
       preprocess xs
     preprocess (TsToken currentToken xs) = do
       -- devise the next Action
@@ -542,8 +549,7 @@ scan filepath = runPreprocess . preprocess . runLexer lexer filepath . Text.unpa
         Newline -> do
           loc <- locEnd <$> gets ppPrevLoc
           TsToken (L loc TokNewline) . TsToken currentToken <$> preprocess xs
-        Bar -> do
-          loc <- locEnd <$> gets ppPrevLoc
+        Bar loc -> do
           TsToken (L loc TokGuardBar) . TsToken currentToken <$> preprocess xs
         Dedent -> do
           popStack

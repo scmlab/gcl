@@ -2,7 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module GCL.Type where
-import Syntax.Concrete
+import Syntax.Abstract
 import GHC.Generics (Generic)
 import Data.Map (Map)
 import qualified Data.Map as Map
@@ -86,10 +86,6 @@ occursT x s = x `Set.member` fv s
 type Infer = RWST TypeEnv [Constraint] InferState (Except TypeError)
 
 type InferState = Int
-
-instance ToJSON Type where
-instance ToJSON Interval where
-instance ToJSON Endpoint where
 
 data TypeError
   = NotInScope Text Loc

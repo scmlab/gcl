@@ -11,8 +11,7 @@ import qualified Data.Text.Lazy.Encoding as LazyText
 import Error
 import qualified LSP
 import Pretty ()
-import Syntax.Concrete
-import Syntax.Location
+import Syntax.Abstract
 import Syntax.Predicate
 import Test.Tasty
 import Test.Tasty.HUnit
@@ -24,7 +23,7 @@ tests = testGroup "WP 1" [emptyProg, statements, issues]
 run :: Text -> Either Error ([PO], [Spec])
 run text = LSP.runM $ do 
   (pos, specs) <- LSP.parseProgram "<test>" text >>= LSP.sweep
-  return (map toNoLoc pos, map toNoLoc specs)            
+  return (pos, specs)            
 
 --------------------------------------------------------------------------------
 

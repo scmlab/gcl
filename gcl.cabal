@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: d90a5957cd304057545d0c1fb964929ae7d93bc177a9c9d58bf86267339a4b67
+-- hash: f6ada30269a834d96bd0c33512d9902492994aaf681a87bbaf19830885e58127
 
 name:           gcl
 version:        0.1.0.0
@@ -38,15 +38,14 @@ library
       Pretty.Variadic
       SCM.Test
       Syntax.Abstract
+      Syntax.Common
       Syntax.Concrete
       Syntax.ConstExpr
-      Syntax.Location
       Syntax.Parser
       Syntax.Parser.Lexer
       Syntax.Parser.TokenStream
       Syntax.Parser.Util
       Syntax.Predicate
-      Type
   other-modules:
       Paths_gcl
   hs-source-dirs:
@@ -62,6 +61,7 @@ library
     , lsp
     , megaparsec >=8.0
     , mtl
+    , multiset
     , network
     , network-simple
     , parser-combinators
@@ -92,6 +92,7 @@ executable gcl
     , lsp
     , megaparsec >=8.0
     , mtl
+    , multiset
     , network
     , network-simple
     , parser-combinators
@@ -108,8 +109,8 @@ test-suite gcl-test
   type: exitcode-stdio-1.0
   main-is: Test.hs
   other-modules:
+      Test.Lexer
       Test.Parser
-      Test.Pretty
       Test.ProofObligation
       Test.Type
       Test.WP
@@ -130,15 +131,14 @@ test-suite gcl-test
       Pretty.Variadic
       SCM.Test
       Syntax.Abstract
+      Syntax.Common
       Syntax.Concrete
       Syntax.ConstExpr
-      Syntax.Location
       Syntax.Parser
       Syntax.Parser.Lexer
       Syntax.Parser.TokenStream
       Syntax.Parser.Util
       Syntax.Predicate
-      Type
       Paths_gcl
   hs-source-dirs:
       test
@@ -153,6 +153,7 @@ test-suite gcl-test
     , lsp
     , megaparsec >=8.0
     , mtl
+    , multiset
     , network
     , network-simple
     , parser-combinators

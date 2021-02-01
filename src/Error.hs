@@ -14,7 +14,7 @@ import GHC.Generics
 import Syntax.Parser (SyntacticError)
 import Syntax.Parser.Lexer (LexicalError)
 import Syntax.Parser.Util ()
-import Type ()
+import Syntax.Common ()
 
 --------------------------------------------------------------------------------
 
