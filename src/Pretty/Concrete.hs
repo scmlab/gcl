@@ -10,7 +10,7 @@ import Pretty.Util
 import Pretty.Variadic
 import Syntax.Common (Fixity (..))
 import Syntax.Concrete
-import Syntax.Parser.Lexer (Tok (..))
+-- import Syntax.Parser.Lexer (Tok (..))
 import Prelude hiding (Ordering (..))
 
 --------------------------------------------------------------------------------
@@ -26,100 +26,100 @@ instance (PrettyWithLoc (Token sep), PrettyWithLoc a) => PrettyWithLoc (SepBy se
     prettyWithLoc x <> prettyWithLoc sep <> prettyWithLoc xs
 
 -- | Tokens
-instance PrettyWithLoc (Token 'TokCon) where
+instance PrettyWithLoc (Token "con") where
   prettyWithLoc (Token l r) = DocWithLoc "con" l r
 
-instance PrettyWithLoc (Token 'TokVar) where
+instance PrettyWithLoc (Token "var") where
   prettyWithLoc (Token l r) = DocWithLoc "var" l r
 
-instance PrettyWithLoc (Token 'TokLet) where
+instance PrettyWithLoc (Token "let") where
   prettyWithLoc (Token l r) = DocWithLoc "let" l r
 
-instance PrettyWithLoc (Token 'TokBraceOpen) where
+instance PrettyWithLoc (Token "{") where
   prettyWithLoc (Token l r) = DocWithLoc "{" l r
 
-instance PrettyWithLoc (Token 'TokBraceClose) where
+instance PrettyWithLoc (Token "}") where
   prettyWithLoc (Token l r) = DocWithLoc "}" l r
 
-instance PrettyWithLoc (Token 'TokBracketOpen) where
+instance PrettyWithLoc (Token "[") where
   prettyWithLoc (Token l r) = DocWithLoc "[" l r
 
-instance PrettyWithLoc (Token 'TokBracketClose) where
+instance PrettyWithLoc (Token "]") where
   prettyWithLoc (Token l r) = DocWithLoc "]" l r
 
-instance PrettyWithLoc (Token 'TokParenOpen) where
+instance PrettyWithLoc (Token "(") where
   prettyWithLoc (Token l r) = DocWithLoc "(" l r
 
-instance PrettyWithLoc (Token 'TokParenClose) where
+instance PrettyWithLoc (Token ")") where
   prettyWithLoc (Token l r) = DocWithLoc ")" l r
 
-instance PrettyWithLoc (Token 'TokQuantOpen) where
+instance PrettyWithLoc (Token "<|") where
   prettyWithLoc (Token l r) = DocWithLoc "<|" l r
 
-instance PrettyWithLoc (Token 'TokQuantOpenU) where
+instance PrettyWithLoc (Token "⟨") where
   prettyWithLoc (Token l r) = DocWithLoc "⟨" l r
 
-instance PrettyWithLoc (Token 'TokQuantClose) where
+instance PrettyWithLoc (Token "|>") where
   prettyWithLoc (Token l r) = DocWithLoc "|>" l r
 
-instance PrettyWithLoc (Token 'TokQuantCloseU) where
+instance PrettyWithLoc (Token "⟩") where
   prettyWithLoc (Token l r) = DocWithLoc "⟩" l r
 
-instance PrettyWithLoc (Token 'TokSpecOpen) where
+instance PrettyWithLoc (Token "{!") where
   prettyWithLoc (Token l r) = DocWithLoc "{!" l r
 
-instance PrettyWithLoc (Token 'TokSpecClose) where
+instance PrettyWithLoc (Token "!}") where
   prettyWithLoc (Token l r) = DocWithLoc "!}" l r
 
-instance PrettyWithLoc (Token 'TokProofOpen) where
+instance PrettyWithLoc (Token "{-") where
   prettyWithLoc (Token l r) = DocWithLoc "{-" l r
 
-instance PrettyWithLoc (Token 'TokProofClose) where
+instance PrettyWithLoc (Token "-}") where
   prettyWithLoc (Token l r) = DocWithLoc "-}" l r
   
-instance PrettyWithLoc (Token 'TokColon) where
+instance PrettyWithLoc (Token ":") where
   prettyWithLoc (Token l r) = DocWithLoc ":" l r
 
-instance PrettyWithLoc (Token 'TokComma) where
+instance PrettyWithLoc (Token ",") where
   prettyWithLoc (Token l r) = DocWithLoc "," l r
 
-instance PrettyWithLoc (Token 'TokRange) where
+instance PrettyWithLoc (Token "..") where
   prettyWithLoc (Token l r) = DocWithLoc ".." l r
 
-instance PrettyWithLoc (Token 'TokArray) where
+instance PrettyWithLoc (Token "array") where
   prettyWithLoc (Token l r) = DocWithLoc "array" l r
 
-instance PrettyWithLoc (Token 'TokOf) where
+instance PrettyWithLoc (Token "of") where
   prettyWithLoc (Token l r) = DocWithLoc "of" l r
 
-instance PrettyWithLoc (Token 'TokBnd) where
+instance PrettyWithLoc (Token "bnd") where
   prettyWithLoc (Token l r) = DocWithLoc "bnd" l r
 
-instance PrettyWithLoc (Token 'TokIf) where
+instance PrettyWithLoc (Token "if") where
   prettyWithLoc (Token l r) = DocWithLoc "if" l r
 
-instance PrettyWithLoc (Token 'TokFi) where
+instance PrettyWithLoc (Token "fi") where
   prettyWithLoc (Token l r) = DocWithLoc "fi" l r
 
-instance PrettyWithLoc (Token 'TokDo) where
+instance PrettyWithLoc (Token "do") where
   prettyWithLoc (Token l r) = DocWithLoc "do" l r
 
-instance PrettyWithLoc (Token 'TokOd) where
+instance PrettyWithLoc (Token "od") where
   prettyWithLoc (Token l r) = DocWithLoc "od" l r
 
-instance PrettyWithLoc (Token 'TokAssign) where
+instance PrettyWithLoc (Token ":=") where
   prettyWithLoc (Token l r) = DocWithLoc ":=" l r
 
-instance PrettyWithLoc (Token 'TokEQ) where
+instance PrettyWithLoc (Token "=") where
   prettyWithLoc (Token l r) = DocWithLoc "=" l r
 
-instance PrettyWithLoc (Token 'TokGuardBar) where
+instance PrettyWithLoc (Token "|") where
   prettyWithLoc (Token l r) = DocWithLoc "|" l r
 
-instance PrettyWithLoc (Token 'TokArrow) where
+instance PrettyWithLoc (Token "->") where
   prettyWithLoc (Token l r) = DocWithLoc "->" l r
 
-instance PrettyWithLoc (Token 'TokArrowU) where
+instance PrettyWithLoc (Token "→") where
   prettyWithLoc (Token l r) = DocWithLoc "→" l r
 
 --------------------------------------------------------------------------------

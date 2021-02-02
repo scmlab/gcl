@@ -12,8 +12,9 @@ import GHC.Generics (Generic)
 import Syntax.Common (Fixity(..))
 import qualified Syntax.Abstract as A
 import qualified Syntax.ConstExpr as ConstExpr
-import Syntax.Parser.Lexer (Tok (..))
+-- import Syntax.Parser.Lexer (Tok (..))
 import Prelude hiding (Ordering (..))
+import GHC.Base (Symbol)
 
 --------------------------------------------------------------------------------
 
@@ -24,7 +25,7 @@ class ToAbstract a b | a -> b where
 --------------------------------------------------------------------------------
 
 -- | A Token with start & ending Pos
-data Token (a :: Tok) = Token Pos Pos
+data Token (a :: Symbol) = Token Pos Pos
   deriving (Eq, Show)
 
 instance Located (Token a) where
@@ -35,7 +36,7 @@ instance (Located a, Located b) => Located (Either a b) where
   locOf (Right x) = locOf x
 
 -- | A non-empty list of stuff seperated by commas
-data SepBy (sep :: Tok) a = Head a | Delim a (Token sep) (SepBy sep a)
+data SepBy (sep :: Symbol) a = Head a | Delim a (Token sep) (SepBy sep a)
   deriving (Eq, Show)
 
 fromSepBy :: SepBy sep a -> [a]
@@ -69,11 +70,11 @@ instance Located Program where
 type Defns = Map Text Expr
 
 data Declaration
-  = ConstDecl (Token 'TokCon) (SepBy 'TokComma Name) (Token 'TokColon) Type
-  | ConstDeclWithProp (Token 'TokCon) (SepBy 'TokComma Name) (Token 'TokColon) Type (Token 'TokBraceOpen) Expr (Token 'TokBraceClose)
-  | VarDecl (Token 'TokVar) (SepBy 'TokComma Name) (Token 'TokColon) Type
-  | VarDeclWithProp (Token 'TokVar) (SepBy 'TokComma Name) (Token 'TokColon) Type (Token 'TokBraceOpen) Expr (Token 'TokBraceClose)
-  | LetDecl (Token 'TokLet) Name [Name] (Token 'TokEQ) Expr
+  = ConstDecl (Token "con") (SepBy "," Name) (Token ":") Type
+  | ConstDeclWithProp (Token "con") (SepBy "," Name) (Token ":") Type (Token "{") Expr (Token "}")
+  | VarDecl (Token "var") (SepBy "," Name) (Token ":") Type
+  | VarDeclWithProp (Token "var") (SepBy "," Name) (Token ":") Type (Token "{") Expr (Token "}")
+  | LetDecl (Token "let") Name [Name] (Token "=") Expr
   deriving (Eq, Show)
 
 instance ToAbstract Declaration A.Declaration where
@@ -93,14 +94,14 @@ instance Located Declaration where
 data Stmt
   = Skip Loc
   | Abort Loc
-  | Assign (SepBy 'TokComma Name) (Token 'TokAssign) (SepBy 'TokComma Expr)
-  | Assert (Token 'TokBraceOpen) Expr (Token 'TokBraceClose)
-  | LoopInvariant (Token 'TokBraceOpen) Expr (Token 'TokComma) (Token 'TokBnd) (Token 'TokColon) Expr (Token 'TokBraceClose)
-  | Do (Token 'TokDo) (SepBy 'TokGuardBar GdCmd) (Token 'TokOd)
-  | If (Token 'TokIf) (SepBy 'TokGuardBar GdCmd) (Token 'TokFi)
+  | Assign (SepBy "," Name) (Token ":=") (SepBy "," Expr)
+  | Assert (Token "{") Expr (Token "}")
+  | LoopInvariant (Token "{") Expr (Token ",") (Token "bnd") (Token ":") Expr (Token "}")
+  | Do (Token "do") (SepBy "|" GdCmd) (Token "od")
+  | If (Token "if") (SepBy "|" GdCmd) (Token "fi")
   | SpecQM Loc -- ? to be rewritten as {!!} by the frontend
-  | Spec (Token 'TokSpecOpen) (Token 'TokSpecClose)
-  | Proof (Token 'TokProofOpen) (Token 'TokProofClose)
+  | Spec (Token "{!") (Token "!}")
+  | Proof (Token "{-") (Token "-}")
   deriving (Eq, Show)
 
 instance ToAbstract Stmt A.Stmt where
@@ -127,7 +128,7 @@ instance Located Stmt where
   locOf (Spec l r) = l <--> r
   locOf (Proof l r) = l <--> r
 
-data GdCmd = GdCmd Expr (Either (Token 'TokArrow) (Token 'TokArrowU)) [Stmt] deriving (Eq, Show)
+data GdCmd = GdCmd Expr (Either (Token "->") (Token "→")) [Stmt] deriving (Eq, Show)
 
 instance ToAbstract GdCmd A.GdCmd where
   toAbstract (GdCmd a _ b) = A.GdCmd (toAbstract a) (fmap toAbstract b) (a <--> b)
@@ -136,13 +137,13 @@ instance ToAbstract GdCmd A.GdCmd where
 
 -- | Interval
 data EndpointOpen
-  = IncludingOpening (Token 'TokBracketOpen) Expr
-  | ExcludingOpening (Token 'TokParenOpen) Expr
+  = IncludingOpening (Token "{") Expr
+  | ExcludingOpening (Token "(") Expr
   deriving (Eq, Show)
 
 data EndpointClose
-  = IncludingClosing Expr (Token 'TokBracketClose)
-  | ExcludingClosing Expr (Token 'TokParenClose)
+  = IncludingClosing Expr (Token "}")
+  | ExcludingClosing Expr (Token ")")
   deriving (Eq, Show)
 
 instance ToAbstract EndpointOpen A.Endpoint where
@@ -162,7 +163,7 @@ instance Located EndpointClose where
   locOf (ExcludingClosing e l) = e <--> l
 
 -- | Interval
-data Interval = Interval EndpointOpen (Token 'TokRange) EndpointClose deriving (Eq, Show)
+data Interval = Interval EndpointOpen (Token "..") EndpointClose deriving (Eq, Show)
 
 instance ToAbstract Interval A.Interval where
   toAbstract (Interval a _ b) = A.Interval (toAbstract a) (toAbstract b) (a <--> b)
@@ -189,10 +190,10 @@ instance ToAbstract TBase A.TBase where
 
 -- | Type
 data Type
-  = TParen (Token 'TokParenOpen) Type (Token 'TokParenClose)
+  = TParen (Token "(") Type (Token ")")
   | TBase TBase
-  | TArray (Token 'TokArray) Interval (Token 'TokOf) Type
-  | TFunc Type (Either (Token 'TokArrow) (Token 'TokArrowU)) Type
+  | TArray (Token "array") Interval (Token "of") Type
+  | TFunc Type (Either (Token "->") (Token "→")) Type
   | TVar Name
   deriving (Eq, Show)
 
@@ -214,21 +215,21 @@ instance Located Type where
 
 -- | Expressions
 data Expr
-  = Paren (Token 'TokParenOpen) Expr (Token 'TokParenClose)
+  = Paren (Token "(") Expr (Token ")")
   | Lit Lit
   | Var Name
   | Const Name
   | Op Op
   | App Expr Expr
   | Quant
-      (Either (Token 'TokQuantOpen) (Token 'TokQuantOpenU))
+      (Either (Token "<|") (Token "⟨"))
       (Either Op Expr)
       [Name]
-      (Token 'TokColon)
+      (Token ":")
       Expr
-      (Token 'TokColon)
+      (Token ":")
       Expr
-      (Either (Token 'TokQuantClose) (Token 'TokQuantCloseU))
+      (Either (Token "|>") (Token "⟩"))
   deriving (Eq, Show, Generic)
 
 instance Located Expr where
