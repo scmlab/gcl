@@ -8,12 +8,11 @@ import Control.Applicative.Combinators (choice, many, sepBy1, (<|>))
 import Control.Monad.Combinators.Expr (Operator (..), makeExprParser)
 import Data.Loc (Located (locOf))
 import Data.Text.Lazy (Text)
-import qualified Data.Text.Lazy as Text
 import qualified Data.Ord as Ord
 import Syntax.Concrete (Declaration (..), EndpointClose (..), EndpointOpen (..), Expr (..), GdCmd (..), Interval (..), Name (..), Op (..), Program (..), SepBy (..), Stmt (..), TBase (..), Token, Type (..))
 import Syntax.Parser.Lexer
 import Syntax.Parser.Util
-import Text.Megaparsec (setOffset, getOffset, State(State), MonadParsec (..), parse, (<?>))
+import Text.Megaparsec (MonadParsec (..), parse, (<?>))
 import qualified Text.Megaparsec.Char.Lexer as Lex
 import Control.Monad (void)
 
@@ -108,6 +107,7 @@ pLetDecl =
 pStmts :: Parser [Stmt]
 pStmts = many (pStmt <* scn) <?> "statements"
 
+-- NOTE :: this function doesn't consume newline after finish parsing the statement
 pStmt :: Parser Stmt
 pStmt = Lex.lineFold scn pStmt' <?> "statement"
 
