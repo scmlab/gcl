@@ -1,708 +1,377 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# OPTIONS_GHC -fwarn-incomplete-patterns #-}
 
 module Syntax.Parser where
 
-import Control.Monad (void)
-import Control.Monad.Combinators.Expr
-import Control.Monad.State (lift)
-import Data.Loc
+import Control.Applicative.Combinators (choice, many, sepBy1, (<|>))
+import Control.Monad.Combinators.Expr (Operator (..), makeExprParser)
+import Data.Loc (Located (locOf))
 import Data.Text.Lazy (Text)
-import Data.Void
-import Syntax.Concrete
+import qualified Data.Text.Lazy as Text
+import qualified Data.Ord as Ord
+import Syntax.Concrete (Declaration (..), EndpointClose (..), EndpointOpen (..), Expr (..), GdCmd (..), Interval (..), Name (..), Op (..), Program (..), SepBy (..), Stmt (..), TBase (..), Token, Type (..))
 import Syntax.Parser.Lexer
 import Syntax.Parser.Util
-  ( PosLog,
-    extract,
-  )
-import qualified Syntax.Parser.Util as Util
-import Text.Megaparsec hiding
-  ( ParseError,
-    Pos,
-    State,
-    Token,
-    parse,
-  )
-import qualified Text.Megaparsec as Mega
-import Prelude hiding (Ordering (..))
+import Text.Megaparsec (setOffset, getOffset, State(State), MonadParsec (..), parse, (<?>))
+import qualified Text.Megaparsec.Char.Lexer as Lex
+import Control.Monad (void)
 
---------------------------------------------------------------------------------
+type Parser = Lexer
 
--- | States for source location bookkeeping
-type Parser = ParsecT Void TokStream (PosLog Tok)
+------------------------------------------
+-- parse Program
+------------------------------------------
 
-type SyntacticError = (Loc, String)
-
-parse :: Parser a -> FilePath -> TokStream -> Either [SyntacticError] a
-parse parser filepath tokenStream =
-  case Util.runPosLog (runParserT parser filepath tokenStream) of
+runParse :: Parser a -> FilePath -> Text -> Either [SyntacticError] a
+runParse p filepath s =
+  case parse p filepath s of
     Left e -> Left (fromParseErrorBundle e)
     Right x -> Right x
+
+pProgram :: Parser Program
+pProgram = do
+  scn
+  Program <$> many pDeclaration <*> pStmts
+
+------------------------------------------
+-- parse Declaration
+------------------------------------------
+
+pDeclaration :: Parser Declaration
+pDeclaration = Lex.lineFold scn p
   where
-    fromParseErrorBundle ::
-      ShowErrorComponent e => ParseErrorBundle TokStream e -> [SyntacticError]
-    fromParseErrorBundle (ParseErrorBundle errors posState) =
-      snd $
-        foldr f (posState, []) errors
-      where
-        f ::
-          ShowErrorComponent e =>
-          Mega.ParseError TokStream e ->
-          (PosState TokStream, [SyntacticError]) ->
-          (PosState TokStream, [SyntacticError])
-        f err (initial, accum) =
-          let (_, next) = reachOffset (errorOffset err) initial
-           in (next, (getLoc err, parseErrorTextPretty err) : accum)
+    p sc' =
+      f
+        sc'
+        [ try . pConstDeclWithProp,
+          pConstDecl,
+          try . pVarDeclWithProp,
+          pVarDecl,
+          pLetDecl
+        ]
+        <* scn
+        <?> "declaration"
+    f sc' = choice . map (\g -> g sc')
 
-        getLoc :: ShowErrorComponent e => Mega.ParseError TokStream e -> Loc
-        -- get the Loc of all unexpected tokens
-        getLoc (TrivialError _ (Just (Tokens xs)) _) = foldMap locOf xs
-        getLoc _ = mempty
+pConstDecl :: Parser () -> Parser Declaration
+pConstDecl =
+  ConstDecl
+    <$.> lexCon
+    <**> pList upperName
+    <**> lexColon
+    <**> pType'
 
-program :: Parser Program
-program = do
-  skipMany (symbol TokNewline)
-  decls <- many (declaration <* choice [symbol TokNewline, eof]) <?> "declarations"
-  skipMany (symbol TokNewline)
-  stmts <- many (statement <* choice [symbol TokNewline, eof]) <?> "statements"
-  skipMany (symbol TokNewline)
-  return $ Program decls stmts
+pConstDeclWithProp :: Parser () -> Parser Declaration
+pConstDeclWithProp =
+  ConstDeclWithProp
+    <$.> lexCon
+    <**> pList upperName
+    <**> lexColon
+    <**> pType'
+    <**> lexBraceStart
+    <**> pExpr'
+    <**> lexBraceEnd
 
-specContent :: Parser [Stmt]
-specContent = do
-  many statement <?> "statements"
+pVarDecl :: Parser () -> Parser Declaration
+pVarDecl =
+  VarDecl
+    <$.> lexVar
+    <**> pList lowerName
+    <**> lexColon
+    <**> pType'
 
---------------------------------------------------------------------------------
+pVarDeclWithProp :: Parser () -> Parser Declaration
+pVarDeclWithProp =
+  VarDeclWithProp
+    <$.> lexVar
+    <**> pList lowerName
+    <**> lexColon
+    <**> pType'
+    <**> lexBraceStart
+    <**> pExpr'
+    <**> lexBraceEnd
 
--- | Parser for SepByComma
-sepBy' :: Parser (Token sep) -> Parser a -> Parser (SepBy sep a)
-sepBy' delim parser = do
-  x <- parser
+pLetDecl :: Parser () -> Parser Declaration
+pLetDecl =
+  LetDecl
+    <$.> lexLet
+    <**> upperName
+    <**> (many . lowerName)
+    <**> lexEQ'
+    <**> pExpr'
 
+------------------------------------------
+-- parse Stmt
+------------------------------------------
+
+pStmts :: Parser [Stmt]
+pStmts = many (pStmt <* scn) <?> "statements"
+
+pStmt :: Parser Stmt
+pStmt = Lex.lineFold scn pStmt' <?> "statement"
+
+pStmt' :: Parser () -> Parser Stmt
+pStmt' sc' =
+  f
+    [ 
+      pSkip,
+      pAbort,
+      try . pAssert,
+      try . pLoopInvariant,
+      try . pDo,
+      try . pIf,
+      try . pAssign,
+      pSpecQM,
+      pSpec,
+      pProof
+    ] <* sc
+    <?> "statement"
+  where
+    f = choice . map (\g -> g sc')
+
+pSkip :: Parser () -> Parser Stmt
+pSkip = (Skip . locOf) <$.> lexSkip
+
+pAbort :: Parser () -> Parser Stmt
+pAbort = (Abort . locOf) <$.> lexAbort
+
+pAssign :: Parser () -> Parser Stmt
+pAssign = Assign <$.> pList lowerName <**> lexAssign <**> pList pExpr'
+
+pAssert :: Parser () -> Parser Stmt
+pAssert = Assert <$.> lexBraceStart <**> pExpr' <**> lexBraceEnd
+
+pLoopInvariant :: Parser () -> Parser Stmt
+pLoopInvariant =
+  LoopInvariant
+    <$.> lexBraceStart
+    <**> pExpr'
+    <**> lexComma
+    <**> lexBnd
+    <**> lexColon
+    <**> pExpr'
+    <**> lexBraceEnd
+
+pDo :: Parser () -> Parser Stmt
+pDo = const pDoLineFold
+
+pDoLineFold :: Parser Stmt
+pDoLineFold = do
+  (tDo, gdcmds, tOd) <- pIfoDoHelper lexDo lexOd
+  return $ Do tDo gdcmds tOd
+
+pIf :: Parser () -> Parser Stmt
+pIf = const pIfLineFold
+
+pIfLineFold :: Parser Stmt
+pIfLineFold = do
+    (tIf, gdcmds, tFi) <- pIfoDoHelper lexIf lexFi
+    return $ If tIf gdcmds tFi
+
+pGdCmd :: Parser GdCmd
+pGdCmd = pGdCmdOneLine
+
+pGdCmdOneLine :: Parser GdCmd
+pGdCmdOneLine = Lex.indentBlock scn p
+  where
+    p = do
+      ref <- Lex.indentLevel 
+      gd <- pExpr
+      arrow <- lexArrow . void $ Lex.indentGuard scn Ord.GT ref
+      pos <- Lex.indentLevel
+      s0 <- pStmt
+      return $ Lex.IndentMany (Just pos) (\ss -> return $ GdCmd gd arrow (s0 : ss) ) pStmt
+
+pSpecQM :: Parser () -> Parser Stmt
+pSpecQM = (SpecQM . locOf) <$.> lexQM
+
+pSpec :: Parser () -> Parser Stmt
+pSpec = Spec <$.> lexSpecStart <**> lexSpecEnd
+
+pProof :: Parser () -> Parser Stmt
+pProof = Proof <$.> lexProofStart <**> lexProofEnd
+
+------------------------------------------
+-- parse Type
+------------------------------------------
+
+pType :: Parser Type
+pType = pType' scn <?> "type"
+
+pType' :: Parser () -> Parser Type
+pType' sc' = makeExprParser (pType'Term sc') [[InfixR (pFunction sc')]] <* (try sc' <|> sc) <?> "type"
+
+pType'Term :: Parser () -> Parser Type
+pType'Term sc' = choice . map (\f -> f sc') $ [pParensType, pArray, pBase]
+
+pFunction :: Parser () -> Parser (Type -> Type -> Type)
+pFunction sc' = do
+  arrow <- lexArrow sc'
+  return $ \t1 t2 -> TFunc t1 arrow t2
+
+pParensType :: Parser () -> Parser Type
+pParensType = TParen <$.> lexParenStart <**> pType' <**> lexParenEnd
+
+pArray :: Parser () -> Parser Type
+pArray = TArray <$.> lexArray <**> pInterval <**> lexOf <**> pType'
+
+-- NOTE :: not sure if this work
+pBase :: Parser () -> Parser Type
+pBase sc' =
+  TBase
+    <$> f
+      [ (TInt . locOf) <$.> lexTypeInt,
+        (TBool . locOf) <$.> lexTypeBool,
+        (TChar . locOf) <$.> lexTypeChar
+      ]
+  where
+    f = choice . map (\g -> g sc')
+
+pInterval :: Parser () -> Parser Interval
+pInterval = Interval <$.> pEndpointOpen <**> lexRange <**> pEndpointClose
+
+pEndpointOpen :: Parser () -> Parser EndpointOpen
+pEndpointOpen sc' =
+  (IncludingOpening <$.> lexBracketStart <**> pExpr' $ sc')
+    <|> (ExcludingOpening <$.> lexParenStart <**> pExpr' $ sc')
+
+pEndpointClose :: Parser () -> Parser EndpointClose
+pEndpointClose sc' =
+  try (IncludingClosing <$.> pExpr' <**> lexBracketEnd $ sc')
+    <|> (ExcludingClosing <$.> pExpr' <**> lexParenEnd $ sc')
+
+------------------------------------------
+-- parse Expr
+------------------------------------------
+
+pExpr :: Parser Expr
+pExpr = pExpr' scn <?> "expression"
+
+pExpr' :: Parser () -> Parser Expr
+pExpr' sc' = makeExprParser (pTerm sc') (opTable sc') <* (try sc' <|> sc) <?> "expression"
+
+opTable :: Parser () -> [[Operator Parser Expr]]
+opTable sc' =
+  fmap
+    (fmap (\f -> f sc'))
+    [ [Postfix . pApp],
+      [InfixL . pBinary . lexMod],
+      [InfixL . pBinary . lexMul, InfixL . pBinary . lexDiv],
+      [InfixL . pBinary . lexAdd, InfixL . pBinary . lexSub],
+      [ InfixL . pBinary . lexNEQ,
+        InfixL . pBinary . lexNEQU,
+        InfixL . pBinary . lexLT,
+        InfixL . pBinary . lexLTE,
+        InfixL . pBinary . lexLTEU,
+        InfixL . pBinary . lexGT,
+        InfixL . pBinary . lexGTE,
+        InfixL . pBinary . lexGTEU
+      ],
+      [InfixL . pBinary . lexEQ],
+      [Prefix . pUnary . lexNeg, Prefix . pUnary . lexNegU],
+      [InfixL . pBinary . lexConj, InfixL . pBinary . lexConjU],
+      [InfixL . pBinary . lexDisj, InfixL . pBinary . lexDisjU],
+      [InfixL . pBinary . lexImpl, InfixL . pBinary . lexImplU]
+    ]
+
+pTerm :: Parser () -> Parser Expr
+pTerm sc' = f [pParen, pLit, pVar, pConst, pQuant] <?> "term"
+  where
+    f = choice . map (\g -> try . g $ sc')
+
+pParen :: Parser () -> Parser Expr
+pParen = Paren <$.> lexParenStart <**> pExpr' <**> lexParenEnd
+
+pLit :: Parser () -> Parser Expr
+pLit = Lit <$.> lexLits
+
+pVar :: Parser () -> Parser Expr
+pVar = Var <$.> lowerName
+
+pConst :: Parser () -> Parser Expr
+pConst = Const <$.> upperName
+
+pQuant :: Parser () -> Parser Expr
+pQuant =
+  Quant
+    <$.> lexQuantStarts
+    <**> qOp
+    <**> qNames
+    <**> lexColon
+    <**> pExpr'
+    <**> lexColon
+    <**> pExpr'
+    <**> lexQuantEnds
+  where
+    qOp sc'' = choice . map (\g -> g sc'') $ [fmap Left . lexOps, fmap Right . pTerm]
+    qNames sc'' = sepBy1 (lowerName sc'') (try sc'')
+
+pApp :: Parser () -> Parser (Expr -> Expr)
+pApp sc' = do
+  terms <- many (pTerm sc')
+  return $ \func -> do
+    foldl App func terms
+
+pBinary :: Parser Op -> Parser (Expr -> Expr -> Expr)
+pBinary m = do
+  -- NOTE: operator cannot be followed by any symbol
+  op <- try (notFollowedBySymbol m)
+  return $ \x y -> App (App (Op op) x) y
+
+pUnary :: Parser Op -> Parser (Expr -> Expr)
+pUnary m = do
+  op <- try (notFollowedBySymbol m)
+  return $ \x -> App (Op op) x
+
+------------------------------------------
+-- combinators
+------------------------------------------
+upperName :: Parser () -> Parser Name
+upperName = uncurry Name <$.> lexUpper
+
+lowerName :: Parser () -> Parser Name
+lowerName = uncurry Name <$.> lexLower
+
+pSepBy :: (Parser () -> Parser (Token sep)) 
+  -> (Parser () -> Parser a) 
+  -> Parser () -> Parser (SepBy sep a)
+pSepBy delim p sc' = do
+  x <- p sc'
   let f = return (Head x)
-  let g = do
-        sep <- delim
-        xs <- sepBy' delim parser
-        return $ Delim x sep xs
+  let g = Delim x <$.> delim <**> pSepBy delim p $ sc'
   try g <|> f
 
-sepByComma :: Parser a -> Parser (SepBy 'TokComma a)
-sepByComma = sepBy' tokenComma
+pList :: (Parser () -> Parser a) -> Parser () -> Parser (SepBy tokComma a)
+pList = pSepBy lexComma
 
-sepByGuardBar :: Parser a -> Parser (SepBy 'TokGuardBar a)
-sepByGuardBar = sepBy' tokenGuardBar
+pIfoDoHelper :: 
+  (Parser () -> Parser (Token s))
+  -> (Parser () -> Parser (Token e))
+  -> Parser (Token s, SepBy sep GdCmd, Token e)
+pIfoDoHelper start end = pIndentSepBy start end pGdCmd lexGuardBar 
 
--- for building parsers for tokens
-adapt :: Tok -> String -> Parser (Token a)
-adapt t errMsg = do
-  (_, loc) <- Util.getLoc (symbol t <?> errMsg)
-  case loc of
-    NoLoc -> error "NoLoc when parsing token"
-    Loc l r -> return $ Token l r
-
-tokenConst :: Parser (Token 'TokCon)
-tokenConst = adapt TokCon "reserved word \"con\""
-
-tokenVar :: Parser (Token 'TokVar)
-tokenVar = adapt TokVar "reserved word \"var\""
-
-tokenLet :: Parser (Token 'TokLet)
-tokenLet = adapt TokLet "reserved word \"let\""
-
-tokenBraceOpen :: Parser (Token 'TokBraceOpen)
-tokenBraceOpen = adapt TokBraceOpen "opening curly bracket"
-
-tokenBraceClose :: Parser (Token 'TokBraceClose)
-tokenBraceClose = adapt TokBraceClose "closing curly bracket"
-
-tokenBracketOpen :: Parser (Token 'TokBracketOpen)
-tokenBracketOpen = adapt TokBracketOpen "opening square bracket"
-
-tokenBracketClose :: Parser (Token 'TokBracketClose)
-tokenBracketClose = adapt TokBracketClose "closing square bracket"
-
-tokenParenOpen :: Parser (Token 'TokParenOpen)
-tokenParenOpen = adapt TokParenOpen "opening parenthesis"
-
-tokenParenClose :: Parser (Token 'TokParenClose)
-tokenParenClose = adapt TokParenClose "closing parenthesis"
-
-tokenQuantOpen :: Parser (Token 'TokQuantOpen)
-tokenQuantOpen = adapt TokQuantOpen "<|"
-
-tokenQuantOpenU :: Parser (Token 'TokQuantOpenU)
-tokenQuantOpenU = adapt TokQuantOpenU "⟨"
-
-tokenQuantClose :: Parser (Token 'TokQuantClose)
-tokenQuantClose = adapt TokQuantClose "|>"
-
-tokenQuantCloseU :: Parser (Token 'TokQuantCloseU)
-tokenQuantCloseU = adapt TokQuantCloseU "⟩"
-
-tokenSpecOpen :: Parser (Token 'TokSpecOpen)
-tokenSpecOpen = adapt TokSpecOpen "{!"
-
-tokenSpecClose :: Parser (Token 'TokSpecClose)
-tokenSpecClose = adapt TokSpecClose "!}"
-
-tokenProofOpen :: Parser (Token 'TokProofOpen)
-tokenProofOpen = adapt TokProofOpen "{-"
-
-tokenProofClose :: Parser (Token 'TokProofClose)
-tokenProofClose = adapt TokProofClose "-}"
-
-tokenColon :: Parser (Token 'TokColon)
-tokenColon = adapt TokColon "colon"
-
-tokenComma :: Parser (Token 'TokComma)
-tokenComma = adapt TokComma "comma"
-
-tokenRange :: Parser (Token 'TokRange)
-tokenRange = adapt TokRange ".."
-
-tokenArray :: Parser (Token 'TokArray)
-tokenArray = adapt TokArray "reserved word \"array\""
-
-tokenOf :: Parser (Token 'TokOf)
-tokenOf = adapt TokOf "reserved word \"of\""
-
-tokenBnd :: Parser (Token 'TokBnd)
-tokenBnd = adapt TokBnd "reserved word \"bnd\""
-
-tokenIf :: Parser (Token 'TokIf)
-tokenIf = adapt TokIf "reserved word \"if\""
-
-tokenFi :: Parser (Token 'TokFi)
-tokenFi = adapt TokFi "reserved word \"fi\""
-
-tokenDo :: Parser (Token 'TokDo)
-tokenDo = adapt TokDo "reserved word \"do\""
-
-tokenOd :: Parser (Token 'TokOd)
-tokenOd = adapt TokOd "reserved word \"od\""
-
-tokenAssign :: Parser (Token 'TokAssign)
-tokenAssign = adapt TokAssign ":="
-
-tokenEQ :: Parser (Token 'TokEQ)
-tokenEQ = adapt TokEQ "="
-
-tokenGuardBar :: Parser (Token 'TokGuardBar)
-tokenGuardBar = adapt TokGuardBar "|"
-
-tokenArrow :: Parser (Token 'TokArrow)
-tokenArrow = adapt TokArrow "->"
-
-tokenArrowU :: Parser (Token 'TokArrowU)
-tokenArrowU = adapt TokArrowU "→"
-
---------------------------------------------------------------------------------
-
--- | Declarations
-declaration :: Parser Declaration
-declaration =
-  choice
-    [ try constDeclWithProp,
-      constDecl,
-      try varDeclWithProp,
-      varDecl,
-      letDecl
-    ]
-    <?> "declaration"
-
-constDecl :: Parser Declaration
-constDecl =
-  ConstDecl
-    <$> tokenConst
-    <*> constList
-    <*> tokenColon
-    <*> type'
-
-constDeclWithProp :: Parser Declaration
-constDeclWithProp =
-  ConstDeclWithProp
-    <$> tokenConst
-    <*> constList
-    <*> tokenColon
-    <*> type'
-    <*> tokenBraceOpen
-    <*> expression
-    <*> tokenBraceClose
-
-varDecl :: Parser Declaration
-varDecl =
-  VarDecl
-    <$> tokenVar
-    <*> variableList
-    <*> tokenColon
-    <*> type'
-
-varDeclWithProp :: Parser Declaration
-varDeclWithProp =
-  VarDeclWithProp
-    <$> tokenVar
-    <*> variableList
-    <*> tokenColon
-    <*> type'
-    <*> tokenBraceOpen
-    <*> expression
-    <*> tokenBraceClose
-
-letDecl :: Parser Declaration
-letDecl =
-  LetDecl
-    <$> tokenLet
-    <*> upper
-    <*> many lower
-    <*> tokenEQ
-    <*> predicate
-
---------------------------------------------------------------------------------
-
--- | Variables and stuff
-
--- separated by commas
-constList :: Parser (SepBy 'TokComma Name)
-constList = sepByComma upper <?> "a list of constants separated by commas"
-
--- separated by commas
-variableList :: Parser (SepBy 'TokComma Name)
-variableList = sepByComma lower <?> "a list of variables separated by commas"
-
---------------------------------------------------------------------------------
-
--- | Stmts
-statement :: Parser Stmt
-statement =
-  choice
-    [ try assign,
-      abort,
-      try assertWithBnd,
-      spec,
-      proof,
-      assert,
-      skip,
-      loop,
-      conditional,
-      hole
-    ]
-    <?> "statement"
-
-statements :: Parser [Stmt]
-statements = sepBy statement (symbol TokNewline)
-
-statements1 :: Parser [Stmt]
-statements1 = sepBy1 statement (symbol TokNewline)
-
-skip :: Parser Stmt
-skip = withLoc $ Skip <$ symbol TokSkip
-
-abort :: Parser Stmt
-abort = withLoc $ Abort <$ symbol TokAbort
-
-assert :: Parser Stmt
-assert =
-  Assert
-    <$> tokenBraceOpen
-    <*> expression
-    <*> tokenBraceClose
-
-assertWithBnd :: Parser Stmt
-assertWithBnd = do
-  LoopInvariant
-    <$> tokenBraceOpen
-    <*> predicate
-    <*> tokenComma
-    <*> tokenBnd
-    <*> tokenColon
-    <*> expression
-    <*> tokenBraceClose
-
-assign :: Parser Stmt
-assign =
-  Assign
-    <$> sepByComma lower
-    <*> tokenAssign
-    <*> sepByComma expression
-
-loop :: Parser Stmt
-loop =
-  block'
-    Do
-    tokenDo
-    (sepByGuardBar guardedCommand)
-    tokenOd
-
-conditional :: Parser Stmt
-conditional =
-  block'
-    If
-    tokenIf
-    (sepByGuardBar guardedCommand)
-    tokenFi
-
-guardedCommands :: Parser [GdCmd]
-guardedCommands = sepBy1 guardedCommand $ do
-  symbol TokGuardBar <?> "|"
-
-guardedCommand :: Parser GdCmd
-guardedCommand =
-  GdCmd
-    <$> predicate
-    <*> ((Left <$> tokenArrow) <|> (Right <$> tokenArrowU))
-    <*> block statements1
-
-hole :: Parser Stmt
-hole = withLoc $ SpecQM <$ (symbol TokQM <?> "?")
-
-spec :: Parser Stmt
-spec =
-  Spec
-    <$> tokenSpecOpen
-    <* specContent
-    <* takeWhileP (Just "anything other than '!}'") isTokSpecClose
-    <*> tokenSpecClose
+pIndentSepBy ::
+  (Parser () -> Parser (Token s))
+  -> (Parser () -> Parser (Token e))
+  -> Parser a 
+  -> (Parser () -> Parser (Token sep)) 
+  -> Parser (Token s, SepBy sep a, Token e)
+pIndentSepBy start end p delim = do
+  ref <- Lex.indentLevel 
+  ts <- start . void . Lex.indentGuard scn Ord.GT $ ref
+  pos <- Lex.indentLevel
+  gds <- f ref pos
+  void $ try (Lex.indentGuard scn Ord.EQ ref) <|> Lex.indentGuard scn Ord.GT ref
+  te <- end sc
+  return (ts, gds, te)
   where
-    isTokSpecClose :: L Tok -> Bool
-    isTokSpecClose (L _ TokSpecClose) = False
-    isTokSpecClose _ = True
+    f ref pos = do
+        x <- p
+        let g1 = return (Head x)
+        let g2 = do
+              void $ Lex.indentGuard scn Ord.GT ref
+              tok <- delim (void $ Lex.indentGuard sc Ord.EQ pos)
+              Delim x tok <$> f ref pos
+        try g2 <|> g1
 
-proof :: Parser Stmt
-proof =
-  Proof
-    <$> tokenProofOpen
-    <* specContent
-    <* takeWhileP (Just "anything other than '-}'") isTokProofClose
-      <*> tokenProofClose
-  where
-    isTokProofClose :: L Tok -> Bool
-    isTokProofClose (L _ TokProofClose) = False
-    isTokProofClose _ = True
-
---------------------------------------------------------------------------------
-
--- | Expressions
-expressionList :: Parser [Expr]
-expressionList =
-  sepBy1 expression (symbol TokComma)
-    <?> "a list of expressions separated by commas"
-
-predicate :: Parser Expr
-predicate = expression <?> "predicate"
-
-expression :: Parser Expr
-expression = makeExprParser term table <?> "expression"
-  where
-    table :: [[Operator Parser Expr]]
-    table =
-      [ [Postfix application],
-        [InfixL $ binary Mod TokMod],
-        [ InfixL $ binary Mul TokMul,
-          InfixL $ binary Div TokDiv
-        ],
-        [ InfixL $ binary Add TokAdd,
-          InfixL $ binary Sub TokSub
-        ],
-        [ InfixL $ binary NEQ TokNEQ,
-          InfixL $ binary NEQU TokNEQU,
-          InfixL $ binary LT TokLT,
-          InfixL $ binary LTE TokLTE,
-          InfixL $ binary LTEU TokLTEU,
-          InfixL $ binary GT TokGT,
-          InfixL $ binary GTE TokGTE,
-          InfixL $ binary GTEU TokGTEU
-        ],
-        [InfixL $ binary EQ TokEQ],
-        [Prefix $ unary Neg TokNeg, Prefix $ unary NegU TokNegU],
-        [InfixL $ binary Conj TokConj, InfixL $ binary ConjU TokConjU],
-        [InfixL $ binary Disj TokDisj, InfixL $ binary DisjU TokDisjU],
-        [InfixR $ binary Implies TokImpl, InfixR $ binary ImpliesU TokImplU]
-      ]
-
-    application :: Parser (Expr -> Expr)
-    application = do
-      terms <- many term
-      return $ \func -> do
-        let app inner t = App inner t
-        foldl app func terms
-
-    unary :: (Loc -> Op) -> Tok -> Parser (Expr -> Expr)
-    unary operator' tok = do
-      (op, loc) <- Util.getLoc (operator' <$ symbol tok)
-      return $ \result -> App (Op (op loc)) result
-
-    binary :: (Loc -> Op) -> Tok -> Parser (Expr -> Expr -> Expr)
-    binary operator' tok = do
-      (op, loc) <- Util.getLoc (operator' <$ symbol tok)
-      return $ \x y -> App (App (Op (op loc)) x) y
-
-    parensExpr :: Parser Expr
-    parensExpr =
-      Paren
-        <$> tokenParenOpen
-          <*> expression
-          <*> tokenParenClose
-
-    term :: Parser Expr
-    term = try term' <|> parensExpr
-      where
-        term' :: Parser Expr
-        term' =
-          choice
-            [ Var <$> lower,
-              Const <$> upper,
-              Lit <$> literal,
-              -- Op <$ symbol TokParenOpen <*> operator <* symbol TokParenClose,
-              Quant
-                <$> choice [Left <$> tokenQuantOpen, Right <$> tokenQuantOpenU]
-                <*> choice [Left <$> operator, Right <$> term']
-                <*> some lower
-                <*> tokenColon
-                <*> expression
-                <*> tokenColon
-                <*> expression
-                <*> choice [Left <$> tokenQuantClose, Right <$> tokenQuantCloseU]
-            ]
-            <?> "term"
-
-    -- quantOp :: Parser Op
-    -- quantOp = operator <|> do
-    --                           (_, _start) <- Util.getLoc (symbol TokParenOpen <?> "opening parenthesis")
-    --                           op <- operator
-    --                           (_, _end) <- Util.getLoc (symbol TokParenClose <?> "closing parenthesis")
-    --                           return op
-    -- choice
-    --   [ do
-    --       -- (_, start) <- Util.getLoc (symbol TokParenOpen <?> "opening parenthesis")
-    --       -- (op, loc) <- Util.getLoc operator
-    --       -- (_, end) <- Util.getLoc (symbol TokParenClose <?> "closing parenthesis")
-    --       return $ op
-    --     -- do
-    --     --   op <- term
-    --     --   return $ case op of
-    --     --     Op (Add l) loc -> Op (Sum l) loc
-    --     --     Op (Conj l) loc -> Op (Forall l) loc
-    --     --     Op (Disj l) loc -> Op (Exists l) loc
-    --     --     others -> others,
-    --     -- parensExpr
-    --   ]
-
-    -- -- replace "+", "∧", and "∨" in Quant with "Σ", "∀", and "∃"
-    -- quantOp :: Parser Expr
-    -- quantOp = do
-    --   op <- term
-    --   return $ case op of
-    --     Op Add loc -> Op Sum loc
-    --     Op Conj loc -> Op Forall loc
-    --     Op Disj loc -> Op Exists loc
-    --     others -> others
-
-    literal :: Parser Lit
-    literal =
-      withLoc
-        ( choice
-            [ LitBool True <$ symbol TokTrue,
-              LitBool False <$ symbol TokFalse,
-              LitInt <$> integer
-            ]
-        )
-        <?> "literal"
-
-    operator :: Parser Op
-    operator =
-      withLoc
-        ( choice
-            [ EQ <$ symbol TokEQ,
-              NEQ <$ symbol TokNEQ,
-              NEQU <$ symbol TokNEQU,
-              LTE <$ symbol TokLTE,
-              LTEU <$ symbol TokLTEU,
-              GTE <$ symbol TokGTE,
-              GTEU <$ symbol TokGTEU,
-              LT <$ symbol TokLT,
-              GT <$ symbol TokGT,
-              Implies <$ symbol TokImpl,
-              ImpliesU <$ symbol TokImplU,
-              Conj <$ symbol TokConj,
-              ConjU <$ symbol TokConjU,
-              Disj <$ symbol TokDisj,
-              DisjU <$ symbol TokDisjU,
-              Neg <$ symbol TokNeg,
-              NegU <$ symbol TokNegU,
-              Add <$ symbol TokAdd,
-              Sub <$ symbol TokSub,
-              Mul <$ symbol TokMul,
-              Div <$ symbol TokDiv,
-              Mod <$ symbol TokMod
-            ]
-        )
-        <?> "operator"
-
---------------------------------------------------------------------------------
-
--- | Type
-type' :: Parser Type
-type' = ignoreIndentations $ do
-  makeExprParser term table <?> "type"
-  where
-    table :: [[Operator Parser Type]]
-    table = [[InfixR function]]
-
-    function :: Parser (Type -> Type -> Type)
-    function = ignoreIndentations $ do
-      arrow <- choice [Left <$> tokenArrow, Right <$> tokenArrowU]
-      return $ \x y -> TFunc x arrow y
-
-    term :: Parser Type
-    term = ignoreIndentations $ do
-      parensType <|> array <|> base <?> "type term"
-
-    parensType :: Parser Type
-    parensType = TParen <$> tokenParenOpen <*> type' <*> tokenParenClose
-
-    base :: Parser Type
-    base = TBase <$> withLoc (extract isBaseType)
-      where
-        isBaseType :: Tok -> Maybe (Loc -> TBase)
-        isBaseType (TokUpperName "Int") = Just TInt
-        isBaseType (TokUpperName "Bool") = Just TBool
-        isBaseType (TokUpperName "Char") = Just TChar
-        isBaseType _ = Nothing
-
-    array :: Parser Type
-    array = TArray <$> tokenArray <*> interval <*> tokenOf <*> type'
-
-    endpointOpening :: Parser EndpointOpen
-    endpointOpening =
-      choice
-        [ IncludingOpening <$> tokenBracketOpen <*> expression,
-          ExcludingOpening <$> tokenParenOpen <*> expression
-        ]
-
-    endpointClosing :: Parser EndpointClose
-    endpointClosing = do
-      expr <- expression
-      choice
-        [ IncludingClosing expr <$> tokenBracketClose,
-          ExcludingClosing expr <$> tokenParenClose
-        ]
-
-    interval :: Parser Interval
-    interval =
-      Interval
-        <$> endpointOpening
-        <*> tokenRange
-        <*> endpointClosing
-
--- withLoc $ do
--- start <-
---   choice
---     [Excluding <$ symbol TokParenOpen, Including <$ symbol TokBracketOpen]
--- i <- expression
--- symbol TokRange
--- j <- expression
--- end <-
---   choice
---     [Excluding <$ symbol TokParenClose, Including <$ symbol TokBracketClose]
--- return $ Interval (start i) (end j)
-
---------------------------------------------------------------------------------
-
--- | Combinators
-block :: Parser a -> Parser a
-block parser = do
-  Util.ignore TokIndent <?> "indentation"
-  result <- parser
-  Util.ignore TokDedent <?> "dedentation"
-  return result
-
-block' :: (l -> x -> r -> y) -> Parser l -> Parser x -> Parser r -> Parser y
-block' constructor open parser close = do
-  a <- open
-  symbol TokIndent <?> "indentation"
-  b <- parser
-  c <-
-    choice
-      [ do
-          -- the ideal case
-          symbol TokDedent <?> "dedentation"
-          close,
-        do
-          -- the fucked up case:
-          --  the lexer is not capable of handling cases like "if True -> skip fi"
-          --  because it's not possible to determine the number of `TokDedent` before `TokFi`
-          c <- close
-          symbol TokDedent <?> "dedentation"
-          return c
-      ]
-  return $ constructor a b c
-
--- consumes 0 or more newlines/indents/dedents afterwards
-ignoreIndentations :: Parser a -> Parser a
-ignoreIndentations parser = do
-  result <- parser
-  void $ many (Util.ignoreP indentationRelated)
-  return result
-  where
-    indentationRelated TokIndent = True
-    indentationRelated TokDedent = True
-    indentationRelated _ = False
-
--- consumes 1 or more newlines
-expectNewline :: Parser ()
-expectNewline = do
-  -- see if the latest accepcted token is TokNewline
-  t <- lift Util.getLastToken
-  case t of
-    Just TokNewline -> return ()
-    _ -> void $ some (Util.ignore TokNewline)
-
-symbol :: Tok -> Parser ()
-symbol = Util.symbol
-
-withLoc :: Parser (Loc -> a) -> Parser a
-withLoc = Util.withLoc
-
-parens :: Parser a -> Parser (a, Loc)
-parens parser = do
-  (_, start) <- Util.getLoc (symbol TokParenOpen <?> "opening parenthesis")
-  result <- parser
-  (_, end) <- Util.getLoc (symbol TokParenClose <?> "closing parenthesis")
-  let loc = start <--> end
-  return (result, loc)
-
-braces :: Parser a -> Parser (a, Loc)
-braces parser = do
-  (_, start) <- Util.getLoc (symbol TokBraceOpen <?> "opening braces")
-  result <- parser
-  (_, end) <- Util.getLoc (symbol TokBraceClose <?> "closing braces")
-  let loc = start <--> end
-  return (result, loc)
-
-upperName :: Parser Text
-upperName = extract p
-  where
-    p (TokUpperName s) = Just s
-    p _ = Nothing
-
-upper :: Parser Name
-upper =
-  withLoc (Name <$> upperName)
-    <?> "identifier that starts with a uppercase letter"
-
-lowerName :: Parser Text
-lowerName = extract p
-  where
-    p (TokLowerName s) = Just s
-    p _ = Nothing
-
-lower :: Parser Name
-lower =
-  withLoc (Name <$> lowerName)
-    <?> "identifier that starts with a lowercase letter"
-
-integer :: Parser Int
-integer = extract p <?> "integer"
-  where
-    p (TokInt s) = Just s
-    p _ = Nothing

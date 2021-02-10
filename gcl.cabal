@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 72792ad392b727505d6276ce362db1f14f09daf3c61eb369c8d26dec94c67ce5
+-- hash: 042b4fadcba62cd24b7922d216126642e7a2fd81f14465139db736cb498331f2
 
 name:           gcl
 version:        0.1.0.0
@@ -36,19 +36,15 @@ library
       Pretty.Predicate
       Pretty.Util
       Pretty.Variadic
-      SCM.Test
       Syntax.Abstract
       Syntax.Common
       Syntax.Concrete
       Syntax.ConstExpr
-      Syntax.Parser
       Syntax.Parser.Lexer
-      Syntax.Parser.Lexer2
       Syntax.Parser.Token
       Syntax.Parser.TokenStream
       Syntax.Parser.Util
-      Syntax.Parser.Util2
-      Syntax.Parser2
+      Syntax.Parser
       Syntax.Predicate
   other-modules:
       Paths_gcl
@@ -113,9 +109,7 @@ test-suite gcl-test
   type: exitcode-stdio-1.0
   main-is: Test.hs
   other-modules:
-      Test.Lexer
       Test.Parser
-      Test.ProofObligation
       Test.Type
       Test.WP
       Error
@@ -133,19 +127,16 @@ test-suite gcl-test
       Pretty.Predicate
       Pretty.Util
       Pretty.Variadic
-      SCM.Test
       Syntax.Abstract
       Syntax.Common
       Syntax.Concrete
       Syntax.ConstExpr
-      Syntax.Parser
       Syntax.Parser.Lexer
-      Syntax.Parser.Lexer2
       Syntax.Parser.Token
       Syntax.Parser.TokenStream
       Syntax.Parser.Util
-      Syntax.Parser.Util2
-      Syntax.Parser2
+      Syntax.Parser.Util
+      Syntax.Parser
       Syntax.Predicate
       Paths_gcl
   hs-source-dirs:

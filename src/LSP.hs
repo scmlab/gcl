@@ -33,9 +33,10 @@ import Network.Socket (socketToHandle)
 import Pretty
 import qualified Syntax.Abstract as A
 import Syntax.Concrete (ToAbstract (toAbstract))
-import qualified Syntax.Parser as Parser
-import Syntax.Parser.Lexer (TokStream)
-import qualified Syntax.Parser.Lexer as Lexer
+-- import qualified Syntax.Parser as Parser
+-- import Syntax.Parser.Lexer (TokStream)
+-- import qualified Syntax.Parser.Lexer as Lexer
+import Syntax.Parser
 import Syntax.Predicate
   ( Origin (..),
     PO (..),
@@ -402,25 +403,34 @@ asLocalError i program =
 
 --------------------------------------------------------------------------------
 
-scan :: FilePath -> Text -> M TokStream
-scan filepath = withExceptT LexicalError . liftEither . Lexer.scan filepath . LazyText.fromStrict
+-- scan :: FilePath -> Text -> M TokStream
+-- scan filepath = withExceptT LexicalError . liftEither . Lexer.scan filepath . LazyText.fromStrict
 
-scanLazy :: FilePath -> LazyText.Text -> M TokStream
-scanLazy filepath = withExceptT LexicalError . liftEither . Lexer.scan filepath
+-- scanLazy :: FilePath -> LazyText.Text -> M TokStream
+-- scanLazy filepath = withExceptT LexicalError . liftEither . Lexer.scan filepath
 
-parse :: Parser.Parser a -> FilePath -> TokStream -> M a
-parse parser filepath =
-  withExceptT SyntacticError . liftEither . Parser.parse parser filepath
+-- parse :: Parser.Parser a -> FilePath -> TokStream -> M a
+-- parse parser filepath =
+--   withExceptT SyntacticError . liftEither . Parser.parse parser filepath
+
+-- parseProgram :: FilePath -> Text -> M A.Program
+-- parseProgram filepath source = do
+--   tokens <- scan filepath source
+--   toAbstract <$> parse Parser.program filepath tokens
+
+parse :: Parser a -> FilePath -> Text -> M a
+parse p filepath = withExcept SyntacticError . liftEither . runParse p filepath . LazyText.fromStrict
 
 parseProgram :: FilePath -> Text -> M A.Program
 parseProgram filepath source = do
-  tokens <- scan filepath source
-  toAbstract <$> parse Parser.program filepath tokens
-
+  toAbstract <$> parse pProgram filepath source
+  
+-- refine :: Text -> M ()
+-- refine payload = do
+--   _ <- scan "<spec>" payload >>= parse Parser.specContent "<specification>"
+--   return ()
 refine :: Text -> M ()
-refine payload = do
-  _ <- scan "<spec>" payload >>= parse Parser.specContent "<specification>"
-  return ()
+refine = void . parse pStmts "<specification>"
 
 sweep :: A.Program -> M ([PO], [Spec])
 sweep (A.Program _ _ ds statements _) = do

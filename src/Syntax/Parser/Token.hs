@@ -205,3 +205,14 @@ tokTypeBool = "Bool"
 
 tokTypeChar :: Text
 tokTypeChar = "Char"
+
+
+notLowerKeyword :: Text -> Bool
+notLowerKeyword t = 
+  t /= tokSkip && t /= tokAbort && t /= tokIf && t /= tokFi && 
+    t /= tokDo && t /= tokOd && t /= tokBnd && t /= tokCon && t /= tokVar &&
+    t /= tokLet && t /= tokArray && t /= tokOf
+
+notUpperKeyworkd :: Text -> Bool
+notUpperKeyworkd t = 
+  t /= tokTypeInt && t /= tokTypeBool && t /= tokTypeChar

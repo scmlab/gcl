@@ -137,12 +137,12 @@ instance ToAbstract GdCmd A.GdCmd where
 
 -- | Interval
 data EndpointOpen
-  = IncludingOpening (Token "{") Expr
+  = IncludingOpening (Token "[") Expr
   | ExcludingOpening (Token "(") Expr
   deriving (Eq, Show)
 
 data EndpointClose
-  = IncludingClosing Expr (Token "}")
+  = IncludingClosing Expr (Token "]")
   | ExcludingClosing Expr (Token ")")
   deriving (Eq, Show)
 

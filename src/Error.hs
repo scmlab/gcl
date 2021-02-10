@@ -11,7 +11,7 @@ import GCL.Type (TypeError)
 -- import GCL.Exec.ExecMonad (ExecError)
 import GCL.WP (StructError)
 import GHC.Generics
-import Syntax.Parser (SyntacticError)
+import Syntax.Parser.Util (SyntacticError)
 import Syntax.Parser.Lexer (LexicalError)
 import Syntax.Parser.Util ()
 import Syntax.Common ()

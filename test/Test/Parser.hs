@@ -13,11 +13,14 @@ import Data.ByteString.Lazy (ByteString)
 import qualified Data.ByteString.Lazy as BS
 import qualified Data.ByteString.Lazy.Char8 as BS8
 
-import Error ( Error )
+import Error ( Error(..) )
 import qualified LSP 
 
-import Syntax.Parser (Parser)
-import qualified Syntax.Parser as Parser
+import Syntax.Parser
+import Syntax.Parser.Lexer
+import Text.Megaparsec.Char
+import qualified Text.Megaparsec.Char.Lexer as Lex
+-- import qualified Syntax.Parser as Parser
 
 import Test.Tasty.Golden.Advanced (goldenTest)
 import Test.Tasty.Golden (createDirectoriesAndWriteFile)
@@ -27,31 +30,41 @@ import Data.Char (isSpace)
 import Data.Int (Int64)
 
 import Prelude hiding (compare)
+import Control.Monad.Except (runExcept, withExcept, liftEither)
+import Syntax.Parser.Token
+import Syntax.Concrete (Type(..), TBase (..))
+import Data.Loc (Located(locOf))
+import Text.Megaparsec (Stream(reachOffset), setOffset, getOffset, MonadParsec(updateParserState, getParserState, observing, lookAhead, try), State(State, statePosState, stateInput, stateOffset))
+import Control.Monad.Combinators (optional, many, (<|>))
+import qualified Data.Ord as Ord
+import Control.Monad (void)
 
 tests :: TestTree
 tests = testGroup "Prettifier" [expression, type', declaration, statement, parseError, golden]
 
 --------------------------------------------------------------------------------
 
-parse :: Pretty a => Parser a -> Text -> Either Error a
-parse parser raw = LSP.runM $ LSP.scanLazy "<test>" raw >>= LSP.parse parser "<test>"
+parse :: Parser a -> Text -> Either Error a
+parse parser = 
+  runExcept . withExcept SyntacticError . liftEither . runParse parser "<test>" 
+  -- LSP.runM $ LSP.scanLazy "<test>" raw >>= LSP.parse parser "<test>"
 
 render :: Pretty a => Either Error a -> Text
 render = renderLazy . layoutPretty defaultLayoutOptions . pretty
 
 
 isomorphic :: Pretty a => Parser a -> Text -> Assertion
-isomorphic parser raw = removeTrailingWhitespace (render (parse parser raw)) @?= removeTrailingWhitespace raw
+isomorphic parser raw = removeWhitespace (render (parse parser raw)) @?= removeWhitespace raw
   where
-    removeTrailingWhitespace :: Text -> Text
-    removeTrailingWhitespace = Text.unlines . map Text.stripEnd . Text.lines
+    removeWhitespace :: Text -> Text
+    removeWhitespace = Text.unlines . map Text.stripEnd . Text.lines
 
 
 compare :: Pretty a => Parser a -> Text -> Text -> Assertion
-compare parser actual expected = removeTrailingWhitespace (render (parse parser actual)) @?= removeTrailingWhitespace expected
+compare parser actual expected = removeWhitespace (render (parse parser actual)) @?= removeWhitespace expected
   where
-    removeTrailingWhitespace :: Text -> Text
-    removeTrailingWhitespace = Text.unlines . map Text.stripEnd . Text.lines
+    removeWhitespace :: Text -> Text
+    removeWhitespace = Text.unlines . map Text.stripEnd . Text.lines
 
 -- | Expression
 expression :: TestTree
@@ -62,7 +75,7 @@ expression =
       testCase "literal (True)" $ run "True",
       testCase "literal (False)" $ run "False",
       testCase "variable" $ run "   x",
-      testCase "constant" $ run " ( X)",
+      testCase "constant" $ run " (X)",
       testCase "numeric 1" $ run "(1   \n  +  \n  (   \n   1))",
       testCase "numeric 2" $ run "A + X * Y",
       testCase "numeric 3" $ run "(A + X) * Y % 2",
@@ -71,7 +84,7 @@ expression =
       testCase "relation (LT)" $ run "A < B",
       testCase "relation (LTE)" $ run "A <= B",
       testCase "relation (GT)" $ run "A > B",
-      testCase "relation (LTE)" $ run "A >= B",
+      testCase "relation (GTE)" $ run "A >= B",
       testCase "boolean (Conj)" $ run "A && B",
       testCase "boolean (Disj)" $ run "A || B",
       testCase "boolean (Implies)" $ run "A => B",
@@ -98,7 +111,7 @@ expression =
       testCase "mixed 10" $ run "3 / 2 + X"
     ]
   where
-    run = isomorphic Parser.expression
+    run = isomorphic (scn >> pExpr)
 
 --------------------------------------------------------------------------------
 
@@ -108,6 +121,7 @@ type' =
   testGroup
     "Types"
     [ testCase "base types (Int)" $ run "Int",
+      testCase "base types (Bool)" $ run "(Bool)",
       testCase "base types (Bool)" $ run "  ((Bool))",
       testCase "base types (Char)" $ run "Char",
       testCase "function types 1" $ run "(Char -> (Int   ))",
@@ -124,7 +138,7 @@ type' =
       testCase "array 4" $ run "array (  0 .. (Int) ) of \n Int"
     ]
   where
-    run = isomorphic Parser.type'
+    run = isomorphic (scn >> pType)
 
 --------------------------------------------------------------------------------
 
@@ -137,14 +151,14 @@ declaration =
       testCase "variable (with newlines in between)" $
         run
           "var\n\
-          \ x \n\
+          \  x \n\
           \   : Int\n",
       testCase "variable with properties" $ run "var x : Int  {    True \n }",
       testCase "constant" $ run "con X , Z,B, Y : Int",
       testCase "let binding" $ run " let  X   i  =  N  >   (0)  "
     ]
   where
-    run = isomorphic Parser.declaration
+    run = isomorphic pDeclaration
 
 --------------------------------------------------------------------------------
 
@@ -159,13 +173,13 @@ statement =
       testCase "assignment" $ run "x := 0",
       testCase "assignment (parallel)" $ run "x   , y  := 0    ,    1",
       testCase "conditional 1" $ run "if True -> skip fi",
-      testCase "conditional 2" $ run "if True ->    skip   \n | False -> abort fi",
-      testCase "loop invariant" $ run "    { True    ,     bnd      : a \n }",
+      testCase "conditional 2" $ run "if True ->    skip   \n | False -> abort \nfi",
+      testCase "loop invariant" $ run "{ True ,     bnd      : a  }",
       testCase "loop body 1" $ run "do True -> skip od",
       testCase "loop body 2" $ run "do True    →       skip od"
     ]
   where
-    run = isomorphic Parser.statement
+    run = isomorphic pStmt
 
 --------------------------------------------------------------------------------
 
@@ -177,7 +191,8 @@ parseError =
     [ testCase "quant with parentheses" $ run "<| (+) i : i > 0 : f i |>" "Error Syntactic Error [(<test>:1:4, unexpected '(' expecting expression )]\n"
     ]
   where
-    run = compare Parser.expression 
+    run = compare pExpr
+
 
 --------------------------------------------------------------------------------
 
@@ -193,6 +208,7 @@ golden =
       ast "issue 14" "./test/source/issue14.gcl",
       ast "no-decl" "./test/source/no-decl.gcl",
       ast "no-stmt" "./test/source/no-stmt.gcl",
+      ast "assign" "./test/source/assign.gcl",
       ast "quant 1" "./test/source/quant1.gcl",
       ast "spec" "./test/source/spec.gcl"
     ]
@@ -248,4 +264,5 @@ golden =
       createDirectoriesAndWriteFile (suffixGolden filePath) (run input)
 
     run :: ByteString -> ByteString
-    run = Text.encodeUtf8 . render . parse Parser.program . Text.decodeUtf8
+    run = Text.encodeUtf8 . render . parse pProgram . Text.decodeUtf8
+
