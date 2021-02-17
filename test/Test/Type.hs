@@ -51,8 +51,11 @@ inferTests =
       testCase "infer op" $
         runInfer env (infer (o Add)) @?= liftEither (Right (f tint (f tint tint), [])),
       testCase "check assignment" $
-        checkStmt env (Assign [n "b"] [xaddy] NoLoc) @?= liftEither (Left (UnifyFailed tbool tint NoLoc))
-
+        checkStmt env (Assign [n "b"] [xaddy] NoLoc) @?= liftEither (Left (UnifyFailed tbool tint NoLoc)),
+      testCase "check gdcmd" $
+        checkGdCmd env gd @?= liftEither (Left (UnifyFailed tint tbool NoLoc)),
+      testCase "check do" $
+        checkStmt env (Do [gd] NoLoc) @?= liftEither (Left (UnifyFailed tint tbool NoLoc))
     ]
     where
       fff g (a, b) = (g a, g b)
@@ -66,6 +69,7 @@ inferTests =
       tbool = TBase TBool NoLoc 
       tint = TBase TInt NoLoc
       xaddy = a (a (o Add) (v "x")) (v "y")
+      gd = GdCmd xaddy [Skip NoLoc] NoLoc
 
 
 actual :: Type -> Type -> Either TypeError SubstT

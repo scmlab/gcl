@@ -148,12 +148,6 @@ inferExpr env e = do
   (t, cs) <- runInfer env (infer e)
   s <- runSolver cs
   return $ closeOver s t
-  -- case runInfer env (infer e) of
-  --   Left err -> Left err
-  --   Right (t, cs) -> 
-  --     case runSolver cs of
-  --       Left err -> Left err
-  --       Right s -> Right $ closeOver s t
 
 inferDecl :: TypeEnv -> Declaration -> TM TypeEnv
 inferDecl env (ConstDecl ns t _ _) = 
@@ -215,17 +209,15 @@ checkName env@(TypeEnv envM) (n, expr) =
     Just (ForallV _ t) -> do
       (ForallV _ t') <- inferExpr env expr
       void $ runSolver [(t, t')]
-  -- case (Map.lookup n envM, inferExpr env expr) of
-  --   (Nothing, _) -> throwError $ NotInScope n NoLoc
-  --   (_, Left err) -> throwError err
-  --   (Just (ForallV _ t), Right (ForallV _ t')) -> void $ runSolver [(t, t')] 
 
 checkExpr :: TypeEnv -> Expr -> TM ()
 checkExpr env expr = void $ inferExpr env expr
 
 checkGdCmd :: TypeEnv -> GdCmd -> TM ()
-checkGdCmd env (GdCmd expr stmts _) = 
-  inferExpr env expr >> mapM_ (checkStmt env) stmts
+checkGdCmd env (GdCmd expr stmts _) = do
+  ForallV _ gd <- inferExpr env expr
+  void $ runSolver [(gd, TBase TBool NoLoc)]
+  mapM_ (checkStmt env) stmts
 
 checkStmt :: TypeEnv -> Stmt -> TM ()
 checkStmt _ (Skip _) = return ()
