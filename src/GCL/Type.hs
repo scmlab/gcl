@@ -16,6 +16,8 @@ import Control.Monad.Except
 import Control.Monad.RWS hiding (Sum)
 import Prelude hiding (Ordering (..))
 
+type TM = Except TypeError
+
 ------------------------------------------
 -- type enviornment
 ------------------------------------------
@@ -25,7 +27,7 @@ type TVar = Text
 newtype TypeEnv = TypeEnv (Map TVar Scheme)
 
 -- schemes model polymorphic types
-data Scheme = ForallV [TVar] Type
+data Scheme = ForallV [TVar] Type deriving (Eq, Show)
 
 emptyEnv :: TypeEnv
 emptyEnv = TypeEnv Map.empty
@@ -33,7 +35,7 @@ emptyEnv = TypeEnv Map.empty
 extend :: TypeEnv -> (TVar, Scheme) -> TypeEnv
 extend (TypeEnv env) (x, s) = TypeEnv (Map.insert x s env)
 
-extend' :: TypeEnv -> (TVar, Scheme) -> Except TypeError TypeEnv
+extend' :: TypeEnv -> (TVar, Scheme) -> TM TypeEnv
 extend' e@(TypeEnv env) (x, s) =
   case Map.lookup x env of
     Nothing -> return $ e `extend` (x, s)
@@ -83,7 +85,7 @@ occursT x s = x `Set.member` fv s
 -- type inference
 ------------------------------------------
 
-type Infer = RWST TypeEnv [Constraint] InferState (Except TypeError)
+type Infer = RWST TypeEnv [Constraint] InferState TM
 
 type InferState = Int
 
@@ -108,7 +110,7 @@ initInfer = 0
 runInfer' :: TypeEnv -> Infer Type -> Either TypeError (Type, [Constraint])
 runInfer' env m = runExcept $ evalRWST m env initInfer
 
-runInfer :: TypeEnv -> Infer Type -> Except TypeError (Type, [Constraint])
+runInfer :: TypeEnv -> Infer Type -> TM (Type, [Constraint])
 runInfer env m = evalRWST m env initInfer
 
 infer :: Expr -> Infer Type
@@ -141,7 +143,7 @@ infer (Subst expr sub) = do
   s <- mapM infer sub
   return $ apply s t
 
-inferExpr :: TypeEnv -> Expr -> Except TypeError Scheme
+inferExpr :: TypeEnv -> Expr -> TM Scheme
 inferExpr env e = do
   (t, cs) <- runInfer env (infer e)
   s <- runSolver cs
@@ -153,23 +155,18 @@ inferExpr env e = do
   --       Left err -> Left err
   --       Right s -> Right $ closeOver s t
 
-inferDecl :: TypeEnv -> Declaration -> Except TypeError TypeEnv
+inferDecl :: TypeEnv -> Declaration -> TM TypeEnv
 inferDecl env (ConstDecl ns t _ _) = 
   foldM f env [n | Name n _ <- ns]
   where
-    -- f (Left err) _ = Left err
     f env' n = env' `extend'` (n, generalize env' t)
 inferDecl env (VarDecl ns t _ _) = 
   foldM f env [n | Name n _ <- ns]
   where
-    -- f (Left err) _ = Left err
     f env' n = env' `extend'` (n, generalize env' t)
 inferDecl env (LetDecl (Name n _) args expr _) = do
   s <- inferExpr env expr'
   env `extend'` (n, s)
-  -- case inferExpr env expr' of
-  --   Left err -> Left err
-  --   Right s -> env `extend'` (n, s)
   where
     expr' = foldr (\a e' -> Lam a e' NoLoc) expr args
 
@@ -211,7 +208,7 @@ fresh l = flip TVar l . flip Name l <$> freshTVar
 -- type check
 ------------------------------------------
 
-checkName :: TypeEnv -> (Text, Expr) -> Except TypeError ()
+checkName :: TypeEnv -> (Text, Expr) -> TM ()
 checkName env@(TypeEnv envM) (n, expr) = 
   case Map.lookup n envM of
     Nothing -> throwError $ NotInScope n NoLoc
@@ -223,14 +220,14 @@ checkName env@(TypeEnv envM) (n, expr) =
   --   (_, Left err) -> throwError err
   --   (Just (ForallV _ t), Right (ForallV _ t')) -> void $ runSolver [(t, t')] 
 
-checkExpr :: TypeEnv -> Expr -> Except TypeError ()
+checkExpr :: TypeEnv -> Expr -> TM ()
 checkExpr env expr = void $ inferExpr env expr
 
-checkGdCmd :: TypeEnv -> GdCmd -> Except TypeError ()
+checkGdCmd :: TypeEnv -> GdCmd -> TM ()
 checkGdCmd env (GdCmd expr stmts _) = 
   inferExpr env expr >> mapM_ (checkStmt env) stmts
 
-checkStmt :: TypeEnv -> Stmt -> Except TypeError ()
+checkStmt :: TypeEnv -> Stmt -> TM ()
 checkStmt _ (Skip _) = return ()
 checkStmt _ (Abort _) = return ()
 checkStmt env (Assign ns es _)
@@ -245,7 +242,7 @@ checkStmt _ (SpecQM _) = return ()
 checkStmt _ (Spec _) = return ()
 checkStmt _ (Proof _) = return ()
 
-checkProg :: Program -> Except TypeError ()
+checkProg :: Program -> TM ()
 checkProg (Program decls exprs defs stmts _) = do
   env <- foldM inferDecl emptyEnv decls
   mapM_ (checkExpr env) exprs
@@ -260,15 +257,13 @@ type Constraint = (Type, Type)
 
 type Unifier = (SubstT, [Constraint])
 
-type Solve = Except TypeError
-
 emptyUnifier :: Unifier
 emptyUnifier = (emptySubstT, [])
 
-unifiesScheme :: Scheme -> Scheme -> Solve SubstT
+unifiesScheme :: Scheme -> Scheme -> TM SubstT
 unifiesScheme (ForallV _ t1) (ForallV _ t2) = unifies t1 t2
 
-unifies :: Type -> Type -> Solve SubstT
+unifies :: Type -> Type -> TM SubstT
 unifies (TBase t1 _) (TBase t2 _)
   | t1 == t2 = return emptySubstT
 unifies (TArray i1 t1 _) (TArray i2 t2 _)
@@ -284,16 +279,18 @@ unifies t1 t2 = throwError $ UnifyFailed t1 t2 (locOf t1)
 runSolver' :: [Constraint] -> Either TypeError SubstT
 runSolver' cs = runExcept . solver $ (emptySubstT, cs)
 
-runSolver :: [Constraint] -> Except TypeError SubstT
+runSolver :: [Constraint] -> TM SubstT
 runSolver cs = solver (emptySubstT, cs)
 
-solver :: Unifier -> Solve SubstT
+solver :: Unifier -> TM SubstT
 solver (s, []) = return s
 solver (s, (t1, t2) : cs) = do
   su <- unifies t1 t2
-  solver (su `compose` s, map (fmap (apply su)) cs)
+  solver (su `compose` s, map (f (apply su)) cs)
+  where
+    f g (a, b) = (g a, g b)
 
-bind :: TVar -> Type -> Solve SubstT
+bind :: TVar -> Type -> TM SubstT
 x `bind` (TVar (Name y _) _)
   | x == y = return emptySubstT
 x `bind` t

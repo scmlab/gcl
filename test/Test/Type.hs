@@ -12,6 +12,7 @@ import qualified Data.Text.Encoding as Text
 import Data.Text (Text)
 import Data.Text.Prettyprint.Doc.Internal
 import Data.Text.Prettyprint.Doc.Render.Text
+import qualified Data.Map as Map
 import GCL.Type
 import Error
 import LSP
@@ -20,10 +21,11 @@ import Test.Tasty
 import Test.Tasty.Golden
 import Test.Tasty.Golden.Advanced
 import Test.Tasty.HUnit
+import qualified Data.Bifunctor
 
 tests :: TestTree
--- tests = testGroup "Type" [unifyTests]
-tests = testGroup "Type" [unifyTests, typeCheckTests]
+tests = testGroup "Type" [inferTests]
+-- tests = testGroup "Type" [unifyTests, typeCheckTests]
 
 
 unifyTests :: TestTree 
@@ -36,6 +38,35 @@ unifyTests =
       testCase "TBase 2" $
         mapM_ (\(t1, t2) -> actual t1 t2 @?= Left (UnifyFailed t1 t2 NoLoc)) [(TBase TInt NoLoc, TBase TBool NoLoc), (TBase TInt NoLoc, TBase TChar NoLoc), (TBase TBool NoLoc, TBase TChar NoLoc)]
     ]
+
+inferTests :: TestTree
+inferTests = 
+  testGroup
+    "infer"
+    [
+      testCase "lookup name in env" $
+        runInfer env (lookupEnv (Name "b" NoLoc)) @?= liftEither (Right (tbool, [])),
+      testCase "infer var" $
+        runInfer env (infer (v "b")) @?= liftEither (Right (tbool, [])),
+      testCase "infer op" $
+        runInfer env (infer (o Add)) @?= liftEither (Right (f tint (f tint tint), [])),
+      testCase "check assignment" $
+        checkStmt env (Assign [n "b"] [xaddy] NoLoc) @?= liftEither (Left (UnifyFailed tbool tint NoLoc))
+
+    ]
+    where
+      fff g (a, b) = (g a, g b)
+      env = TypeEnv $ Map.fromList [("x", ForallV [] tint), ("y", ForallV [] tint), ("b", ForallV [] tbool)]
+      tv x = TVar (n x) NoLoc
+      n x = Name x NoLoc
+      v x = Var (n x) NoLoc
+      o op = Op op NoLoc
+      a e1 e2 = App e1 e2 NoLoc
+      f t1 t2 = TFunc t1 t2 NoLoc 
+      tbool = TBase TBool NoLoc 
+      tint = TBase TInt NoLoc
+      xaddy = a (a (o Add) (v "x")) (v "y")
+
 
 actual :: Type -> Type -> Either TypeError SubstT
 actual t1 t2 = runSolver' [(t1, t2)]
