@@ -40,7 +40,8 @@ import qualified Data.Ord as Ord
 import Control.Monad (void)
 
 tests :: TestTree
-tests = testGroup "Prettifier" [expression, type', declaration, statement, parseError, golden]
+tests = testGroup "Prettifier" [myTest]
+-- tests = testGroup "Prettifier" [expression, type', declaration, statement, parseError, golden]
 
 --------------------------------------------------------------------------------
 
@@ -65,6 +66,19 @@ compare parser actual expected = removeWhitespace (render (parse parser actual))
   where
     removeWhitespace :: Text -> Text
     removeWhitespace = Text.unlines . map Text.stripEnd . Text.lines
+
+
+myTest :: TestTree
+myTest = 
+  testGroup
+    "conjective chain"
+    [
+      testCase "a + 1 <= b + 2 < c + 3" $ run "a + 1 <= b + 2 < c + 3",
+      testCase "a  + 1 < b" $ run "a + 1 < b"
+    ]
+    where
+      run = isomorphic (pExpr' sc)
+      run' t = show (parse (pExpr' sc) t) @?= ""
 
 -- | Expression
 expression :: TestTree

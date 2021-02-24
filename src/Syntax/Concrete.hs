@@ -5,7 +5,7 @@
 
 module Syntax.Concrete where
 
-import Data.Loc ( Loc(..), Pos, (<-->), Located(locOf) )
+import Data.Loc (Loc(..), Pos, (<-->), Located(locOf) )
 import Data.Map (Map)
 import Data.Text.Lazy (Text)
 import GHC.Generics (Generic)
@@ -29,7 +29,7 @@ data Token (a :: Symbol) = Token Pos Pos
   deriving (Eq, Show)
 
 instance Located (Token a) where
-  locOf (Token l r) = Loc l r
+  locOf (Token l r) = l <--> r
 
 instance (Located a, Located b) => Located (Either a b) where
   locOf (Left x) = locOf x
@@ -220,6 +220,7 @@ data Expr
   | Var Name
   | Const Name
   | Op Op
+  | Chain Expr Op Expr                  -- Left Associative
   | App Expr Expr
   | Quant
       (Either (Token "<|") (Token "⟨"))
@@ -238,6 +239,7 @@ instance Located Expr where
   locOf (Var x) = locOf x
   locOf (Const x) = locOf x
   locOf (Op x) = locOf x
+  locOf (Chain e1 op e2) = e1 <--> op <--> e2
   locOf (App x y) = x <--> y
   locOf (Quant l _ _ _ _ _ _ r) = l <--> r
 
@@ -248,6 +250,16 @@ instance ToAbstract Expr A.Expr where
     Var a -> A.Var (toAbstract a) (locOf x)
     Const a -> A.Const (toAbstract a) (locOf x)
     Op a -> A.Op (toAbstract a) (locOf x)
+    Chain a op b -> 
+      case a of
+        Chain e1 op' e2 -> 
+          -- e1 op' e2'
+          let a1 = A.App (A.App (toAbstract (Op op')) (toAbstract e1) (e1 <--> op')) (toAbstract e2) (e1 <--> e2) in
+          -- e2 op b
+          let a2 = A.App (A.App (toAbstract (Op op)) (toAbstract e2) (e2 <--> op)) (toAbstract b) (e2 <--> op <--> b) in
+            -- c1 && c2
+            A.App (A.App (A.Op A.Conj NoLoc) a1 (locOf a1)) a2 (a1 <--> a2)
+        _ -> A.App (A.App (toAbstract (Op op)) (toAbstract a) (a <--> op)) (toAbstract b) (locOf x)
     App a b -> A.App (toAbstract a) (toAbstract b) (locOf x)
     Quant _ a b _ c _ d _ -> A.Quant (either (toAbstract . Op) toAbstract a) (fmap toAbstract b) (toAbstract c) (toAbstract d) (locOf x)
 
@@ -397,3 +409,4 @@ classify (Mod _) = InfixL 9
 classify (Sum _) = Prefix 5
 classify (Exists _) = Prefix 6
 classify (Forall _) = Prefix 7
+

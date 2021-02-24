@@ -24,8 +24,8 @@ import Test.Tasty.HUnit
 import qualified Data.Bifunctor
 
 tests :: TestTree
-tests = testGroup "Type" [inferTests]
--- tests = testGroup "Type" [unifyTests, typeCheckTests]
+-- tests = testGroup "Type" [typeCheckTests]
+tests = testGroup "Type" [unifyTests, typeCheckTests]
 
 
 unifyTests :: TestTree 
@@ -79,7 +79,9 @@ typeCheckTests :: TestTree
 typeCheckTests = 
   testGroup "Type Check" 
     [
-      typeCheckGolden "2" "./test/source/2.gcl"
+      typeCheckGolden "2" "./test/source/2.gcl",
+      typeCheckGolden "quant1" "./test/source/quant1.gcl"
+
 --       typeCheckGolden "let binding" "./test/source/let.gcl",
 --       typeCheckGolden "factor" "./test/source/examples/factor.gcl"
     ]
@@ -100,7 +102,7 @@ typeCheck (filepath, source) = renderStrict . layoutCompact . pretty $ result
   where 
     result = 
       case runM (parseProgram filepath source) of
-        Left err -> return ()
+        Left err -> Left err
         Right prog -> runM . withExcept TypeError $ checkProg prog
 
 compareAndReport :: (FilePath, Text) -> (FilePath, Text) -> IO (Maybe String)

@@ -126,14 +126,14 @@ infer (App e1 e2 l) = do
   return v
 infer (Lam x e l) = do
   v <- fresh l
-  t <- inEnv (x, ForallV [] v) (infer e)
+  t <- inEnv [(x, ForallV [] v)] (infer e)
   return (TFunc v t l)
 infer (Hole l) = fresh l
-infer (Quant op _ rng t l) = do
+infer (Quant op iters rng t l) = do
   x <- fresh l
   to <- infer op
-  tr <- infer rng
-  tt <- infer t
+  tr <- inEnv [(n, ForallV [] (TBase TInt loc)) | Name n loc <- iters] (infer rng)
+  tt <- inEnv [(n, ForallV [] (TBase TInt loc)) | Name n loc <- iters] (infer t)
   uni to (TFunc x (TFunc x x l) l)
   uni tr (TBase TBool l)
   uni tt x
@@ -184,9 +184,13 @@ lookupEnv (Name n l) = do
     Just s -> instantiate s
     Nothing -> throwError $ NotInScope n l
 
-inEnv :: (TVar, Scheme) -> Infer a -> Infer a
-inEnv (x, sc) m = do
-  let scope (TypeEnv e) = TypeEnv (Map.delete x e) `extend` (x, sc)
+-- inEnv :: (TVar, Scheme) -> Infer a -> Infer a
+-- inEnv (x, sc) m = do
+--   let scope (TypeEnv e) = TypeEnv (Map.delete x e) `extend` (x, sc)
+--   local scope m
+inEnv :: [(TVar, Scheme)] -> Infer a -> Infer a
+inEnv l m = do
+  let scope (TypeEnv e) = TypeEnv $ foldl (\e' (x, sc) -> Map.insert x sc e') e l
   local scope m
 
 freshTVar :: Infer TVar

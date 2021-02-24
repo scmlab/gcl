@@ -280,6 +280,11 @@ handleExpr (Var x) = return $ prettyWithLoc x
 handleExpr (Const x) = return $ prettyWithLoc x
 handleExpr (Lit x) = return $ prettyWithLoc x
 handleExpr (Op x) = handleOp x
+handleExpr (Chain x op y) = 
+  return $
+    prettyWithLoc x
+    <> prettyWithLoc op
+    <> prettyWithLoc y
 handleExpr (App p q) = case handleExpr p of
   Expect f -> f q
   Complete s -> do

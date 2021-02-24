@@ -119,8 +119,8 @@ pStmt' sc' =
       pAbort,
       try . pAssert,
       try . pLoopInvariant,
-      try . pDo,
-      try . pIf,
+      try . const pDo,
+      try . const pIf,
       try . pAssign,
       pSpecQM,
       pSpec,
@@ -153,27 +153,18 @@ pLoopInvariant =
     <**> pExpr'
     <**> lexBraceEnd
 
-pDo :: Parser () -> Parser Stmt
-pDo = const pDoLineFold
-
-pDoLineFold :: Parser Stmt
-pDoLineFold = do
+pDo :: Parser Stmt
+pDo = do
   (tDo, gdcmds, tOd) <- pIfoDoHelper lexDo lexOd
   return $ Do tDo gdcmds tOd
 
-pIf :: Parser () -> Parser Stmt
-pIf = const pIfLineFold
-
-pIfLineFold :: Parser Stmt
-pIfLineFold = do
+pIf :: Parser Stmt
+pIf = do
     (tIf, gdcmds, tFi) <- pIfoDoHelper lexIf lexFi
     return $ If tIf gdcmds tFi
 
 pGdCmd :: Parser GdCmd
-pGdCmd = pGdCmdOneLine
-
-pGdCmdOneLine :: Parser GdCmd
-pGdCmdOneLine = Lex.indentBlock scn p
+pGdCmd = Lex.indentBlock scn p
   where
     p = do
       ref <- Lex.indentLevel 
@@ -216,12 +207,12 @@ pParensType = TParen <$.> lexParenStart <**> pType' <**> lexParenEnd
 pArray :: Parser () -> Parser Type
 pArray = TArray <$.> lexArray <**> pInterval <**> lexOf <**> pType'
 
--- NOTE :: not sure if this work
 pBase :: Parser () -> Parser Type
 pBase sc' =
   TBase
-    <$> f
-      [ (TInt . locOf) <$.> lexTypeInt,
+    <$> f 
+      [ 
+        (TInt . locOf) <$.> lexTypeInt,
         (TBool . locOf) <$.> lexTypeBool,
         (TChar . locOf) <$.> lexTypeChar
       ]
@@ -249,31 +240,44 @@ pExpr :: Parser Expr
 pExpr = pExpr' scn <?> "expression"
 
 pExpr' :: Parser () -> Parser Expr
-pExpr' sc' = makeExprParser (pTerm sc') (opTable sc') <* (try sc' <|> sc) <?> "expression"
+pExpr' sc' = makeExprParser (pExprArith sc') (chainOpTable sc') <* (try sc' <|> sc) <?> "expression"
 
-opTable :: Parser () -> [[Operator Parser Expr]]
-opTable sc' =
+chainOpTable :: Parser () -> [[Operator Parser Expr]]
+chainOpTable sc' =
   fmap
     (fmap (\f -> f sc'))
-    [ [Postfix . pApp],
+    [ 
+      [ 
+        InfixL . (const pChain <*> cOp [lexNEQ, lexNEQU]),
+        InfixL . pChain . lexLT,
+        InfixL . (const pChain <*> cOp [lexLTE, lexLTEU]),
+        InfixL . pChain . lexGT,
+        InfixL . (const pChain <*> cOp [lexGTE, lexGTEU])
+      ],
+      [InfixL . pChain . lexEQ],
+      [InfixL . (const pChain <*> cOp [lexConj, lexConjU])],
+      [InfixL . (const pChain <*> cOp [lexDisj, lexDisjU])],
+      [InfixL . (const pChain <*> cOp [lexImpl, lexImplU])]
+    ]
+    where
+      cOp l s = choice (map (\g -> g s) l)
+
+pExprArith :: Parser () -> Parser Expr
+pExprArith sc' = makeExprParser (pTerm sc') (arithTable sc') <* (try sc' <|> sc)
+
+arithTable :: Parser () -> [[Operator Parser Expr]]
+arithTable sc' = 
+  fmap
+    (fmap (\f -> f sc'))
+    [
+      [Postfix . pApp],
       [InfixL . pBinary . lexMod],
       [InfixL . pBinary . lexMul, InfixL . pBinary . lexDiv],
       [InfixL . pBinary . lexAdd, InfixL . pBinary . lexSub],
-      [ InfixL . pBinary . lexNEQ,
-        InfixL . pBinary . lexNEQU,
-        InfixL . pBinary . lexLT,
-        InfixL . pBinary . lexLTE,
-        InfixL . pBinary . lexLTEU,
-        InfixL . pBinary . lexGT,
-        InfixL . pBinary . lexGTE,
-        InfixL . pBinary . lexGTEU
-      ],
-      [InfixL . pBinary . lexEQ],
-      [Prefix . pUnary . lexNeg, Prefix . pUnary . lexNegU],
-      [InfixL . pBinary . lexConj, InfixL . pBinary . lexConjU],
-      [InfixL . pBinary . lexDisj, InfixL . pBinary . lexDisjU],
-      [InfixL . pBinary . lexImpl, InfixL . pBinary . lexImplU]
+      [Prefix . (const pUnary <*> cOp [lexNeg, lexNegU])]
     ]
+    where
+      cOp l s = choice (map (\g -> g s) l)
 
 pTerm :: Parser () -> Parser Expr
 pTerm sc' = f [pParen, pLit, pVar, pConst, pQuant] <?> "term"
@@ -304,14 +308,20 @@ pQuant =
     <**> pExpr'
     <**> lexQuantEnds
   where
-    qOp sc'' = choice . map (\g -> g sc'') $ [fmap Left . lexOps, fmap Right . pTerm]
-    qNames sc'' = sepBy1 (lowerName sc'') (try sc'')
+    qOp sc' = choice . map (\g -> g sc') $ [fmap Left . lexOps, fmap Right . pTerm]
+    qNames sc' = sepBy1 (lowerName sc') (try sc')
 
 pApp :: Parser () -> Parser (Expr -> Expr)
 pApp sc' = do
   terms <- many (pTerm sc')
   return $ \func -> do
     foldl App func terms
+
+pChain :: Parser Op -> Parser (Expr -> Expr -> Expr)
+pChain m = do
+  -- NOTE: operator cannot be followed by any symbol
+  op <- try (notFollowedBySymbol m)
+  return $ \x y -> Chain x op y
 
 pBinary :: Parser Op -> Parser (Expr -> Expr -> Expr)
 pBinary m = do
@@ -321,6 +331,7 @@ pBinary m = do
 
 pUnary :: Parser Op -> Parser (Expr -> Expr)
 pUnary m = do
+  -- NOTE: operator cannot be followed by any symbol
   op <- try (notFollowedBySymbol m)
   return $ \x -> App (Op op) x
 
