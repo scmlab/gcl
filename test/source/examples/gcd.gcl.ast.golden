@@ -1,0 +1,11 @@
+con A, B : Int { A > 0 ∧ B > 0}
+var gcd : Int -> Int -> Int
+var x, y : Int
+
+x, y := A, B
+
+{ gcd x y = gcd A B ∧ x > 0 ∧ y > 0, bnd: x + y }
+do x < y -> y := y - x
+ | x > y -> x := x - y
+od
+{ x = gcd A B }

@@ -40,8 +40,8 @@ import Control.Monad (void)
 import Syntax.Parser.Util (parser, (↓))
 
 tests :: TestTree
--- tests = testGroup "Prettifier" [myTest]
-tests = testGroup "Prettifier" [expression, type', declaration, statement, parseError, golden]
+tests = testGroup "Prettifier" [golden]
+-- tests = testGroup "Prettifier" [expression, type', declaration, statement, parseError, golden]
 
 --------------------------------------------------------------------------------
 
@@ -224,7 +224,8 @@ golden =
       ast "no-stmt" "./test/source/no-stmt.gcl",
       ast "assign" "./test/source/assign.gcl",
       ast "quant 1" "./test/source/quant1.gcl",
-      ast "spec" "./test/source/spec.gcl"
+      ast "spec" "./test/source/spec.gcl",
+      ast "gcd" "./test/source/examples/gcd.gcl"
     ]
   where
     suffixGolden :: FilePath -> FilePath

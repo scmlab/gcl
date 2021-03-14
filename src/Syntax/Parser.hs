@@ -237,6 +237,9 @@ pExpr' = makeExprParser pExprArith chainOpTable <* (↑) (\sc' -> try sc' <|> sc
 
 chainOpTable :: [[Operator ParserF Expr]]
 chainOpTable = [
+    [InfixL . pChain . choice $ [lexConj, lexConjU]],
+    [InfixL . pChain . choice $ [lexDisj, lexDisjU]],
+    [InfixL . pChain . choice $ [lexImpl, lexImplU]],
     [
       InfixL . pChain . choice $ [lexNEQ, lexNEQU],
       InfixL . pChain $ lexLT,
@@ -244,10 +247,7 @@ chainOpTable = [
       InfixL . pChain $ lexGT,
       InfixL . pChain . choice $ [lexGTE, lexGTEU]
     ],
-    [InfixL . pChain $ lexEQ],
-    [InfixL . pChain . choice $ [lexConj, lexConjU]],
-    [InfixL . pChain . choice $ [lexDisj, lexDisjU]],
-    [InfixL . pChain . choice $ [lexImpl, lexImplU]]
+    [InfixL . pChain $ lexEQ]
   ]
 
 pExprArith :: ParserF Expr
