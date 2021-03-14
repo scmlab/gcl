@@ -20,7 +20,6 @@ import Syntax.Parser
 import Syntax.Parser.Lexer
 import Text.Megaparsec.Char
 import qualified Text.Megaparsec.Char.Lexer as Lex
--- import qualified Syntax.Parser as Parser
 
 import Test.Tasty.Golden.Advanced (goldenTest)
 import Test.Tasty.Golden (createDirectoriesAndWriteFile)
@@ -38,10 +37,11 @@ import Text.Megaparsec (Stream(reachOffset), setOffset, getOffset, MonadParsec(u
 import Control.Monad.Combinators (optional, many, (<|>))
 import qualified Data.Ord as Ord
 import Control.Monad (void)
+import Syntax.Parser.Util (parser, (↓))
 
 tests :: TestTree
-tests = testGroup "Prettifier" [myTest]
--- tests = testGroup "Prettifier" [expression, type', declaration, statement, parseError, golden]
+-- tests = testGroup "Prettifier" [myTest]
+tests = testGroup "Prettifier" [expression, type', declaration, statement, parseError, golden]
 
 --------------------------------------------------------------------------------
 
@@ -77,8 +77,8 @@ myTest =
       testCase "a  + 1 < b" $ run "a + 1 < b"
     ]
     where
-      run = isomorphic (pExpr' sc)
-      run' t = show (parse (pExpr' sc) t) @?= ""
+      run = isomorphic ((↓) pExpr' sc)
+      run' t = show (parse ((↓) pExpr' sc) t) @?= ""
 
 -- | Expression
 expression :: TestTree

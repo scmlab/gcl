@@ -1,7 +1,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE OverloadedStrings #-}
--- {-# LANGUAGE TupleSections     #-}
 
+{-# OPTIONS_GHC -Wno-unused-imports #-}
 module Syntax.Parser.Lexer where
 
 import Control.Monad (void)
@@ -16,11 +16,11 @@ import Text.Megaparsec.Char (string, alphaNumChar, lowerChar, char, upperChar, s
 import qualified Text.Megaparsec.Char.Lexer as Lex
 import Syntax.Concrete (Lit(..),  Op(..), Token (..))
 import Syntax.Parser.Token
-import Syntax.Parser.Util (getSourcePos',  sourceToLoc, (<$.>) )
-import qualified Data.Text.Lazy as Text
+import Syntax.Parser.Util
 
 type LexicalError = Pos
 type Lexer = Parsec Void Text
+type LexerF = ParseFunc Lexer
 
 spaceNotNewline :: Lexer Char
 spaceNotNewline = satisfy (\t -> isSpace t && t /= '\n' && t /= '\r' && t /= '\f' && t /= '\v')
@@ -40,12 +40,12 @@ skipBlockComment :: Lexer ()
 skipBlockComment = Lex.skipBlockComment "--/" "/--"
 
 -- wrapper of tokens
-lexeme :: Lexer () -> Lexer a -> Lexer (a, Loc)
-lexeme sc' = Lex.lexeme (try sc' <|> sc) . getLoc
+lexeme :: Lexer a -> LexerF (a, Loc)
+lexeme p = (↑) (\sc' -> Lex.lexeme (try sc' <|> sc) . getLoc $ p)
 
-symbol :: Text -> Lexer () -> Lexer (Token a)
-symbol t sc' = do
-  (_, loc) <- Lex.lexeme (try sc' <|> sc) . getLoc . string $ t
+symbol :: Text -> LexerF (Token a)
+symbol t = do
+  (_, loc) <- lexeme . string $ t
   case loc of
     NoLoc -> error "NoLoc when parsing token"
     Loc l r -> return $ Token l r
@@ -53,232 +53,230 @@ symbol t sc' = do
 ------------------------------------------
 -- lexical token 
 ------------------------------------------ 
-lexSkip :: Lexer () -> Lexer (Token tokSkip)
+lexSkip :: LexerF (Token tokSkip)
 lexSkip = symbol tokSkip 
 
-lexAbort :: Lexer () -> Lexer (Token tokAbort)
+lexAbort :: LexerF (Token tokAbort)
 lexAbort = symbol tokAbort 
 
-lexDo :: Lexer () -> Lexer (Token tokDo)
+lexDo :: LexerF (Token tokDo)
 lexDo = symbol tokDo 
 
-lexOd :: Lexer () -> Lexer (Token tokOd)
+lexOd :: LexerF (Token tokOd)
 lexOd = symbol tokOd 
 
-lexIf :: Lexer () -> Lexer (Token tokIf)
+lexIf :: LexerF (Token tokIf)
 lexIf = symbol tokIf 
 
-lexFi :: Lexer () -> Lexer (Token tokFi)
+lexFi :: LexerF (Token tokFi)
 lexFi = symbol tokFi 
 
-lexBnd :: Lexer () -> Lexer (Token tokBnd)
+lexBnd :: LexerF (Token tokBnd)
 lexBnd = symbol tokBnd 
 
-lexQM :: Lexer () -> Lexer (Token tokQM)
+lexQM :: LexerF (Token tokQM)
 lexQM = symbol tokQM 
 
-lexCon :: Lexer () -> Lexer (Token tokCon)
+lexCon :: LexerF (Token tokCon)
 lexCon = symbol tokCon 
 
-lexVar :: Lexer () -> Lexer (Token tokVar)
+lexVar :: LexerF (Token tokVar)
 lexVar = symbol tokVar 
 
-lexLet :: Lexer () -> Lexer (Token tokLet)
+lexLet :: LexerF (Token tokLet)
 lexLet = symbol tokLet 
 
-lexArray :: Lexer () -> Lexer (Token tokArray)
+lexArray :: LexerF (Token tokArray)
 lexArray = symbol tokArray 
 
-lexOf :: Lexer () -> Lexer (Token tokOf)
+lexOf :: LexerF (Token tokOf)
 lexOf = symbol tokOf 
 
-lexRange :: Lexer () -> Lexer (Token tokRange)
+lexRange :: LexerF (Token tokRange)
 lexRange = symbol tokRange 
 
-lexGuardBar :: Lexer () -> Lexer (Token tokGuardBar)
+lexGuardBar :: LexerF (Token tokGuardBar)
 lexGuardBar = symbol tokGuardBar 
 
-lexArrow :: Lexer () -> Lexer (Either (Token tokArrow) (Token tokArrowU))
-lexArrow sc' = choice [Left <$> symbol tokArrow sc', Right <$> symbol tokArrowU sc']
+lexArrow :: LexerF (Either (Token tokArrow) (Token tokArrowU))
+lexArrow = choice [Left <$> symbol tokArrow, Right <$> symbol tokArrowU]
 
 ------------------------------------------
 -- delimiters
 ------------------------------------------
 
-lexSpace :: Lexer () -> Lexer (Token tokSpace)
+lexSpace :: LexerF (Token tokSpace)
 lexSpace = symbol tokSpace 
 
-lexComma :: Lexer () -> Lexer (Token tokComma)
+lexComma :: LexerF (Token tokComma)
 lexComma = symbol tokComma 
 
-lexColon :: Lexer () -> Lexer (Token tokColon)
+lexColon :: LexerF (Token tokColon)
 lexColon = symbol tokColon 
 
-lexSemi :: Lexer () -> Lexer (Token tokSemi)
+lexSemi :: LexerF (Token tokSemi)
 lexSemi = symbol tokSemi 
 
-lexAssign :: Lexer () -> Lexer (Token tokAssign)
+lexAssign :: LexerF (Token tokAssign)
 lexAssign = symbol tokAssign 
 
-lexSpecStart :: Lexer () -> Lexer (Token tokSpecStart)
+lexSpecStart :: LexerF (Token tokSpecStart)
 lexSpecStart = symbol tokSpecStart 
 
-lexSpecEnd :: Lexer () -> Lexer (Token tokSpecEnd)
+lexSpecEnd :: LexerF (Token tokSpecEnd)
 lexSpecEnd = symbol tokSpecEnd 
 
-lexParenStart :: Lexer () -> Lexer (Token tokParenStart)
+lexParenStart :: LexerF (Token tokParenStart)
 lexParenStart = symbol tokParenStart 
 
-lexParenEnd :: Lexer () -> Lexer (Token tokParenEnd)
+lexParenEnd :: LexerF (Token tokParenEnd)
 lexParenEnd = symbol tokParenEnd 
 
-lexBracketStart :: Lexer () -> Lexer (Token tokBracketStart)
+lexBracketStart :: LexerF (Token tokBracketStart)
 lexBracketStart = symbol tokBracketStart 
 
-lexBracketEnd :: Lexer () -> Lexer (Token tokBracketEnd)
+lexBracketEnd :: LexerF (Token tokBracketEnd)
 lexBracketEnd = symbol tokBracketEnd 
 
-lexBraceStart :: Lexer () -> Lexer (Token tokBraceStart)
+lexBraceStart :: LexerF (Token tokBraceStart)
 lexBraceStart = symbol tokBraceStart 
 
-lexBraceEnd :: Lexer () -> Lexer (Token tokBraceEnd)
+lexBraceEnd :: LexerF (Token tokBraceEnd)
 lexBraceEnd = symbol tokBraceEnd 
 
-lexQuantStarts :: Lexer () -> Lexer (Either (Token tokQuantStarts) (Token tokQuantStartU))
-lexQuantStarts sc' = choice [Left <$> symbol tokQuantStarts sc', Right <$> symbol tokQuantStartU sc']
+lexQuantStarts :: LexerF (Either (Token tokQuantStarts) (Token tokQuantStartU))
+lexQuantStarts = choice [Left <$> symbol tokQuantStarts, Right <$> symbol tokQuantStartU]
 
-lexQuantEnds :: Lexer () -> Lexer (Either (Token tokQuantEnds) (Token tokQuantEndU))
-lexQuantEnds sc' = choice [Left <$> symbol tokQuantEnds sc', Right <$> symbol tokQuantEndU sc'] 
+lexQuantEnds :: LexerF (Either (Token tokQuantEnds) (Token tokQuantEndU))
+lexQuantEnds = choice [Left <$> symbol tokQuantEnds, Right <$> symbol tokQuantEndU] 
 
-lexProofStart :: Lexer () -> Lexer (Token tokProofStart)
+lexProofStart :: LexerF (Token tokProofStart)
 lexProofStart = symbol tokProofStart 
 
-lexProofEnd :: Lexer () -> Lexer (Token tokProofEnd)
+lexProofEnd :: LexerF (Token tokProofEnd)
 lexProofEnd = symbol tokProofEnd 
 
-lexBackSlash :: Lexer () -> Lexer (Token tokBackSlash)
+lexBackSlash :: LexerF (Token tokBackSlash)
 lexBackSlash = symbol tokBackSlash 
 
 ------------------------------------------
 -- Operators
 ------------------------------------------
 
-lexEQ' :: Lexer () -> Lexer (Token tokEQ)
+lexEQ' :: LexerF (Token tokEQ)
 lexEQ' = symbol tokEQ 
 
-lexEQ :: Lexer () -> Lexer Op
-lexEQ sc' = Syntax.Concrete.EQ . locOf <$> symbol tokEQ sc'
+lexEQ :: LexerF Op
+lexEQ = Syntax.Concrete.EQ . locOf <$> symbol tokEQ 
 
-lexNEQ :: Lexer () -> Lexer Op
-lexNEQ sc' = NEQ . locOf <$> symbol tokNEQ sc'
+lexNEQ :: LexerF Op
+lexNEQ = NEQ . locOf <$> symbol tokNEQ 
 
-lexNEQU :: Lexer () -> Lexer Op
-lexNEQU sc' = NEQU . locOf <$> symbol tokNEQU sc'
+lexNEQU :: LexerF Op
+lexNEQU = NEQU . locOf <$> symbol tokNEQU 
 
-lexGT :: Lexer () -> Lexer Op
-lexGT sc' =  Syntax.Concrete.GT . locOf <$> symbol tokGT sc' 
+lexGT :: LexerF Op
+lexGT =  Syntax.Concrete.GT . locOf <$> symbol tokGT
 
-lexGTE :: Lexer () -> Lexer Op
-lexGTE sc' = GTE . locOf <$> symbol tokGTE sc'
+lexGTE :: LexerF Op
+lexGTE = GTE . locOf <$> symbol tokGTE 
 
-lexGTEU :: Lexer () -> Lexer Op
-lexGTEU sc' = GTEU . locOf <$> symbol tokGTEU sc'
+lexGTEU :: LexerF Op
+lexGTEU = GTEU . locOf <$> symbol tokGTEU 
 
-lexLT :: Lexer () -> Lexer Op
-lexLT sc' = Syntax.Concrete.LT . locOf <$> symbol tokLT sc'
+lexLT :: LexerF Op
+lexLT = Syntax.Concrete.LT . locOf <$> symbol tokLT 
 
-lexLTE :: Lexer () -> Lexer Op
-lexLTE sc' = LTE . locOf <$> symbol tokLTE sc'
+lexLTE :: LexerF Op
+lexLTE = LTE . locOf <$> symbol tokLTE 
 
-lexLTEU :: Lexer () -> Lexer Op
-lexLTEU sc' = LTEU . locOf <$> symbol tokLTEU sc'
+lexLTEU :: LexerF Op
+lexLTEU = LTEU . locOf <$> symbol tokLTEU 
 
-lexImpl :: Lexer () -> Lexer Op
-lexImpl sc' = Implies . locOf <$> symbol tokImpl sc'
+lexImpl :: LexerF Op
+lexImpl = Implies . locOf <$> symbol tokImpl
 
-lexImplU :: Lexer () -> Lexer Op
-lexImplU sc' = ImpliesU . locOf <$> symbol tokImplU sc'
+lexImplU :: LexerF Op
+lexImplU = ImpliesU . locOf <$> symbol tokImplU
 
-lexConj :: Lexer () -> Lexer Op
-lexConj sc' = Conj . locOf <$> symbol tokConj sc'
+lexConj :: LexerF Op
+lexConj = Conj . locOf <$> symbol tokConj
 
-lexConjU :: Lexer () -> Lexer Op
-lexConjU sc' = ConjU . locOf <$> symbol tokConjU sc'
+lexConjU :: LexerF Op
+lexConjU = ConjU . locOf <$> symbol tokConjU
 
-lexDisj :: Lexer () -> Lexer Op
-lexDisj sc' = Disj . locOf <$> symbol tokDisj sc'
+lexDisj :: LexerF Op
+lexDisj = Disj . locOf <$> symbol tokDisj
 
-lexDisjU :: Lexer () -> Lexer Op
-lexDisjU sc' = DisjU . locOf <$> symbol tokDisjU sc'
+lexDisjU :: LexerF Op
+lexDisjU = DisjU . locOf <$> symbol tokDisjU
 
-lexNeg :: Lexer () -> Lexer Op
-lexNeg sc' = Neg . locOf <$> symbol tokNeg sc'
+lexNeg :: LexerF Op
+lexNeg = Neg . locOf <$> symbol tokNeg
 
-lexNegU :: Lexer () -> Lexer Op
-lexNegU sc' = NegU . locOf <$> symbol tokNegU sc'
+lexNegU :: LexerF Op
+lexNegU = NegU . locOf <$> symbol tokNegU
 
-lexAdd :: Lexer () -> Lexer Op
-lexAdd sc' = Add . locOf <$> symbol tokAdd sc'
+lexAdd :: LexerF Op
+lexAdd = Add . locOf <$> symbol tokAdd
 
-lexSub :: Lexer () -> Lexer Op
-lexSub sc' = Sub . locOf <$> symbol tokSub sc'
+lexSub :: LexerF Op
+lexSub = Sub . locOf <$> symbol tokSub
 
-lexMul :: Lexer () -> Lexer Op
-lexMul sc' = Mul . locOf <$> symbol tokMul sc'
+lexMul :: LexerF Op
+lexMul = Mul . locOf <$> symbol tokMul
 
-lexDiv :: Lexer () -> Lexer Op
-lexDiv sc' = Div . locOf <$> symbol tokDiv sc'
+lexDiv :: LexerF Op
+lexDiv = Div . locOf <$> symbol tokDiv
 
-lexMod :: Lexer () -> Lexer Op
-lexMod sc' = Mod . locOf <$> symbol tokMod sc'
+lexMod :: LexerF Op
+lexMod = Mod . locOf <$> symbol tokMod
 
-lexOps :: Lexer () -> Lexer Op
-lexOps sc' = choice (fmap (\f -> f sc') [
+lexOps :: LexerF Op
+lexOps = choice [
     lexEQ, lexNEQ, lexNEQU, 
     lexGT, lexGTE, lexGTEU,
     lexLT, lexLTE, lexLTEU,
     lexImpl, lexImplU,
     lexConj, lexConjU, lexDisj, lexDisjU,
     lexNeg, lexNEQU, lexAdd, lexSub, lexMul, lexDiv, lexMod
-  ]) <?> "operators"
+  ] <?> "operators"
 
 ------------------------------------------
 -- literals
 ------------------------------------------
 
-lexUpper :: Lexer () -> Lexer (Text, Loc)
-lexUpper sc' = withPredicate notLowerKeyword . lexeme sc' $ do
+lexUpper :: LexerF (Text, Loc)
+lexUpper = withPredicate notLowerKeyword . lexeme $ do
   x <- upperChar
   xs <- many . choice $ [alphaNumChar , char '_', char '\'']
   return $ tokensToChunk (Proxy :: Proxy Text) (x : xs)
 
-lexLower :: Lexer () -> Lexer (Text, Loc)
-lexLower sc' = withPredicate notLowerKeyword . lexeme sc' $ do
+lexLower :: LexerF (Text, Loc)
+lexLower = withPredicate notLowerKeyword . lexeme $ do
   x <- lowerChar 
   xs <- many . choice $ [alphaNumChar, char '_', char '\'']
   return $ tokensToChunk (Proxy :: Proxy Text) (x : xs)
 
-lexTrue :: Lexer () -> Lexer Lit
-lexTrue = (LitBool True . locOf) <$.> symbol "True"
+lexTrue :: LexerF Lit
+lexTrue = LitBool True . locOf <$> symbol "True"
 
-lexFalse :: Lexer () -> Lexer Lit
-lexFalse = (LitBool False . locOf) <$.> symbol "False"
+lexFalse :: LexerF Lit
+lexFalse = LitBool False . locOf <$> symbol "False"
 
-lexInt :: Lexer () -> Lexer Lit
-lexInt sc' = uncurry LitInt <$> lexeme sc' Lex.decimal
+lexInt :: LexerF Lit
+lexInt = uncurry LitInt <$> lexeme Lex.decimal
 
-lexLits :: Lexer () -> Lexer Lit
-lexLits sc' = f [lexTrue, lexFalse, lexInt] <?> "literals"
-  where
-    f = choice . map (\g -> g sc')
+lexLits :: LexerF Lit
+lexLits = choice [lexTrue, lexFalse, lexInt] <?> "literals"
 
-lexTypeInt :: Lexer () -> Lexer (Token tokTypeInt)
+lexTypeInt :: LexerF (Token tokTypeInt)
 lexTypeInt = symbol tokTypeInt
 
-lexTypeBool :: Lexer () -> Lexer (Token tokTypeBool)
+lexTypeBool :: LexerF (Token tokTypeBool)
 lexTypeBool = symbol tokTypeBool
 
-lexTypeChar :: Lexer () -> Lexer (Token tokTypeChar)
+lexTypeChar :: LexerF (Token tokTypeChar)
 lexTypeChar = symbol tokTypeChar
 
 
@@ -299,15 +297,16 @@ withLoc p = do
   loc <- locOf <$> p
   return (x, loc)
 
-notFollowedBySymbol :: Lexer a -> Lexer a
+notFollowedBySymbol :: LexerF a -> LexerF a
 notFollowedBySymbol m = m <* notFollowedBy (satisfy isSymbol)
 
-withPredicate :: (a -> Bool) -> Lexer (a, Loc) -> Lexer (a, Loc)
-withPredicate f p = do
-  o <- getOffset
-  (r, loc) <- p
-  if f r
-    then return (r, loc)
-    else do
-      setOffset o
-      fail "using keyword as variable name"
+withPredicate :: (a -> Bool) -> LexerF (a, Loc) -> LexerF (a, Loc)
+withPredicate f p = (↑) (\sc' -> do
+    o <- getOffset
+    (r, loc) <- (↓) p sc'
+    if f r
+      then return (r, loc)
+      else do
+        setOffset o
+        fail "using keyword as variable name"
+  )
