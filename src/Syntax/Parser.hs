@@ -10,10 +10,10 @@ import Control.Monad.Combinators.Expr (Operator (..), makeExprParser)
 import Data.Loc (Located (locOf))
 import Data.Text.Lazy (Text)
 import qualified Data.Ord as Ord
-import Syntax.Concrete (Declaration (..), EndpointClose (..), EndpointOpen (..), Expr (..), GdCmd (..), Interval (..), Name (..), Op (..), Program (..), SepBy (..), Stmt (..), TBase (..), Token, Type (..))
+import Syntax.Concrete (Declaration (..), EndpointClose (..), EndpointOpen (..), Expr (..), GdCmd (..), Interval (..), Name (..), Op (..), Program (..), SepBy (..), Stmt (..), TBase (..), Token (..), Type (..))
 import Syntax.Parser.Lexer
 import Syntax.Parser.Util
-import Text.Megaparsec (MonadParsec (..), parse, (<?>))
+import Text.Megaparsec (MonadParsec (..), parse, (<?>), skipManyTill, anySingle)
 import qualified Text.Megaparsec.Char.Lexer as Lex
 import Control.Monad (void)
 import Control.Monad.Trans (lift)
@@ -364,9 +364,12 @@ pIndentSepBy start end m = do
   ref <- Lex.indentLevel
   case m of
     Nothing -> do
-      ts <- (↓) start . void $ (try (Lex.indentGuard scn Ord.EQ ref) <|> Lex.indentGuard scn Ord.GT ref)
-      te <- (↓) end sc
-      return (ts, Nothing, te)
+      ts <- (↓) start sc
+      te <- skipManyTill anySingle ((↓) end sc)
+      let pos = getTokenColumn te
+      if compare pos ref == Ord.LT
+        then Lex.incorrectIndent Ord.EQ pos ref
+        else return (ts, Nothing, te)
     Just (p, delim) -> do
       -- parse start token and guard the indentation level
       ts <- (↓) start . void . Lex.indentGuard scn Ord.GT $ ref
