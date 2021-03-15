@@ -5,7 +5,7 @@
 module Syntax.Parser.Lexer where
 
 import Control.Monad (void)
-import Control.Applicative.Combinators ((<|>), choice, some, many)
+import Control.Applicative.Combinators ((<|>), choice, some, many, skipMany)
 import Data.Void (Void)
 import Data.Proxy (Proxy(Proxy))
 import Data.Char (isSymbol, isSpace)

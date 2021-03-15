@@ -6,14 +6,15 @@
 module Syntax.Parser.Util where
 
 import Data.Text.Lazy (Text)
-import Text.Megaparsec (setParserState, MonadParsec(..),  unPos, SourcePos(..), errorOffset, Stream(..), ParseError(..), ParseErrorBundle(..), ShowErrorComponent, PosState(..), State (..))
+import Text.Megaparsec (setParserState, MonadParsec(..),  unPos, SourcePos(..), errorOffset, Stream(..), ParseError(..), ParseErrorBundle(..), ShowErrorComponent, PosState(..), State (..), mkPos, Pos)
 import Text.Megaparsec.Error (parseErrorTextPretty)
-import Data.Loc (Loc(..))
+import Data.Loc (Loc(..), posCol)
 import qualified Data.Loc as Loc
 import Control.Monad.Trans (MonadTrans, lift)
 import Control.Applicative (Alternative(..))
 import Control.Monad (MonadPlus)
 import Data.Coerce (coerce)
+import Syntax.Concrete (Token(Token))
 
 
 ------------------------------------------
@@ -82,6 +83,9 @@ getSourcePos' = do
   let pst = reachOffsetNoLine (stateOffset st - 1) (statePosState st)
   setParserState st {statePosState = pst}
   return (pstateSourcePos pst)
+
+getTokenColumn :: Syntax.Concrete.Token e -> Text.Megaparsec.Pos
+getTokenColumn (Token s _) = mkPos . posCol $ s
 
 sourceToLoc :: SourcePos -> Loc
 sourceToLoc SourcePos{..} = Loc.locOf $ Loc.Pos sourceName (unPos sourceLine) (unPos sourceColumn) 0
