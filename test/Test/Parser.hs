@@ -33,15 +33,15 @@ import Control.Monad.Except (runExcept, withExcept, liftEither)
 import Syntax.Parser.Token
 import Syntax.Concrete (Type(..), TBase (..))
 import Data.Loc (Located(locOf))
-import Text.Megaparsec (Stream(reachOffset), setOffset, getOffset, MonadParsec(updateParserState, getParserState, observing, lookAhead, try), State(State, statePosState, stateInput, stateOffset))
+import Text.Megaparsec (Stream(reachOffset), setOffset, getOffset, MonadParsec(updateParserState, getParserState, observing, lookAhead, try), State(State, statePosState, stateInput, stateOffset), getInput)
 import Control.Monad.Combinators (optional, many, (<|>))
 import qualified Data.Ord as Ord
 import Control.Monad (void)
 import Syntax.Parser.Util (parser, (↓))
 
 tests :: TestTree
-tests = testGroup "Prettifier" [golden]
--- tests = testGroup "Prettifier" [expression, type', declaration, statement, parseError, golden]
+-- tests = testGroup "Prettifier" [myTest]
+tests = testGroup "Prettifier" [expression, type', declaration, statement, parseError, golden]
 
 --------------------------------------------------------------------------------
 
@@ -74,11 +74,31 @@ myTest =
     "conjective chain"
     [
       testCase "a + 1 <= b + 2 < c + 3" $ run "a + 1 <= b + 2 < c + 3",
-      testCase "a  + 1 < b" $ run "a + 1 < b"
+      testCase "a  + 1 < b" $ run "a + 1 < b",
+      testCase "do indentation" $ runDo
+        "  do\n\
+        \ y /= 1 ->\n\
+        \skip\n\
+        \  od\n"
     ]
     where
       run = isomorphic ((↓) pExpr' sc)
       run' t = show (parse ((↓) pExpr' sc) t) @?= ""
+      runDo t = show (parse wrap t) @?= ""
+      wrap = do
+        scn
+        ref <- Lex.indentLevel
+        -- (↓) lexDo scn
+        -- indentGuard' scn Ord.GT ref
+        (↓) lexDo (void $ Lex.indentGuard scn Ord.GT ref)
+        -- pos <- Lex.indentLevel
+        -- if Ord.compare pos ref == Ord.GT
+        --   then do
+        --     pGdCmd 
+        --     i <- getInput
+        --     return (ref, pos, Ord.compare pos ref, i)
+        --   else
+        --     Lex.incorrectIndent Ord.GT ref pos
 
 -- | Expression
 expression :: TestTree

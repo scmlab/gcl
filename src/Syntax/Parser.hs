@@ -1,8 +1,6 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE OverloadedStrings #-}
--- {-# OPTIONS_GHC -fwarn-incomplete-patterns #-}
-
--- {-# OPTIONS_GHC -Wno-deferred-type-errors #-}
+{-# LANGUAGE PartialTypeSignatures #-}
 module Syntax.Parser where
 
 import Control.Applicative.Combinators (choice, many, sepBy1, (<|>))
@@ -13,7 +11,7 @@ import qualified Data.Ord as Ord
 import Syntax.Concrete (Declaration (..), EndpointClose (..), EndpointOpen (..), Expr (..), GdCmd (..), Interval (..), Name (..), Op (..), Program (..), SepBy (..), Stmt (..), TBase (..), Token (..), Type (..))
 import Syntax.Parser.Lexer
 import Syntax.Parser.Util
-import Text.Megaparsec (MonadParsec (..), parse, (<?>), skipManyTill, anySingle)
+import Text.Megaparsec (MonadParsec (..), parse, (<?>), skipManyTill, anySingle, Pos)
 import qualified Text.Megaparsec.Char.Lexer as Lex
 import Control.Monad (void)
 import Control.Monad.Trans (lift)
@@ -160,13 +158,16 @@ pIf = do
     (tIf, gdcmds, tFi) <- pIfoDoHelper lexIf lexFi
     return $ If tIf gdcmds tFi
 
-pGdCmd :: Parser GdCmd
-pGdCmd = Lex.indentBlock scn p
+pGdCmd :: ParserF GdCmd
+pGdCmd = (↑) (Lex.indentBlock scn . p)
   where
-    p = do
-      ref <- Lex.indentLevel
+    p :: Parser () -> Parser (Lex.IndentOpt Parser GdCmd Stmt)
+    p sc' = do
+      -- ref <- Lex.indentLevel
       gd <- pExpr
-      arrow <- parser lexArrow . void $ Lex.indentGuard scn Ord.GT ref
+      arrow <- (↓) lexArrow sc
+      -- indentGTE ref scn
+      sc'
       pos <- Lex.indentLevel
       s0 <- pStmt
       return $ Lex.IndentMany (Just pos) (\ss -> return $ GdCmd gd arrow (s0 : ss) ) pStmt
@@ -238,9 +239,6 @@ pExpr' = makeExprParser pExprArith chainOpTable <* (↑) (\sc' -> try sc' <|> sc
 
 chainOpTable :: [[Operator ParserF Expr]]
 chainOpTable = [
-    [InfixL . pChain . choice $ [lexConj, lexConjU]],
-    [InfixL . pChain . choice $ [lexDisj, lexDisjU]],
-    [InfixL . pChain . choice $ [lexImpl, lexImplU]],
     [
       InfixL . pChain . choice $ [lexNEQ, lexNEQU],
       InfixL . pChain $ lexLT,
@@ -248,7 +246,10 @@ chainOpTable = [
       InfixL . pChain $ lexGT,
       InfixL . pChain . choice $ [lexGTE, lexGTEU]
     ],
-    [InfixL . pChain $ lexEQ]
+    [InfixL . pChain $ lexEQ],
+    [InfixL . pBinary . choice $ [lexConj, lexConjU]],
+    [InfixL . pBinary . choice $ [lexDisj, lexDisjU]],
+    [InfixL . pBinary . choice $ [lexImpl, lexImplU]]
   ]
 
 pExprArith :: ParserF Expr
@@ -354,11 +355,10 @@ pSpecProofHelper start end = do
   (ts, Nothing, te) <- pIndentSepBy start end Nothing
   return (ts, te)
 
-
 pIndentSepBy ::
   ParserF (Token s)
   -> ParserF (Token e)
-  -> Maybe (Parser a, ParserF (Token sep))
+  -> Maybe (ParserF a, ParserF (Token sep))
   -> Parser (Token s, Maybe (SepBy sep a), Token e)
 pIndentSepBy start end m = do
   ref <- Lex.indentLevel
@@ -372,21 +372,31 @@ pIndentSepBy start end m = do
         else return (ts, Nothing, te)
     Just (p, delim) -> do
       -- parse start token and guard the indentation level
-      ts <- (↓) start . void . Lex.indentGuard scn Ord.GT $ ref
-      -- indentation position
-      pos <- Lex.indentLevel
+      ts <- (↓) start sc
       -- start parsing p
-      ps <- parsep pos 
-      void $ try (Lex.indentGuard scn Ord.EQ ref) <|> Lex.indentGuard scn Ord.GT ref
+      ps <- parseP
+      indentGTE ref scn
       te <- (↓) end sc
       return (ts, Just ps, te)
       where
-        parsep pos = do
-            x <- p
-            let g1 = return (Head x)
-            let g2 = do
-                  void $ Lex.indentGuard scn Ord.GT ref
-                  tok <- parser delim (void $ Lex.indentGuard sc Ord.EQ pos)
-                  Delim x tok <$> parsep pos
-            try g2 <|> g1
+        parseP = do
+          gdPos <- Lex.indentGuard scn Ord.GT ref
+          x <- (↓) p . void $ Lex.indentGuard scn Ord.GT ref
+          let g = do
+                delimPos <- Lex.indentGuard scn Ord.GT ref
+                if compare delimPos gdPos == Ord.LT 
+                  then Delim x <$> (↓) delim sc <*> parseP' gdPos delimPos
+                  else Lex.incorrectIndent Ord.LT gdPos delimPos
+          try g <|> return (Head x)
 
+        parseP' gdPos delimPos = do
+          void $ Lex.indentGuard sc Ord.EQ gdPos
+          -- x <- (↓) p sc
+          x <- (↓) p . void $ Lex.indentGuard scn Ord.GT ref
+          let g = do
+                void $ Lex.indentGuard scn Ord.EQ delimPos
+                Delim x <$> (↓) delim sc <*> parseP' gdPos delimPos
+          try g <|> return (Head x)
+                  
+indentGTE :: Pos -> Parser () -> Parser ()
+indentGTE ref sc' = void $ try (Lex.indentGuard sc' Ord.EQ ref) <|> Lex.indentGuard sc' Ord.GT ref
