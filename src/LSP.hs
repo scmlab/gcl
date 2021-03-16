@@ -243,10 +243,6 @@ toLSPSideEffects _lspID (Req filepath source kind) = handle kind
       let version = Just 0
 
       publishDiagnostics 100 fileUri version (partitionBySource diags)
-
-      -- send response
-      let response = toResponse (IdInt 0) $ Req filepath source ReqLoad
-      sendNotification (SCustomMethod "guacamole") $ JSON.toJSON response
       where
         errorToDiagnostics :: Error -> [Diagnostic]
         errorToDiagnostics (LexicalError pos) = [makeError (Loc pos pos) "Lexical error" ""]
