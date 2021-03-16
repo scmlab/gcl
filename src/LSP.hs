@@ -15,7 +15,7 @@ import Data.Aeson (FromJSON, ToJSON)
 import qualified Data.Aeson as JSON
 import Data.List (sort)
 import Data.Loc (Loc (..), Located (locOf), Pos (..), posCoff, posFile)
-import Data.Text (Text)
+import Data.Text (Text, pack)
 import qualified Data.Text as Text
 import qualified Data.Text.IO as Text
 import qualified Data.Text.Lazy as LazyText
@@ -126,17 +126,23 @@ handlers =
   mconcat
     [ -- custom methods, not part of LSP
       requestHandler (SCustomMethod "guacamole") $ \req responder -> do
-        writeLog "SCustomMethod"
+        
         let RequestMessage _ i _ params = req
         -- JSON Value => Request => Response
         response <- case JSON.fromJSON params of
-          JSON.Error msg -> return $ CannotDecodeRequest $ show msg ++ "\n" ++ show params
-          JSON.Success request -> handleRequest i request
+          JSON.Error msg -> do 
+            writeLog " --> CustomMethod: CannotDecodeRequest"
+            return $ CannotDecodeRequest $ show msg ++ "\n" ++ show params
+          JSON.Success request -> do 
+            writeLog $ " --> Custom Reqeust: " <> pack (show request)
+            handleRequest i request
+
+        writeLog $ " <-- " <> pack (show response)
         -- respond with the Response
         responder $ Right $ JSON.toJSON response,
       -- when the client saved the document
       notificationHandler STextDocumentDidSave $ \ntf -> do
-        writeLog "STextDocumentDidSave"
+        writeLog " --> TextDocumentDidSave"
         let NotificationMessage _ _ (DidSaveTextDocumentParams (TextDocumentIdentifier uri) text) = ntf
         case text of
           Just source ->
@@ -144,16 +150,18 @@ handlers =
               Nothing -> pure ()
               Just filepath -> do
                 response <- handleRequest (IdInt 0) (Req filepath source ReqLoad)
+                writeLog $ " <-- " <> pack (show response)
                 sendNotification (SCustomMethod "guacamole") $ JSON.toJSON response
           Nothing -> pure (),
       -- when the client opened the document
       notificationHandler STextDocumentDidOpen $ \ntf -> do
-        writeLog "STextDocumentDidOpen"
+        writeLog " --> TextDocumentDidOpen"
         let NotificationMessage _ _ (DidOpenTextDocumentParams (TextDocumentItem uri _ _ source)) = ntf
         case uriToFilePath uri of
           Nothing -> pure ()
           Just filepath -> do
             response <- handleRequest (IdInt 0) (Req filepath source ReqLoad)
+            writeLog $ " <-- " <> pack (show response)
             sendNotification (SCustomMethod "guacamole") $ JSON.toJSON response
     ]
 
@@ -454,10 +462,21 @@ data ReqKind
 
 instance FromJSON ReqKind
 
+instance Show ReqKind where 
+  show ReqLoad = "Load"
+  show (ReqInspect x y) = "Inspect " <> show x <> " " <> show y
+  show (ReqRefine i x) = "Refine #" <> show i <> " " <> show x
+  show (ReqSubstitute i x y) = "Substitute #" <> show i <> " " <> show x <> " => " <> show y
+  show ReqExportProofObligations = "ExportProofObligations"
+  show ReqDebug = "Debug"
+
 data Request = Req FilePath Text ReqKind
   deriving (Generic)
 
 instance FromJSON Request
+
+instance Show Request where 
+  show (Req _path _content kind) = show kind 
 
 --------------------------------------------------------------------------------
 
@@ -472,10 +491,24 @@ data ResKind
 
 instance ToJSON ResKind
 
+instance Show ResKind where 
+  show (ResOK i pos specs props) = "OK " <> show i <> " " 
+    <> show (length pos) <> " pos, "
+    <> show (length specs) <> " specs, "
+    <> show (length props) <> " props"
+  show (ResError errors) = "Error " <> show (length errors) <> " errors"
+  show (ResResolve i) = "Resolve " <> show i
+  show (ResSubstitute i _) = "Substitute " <> show i
+  show (ResConsoleLog x) = "ConsoleLog " <> show x
+
 data Response = Res FilePath [ResKind] | CannotDecodeRequest String
   deriving (Generic)
 
 instance ToJSON Response
+
+instance Show Response where 
+  show (Res _path kinds) = show kinds 
+  show (CannotDecodeRequest s) = "CannotDecodeRequest " <> s
 
 --------------------------------------------------------------------------------
 
