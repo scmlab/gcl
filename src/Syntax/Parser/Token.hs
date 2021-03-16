@@ -79,10 +79,10 @@ tokAssign :: Text
 tokAssign = ":="
 
 tokSpecStart :: Text
-tokSpecStart = "{!"
+tokSpecStart = "[!"
 
 tokSpecEnd :: Text
-tokSpecEnd = "!}"
+tokSpecEnd = "!]"
 
 tokParenStart :: Text
 tokParenStart = "("

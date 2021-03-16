@@ -100,7 +100,7 @@ data Stmt
   | Do (Token "do") (SepBy "|" GdCmd) (Token "od")
   | If (Token "if") (SepBy "|" GdCmd) (Token "fi")
   | SpecQM Loc -- ? to be rewritten as {!!} by the frontend
-  | Spec (Token "{!") (Token "!}")
+  | Spec (Token "[!") (Token "!]")
   | Proof (Token "{-") (Token "-}")
   deriving (Eq, Show)
 
