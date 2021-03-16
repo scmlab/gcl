@@ -9,6 +9,6 @@ main :: IO ()
 main = defaultMain tests
 
 tests :: TestTree
-tests = testGroup "Tests" [Type.tests, Parser.tests]
+tests = testGroup "Tests" [Parser.tests]
 -- tests = testGroup "Tests" [Type.tests]
     -- [Lexer.tests, Parser.tests, Concrete.tests, WP.tests]

@@ -33,11 +33,11 @@ import Control.Monad.Except (runExcept, withExcept, liftEither)
 import Syntax.Parser.Token
 import Syntax.Concrete (Type(..), TBase (..))
 import Data.Loc (Located(locOf))
-import Text.Megaparsec (Stream(reachOffset), setOffset, getOffset, MonadParsec(updateParserState, getParserState, observing, lookAhead, try), State(State, statePosState, stateInput, stateOffset), getInput)
+import Text.Megaparsec (Stream(reachOffset), setOffset, getOffset, MonadParsec(updateParserState, getParserState, observing, lookAhead, try), State(State, statePosState, stateInput, stateOffset), getInput, getSourcePos)
 import Control.Monad.Combinators (optional, many, (<|>))
 import qualified Data.Ord as Ord
 import Control.Monad (void)
-import Syntax.Parser.Util (parser, (↓))
+import Syntax.Parser.Util (parser, (↓), getCurLoc)
 
 tests :: TestTree
 -- tests = testGroup "Prettifier" [myTest]
@@ -71,34 +71,31 @@ compare parser actual expected = removeWhitespace (render (parse parser actual))
 myTest :: TestTree
 myTest = 
   testGroup
-    "conjective chain"
+    "pos test"
     [
-      testCase "a + 1 <= b + 2 < c + 3" $ run "a + 1 <= b + 2 < c + 3",
-      testCase "a  + 1 < b" $ run "a + 1 < b",
-      testCase "do indentation" $ runDo
-        "  do\n\
-        \ y /= 1 ->\n\
-        \skip\n\
-        \  od\n"
+      testCase "pos test" $ run 
+        "a := a + 1"
     ]
     where
-      run = isomorphic ((↓) pExpr' sc)
-      run' t = show (parse ((↓) pExpr' sc) t) @?= ""
-      runDo t = show (parse wrap t) @?= ""
+      run t = show (parse wrap' t) @?= ""
+      wrap' = do
+        a1 <- (↓) (symbol "a") sc
+        ass <- (↓) (symbol ":=") sc
+        a2 <- (↓) (symbol "a") sc
+        plus <- (↓) (symbol "+") sc
+        one <- (↓) (symbol "1") sc
+        return (a1, ass, a2, plus, one)
+
       wrap = do
-        scn
-        ref <- Lex.indentLevel
-        -- (↓) lexDo scn
-        -- indentGuard' scn Ord.GT ref
-        (↓) lexDo (void $ Lex.indentGuard scn Ord.GT ref)
-        -- pos <- Lex.indentLevel
-        -- if Ord.compare pos ref == Ord.GT
-        --   then do
-        --     pGdCmd 
-        --     i <- getInput
-        --     return (ref, pos, Ord.compare pos ref, i)
-        --   else
-        --     Lex.incorrectIndent Ord.GT ref pos
+        ap <- getCurLoc
+        a <- string "a"
+        ap' <- getCurLoc
+        sc
+        assp <- getCurLoc
+        ass <- string ":="
+        assp' <- getCurLoc
+        return ((a, ap, ap'), (ass, assp, assp'))
+      
 
 -- | Expression
 expression :: TestTree
