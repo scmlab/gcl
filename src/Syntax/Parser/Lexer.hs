@@ -286,10 +286,10 @@ lexTypeChar = symbol tokTypeChar
 
 getLoc :: Lexer a -> Lexer (a, Loc)
 getLoc m = do
-  start <- getSourcePos
+  start <- getCurLoc
   x <- m
-  end <- getSourcePos' 
-  return (x, sourceToLoc start <--> sourceToLoc end)
+  end <- getEndLoc
+  return (x, start <--> end)
 
 withLoc :: Located a => Lexer a -> Lexer (a, Loc)
 withLoc p = do

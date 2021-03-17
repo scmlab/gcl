@@ -65,11 +65,11 @@ instance PrettyWithLoc (Token "|>") where
 instance PrettyWithLoc (Token "⟩") where
   prettyWithLoc (Token l r) = DocWithLoc "⟩" l r
 
-instance PrettyWithLoc (Token "{!") where
-  prettyWithLoc (Token l r) = DocWithLoc "{!" l r
+instance PrettyWithLoc (Token "[!") where
+  prettyWithLoc (Token l r) = DocWithLoc "[!" l r
 
-instance PrettyWithLoc (Token "!}") where
-  prettyWithLoc (Token l r) = DocWithLoc "!}" l r
+instance PrettyWithLoc (Token "!]") where
+  prettyWithLoc (Token l r) = DocWithLoc "!]" l r
 
 instance PrettyWithLoc (Token "{-") where
   prettyWithLoc (Token l r) = DocWithLoc "{-" l r

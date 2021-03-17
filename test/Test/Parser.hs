@@ -33,15 +33,15 @@ import Control.Monad.Except (runExcept, withExcept, liftEither)
 import Syntax.Parser.Token
 import Syntax.Concrete (Type(..), TBase (..))
 import Data.Loc (Located(locOf))
-import Text.Megaparsec (Stream(reachOffset), setOffset, getOffset, MonadParsec(updateParserState, getParserState, observing, lookAhead, try), State(State, statePosState, stateInput, stateOffset))
+import Text.Megaparsec (Stream(reachOffset), setOffset, getOffset, MonadParsec(updateParserState, getParserState, observing, lookAhead, try), State(State, statePosState, stateInput, stateOffset), getInput, getSourcePos)
 import Control.Monad.Combinators (optional, many, (<|>))
 import qualified Data.Ord as Ord
 import Control.Monad (void)
-import Syntax.Parser.Util (parser, (↓))
+import Syntax.Parser.Util (parser, (↓), getCurLoc)
 
 tests :: TestTree
-tests = testGroup "Prettifier" [golden]
--- tests = testGroup "Prettifier" [expression, type', declaration, statement, parseError, golden]
+-- tests = testGroup "Prettifier" [myTest]
+tests = testGroup "Prettifier" [expression, type', declaration, statement, parseError, golden]
 
 --------------------------------------------------------------------------------
 
@@ -71,14 +71,31 @@ compare parser actual expected = removeWhitespace (render (parse parser actual))
 myTest :: TestTree
 myTest = 
   testGroup
-    "conjective chain"
+    "pos test"
     [
-      testCase "a + 1 <= b + 2 < c + 3" $ run "a + 1 <= b + 2 < c + 3",
-      testCase "a  + 1 < b" $ run "a + 1 < b"
+      testCase "pos test" $ run 
+        "a := a + 1"
     ]
     where
-      run = isomorphic ((↓) pExpr' sc)
-      run' t = show (parse ((↓) pExpr' sc) t) @?= ""
+      run t = show (parse wrap' t) @?= ""
+      wrap' = do
+        a1 <- (↓) (symbol "a") sc
+        ass <- (↓) (symbol ":=") sc
+        a2 <- (↓) (symbol "a") sc
+        plus <- (↓) (symbol "+") sc
+        one <- (↓) (symbol "1") sc
+        return (a1, ass, a2, plus, one)
+
+      wrap = do
+        ap <- getCurLoc
+        a <- string "a"
+        ap' <- getCurLoc
+        sc
+        assp <- getCurLoc
+        ass <- string ":="
+        assp' <- getCurLoc
+        return ((a, ap, ap'), (ass, assp, assp'))
+      
 
 -- | Expression
 expression :: TestTree

@@ -80,7 +80,8 @@ typeCheckTests =
   testGroup "Type Check" 
     [
       typeCheckGolden "2" "./test/source/2.gcl",
-      typeCheckGolden "quant1" "./test/source/quant1.gcl"
+      typeCheckGolden "quant1" "./test/source/quant1.gcl",
+      typeCheckGolden "mss" "./examples/mss.gcl"
     ]
 
 typeCheckGolden :: String -> FilePath -> TestTree 

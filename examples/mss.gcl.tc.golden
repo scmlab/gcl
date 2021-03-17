@@ -1,0 +1,15 @@
+con N : Int
+con A : array (0 .. N] of Int
+var m, s, n : Int
+
+let Sum i j = ⟨ + k : i ≤ k < j : A k ⟩
+let P n = m = ⟨ max i j : 0 ≤ i ≤ j ≤ n : Sum i j ⟩
+let Q n = s = ⟨ max i : 0 ≤ i ≤ n : Sum i n ⟩
+
+m, n := 0, 0
+{ P n ∧ Q n ∧ 0 ≤ n ≤ N, bnd: N - n }
+do n ≠ N -> s := max (s + A n) 0
+            m := max m s
+            n := n + 1          
+od
+{ m = ⟨ max i j : 0 ≤ i ≤ j ≤ N : Sum i j ⟩ }
