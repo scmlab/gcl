@@ -45,6 +45,7 @@ import Syntax.Predicate
     Spec,
   )
 import Control.Monad.Reader
+import LSP.ExportPO ()
 
 --------------------------------------------------------------------------------
 
@@ -185,14 +186,11 @@ toResponse lspID (Req filepath source kind) =
   where
     handle :: ReqKind -> [ResKind]
     handle ReqLoad = asGlobalError $ do
-      program@(A.Program _ globalProps _ _ _) <- parseProgram filepath source
-      typeCheck program
-      (pos, specs) <- genPO program
+      (pos, specs, globalProps) <- check filepath source 
 
       return [ResOK lspID pos specs globalProps]
-    handle (ReqInspect selStart selEnd) = ignoreError $ do
-      program@(A.Program _ globalProps _ _ _) <- parseProgram filepath source
-      (pos, specs) <- genPO program
+    handle (ReqInspect selStart selEnd) = asGlobalError $ do
+      (pos, specs, globalProps) <- check filepath source
       -- find the POs whose Range overlaps with the selection
       let isOverlapped po = case locOf po of
             NoLoc -> False
@@ -233,14 +231,10 @@ toLSPSideEffects _lspID (Req filepath source kind) = handle kind
     handle ReqLoad = do
       -- send diagnostics
       diags <- do
-        let reuslt = runM $ do
-              program <- parseProgram filepath source
-              typeCheck program
-              genPO program
-        return $ case reuslt of
+        let result = runM $ check filepath source
+        return $ case result of
           Left err -> errorToDiagnostics err
-          Right (pos, _) ->
-            map proofObligationToDiagnostic pos
+          Right (pos, _, _) -> map proofObligationToDiagnostic pos
       let fileUri = toNormalizedUri (filePathToUri filepath)
       let version = Just 0
 
@@ -330,54 +324,7 @@ toLSPSideEffects _lspID (Req filepath source kind) = handle kind
 
         makeError :: Loc -> Text.Text -> Text.Text -> Diagnostic
         makeError = severityToDiagnostic (Just DsError)
-    handle ReqExportProofObligations = createPOFile
-      where
-        exportFilepath :: Text.Text
-        exportFilepath = Text.pack filepath <> ".md"
-
-        createPOFile :: LspT () ServerM ()
-        createPOFile = do
-          let uri = Uri exportFilepath
-          let createFile = CreateFile uri Nothing
-          let edit = WorkspaceEdit Nothing (Just (List [InR (InL createFile)]))
-          _ <- sendRequest SWorkspaceApplyEdit (ApplyWorkspaceEditParams (Just "create export file") edit) handleCreatePOFile
-          pure ()
-
-        handleCreatePOFile :: Either ResponseError ApplyWorkspaceEditResponseBody -> LspT () ServerM ()
-        handleCreatePOFile (Left (ResponseError _ message _)) = sendNotification SWindowShowMessage (ShowMessageParams MtError $ "Failed to export proof obligations: \n" <> message)
-        handleCreatePOFile (Right (ApplyWorkspaceEditResponseBody False Nothing)) = sendNotification SWindowShowMessage (ShowMessageParams MtWarning $ exportFilepath <> " already existed")
-        handleCreatePOFile (Right _) = exportPOs
-
-        exportPOs :: LspT () ServerM ()
-        exportPOs = do
-          let result = runM $ do
-                program <- parseProgram filepath source
-                (pos, _) <- genPO program
-                return pos
-          case result of
-            Left err -> do
-              let message = Text.pack $ show err
-              sendNotification SWindowShowMessage (ShowMessageParams MtError $ "Failed calculate proof obligations: \n" <> message)
-            Right pos -> do
-              let toMarkdown (PO i pre post _) = pretty i <> "." <+> pretty pre <+> "=>" <+> pretty post
-              let content = renderStrict $ concatWith (\x y -> x <> line <> y) $ map toMarkdown pos
-
-              let identifier = VersionedTextDocumentIdentifier (Uri exportFilepath) (Just 0)
-              let range = Range (Position 0 0) (Position 0 0)
-              let textEdits = [TextEdit range content]
-              -- let textEdits = map (TextEdit range . renderStrict . toMarkdown) pos
-              let textDocEdit = TextDocumentEdit identifier $ List textEdits
-              let edit = WorkspaceEdit Nothing (Just (List [InL textDocEdit]))
-              _ <- sendRequest SWorkspaceApplyEdit (ApplyWorkspaceEditParams (Just "writing proof obligations") edit) handleExportPos
-
-              -- sendNotification SWindowShowMessage (ShowMessageParams MtInfo $ "a\nb")
-              -- sendNotification SWindowLogMessage (LogMessageParams MtInfo $ "a\nb")
-
-              pure ()
-
-        handleExportPos :: Either ResponseError ApplyWorkspaceEditResponseBody -> LspT () ServerM ()
-        handleExportPos (Left (ResponseError _ message _)) = sendNotification SWindowShowMessage (ShowMessageParams MtError $ "Failed to write proof obligations: \n" <> message)
-        handleExportPos (Right message) = sendNotification SWindowShowMessage (ShowMessageParams MtWarning $ Text.pack $ show message)
+    handle ReqExportProofObligations = return ()
     handle _ = pure ()
 
 --------------------------------------------------------------------------------
@@ -422,12 +369,19 @@ parseProgram filepath source = do
 refine :: Text -> M ()
 refine = void . parse pStmts "<specification>"
 
+-- | Type check + generate POs and Specs
+check :: FilePath -> Text -> M ([PO], [Spec], [A.Expr])
+check filepath source = do 
+  program@(A.Program _ globalProps _ _ _) <- parseProgram filepath source
+  typeCheck program
+  (pos, specs) <- genPO program
+  return (pos, specs, globalProps)
+  where 
+    typeCheck :: A.Program -> M ()
+    typeCheck = withExcept TypeError . TypeChecking.checkProg
 
-typeCheck :: A.Program -> M ()
-typeCheck = withExcept TypeError . TypeChecking.checkProg
-
-genPO :: A.Program -> M ([PO], [Spec])
-genPO = withExcept StructError . liftEither . POGen.sweep
+    genPO :: A.Program -> M ([PO], [Spec])
+    genPO = withExcept StructError . liftEither . POGen.sweep
 
 --------------------------------------------------------------------------------
 
