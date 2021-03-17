@@ -3,7 +3,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module GCL.WP where
+module GCL.WP (sweep, StructError(..)) where
 
 import Control.Monad.Except hiding (guard)
 import Control.Monad.Reader hiding (guard)
@@ -259,15 +259,14 @@ instance E.ExpandM SMSubst where
 runSM ::
   SM a ->
   Defns ->
-  (Int, Int, Int) ->
-  Either StructError (((a, [PO]), [Spec]), (Int, Int, Int))
-runSM p defs = runStateT (runWriterT . runWriterT $ runReaderT p defs)
+  Either StructError ((a, [PO]), [Spec])
+runSM p defs = evalStateT (runWriterT . runWriterT $ runReaderT p defs) (0, 0, 0)
 
-runWP :: SM a -> Defns -> Either StructError ((a, [PO]), [Spec])
-runWP p defs = fmap fst $ runSM p defs (0, 0, 0)
+sweep :: A.Program -> Either StructError ([PO], [Spec])
+sweep (A.Program _ _ ds statements _) = do 
+    ((_, pos), specs) <- runSM (structProg statements) ds
+    return (pos, specs)
 
--- censorSpec :: ([Spec] -> [Spec]) -> SM a -> SM a
--- censorSpec f = mapWriterT (censor f)
 
 data StructError
   = MissingAssertion Loc

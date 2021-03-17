@@ -21,8 +21,10 @@ import qualified Data.Text.IO as Text
 import qualified Data.Text.Lazy as LazyText
 import Error
 import GCL.Expr (expand, runSubstM)
-import GCL.Type (TypeError (..), checkProg)
-import GCL.WP (StructError (..), runWP, structProg)
+import qualified GCL.Type as TypeChecking
+import GCL.Type (TypeError(..))
+import qualified GCL.WP as POGen
+import GCL.WP (StructError (..))
 import GHC.Generics (Generic)
 import GHC.IO.IOMode (IOMode (ReadWriteMode))
 import Language.LSP.Diagnostics (partitionBySource)
@@ -184,13 +186,13 @@ toResponse lspID (Req filepath source kind) =
     handle :: ReqKind -> [ResKind]
     handle ReqLoad = asGlobalError $ do
       program@(A.Program _ globalProps _ _ _) <- parseProgram filepath source
-      withExcept TypeError (checkProg program)
-      (pos, specs) <- sweep program
+      typeCheck program
+      (pos, specs) <- genPO program
 
       return [ResOK lspID pos specs globalProps]
     handle (ReqInspect selStart selEnd) = ignoreError $ do
       program@(A.Program _ globalProps _ _ _) <- parseProgram filepath source
-      (pos, specs) <- sweep program
+      (pos, specs) <- genPO program
       -- find the POs whose Range overlaps with the selection
       let isOverlapped po = case locOf po of
             NoLoc -> False
@@ -233,8 +235,8 @@ toLSPSideEffects _lspID (Req filepath source kind) = handle kind
       diags <- do
         let reuslt = runM $ do
               program <- parseProgram filepath source
-              withExcept TypeError (checkProg program)
-              sweep program
+              typeCheck program
+              genPO program
         return $ case reuslt of
           Left err -> errorToDiagnostics err
           Right (pos, _) ->
@@ -350,7 +352,7 @@ toLSPSideEffects _lspID (Req filepath source kind) = handle kind
         exportPOs = do
           let result = runM $ do
                 program <- parseProgram filepath source
-                (pos, _) <- sweep program
+                (pos, _) <- genPO program
                 return pos
           case result of
             Left err -> do
@@ -407,42 +409,25 @@ asLocalError i program =
 
 --------------------------------------------------------------------------------
 
--- scan :: FilePath -> Text -> M TokStream
--- scan filepath = withExceptT LexicalError . liftEither . Lexer.scan filepath . LazyText.fromStrict
-
--- scanLazy :: FilePath -> LazyText.Text -> M TokStream
--- scanLazy filepath = withExceptT LexicalError . liftEither . Lexer.scan filepath
-
--- parse :: Parser.Parser a -> FilePath -> TokStream -> M a
--- parse parser filepath =
---   withExceptT SyntacticError . liftEither . Parser.parse parser filepath
-
--- parseProgram :: FilePath -> Text -> M A.Program
--- parseProgram filepath source = do
---   tokens <- scan filepath source
---   toAbstract <$> parse Parser.program filepath tokens
-
+-- | Parse with a parser
 parse :: Parser a -> FilePath -> Text -> M a
 parse p filepath = withExcept SyntacticError . liftEither . runParse p filepath . LazyText.fromStrict
 
+-- | Parse the whole program
 parseProgram :: FilePath -> Text -> M A.Program
 parseProgram filepath source = do
   toAbstract <$> parse pProgram filepath source
   
--- refine :: Text -> M ()
--- refine payload = do
---   _ <- scan "<spec>" payload >>= parse Parser.specContent "<specification>"
---   return ()
+-- | Try to parse a piece of text in a Spec
 refine :: Text -> M ()
 refine = void . parse pStmts "<specification>"
 
-sweep :: A.Program -> M ([PO], [Spec])
-sweep (A.Program _ _ ds statements _) = do
-  ((_, pos), specs) <-
-    withExceptT StructError $
-      liftEither $
-        runWP (structProg statements) ds
-  return (pos, specs)
+
+typeCheck :: A.Program -> M ()
+typeCheck = withExcept TypeError . TypeChecking.checkProg
+
+genPO :: A.Program -> M ([PO], [Spec])
+genPO = withExcept StructError . liftEither . POGen.sweep
 
 --------------------------------------------------------------------------------
 
