@@ -9,10 +9,12 @@ module LSP where
 -- import Control.Monad.IO.Class
 
 import Control.Concurrent (forkIO)
-import Control.Concurrent.Chan (writeChan, readChan, Chan, newChan)
+import Control.Concurrent.Chan (Chan, newChan, readChan, writeChan)
 import Control.Monad.Except hiding (guard)
+import Control.Monad.Reader
 import Data.Aeson (FromJSON, ToJSON)
 import qualified Data.Aeson as JSON
+import Data.IORef (IORef, newIORef, writeIORef, readIORef)
 import Data.List (sort)
 import Data.Loc (Loc (..), Located (locOf), Pos (..), posCoff, posFile)
 import Data.Text (Text, pack)
@@ -21,12 +23,13 @@ import qualified Data.Text.IO as Text
 import qualified Data.Text.Lazy as LazyText
 import Error
 import GCL.Expr (expand, runSubstM)
+import GCL.Type (TypeError (..))
 import qualified GCL.Type as TypeChecking
-import GCL.Type (TypeError(..))
-import qualified GCL.WP as POGen
 import GCL.WP (StructError (..))
+import qualified GCL.WP as POGen
 import GHC.Generics (Generic)
 import GHC.IO.IOMode (IOMode (ReadWriteMode))
+import LSP.ExportPO ()
 import Language.LSP.Diagnostics (partitionBySource)
 import Language.LSP.Server
 import Language.LSP.Types hiding (TextDocumentSyncClientCapabilities (..))
@@ -35,45 +38,57 @@ import Network.Socket (socketToHandle)
 import Pretty
 import qualified Syntax.Abstract as A
 import Syntax.Concrete (ToAbstract (toAbstract))
--- import qualified Syntax.Parser as Parser
--- import Syntax.Parser.Lexer (TokStream)
--- import qualified Syntax.Parser.Lexer as Lexer
 import Syntax.Parser
 import Syntax.Predicate
   ( Origin (..),
     PO (..),
     Spec,
   )
-import Control.Monad.Reader
-import LSP.ExportPO ()
 
 --------------------------------------------------------------------------------
 
-
 data Env = Env
-  { envChan :: Chan Text
-  , envDevMode :: Bool
+  { envChan :: Chan Text,
+    envDevMode :: Bool,
+    -- | Using (Reader + IORef) instead of State to prevent memory leak
+    envProgramSource :: IORef (Maybe Text)
   }
+
+initEnv :: Bool -> IO Env
+initEnv devMode = Env <$> newChan <*> pure devMode <*> newIORef Nothing
+
+
+--------------------------------------------------------------------------------
 
 type ServerM = ReaderT Env IO
 
-runServerM :: Env -> LanguageContextEnv () -> LspT () ServerM a -> IO a 
+runServerM :: Env -> LanguageContextEnv () -> LspT () ServerM a -> IO a
 runServerM env ctxEnv program = runReaderT (runLspT ctxEnv program) env
 
 writeLog :: Text -> LspT () ServerM ()
-writeLog msg = do 
+writeLog msg = do
   chan <- lift $ asks envChan
   liftIO $ writeChan chan msg
+
+saveProgramSource :: Text -> LspT () ServerM ()
+saveProgramSource text = do
+  ref <- lift $ asks envProgramSource
+  liftIO $ writeIORef ref (Just text)
+
+getProgramSource :: LspT () ServerM (Maybe Text)
+getProgramSource = do
+  ref <- lift $ asks envProgramSource
+  liftIO $ readIORef ref
+
 
 --------------------------------------------------------------------------------
 
 -- entry point of the LSP server
 run :: Bool -> IO Int
 run devMode = do
-  chan <- newChan
+  env <- initEnv devMode
   if devMode
     then do
-      let env = Env chan True
       let port = "3000"
       _ <- forkIO (printLog env)
       serve (Host "localhost") port $ \(sock, _remoteAddr) -> do
@@ -81,15 +96,14 @@ run devMode = do
         handle <- socketToHandle sock ReadWriteMode
         _ <- runServerWithHandles handle handle (serverDefn env)
         putStrLn "== dev server closed =="
-    else do 
-      let env = Env chan False
+    else do
       runServer (serverDefn env)
   where
     printLog :: Env -> IO ()
-    printLog env = do 
+    printLog env = do
       result <- readChan (envChan env)
-      when (envDevMode env) $ do 
-        Text.putStrLn result 
+      when (envDevMode env) $ do
+        Text.putStrLn result
       printLog env
 
     serverDefn :: Env -> ServerDefinition ()
@@ -129,29 +143,29 @@ handlers =
   mconcat
     [ -- custom methods, not part of LSP
       requestHandler (SCustomMethod "guacamole") $ \req responder -> do
-        
         let RequestMessage _ i _ params = req
         -- JSON Value => Request => Response
         response <- case JSON.fromJSON params of
-          JSON.Error msg -> do 
+          JSON.Error msg -> do
             writeLog " --> CustomMethod: CannotDecodeRequest"
             return $ CannotDecodeRequest $ show msg ++ "\n" ++ show params
-          JSON.Success request -> do 
+          JSON.Success request -> do
             writeLog $ " --> Custom Reqeust: " <> pack (show request)
             handleRequest i request
 
         writeLog $ " <-- " <> pack (show response)
-        -- respond with the Response
         responder $ Right $ JSON.toJSON response,
-      -- when the client saved the document
+      -- when the client saved the document, store the text for later use
       notificationHandler STextDocumentDidSave $ \ntf -> do
         writeLog " --> TextDocumentDidSave"
         let NotificationMessage _ _ (DidSaveTextDocumentParams (TextDocumentIdentifier uri) text) = ntf
+
         case text of
           Just source ->
             case uriToFilePath uri of
               Nothing -> pure ()
               Just filepath -> do
+                saveProgramSource source
                 response <- handleRequest (IdInt 0) (Req filepath source ReqLoad)
                 writeLog $ " <-- " <> pack (show response)
                 sendNotification (SCustomMethod "guacamole") $ JSON.toJSON response
@@ -170,23 +184,27 @@ handlers =
 
 handleRequest :: ID -> Request -> LspT () ServerM Response
 handleRequest i request = do
-  -- convert Request to LSP side effects
-  toLSPSideEffects i request
-  -- convert Request to Response
-  return $ toResponse i request
+  result <- getProgramSource
+  case result of
+    Nothing -> pure NotLoaded
+    Just source -> do
+      -- convert Request to LSP side effects
+      toLSPSideEffects i request
+      -- convert Request to Response
+      return $ toResponse i request source
 
 --------------------------------------------------------------------------------
 
 type ID = LspId ('CustomMethod :: Method 'FromClient 'Request)
 
-toResponse :: ID -> Request -> Response
-toResponse lspID (Req filepath source kind) =
+toResponse :: ID -> Request -> Text -> Response
+toResponse lspID (Req filepath _ kind) source =
   let responses = handle kind
    in Res filepath responses
   where
     handle :: ReqKind -> [ResKind]
     handle ReqLoad = asGlobalError $ do
-      (pos, specs, globalProps) <- check filepath source 
+      (pos, specs, globalProps) <- check filepath source
 
       return [ResOK lspID pos specs globalProps]
     handle (ReqInspect selStart selEnd) = asGlobalError $ do
@@ -364,19 +382,19 @@ parse p filepath = withExcept SyntacticError . liftEither . runParse p filepath 
 parseProgram :: FilePath -> Text -> M A.Program
 parseProgram filepath source = do
   toAbstract <$> parse pProgram filepath source
-  
+
 -- | Try to parse a piece of text in a Spec
 refine :: Text -> M ()
 refine = void . parse pStmts "<specification>"
 
 -- | Type check + generate POs and Specs
 check :: FilePath -> Text -> M ([PO], [Spec], [A.Expr])
-check filepath source = do 
+check filepath source = do
   program@(A.Program _ globalProps _ _ _) <- parseProgram filepath source
   typeCheck program
   (pos, specs) <- genPO program
   return (pos, specs, globalProps)
-  where 
+  where
     typeCheck :: A.Program -> M ()
     typeCheck = withExcept TypeError . TypeChecking.checkProg
 
@@ -397,7 +415,7 @@ data ReqKind
 
 instance FromJSON ReqKind
 
-instance Show ReqKind where 
+instance Show ReqKind where
   show ReqLoad = "Load"
   show (ReqInspect x y) = "Inspect " <> show x <> " " <> show y
   show (ReqRefine i x) = "Refine #" <> show i <> " " <> show x
@@ -410,8 +428,8 @@ data Request = Req FilePath Text ReqKind
 
 instance FromJSON Request
 
-instance Show Request where 
-  show (Req _path _content kind) = show kind 
+instance Show Request where
+  show (Req _path _content kind) = show kind
 
 --------------------------------------------------------------------------------
 
@@ -426,24 +444,32 @@ data ResKind
 
 instance ToJSON ResKind
 
-instance Show ResKind where 
-  show (ResOK i pos specs props) = "OK " <> show i <> " " 
-    <> show (length pos) <> " pos, "
-    <> show (length specs) <> " specs, "
-    <> show (length props) <> " props"
+instance Show ResKind where
+  show (ResOK i pos specs props) =
+    "OK " <> show i <> " "
+      <> show (length pos)
+      <> " pos, "
+      <> show (length specs)
+      <> " specs, "
+      <> show (length props)
+      <> " props"
   show (ResError errors) = "Error " <> show (length errors) <> " errors"
   show (ResResolve i) = "Resolve " <> show i
   show (ResSubstitute i _) = "Substitute " <> show i
   show (ResConsoleLog x) = "ConsoleLog " <> show x
 
-data Response = Res FilePath [ResKind] | CannotDecodeRequest String
+data Response
+  = Res FilePath [ResKind]
+  | CannotDecodeRequest String
+  | NotLoaded
   deriving (Generic)
 
 instance ToJSON Response
 
-instance Show Response where 
-  show (Res _path kinds) = show kinds 
+instance Show Response where
+  show (Res _path kinds) = show kinds
   show (CannotDecodeRequest s) = "CannotDecodeRequest " <> s
+  show NotLoaded = "NotLoaded"
 
 --------------------------------------------------------------------------------
 

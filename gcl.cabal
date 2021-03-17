@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 042b4fadcba62cd24b7922d216126642e7a2fd81f14465139db736cb498331f2
+-- hash: f39ebcc10d1f3be3d4459152fbf1d6a8cd82d119ca3357068e40cc7ed85d069f
 
 name:           gcl
 version:        0.1.0.0
@@ -30,6 +30,7 @@ library
       GCL.Type
       GCL.WP
       LSP
+      LSP.ExportPO
       Pretty
       Pretty.Abstract
       Pretty.Concrete
@@ -40,11 +41,11 @@ library
       Syntax.Common
       Syntax.Concrete
       Syntax.ConstExpr
+      Syntax.Parser
       Syntax.Parser.Lexer
       Syntax.Parser.Token
       Syntax.Parser.TokenStream
       Syntax.Parser.Util
-      Syntax.Parser
       Syntax.Predicate
   other-modules:
       Paths_gcl
@@ -121,6 +122,7 @@ test-suite gcl-test
       GCL.Type
       GCL.WP
       LSP
+      LSP.ExportPO
       Pretty
       Pretty.Abstract
       Pretty.Concrete
@@ -131,12 +133,11 @@ test-suite gcl-test
       Syntax.Common
       Syntax.Concrete
       Syntax.ConstExpr
+      Syntax.Parser
       Syntax.Parser.Lexer
       Syntax.Parser.Token
       Syntax.Parser.TokenStream
       Syntax.Parser.Util
-      Syntax.Parser.Util
-      Syntax.Parser
       Syntax.Predicate
       Paths_gcl
   hs-source-dirs:

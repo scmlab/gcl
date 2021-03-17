@@ -46,7 +46,6 @@ instance Pretty Error where
   pretty (StructError err) =
     "Struct Error" <+> pretty (locOf err) <> line <> pretty err
   pretty (CannotReadFile path) = "CannotReadFile" <+> pretty path
-  pretty NotLoaded = "NotLoaded"
 
 instance Pretty LexicalError where
   pretty = pretty . show
