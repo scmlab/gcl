@@ -14,7 +14,7 @@ import Control.Monad.Except hiding (guard)
 import Control.Monad.Reader
 import Data.Aeson (FromJSON, ToJSON)
 import qualified Data.Aeson as JSON
-import Data.IORef (IORef, newIORef, writeIORef, readIORef)
+import Data.IORef (IORef, newIORef, readIORef, modifyIORef')
 import Data.List (sort)
 import Data.Loc (Loc (..), Located (locOf), Pos (..), posCoff, posFile)
 import Data.Text (Text, pack)
@@ -44,19 +44,22 @@ import Syntax.Predicate
     PO (..),
     Spec,
   )
+import Data.Map (Map)
+import qualified Data.Map as Map
 
 --------------------------------------------------------------------------------
 
 data Env = Env
   { envChan :: Chan Text,
     envDevMode :: Bool,
-    -- | Using (Reader + IORef) instead of State to prevent memory leak
-    envProgramSource :: IORef (Maybe Text)
+    -- | We maintain our own Uri-Source mapping 
+    --   instead of using the built-in LSP VFS 
+    --   to have better control of update management
+    envSourceMap :: IORef (Map FilePath Text)
   }
 
 initEnv :: Bool -> IO Env
-initEnv devMode = Env <$> newChan <*> pure devMode <*> newIORef Nothing
-
+initEnv devMode = Env <$> newChan <*> pure devMode <*> newIORef Map.empty
 
 --------------------------------------------------------------------------------
 
@@ -70,16 +73,16 @@ writeLog msg = do
   chan <- lift $ asks envChan
   liftIO $ writeChan chan msg
 
-saveProgramSource :: Text -> LspT () ServerM ()
-saveProgramSource text = do
-  ref <- lift $ asks envProgramSource
-  liftIO $ writeIORef ref (Just text)
+commitSource :: FilePath -> Text -> LspT () ServerM ()
+commitSource filepath source = do
+  ref <- lift $ asks envSourceMap
+  liftIO $ modifyIORef' ref (Map.insert filepath source)
 
-getProgramSource :: LspT () ServerM (Maybe Text)
-getProgramSource = do
-  ref <- lift $ asks envProgramSource
-  liftIO $ readIORef ref
-
+readSource :: FilePath -> LspT () ServerM (Maybe Text)
+readSource filepath = do
+  ref <- lift $ asks envSourceMap
+  mapping <- liftIO $ readIORef ref 
+  return $ Map.lookup filepath mapping
 
 --------------------------------------------------------------------------------
 
@@ -165,21 +168,22 @@ handlers =
             case uriToFilePath uri of
               Nothing -> pure ()
               Just filepath -> do
-                saveProgramSource source
+                commitSource filepath source
                 toLSPSideEffects filepath source,
       -- when the client opened the document
       notificationHandler STextDocumentDidOpen $ \ntf -> do
         writeLog " --> TextDocumentDidOpen"
         let NotificationMessage _ _ (DidOpenTextDocumentParams (TextDocumentItem uri _ _ source)) = ntf
-        saveProgramSource source
         case uriToFilePath uri of
           Nothing -> pure ()
-          Just filepath -> toLSPSideEffects filepath source
+          Just filepath -> do 
+            commitSource filepath source
+            toLSPSideEffects filepath source
     ]
 
 handleRequest :: ID -> Request -> LspT () ServerM Response
 handleRequest i request@(Req filepath _) = do
-  result <- getProgramSource
+  result <- readSource filepath
   case result of
     Nothing -> pure NotLoaded
     Just source -> do
