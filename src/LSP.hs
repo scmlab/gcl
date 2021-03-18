@@ -94,7 +94,7 @@ run devMode = do
     then do
       let port = "3000"
       _ <- forkIO (printLog env)
-      serve (Host "localhost") port $ \(sock, _remoteAddr) -> do
+      serve (Host "127.0.0.1") port $ \(sock, _remoteAddr) -> do
         putStrLn $ "== connection established at " ++ port ++ " =="
         handle <- socketToHandle sock ReadWriteMode
         _ <- runServerWithHandles handle handle (serverDefn env)
