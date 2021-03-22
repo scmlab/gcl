@@ -25,7 +25,7 @@ import Error
 import GCL.Expr (expand, runSubstM)
 import GCL.Type (TypeError (..))
 import qualified GCL.Type as TypeChecking
-import GCL.WP (StructError (..))
+import GCL.WP (StructError (..), StructWarning(..))
 import qualified GCL.WP as POGen
 import GHC.Generics (Generic)
 import GHC.IO.IOMode (IOMode (ReadWriteMode))
@@ -181,9 +181,9 @@ handlers =
               Just filepath -> do
                 updateSource filepath source
                 lastSelection <- readLastSelection filepath
-                case lastSelection of 
+                case lastSelection of
                   Nothing -> return ()
-                  Just (selStart, selEnd) -> do 
+                  Just (selStart, selEnd) -> do
                     let response = toResponse (IdInt 0) filepath source (ReqInspect selStart selEnd)
                     sendNotification (SCustomMethod "guacamole") $ JSON.toJSON response
                 toLSPSideEffects filepath source,
@@ -207,7 +207,7 @@ handleRequest i (Req filepath kind) = do
       -- send Diagnostics
       toLSPSideEffects filepath source
       -- save Mouse Selection
-      case kind of 
+      case kind of
         ReqInspect selStart selEnd -> updateSelection filepath (selStart, selEnd)
         _ -> return ()
       -- convert Request to Response
@@ -225,7 +225,7 @@ calculateRelatedPOs pos (selStart, selEnd) = reverse $ case overlapped of
                       NoLoc -> False
                       Loc start' _ -> start == start'
                  in filter same overlapped
-    where 
+    where
       -- find the POs whose Range overlaps with the selection
       isOverlapped po = case locOf po of
             NoLoc -> False
@@ -247,10 +247,10 @@ toResponse lspID filepath source kind = Res filepath (handle kind)
   where
     handle :: ReqKind -> [ResKind]
     handle (ReqInspect selStart selEnd) = asGlobalError $ do
-      (pos, specs, globalProps) <- check filepath source
+      (pos, specs, globalProps, warnings) <- check filepath source
       -- find the POs whose Range overlaps with the selection
       let opverlapped = calculateRelatedPOs pos (selStart, selEnd)
-      return [ResOK lspID opverlapped specs globalProps]
+      return [ResOK lspID opverlapped specs globalProps warnings]
     handle (ReqRefine i payload) = asLocalError i $ do
       _ <- refine payload
       return [ResResolve i]
@@ -266,16 +266,19 @@ toLSPSideEffects :: FilePath -> Text -> LspT () ServerM ()
 toLSPSideEffects filepath source = do
   -- send diagnostics
   diags <- do
-    writeLog source
     let result = runM $ check filepath source
     return $ case result of
       Left err -> errorToDiagnostics err
-      Right (pos, _, _) -> map proofObligationToDiagnostic pos
+      Right (pos, _, _, warnings) -> map proofObligationToDiagnostic pos ++ concatMap warningToDiagnostics warnings
   let fileUri = toNormalizedUri (filePathToUri filepath)
   let version = Just 0
 
   publishDiagnostics 100 fileUri version (partitionBySource diags)
   where
+    warningToDiagnostics :: StructWarning -> [Diagnostic]
+    warningToDiagnostics (MissingBound loc) = [makeWarning loc "Bound Missing" "Bound missing at the end of the assertion before the DO construct \" , bnd : ... }\""]
+    warningToDiagnostics (ExcessBound loc) = [makeWarning loc "Excess Bound" "Unnecessary bound annotation at this assertion"]
+
     errorToDiagnostics :: Error -> [Diagnostic]
     errorToDiagnostics (LexicalError pos) = [makeError (Loc pos pos) "Lexical error" ""]
     errorToDiagnostics (SyntacticError errs) = map syntacticErrorToDiagnostics errs
@@ -284,8 +287,6 @@ toLSPSideEffects filepath source = do
     errorToDiagnostics (StructError err) = structErrorToDiagnostics err
       where
         structErrorToDiagnostics (MissingAssertion loc) = [makeError loc "Assertion Missing" "Assertion before the DO construct is missing"]
-        structErrorToDiagnostics (MissingBound loc) = [makeError loc "Bound Missing" "Bound missing at the end of the assertion before the DO construct \" , bnd : ... }\""]
-        structErrorToDiagnostics (ExcessBound loc) = [makeError loc "Excess Bound" "Unnecessary bound annotation at this assertion"]
         structErrorToDiagnostics (MissingPostcondition loc) = [makeError loc "Postcondition Missing" "The last statement of the program should be an assertion"]
         structErrorToDiagnostics (DigHole _) = []
     errorToDiagnostics (TypeError err) = typeErrorToDiagnostics err
@@ -403,17 +404,17 @@ refine :: Text -> M ()
 refine = void . parse pStmts "<specification>"
 
 -- | Type check + generate POs and Specs
-check :: FilePath -> Text -> M ([PO], [Spec], [A.Expr])
+check :: FilePath -> Text -> M ([PO], [Spec], [A.Expr], [StructWarning])
 check filepath source = do
   program@(A.Program _ globalProps _ _ _) <- parseProgram filepath source
   typeCheck program
-  (pos, specs) <- genPO program
-  return (pos, specs, globalProps)
+  (pos, specs, warings) <- genPO program
+  return (pos, specs, globalProps, warings)
 
 typeCheck :: A.Program -> M ()
 typeCheck = withExcept TypeError . TypeChecking.checkProg
 
-genPO :: A.Program -> M ([PO], [Spec])
+genPO :: A.Program -> M ([PO], [Spec], [StructWarning])
 genPO = withExcept StructError . liftEither . POGen.sweep
 
 --------------------------------------------------------------------------------
@@ -448,7 +449,7 @@ instance Show Request where
 
 -- | Response
 data ResKind
-  = ResOK ID [PO] [Spec] [A.Expr]
+  = ResOK ID [PO] [Spec] [A.Expr] [StructWarning]
   | ResError [(Site, Error)]
   | ResResolve Int -- resolves some Spec
   | ResSubstitute Int A.Expr
@@ -458,14 +459,16 @@ data ResKind
 instance ToJSON ResKind
 
 instance Show ResKind where
-  show (ResOK i pos specs props) =
+  show (ResOK i pos specs props warnings) =
     "OK " <> show i <> " "
       <> show (length pos)
       <> " pos, "
       <> show (length specs)
       <> " specs, "
       <> show (length props)
-      <> " props"
+      <> " props, "
+      <> show (length warnings)
+      <> " warnings"
   show (ResError errors) = "Error " <> show (length errors) <> " errors"
   show (ResResolve i) = "Resolve " <> show i
   show (ResSubstitute i _) = "Substitute " <> show i

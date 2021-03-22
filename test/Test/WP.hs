@@ -3,12 +3,13 @@
 module Test.WP where
 
 import Data.Loc
+import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.IO as Text
-import Data.Text (Text)
-import Data.Text.Lazy (toStrict, fromStrict)
+import Data.Text.Lazy (fromStrict, toStrict)
 import qualified Data.Text.Lazy.Encoding as LazyText
 import Error
+import GCL.WP (StructWarning)
 import qualified LSP
 import Pretty ()
 import Syntax.Abstract
@@ -20,10 +21,10 @@ import Prelude hiding (Ordering (..))
 tests :: TestTree
 tests = testGroup "WP 1" [emptyProg, statements, issues]
 
-run :: Text -> Either Error ([PO], [Spec])
-run text = LSP.runM $ do 
-  (pos, specs) <- LSP.parseProgram "<test>" text >>= LSP.genPO
-  return (pos, specs)            
+run :: Text -> Either Error ([PO], [Spec], [StructWarning])
+run text = LSP.runM $ do
+  (pos, specs, warnings) <- LSP.parseProgram "<test>" text >>= LSP.genPO
+  return (pos, specs, warnings)
 
 --------------------------------------------------------------------------------
 
@@ -34,7 +35,7 @@ emptyProg =
     "empty"
     [ testCase "empty" $ do
         let actual = run ""
-        actual @?= Right ([], [])
+        actual @?= Right ([], [], [])
     ]
 
 --------------------------------------------------------------------------------
@@ -45,10 +46,11 @@ statements =
   testGroup
     "simple program"
     [ testCase "skip" $ do
-        let actual = run
-              "{ True }   \n\
-              \skip       \n\
-              \{ 0 = 0 }"
+        let actual =
+              run
+                "{ True }   \n\
+                \skip       \n\
+                \{ 0 = 0 }"
         actual
           @?= Right
             ( [ PO
@@ -57,20 +59,23 @@ statements =
                   (assertion (number 0 `eqq` number 0))
                   (AtSkip NoLoc)
               ],
+              [],
               []
             ),
       testCase "abort" $ do
-        let actual = run
-              "{ True }   \n\
-              \abort      \n\
-              \{ True }"
+        let actual =
+              run
+                "{ True }   \n\
+                \abort      \n\
+                \{ True }"
         actual
-          @?= Right ([PO 0 (assertion true) (Constant false) (AtAbort NoLoc)], []),
+          @?= Right ([PO 0 (assertion true) (Constant false) (AtAbort NoLoc)], [], []),
       testCase "assignment" $ do
-        let actual = run
-              "{ True }   \n\
-              \x := 1     \n\
-              \{ 0 = x }"
+        let actual =
+              run
+                "{ True }   \n\
+                \x := 1     \n\
+                \{ 0 = x }"
         actual
           @?= Right
             ( [ PO
@@ -79,14 +84,16 @@ statements =
                   (assertion (number 0 `eqq` number 1))
                   (AtAssignment NoLoc)
               ],
+              [],
               []
             ),
       testCase "spec" $ do
-        let actual = run
-              "{ True }   \n\
-              \{!       \n\
-              \!}       \n\
-              \{ 0 = 0 }"
+        let actual =
+              run
+                "{ True }   \n\
+                \{!       \n\
+                \!}       \n\
+                \{ 0 = 0 }"
         actual
           @?= Right
             ( [],
@@ -95,7 +102,8 @@ statements =
                   (Assertion true NoLoc)
                   (assertion (number 0 `eqq` number 0))
                   NoLoc
-              ]
+              ],
+              []
             )
     ]
 
@@ -153,24 +161,28 @@ issue2 =
   testGroup
     "Issue #2"
     [ testCase "Postcondition only" $ do
-        let actual = run
-              "con A, B : Int\n\
-              \var x, y, z : Int\n\
-              \{ z = A * B }"
+        let actual =
+              run
+                "con A, B : Int\n\
+                \var x, y, z : Int\n\
+                \{ z = A * B }"
         actual
           @?= Right
             ( [PO 0 (Constant true) (assertion (variable "z" `eqq` binary Mul (constant "A") (constant "B"))) (AtAssertion NoLoc)],
+              [],
               []
             ),
       testCase "Postcondition + precondition" $ do
-        let actual = run 
-              "con A, B : Int\n\
-              \var x, y, z : Int\n\
-              \{ True }\n\
-              \{ z = A * B }"
+        let actual =
+              run
+                "con A, B : Int\n\
+                \var x, y, z : Int\n\
+                \{ True }\n\
+                \{ z = A * B }"
         actual
           @?= Right
             ( [PO 0 (assertion true) (assertion (variable "z" `eqq` binary Mul (constant "A") (constant "B"))) (AtAssertion NoLoc)],
+              [],
               []
             )
     ]
