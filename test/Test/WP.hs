@@ -22,7 +22,7 @@ tests = testGroup "WP 1" [emptyProg, statements, issues]
 
 run :: Text -> Either Error ([PO], [Spec])
 run text = LSP.runM $ do 
-  (pos, specs) <- LSP.parseProgram "<test>" text >>= LSP.sweep
+  (pos, specs) <- LSP.parseProgram "<test>" text >>= LSP.genPO
   return (pos, specs)            
 
 --------------------------------------------------------------------------------

@@ -15,7 +15,7 @@ import Data.Text.Prettyprint.Doc.Render.Text
 import qualified Data.Map as Map
 import GCL.Type
 import Error
-import LSP
+import qualified LSP
 import Syntax.Abstract
 import Test.Tasty
 import Test.Tasty.Golden
@@ -99,9 +99,9 @@ typeCheck :: (FilePath, Text) -> Text
 typeCheck (filepath, source) = renderStrict . layoutCompact . pretty $ result
   where 
     result = 
-      case runM (parseProgram filepath source) of
+      case LSP.runM (LSP.parseProgram filepath source) of
         Left err -> Left err
-        Right prog -> runM . withExcept TypeError $ checkProg prog
+        Right prog -> LSP.runM . withExcept TypeError $ checkProg prog
 
 compareAndReport :: (FilePath, Text) -> (FilePath, Text) -> IO (Maybe String)
 compareAndReport (expectedPath, expectedRes) (actualPath, actualRaw) = do

@@ -409,12 +409,12 @@ check filepath source = do
   typeCheck program
   (pos, specs) <- genPO program
   return (pos, specs, globalProps)
-  where
-    typeCheck :: A.Program -> M ()
-    typeCheck = withExcept TypeError . TypeChecking.checkProg
 
-    genPO :: A.Program -> M ([PO], [Spec])
-    genPO = withExcept StructError . liftEither . POGen.sweep
+typeCheck :: A.Program -> M ()
+typeCheck = withExcept TypeError . TypeChecking.checkProg
+
+genPO :: A.Program -> M ([PO], [Spec])
+genPO = withExcept StructError . liftEither . POGen.sweep
 
 --------------------------------------------------------------------------------
 
