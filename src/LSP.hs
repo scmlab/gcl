@@ -55,7 +55,7 @@ data Env = Env
     -- | We maintain our own Uri-Source mapping 
     --   instead of using the built-in LSP VFS 
     --   to have better control of update management
-    envSourceMap :: IORef (Map FilePath Text)
+    envSourceMap :: IORef (Map FilePath (Text, Maybe (Int, Int)))
   }
 
 initEnv :: Bool -> IO Env
@@ -73,16 +73,27 @@ writeLog msg = do
   chan <- lift $ asks envChan
   liftIO $ writeChan chan msg
 
-commitSource :: FilePath -> Text -> LspT () ServerM ()
-commitSource filepath source = do
+updateSource :: FilePath -> Text -> LspT () ServerM ()
+updateSource filepath source = do
   ref <- lift $ asks envSourceMap
-  liftIO $ modifyIORef' ref (Map.insert filepath source)
+  liftIO $ modifyIORef' ref (Map.insertWith (\(src, _) (_, sel) -> (src, sel)) filepath (source, Nothing))
+
+updateSelection :: FilePath -> (Int, Int) -> LspT () ServerM ()
+updateSelection filepath selection = do
+  ref <- lift $ asks envSourceMap
+  liftIO $ modifyIORef' ref (Map.update (\(source, _) -> Just (source, Just selection)) filepath)
 
 readSource :: FilePath -> LspT () ServerM (Maybe Text)
 readSource filepath = do
   ref <- lift $ asks envSourceMap
-  mapping <- liftIO $ readIORef ref 
-  return $ Map.lookup filepath mapping
+  mapping <- liftIO $ readIORef ref
+  return $ fst <$> Map.lookup filepath mapping
+
+readLastSelection :: FilePath -> LspT () ServerM (Maybe (Int, Int))
+readLastSelection filepath = do
+  ref <- lift $ asks envSourceMap
+  mapping <- liftIO $ readIORef ref
+  return $ snd =<< Map.lookup filepath mapping
 
 --------------------------------------------------------------------------------
 
@@ -168,7 +179,13 @@ handlers =
             case uriToFilePath uri of
               Nothing -> pure ()
               Just filepath -> do
-                commitSource filepath source
+                updateSource filepath source
+                lastSelection <- readLastSelection filepath
+                case lastSelection of 
+                  Nothing -> return ()
+                  Just (selStart, selEnd) -> do 
+                    let response = toResponse (IdInt 0) filepath source (ReqInspect selStart selEnd)
+                    sendNotification (SCustomMethod "guacamole") $ JSON.toJSON response
                 toLSPSideEffects filepath source,
       -- when the client opened the document
       notificationHandler STextDocumentDidOpen $ \ntf -> do
@@ -176,47 +193,30 @@ handlers =
         let NotificationMessage _ _ (DidOpenTextDocumentParams (TextDocumentItem uri _ _ source)) = ntf
         case uriToFilePath uri of
           Nothing -> pure ()
-          Just filepath -> do 
-            commitSource filepath source
+          Just filepath -> do
+            updateSource filepath source
             toLSPSideEffects filepath source
     ]
 
 handleRequest :: ID -> Request -> LspT () ServerM Response
-handleRequest i request@(Req filepath _) = do
+handleRequest i (Req filepath kind) = do
   result <- readSource filepath
   case result of
     Nothing -> pure NotLoaded
     Just source -> do
-      -- convert Request to LSP side effects
+      -- send Diagnostics
       toLSPSideEffects filepath source
+      -- save Mouse Selection
+      case kind of 
+        ReqInspect selStart selEnd -> updateSelection filepath (selStart, selEnd)
+        _ -> return ()
       -- convert Request to Response
-      return $ toResponse i request source
+      return $ toResponse i filepath source kind
 
 --------------------------------------------------------------------------------
 
-type ID = LspId ('CustomMethod :: Method 'FromClient 'Request)
-
-toResponse :: ID -> Request -> Text -> Response
-toResponse lspID (Req filepath kind) source =
-  let responses = handle kind
-   in Res filepath responses
-  where
-    handle :: ReqKind -> [ResKind]
-    handle (ReqInspect selStart selEnd) = asGlobalError $ do
-      (pos, specs, globalProps) <- check filepath source
-      -- find the POs whose Range overlaps with the selection
-      let isOverlapped po = case locOf po of
-            NoLoc -> False
-            Loc start' end' ->
-              let start = posCoff start'
-                  end = posCoff end' + 1
-               in (selStart <= start && selEnd >= start) -- the end of the selection overlaps with the start of PO
-                    || (selStart <= end && selEnd >= end) -- the start of the selection overlaps with the end of PO
-                    || (selStart <= start && selEnd >= end) -- the selection covers the PO
-                    || (selStart >= start && selEnd <= end) -- the selection is within the PO
-                    -- sort them by comparing their starting position
-      let overlapped = reverse $ sort $ filter isOverlapped pos
-      let nearest = reverse $ case overlapped of
+calculateRelatedPOs :: [PO] -> (Int, Int) -> [PO]
+calculateRelatedPOs pos (selStart, selEnd) = reverse $ case overlapped of
             [] -> []
             (x : _) -> case locOf x of
               NoLoc -> []
@@ -225,7 +225,32 @@ toResponse lspID (Req filepath kind) source =
                       NoLoc -> False
                       Loc start' _ -> start == start'
                  in filter same overlapped
-      return [ResOK lspID nearest specs globalProps]
+    where 
+      -- find the POs whose Range overlaps with the selection
+      isOverlapped po = case locOf po of
+            NoLoc -> False
+            Loc start' end' ->
+              let start = posCoff start'
+                  end = posCoff end' + 1
+               in (selStart <= start && selEnd >= start) -- the end of the selection overlaps with the start of PO
+                    || (selStart <= end && selEnd >= end) -- the start of the selection overlaps with the end of PO
+                    || (selStart <= start && selEnd >= end) -- the selection covers the PO
+                    || (selStart >= start && selEnd <= end) -- the selection is within the PO
+      -- sort them by comparing their starting position
+      overlapped = reverse $ sort $ filter isOverlapped pos
+
+
+type ID = LspId ('CustomMethod :: Method 'FromClient 'Request)
+
+toResponse :: ID -> FilePath -> Text -> ReqKind -> Response
+toResponse lspID filepath source kind = Res filepath (handle kind)
+  where
+    handle :: ReqKind -> [ResKind]
+    handle (ReqInspect selStart selEnd) = asGlobalError $ do
+      (pos, specs, globalProps) <- check filepath source
+      -- find the POs whose Range overlaps with the selection
+      let opverlapped = calculateRelatedPOs pos (selStart, selEnd)
+      return [ResOK lspID opverlapped specs globalProps]
     handle (ReqRefine i payload) = asLocalError i $ do
       _ <- refine payload
       return [ResResolve i]
@@ -238,9 +263,10 @@ toResponse lspID (Req filepath kind) source =
     handle ReqDebug = error "crash!"
 
 toLSPSideEffects :: FilePath -> Text -> LspT () ServerM ()
-toLSPSideEffects filepath source = do 
+toLSPSideEffects filepath source = do
   -- send diagnostics
   diags <- do
+    writeLog source
     let result = runM $ check filepath source
     return $ case result of
       Left err -> errorToDiagnostics err
@@ -370,8 +396,7 @@ parse p filepath = withExcept SyntacticError . liftEither . runParse p filepath 
 
 -- | Parse the whole program
 parseProgram :: FilePath -> Text -> M A.Program
-parseProgram filepath source = do
-  toAbstract <$> parse pProgram filepath source
+parseProgram filepath source = toAbstract <$> parse pProgram filepath source
 
 -- | Try to parse a piece of text in a Spec
 refine :: Text -> M ()
