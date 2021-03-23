@@ -154,7 +154,11 @@ struct _ _ _ (A.Proof _) _ = return ()
 
 structStmts :: Bool -> Pred -> Maybe Expr -> [Stmt] -> Pred -> SM ()
 structStmts _ pre _ [] post = do
-  obligate pre post (AtAssertion (locOf pre))
+  -- the precondition may be a Constant and have no srcloc
+  -- in that case, use the srcloc of postcondition instead
+  case locOf pre of 
+    NoLoc -> obligate pre post (AtAssertion (locOf post))
+    others -> obligate pre post (AtAssertion others)
   return ()
 structStmts True pre _ (A.Assert p l : stmts) post = do
   obligate pre (Assertion p l) (AtAssertion l)
@@ -287,8 +291,8 @@ runSM p defs = evalStateT (runWriterT . runWriterT . runWriterT $ runReaderT p d
 
 sweep :: A.Program -> Either StructError ([PO], [Spec], [StructWarning])
 sweep (A.Program _ _ ds statements _) = do
-  (((_, pos), specs), warnings) <- runSM (structProg statements) ds
-  return (pos, specs, warnings)
+  (((_, pos'), specs), warnings) <- runSM (structProg statements) ds
+  return (pos', specs, warnings)
 
 data StructWarning
   = MissingBound Loc

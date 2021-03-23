@@ -19,7 +19,7 @@ import Test.Tasty.HUnit
 import Prelude hiding (Ordering (..))
 
 tests :: TestTree
-tests = testGroup "WP 1" [emptyProg, statements, issues]
+tests = testGroup "WP" [emptyProg, statements, issues]
 
 run :: Text -> Either Error ([PO], [Spec], [StructWarning])
 run text = LSP.runM $ do
@@ -55,38 +55,72 @@ statements =
           @?= Right
             ( [ PO
                   0
-                  (assertion true)
-                  (assertion (number 0 `eqq` number 0))
-                  (AtSkip NoLoc)
+                  (Assertion (Lit (Bol True) (Loc (pos 1 3 2) (pos 1 6 5))) (Loc (pos 1 1 0) (pos 1 8 7)))
+                  ( Assertion
+                      ( App
+                          ( App
+                              (Op EQ (Loc (pos 3 5 28) (pos 3 5 28)))
+                              (Lit (Num 0) (Loc (pos 3 3 26) (pos 3 3 26)))
+                              (Loc (pos 3 3 26) (pos 3 5 28))
+                          )
+                          (Lit (Num 0) (Loc (pos 3 7 30) (pos 3 7 30)))
+                          (Loc (pos 3 3 26) (pos 3 7 30))
+                      )
+                      (Loc (pos 3 1 24) (pos 3 9 32))
+                  )
+                  (AtSkip (Loc (pos 2 1 12) (pos 2 4 15)))
               ],
               [],
               []
             ),
-      testCase "abort" $ do
-        let actual =
-              run
-                "{ True }   \n\
-                \abort      \n\
-                \{ True }"
-        actual
-          @?= Right ([PO 0 (assertion true) (Constant false) (AtAbort NoLoc)], [], []),
-      testCase "assignment" $ do
-        let actual =
-              run
-                "{ True }   \n\
-                \x := 1     \n\
-                \{ 0 = x }"
-        actual
-          @?= Right
-            ( [ PO
-                  0
-                  (assertion true)
-                  (assertion (number 0 `eqq` number 1))
-                  (AtAssignment NoLoc)
-              ],
-              [],
-              []
-            ),
+      testCase "abort" $
+        do
+          let actual =
+                run
+                  "{ True }   \n\
+                  \abort      \n\
+                  \{ True }"
+          actual
+            @?= Right
+              ( [ PO
+                    0
+                    (Assertion (Lit (Bol True) (Loc (pos 1 3 2) (pos 1 6 5))) (Loc (pos 1 1 0) (pos 1 8 7)))
+                    (Constant (Lit (Bol False) NoLoc))
+                    (AtAbort (Loc (pos 2 1 12) (pos 2 5 16)))
+                ],
+                [],
+                []
+              ),
+      testCase
+        "assignment"
+        $ do
+          let actual =
+                run
+                  "{ True }   \n\
+                  \x := 1     \n\
+                  \{ 0 = x }"
+          actual
+            @?= Right
+              ( [ PO
+                    0
+                    (Assertion (Lit (Bol True) (Loc (pos 1 3 2) (pos 1 6 5))) (Loc (pos 1 1 0) (pos 1 8 7)))
+                    ( Assertion
+                        ( App
+                            ( App
+                                (Op EQ (Loc (pos 3 5 28) (pos 3 5 28)))
+                                (Lit (Num 0) (Loc (pos 3 3 26) (pos 3 3 26)))
+                                (Loc (pos 3 3 26) (pos 3 5 28))
+                            )
+                            (Lit (Num 1) (Loc (pos 2 6 17) (pos 2 6 17)))
+                            (Loc (pos 3 3 26) (pos 3 7 30))
+                        )
+                        (Loc (pos 3 1 24) (pos 3 9 32))
+                    )
+                    (AtAssignment (Loc (pos 2 1 12) (pos 2 6 17)))
+                ],
+                [],
+                []
+              ),
       testCase "spec" $ do
         let actual =
               run
@@ -96,13 +130,13 @@ statements =
                 \{ 0 = 0 }"
         actual
           @?= Right
-            ( [],
-              [ Specification
+            ( [ PO
                   0
-                  (Assertion true NoLoc)
-                  (assertion (number 0 `eqq` number 0))
-                  NoLoc
+                  (Constant (Lit (Bol True) NoLoc))
+                  (Assertion (Lit (Bol True) (Loc (pos 1 3 2) (pos 1 6 5))) (Loc (pos 1 1 0) (pos 1 8 7)))
+                  (AtAssertion (Loc (pos 1 1 0) (pos 1 8 7)))
               ],
+              [],
               []
             )
     ]
@@ -168,7 +202,31 @@ issue2 =
                 \{ z = A * B }"
         actual
           @?= Right
-            ( [PO 0 (Constant true) (assertion (variable "z" `eqq` binary Mul (constant "A") (constant "B"))) (AtAssertion NoLoc)],
+            ( [ PO
+                  0
+                  (Constant (Lit (Bol True) NoLoc))
+                  ( Assertion
+                      ( App
+                          ( App
+                              (Op EQ (Loc (pos 3 5 37) (pos 3 5 37)))
+                              (Var (Name "z" (Loc (pos 3 3 35) (pos 3 3 35))) (Loc (pos 3 3 35) (pos 3 3 35)))
+                              (Loc (pos 3 3 35) (pos 3 5 37))
+                          )
+                          ( App
+                              ( App
+                                  (Op Mul (Loc (pos 3 9 41) (pos 3 9 41)))
+                                  (Const (Name "A" (Loc (pos 3 7 39) (pos 3 7 39))) (Loc (pos 3 7 39) (pos 3 7 39)))
+                                  (Loc (pos 3 7 39) (pos 3 9 41))
+                              )
+                              (Const (Name "B" (Loc (pos 3 11 43) (pos 3 11 43))) (Loc (pos 3 11 43) (pos 3 11 43)))
+                              (Loc (pos 3 7 39) (pos 3 11 43))
+                          )
+                          (Loc (pos 3 3 35) (pos 3 11 43))
+                      )
+                      (Loc (pos 3 1 33) (pos 3 13 45))
+                  )
+                  (AtAssertion (Loc (pos 3 1 33) (pos 3 13 45)))
+              ],
               [],
               []
             ),
@@ -181,7 +239,31 @@ issue2 =
                 \{ z = A * B }"
         actual
           @?= Right
-            ( [PO 0 (assertion true) (assertion (variable "z" `eqq` binary Mul (constant "A") (constant "B"))) (AtAssertion NoLoc)],
+            ( [ PO
+                  0
+                  (Assertion (Lit (Bol True) (Loc (pos 3 3 35) (pos 3 6 38))) (Loc (pos 3 1 33) (pos 3 8 40)))
+                  ( Assertion
+                      ( App
+                          ( App
+                              (Op EQ (Loc (pos 4 5 46) (pos 4 5 46)))
+                              (Var (Name "z" (Loc (pos 4 3 44) (pos 4 3 44))) (Loc (pos 4 3 44) (pos 4 3 44)))
+                              (Loc (pos 4 3 44) (pos 4 5 46))
+                          )
+                          ( App
+                              ( App
+                                  (Op Mul (Loc (pos 4 9 50) (pos 4 9 50)))
+                                  (Const (Name "A" (Loc (pos 4 7 48) (pos 4 7 48))) (Loc (pos 4 7 48) (pos 4 7 48)))
+                                  (Loc (pos 4 7 48) (pos 4 9 50))
+                              )
+                              (Const (Name "B" (Loc (pos 4 11 52) (pos 4 11 52))) (Loc (pos 4 11 52) (pos 4 11 52)))
+                              (Loc (pos 4 7 48) (pos 4 11 52))
+                          )
+                          (Loc (pos 4 3 44) (pos 4 11 52))
+                      )
+                      (Loc (pos 4 1 42) (pos 4 13 54))
+                  )
+                  (AtAssertion (Loc (pos 3 1 33) (pos 3 8 40)))
+              ],
               [],
               []
             )
