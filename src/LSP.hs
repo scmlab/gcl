@@ -14,7 +14,7 @@ import Control.Monad.Except hiding (guard)
 import Control.Monad.Reader
 import Data.Aeson (FromJSON, ToJSON)
 import qualified Data.Aeson as JSON
-import Data.IORef (IORef, newIORef, readIORef, modifyIORef')
+import Data.IORef (IORef, newIORef, readIORef, modifyIORef', writeIORef)
 import Data.List (sort)
 import Data.Loc (Loc (..), Located (locOf), Pos (..), posCoff, posFile)
 import Data.Text (Text, pack)
@@ -55,11 +55,13 @@ data Env = Env
     -- | We maintain our own Uri-Source mapping 
     --   instead of using the built-in LSP VFS 
     --   to have better control of update management
-    envSourceMap :: IORef (Map FilePath (Text, Maybe (Int, Int)))
+    envSourceMap :: IORef (Map FilePath (Text, Maybe (Int, Int))),
+    -- | Counter for generating fresh numbers
+    envCounter :: IORef Int
   }
 
 initEnv :: Bool -> IO Env
-initEnv devMode = Env <$> newChan <*> pure devMode <*> newIORef Map.empty
+initEnv devMode = Env <$> newChan <*> pure devMode <*> newIORef Map.empty <*> newIORef 0
 
 --------------------------------------------------------------------------------
 
@@ -94,6 +96,13 @@ readLastSelection filepath = do
   ref <- lift $ asks envSourceMap
   mapping <- liftIO $ readIORef ref
   return $ snd =<< Map.lookup filepath mapping
+
+bumpCounter :: LspT () ServerM Int
+bumpCounter = do 
+  ref <- lift $ asks envCounter
+  n <- liftIO $ readIORef ref
+  liftIO $ writeIORef ref (succ n)
+  return n
 
 --------------------------------------------------------------------------------
 
@@ -163,9 +172,36 @@ handlers =
           JSON.Error msg -> do
             writeLog " --> CustomMethod: CannotDecodeRequest"
             return $ CannotDecodeRequest $ show msg ++ "\n" ++ show params
-          JSON.Success request -> do
+          JSON.Success request@(Req filepath kind) -> do
             writeLog $ " --> Custom Reqeust: " <> pack (show request)
-            handleRequest i request
+            
+            result <- readSource filepath
+            case result of
+              Nothing -> pure NotLoaded
+              Just source -> do
+                -- send Diagnostics
+                version <- case i of 
+                  IdInt n -> return n
+                  IdString _ -> bumpCounter
+                sendDiagnostics filepath source version
+                -- convert Request to Response
+                kinds <- case kind of 
+                  ReqInspect selStart selEnd -> do 
+                    updateSelection filepath (selStart, selEnd)
+                    return $ asGlobalError $ do
+                      (pos, specs, globalProps, warnings) <- checkEverything filepath source (Just (selStart, selEnd))
+                      return [ResOK i pos specs globalProps warnings]
+                  ReqRefine index payload -> return $ asLocalError index $ do
+                    _ <- refine payload
+                    return [ResResolve index]
+                  ReqSubstitute index expr _subst -> return $ asGlobalError $ do
+                    A.Program _ _ defns _ _ <- parseProgram filepath source
+                    let expr' = runSubstM (expand (A.Subst expr _subst)) defns 1
+                    return [ResSubstitute index expr']
+                  ReqExportProofObligations -> return $ asGlobalError $ do
+                    return [ResConsoleLog "Export"]
+                  ReqDebug -> return $ error "crash!"
+                return $ Res filepath kinds
 
         writeLog $ " <-- " <> pack (show response)
         responder $ Right $ JSON.toJSON response,
@@ -180,15 +216,9 @@ handlers =
               Nothing -> pure ()
               Just filepath -> do
                 updateSource filepath source
-                lastSelection <- readLastSelection filepath
-                
-                let result = runM (checkEverything filepath source lastSelection)
-                let response = case result of 
-                      Left e -> Res filepath [ResError [globalError e]]
-                      Right (pos, specs, globalProps, warnings) -> Res filepath [ResOK (IdInt 0) pos specs globalProps warnings]
-                sendNotification (SCustomMethod "guacamole") $ JSON.toJSON response
-
-                toLSPSideEffects filepath source,
+                version <- bumpCounter
+                checkAndSendResult filepath source version
+                sendDiagnostics filepath source version,
       -- when the client opened the document
       notificationHandler STextDocumentDidOpen $ \ntf -> do
         writeLog " --> TextDocumentDidOpen"
@@ -197,33 +227,22 @@ handlers =
           Nothing -> pure ()
           Just filepath -> do
             updateSource filepath source
-
-            let result = runM (checkEverything filepath source Nothing)
-            let response = case result of 
-                  Left e -> Res filepath [ResError [globalError e]]
-                  Right (pos, specs, globalProps, warnings) -> Res filepath [ResOK (IdInt 0) pos specs globalProps warnings]
-            sendNotification (SCustomMethod "guacamole") $ JSON.toJSON response
-
-            toLSPSideEffects filepath source
+            version <- bumpCounter
+            checkAndSendResult filepath source version
+            sendDiagnostics filepath source version
     ]
 
-handleRequest :: ID -> Request -> LspT () ServerM Response
-handleRequest i (Req filepath kind) = do
-  result <- readSource filepath
-  case result of
-    Nothing -> pure NotLoaded
-    Just source -> do
-      -- send Diagnostics
-      toLSPSideEffects filepath source
-      -- save Mouse Selection
-      case kind of
-        ReqInspect selStart selEnd -> updateSelection filepath (selStart, selEnd)
-        _ -> return ()
-      -- convert Request to Response
-      return $ toResponse i filepath source kind
+checkAndSendResult :: FilePath -> Text -> Int -> LspT () ServerM ()
+checkAndSendResult filepath source version = do 
+  lastSelection <- readLastSelection filepath
+  let result = runM (checkEverything filepath source lastSelection)
+  let response = case result of 
+        Left e -> Res filepath [ResError [globalError e]]
+        Right (pos, specs, globalProps, warnings) -> Res filepath [ResOK (IdInt version) pos specs globalProps warnings]
+  sendNotification (SCustomMethod "guacamole") $ JSON.toJSON response
 
-toLSPSideEffects :: FilePath -> Text -> LspT () ServerM ()
-toLSPSideEffects filepath source = do
+sendDiagnostics :: FilePath -> Text -> Int -> LspT () ServerM ()
+sendDiagnostics filepath source version = do
   -- send diagnostics
   diags <- do
     let result = runM $ checkEverything filepath source Nothing
@@ -231,9 +250,8 @@ toLSPSideEffects filepath source = do
       Left err -> errorToDiagnostics err
       Right res -> resultToDiagnostics res
   let fileUri = toNormalizedUri (filePathToUri filepath)
-  let version = Just 0
 
-  publishDiagnostics 100 fileUri version (partitionBySource diags)
+  publishDiagnostics 100 fileUri (Just version) (partitionBySource diags)
   where
     resultToDiagnostics :: Result -> [Diagnostic]
     resultToDiagnostics (pos, _, _, warnings) = map proofObligationToDiagnostic pos ++ concatMap warningToDiagnostics warnings
@@ -355,24 +373,6 @@ filterPOs (selStart, selEnd) pos = opverlappedPOs
           overlapped = reverse $ sort $ filter isOverlapped pos
 
 type ID = LspId ('CustomMethod :: Method 'FromClient 'Request)
-
-toResponse :: ID -> FilePath -> Text -> ReqKind -> Response
-toResponse lspID filepath source kind = Res filepath (handle kind)
-  where
-    handle :: ReqKind -> [ResKind]
-    handle (ReqInspect selStart selEnd) = asGlobalError $ do
-      (pos, specs, globalProps, warnings) <- checkEverything filepath source (Just (selStart, selEnd))
-      return [ResOK lspID pos specs globalProps warnings]
-    handle (ReqRefine i payload) = asLocalError i $ do
-      _ <- refine payload
-      return [ResResolve i]
-    handle (ReqSubstitute i expr _subst) = asGlobalError $ do
-      A.Program _ _ defns _ _ <- parseProgram filepath source
-      let expr' = runSubstM (expand (A.Subst expr _subst)) defns 1
-      return [ResSubstitute i expr']
-    handle ReqExportProofObligations = asGlobalError $ do
-      return [ResConsoleLog "Export"]
-    handle ReqDebug = error "crash!"
 
 --------------------------------------------------------------------------------
 
