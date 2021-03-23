@@ -181,11 +181,13 @@ handlers =
               Just filepath -> do
                 updateSource filepath source
                 lastSelection <- readLastSelection filepath
-                case lastSelection of
-                  Nothing -> return ()
-                  Just (selStart, selEnd) -> do
-                    let response = toResponse (IdInt 0) filepath source (ReqInspect selStart selEnd)
-                    sendNotification (SCustomMethod "guacamole") $ JSON.toJSON response
+                
+                let result = runM (checkEverything filepath source lastSelection)
+                let response = case result of 
+                      Left e -> Res filepath [ResError [globalError e]]
+                      Right (pos, specs, globalProps, warnings) -> Res filepath [ResOK (IdInt 0) pos specs globalProps warnings]
+                sendNotification (SCustomMethod "guacamole") $ JSON.toJSON response
+
                 toLSPSideEffects filepath source,
       -- when the client opened the document
       notificationHandler STextDocumentDidOpen $ \ntf -> do
@@ -195,6 +197,13 @@ handlers =
           Nothing -> pure ()
           Just filepath -> do
             updateSource filepath source
+
+            let result = runM (checkEverything filepath source Nothing)
+            let response = case result of 
+                  Left e -> Res filepath [ResError [globalError e]]
+                  Right (pos, specs, globalProps, warnings) -> Res filepath [ResOK (IdInt 0) pos specs globalProps warnings]
+            sendNotification (SCustomMethod "guacamole") $ JSON.toJSON response
+
             toLSPSideEffects filepath source
     ]
 
@@ -213,68 +222,22 @@ handleRequest i (Req filepath kind) = do
       -- convert Request to Response
       return $ toResponse i filepath source kind
 
---------------------------------------------------------------------------------
-
-calculateRelatedPOs :: [PO] -> (Int, Int) -> [PO]
-calculateRelatedPOs pos (selStart, selEnd) = reverse $ case overlapped of
-            [] -> []
-            (x : _) -> case locOf x of
-              NoLoc -> []
-              Loc start _ ->
-                let same y = case locOf y of
-                      NoLoc -> False
-                      Loc start' _ -> start == start'
-                 in filter same overlapped
-    where
-      -- find the POs whose Range overlaps with the selection
-      isOverlapped po = case locOf po of
-            NoLoc -> False
-            Loc start' end' ->
-              let start = posCoff start'
-                  end = posCoff end' + 1
-               in (selStart <= start && selEnd >= start) -- the end of the selection overlaps with the start of PO
-                    || (selStart <= end && selEnd >= end) -- the start of the selection overlaps with the end of PO
-                    || (selStart <= start && selEnd >= end) -- the selection covers the PO
-                    || (selStart >= start && selEnd <= end) -- the selection is within the PO
-      -- sort them by comparing their starting position
-      overlapped = reverse $ sort $ filter isOverlapped pos
-
-
-type ID = LspId ('CustomMethod :: Method 'FromClient 'Request)
-
-toResponse :: ID -> FilePath -> Text -> ReqKind -> Response
-toResponse lspID filepath source kind = Res filepath (handle kind)
-  where
-    handle :: ReqKind -> [ResKind]
-    handle (ReqInspect selStart selEnd) = asGlobalError $ do
-      (pos, specs, globalProps, warnings) <- check filepath source
-      -- find the POs whose Range overlaps with the selection
-      let opverlapped = calculateRelatedPOs pos (selStart, selEnd)
-      return [ResOK lspID opverlapped specs globalProps warnings]
-    handle (ReqRefine i payload) = asLocalError i $ do
-      _ <- refine payload
-      return [ResResolve i]
-    handle (ReqSubstitute i expr _subst) = asGlobalError $ do
-      A.Program _ _ defns _ _ <- parseProgram filepath source
-      let expr' = runSubstM (expand (A.Subst expr _subst)) defns 1
-      return [ResSubstitute i expr']
-    handle ReqExportProofObligations = asGlobalError $ do
-      return [ResConsoleLog "Export"]
-    handle ReqDebug = error "crash!"
-
 toLSPSideEffects :: FilePath -> Text -> LspT () ServerM ()
 toLSPSideEffects filepath source = do
   -- send diagnostics
   diags <- do
-    let result = runM $ check filepath source
+    let result = runM $ checkEverything filepath source Nothing
     return $ case result of
       Left err -> errorToDiagnostics err
-      Right (pos, _, _, warnings) -> map proofObligationToDiagnostic pos ++ concatMap warningToDiagnostics warnings
+      Right res -> resultToDiagnostics res
   let fileUri = toNormalizedUri (filePathToUri filepath)
   let version = Just 0
 
   publishDiagnostics 100 fileUri version (partitionBySource diags)
   where
+    resultToDiagnostics :: Result -> [Diagnostic]
+    resultToDiagnostics (pos, _, _, warnings) = map proofObligationToDiagnostic pos ++ concatMap warningToDiagnostics warnings
+
     warningToDiagnostics :: StructWarning -> [Diagnostic]
     warningToDiagnostics (MissingBound loc) = [makeWarning loc "Bound Missing" "Bound missing at the end of the assertion before the DO construct \" , bnd : ... }\""]
     warningToDiagnostics (ExcessBound loc) = [makeWarning loc "Excess Bound" "Unnecessary bound annotation at this assertion"]
@@ -364,6 +327,55 @@ toLSPSideEffects filepath source = do
 
 --------------------------------------------------------------------------------
 
+-- | Given an interval of mouse selection, calculate POs within the interval, ordered by their vicinity
+filterPOs :: (Int, Int) -> [PO] -> [PO]
+filterPOs (selStart, selEnd) pos = opverlappedPOs
+  where 
+    opverlappedPOs = reverse $ case overlapped of
+                [] -> []
+                (x : _) -> case locOf x of
+                  NoLoc -> []
+                  Loc start _ ->
+                    let same y = case locOf y of
+                          NoLoc -> False
+                          Loc start' _ -> start == start'
+                    in filter same overlapped
+        where
+          -- find the POs whose Range overlaps with the selection
+          isOverlapped po = case locOf po of
+                NoLoc -> False
+                Loc start' end' ->
+                  let start = posCoff start'
+                      end = posCoff end' + 1
+                  in (selStart <= start && selEnd >= start) -- the end of the selection overlaps with the start of PO
+                        || (selStart <= end && selEnd >= end) -- the start of the selection overlaps with the end of PO
+                        || (selStart <= start && selEnd >= end) -- the selection covers the PO
+                        || (selStart >= start && selEnd <= end) -- the selection is within the PO
+          -- sort them by comparing their starting position
+          overlapped = reverse $ sort $ filter isOverlapped pos
+
+type ID = LspId ('CustomMethod :: Method 'FromClient 'Request)
+
+toResponse :: ID -> FilePath -> Text -> ReqKind -> Response
+toResponse lspID filepath source kind = Res filepath (handle kind)
+  where
+    handle :: ReqKind -> [ResKind]
+    handle (ReqInspect selStart selEnd) = asGlobalError $ do
+      (pos, specs, globalProps, warnings) <- checkEverything filepath source (Just (selStart, selEnd))
+      return [ResOK lspID pos specs globalProps warnings]
+    handle (ReqRefine i payload) = asLocalError i $ do
+      _ <- refine payload
+      return [ResResolve i]
+    handle (ReqSubstitute i expr _subst) = asGlobalError $ do
+      A.Program _ _ defns _ _ <- parseProgram filepath source
+      let expr' = runSubstM (expand (A.Subst expr _subst)) defns 1
+      return [ResSubstitute i expr']
+    handle ReqExportProofObligations = asGlobalError $ do
+      return [ResConsoleLog "Export"]
+    handle ReqDebug = error "crash!"
+
+--------------------------------------------------------------------------------
+
 type M = Except Error
 
 runM :: M a -> Either Error a
@@ -403,13 +415,17 @@ parseProgram filepath source = toAbstract <$> parse pProgram filepath source
 refine :: Text -> M ()
 refine = void . parse pStmts "<specification>"
 
+type Result = ([PO], [Spec], [A.Expr], [StructWarning])
+
 -- | Type check + generate POs and Specs
-check :: FilePath -> Text -> M ([PO], [Spec], [A.Expr], [StructWarning])
-check filepath source = do
+checkEverything :: FilePath -> Text -> Maybe (Int, Int) -> M Result
+checkEverything filepath source mouseSelection = do
   program@(A.Program _ globalProps _ _ _) <- parseProgram filepath source
   typeCheck program
   (pos, specs, warings) <- genPO program
-  return (pos, specs, globalProps, warings)
+  case mouseSelection of 
+    Nothing -> return (pos, specs, globalProps, warings)
+    Just sel -> return (filterPOs sel pos, specs, globalProps, warings)
 
 typeCheck :: A.Program -> M ()
 typeCheck = withExcept TypeError . TypeChecking.checkProg
