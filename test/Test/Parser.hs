@@ -48,7 +48,6 @@ tests = testGroup "Prettifier" [expression, type', declaration, statement, parse
 parse :: Parser a -> Text -> Either Error a
 parse parser = 
   runExcept . withExcept SyntacticError . liftEither . runParse parser "<test>" 
-  -- LSP.runM $ LSP.scanLazy "<test>" raw >>= LSP.parse parser "<test>"
 
 render :: Pretty a => Either Error a -> Text
 render = renderLazy . layoutPretty defaultLayoutOptions . pretty
@@ -166,10 +165,13 @@ type' =
       testCase "array 1" $ run "array [0 .. N  )   of    Int",
       testCase "array 2" $ run "array (   0   ..  N   ] of Int",
       testCase "array 3" $ run "array [  0 .. N  ] of     Int",
-      testCase "array 4" $ run "array (  0 .. (Int) ) of \n Int"
+      testCase "array 4" $ run' 
+        "array (  0 .. (Int) ) of \n Int" 
+        "Error Syntactic Error [(<test>:1:16, using keyword as variable name )]\n"
     ]
   where
     run = isomorphic (scn >> pType)
+    run' = compare (scn >> pType)
 
 --------------------------------------------------------------------------------
 
@@ -179,6 +181,9 @@ declaration =
   testGroup
     "Declarations"
     [ testCase "variable" $ run "var   x     :   ( Int)",
+      testCase "variable keyword collision 1" $ 
+        run' "var if : Int" "Error Syntactic Error [(<test>:1:5, using keyword as variable name )]\n",
+      testCase "variable keyword collision 2" $ run "var iff : Int",
       testCase "variable (with newlines in between)" $
         run
           "var\n\
@@ -186,10 +191,13 @@ declaration =
           \   : Int\n",
       testCase "variable with properties" $ run "var x : Int  {    True \n }",
       testCase "constant" $ run "con X , Z,B, Y : Int",
+      testCase "constant keyword collision 1" $ run' "con False : Int" "Error Syntactic Error [(<test>:1:5, using keyword as variable name )]\n",
+      testCase "constant keyword collision 2" $ run "con Falsee : Int",
       testCase "let binding" $ run " let  X   i  =  N  >   (0)  "
     ]
   where
     run = isomorphic pDeclaration
+    run' = compare pDeclaration
 
 --------------------------------------------------------------------------------
 
@@ -219,7 +227,7 @@ parseError :: TestTree
 parseError =
   testGroup
     "Parse error"
-    [ testCase "quant with parentheses" $ run "<| (+) i : i > 0 : f i |>" "Error Syntactic Error [(<test>:1:4, unexpected '(' expecting expression )]\n"
+    [ testCase "quant with parentheses" $ run "<| (+) i : i > 0 : f i |>" "Error Syntactic Error [(<test>:1:5, unexpected \"+) i \" expecting expression )]\n"
     ]
   where
     run = compare pExpr
