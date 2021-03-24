@@ -24,8 +24,8 @@ import Test.Tasty.HUnit
 import qualified Data.Bifunctor
 
 tests :: TestTree
--- tests = testGroup "Type" [typeCheckTests]
-tests = testGroup "Type" [unifyTests, typeCheckTests]
+tests = testGroup "Type" [typeCheckTests]
+-- tests = testGroup "Type" [unifyTests, typeCheckTests]
 
 
 unifyTests :: TestTree 
@@ -44,22 +44,26 @@ inferTests =
   testGroup
     "infer"
     [
-      testCase "lookup name in env" $
-        runInfer env (lookupEnv (Name "b" NoLoc)) @?= liftEither (Right (tbool, [])),
-      testCase "infer var" $
-        runInfer env (infer (v "b")) @?= liftEither (Right (tbool, [])),
-      testCase "infer op" $
-        runInfer env (infer (o Add)) @?= liftEither (Right (f tint (f tint tint), [])),
-      testCase "check assignment" $
-        checkStmt env (Assign [n "b"] [xaddy] NoLoc) @?= liftEither (Left (UnifyFailed tbool tint NoLoc)),
-      testCase "check gdcmd" $
-        checkGdCmd env gd @?= liftEither (Left (UnifyFailed tint tbool NoLoc)),
-      testCase "check do" $
-        checkStmt env (Do [gd] NoLoc) @?= liftEither (Left (UnifyFailed tint tbool NoLoc))
+      -- testCase "lookup name in env" $
+      --   runInfer env (lookupEnv (Name "b" NoLoc)) @?= liftEither (Right (tbool, [])),
+      -- testCase "infer var" $
+      --   runInfer env (infer (v "b")) @?= liftEither (Right (tbool, [])),
+      -- testCase "infer op" $
+      --   runInfer env (infer (o Add)) @?= liftEither (Right (f tint (f tint tint), [])),
+      -- testCase "check assignment" $
+      --   checkStmt env (Assign [n "b"] [xaddy] NoLoc) @?= liftEither (Left (UnifyFailed tbool tint NoLoc)),
+      -- testCase "check gdcmd" $
+      --   checkGdCmd env gd @?= liftEither (Left (UnifyFailed tint tbool NoLoc)),
+      -- testCase "check do" $
+      --   checkStmt env (Do [gd] NoLoc) @?= liftEither (Left (UnifyFailed tint tbool NoLoc)),
+      testCase "check array" $
+        inferDecl env (ConstDecl [n "A"] (arr (endi (litNum 0)) (ende (con "N")) tint) Nothing NoLoc) @?= liftEither (Right env)
     ]
     where
-      fff g (a, b) = (g a, g b)
-      env = TypeEnv $ Map.fromList [("x", ForallV [] tint), ("y", ForallV [] tint), ("b", ForallV [] tbool)]
+      env = TypeEnv $ Map.fromList [("N", ForallV [] tint)]
+      -- fff g (a, b) = (g a, g b)
+      -- env = TypeEnv $ Map.fromList [("x", ForallV [] tint), ("y", ForallV [] tint), ("b", ForallV [] tbool)]
+      con name = Const (n name) NoLoc
       tv x = TVar (n x) NoLoc
       n x = Name x NoLoc
       v x = Var (n x) NoLoc
@@ -68,6 +72,12 @@ inferTests =
       f t1 t2 = TFunc t1 t2 NoLoc 
       tbool = TBase TBool NoLoc 
       tint = TBase TInt NoLoc
+      arr e1 e2 t = TArray (i e1 e2) t NoLoc
+      i e1 e2 = Interval e1 e2 NoLoc
+      endi e = Including e
+      ende e = Excluding e
+      litNum i = Lit (Num i) NoLoc
+      
       xaddy = a (a (o Add) (v "x")) (v "y")
       gd = GdCmd xaddy [Skip NoLoc] NoLoc
 
@@ -81,7 +91,7 @@ typeCheckTests =
     [
       typeCheckGolden "2" "./test/source/2.gcl",
       typeCheckGolden "quant1" "./test/source/quant1.gcl",
-      typeCheckGolden "mss" "./examples/mss.gcl"
+      typeCheckGolden "mss" "./test/source/mss.gcl"
     ]
 
 typeCheckGolden :: String -> FilePath -> TestTree 
