@@ -3,6 +3,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE RoleAnnotations #-}
+{-# LANGUAGE NamedFieldPuns #-}
 module Syntax.Parser.Util where
 
 import Data.Text.Lazy (Text)
@@ -77,21 +78,26 @@ instance MonadParsec e s m => MonadParsec e s (ParseFunc m) where
 
 type SyntacticError = (Loc, String)
 
-getSourcePos' :: (MonadParsec e s m) => m SourcePos
-getSourcePos' = do
-  st <- getParserState
-  let pst = reachOffsetNoLine (stateOffset st - 1) (statePosState st)
-  setParserState st {statePosState = pst}
-  return (pstateSourcePos pst)
-
 getTokenColumn :: Syntax.Concrete.Token e -> Text.Megaparsec.Pos
 getTokenColumn (Token s _) = mkPos . posCol $ s
 
-sourceToLoc :: SourcePos -> Loc
-sourceToLoc SourcePos{..} = Loc.locOf $ Loc.Pos sourceName (unPos sourceLine) (unPos sourceColumn) 0
-
 posStateToLoc :: Stream s => PosState s -> Loc
-posStateToLoc = Loc.locOf . sourceToLoc . pstateSourcePos
+posStateToLoc PosState {pstateOffset, pstateSourcePos = SourcePos{..}} = 
+    Loc.locOf $ Loc.Pos sourceName (unPos sourceLine) (unPos sourceColumn) pstateOffset 
+
+getCurLoc :: (MonadParsec e s m) => m Loc
+getCurLoc = do
+  st@State{stateOffset, statePosState} <- getParserState
+  let pst = reachOffsetNoLine stateOffset statePosState
+  setParserState st{statePosState = pst}
+  return . posStateToLoc $ pst
+
+getEndLoc :: (MonadParsec e s m) => m Loc
+getEndLoc = do
+  st@State{stateOffset, statePosState} <- getParserState
+  let pst= reachOffsetNoLine (stateOffset - 1) statePosState
+  setParserState st{statePosState = pst}
+  return . posStateToLoc $ pst
 
 fromParseErrorBundle :: ShowErrorComponent e => ParseErrorBundle Text e -> [SyntacticError]
 fromParseErrorBundle (ParseErrorBundle errs posState)=

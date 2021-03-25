@@ -33,11 +33,11 @@ import Control.Monad.Except (runExcept, withExcept, liftEither)
 import Syntax.Parser.Token
 import Syntax.Concrete (Type(..), TBase (..))
 import Data.Loc (Located(locOf))
-import Text.Megaparsec (Stream(reachOffset), setOffset, getOffset, MonadParsec(updateParserState, getParserState, observing, lookAhead, try), State(State, statePosState, stateInput, stateOffset), getInput)
+import Text.Megaparsec (Stream(reachOffset), setOffset, getOffset, MonadParsec(updateParserState, getParserState, observing, lookAhead, try), State(State, statePosState, stateInput, stateOffset), getInput, getSourcePos)
 import Control.Monad.Combinators (optional, many, (<|>))
 import qualified Data.Ord as Ord
 import Control.Monad (void)
-import Syntax.Parser.Util (parser, (↓))
+import Syntax.Parser.Util (parser, (↓), getCurLoc)
 
 tests :: TestTree
 -- tests = testGroup "Prettifier" [myTest]
@@ -48,7 +48,6 @@ tests = testGroup "Prettifier" [expression, type', declaration, statement, parse
 parse :: Parser a -> Text -> Either Error a
 parse parser = 
   runExcept . withExcept SyntacticError . liftEither . runParse parser "<test>" 
-  -- LSP.runM $ LSP.scanLazy "<test>" raw >>= LSP.parse parser "<test>"
 
 render :: Pretty a => Either Error a -> Text
 render = renderLazy . layoutPretty defaultLayoutOptions . pretty
@@ -71,34 +70,31 @@ compare parser actual expected = removeWhitespace (render (parse parser actual))
 myTest :: TestTree
 myTest = 
   testGroup
-    "conjective chain"
+    "pos test"
     [
-      testCase "a + 1 <= b + 2 < c + 3" $ run "a + 1 <= b + 2 < c + 3",
-      testCase "a  + 1 < b" $ run "a + 1 < b",
-      testCase "do indentation" $ runDo
-        "  do\n\
-        \ y /= 1 ->\n\
-        \skip\n\
-        \  od\n"
+      testCase "pos test" $ run 
+        "a := a + 1"
     ]
     where
-      run = isomorphic ((↓) pExpr' sc)
-      run' t = show (parse ((↓) pExpr' sc) t) @?= ""
-      runDo t = show (parse wrap t) @?= ""
+      run t = show (parse wrap' t) @?= ""
+      wrap' = do
+        a1 <- (↓) (symbol "a") sc
+        ass <- (↓) (symbol ":=") sc
+        a2 <- (↓) (symbol "a") sc
+        plus <- (↓) (symbol "+") sc
+        one <- (↓) (symbol "1") sc
+        return (a1, ass, a2, plus, one)
+
       wrap = do
-        scn
-        ref <- Lex.indentLevel
-        -- (↓) lexDo scn
-        -- indentGuard' scn Ord.GT ref
-        (↓) lexDo (void $ Lex.indentGuard scn Ord.GT ref)
-        -- pos <- Lex.indentLevel
-        -- if Ord.compare pos ref == Ord.GT
-        --   then do
-        --     pGdCmd 
-        --     i <- getInput
-        --     return (ref, pos, Ord.compare pos ref, i)
-        --   else
-        --     Lex.incorrectIndent Ord.GT ref pos
+        ap <- getCurLoc
+        a <- string "a"
+        ap' <- getCurLoc
+        sc
+        assp <- getCurLoc
+        ass <- string ":="
+        assp' <- getCurLoc
+        return ((a, ap, ap'), (ass, assp, assp'))
+      
 
 -- | Expression
 expression :: TestTree
@@ -169,10 +165,13 @@ type' =
       testCase "array 1" $ run "array [0 .. N  )   of    Int",
       testCase "array 2" $ run "array (   0   ..  N   ] of Int",
       testCase "array 3" $ run "array [  0 .. N  ] of     Int",
-      testCase "array 4" $ run "array (  0 .. (Int) ) of \n Int"
+      testCase "array 4" $ run' 
+        "array (  0 .. (Int) ) of \n Int" 
+        "Error Syntactic Error [(<test>:1:16, using keyword as variable name )]\n"
     ]
   where
     run = isomorphic (scn >> pType)
+    run' = compare (scn >> pType)
 
 --------------------------------------------------------------------------------
 
@@ -182,6 +181,9 @@ declaration =
   testGroup
     "Declarations"
     [ testCase "variable" $ run "var   x     :   ( Int)",
+      testCase "variable keyword collision 1" $ 
+        run' "var if : Int" "Error Syntactic Error [(<test>:1:5, using keyword as variable name )]\n",
+      testCase "variable keyword collision 2" $ run "var iff : Int",
       testCase "variable (with newlines in between)" $
         run
           "var\n\
@@ -189,10 +191,13 @@ declaration =
           \   : Int\n",
       testCase "variable with properties" $ run "var x : Int  {    True \n }",
       testCase "constant" $ run "con X , Z,B, Y : Int",
+      testCase "constant keyword collision 1" $ run' "con False : Int" "Error Syntactic Error [(<test>:1:5, using keyword as variable name )]\n",
+      testCase "constant keyword collision 2" $ run "con Falsee : Int",
       testCase "let binding" $ run " let  X   i  =  N  >   (0)  "
     ]
   where
     run = isomorphic pDeclaration
+    run' = compare pDeclaration
 
 --------------------------------------------------------------------------------
 
@@ -222,7 +227,7 @@ parseError :: TestTree
 parseError =
   testGroup
     "Parse error"
-    [ testCase "quant with parentheses" $ run "<| (+) i : i > 0 : f i |>" "Error Syntactic Error [(<test>:1:4, unexpected '(' expecting expression )]\n"
+    [ testCase "quant with parentheses" $ run "<| (+) i : i > 0 : f i |>" "Error Syntactic Error [(<test>:1:5, unexpected \"+) i \" expecting expression )]\n"
     ]
   where
     run = compare pExpr

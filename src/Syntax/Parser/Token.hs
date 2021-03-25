@@ -206,6 +206,11 @@ tokTypeBool = "Bool"
 tokTypeChar :: Text
 tokTypeChar = "Char"
 
+tokTrue :: Text
+tokTrue = "True"
+
+tokFalse :: Text
+tokFalse = "False"
 
 notLowerKeyword :: Text -> Bool
 notLowerKeyword t = 
@@ -213,6 +218,8 @@ notLowerKeyword t =
     t /= tokDo && t /= tokOd && t /= tokBnd && t /= tokCon && t /= tokVar &&
     t /= tokLet && t /= tokArray && t /= tokOf
 
-notUpperKeyworkd :: Text -> Bool
-notUpperKeyworkd t = 
-  t /= tokTypeInt && t /= tokTypeBool && t /= tokTypeChar
+notUpperKeyword :: Text -> Bool
+notUpperKeyword t = 
+  t /= tokTypeInt && t /= tokTypeBool && t /= tokTypeChar &&
+  t /= tokTrue && t /= tokFalse
+
