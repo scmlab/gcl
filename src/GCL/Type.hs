@@ -81,6 +81,12 @@ instance Substitutable TypeEnv where
 occursT :: (Substitutable a) => TVar -> a -> Bool
 occursT x s = x `Set.member` fv s
 
+typeWithLoc :: Loc -> Type -> Type
+typeWithLoc l (TBase b _) = TBase b l
+typeWithLoc l (TArray i t _) = TArray i t l
+typeWithLoc l (TFunc t1 t2 _) = TFunc t1 t2 l
+typeWithLoc l (TVar n _) = TVar n l
+
 ------------------------------------------
 -- type inference
 ------------------------------------------
@@ -135,7 +141,7 @@ infer (Quant op iters rng t l) = do
   tr <- inEnv [(n, ForallV [] (TBase TInt loc)) | Name n loc <- iters] (infer rng)
   tt <- inEnv [(n, ForallV [] (TBase TInt loc)) | Name n loc <- iters] (infer t)
   uni to (TFunc x (TFunc x x l) l)
-  uni tr (TBase TBool l)
+  uni tr (TBase TBool (locOf rng))
   uni tt x
   return x
 infer (Subst expr sub) = do
@@ -183,7 +189,7 @@ lookupEnv :: Name -> Infer Type
 lookupEnv (Name n l) = do
   (TypeEnv env) <- ask
   case Map.lookup n env of
-    Just s -> instantiate s
+    Just (ForallV vs t) -> instantiate (ForallV vs (typeWithLoc l t))
     Nothing -> throwError $ NotInScope n l
 
 -- inEnv :: (TVar, Scheme) -> Infer a -> Infer a
@@ -255,11 +261,16 @@ checkStmt _ (Spec _) = return ()
 checkStmt _ (Proof _) = return ()
 
 
--- declsMap :: [Declaration] -> Map Name (Either Type Expr)
--- declsMap [] = Map.empty
--- declsMap (ConstDecl ns t _ _ : decls) = foldl (\m n -> Map.insert n (Left t) m) Map.empty ns
--- declsMap (VarDecl ns t _ _ : decls) = _
--- declsMap (LetDecl n args expr _ : decls) = _
+declsMap :: [Declaration] -> Map Name (Either Type Expr)
+declsMap [] = Map.empty
+declsMap (ConstDecl ns t _ _ : decls) = 
+  foldl (\m n -> Map.insert n (Left t) m) (declsMap decls) ns
+declsMap (VarDecl ns t _ _ : decls) = 
+  foldl (\m n -> Map.insert n (Left t) m) (declsMap decls) ns
+declsMap (LetDecl n args expr _ : decls) = 
+  Map.insert n (Right expr') (declsMap decls)
+  where
+    expr' = foldr (\a e' -> Lam a e' (locOf e')) expr args
 
 checkProg :: Program -> TM ()
 checkProg (Program decls exprs defs stmts _) = do
@@ -294,8 +305,8 @@ unifies (TFunc t1 t2 _) (TFunc t3 t4 _) = do
   s1 <- unifies t1 t3
   s2 <- unifies (apply s1 t2) (apply s1 t4)
   return (s2 `compose` s1)
-unifies (TVar (Name x _) _) t = x `bind` t
-unifies t (TVar (Name x _) _) = x `bind` t
+unifies (TVar (Name x _) _) t = bind x t (locOf t)
+unifies t (TVar (Name x _) l) = bind x t l
 unifies t1 t2 = throwError $ UnifyFailed t1 t2 (locOf t1)
 
 runSolver' :: [Constraint] -> Either TypeError SubstT
@@ -312,12 +323,12 @@ solver (s, (t1, t2) : cs) = do
   where
     f g (a, b) = (g a, g b)
 
-bind :: TVar -> Type -> TM SubstT
-x `bind` (TVar (Name y _) _)
+bind :: TVar -> Type -> Loc -> TM SubstT
+bind x (TVar (Name y _) _) _
   | x == y = return emptySubstT
-x `bind` t
-  | occursT x t = throwError $ RecursiveType x t (locOf t)
-  | otherwise = return (Map.singleton x t)
+bind x t l
+  | occursT x t = throwError $ RecursiveType x t l
+  | otherwise = return (Map.singleton x (typeWithLoc l t))
 
 ------------------------------------------
 -- helper functions

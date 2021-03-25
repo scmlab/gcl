@@ -31,7 +31,7 @@ import Data.Int (Int64)
 import Prelude hiding (compare)
 import Control.Monad.Except (runExcept, withExcept, liftEither)
 import Syntax.Parser.Token
-import Syntax.Concrete (Type(..), TBase (..))
+import Syntax.Concrete (Type(..), TBase (..),ToAbstract (toAbstract))
 import Data.Loc (Located(locOf))
 import Text.Megaparsec (Stream(reachOffset), setOffset, getOffset, MonadParsec(updateParserState, getParserState, observing, lookAhead, try), State(State, statePosState, stateInput, stateOffset), getInput, getSourcePos)
 import Control.Monad.Combinators (optional, many, (<|>))
@@ -40,8 +40,8 @@ import Control.Monad (void)
 import Syntax.Parser.Util (parser, (↓), getCurLoc)
 
 tests :: TestTree
--- tests = testGroup "Prettifier" [myTest]
-tests = testGroup "Prettifier" [expression, type', declaration, statement, parseError, golden]
+tests = testGroup "Prettifier" [myTest]
+-- tests = testGroup "Prettifier" [expression, type', declaration, statement, parseError, golden]
 
 --------------------------------------------------------------------------------
 
@@ -72,28 +72,18 @@ myTest =
   testGroup
     "pos test"
     [
-      testCase "pos test" $ run 
-        "a := a + 1"
+      testCase "F" $ run'
+        "F",
+      testCase "chain expr" $ run
+        "F i < 0 ∧ F j < 0",
+      testCase "F i < 0" $ run
+        "F i < 0"
     ]
     where
-      run t = show (parse wrap' t) @?= ""
-      wrap' = do
-        a1 <- (↓) (symbol "a") sc
-        ass <- (↓) (symbol ":=") sc
-        a2 <- (↓) (symbol "a") sc
-        plus <- (↓) (symbol "+") sc
-        one <- (↓) (symbol "1") sc
-        return (a1, ass, a2, plus, one)
+      run t = show (parse (toAbstract <$> pExpr) t) @?= ""
+      run' t = show (parse pExpr t) @?= ""
+      
 
-      wrap = do
-        ap <- getCurLoc
-        a <- string "a"
-        ap' <- getCurLoc
-        sc
-        assp <- getCurLoc
-        ass <- string ":="
-        assp' <- getCurLoc
-        return ((a, ap, ap'), (ass, assp, assp'))
       
 
 -- | Expression
