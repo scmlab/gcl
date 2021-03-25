@@ -24,7 +24,7 @@ type TM = Except TypeError
 
 type TVar = Text
 
-newtype TypeEnv = TypeEnv (Map TVar Scheme)
+newtype TypeEnv = TypeEnv (Map TVar Scheme) deriving (Eq, Show)
 
 -- schemes model polymorphic types
 data Scheme = ForallV [TVar] Type deriving (Eq, Show)
@@ -150,11 +150,13 @@ inferExpr env e = do
   return $ closeOver s t
 
 inferDecl :: TypeEnv -> Declaration -> TM TypeEnv
-inferDecl env (ConstDecl ns t _ _) = 
+inferDecl env (ConstDecl ns t _ _) = do
+  checkType env t
   foldM f env [n | Name n _ <- ns]
   where
     f env' n = env' `extend'` (n, generalize env' t)
-inferDecl env (VarDecl ns t _ _) = 
+inferDecl env (VarDecl ns t _ _) = do
+  checkType env t
   foldM f env [n | Name n _ <- ns]
   where
     f env' n = env' `extend'` (n, generalize env' t)
@@ -162,7 +164,7 @@ inferDecl env (LetDecl (Name n _) args expr _) = do
   s <- inferExpr env expr'
   env `extend'` (n, s)
   where
-    expr' = foldr (\a e' -> Lam a e' NoLoc) expr args
+    expr' = foldr (\a e' -> Lam a e' (locOf e')) expr args
 
 instantiate :: Scheme -> Infer Type
 instantiate (ForallV vs t) = 
@@ -214,6 +216,20 @@ checkName env@(TypeEnv envM) (n, expr) =
       (ForallV _ t') <- inferExpr env expr
       void $ runSolver [(t, t')]
 
+checkType :: TypeEnv -> Type -> TM ()
+checkType _ (TBase _ _) = return ()
+checkType env (TArray (Interval e1 e2 _) t _) = do
+  ForallV _ t1 <- inferExpr env (getEndpointExpr e1)
+  void $ runSolver [(t1, TBase TInt NoLoc)]
+  ForallV _ t2 <- inferExpr env (getEndpointExpr e2)
+  void $ runSolver [(t2, TBase TInt NoLoc)]
+  checkType env t
+  where
+    getEndpointExpr (Including e) = e
+    getEndpointExpr (Excluding e) = e
+checkType env (TFunc t1 t2 _) = checkType env t1 >> checkType env t2
+checkType _ (TVar _ _) = return ()
+
 checkExpr :: TypeEnv -> Expr -> TM ()
 checkExpr env expr = void $ inferExpr env expr
 
@@ -237,6 +253,13 @@ checkStmt env (If gdcmds _) = mapM_ (checkGdCmd env) gdcmds
 checkStmt _ (SpecQM _) = return ()
 checkStmt _ (Spec _) = return ()
 checkStmt _ (Proof _) = return ()
+
+
+-- declsMap :: [Declaration] -> Map Name (Either Type Expr)
+-- declsMap [] = Map.empty
+-- declsMap (ConstDecl ns t _ _ : decls) = foldl (\m n -> Map.insert n (Left t) m) Map.empty ns
+-- declsMap (VarDecl ns t _ _ : decls) = _
+-- declsMap (LetDecl n args expr _ : decls) = _
 
 checkProg :: Program -> TM ()
 checkProg (Program decls exprs defs stmts _) = do
@@ -264,6 +287,9 @@ unifies (TBase t1 _) (TBase t2 _)
   | t1 == t2 = return emptySubstT
 unifies (TArray i1 t1 _) (TArray i2 t2 _)
   | i1 == i2 = unifies t1 t2
+-- view array of type `t` as function type of `Int -> t`
+unifies (TArray _ t1 _) (TFunc (TBase TInt _) t2 _) =
+  unifies t1 t2
 unifies (TFunc t1 t2 _) (TFunc t3 t4 _) = do
   s1 <- unifies t1 t3
   s2 <- unifies (apply s1 t2) (apply s1 t4)

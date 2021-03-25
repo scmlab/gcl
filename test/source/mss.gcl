@@ -1,0 +1,2 @@
+con N : Bool
+con A : array (0 .. N] of Int

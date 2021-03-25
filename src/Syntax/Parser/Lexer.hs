@@ -247,7 +247,7 @@ lexOps = choice [
 ------------------------------------------
 
 lexUpper :: LexerF (Text, Loc)
-lexUpper = withPredicate notLowerKeyword . lexeme $ do
+lexUpper = withPredicate notUpperKeyword . lexeme $ do
   x <- upperChar
   xs <- many . choice $ [alphaNumChar , char '_', char '\'']
   return $ tokensToChunk (Proxy :: Proxy Text) (x : xs)
@@ -259,10 +259,10 @@ lexLower = withPredicate notLowerKeyword . lexeme $ do
   return $ tokensToChunk (Proxy :: Proxy Text) (x : xs)
 
 lexTrue :: LexerF Lit
-lexTrue = LitBool True . locOf <$> symbol "True"
+lexTrue = LitBool True . locOf <$> symbol tokTrue
 
 lexFalse :: LexerF Lit
-lexFalse = LitBool False . locOf <$> symbol "False"
+lexFalse = LitBool False . locOf <$> symbol tokFalse
 
 lexInt :: LexerF Lit
 lexInt = uncurry LitInt <$> lexeme Lex.decimal
