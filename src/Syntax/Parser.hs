@@ -265,7 +265,7 @@ arithTable = [
   ]
 
 pTerm :: ParserF Expr
-pTerm = choice [pParen, pLit, pVar, pConst, pQuant] <?> "term"
+pTerm = choice [pParen, pVar, pConst, pLit, pQuant] <?> "term"
 
 pParen :: ParserF Expr
 pParen = Paren <$> lexParenStart <*> pExpr' <*> lexParenEnd

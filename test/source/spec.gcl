@@ -2,8 +2,8 @@ con A, B : Int { A > 0 }
 var x, y, z : Int
 
 { z + x * y = A * B, bnd: y }
-    do y /= 1 -> 
-        {!
-        !}
-    od
+do y /= 1 -> 
+    [!
+    !]
+od
 { z = A * B }
