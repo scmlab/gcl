@@ -8,10 +8,10 @@ import Control.Monad (void)
 import Control.Applicative.Combinators ((<|>), choice, some, many, skipMany)
 import Data.Void (Void)
 import Data.Proxy (Proxy(Proxy))
-import Data.Char (isSymbol, isSpace)
+import Data.Char (isSymbol, isSpace, isAlphaNum)
 import Data.Text.Lazy (Text)
 import Data.Loc (Located(..), Loc(..), (<-->), Pos)
-import Text.Megaparsec (setOffset, getOffset, MonadParsec(try, notFollowedBy), getSourcePos, Stream(tokensToChunk), satisfy, (<?>), Parsec )
+import Text.Megaparsec (setOffset, getOffset, MonadParsec(try, notFollowedBy, tokens), getSourcePos, Stream(tokensToChunk), satisfy, (<?>), Parsec )
 import Text.Megaparsec.Char (string, alphaNumChar, lowerChar, char, upperChar, space1)
 import qualified Text.Megaparsec.Char.Lexer as Lex
 import Syntax.Concrete (Lit(..),  Op(..), Token (..))
@@ -247,15 +247,15 @@ lexOps = choice [
 ------------------------------------------
 
 lexUpper :: LexerF (Text, Loc)
-lexUpper = withPredicate notUpperKeyword . lexeme $ do
+lexUpper =  lexeme . try . withPredicate notUpperKeywords $ do
   x <- upperChar
-  xs <- many . choice $ [alphaNumChar , char '_', char '\'']
+  xs <- many . satisfy $ (\c -> isAlphaNum c || c == '_' || c == '\'')
   return $ tokensToChunk (Proxy :: Proxy Text) (x : xs)
 
 lexLower :: LexerF (Text, Loc)
-lexLower = withPredicate notLowerKeyword . lexeme $ do
+lexLower = lexeme . try . withPredicate notLowerKeywords $ do
   x <- lowerChar 
-  xs <- many . choice $ [alphaNumChar, char '_', char '\'']
+  xs <- many . satisfy $ (\c -> isAlphaNum c || c == '_' || c == '\'')
   return $ tokensToChunk (Proxy :: Proxy Text) (x : xs)
 
 lexTrue :: LexerF Lit
@@ -300,13 +300,12 @@ withLoc p = do
 notFollowedBySymbol :: LexerF a -> LexerF a
 notFollowedBySymbol m = m <* notFollowedBy (satisfy isSymbol)
 
-withPredicate :: (a -> Bool) -> LexerF (a, Loc) -> LexerF (a, Loc)
-withPredicate f p = (↑) (\sc' -> do
-    o <- getOffset
-    (r, loc) <- (↓) p sc'
-    if f r
-      then return (r, loc)
-      else do
-        setOffset o
-        fail "using keyword as variable name"
-  )
+withPredicate :: (a -> Bool) -> Lexer a -> Lexer a
+withPredicate f p = do
+  o <- getOffset
+  x <- p
+  if f x
+    then return x
+    else do
+      setOffset o
+      fail "using keyword as variable name"
