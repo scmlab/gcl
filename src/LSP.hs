@@ -189,8 +189,8 @@ handlers =
                   ReqInspect selStart selEnd -> do 
                     updateSelection filepath (selStart, selEnd)
                     return $ asGlobalError $ do
-                      (pos, specs, globalProps, warnings) <- checkEverything filepath source (Just (selStart, selEnd))
-                      return [ResOK i pos specs globalProps warnings]
+                      (pos, _specs, _globalProps, _warnings) <- checkEverything filepath source (Just (selStart, selEnd))
+                      return [ResInspect pos]
                   ReqRefine index payload -> return $ asLocalError index $ do
                     _ <- refine payload
                     return [ResResolve index]
@@ -466,6 +466,7 @@ instance Show Request where
 -- | Response
 data ResKind
   = ResOK ID [PO] [Spec] [A.Expr] [StructWarning]
+  | ResInspect [PO]
   | ResError [(Site, Error)]
   | ResResolve Int -- resolves some Spec
   | ResSubstitute Int A.Expr
@@ -485,6 +486,7 @@ instance Show ResKind where
       <> " props, "
       <> show (length warnings)
       <> " warnings"
+  show (ResInspect pos) = "Inspect " <> show (length pos) <> " POs"
   show (ResError errors) = "Error " <> show (length errors) <> " errors"
   show (ResResolve i) = "Resolve " <> show i
   show (ResSubstitute i _) = "Substitute " <> show i
