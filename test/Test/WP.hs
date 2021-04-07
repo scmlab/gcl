@@ -125,8 +125,8 @@ statements =
         let actual =
               run
                 "{ True }   \n\
-                \{!       \n\
-                \!}       \n\
+                \[!       \n\
+                \!]       \n\
                 \{ 0 = 0 }"
         actual
           @?= Right
