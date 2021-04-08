@@ -9,6 +9,7 @@ import Data.Text.Lazy (Text)
 import GHC.Generics (Generic)
 import Syntax.Common (Fixity (..))
 import Prelude hiding (Ordering (..))
+import Data.Function (on)
 
 --------------------------------------------------------------------------------
 
@@ -33,7 +34,7 @@ data Program
 instance Located Program where
   locOf (Program _ _ _ _ l) = l
 
-type Defns = Map Text Expr
+type Defns = Map Name Expr
 
 data Declaration
   = ConstDecl [Name] Type (Maybe Expr) Loc
@@ -73,10 +74,10 @@ extractAssertion (ConstDecl _ _ e _) = e
 extractAssertion (VarDecl _ _ e _) = e
 extractAssertion LetDecl {} = Nothing
 
-extractLetBinding :: Declaration -> Maybe (Text, Expr)
+extractLetBinding :: Declaration -> Maybe (Name, Expr)
 extractLetBinding ConstDecl {} = Nothing
 extractLetBinding VarDecl {} = Nothing
-extractLetBinding (LetDecl c a e _) = Just (nameToText c, wrapLam a e)
+extractLetBinding (LetDecl name a e _) = Just (name, wrapLam a e)
 
 getGuards :: [GdCmd] -> [Expr]
 getGuards = fst . unzipGdCmds
@@ -155,7 +156,11 @@ wrapLam (x : xs) body = Lam x (wrapLam xs body) NoLoc
 
 -- | Variables and stuff
 data Name = Name Text Loc
-  deriving (Eq, Show, Generic)
+  deriving (Show, Generic)
+
+-- | Compare regardless of their locations 
+instance Eq Name where 
+  (==) = (==) `on` nameToText
 
 instance Located Name where
   locOf (Name _ l) = l

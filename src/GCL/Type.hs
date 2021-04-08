@@ -208,10 +208,10 @@ fresh l = flip TVar l . flip Name l <$> freshTVar
 -- type check
 ------------------------------------------
 
-checkName :: TypeEnv -> (Text, Expr) -> TM ()
-checkName env@(TypeEnv envM) (n, expr) = 
-  case Map.lookup n envM of
-    Nothing -> throwError $ NotInScope n NoLoc
+checkName :: TypeEnv -> (Name, Expr) -> TM ()
+checkName env@(TypeEnv envM) (name, expr) = 
+  case Map.lookup (nameToText name) envM of
+    Nothing -> throwError $ NotInScope (nameToText name) (locOf name)
     Just (ForallV _ t) -> do
       (ForallV _ t') <- inferExpr env expr
       void $ runSolver [(t, t')]
@@ -245,7 +245,7 @@ checkStmt _ (Abort _) = return ()
 checkStmt env (Assign ns es _)
   | length ns > length es = throwError $ error "Missing Expression"
   | length ns < length es = throwError $ error "Duplicated Assignment"
-  | otherwise = forM_ (zip ns es) (\(Name n _, expr) -> checkName env (n, expr))
+  | otherwise = forM_ (zip ns es) (checkName env)
 checkStmt env (Assert expr _) = void $ inferExpr env expr
 checkStmt env (LoopInvariant e1 e2 _) = void $ inferExpr env e1 >> inferExpr env e2
 checkStmt env (Do gdcmds _) = mapM_ (checkGdCmd env) gdcmds

@@ -56,10 +56,10 @@ instance ExpandM SubstM where
                          else local (\n -> n - 1) me
   doExLevel n = local (const n)
 
-ifInDefns :: DefsM m => Text -> (Expr -> m a) -> m a -> m a
-ifInDefns x f y = do
+ifInDefns :: DefsM m => Name -> (Expr -> m a) -> m a -> m a
+ifInDefns name f y = do
   defs <- askDefns
-  case Map.lookup x defs of
+  case Map.lookup name defs of
     Just e -> f e
     Nothing -> y
 
@@ -113,7 +113,7 @@ convLam xs x e
   | otherwise = return (x, e, False)
 
 subst :: ExpandM m => Subst -> Expr -> m Expr
-subst env v@(Var (Name x _) _) = do
+subst env v@(Var name _) = do
   -- e' <- expand v
   -- case e' of
   --   v'@(Var (Name x _) _) ->
@@ -121,11 +121,11 @@ subst env v@(Var (Name x _) _) = do
   --                 (return $ fromMaybe v' (Map.lookup x env))
   --   _ -> subst env e'
   defs <- askDefns
-  case Map.lookup x defs of
+  case Map.lookup name defs of
     Just e  -> ifExpand (subst env e)
                 (return (applySubst v env))
-    Nothing -> return $ fromMaybe v (Map.lookup x env)
-subst env c@(Const (Name x _)  _) = do
+    Nothing -> return $ fromMaybe v (Map.lookup (nameToText name) env)
+subst env c@(Const name  _) = do
   -- e' <- expand c
   -- case e' of
   --   c'@(Var (Name x _) _) ->
@@ -133,10 +133,10 @@ subst env c@(Const (Name x _)  _) = do
   --                 (return $ fromMaybe c' (Map.lookup x env))
   --   _ -> subst env e'
   defs <- askDefns
-  case Map.lookup x defs of
+  case Map.lookup name defs of
     Just e  -> ifExpand (subst env e)
                 (return (applySubst c env))
-    Nothing -> return $ fromMaybe c (Map.lookup x env)
+    Nothing -> return $ fromMaybe c (Map.lookup (nameToText name) env)
 subst _   (Op    op l ) = return $ Op op l
 subst _   (Lit   n  l ) = return $ Lit n l
 subst env (App e1 e2 l) = do
@@ -181,11 +181,11 @@ subst env s@(Subst _ _) =
 
 expand :: ExpandM m => Expr -> m Expr
 expand (Lit v l) = return $ Lit v l
-expand c@(Const (Name x _) _) = do
-  ifExpand (ifInDefns x expand (return c))
+expand c@(Const name _) = do
+  ifExpand (ifInDefns name expand (return c))
            (return c)
-expand v@(Var (Name x _) _) = do
-  ifExpand (ifInDefns x expand (return v))
+expand v@(Var name _) = do
+  ifExpand (ifInDefns name expand (return v))
            (return v)
 expand op@(Op _ _) = return op
 expand (App e1 e2 l) = do
