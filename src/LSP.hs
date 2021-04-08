@@ -75,6 +75,11 @@ writeLog msg = do
   chan <- lift $ asks envChan
   liftIO $ writeChan chan msg
 
+writeLog' :: Show a => a -> LspT () ServerM ()
+writeLog' x = do
+  chan <- lift $ asks envChan
+  liftIO $ writeChan chan (pack (show x))
+
 updateSource :: FilePath -> Text -> LspT () ServerM ()
 updateSource filepath source = do
   ref <- lift $ asks envSourceMap
@@ -215,6 +220,8 @@ handlers =
             case uriToFilePath uri of
               Nothing -> pure ()
               Just filepath -> do
+                -- debugging line for checking if the program has been correctly parsed
+                -- writeLog' $ fmap pretty $ runM $ parseProgram filepath source
                 updateSource filepath source
                 version <- bumpCounter
                 checkAndSendResult filepath source version

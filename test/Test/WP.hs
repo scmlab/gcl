@@ -130,13 +130,13 @@ statements =
                 \{ 0 = 0 }"
         actual
           @?= Right
-            ( [ PO
+            ( [],
+              [ Specification
                   0
-                  (Constant (Lit (Bol True) NoLoc))
-                  (Assertion (Lit (Bol True) (Loc (pos 1 3 2) (pos 1 6 5))) (Loc (pos 1 1 0) (pos 1 8 7)))
-                  (AtAssertion (Loc (pos 1 1 0) (pos 1 8 7)))
+                  (Assertion (Lit (Bol True) (Loc (Pos "<test>" 1 3 2) (Pos "<test>" 1 6 5))) (Loc (Pos "<test>" 1 1 0) (Pos "<test>" 1 8 7)))
+                  (Assertion (App (App (Op EQ (Loc (Pos "<test>" 4 5 36) (Pos "<test>" 4 5 36))) (Lit (Num 0) (Loc (Pos "<test>" 4 3 34) (Pos "<test>" 4 3 34))) (Loc (Pos "<test>" 4 3 34) (Pos "<test>" 4 5 36))) (Lit (Num 0) (Loc (Pos "<test>" 4 7 38) (Pos "<test>" 4 7 38))) (Loc (Pos "<test>" 4 3 34) (Pos "<test>" 4 7 38))) (Loc (Pos "<test>" 4 1 32) (Pos "<test>" 4 9 40)))
+                  (Loc (Pos "<test>" 2 1 12) (Pos "<test>" 3 2 23))
               ],
-              [],
               []
             )
     ]
