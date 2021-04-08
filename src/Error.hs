@@ -11,9 +11,8 @@ import GCL.Type (TypeError)
 -- import GCL.Exec.ExecMonad (ExecError)
 import GCL.WP (StructError)
 import GHC.Generics
-import Syntax.Parser.Util (SyntacticError)
+import Syntax.Parser.Util ( SyntacticError )
 import Syntax.Parser.Lexer (LexicalError)
-import Syntax.Parser.Util ()
 import Syntax.Common ()
 
 --------------------------------------------------------------------------------
@@ -35,7 +34,6 @@ data Error
   | TypeError TypeError
   | StructError StructError
   | CannotReadFile FilePath
-  | NotLoaded
   deriving (Eq, Show, Generic)
 
 instance Located Error where
@@ -44,7 +42,6 @@ instance Located Error where
   locOf (TypeError e) = locOf e
   locOf (StructError e) = locOf e
   locOf (CannotReadFile _) = NoLoc
-  locOf NotLoaded = NoLoc
 
 localError :: Int -> Error -> (Site, Error)
 localError i e = (Local (locOf e) i, e)

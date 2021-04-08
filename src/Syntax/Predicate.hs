@@ -74,6 +74,9 @@ subst env (Negate x) = Negate <$> subst env x
 --------------------------------------------------------------------------------
 
 -- | Smart constructors for testing
+pos :: Int -> Int -> Int -> Pos
+pos = Pos "<test>"
+
 assertion :: Expr -> Pred
 assertion x = Assertion x NoLoc
 

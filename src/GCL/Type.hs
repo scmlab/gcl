@@ -214,10 +214,10 @@ fresh l = flip TVar l . flip Name l <$> freshTVar
 -- type check
 ------------------------------------------
 
-checkName :: TypeEnv -> (Text, Expr) -> TM ()
-checkName env@(TypeEnv envM) (n, expr) = 
+checkName :: TypeEnv -> (Name, Expr) -> TM ()
+checkName env@(TypeEnv envM) (Name n l, expr) = 
   case Map.lookup n envM of
-    Nothing -> throwError $ NotInScope n NoLoc
+    Nothing -> throwError $ NotInScope n l
     Just (ForallV _ t) -> do
       (ForallV _ t') <- inferExpr env expr
       void $ runSolver [(t, t')]
@@ -251,7 +251,7 @@ checkStmt _ (Abort _) = return ()
 checkStmt env (Assign ns es _)
   | length ns > length es = throwError $ error "Missing Expression"
   | length ns < length es = throwError $ error "Duplicated Assignment"
-  | otherwise = forM_ (zip ns es) (\(Name n _, expr) -> checkName env (n, expr))
+  | otherwise = forM_ (zip ns es) (\(n, expr) -> checkName env (n, expr))
 checkStmt env (Assert expr _) = void $ inferExpr env expr
 checkStmt env (LoopInvariant e1 e2 _) = void $ inferExpr env e1 >> inferExpr env e2
 checkStmt env (Do gdcmds _) = mapM_ (checkGdCmd env) gdcmds
@@ -276,7 +276,7 @@ checkProg :: Program -> TM ()
 checkProg (Program decls exprs defs stmts _) = do
   env <- foldM inferDecl emptyEnv decls
   mapM_ (checkExpr env) exprs
-  mapM_ (checkName env) (Map.toList defs)
+  mapM_ (checkName env) (Map.toList (Map.mapKeysMonotonic (`Name` NoLoc) defs))
   mapM_ (checkStmt env) stmts
 
 ------------------------------------------

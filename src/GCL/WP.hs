@@ -3,7 +3,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module GCL.WP where
+module GCL.WP (sweep, StructError (..), StructWarning(..)) where
 
 import Control.Monad.Except hiding (guard)
 import Control.Monad.Reader hiding (guard)
@@ -17,6 +17,7 @@ import Data.Loc
 import qualified Data.Map as Map
 -- import qualified Syntax.Predicate as P
 
+import GCL.Expr (Fresh (freshVar))
 import qualified GCL.Expr as E
 import GHC.Generics
 import Syntax.Abstract
@@ -27,7 +28,6 @@ import Syntax.Abstract
   )
 import qualified Syntax.Abstract as A
 import Syntax.Predicate hiding (Stmt)
-import GCL.Expr (Fresh(freshVar))
 
 type SM =
   ReaderT
@@ -36,7 +36,10 @@ type SM =
         [PO]
         ( WriterT
             [Spec]
-            (StateT (Int, Int, Int) (Either StructError))
+            ( WriterT
+                [StructWarning]
+                (StateT (Int, Int, Int) (Either StructError))
+            )
         )
     )
 
@@ -61,6 +64,11 @@ tellSpec p q loc = do
   put (i, succ j, k)
   lift . lift $ tell [Specification j p q loc]
 
+
+throwWarning :: StructWarning -> SM ()
+throwWarning warning = do 
+  lift . lift . lift $ tell [warning]
+
 --------------------------------------------------------------------------------
 
 -- | Structure, and Weakest-Precondition
@@ -72,7 +80,7 @@ struct True pre _ (A.Assert p l) post = do
   obligate (Assertion p l) post (AtAssertion l)
 struct False pre _ (A.Assert _ l) post = do
   obligate pre post (AtAssertion l)
-struct _ _ _ (A.LoopInvariant _ _ l) _ = throwError (ExcessBound l)
+struct _ _ _ (A.LoopInvariant _ _ l) _ = throwWarning (ExcessBound l)
 struct _ pre _ (A.Assign xs es l) post = do
   let denv = assignmentEnv xs es -- E.extendSubstWithDefns (assignmentEnv xs es) ds
   post' <- runReaderT (subst denv post :: SMSubst Pred) 0
@@ -84,7 +92,22 @@ struct True pre _ (A.If gcmds l) post = do
 struct False pre _ (A.If gcmds _) post = do
   forM_ gcmds $ \(A.GdCmd guard body _) ->
     structStmts False (Conjunct [pre, guardIf guard]) Nothing body post
-struct _ _ Nothing (A.Do _ l) _ = throwError (MissingBound l)
+struct _ inv Nothing (A.Do gcmds l) post = do
+  do
+    -- warning user about missing "bnd"
+    throwWarning (MissingBound l)
+    -- base case
+    let guards = A.getGuards gcmds
+    obligate (Conjunct (inv : map (Negate . guardLoop) guards)) post (AtLoop l)
+    -- inductive cases
+    forM_ gcmds $ \(A.GdCmd guard body _) ->
+      structStmts True (Conjunct [inv, guardLoop guard]) Nothing body inv
+    -- termination
+    obligate
+      (Conjunct (inv : map guardLoop guards))
+      post
+      (AtTermination l)
+-- Issue: #4
 {- Or if we want to tolerate the user and carry on ---
 do -- warn that bnd is missing
  let gcmds' = map (\(GdCmd x y _) -> (depart x, y)) gcmds
@@ -98,14 +121,14 @@ do -- warn that bnd is missing
 struct True inv (Just bnd) (A.Do gcmds l) post = do
   -- base case
   let guards = A.getGuards gcmds
-  obligate (Conjunct (inv : (map (Negate . guardLoop) guards))) post (AtLoop l)
+  obligate (Conjunct (inv : map (Negate . guardLoop) guards)) post (AtLoop l)
   -- inductive cases
   forM_ gcmds $ \(A.GdCmd guard body _) ->
     structStmts True (Conjunct [inv, guardLoop guard]) Nothing body inv
   -- termination
   obligate
     (Conjunct (inv : map guardLoop guards))
-    (Bound (bnd `A.gte` (A.Lit (A.Num 0) NoLoc)) NoLoc)
+    (Bound (bnd `A.gte` A.Lit (A.Num 0) NoLoc) NoLoc)
     (AtTermination l)
   -- bound decrementation
   oldbnd <- freshVar "bnd"
@@ -123,7 +146,7 @@ struct True inv (Just bnd) (A.Do gcmds l) post = do
       (Bound (bnd `A.lt` A.Var (A.Name oldbnd NoLoc) NoLoc) NoLoc)
 struct False inv _ (A.Do gcmds l) post = do
   let guards = A.getGuards gcmds
-  obligate (Conjunct (inv : (map (Negate . guardLoop) guards))) post (AtLoop l)
+  obligate (Conjunct (inv : map (Negate . guardLoop) guards)) post (AtLoop l)
 struct _ _ _ (A.SpecQM l) _ = throwError $ DigHole l
 struct b pre _ (A.Spec l) post = when b (tellSpec pre post l)
 -- banacorn: what to do about this?
@@ -131,7 +154,11 @@ struct _ _ _ (A.Proof _) _ = return ()
 
 structStmts :: Bool -> Pred -> Maybe Expr -> [Stmt] -> Pred -> SM ()
 structStmts _ pre _ [] post = do
-  obligate pre post (AtAssertion (locOf pre))
+  -- the precondition may be a Constant and have no srcloc
+  -- in that case, use the srcloc of postcondition instead
+  case locOf pre of 
+    NoLoc -> obligate pre post (AtAssertion (locOf post))
+    others -> obligate pre post (AtAssertion others)
   return ()
 structStmts True pre _ (A.Assert p l : stmts) post = do
   obligate pre (Assertion p l) (AtAssertion l)
@@ -144,7 +171,7 @@ structStmts True pre _ (A.LoopInvariant p bnd l : stmts) post = do
   structStmts True (LoopInvariant p bnd l) (Just bnd) stmts post
 
 -- SCM: think about this one later
-structStmts False pre _ (A.LoopInvariant _ _ _ : stmts) post = do
+structStmts False pre _ (A.LoopInvariant {} : stmts) post = do
   structStmts False pre Nothing stmts post
 structStmts b pre bnd (stmt : stmts) post = do
   post' <- wpStmts b stmts post
@@ -163,7 +190,7 @@ data ProgView
 
 progView :: [Stmt] -> ProgView
 progView [] = ProgViewEmpty
-progView (A.Assert pre l : []) = ProgViewMissingPrecondition [] (Assertion pre l)
+progView [A.Assert pre l] = ProgViewMissingPrecondition [] (Assertion pre l)
 progView stmts = case (head stmts, last stmts) of
   (A.Assert pre l, A.Assert post m) -> ProgViewOkay (Assertion pre l) (init (tail stmts)) (Assertion post m)
   (A.Assert pre l, _) -> ProgViewMissingPostcondition (Assertion pre l) (tail stmts)
@@ -189,7 +216,7 @@ wpStmts False (A.Assert _ _ : stmts) post =
 wpStmts True (A.LoopInvariant pre bnd l : stmts) post =
   structStmts True (LoopInvariant pre bnd l) (Just bnd) stmts post
     >> return (LoopInvariant pre bnd l)
-wpStmts False (A.LoopInvariant _ _ _ : stmts) post =
+wpStmts False (A.LoopInvariant {} : stmts) post =
   wpStmts False stmts post
 wpStmts b (stmt : stmts) post = do
   post' <- wpStmts b stmts post
@@ -213,7 +240,7 @@ wp b (A.If gcmds _) post = do
   -- return (Disjunct (map guardIf (A.getGuards gcmds))) -- is this enough?
   let disGuards = disjunct (map guardIf (A.getGuards gcmds))
   pres <- forM gcmds $ \(A.GdCmd guard body _) ->
-    (Constant . (guard `A.imply`) . toExpr)
+    Constant . (guard `A.imply`) . toExpr
       <$> wpStmts b body post
   return (conjunct (disGuards : pres))
 wp _ (A.Do _ l) _ = throwError (MissingAssertion l)
@@ -259,28 +286,33 @@ instance E.ExpandM SMSubst where
 runSM ::
   SM a ->
   Defns ->
-  (Int, Int, Int) ->
-  Either StructError (((a, [PO]), [Spec]), (Int, Int, Int))
-runSM p defs = runStateT (runWriterT . runWriterT $ runReaderT p defs)
+  Either StructError (((a, [PO]), [Spec]), [StructWarning])
+runSM p defs = evalStateT (runWriterT . runWriterT . runWriterT $ runReaderT p defs) (0, 0, 0)
 
-runWP :: SM a -> Defns -> Either StructError ((a, [PO]), [Spec])
-runWP p defs = fmap fst $ runSM p defs (0, 0, 0)
+sweep :: A.Program -> Either StructError ([PO], [Spec], [StructWarning])
+sweep (A.Program _ _ ds statements _) = do
+  (((_, pos'), specs), warnings) <- runSM (structProg statements) ds
+  return (pos', specs, warnings)
 
--- censorSpec :: ([Spec] -> [Spec]) -> SM a -> SM a
--- censorSpec f = mapWriterT (censor f)
+data StructWarning
+  = MissingBound Loc
+  | ExcessBound Loc
+  deriving (Eq, Show, Generic)
+
+instance Located StructWarning where
+  locOf (MissingBound loc) = loc
+  locOf (ExcessBound loc) = loc
+
+instance ToJSON StructWarning
 
 data StructError
   = MissingAssertion Loc
-  | MissingBound Loc
-  | ExcessBound Loc
   | MissingPostcondition Loc
   | DigHole Loc
   deriving (Eq, Show, Generic)
 
 instance Located StructError where
   locOf (MissingAssertion loc) = loc
-  locOf (MissingBound loc) = loc
-  locOf (ExcessBound loc) = loc
   locOf (MissingPostcondition loc) = loc
   locOf (DigHole loc) = loc
 

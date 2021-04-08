@@ -1,0 +1,34 @@
+{- 和 haskell 一樣，這種括號放註解
+   下面那種括號則放 declarations -}
+
+{: A, B : Int
+   A > 0 ∧ B > 0
+
+     -- 我在考慮拿掉 con 這個 keyword
+     -- 常數可以直接宣告在 declaration block 中
+     -- 宣告後面可以放常數該滿足的性質
+:}
+
+var x, y : Int
+
+x, y := A, B
+
+{ gcd x y = gcd A B ∧ x > 0 ∧ y > 0, bnd: x + y }
+do x < y -> y := y - x
+ | x > y -> x := x - y
+od
+{ x = gcd A B }
+
+{:
+gcd : Int -> Int -> Int
+gcd x y = gcd y x
+gcd x x = x
+gcd x y = gcd x (y - x)  <=  x < y
+gcd x y = gcd (x - y) y  <=  x > y
+
+  -- 如果是為了證明，在 gcd 宣告之後的不需要是 inductive 定義，
+  -- 應該可以是任何型別為 Bool 的式子。甚至不需要是等式。
+  -- 但這樣不知是否符合定理證明器的需求。
+
+  -- 也許該把「常數一定要是大寫」的限制放鬆。
+:}

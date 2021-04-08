@@ -15,7 +15,7 @@ import Data.Text.Prettyprint.Doc
 import qualified Data.Text.Prettyprint.Doc.Render.Text as Text
 import Error
 import GCL.Type (TypeError (..))
-import GCL.WP (StructError (..))
+import GCL.WP (StructError (..), StructWarning (..))
 import Pretty.Abstract ()
 import Pretty.Concrete ()
 import Pretty.Predicate ()
@@ -46,15 +46,16 @@ instance Pretty Error where
   pretty (StructError err) =
     "Struct Error" <+> pretty (locOf err) <> line <> pretty err
   pretty (CannotReadFile path) = "CannotReadFile" <+> pretty path
-  pretty NotLoaded = "NotLoaded"
 
 instance Pretty LexicalError where
   pretty = pretty . show
 
-instance Pretty StructError where
-  pretty (MissingAssertion loc) = "Missing Assertion" <+> pretty loc
+instance Pretty StructWarning where
   pretty (MissingBound loc) = "Missing Bound" <+> pretty loc
   pretty (ExcessBound loc) = "Excess Bound" <+> pretty loc
+
+instance Pretty StructError where
+  pretty (MissingAssertion loc) = "Missing Assertion" <+> pretty loc
   pretty (MissingPostcondition loc) = "Missing Postcondition" <+> pretty loc
   pretty (DigHole loc) = "Dig Hole" <+> pretty loc
 

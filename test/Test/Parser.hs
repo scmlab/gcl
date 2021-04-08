@@ -40,8 +40,8 @@ import Control.Monad (void)
 import Syntax.Parser.Util (parser, (↓), getCurLoc)
 
 tests :: TestTree
-tests = testGroup "Prettifier" [myTest]
--- tests = testGroup "Prettifier" [expression, type', declaration, statement, parseError, golden]
+-- tests = testGroup "Prettifier" [myTest]
+tests = testGroup "Prettifier" [expression, type', declaration, statement, parseError, golden]
 
 --------------------------------------------------------------------------------
 
@@ -230,39 +230,39 @@ golden :: TestTree
 golden =
   testGroup
     "Program"
-    [ ast "empty" "./test/source/empty.gcl",
-      ast "2" "./test/source/2.gcl",
-      ast "comment" "./test/source/comment.gcl",
-      ast "issue 1" "./test/source/issue1.gcl",
-      ast "issue 14" "./test/source/issue14.gcl",
-      ast "no-decl" "./test/source/no-decl.gcl",
-      ast "no-stmt" "./test/source/no-stmt.gcl",
-      ast "assign" "./test/source/assign.gcl",
-      ast "quant 1" "./test/source/quant1.gcl",
-      ast "spec" "./test/source/spec.gcl",
-      ast "gcd" "./test/source/examples/gcd.gcl"
+    [ ast "empty" "./test/source/" "empty.gcl",
+      ast "2" "./test/source/" "2.gcl",
+      ast "comment" "./test/source/" "comment.gcl",
+      ast "issue 1" "./test/source/" "issue1.gcl",
+      ast "issue 14" "./test/source/" "issue14.gcl",
+      ast "no-decl" "./test/source/" "no-decl.gcl",
+      ast "no-stmt" "./test/source/" "no-stmt.gcl",
+      ast "assign" "./test/source/" "assign.gcl",
+      ast "quant 1" "./test/source/" "quant1.gcl",
+      ast "spec" "./test/source/" "spec.gcl",
+      ast "gcd" "./test/source/examples/" "gcd.gcl"
     ]
   where
     suffixGolden :: FilePath -> FilePath
     suffixGolden filePath = filePath ++ ".ast.golden"
 
-    ast :: String -> FilePath -> TestTree
-    ast name filePath =
+    ast :: String -> FilePath -> FilePath -> TestTree
+    ast name filePath fileName =
       goldenTest
         name
-        (readFile (suffixGolden filePath))
-        (readFile filePath)
+        (readFile (filePath ++ "golden/") (fileName ++ ".ast.golden"))
+        (readFile filePath fileName)
         compareAndReport
         update
 
-    readFile :: FilePath -> IO (FilePath, ByteString)
-    readFile filePath = do
-      raw <- BS.readFile filePath
-      return (filePath, raw)
+    readFile :: FilePath -> FilePath -> IO (FilePath, FilePath, ByteString)
+    readFile filePath fileName = do
+      raw <- BS.readFile (filePath ++ fileName)
+      return (filePath, fileName, raw)
 
     compareAndReport ::
-      (FilePath, ByteString) -> (FilePath, ByteString) -> IO (Maybe String)
-    compareAndReport (expectedPath, expected) (actualPath, actualRaw) = do
+      (FilePath, FilePath, ByteString) -> (FilePath, FilePath, ByteString) -> IO (Maybe String)
+    compareAndReport (expectedPath, expectedFileName, expected) (actualPath, actualFileName, actualRaw) = do
       let actual = run actualRaw
       if removeTrailingWhitespace expected == removeTrailingWhitespace actual
         then return Nothing
@@ -271,9 +271,9 @@ golden =
           -- BS8.putStrLn actual
           return $
             Just $
-              "expected (" ++ expectedPath ++ ", " ++ show (length (BS8.unpack expected)) ++ " chars):\n" ++ BS8.unpack expected ++ "\n------------\n"
+              "expected (" ++ expectedPath ++ expectedFileName ++ ", " ++ show (length (BS8.unpack expected)) ++ " chars):\n" ++ BS8.unpack expected ++ "\n------------\n"
                 ++ "actual ("
-                ++ actualPath
+                ++ actualPath ++ actualFileName
                 ++ ", "
                 ++ show (length (BS8.unpack actual))
                 ++ " chars): \n"
@@ -289,9 +289,9 @@ golden =
         stripEnd :: ByteString -> ByteString
         stripEnd s = BS8.take (lastNonSpaceCharIndex s) s
 
-    update :: (FilePath, ByteString) -> IO ()
-    update (filePath, input) = do
-      createDirectoriesAndWriteFile (suffixGolden filePath) (run input)
+    update :: (FilePath, FilePath, ByteString) -> IO ()
+    update (filePath, fileName, input) = do
+      createDirectoriesAndWriteFile (filePath ++ "golden/" ++ fileName ++ ".ast.golden") (run input)
 
     run :: ByteString -> ByteString
     run = Text.encodeUtf8 . render . parse pProgram . Text.decodeUtf8

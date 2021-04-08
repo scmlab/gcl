@@ -16,7 +16,7 @@ import Data.Text.Prettyprint.Doc.Render.Text
 import qualified Data.Map as Map
 import GCL.Type
 import Error
-import LSP
+import qualified LSP
 import Syntax.Abstract
 import Test.Tasty
 import Test.Tasty.Golden
@@ -27,8 +27,8 @@ import Syntax.Parser (Parser, runParse, pExpr)
 import Syntax.Concrete (ToAbstract(toAbstract))
 
 tests :: TestTree
-tests = testGroup "Type" [inferTests]
--- tests = testGroup "Type" [unifyTests, typeCheckTests]
+-- tests = testGroup "Type" [inferTests]
+tests = testGroup "Type" [unifyTests, typeCheckTests]
 
 
 unifyTests :: TestTree 
@@ -85,7 +85,7 @@ inferTests =
       testCase "F" $
         (runExcept . withExcept TypeError . runInfer env)
          (lookupEnv (Name "F" (Loc (Pos "<test>" 1 1 0) (Pos "<test>" 1 1 0))))
-         @?= Left NotLoaded ,
+         @?= Left (TypeError (NotInScope "F" NoLoc)),
       testCase "F" $
         run' "F",
       testCase "F i" $
@@ -110,7 +110,7 @@ inferTests =
               case parse (toAbstract <$> pExpr) t of
                 Right expr -> runExcept . withExcept TypeError . inferExpr env $ expr
                 Left err -> Left err
-        in res @?= Left NotLoaded 
+        in res @?= Left (TypeError (NotInScope "" NoLoc))
       
 
 actual :: Type -> Type -> Either TypeError SubstT
@@ -120,34 +120,36 @@ typeCheckTests :: TestTree
 typeCheckTests = 
   testGroup "Type Check" 
     [
-      typeCheckGolden "2" "./test/source/2.gcl",
-      typeCheckGolden "quant1" "./test/source/quant1.gcl",
-      typeCheckGolden "mss" "./test/source/mss.gcl",
-      typeCheckGolden "posnegpairs" "./test/source/examples/posnegpairs.gcl"
+      typeCheckGolden "2" "./test/source/" "2.gcl",
+      typeCheckGolden "quant1" "./test/source/" "quant1.gcl",
+      typeCheckGolden "mss" "./test/source/" "mss.gcl",
+      typeCheckGolden "posnegpairs" "./test/source/examples/" "posnegpairs.gcl"
     ]
 
-typeCheckGolden :: String -> FilePath -> TestTree 
-typeCheckGolden name filePath = 
+typeCheckGolden :: String -> FilePath -> FilePath -> TestTree 
+typeCheckGolden name filePath fileName = 
   goldenTest
     name
-    ((expectedPath,) <$> Text.readFile expectedPath)
-    ((filePath,) <$> Text.readFile filePath)
+    ((expectedPath, expectedFileName,) <$> Text.readFile (expectedPath ++ expectedFileName))
+    ((filePath, fileName,) <$> Text.readFile (filePath ++ fileName))
     compareAndReport
     update
     where
-      expectedPath = filePath ++ ".tc.golden"
+      expectedPath = filePath ++ "golden/"
+      expectedFileName = fileName ++ ".tc.golden"
+      
 
 typeCheck :: (FilePath, Text) -> Text
 typeCheck (filepath, source) = renderStrict . layoutCompact . pretty $ result
   where 
     result = 
-      case runM (parseProgram filepath source) of
+      case LSP.runM (LSP.parseProgram filepath source) of
         Left err -> Left err
-        Right prog -> runM . withExcept TypeError $ checkProg prog
+        Right prog -> LSP.runM . withExcept TypeError $ checkProg prog
 
-compareAndReport :: (FilePath, Text) -> (FilePath, Text) -> IO (Maybe String)
-compareAndReport (expectedPath, expectedRes) (actualPath, actualRaw) = do
-  let actualRes = typeCheck (actualPath, actualRaw)
+compareAndReport :: (FilePath, FilePath, Text) -> (FilePath, FilePath, Text) -> IO (Maybe String)
+compareAndReport (expectedPath, _, expectedRes) (actualPath, fileName, actualRaw) = do
+  let actualRes = typeCheck (actualPath ++ fileName, actualRaw)
   if expectedRes == actualRes
     then 
       return Nothing
@@ -156,7 +158,7 @@ compareAndReport (expectedPath, expectedRes) (actualPath, actualRaw) = do
         "expected: \n\t" ++ Text.unpack expectedRes ++ "\n------------\n" 
         ++ "actual: \n\t" ++ Text.unpack actualRes
 
-update :: (FilePath, Text) -> IO ()
-update (filePath, input) = createDirectoriesAndWriteFile (filePath ++ ".tc.golden") result
+update :: (FilePath, FilePath, Text) -> IO ()
+update (filePath, fileName, input) = createDirectoriesAndWriteFile (filePath ++ "golden/" ++ fileName ++ ".tc.golden") result
   where 
     result = BS.fromStrict . Text.encodeUtf8 . renderStrict . layoutCompact . pretty $ input

@@ -115,10 +115,10 @@ pStmt' =
     pSkip,
     pAbort,
     try pAssert,
-    try pLoopInvariant,
-    try (lift pDo),
-    try (lift pIf),
-    try pAssign,
+    pLoopInvariant,
+    pAssign,
+    lift pDo,
+    lift pIf,
     pSpecQM,
     lift pSpec,
     lift pProof
@@ -163,10 +163,8 @@ pGdCmd = (↑) (Lex.indentBlock scn . p)
   where
     p :: Parser () -> Parser (Lex.IndentOpt Parser GdCmd Stmt)
     p sc' = do
-      -- ref <- Lex.indentLevel
       gd <- pExpr
       arrow <- (↓) lexArrow sc
-      -- indentGTE ref scn
       sc'
       pos <- Lex.indentLevel
       s0 <- pStmt
@@ -265,7 +263,7 @@ arithTable = [
   ]
 
 pTerm :: ParserF Expr
-pTerm = choice [pParen, pLit, pVar, pConst, pQuant] <?> "term"
+pTerm = choice [pParen, pVar, pConst, pLit, pQuant] <?> "term"
 
 pParen :: ParserF Expr
 pParen = Paren <$> lexParenStart <*> pExpr' <*> lexParenEnd

@@ -1,8 +1,11 @@
 {-# LANGUAGE OverloadedStrings #-}
 
+{-# LANGUAGE ScopedTypeVariables #-}
 module Syntax.Parser.Token where
 
-import Data.Text.Lazy (Text)
+import Data.Text.Lazy (Text, unpack)
+import qualified Data.Text.Lazy as T
+import Data.Char (isAlphaNum, isUpper, isLower)
 
 ------------------------------------------
 -- tokens 
@@ -212,14 +215,29 @@ tokTrue = "True"
 tokFalse :: Text
 tokFalse = "False"
 
-notLowerKeyword :: Text -> Bool
-notLowerKeyword t = 
-  t /= tokSkip && t /= tokAbort && t /= tokIf && t /= tokFi && 
-    t /= tokDo && t /= tokOd && t /= tokBnd && t /= tokCon && t /= tokVar &&
-    t /= tokLet && t /= tokArray && t /= tokOf
+notLowerKeywords :: Text -> Bool
+notLowerKeywords t = t `notElem` lowerKeywords
+  -- t /= tokSkip && t /= tokAbort && t /= tokIf && t /= tokFi && 
+  --   t /= tokDo && t /= tokOd && t /= tokBnd && t /= tokCon && t /= tokVar &&
+  --   t /= tokLet && t /= tokArray && t /= tokOf
 
-notUpperKeyword :: Text -> Bool
-notUpperKeyword t = 
-  t /= tokTypeInt && t /= tokTypeBool && t /= tokTypeChar &&
-  t /= tokTrue && t /= tokFalse
+notUpperKeywords :: Text -> Bool
+notUpperKeywords t = t `notElem` upperKeywords
+  -- t /= tokTypeInt && t /= tokTypeBool && t /= tokTypeChar &&
+  -- t /= tokTrue && t /= tokFalse
 
+-- startwUpper :: Text -> Bool
+-- startwUpper t =
+--   not (T.null t) && (isUpper . T.head) t &&
+--     T.all (\c -> isAlphaNum c || c == '_' || c == '\'') t
+
+-- startwLower :: Text -> Bool
+-- startwLower t =
+--   not (T.null t) && (isLower . T.head) t &&
+--     T.all (\c -> isAlphaNum c || c == '_' || c == '\'') t
+
+lowerKeywords :: [Text]
+lowerKeywords = [tokSkip, tokAbort, tokIf, tokFi, tokDo, tokOd, tokBnd, tokCon, tokVar, tokLet, tokArray, tokOf]
+
+upperKeywords :: [Text]
+upperKeywords = [tokTypeInt, tokTypeBool, tokTypeChar, tokTrue, tokFalse]
