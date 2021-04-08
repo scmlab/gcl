@@ -32,7 +32,7 @@ runParse p filepath s =
 pProgram :: Parser Program
 pProgram = do
   scn
-  Program <$> many pDeclaration <*> pStmts
+  Program <$> many pDeclaration <*> pStmts <* eof
 
 ------------------------------------------
 -- parse Declaration

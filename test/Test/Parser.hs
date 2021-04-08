@@ -31,17 +31,17 @@ import Data.Int (Int64)
 import Prelude hiding (compare)
 import Control.Monad.Except (runExcept, withExcept, liftEither)
 import Syntax.Parser.Token
-import Syntax.Concrete (Type(..), TBase (..),ToAbstract (toAbstract))
+import Syntax.Concrete (Type(..), TBase (..),ToAbstract (toAbstract), Program (..))
 import Data.Loc (Located(locOf))
-import Text.Megaparsec (Stream(reachOffset), setOffset, getOffset, MonadParsec(updateParserState, getParserState, observing, lookAhead, try), State(State, statePosState, stateInput, stateOffset), getInput, getSourcePos)
+import Text.Megaparsec (Stream(reachOffset), setOffset, getOffset, MonadParsec(updateParserState, getParserState, observing, lookAhead, try, eof), State(State, statePosState, stateInput, stateOffset), getInput, getSourcePos)
 import Control.Monad.Combinators (optional, many, (<|>))
 import qualified Data.Ord as Ord
 import Control.Monad (void)
 import Syntax.Parser.Util (parser, (↓), getCurLoc)
 
 tests :: TestTree
--- tests = testGroup "Prettifier" [myTest]
-tests = testGroup "Prettifier" [expression, type', declaration, statement, parseError, golden]
+tests = testGroup "Prettifier" [myTest]
+-- tests = testGroup "Prettifier" [expression, type', declaration, statement, parseError, golden]
 
 --------------------------------------------------------------------------------
 
@@ -70,18 +70,20 @@ compare parser actual expected = removeWhitespace (render (parse parser actual))
 myTest :: TestTree
 myTest = 
   testGroup
-    "pos test"
+    "parse test"
     [
-      testCase "F" $ run'
-        "F",
-      testCase "chain expr" $ run
-        "F i < 0 ∧ F j < 0",
-      testCase "F i < 0" $ run
-        "F i < 0"
+      testCase "1" $ run
+        "con A, B : Int\n\
+        \x := 1 +\n\
+        \skip"
     ]
     where
-      run t = show (parse (toAbstract <$> pExpr) t) @?= ""
-      run' t = show (parse pExpr t) @?= ""
+      run t = show (parse pProgram t) @?= ""
+      wrap = do
+        decls <- many pDeclaration 
+        stmt1 <- pStmts
+        eof
+        return (Program decls stmt1)
       
 
       
@@ -205,7 +207,8 @@ statement =
       testCase "conditional 2" $ run "if True ->    skip   \n | False -> abort \nfi",
       testCase "loop invariant" $ run "{ True ,     bnd      : a  }",
       testCase "loop body 1" $ run "do True -> skip od",
-      testCase "loop body 2" $ run "do True    →       skip od"
+      testCase "loop body 2" $ run "do True    →       skip od",
+      testCase "invalid statement" $ run "!]"
     ]
   where
     run = isomorphic pStmt
