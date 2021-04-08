@@ -164,7 +164,7 @@ inferDecl env (LetDecl (Name n _) args expr _) = do
   s <- inferExpr env expr'
   env `extend'` (n, s)
   where
-    expr' = foldr (\a e' -> Lam a e' (locOf e')) expr args
+    expr' = foldr (\a e' -> Lam (nameToText a) e' (locOf e')) expr args
 
 instantiate :: Scheme -> Infer Type
 instantiate (ForallV vs t) = 

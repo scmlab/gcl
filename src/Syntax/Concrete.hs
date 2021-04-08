@@ -82,7 +82,7 @@ instance ToAbstract Declaration A.Declaration where
   toAbstract (ConstDeclWithProp x a _ b _ c r) = A.ConstDecl (toAbstract <$> fromSepBy a) (toAbstract b) (Just $ toAbstract c) (x <--> r)
   toAbstract (VarDecl l a _ b) = A.VarDecl (toAbstract <$> fromSepBy a) (toAbstract b) Nothing (l <--> b)
   toAbstract (VarDeclWithProp x a _ b _ c r) = A.VarDecl (toAbstract <$> fromSepBy a) (toAbstract b) (Just $ toAbstract c) (x <--> r)
-  toAbstract (LetDecl l a b _ c) = A.LetDecl (toAbstract a) (fmap nameToText b) (toAbstract c) (l <--> c)
+  toAbstract (LetDecl l a b _ c) = A.LetDecl (toAbstract a) (map toAbstract b) (toAbstract c) (l <--> c)
 
 instance Located Declaration where
   locOf (ConstDecl l _ _ r) = l <--> r

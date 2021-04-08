@@ -39,7 +39,7 @@ type Defns = Map Name Expr
 data Declaration
   = ConstDecl [Name] Type (Maybe Expr) Loc
   | VarDecl [Name] Type (Maybe Expr) Loc
-  | LetDecl Name [Text] Expr Loc
+  | LetDecl Name [Name] Expr Loc
   deriving (Eq, Show)
 
 data Stmt
@@ -77,7 +77,7 @@ extractAssertion LetDecl {} = Nothing
 extractLetBinding :: Declaration -> Maybe (Name, Expr)
 extractLetBinding ConstDecl {} = Nothing
 extractLetBinding VarDecl {} = Nothing
-extractLetBinding (LetDecl name a e _) = Just (name, wrapLam a e)
+extractLetBinding (LetDecl name args expr _) = Just (name, wrapLam (map nameToText args) expr)
 
 getGuards :: [GdCmd] -> [Expr]
 getGuards = fst . unzipGdCmds
