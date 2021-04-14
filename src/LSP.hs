@@ -45,6 +45,7 @@ import Syntax.Predicate
     PO (..),
     Spec,
   )
+import qualified Syntax.Concrete as C
 
 --------------------------------------------------------------------------------
 
@@ -224,7 +225,7 @@ handlers =
               Nothing -> pure ()
               Just filepath -> do
                 -- debugging line for checking if the program has been correctly parsed
-                writeLog' $ fmap pretty $ runM $ parseProgram filepath source
+                writeLog' $ fmap pretty $ runM $ parseProgramC filepath source
                 updateSource filepath source
                 version <- bumpCounter
                 checkAndSendResult filepath source version
@@ -330,6 +331,9 @@ parse p filepath = withExcept SyntacticError . liftEither . runParse p filepath 
 -- | Parse the whole program
 parseProgram :: FilePath -> Text -> M A.Program
 parseProgram filepath source = toAbstract <$> parse pProgram filepath source
+
+parseProgramC :: FilePath -> Text -> M C.Program
+parseProgramC filepath source = parse pProgram filepath source
 
 -- | Try to parse a piece of text in a Spec
 refine :: Text -> M ()
