@@ -1,0 +1,2 @@
+Error Type Error ./test/source/mss.gcl:2:21
+Cannot unify: Bool with Int

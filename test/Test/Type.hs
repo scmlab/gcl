@@ -4,12 +4,13 @@ module Test.Type where
 
 import Control.Monad.State hiding (guard)
 import Control.Monad.Except
-import Data.Loc ( Loc(NoLoc) )
+import Data.Loc ( Loc(Loc, NoLoc), Pos(Pos) )
 import qualified Data.ByteString.Lazy as BS
 import qualified Data.Text as Text
 import qualified Data.Text.IO as Text
 import qualified Data.Text.Encoding as Text
 import Data.Text (Text)
+import qualified Data.Text.Lazy as LT
 import Data.Text.Prettyprint.Doc.Internal
 import Data.Text.Prettyprint.Doc.Render.Text
 import qualified Data.Map as Map
@@ -22,10 +23,12 @@ import Test.Tasty.Golden
 import Test.Tasty.Golden.Advanced
 import Test.Tasty.HUnit
 import qualified Data.Bifunctor
+import Syntax.Parser (Parser, runParse, pExpr)
+import Syntax.Concrete (ToAbstract(toAbstract))
 
 tests :: TestTree
-tests = testGroup "Type" [typeCheckTests]
--- tests = testGroup "Type" [unifyTests, typeCheckTests]
+-- tests = testGroup "Type" [inferTests]
+tests = testGroup "Type" [unifyTests, typeCheckTests]
 
 
 unifyTests :: TestTree 
@@ -39,48 +42,76 @@ unifyTests =
         mapM_ (\(t1, t2) -> actual t1 t2 @?= Left (UnifyFailed t1 t2 NoLoc)) [(TBase TInt NoLoc, TBase TBool NoLoc), (TBase TInt NoLoc, TBase TChar NoLoc), (TBase TBool NoLoc, TBase TChar NoLoc)]
     ]
 
+tint :: Type
+tint = TBase TInt NoLoc
+
+tbool :: Type
+tbool = TBase TBool NoLoc
+
+tarr :: Endpoint -> Endpoint -> Type -> Type
+tarr e1 e2 t = TArray (interval e1 e2) t NoLoc
+
+interval :: Endpoint -> Endpoint -> Interval
+interval e1 e2 = Interval e1 e2 NoLoc
+
+litNum :: Int -> Expr
+litNum i = Lit (Num i) NoLoc 
+
+cons :: LT.Text -> Expr
+cons name = Const (Name name NoLoc) NoLoc
+
+app :: Expr -> Expr -> Expr
+app e1 e2 = App e1 e2 NoLoc
+
+op :: Op -> Expr
+op o = Op o NoLoc
+
+var :: LT.Text -> Expr
+var t = Var (Name t NoLoc) NoLoc
+
+env :: TypeEnv
+env = TypeEnv $ Map.fromList [
+   ("N", ForallV [] tint), 
+   ("F", ForallV [] (tarr (Including (litNum 0)) (Excluding (cons "N")) tint)),
+   ("i", ForallV [] tint),
+   ("j", ForallV [] tint)
+  ]
+
 inferTests :: TestTree
 inferTests = 
   testGroup
     "infer"
     [
-      -- testCase "lookup name in env" $
-      --   runInfer env (lookupEnv (Name "b" NoLoc)) @?= liftEither (Right (tbool, [])),
-      -- testCase "infer var" $
-      --   runInfer env (infer (v "b")) @?= liftEither (Right (tbool, [])),
-      -- testCase "infer op" $
-      --   runInfer env (infer (o Add)) @?= liftEither (Right (f tint (f tint tint), [])),
-      -- testCase "check assignment" $
-      --   checkStmt env (Assign [n "b"] [xaddy] NoLoc) @?= liftEither (Left (UnifyFailed tbool tint NoLoc)),
-      -- testCase "check gdcmd" $
-      --   checkGdCmd env gd @?= liftEither (Left (UnifyFailed tint tbool NoLoc)),
-      -- testCase "check do" $
-      --   checkStmt env (Do [gd] NoLoc) @?= liftEither (Left (UnifyFailed tint tbool NoLoc)),
-      testCase "check array" $
-        inferDecl env (ConstDecl [n "A"] (arr (endi (litNum 0)) (ende (con "N")) tint) Nothing NoLoc) @?= liftEither (Right env)
+      testCase "F" $
+        (runExcept . withExcept TypeError . runInfer env)
+         (lookupEnv (Name "F" (Loc (Pos "<test>" 1 1 0) (Pos "<test>" 1 1 0))))
+         @?= Left (TypeError (NotInScope "F" NoLoc)),
+      testCase "F" $
+        run' "F",
+      testCase "F i" $
+        run' "F i",
+      testCase "F i < 0" $
+        run "F i < 0 ",
+      testCase "F i ≤ 0 ∧ F j ≥ 0" $
+        run "F i ≤ 0 ∧ F j ≥ 0"
     ]
     where
-      env = TypeEnv $ Map.fromList [("N", ForallV [] tint)]
-      -- fff g (a, b) = (g a, g b)
-      -- env = TypeEnv $ Map.fromList [("x", ForallV [] tint), ("y", ForallV [] tint), ("b", ForallV [] tbool)]
-      con name = Const (n name) NoLoc
-      tv x = TVar (n x) NoLoc
-      n x = Name x NoLoc
-      v x = Var (n x) NoLoc
-      o op = Op op NoLoc
-      a e1 e2 = App e1 e2 NoLoc
-      f t1 t2 = TFunc t1 t2 NoLoc 
-      tbool = TBase TBool NoLoc 
-      tint = TBase TInt NoLoc
-      arr e1 e2 t = TArray (i e1 e2) t NoLoc
-      i e1 e2 = Interval e1 e2 NoLoc
-      endi e = Including e
-      ende e = Excluding e
-      litNum i = Lit (Num i) NoLoc
+      parse parser = 
+        runExcept . withExcept SyntacticError . liftEither . runParse parser "<test>" 
+      run' t = do
+          let res = case parse (toAbstract <$> pExpr) t of
+                Right expr -> do
+                    (t, cs) <- runInfer env (infer expr)
+                    runSolver cs
+                Left err ->  liftEither $ Left (NotInScope "" NoLoc)
+            in res @?= liftEither (Left (NotInScope " test " NoLoc))
+      run t = 
+        let res = 
+              case parse (toAbstract <$> pExpr) t of
+                Right expr -> runExcept . withExcept TypeError . inferExpr env $ expr
+                Left err -> Left err
+        in res @?= Left (TypeError (NotInScope "" NoLoc))
       
-      xaddy = a (a (o Add) (v "x")) (v "y")
-      gd = GdCmd xaddy [Skip NoLoc] NoLoc
-
 
 actual :: Type -> Type -> Either TypeError SubstT
 actual t1 t2 = runSolver' [(t1, t2)]
@@ -89,21 +120,24 @@ typeCheckTests :: TestTree
 typeCheckTests = 
   testGroup "Type Check" 
     [
-      typeCheckGolden "2" "./test/source/2.gcl",
-      typeCheckGolden "quant1" "./test/source/quant1.gcl",
-      typeCheckGolden "mss" "./test/source/mss.gcl"
+      typeCheckGolden "2" "./test/source/" "2.gcl",
+      typeCheckGolden "quant1" "./test/source/" "quant1.gcl",
+      typeCheckGolden "mss" "./test/source/" "mss.gcl",
+      typeCheckGolden "posnegpairs" "./test/source/examples/" "posnegpairs.gcl"
     ]
 
-typeCheckGolden :: String -> FilePath -> TestTree 
-typeCheckGolden name filePath = 
+typeCheckGolden :: String -> FilePath -> FilePath -> TestTree 
+typeCheckGolden name filePath fileName = 
   goldenTest
     name
-    ((expectedPath,) <$> Text.readFile expectedPath)
-    ((filePath,) <$> Text.readFile filePath)
+    ((expectedPath, expectedFileName,) <$> Text.readFile (expectedPath ++ expectedFileName))
+    ((filePath, fileName,) <$> Text.readFile (filePath ++ fileName))
     compareAndReport
     update
     where
-      expectedPath = filePath ++ ".tc.golden"
+      expectedPath = filePath ++ "golden/"
+      expectedFileName = fileName ++ ".tc.golden"
+      
 
 typeCheck :: (FilePath, Text) -> Text
 typeCheck (filepath, source) = renderStrict . layoutCompact . pretty $ result
@@ -113,9 +147,9 @@ typeCheck (filepath, source) = renderStrict . layoutCompact . pretty $ result
         Left err -> Left err
         Right prog -> LSP.runM . withExcept TypeError $ checkProg prog
 
-compareAndReport :: (FilePath, Text) -> (FilePath, Text) -> IO (Maybe String)
-compareAndReport (expectedPath, expectedRes) (actualPath, actualRaw) = do
-  let actualRes = typeCheck (actualPath, actualRaw)
+compareAndReport :: (FilePath, FilePath, Text) -> (FilePath, FilePath, Text) -> IO (Maybe String)
+compareAndReport (expectedPath, _, expectedRes) (actualPath, fileName, actualRaw) = do
+  let actualRes = typeCheck (actualPath ++ fileName, actualRaw)
   if expectedRes == actualRes
     then 
       return Nothing
@@ -124,7 +158,7 @@ compareAndReport (expectedPath, expectedRes) (actualPath, actualRaw) = do
         "expected: \n\t" ++ Text.unpack expectedRes ++ "\n------------\n" 
         ++ "actual: \n\t" ++ Text.unpack actualRes
 
-update :: (FilePath, Text) -> IO ()
-update (filePath, input) = createDirectoriesAndWriteFile (filePath ++ ".tc.golden") result
+update :: (FilePath, FilePath, Text) -> IO ()
+update (filePath, fileName, input) = createDirectoriesAndWriteFile (filePath ++ "golden/" ++ fileName ++ ".tc.golden") result
   where 
     result = BS.fromStrict . Text.encodeUtf8 . renderStrict . layoutCompact . pretty $ input

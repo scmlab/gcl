@@ -252,17 +252,22 @@ instance ToAbstract Expr A.Expr where
     Op a -> A.Op (toAbstract a) (locOf x)
     Chain a op b -> 
       case a of
-        Chain e1 op' e2 -> 
-          -- e1 op' e2'
-          let a1 = A.App (A.App (toAbstract (Op op')) (toAbstract e1) (e1 <--> op')) (toAbstract e2) (e1 <--> e2) in
-          -- e2 op b
-          let a2 = A.App (A.App (toAbstract (Op op)) (toAbstract e2) (e2 <--> op)) (toAbstract b) (e2 <--> op <--> b) in
-            -- c1 && c2
-            A.App (A.App (A.Op A.Conj NoLoc) a1 (locOf a1)) a2 (a1 <--> a2)
-        _ -> A.App (A.App (toAbstract (Op op)) (toAbstract a) (a <--> op)) (toAbstract b) (locOf x)
+        Chain {} -> 
+          let ar = chainRightmost a in
+            A.App
+              (A.App (A.Op A.Conj NoLoc) 
+                (toAbstract a) (locOf a))
+                -- ar op b
+                (A.App (A.App (toAbstract (Op op)) (toAbstract ar) (locOf ar)) (toAbstract b) (ar <--> b))
+              (locOf x)
+        _ -> 
+          A.App (A.App (toAbstract (Op op)) (toAbstract a) (a <--> op)) (toAbstract b) (locOf x)
     App a b -> A.App (toAbstract a) (toAbstract b) (locOf x)
     Quant _ a b _ c _ d _ -> A.Quant (either (toAbstract . Op) toAbstract a) (fmap toAbstract b) (toAbstract c) (toAbstract d) (locOf x)
 
+chainRightmost :: Expr -> Expr
+chainRightmost (Chain _ _ b) = chainRightmost b
+chainRightmost expr = expr
 --------------------------------------------------------------------------------
 
 -- | Literals (Integer / Boolean / Character)

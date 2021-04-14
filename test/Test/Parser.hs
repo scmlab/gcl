@@ -31,9 +31,9 @@ import Data.Int (Int64)
 import Prelude hiding (compare)
 import Control.Monad.Except (runExcept, withExcept, liftEither)
 import Syntax.Parser.Token
-import Syntax.Concrete (Type(..), TBase (..))
+import Syntax.Concrete (Type(..), TBase (..),ToAbstract (toAbstract), Program (..))
 import Data.Loc (Located(locOf))
-import Text.Megaparsec (Stream(reachOffset), setOffset, getOffset, MonadParsec(updateParserState, getParserState, observing, lookAhead, try), State(State, statePosState, stateInput, stateOffset), getInput, getSourcePos)
+import Text.Megaparsec (Stream(reachOffset), setOffset, getOffset, MonadParsec(updateParserState, getParserState, observing, lookAhead, try, eof), State(State, statePosState, stateInput, stateOffset), getInput, getSourcePos)
 import Control.Monad.Combinators (optional, many, (<|>))
 import qualified Data.Ord as Ord
 import Control.Monad (void)
@@ -70,30 +70,22 @@ compare parser actual expected = removeWhitespace (render (parse parser actual))
 myTest :: TestTree
 myTest = 
   testGroup
-    "pos test"
+    "parse test"
     [
-      testCase "pos test" $ run 
-        "a := a + 1"
+      testCase "1" $ run
+        "con A, B : Int\n\
+        \x := 1 +\n\
+        \skip"
     ]
     where
-      run t = show (parse wrap' t) @?= ""
-      wrap' = do
-        a1 <- (↓) (symbol "a") sc
-        ass <- (↓) (symbol ":=") sc
-        a2 <- (↓) (symbol "a") sc
-        plus <- (↓) (symbol "+") sc
-        one <- (↓) (symbol "1") sc
-        return (a1, ass, a2, plus, one)
-
+      run t = show (parse pProgram t) @?= ""
       wrap = do
-        ap <- getCurLoc
-        a <- string "a"
-        ap' <- getCurLoc
-        sc
-        assp <- getCurLoc
-        ass <- string ":="
-        assp' <- getCurLoc
-        return ((a, ap, ap'), (ass, assp, assp'))
+        decls <- many pDeclaration 
+        stmt1 <- pStmts
+        eof
+        return (Program decls stmt1)
+      
+
       
 
 -- | Expression
@@ -240,39 +232,39 @@ golden :: TestTree
 golden =
   testGroup
     "Program"
-    [ ast "empty" "./test/source/empty.gcl",
-      ast "2" "./test/source/2.gcl",
-      ast "comment" "./test/source/comment.gcl",
-      ast "issue 1" "./test/source/issue1.gcl",
-      ast "issue 14" "./test/source/issue14.gcl",
-      ast "no-decl" "./test/source/no-decl.gcl",
-      ast "no-stmt" "./test/source/no-stmt.gcl",
-      ast "assign" "./test/source/assign.gcl",
-      ast "quant 1" "./test/source/quant1.gcl",
-      ast "spec" "./test/source/spec.gcl",
-      ast "gcd" "./test/source/examples/gcd.gcl"
+    [ ast "empty" "./test/source/" "empty.gcl",
+      ast "2" "./test/source/" "2.gcl",
+      ast "comment" "./test/source/" "comment.gcl",
+      ast "issue 1" "./test/source/" "issue1.gcl",
+      ast "issue 14" "./test/source/" "issue14.gcl",
+      ast "no-decl" "./test/source/" "no-decl.gcl",
+      ast "no-stmt" "./test/source/" "no-stmt.gcl",
+      ast "assign" "./test/source/" "assign.gcl",
+      ast "quant 1" "./test/source/" "quant1.gcl",
+      ast "spec" "./test/source/" "spec.gcl",
+      ast "gcd" "./test/source/examples/" "gcd.gcl"
     ]
   where
     suffixGolden :: FilePath -> FilePath
     suffixGolden filePath = filePath ++ ".ast.golden"
 
-    ast :: String -> FilePath -> TestTree
-    ast name filePath =
+    ast :: String -> FilePath -> FilePath -> TestTree
+    ast name filePath fileName =
       goldenTest
         name
-        (readFile (suffixGolden filePath))
-        (readFile filePath)
+        (readFile (filePath ++ "golden/") (fileName ++ ".ast.golden"))
+        (readFile filePath fileName)
         compareAndReport
         update
 
-    readFile :: FilePath -> IO (FilePath, ByteString)
-    readFile filePath = do
-      raw <- BS.readFile filePath
-      return (filePath, raw)
+    readFile :: FilePath -> FilePath -> IO (FilePath, FilePath, ByteString)
+    readFile filePath fileName = do
+      raw <- BS.readFile (filePath ++ fileName)
+      return (filePath, fileName, raw)
 
     compareAndReport ::
-      (FilePath, ByteString) -> (FilePath, ByteString) -> IO (Maybe String)
-    compareAndReport (expectedPath, expected) (actualPath, actualRaw) = do
+      (FilePath, FilePath, ByteString) -> (FilePath, FilePath, ByteString) -> IO (Maybe String)
+    compareAndReport (expectedPath, expectedFileName, expected) (actualPath, actualFileName, actualRaw) = do
       let actual = run actualRaw
       if removeTrailingWhitespace expected == removeTrailingWhitespace actual
         then return Nothing
@@ -281,9 +273,9 @@ golden =
           -- BS8.putStrLn actual
           return $
             Just $
-              "expected (" ++ expectedPath ++ ", " ++ show (length (BS8.unpack expected)) ++ " chars):\n" ++ BS8.unpack expected ++ "\n------------\n"
+              "expected (" ++ expectedPath ++ expectedFileName ++ ", " ++ show (length (BS8.unpack expected)) ++ " chars):\n" ++ BS8.unpack expected ++ "\n------------\n"
                 ++ "actual ("
-                ++ actualPath
+                ++ actualPath ++ actualFileName
                 ++ ", "
                 ++ show (length (BS8.unpack actual))
                 ++ " chars): \n"
@@ -299,9 +291,9 @@ golden =
         stripEnd :: ByteString -> ByteString
         stripEnd s = BS8.take (lastNonSpaceCharIndex s) s
 
-    update :: (FilePath, ByteString) -> IO ()
-    update (filePath, input) = do
-      createDirectoriesAndWriteFile (suffixGolden filePath) (run input)
+    update :: (FilePath, FilePath, ByteString) -> IO ()
+    update (filePath, fileName, input) = do
+      createDirectoriesAndWriteFile (filePath ++ "golden/" ++ fileName ++ ".ast.golden") (run input)
 
     run :: ByteString -> ByteString
     run = Text.encodeUtf8 . render . parse pProgram . Text.decodeUtf8
