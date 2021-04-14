@@ -14,21 +14,22 @@ import Control.Monad.Except hiding (guard)
 import Control.Monad.Reader
 import Data.Aeson (FromJSON, ToJSON)
 import qualified Data.Aeson as JSON
-import Data.IORef (IORef, newIORef, readIORef, modifyIORef', writeIORef)
+import Data.IORef (IORef, modifyIORef', newIORef, readIORef, writeIORef)
 import Data.List (sort)
-import Data.Loc (Loc (..), Located (locOf), Pos (..), posCoff, posFile)
+import Data.Loc (Loc (..), Located (locOf), posCoff)
+import Data.Map (Map)
+import qualified Data.Map as Map
 import Data.Text (Text, pack)
-import qualified Data.Text as Text
 import qualified Data.Text.IO as Text
 import qualified Data.Text.Lazy as LazyText
 import Error
 import GCL.Expr (expand, runSubstM)
-import GCL.Type (TypeError (..))
 import qualified GCL.Type as TypeChecking
-import GCL.WP (StructError (..), StructWarning(..))
+import GCL.WP (StructWarning)
 import qualified GCL.WP as POGen
 import GHC.Generics (Generic)
 import GHC.IO.IOMode (IOMode (ReadWriteMode))
+import LSP.Diagnostic (ToDiagnostics (toDiagnostics))
 import LSP.ExportPO ()
 import Language.LSP.Diagnostics (partitionBySource)
 import Language.LSP.Server
@@ -44,16 +45,14 @@ import Syntax.Predicate
     PO (..),
     Spec,
   )
-import Data.Map (Map)
-import qualified Data.Map as Map
 
 --------------------------------------------------------------------------------
 
 data Env = Env
   { envChan :: Chan Text,
     envDevMode :: Bool,
-    -- | We maintain our own Uri-Source mapping 
-    --   instead of using the built-in LSP VFS 
+    -- | We maintain our own Uri-Source mapping
+    --   instead of using the built-in LSP VFS
     --   to have better control of update management
     envSourceMap :: IORef (Map FilePath (Text, Maybe (Int, Int))),
     -- | Counter for generating fresh numbers
@@ -103,7 +102,7 @@ readLastSelection filepath = do
   return $ snd =<< Map.lookup filepath mapping
 
 bumpCounter :: LspT () ServerM Int
-bumpCounter = do 
+bumpCounter = do
   ref <- lift $ asks envCounter
   n <- liftIO $ readIORef ref
   liftIO $ writeIORef ref (succ n)
@@ -179,32 +178,36 @@ handlers =
             return $ CannotDecodeRequest $ show msg ++ "\n" ++ show params
           JSON.Success request@(Req filepath kind) -> do
             writeLog $ " --> Custom Reqeust: " <> pack (show request)
-            
+
             result <- readSource filepath
             case result of
               Nothing -> pure NotLoaded
               Just source -> do
                 -- send Diagnostics
-                version <- case i of 
+                version <- case i of
                   IdInt n -> return n
                   IdString _ -> bumpCounter
                 sendDiagnostics filepath source version
                 -- convert Request to Response
-                kinds <- case kind of 
-                  ReqInspect selStart selEnd -> do 
+                kinds <- case kind of
+                  ReqInspect selStart selEnd -> do
                     updateSelection filepath (selStart, selEnd)
-                    return $ asGlobalError $ do
-                      (pos, _specs, _globalProps, _warnings) <- checkEverything filepath source (Just (selStart, selEnd))
-                      return [ResInspect pos]
-                  ReqRefine index payload -> return $ asLocalError index $ do
-                    _ <- refine payload
-                    return [ResResolve index]
-                  ReqSubstitute index expr _subst -> return $ asGlobalError $ do
-                    A.Program _ _ defns _ _ <- parseProgram filepath source
-                    let expr' = runSubstM (expand (A.Subst expr _subst)) defns 1
-                    return [ResSubstitute index expr']
-                  ReqExportProofObligations -> return $ asGlobalError $ do
-                    return [ResConsoleLog "Export"]
+                    return $
+                      asGlobalError $ do
+                        (pos, _specs, _globalProps, _warnings) <- checkEverything filepath source (Just (selStart, selEnd))
+                        return [ResInspect pos]
+                  ReqRefine index payload -> return $
+                    asLocalError index $ do
+                      _ <- refine payload
+                      return [ResResolve index]
+                  ReqSubstitute index expr _subst -> return $
+                    asGlobalError $ do
+                      A.Program _ _ defns _ _ <- parseProgram filepath source
+                      let expr' = runSubstM (expand (A.Subst expr _subst)) defns 1
+                      return [ResSubstitute index expr']
+                  ReqExportProofObligations -> return $
+                    asGlobalError $ do
+                      return [ResConsoleLog "Export"]
                   ReqDebug -> return $ error "crash!"
                 return $ Res filepath kinds
 
@@ -221,7 +224,7 @@ handlers =
               Nothing -> pure ()
               Just filepath -> do
                 -- debugging line for checking if the program has been correctly parsed
-                -- writeLog' $ fmap pretty $ runM $ parseProgram filepath source
+                writeLog' $ fmap pretty $ runM $ parseProgram filepath source
                 updateSource filepath source
                 version <- bumpCounter
                 checkAndSendResult filepath source version
@@ -240,10 +243,10 @@ handlers =
     ]
 
 checkAndSendResult :: FilePath -> Text -> Int -> LspT () ServerM ()
-checkAndSendResult filepath source version = do 
+checkAndSendResult filepath source version = do
   lastSelection <- readLastSelection filepath
   let result = runM (checkEverything filepath source lastSelection)
-  let response = case result of 
+  let response = case result of
         Left e -> Res filepath [ResError [globalError e]]
         Right (pos, specs, globalProps, warnings) -> Res filepath [ResOK (IdInt version) pos specs globalProps warnings]
   sendNotification (SCustomMethod "guacamole") $ JSON.toJSON response
@@ -254,130 +257,40 @@ sendDiagnostics filepath source version = do
   diags <- do
     let result = runM $ checkEverything filepath source Nothing
     return $ case result of
-      Left err -> errorToDiagnostics err
-      Right res -> resultToDiagnostics res
+      Left err -> toDiagnostics err
+      Right (pos, _, _, warnings) -> concatMap toDiagnostics pos ++ concatMap toDiagnostics warnings
   let fileUri = toNormalizedUri (filePathToUri filepath)
 
   publishDiagnostics 100 fileUri (Just version) (partitionBySource diags)
-  where
-    resultToDiagnostics :: Result -> [Diagnostic]
-    resultToDiagnostics (pos, _, _, warnings) = map proofObligationToDiagnostic pos ++ concatMap warningToDiagnostics warnings
-
-    warningToDiagnostics :: StructWarning -> [Diagnostic]
-    warningToDiagnostics (MissingBound loc) = [makeWarning loc "Bound Missing" "Bound missing at the end of the assertion before the DO construct \" , bnd : ... }\""]
-    warningToDiagnostics (ExcessBound loc) = [makeWarning loc "Excess Bound" "Unnecessary bound annotation at this assertion"]
-
-    errorToDiagnostics :: Error -> [Diagnostic]
-    errorToDiagnostics (LexicalError pos) = [makeError (Loc pos pos) "Lexical error" ""]
-    errorToDiagnostics (SyntacticError errs) = map syntacticErrorToDiagnostics errs
-      where
-        syntacticErrorToDiagnostics (loc, msg) = makeError loc "Syntax error" (Text.pack msg)
-    errorToDiagnostics (StructError err) = structErrorToDiagnostics err
-      where
-        structErrorToDiagnostics (MissingAssertion loc) = [makeError loc "Assertion Missing" "Assertion before the DO construct is missing"]
-        structErrorToDiagnostics (MissingPostcondition loc) = [makeError loc "Postcondition Missing" "The last statement of the program should be an assertion"]
-        structErrorToDiagnostics (DigHole _) = []
-    errorToDiagnostics (TypeError err) = typeErrorToDiagnostics err
-      where
-        typeErrorToDiagnostics (NotInScope name loc) = [makeError loc "Not in scope" $ "The definition " <> LazyText.toStrict name <> " is not in scope"]
-        typeErrorToDiagnostics (UnifyFailed s t loc) =
-          [ makeError loc "Cannot unify types" $
-              renderStrict $
-                "Cannot unify:" <+> pretty s <> line
-                  <> "with        :" <+> pretty t
-          ]
-        typeErrorToDiagnostics (RecursiveType var t loc) =
-          [ makeError loc "Recursive type variable" $
-              renderStrict $
-                "Recursive type variable:" <+> pretty var <> line
-                  <> "in type             :" <+> pretty t
-          ]
-        typeErrorToDiagnostics (NotFunction t loc) =
-          [ makeError loc "Not a function" $
-              renderStrict $
-                "The type" <+> pretty t <+> "is not a function type"
-          ]
-    errorToDiagnostics _ = []
-
-    proofObligationToDiagnostic :: PO -> Diagnostic
-    proofObligationToDiagnostic (PO _i _pre _post origin) = makeWarning loc title ""
-      where
-        -- we only mark the opening tokens ("do" and "if") for loops & conditionals
-        first2Char :: Loc -> Loc
-        first2Char NoLoc = NoLoc
-        first2Char (Loc start _) = Loc start (translate 1 start)
-
-        loc :: Loc
-        loc = case origin of
-          -- we only mark the closing tokens ("od" and "fi") for loops & conditionals
-          AtLoop l -> first2Char l
-          AtTermination l -> first2Char l
-          AtIf l -> first2Char l
-          others -> locOf others
-
-        title :: Text.Text
-        title = case origin of
-          AtAbort {} -> "Abort"
-          AtSpec {} -> "Spec"
-          AtAssignment {} -> "Assignment"
-          AtAssertion {} -> "Assertion"
-          AtIf {} -> "Conditional"
-          AtLoop {} -> "Loop Invariant"
-          AtTermination {} -> "Loop Termination"
-          AtSkip {} -> "Skip"
-
-    -- translate a Pos along the same line
-    translate :: Int -> Pos -> Pos
-    translate n (Pos path ln col offset) = Pos path ln ((col + n) `max` 0) ((offset + n) `max` 0)
-
-    posToPosition :: Pos -> Position
-    posToPosition (Pos _path ln col _offset) = Position ((ln - 1) `max` 0) ((col - 1) `max` 0)
-
-    locToRange :: Loc -> Range
-    locToRange NoLoc = Range (Position 0 0) (Position 0 0)
-    locToRange (Loc start end) = Range (posToPosition start) (posToPosition (translate 1 end))
-
-    locToLocation :: Loc -> Location
-    locToLocation NoLoc = Location (Uri "") (locToRange NoLoc)
-    locToLocation (Loc start end) = Location (Uri $ Text.pack $ posFile start) (locToRange (Loc start end))
-
-    severityToDiagnostic :: Maybe DiagnosticSeverity -> Loc -> Text.Text -> Text.Text -> Diagnostic
-    severityToDiagnostic severity loc title body = Diagnostic (locToRange loc) severity Nothing Nothing title Nothing (Just $ List [DiagnosticRelatedInformation (locToLocation loc) body])
-
-    makeWarning :: Loc -> Text.Text -> Text.Text -> Diagnostic
-    makeWarning = severityToDiagnostic (Just DsWarning)
-
-    makeError :: Loc -> Text.Text -> Text.Text -> Diagnostic
-    makeError = severityToDiagnostic (Just DsError)
 
 --------------------------------------------------------------------------------
 
 -- | Given an interval of mouse selection, calculate POs within the interval, ordered by their vicinity
 filterPOs :: (Int, Int) -> [PO] -> [PO]
 filterPOs (selStart, selEnd) pos = opverlappedPOs
-  where 
+  where
     opverlappedPOs = reverse $ case overlapped of
-                [] -> []
-                (x : _) -> case locOf x of
-                  NoLoc -> []
-                  Loc start _ ->
-                    let same y = case locOf y of
-                          NoLoc -> False
-                          Loc start' _ -> start == start'
-                    in filter same overlapped
-        where
-          -- find the POs whose Range overlaps with the selection
-          isOverlapped po = case locOf po of
+      [] -> []
+      (x : _) -> case locOf x of
+        NoLoc -> []
+        Loc start _ ->
+          let same y = case locOf y of
                 NoLoc -> False
-                Loc start' end' ->
-                  let start = posCoff start'
-                      end = posCoff end' + 1
-                  in (selStart <= start && selEnd >= start) -- the end of the selection overlaps with the start of PO
-                        || (selStart <= end && selEnd >= end) -- the start of the selection overlaps with the end of PO
-                        || (selStart <= start && selEnd >= end) -- the selection covers the PO
-                        || (selStart >= start && selEnd <= end) -- the selection is within the PO
-          -- sort them by comparing their starting position
-          overlapped = reverse $ sort $ filter isOverlapped pos
+                Loc start' _ -> start == start'
+           in filter same overlapped
+      where
+        -- find the POs whose Range overlaps with the selection
+        isOverlapped po = case locOf po of
+          NoLoc -> False
+          Loc start' end' ->
+            let start = posCoff start'
+                end = posCoff end' + 1
+             in (selStart <= start && selEnd >= start) -- the end of the selection overlaps with the start of PO
+                  || (selStart <= end && selEnd >= end) -- the start of the selection overlaps with the end of PO
+                  || (selStart <= start && selEnd >= end) -- the selection covers the PO
+                  || (selStart >= start && selEnd <= end) -- the selection is within the PO
+                  -- sort them by comparing their starting position
+        overlapped = reverse $ sort $ filter isOverlapped pos
 
 type ID = LspId ('CustomMethod :: Method 'FromClient 'Request)
 
@@ -422,15 +335,13 @@ parseProgram filepath source = toAbstract <$> parse pProgram filepath source
 refine :: Text -> M ()
 refine = void . parse pStmts "<specification>"
 
-type Result = ([PO], [Spec], [A.Expr], [StructWarning])
-
 -- | Type check + generate POs and Specs
-checkEverything :: FilePath -> Text -> Maybe (Int, Int) -> M Result
+checkEverything :: FilePath -> Text -> Maybe (Int, Int) -> M ([PO], [Spec], [A.Expr], [StructWarning])
 checkEverything filepath source mouseSelection = do
   program@(A.Program _ globalProps _ _ _) <- parseProgram filepath source
   typeCheck program
   (pos, specs, warings) <- genPO program
-  case mouseSelection of 
+  case mouseSelection of
     Nothing -> return (pos, specs, globalProps, warings)
     Just sel -> return (filterPOs sel pos, specs, globalProps, warings)
 
