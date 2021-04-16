@@ -247,7 +247,7 @@ instance PrettyWithLoc Stmt where
       <> prettyWithLoc gdCmds
       <> prettyWithLoc r
   prettyWithLoc (SpecQM l) = fromDoc l "?"
-  prettyWithLoc (Spec l r) = prettyWithLoc l <> prettyWithLoc r
+  prettyWithLoc (Spec l _ r) = prettyWithLoc l <> Empty <> prettyWithLoc r
   prettyWithLoc (Proof l r) = prettyWithLoc l <> prettyWithLoc r
 
 instance Pretty GdCmd where

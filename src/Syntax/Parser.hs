@@ -3,7 +3,7 @@
 {-# LANGUAGE PartialTypeSignatures #-}
 module Syntax.Parser where
 
-import Control.Applicative.Combinators (choice, many, sepBy1, (<|>))
+import Control.Applicative.Combinators (choice, many, sepBy1, (<|>), manyTill_, skipManyTill)
 import Control.Monad.Combinators.Expr (Operator (..), makeExprParser)
 import Data.Loc (Located (locOf))
 import Data.Text.Lazy (Text)
@@ -11,10 +11,11 @@ import qualified Data.Ord as Ord
 import Syntax.Concrete (Declaration (..), EndpointClose (..), EndpointOpen (..), Expr (..), GdCmd (..), Interval (..), Name (..), Op (..), Program (..), SepBy (..), Stmt (..), TBase (..), Token (..), Type (..))
 import Syntax.Parser.Lexer
 import Syntax.Parser.Util
-import Text.Megaparsec (MonadParsec (..), parse, (<?>), skipManyTill, anySingle, Pos)
+import Text.Megaparsec (MonadParsec (..), parse, (<?>), anySingle, Pos, tokenToChunk, tokensToChunk)
 import qualified Text.Megaparsec.Char.Lexer as Lex
 import Control.Monad (void)
 import Control.Monad.Trans (lift)
+import Data.Data (Proxy(Proxy))
 
 type Parser = Lexer
 type ParserF = LexerF
@@ -174,10 +175,14 @@ pSpecQM :: ParserF Stmt
 pSpecQM = SpecQM . locOf <$> lexQM
 
 pSpec :: Parser Stmt
-pSpec = uncurry Spec <$> pSpecProofHelper lexSpecStart lexSpecEnd
+pSpec = do
+  (ts, t, te) <- pSpecProofHelper lexSpecStart lexSpecEnd
+  return $ Spec ts t te
 
 pProof :: Parser Stmt
-pProof = uncurry Proof <$> pSpecProofHelper lexProofStart lexProofEnd
+pProof = do
+  (ts, _, te) <- pSpecProofHelper lexProofStart lexProofEnd
+  return $ Proof ts te
 
 ------------------------------------------
 -- parse Type
@@ -341,60 +346,60 @@ pIfoDoHelper ::
   ParserF (Token s)
   -> ParserF (Token e)
   -> Parser (Token s, SepBy sep GdCmd, Token e)
-pIfoDoHelper start end = do
-  (ts, Just gds, te) <- pIndentSepBy start end (Just (pGdCmd, lexGuardBar))
-  return (ts, gds, te)
+pIfoDoHelper start end = 
+  pIndentSepBy start end (pGdCmd, lexGuardBar)
 
-pSpecProofHelper :: 
-  ParserF (Token s) 
-  -> ParserF (Token e) 
-  -> Parser (Token s, Token e)
+pSpecProofHelper ::
+  ParserF (Token s)
+  -> ParserF (Token e)
+  -> Parser (Token s, Text, Token e)
 pSpecProofHelper start end = do
-  (ts, Nothing, te) <- pIndentSepBy start end Nothing
-  return (ts, te)
+  ref <- Lex.indentLevel
+  ts <- (↓) start sc
+  (t, te) <- manyTill_ anySingle ((↓) end sc)
+  let pos = getTokenColumn te
+  if compare pos ref == Ord.LT
+    then Lex.incorrectIndent Ord.EQ pos ref
+    else return (ts, tokensToChunk (Proxy :: Proxy Text) t, te)
+
 
 pIndentSepBy ::
   ParserF (Token s)
   -> ParserF (Token e)
-  -> Maybe (ParserF a, ParserF (Token sep))
-  -> Parser (Token s, Maybe (SepBy sep a), Token e)
-pIndentSepBy start end m = do
+  -> (ParserF a, ParserF (Token sep))
+  -> Parser (Token s, SepBy sep a, Token e)
+pIndentSepBy start end (p, delim) = do
   ref <- Lex.indentLevel
-  case m of
-    Nothing -> do
-      ts <- (↓) start sc
-      te <- skipManyTill anySingle ((↓) end sc)
-      let pos = getTokenColumn te
-      if compare pos ref == Ord.LT
-        then Lex.incorrectIndent Ord.EQ pos ref
-        else return (ts, Nothing, te)
-    Just (p, delim) -> do
-      -- parse start token and guard the indentation level
-      ts <- (↓) start sc
-      -- start parsing p
-      ps <- parseP
-      indentGTE ref scn
-      te <- (↓) end sc
-      return (ts, Just ps, te)
-      where
-        parseP = do
-          gdPos <- Lex.indentGuard scn Ord.GT ref
-          x <- (↓) p . void $ Lex.indentGuard scn Ord.GT ref
-          let g = do
-                delimPos <- Lex.indentGuard scn Ord.GT ref
-                if compare delimPos gdPos == Ord.LT 
-                  then Delim x <$> (↓) delim sc <*> parseP' gdPos delimPos
-                  else Lex.incorrectIndent Ord.LT gdPos delimPos
-          try g <|> return (Head x)
+  -- parse start token and guard the indentation level
+  ts <- (↓) start sc
 
-        parseP' gdPos delimPos = do
-          void $ Lex.indentGuard sc Ord.EQ gdPos
-          -- x <- (↓) p sc
-          x <- (↓) p . void $ Lex.indentGuard scn Ord.GT ref
-          let g = do
-                void $ Lex.indentGuard scn Ord.EQ delimPos
-                Delim x <$> (↓) delim sc <*> parseP' gdPos delimPos
-          try g <|> return (Head x)
+  -- start parsing p
+  ps <- parseP ref
+
+  -- guard the end token position
+  indentGTE ref scn
+  te <- (↓) end sc
+
+  return (ts, ps, te)
+  where
+    parseP ref = do
+      gdPos <- Lex.indentGuard scn Ord.GT ref
+      x <- (↓) p . void $ Lex.indentGuard scn Ord.GT ref
+      let g = do
+            delimPos <- Lex.indentGuard scn Ord.GT ref
+            if compare delimPos gdPos == Ord.LT 
+              then Delim x <$> (↓) delim sc <*> parseP' gdPos delimPos ref
+              else Lex.incorrectIndent Ord.LT gdPos delimPos
+      try g <|> return (Head x)
+
+    parseP' gdPos delimPos ref = do
+      void $ Lex.indentGuard sc Ord.EQ gdPos
+      -- x <- (↓) p sc
+      x <- (↓) p . void $ Lex.indentGuard scn Ord.GT ref
+      let g = do
+            void $ Lex.indentGuard scn Ord.EQ delimPos
+            Delim x <$> (↓) delim sc <*> parseP' gdPos delimPos ref
+      try g <|> return (Head x)
                   
 indentGTE :: Pos -> Parser () -> Parser ()
 indentGTE ref sc' = void $ try (Lex.indentGuard sc' Ord.EQ ref) <|> Lex.indentGuard sc' Ord.GT ref

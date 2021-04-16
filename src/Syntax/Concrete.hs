@@ -100,7 +100,7 @@ data Stmt
   | Do (Token "do") (SepBy "|" GdCmd) (Token "od")
   | If (Token "if") (SepBy "|" GdCmd) (Token "fi")
   | SpecQM Loc -- ? to be rewritten as {!!} by the frontend
-  | Spec (Token "[!") (Token "!]")
+  | Spec (Token "[!") Text (Token "!]")
   | Proof (Token "{-") (Token "-}")
   deriving (Eq, Show)
 
@@ -113,7 +113,7 @@ instance ToAbstract Stmt A.Stmt where
   toAbstract (Do l a r) = A.Do (toAbstract <$> fromSepBy a) (l <--> r)
   toAbstract (If l a r) = A.If (toAbstract <$> fromSepBy a) (l <--> r)
   toAbstract (SpecQM l) = A.SpecQM l
-  toAbstract (Spec l r) = A.Spec mempty (l <--> r)
+  toAbstract (Spec l t r) = A.Spec t (l <--> r)
   toAbstract (Proof l r) = A.Proof (l <--> r)
 
 instance Located Stmt where
@@ -125,7 +125,7 @@ instance Located Stmt where
   locOf (Do l _ r) = l <--> r
   locOf (If l _ r) = l <--> r
   locOf (SpecQM l) = l
-  locOf (Spec l r) = l <--> r
+  locOf (Spec l _ r) = l <--> r
   locOf (Proof l r) = l <--> r
 
 data GdCmd = GdCmd Expr (Either (Token "->") (Token "→")) [Stmt] deriving (Eq, Show)
