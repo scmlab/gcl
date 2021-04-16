@@ -14,6 +14,7 @@ import Control.Monad.Except hiding (guard)
 import Control.Monad.Reader
 import Data.Aeson (FromJSON, ToJSON)
 import qualified Data.Aeson as JSON
+import Data.Foldable (find)
 import Data.IORef (IORef, modifyIORef', newIORef, readIORef, writeIORef)
 import Data.List (sort)
 import Data.Loc (Loc (..), Located (locOf), posCoff)
@@ -45,8 +46,10 @@ import Syntax.Parser
 import Syntax.Predicate
   ( Origin (..),
     PO (..),
-    Spec (specLoc),
+    Spec (..),
   )
+import qualified Data.Text as Text
+import qualified Data.Char as Char
 
 --------------------------------------------------------------------------------
 
@@ -201,6 +204,24 @@ handlers =
                       asGlobalError $ do
                         (pos, _specs, _globalProps, _warnings) <- checkEverything filepath source (Just (selStart, selEnd))
                         return [ResInspect pos]
+                  ReqRefine2 -> do
+                    result' <- readLatestSource filepath
+                    selection' <- readLastSelection filepath
+                    case result' of
+                      Nothing -> return [ResConsoleLog "no source"]
+                      Just source' -> case selection' of
+                        Nothing -> return [ResConsoleLog "no selection"]
+                        Just selection -> do
+                          writeLog source'
+                          return $ asGlobalError $ do
+                              spec <- findPointedSpec filepath source' selection
+                              case spec of 
+                                Nothing -> return [ResConsoleLog "no spec"]
+                                Just spec' -> do 
+                                  let payload = getSpecPayload source spec' 
+                                  return [ResConsoleLog payload]
+                                  -- _ <- refine payload
+                                  -- return [ResResolve (specID spec')]
                   ReqRefine index payload -> return $
                     asLocalError index $ do
                       _ <- refine payload
@@ -211,9 +232,10 @@ handlers =
                       Nothing -> return []
                       Just source' -> do
                         writeLog source'
-                        return $ ignoreError $ do
-                          locs <- tempGetSpecPositions filepath source'
-                          return [ResUpdateSpecPositions locs]
+                        return $
+                          ignoreError $ do
+                            locs <- tempGetSpecPositions filepath source'
+                            return [ResUpdateSpecPositions locs]
                   ReqSubstitute index expr _subst -> return $
                     asGlobalError $ do
                       A.Program _ _ defns _ _ <- parseProgram filepath source
@@ -362,7 +384,6 @@ checkEverything filepath source mouseSelection = do
     Nothing -> return (pos, specs, globalProps, warings)
     Just sel -> return (filterPOs sel pos, specs, globalProps, warings)
 
-
 typeCheck :: A.Program -> M ()
 typeCheck = withExcept TypeError . TypeChecking.checkProg
 
@@ -374,12 +395,39 @@ tempGetSpecPositions filepath source = do
   (_, specs, _) <- parseProgram filepath source >>= genPO
   return (map specLoc specs)
 
+findPointedSpec :: FilePath -> Text -> (Int, Int) -> M (Maybe Spec)
+findPointedSpec filepath source selection = do
+  (_, specs, _) <- parseProgram filepath source >>= genPO
+  return $ find (pointed selection) specs
+  where
+    pointed :: (Int, Int) -> Spec -> Bool
+    pointed (start, end) spec = case specLoc spec of
+      NoLoc -> False
+      Loc open close ->
+        (posCoff open <= start && start <= posCoff close)
+          || (posCoff open <= end && end <= posCoff close)
+
+getSpecPayload :: Text -> Spec -> Text
+getSpecPayload source spec = case specLoc spec of 
+  NoLoc -> mempty 
+  Loc start end -> 
+    let payload = Text.drop (posCoff start) $ Text.take (posCoff end) source
+        indentedLines = init $ tail $ Text.lines payload 
+        splittedIndentedLines = map (Text.break (not . Char.isSpace)) indentedLines
+        smallestIndentation = minimum $ map (Text.length . fst) splittedIndentedLines
+        trimmedLines = map (\(indentation, content) -> Text.drop smallestIndentation indentation <> content ) splittedIndentedLines
+    in  Text.unlines trimmedLines
+        -- Text.intercalate "#" $ init $ tail $ Text.lines payload 
+        -- -- Text.unlines trimmedLines
+
+
 --------------------------------------------------------------------------------
 
 -- | Request
 data ReqKind
   = ReqInspect Int Int
   | ReqRefine Int Text
+  | ReqRefine2
   | ReqRetreiveSpecPositions
   | ReqSubstitute Int A.Expr A.Subst
   | ReqExportProofObligations
@@ -391,6 +439,7 @@ instance FromJSON ReqKind
 instance Show ReqKind where
   show (ReqInspect x y) = "Inspect " <> show x <> " " <> show y
   show (ReqRefine i x) = "Refine #" <> show i <> " " <> show x
+  show ReqRefine2 = "Refine2"
   show ReqRetreiveSpecPositions = "RetreiveSpecPositions"
   show (ReqSubstitute i x y) = "Substitute #" <> show i <> " " <> show x <> " => " <> show y
   show ReqExportProofObligations = "ExportProofObligations"
