@@ -17,7 +17,7 @@ import qualified Data.Aeson as JSON
 import Data.Foldable (find)
 import Data.IORef (IORef, modifyIORef', newIORef, readIORef, writeIORef)
 import Data.List (sort)
-import Data.Loc (Loc (..), Located (locOf), posCoff)
+import Data.Loc (Loc (..), Located (locOf), posCoff, posCol)
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Text (Text, pack)
@@ -30,7 +30,7 @@ import GCL.WP (StructWarning)
 import qualified GCL.WP as POGen
 import GHC.Generics (Generic)
 import GHC.IO.IOMode (IOMode (ReadWriteMode))
-import LSP.Diagnostic (ToDiagnostics (toDiagnostics))
+import LSP.Diagnostic (ToDiagnostics (toDiagnostics), locToRange)
 import LSP.ExportPO ()
 import Language.LSP.Diagnostics (partitionBySource)
 import Language.LSP.Server
@@ -195,7 +195,7 @@ handlers =
                 version <- case i of
                   IdInt n -> return n
                   IdString _ -> bumpCounter
-                sendDiagnostics filepath source version
+                sendDiagnostics2 filepath source version
                 -- convert Request to Response
                 kinds <- case kind of
                   ReqInspect selStart selEnd -> do
@@ -204,7 +204,7 @@ handlers =
                       asGlobalError $ do
                         (pos, _specs, _globalProps, _warnings) <- checkEverything filepath source (Just (selStart, selEnd))
                         return [ResInspect pos]
-                  ReqRefine2 -> do
+                  ReqRefine2 -> do 
                     result' <- readLatestSource filepath
                     selection' <- readLastSelection filepath
                     case result' of
@@ -212,16 +212,39 @@ handlers =
                       Just source' -> case selection' of
                         Nothing -> return [ResConsoleLog "no selection"]
                         Just selection -> do
-                          writeLog source'
-                          return $ asGlobalError $ do
-                              spec <- findPointedSpec filepath source' selection
-                              case spec of 
-                                Nothing -> return [ResConsoleLog "no spec"]
-                                Just spec' -> do 
-                                  let payload = getSpecPayload source spec' 
-                                  return [ResConsoleLog payload]
-                                  -- _ <- refine payload
-                                  -- return [ResResolve (specID spec')]
+                          let program = do
+                                spec <- findPointedSpec filepath source' selection
+                                case spec of 
+                                  Nothing -> throwError $ Others "Cannot find pointed spec" 
+                                  Just spec' -> do 
+                                    let payload = getSpecPayload source spec' 
+                                    return (spec', payload) 
+                          case runM program of 
+                            Left err -> do 
+                              sendDiagnostics filepath 0 (toDiagnostics err)
+                              return []
+                            Right (spec, payload) -> do 
+                              let indentationOfSpec = case specLoc spec of 
+                                    NoLoc -> 0 
+                                    Loc pos _ -> posCol pos - 1
+                              let indentedPayload = Text.intercalate ("\n" <> Text.replicate indentationOfSpec " ") payload
+                              writeLog' (specLoc spec)
+                              writeLog' payload
+                              writeLog' indentedPayload
+                              let removeSpecOpen = TextEdit (locToRange (specLoc spec)) indentedPayload
+                              let identifier = VersionedTextDocumentIdentifier (filePathToUri filepath) (Just 0)
+                              let textDocumentEdit = TextDocumentEdit identifier (List [removeSpecOpen])
+                              let change = InL textDocumentEdit
+                              let workspaceEdit = WorkspaceEdit Nothing (Just (List [change]))
+                              let applyWorkspaceEditParams = ApplyWorkspaceEditParams (Just "Resolve Spec") workspaceEdit
+
+                              -- Either ResponseError Value -> LspT () ServerM ()
+                              let responder' response = case response of 
+                                    Left _responseError -> return ()
+                                    Right _value -> return ()
+                              sendRequest SWorkspaceApplyEdit applyWorkspaceEditParams responder'
+                                -- (MessageParams m) (Either ResponseError (ResponseResult m) -> f ())
+                              return []
                   ReqRefine index payload -> return $
                     asLocalError index $ do
                       _ <- refine payload
@@ -264,7 +287,7 @@ handlers =
                 updateSource filepath source
                 version <- bumpCounter
                 checkAndSendResult filepath source version
-                sendDiagnostics filepath source version,
+                sendDiagnostics2 filepath source version,
       -- when the client opened the document
       notificationHandler STextDocumentDidOpen $ \ntf -> do
         writeLog " --> TextDocumentDidOpen"
@@ -275,7 +298,7 @@ handlers =
             updateSource filepath source
             version <- bumpCounter
             checkAndSendResult filepath source version
-            sendDiagnostics filepath source version
+            sendDiagnostics2 filepath source version
     ]
 
 checkAndSendResult :: FilePath -> Text -> Int -> LspT () ServerM ()
@@ -287,17 +310,19 @@ checkAndSendResult filepath source version = do
         Right (pos, specs, globalProps, warnings) -> Res filepath [ResOK (IdInt version) pos specs globalProps warnings]
   sendNotification (SCustomMethod "guacamole") $ JSON.toJSON response
 
-sendDiagnostics :: FilePath -> Text -> Int -> LspT () ServerM ()
-sendDiagnostics filepath source version = do
+
+sendDiagnostics :: FilePath -> Int -> [Diagnostic] -> LspT () ServerM ()
+sendDiagnostics filepath version diags = publishDiagnostics 100 (toNormalizedUri (filePathToUri filepath)) (Just version) (partitionBySource diags)
+
+sendDiagnostics2 :: FilePath -> Text -> Int -> LspT () ServerM ()
+sendDiagnostics2 filepath source version = do
   -- send diagnostics
   diags <- do
     let result = runM $ checkEverything filepath source Nothing
     return $ case result of
       Left err -> toDiagnostics err
       Right (pos, _, _, warnings) -> concatMap toDiagnostics pos ++ concatMap toDiagnostics warnings
-  let fileUri = toNormalizedUri (filePathToUri filepath)
-
-  publishDiagnostics 100 fileUri (Just version) (partitionBySource diags)
+  sendDiagnostics filepath version diags
 
 --------------------------------------------------------------------------------
 
@@ -407,7 +432,7 @@ findPointedSpec filepath source selection = do
         (posCoff open <= start && start <= posCoff close)
           || (posCoff open <= end && end <= posCoff close)
 
-getSpecPayload :: Text -> Spec -> Text
+getSpecPayload :: Text -> Spec -> [Text]
 getSpecPayload source spec = case specLoc spec of 
   NoLoc -> mempty 
   Loc start end -> 
@@ -416,7 +441,7 @@ getSpecPayload source spec = case specLoc spec of
         splittedIndentedLines = map (Text.break (not . Char.isSpace)) indentedLines
         smallestIndentation = minimum $ map (Text.length . fst) splittedIndentedLines
         trimmedLines = map (\(indentation, content) -> Text.drop smallestIndentation indentation <> content ) splittedIndentedLines
-    in  Text.unlines trimmedLines
+    in  trimmedLines
         -- Text.intercalate "#" $ init $ tail $ Text.lines payload 
         -- -- Text.unlines trimmedLines
 
