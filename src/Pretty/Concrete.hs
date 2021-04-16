@@ -5,12 +5,15 @@
 
 module Pretty.Concrete where
 
+-- import Syntax.Parser.Lexer (Tok (..))
+
+import Data.Loc (locOf, (<-->))
+import Data.Loc.Util (translateLoc)
 import Data.Text.Prettyprint.Doc (Pretty (pretty))
 import Pretty.Util
 import Pretty.Variadic
 import Syntax.Common (Fixity (..))
 import Syntax.Concrete
--- import Syntax.Parser.Lexer (Tok (..))
 import Prelude hiding (Ordering (..))
 
 --------------------------------------------------------------------------------
@@ -76,7 +79,7 @@ instance PrettyWithLoc (Token "{-") where
 
 instance PrettyWithLoc (Token "-}") where
   prettyWithLoc (Token l r) = DocWithLoc "-}" l r
-  
+
 instance PrettyWithLoc (Token ":") where
   prettyWithLoc (Token l r) = DocWithLoc ":" l r
 
@@ -247,7 +250,10 @@ instance PrettyWithLoc Stmt where
       <> prettyWithLoc gdCmds
       <> prettyWithLoc r
   prettyWithLoc (SpecQM l) = fromDoc l "?"
-  prettyWithLoc (Spec l _ r) = prettyWithLoc l <> Empty <> prettyWithLoc r
+  prettyWithLoc (Spec l s r) =
+    prettyWithLoc l
+      <> fromDoc (translateLoc 2 0 (locOf l) <--> translateLoc 0 (-2) (locOf r)) (pretty s)
+      <> prettyWithLoc r
   prettyWithLoc (Proof l r) = prettyWithLoc l <> prettyWithLoc r
 
 instance Pretty GdCmd where
@@ -280,11 +286,11 @@ handleExpr (Var x) = return $ prettyWithLoc x
 handleExpr (Const x) = return $ prettyWithLoc x
 handleExpr (Lit x) = return $ prettyWithLoc x
 handleExpr (Op x) = handleOp x
-handleExpr (Chain x op y) = 
+handleExpr (Chain x op y) =
   return $
     prettyWithLoc x
-    <> prettyWithLoc op
-    <> prettyWithLoc y
+      <> prettyWithLoc op
+      <> prettyWithLoc y
 handleExpr (App p q) = case handleExpr p of
   Expect f -> f q
   Complete s -> do
