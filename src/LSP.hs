@@ -14,6 +14,7 @@ import Control.Monad.Except hiding (guard)
 import Control.Monad.Reader
 import Data.Aeson (FromJSON, ToJSON)
 import qualified Data.Aeson as JSON
+import qualified Data.Char as Char
 import Data.Foldable (find)
 import Data.IORef (IORef, modifyIORef', newIORef, readIORef, writeIORef)
 import Data.List (sort)
@@ -21,6 +22,7 @@ import Data.Loc (Loc (..), Located (locOf), posCoff, posCol)
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Text (Text, pack)
+import qualified Data.Text as Text
 import qualified Data.Text.IO as Text
 import qualified Data.Text.Lazy as LazyText
 import Error
@@ -48,8 +50,6 @@ import Syntax.Predicate
     PO (..),
     Spec (..),
   )
-import qualified Data.Text as Text
-import qualified Data.Char as Char
 
 --------------------------------------------------------------------------------
 
@@ -204,47 +204,45 @@ handlers =
                       asGlobalError $ do
                         (pos, _specs, _globalProps, _warnings) <- checkEverything filepath source (Just (selStart, selEnd))
                         return [ResInspect pos]
-                  ReqRefine2 -> do 
+                  ReqRefine2 selStart selEnd -> do
                     result' <- readLatestSource filepath
-                    selection' <- readLastSelection filepath
                     case result' of
                       Nothing -> return [ResConsoleLog "no source"]
-                      Just source' -> case selection' of
-                        Nothing -> return [ResConsoleLog "no selection"]
-                        Just selection -> do
-                          let program = do
-                                spec <- findPointedSpec filepath source' selection
-                                case spec of 
-                                  Nothing -> throwError $ Others "Cannot find pointed spec" 
-                                  Just spec' -> do 
-                                    let payload = getSpecPayload source spec' 
-                                    return (spec', payload) 
-                          case runM program of 
-                            Left err -> do 
-                              sendDiagnostics filepath 0 (toDiagnostics err)
-                              return []
-                            Right (spec, payload) -> do 
-                              let indentationOfSpec = case specLoc spec of 
-                                    NoLoc -> 0 
-                                    Loc pos _ -> posCol pos - 1
-                              let indentedPayload = Text.intercalate ("\n" <> Text.replicate indentationOfSpec " ") payload
-                              writeLog' (specLoc spec)
-                              writeLog' payload
-                              writeLog' indentedPayload
-                              let removeSpecOpen = TextEdit (locToRange (specLoc spec)) indentedPayload
-                              let identifier = VersionedTextDocumentIdentifier (filePathToUri filepath) (Just 0)
-                              let textDocumentEdit = TextDocumentEdit identifier (List [removeSpecOpen])
-                              let change = InL textDocumentEdit
-                              let workspaceEdit = WorkspaceEdit Nothing (Just (List [change]))
-                              let applyWorkspaceEditParams = ApplyWorkspaceEditParams (Just "Resolve Spec") workspaceEdit
+                      Just source' -> do
+                        writeLog source'
+                        let f = do
+                              spec <- findPointedSpec filepath source' (selStart, selEnd)
+                              case spec of
+                                Nothing -> throwError $ Others "Cannot find pointed spec"
+                                Just spec' -> do
+                                  let payload = getSpecPayload source' spec'
+                                  return (spec', payload)
+                        case runM f of
+                          Left err -> do
+                            sendDiagnostics filepath 0 (toDiagnostics err)
+                            return []
+                          Right (spec, payload) -> do
+                            let indentationOfSpec = case specLoc spec of
+                                  NoLoc -> 0
+                                  Loc pos _ -> posCol pos - 1
+                            let indentedPayload = Text.intercalate ("\n" <> Text.replicate indentationOfSpec " ") payload
+                            writeLog' (specLoc spec)
+                            writeLog' payload
+                            writeLog' indentedPayload
+                            let removeSpecOpen = TextEdit (locToRange (specLoc spec)) indentedPayload
+                            let identifier = VersionedTextDocumentIdentifier (filePathToUri filepath) (Just 0)
+                            let textDocumentEdit = TextDocumentEdit identifier (List [removeSpecOpen])
+                            let change = InL textDocumentEdit
+                            let workspaceEdit = WorkspaceEdit Nothing (Just (List [change]))
+                            let applyWorkspaceEditParams = ApplyWorkspaceEditParams (Just "Resolve Spec") workspaceEdit
 
-                              -- Either ResponseError Value -> LspT () ServerM ()
-                              let responder' response = case response of 
-                                    Left _responseError -> return ()
-                                    Right _value -> return ()
-                              sendRequest SWorkspaceApplyEdit applyWorkspaceEditParams responder'
-                                -- (MessageParams m) (Either ResponseError (ResponseResult m) -> f ())
-                              return []
+                            -- Either ResponseError Value -> LspT () ServerM ()
+                            let responder' response = case response of
+                                  Left _responseError -> return ()
+                                  Right _value -> return ()
+                            _ <- sendRequest SWorkspaceApplyEdit applyWorkspaceEditParams responder'
+                            -- (MessageParams m) (Either ResponseError (ResponseResult m) -> f ())
+                            return []
                   ReqRefine index payload -> return $
                     asLocalError index $ do
                       _ <- refine payload
@@ -283,7 +281,7 @@ handlers =
               Nothing -> pure ()
               Just filepath -> do
                 -- debugging line for checking if the program has been correctly parsed
-                writeLog' $ fmap pretty $ runM $ parseProgramC filepath source
+                -- writeLog' $ fmap pretty $ runM $ parseProgramC filepath source
                 updateSource filepath source
                 version <- bumpCounter
                 checkAndSendResult filepath source version
@@ -309,7 +307,6 @@ checkAndSendResult filepath source version = do
         Left e -> Res filepath [ResError [globalError e]]
         Right (pos, specs, globalProps, warnings) -> Res filepath [ResOK (IdInt version) pos specs globalProps warnings]
   sendNotification (SCustomMethod "guacamole") $ JSON.toJSON response
-
 
 sendDiagnostics :: FilePath -> Int -> [Diagnostic] -> LspT () ServerM ()
 sendDiagnostics filepath version diags = publishDiagnostics 100 (toNormalizedUri (filePathToUri filepath)) (Just version) (partitionBySource diags)
@@ -433,18 +430,18 @@ findPointedSpec filepath source selection = do
           || (posCoff open <= end && end <= posCoff close)
 
 getSpecPayload :: Text -> Spec -> [Text]
-getSpecPayload source spec = case specLoc spec of 
-  NoLoc -> mempty 
-  Loc start end -> 
+getSpecPayload source spec = case specLoc spec of
+  NoLoc -> mempty
+  Loc start end ->
     let payload = Text.drop (posCoff start) $ Text.take (posCoff end) source
-        indentedLines = init $ tail $ Text.lines payload 
+        indentedLines = init $ tail $ Text.lines payload
         splittedIndentedLines = map (Text.break (not . Char.isSpace)) indentedLines
         smallestIndentation = minimum $ map (Text.length . fst) splittedIndentedLines
-        trimmedLines = map (\(indentation, content) -> Text.drop smallestIndentation indentation <> content ) splittedIndentedLines
-    in  trimmedLines
-        -- Text.intercalate "#" $ init $ tail $ Text.lines payload 
-        -- -- Text.unlines trimmedLines
+        trimmedLines = map (\(indentation, content) -> Text.drop smallestIndentation indentation <> content) splittedIndentedLines
+     in trimmedLines
 
+-- Text.intercalate "#" $ init $ tail $ Text.lines payload
+-- -- Text.unlines trimmedLines
 
 --------------------------------------------------------------------------------
 
@@ -452,7 +449,7 @@ getSpecPayload source spec = case specLoc spec of
 data ReqKind
   = ReqInspect Int Int
   | ReqRefine Int Text
-  | ReqRefine2
+  | ReqRefine2 Int Int
   | ReqRetreiveSpecPositions
   | ReqSubstitute Int A.Expr A.Subst
   | ReqExportProofObligations
@@ -464,7 +461,7 @@ instance FromJSON ReqKind
 instance Show ReqKind where
   show (ReqInspect x y) = "Inspect " <> show x <> " " <> show y
   show (ReqRefine i x) = "Refine #" <> show i <> " " <> show x
-  show ReqRefine2 = "Refine2"
+  show (ReqRefine2 x y) = "Refine2 " <> show x <> " " <> show y
   show ReqRetreiveSpecPositions = "RetreiveSpecPositions"
   show (ReqSubstitute i x y) = "Substitute #" <> show i <> " " <> show x <> " => " <> show y
   show ReqExportProofObligations = "ExportProofObligations"
