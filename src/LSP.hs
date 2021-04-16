@@ -34,18 +34,19 @@ import LSP.ExportPO ()
 import Language.LSP.Diagnostics (partitionBySource)
 import Language.LSP.Server
 import Language.LSP.Types hiding (TextDocumentSyncClientCapabilities (..))
+import qualified Language.LSP.VFS as VFS
 import Network.Simple.TCP (HostPreference (Host), serve)
 import Network.Socket (socketToHandle)
 import Pretty
 import qualified Syntax.Abstract as A
 import Syntax.Concrete (ToAbstract (toAbstract))
+import qualified Syntax.Concrete as C
 import Syntax.Parser
 import Syntax.Predicate
   ( Origin (..),
     PO (..),
-    Spec,
+    Spec (specLoc),
   )
-import qualified Syntax.Concrete as C
 
 --------------------------------------------------------------------------------
 
@@ -90,11 +91,14 @@ updateSelection filepath selection = do
   ref <- lift $ asks envSourceMap
   liftIO $ modifyIORef' ref (Map.update (\(source, _) -> Just (source, Just selection)) filepath)
 
-readSource :: FilePath -> LspT () ServerM (Maybe Text)
-readSource filepath = do
+readSavedSource :: FilePath -> LspT () ServerM (Maybe Text)
+readSavedSource filepath = do
   ref <- lift $ asks envSourceMap
   mapping <- liftIO $ readIORef ref
   return $ fst <$> Map.lookup filepath mapping
+
+readLatestSource :: FilePath -> LspT () ServerM (Maybe Text)
+readLatestSource filepath = fmap VFS.virtualFileText <$> getVirtualFile (toNormalizedUri (filePathToUri filepath))
 
 readLastSelection :: FilePath -> LspT () ServerM (Maybe (Int, Int))
 readLastSelection filepath = do
@@ -155,7 +159,7 @@ run devMode = do
     syncOptions =
       TextDocumentSyncOptions
         { _openClose = Just True, -- receive open and close notifications from the client
-          _change = Nothing, -- receive change notifications from the client
+          _change = Just TdSyncIncremental, -- receive change notifications from the client
           _willSave = Just False, -- receive willSave notifications from the client
           _willSaveWaitUntil = Just False, -- receive willSave notifications from the client
           _save = Just $ InR saveOptions
@@ -180,7 +184,7 @@ handlers =
           JSON.Success request@(Req filepath kind) -> do
             writeLog $ " --> Custom Reqeust: " <> pack (show request)
 
-            result <- readSource filepath
+            result <- readSavedSource filepath
             case result of
               Nothing -> pure NotLoaded
               Just source -> do
@@ -201,6 +205,15 @@ handlers =
                     asLocalError index $ do
                       _ <- refine payload
                       return [ResResolve index]
+                  ReqRetreiveSpecPositions -> do
+                    result' <- readLatestSource filepath
+                    case result' of
+                      Nothing -> return []
+                      Just source' -> do
+                        writeLog source'
+                        return $ ignoreError $ do
+                          locs <- tempGetSpecPositions filepath source'
+                          return [ResUpdateSpecPositions locs]
                   ReqSubstitute index expr _subst -> return $
                     asGlobalError $ do
                       A.Program _ _ defns _ _ <- parseProgram filepath source
@@ -333,7 +346,7 @@ parseProgram :: FilePath -> Text -> M A.Program
 parseProgram filepath source = toAbstract <$> parse pProgram filepath source
 
 parseProgramC :: FilePath -> Text -> M C.Program
-parseProgramC filepath source = parse pProgram filepath source
+parseProgramC = parse pProgram
 
 -- | Try to parse a piece of text in a Spec
 refine :: Text -> M ()
@@ -349,11 +362,17 @@ checkEverything filepath source mouseSelection = do
     Nothing -> return (pos, specs, globalProps, warings)
     Just sel -> return (filterPOs sel pos, specs, globalProps, warings)
 
+
 typeCheck :: A.Program -> M ()
 typeCheck = withExcept TypeError . TypeChecking.checkProg
 
 genPO :: A.Program -> M ([PO], [Spec], [StructWarning])
 genPO = withExcept StructError . liftEither . POGen.sweep
+
+tempGetSpecPositions :: FilePath -> Text -> M [Loc]
+tempGetSpecPositions filepath source = do
+  (_, specs, _) <- parseProgram filepath source >>= genPO
+  return (map specLoc specs)
 
 --------------------------------------------------------------------------------
 
@@ -361,6 +380,7 @@ genPO = withExcept StructError . liftEither . POGen.sweep
 data ReqKind
   = ReqInspect Int Int
   | ReqRefine Int Text
+  | ReqRetreiveSpecPositions
   | ReqSubstitute Int A.Expr A.Subst
   | ReqExportProofObligations
   | ReqDebug
@@ -371,6 +391,7 @@ instance FromJSON ReqKind
 instance Show ReqKind where
   show (ReqInspect x y) = "Inspect " <> show x <> " " <> show y
   show (ReqRefine i x) = "Refine #" <> show i <> " " <> show x
+  show ReqRetreiveSpecPositions = "RetreiveSpecPositions"
   show (ReqSubstitute i x y) = "Substitute #" <> show i <> " " <> show x <> " => " <> show y
   show ReqExportProofObligations = "ExportProofObligations"
   show ReqDebug = "Debug"
@@ -390,6 +411,7 @@ data ResKind
   = ResOK ID [PO] [Spec] [A.Expr] [StructWarning]
   | ResInspect [PO]
   | ResError [(Site, Error)]
+  | ResUpdateSpecPositions [Loc]
   | ResResolve Int -- resolves some Spec
   | ResSubstitute Int A.Expr
   | ResConsoleLog Text
@@ -410,6 +432,7 @@ instance Show ResKind where
       <> " warnings"
   show (ResInspect pos) = "Inspect " <> show (length pos) <> " POs"
   show (ResError errors) = "Error " <> show (length errors) <> " errors"
+  show (ResUpdateSpecPositions locs) = "UpdateSpecPositions " <> show (length locs) <> " locs"
   show (ResResolve i) = "Resolve " <> show i
   show (ResSubstitute i _) = "Substitute " <> show i
   show (ResConsoleLog x) = "ConsoleLog " <> show x
