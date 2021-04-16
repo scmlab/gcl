@@ -8,19 +8,15 @@ module LSP where
 
 -- import Control.Monad.IO.Class
 
-import Control.Concurrent (forkIO)
-import Control.Concurrent.Chan (Chan, newChan, readChan, writeChan)
+-- import Control.Monad.IO.Class
+import Control.Concurrent (forkIO, readChan)
 import Control.Monad.Except hiding (guard)
-import Control.Monad.Reader
 import Data.Aeson (FromJSON, ToJSON)
 import qualified Data.Aeson as JSON
 import qualified Data.Char as Char
 import Data.Foldable (find)
-import Data.IORef (IORef, modifyIORef', newIORef, readIORef, writeIORef)
 import Data.List (sort)
 import Data.Loc (Loc (..), Located (locOf), posCoff, posCol)
-import Data.Map (Map)
-import qualified Data.Map as Map
 import Data.Text (Text, pack)
 import qualified Data.Text as Text
 import qualified Data.Text.IO as Text
@@ -37,10 +33,8 @@ import LSP.ExportPO ()
 import Language.LSP.Diagnostics (partitionBySource)
 import Language.LSP.Server
 import Language.LSP.Types hiding (TextDocumentSyncClientCapabilities (..))
-import qualified Language.LSP.VFS as VFS
 import Network.Simple.TCP (HostPreference (Host), serve)
 import Network.Socket (socketToHandle)
-import Pretty
 import qualified Syntax.Abstract as A
 import Syntax.Concrete (ToAbstract (toAbstract))
 import qualified Syntax.Concrete as C
@@ -50,71 +44,7 @@ import Syntax.Predicate
     PO (..),
     Spec (..),
   )
-
---------------------------------------------------------------------------------
-
-data Env = Env
-  { envChan :: Chan Text,
-    envDevMode :: Bool,
-    -- | We maintain our own Uri-Source mapping
-    --   instead of using the built-in LSP VFS
-    --   to have better control of update management
-    envSourceMap :: IORef (Map FilePath (Text, Maybe (Int, Int))),
-    -- | Counter for generating fresh numbers
-    envCounter :: IORef Int
-  }
-
-initEnv :: Bool -> IO Env
-initEnv devMode = Env <$> newChan <*> pure devMode <*> newIORef Map.empty <*> newIORef 0
-
---------------------------------------------------------------------------------
-
-type ServerM = ReaderT Env IO
-
-runServerM :: Env -> LanguageContextEnv () -> LspT () ServerM a -> IO a
-runServerM env ctxEnv program = runReaderT (runLspT ctxEnv program) env
-
-writeLog :: Text -> LspT () ServerM ()
-writeLog msg = do
-  chan <- lift $ asks envChan
-  liftIO $ writeChan chan msg
-
-writeLog' :: Show a => a -> LspT () ServerM ()
-writeLog' x = do
-  chan <- lift $ asks envChan
-  liftIO $ writeChan chan (pack (show x))
-
-updateSource :: FilePath -> Text -> LspT () ServerM ()
-updateSource filepath source = do
-  ref <- lift $ asks envSourceMap
-  liftIO $ modifyIORef' ref (Map.insertWith (\(src, _) (_, sel) -> (src, sel)) filepath (source, Nothing))
-
-updateSelection :: FilePath -> (Int, Int) -> LspT () ServerM ()
-updateSelection filepath selection = do
-  ref <- lift $ asks envSourceMap
-  liftIO $ modifyIORef' ref (Map.update (\(source, _) -> Just (source, Just selection)) filepath)
-
-readSavedSource :: FilePath -> LspT () ServerM (Maybe Text)
-readSavedSource filepath = do
-  ref <- lift $ asks envSourceMap
-  mapping <- liftIO $ readIORef ref
-  return $ fst <$> Map.lookup filepath mapping
-
-readLatestSource :: FilePath -> LspT () ServerM (Maybe Text)
-readLatestSource filepath = fmap VFS.virtualFileText <$> getVirtualFile (toNormalizedUri (filePathToUri filepath))
-
-readLastSelection :: FilePath -> LspT () ServerM (Maybe (Int, Int))
-readLastSelection filepath = do
-  ref <- lift $ asks envSourceMap
-  mapping <- liftIO $ readIORef ref
-  return $ snd =<< Map.lookup filepath mapping
-
-bumpCounter :: LspT () ServerM Int
-bumpCounter = do
-  ref <- lift $ asks envCounter
-  n <- liftIO $ readIORef ref
-  liftIO $ writeIORef ref (succ n)
-  return n
+import LSP.Monad
 
 --------------------------------------------------------------------------------
 
@@ -173,7 +103,7 @@ run devMode = do
     saveOptions = SaveOptions (Just True)
 
 -- handlers of the LSP server
-handlers :: Handlers (LspT () ServerM)
+handlers :: Handlers ServerM
 handlers =
   mconcat
     [ -- custom methods, not part of LSP
@@ -182,10 +112,10 @@ handlers =
         -- JSON Value => Request => Response
         response <- case JSON.fromJSON params of
           JSON.Error msg -> do
-            writeLog " --> CustomMethod: CannotDecodeRequest"
+            logText " --> CustomMethod: CannotDecodeRequest"
             return $ CannotDecodeRequest $ show msg ++ "\n" ++ show params
           JSON.Success request@(Req filepath kind) -> do
-            writeLog $ " --> Custom Reqeust: " <> pack (show request)
+            logText $ " --> Custom Reqeust: " <> pack (show request)
 
             result <- readSavedSource filepath
             case result of
@@ -209,7 +139,7 @@ handlers =
                     case result' of
                       Nothing -> return [ResConsoleLog "no source"]
                       Just source' -> do
-                        writeLog source'
+                        logText source'
                         let f = do
                               spec <- findPointedSpec filepath source' (selStart, selEnd)
                               case spec of
@@ -226,9 +156,9 @@ handlers =
                                   NoLoc -> 0
                                   Loc pos _ -> posCol pos - 1
                             let indentedPayload = Text.intercalate ("\n" <> Text.replicate indentationOfSpec " ") payload
-                            writeLog' (specLoc spec)
-                            writeLog' payload
-                            writeLog' indentedPayload
+                            logStuff (specLoc spec)
+                            logStuff payload
+                            logStuff indentedPayload
                             let removeSpecOpen = TextEdit (locToRange (specLoc spec)) indentedPayload
                             let identifier = VersionedTextDocumentIdentifier (filePathToUri filepath) (Just 0)
                             let textDocumentEdit = TextDocumentEdit identifier (List [removeSpecOpen])
@@ -236,7 +166,7 @@ handlers =
                             let workspaceEdit = WorkspaceEdit Nothing (Just (List [change]))
                             let applyWorkspaceEditParams = ApplyWorkspaceEditParams (Just "Resolve Spec") workspaceEdit
 
-                            -- Either ResponseError Value -> LspT () ServerM ()
+                            -- Either ResponseError Value -> ServerM ()
                             let responder' response = case response of
                                   Left _responseError -> return ()
                                   Right _value -> return ()
@@ -252,7 +182,7 @@ handlers =
                     case result' of
                       Nothing -> return []
                       Just source' -> do
-                        writeLog source'
+                        logText source'
                         return $
                           ignoreError $ do
                             locs <- tempGetSpecPositions filepath source'
@@ -268,11 +198,11 @@ handlers =
                   ReqDebug -> return $ error "crash!"
                 return $ Res filepath kinds
 
-        writeLog $ " <-- " <> pack (show response)
+        logText $ " <-- " <> pack (show response)
         responder $ Right $ JSON.toJSON response,
       -- when the client saved the document, store the text for later use
       notificationHandler STextDocumentDidSave $ \ntf -> do
-        writeLog " --> TextDocumentDidSave"
+        logText " --> TextDocumentDidSave"
         let NotificationMessage _ _ (DidSaveTextDocumentParams (TextDocumentIdentifier uri) text) = ntf
         case text of
           Nothing -> pure ()
@@ -281,14 +211,14 @@ handlers =
               Nothing -> pure ()
               Just filepath -> do
                 -- debugging line for checking if the program has been correctly parsed
-                -- writeLog' $ fmap pretty $ runM $ parseProgramC filepath source
+                -- logStuff $ fmap pretty $ runM $ parseProgramC filepath source
                 updateSource filepath source
                 version <- bumpCounter
                 checkAndSendResult filepath source version
                 sendDiagnostics2 filepath source version,
       -- when the client opened the document
       notificationHandler STextDocumentDidOpen $ \ntf -> do
-        writeLog " --> TextDocumentDidOpen"
+        logText " --> TextDocumentDidOpen"
         let NotificationMessage _ _ (DidOpenTextDocumentParams (TextDocumentItem uri _ _ source)) = ntf
         case uriToFilePath uri of
           Nothing -> pure ()
@@ -299,7 +229,7 @@ handlers =
             sendDiagnostics2 filepath source version
     ]
 
-checkAndSendResult :: FilePath -> Text -> Int -> LspT () ServerM ()
+checkAndSendResult :: FilePath -> Text -> Int -> ServerM ()
 checkAndSendResult filepath source version = do
   lastSelection <- readLastSelection filepath
   let result = runM (checkEverything filepath source lastSelection)
@@ -308,10 +238,10 @@ checkAndSendResult filepath source version = do
         Right (pos, specs, globalProps, warnings) -> Res filepath [ResOK (IdInt version) pos specs globalProps warnings]
   sendNotification (SCustomMethod "guacamole") $ JSON.toJSON response
 
-sendDiagnostics :: FilePath -> Int -> [Diagnostic] -> LspT () ServerM ()
+sendDiagnostics :: FilePath -> Int -> [Diagnostic] -> ServerM ()
 sendDiagnostics filepath version diags = publishDiagnostics 100 (toNormalizedUri (filePathToUri filepath)) (Just version) (partitionBySource diags)
 
-sendDiagnostics2 :: FilePath -> Text -> Int -> LspT () ServerM ()
+sendDiagnostics2 :: FilePath -> Text -> Int -> ServerM ()
 sendDiagnostics2 filepath source version = do
   -- send diagnostics
   diags <- do
