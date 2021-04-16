@@ -51,7 +51,7 @@ data Stmt
   | Do [GdCmd] Loc
   | If [GdCmd] Loc
   | SpecQM Loc -- ? to be rewritten as {!!} by the frontend
-  | Spec Loc
+  | Spec Text Loc
   | Proof Loc
   deriving (Eq, Show)
 
@@ -64,7 +64,7 @@ instance Located Stmt where
   locOf (Do _ l) = l
   locOf (If _ l) = l
   locOf (SpecQM l) = l
-  locOf (Spec l) = l
+  locOf (Spec _ l) = l
   locOf (Proof l) = l
 
 data GdCmd = GdCmd Expr [Stmt] Loc deriving (Eq, Show)

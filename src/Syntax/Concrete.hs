@@ -113,7 +113,7 @@ instance ToAbstract Stmt A.Stmt where
   toAbstract (Do l a r) = A.Do (toAbstract <$> fromSepBy a) (l <--> r)
   toAbstract (If l a r) = A.If (toAbstract <$> fromSepBy a) (l <--> r)
   toAbstract (SpecQM l) = A.SpecQM l
-  toAbstract (Spec l r) = A.Spec (l <--> r)
+  toAbstract (Spec l r) = A.Spec mempty (l <--> r)
   toAbstract (Proof l r) = A.Proof (l <--> r)
 
 instance Located Stmt where

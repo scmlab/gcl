@@ -83,7 +83,7 @@ instance Pretty Stmt where
       <> vsep (map (\x -> " |" <+> pretty x <> line) gdCmds)
       <> "fi"
   pretty (SpecQM _) = "?"
-  pretty (Spec _) = "[!  !]"
+  pretty (Spec content _) = "[!" <> pretty content <> "!]"
   pretty (Proof _) = "{-  -}"
 
 instance Pretty GdCmd where
