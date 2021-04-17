@@ -150,7 +150,7 @@ handlers =
                         case runM f of
                           Left err -> do
                             sendDiagnostics filepath 0 (toDiagnostics err)
-                            return []
+                            return [ResError [globalError err]]
                           Right (spec, payload) -> do
                             let indentationOfSpec = case specLoc spec of
                                   NoLoc -> 0
