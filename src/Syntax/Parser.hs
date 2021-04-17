@@ -3,7 +3,7 @@
 {-# LANGUAGE PartialTypeSignatures #-}
 module Syntax.Parser where
 
-import Control.Applicative.Combinators (choice, many, sepBy1, (<|>), manyTill_, skipManyTill)
+import Control.Applicative.Combinators (choice, many, sepBy1, (<|>), manyTill_)
 import Control.Monad.Combinators.Expr (Operator (..), makeExprParser)
 import Data.Loc (Located (locOf))
 import Data.Text.Lazy (Text)
@@ -11,7 +11,7 @@ import qualified Data.Ord as Ord
 import Syntax.Concrete (Declaration (..), EndpointClose (..), EndpointOpen (..), Expr (..), GdCmd (..), Interval (..), Name (..), Op (..), Program (..), SepBy (..), Stmt (..), TBase (..), Token (..), Type (..))
 import Syntax.Parser.Lexer
 import Syntax.Parser.Util
-import Text.Megaparsec (MonadParsec (..), parse, (<?>), anySingle, Pos, tokenToChunk, tokensToChunk)
+import Text.Megaparsec (MonadParsec (..), parse, (<?>), anySingle, Pos, tokensToChunk)
 import qualified Text.Megaparsec.Char.Lexer as Lex
 import Control.Monad (void)
 import Control.Monad.Trans (lift)
@@ -196,7 +196,7 @@ pType' = makeExprParser pType'Term [[InfixR pFunction]] <*
   (↑) (\sc' -> try sc' <|> sc) <?> "type"
 
 pType'Term :: ParserF Type
-pType'Term = choice [pParensType, pArray, pBase]
+pType'Term = choice [pParensType, pArrayType, pBase]
 
 pFunction :: ParserF (Type -> Type -> Type)
 pFunction = do
@@ -206,8 +206,8 @@ pFunction = do
 pParensType :: ParserF Type
 pParensType = TParen <$> lexParenStart <*> pType' <*> lexParenEnd
 
-pArray :: ParserF Type
-pArray = TArray <$> lexArray <*> pInterval <*> lexOf <*> pType'
+pArrayType :: ParserF Type
+pArrayType = TArray <$> lexArray <*> pInterval <*> lexOf <*> pType'
 
 pBase :: ParserF Type
 pBase =
@@ -268,10 +268,17 @@ arithTable = [
   ]
 
 pTerm :: ParserF Expr
-pTerm = choice [pParen, pVar, pConst, pLit, pQuant] <?> "term"
+pTerm = choice [try pArray, pTerm']
+
+-- To avoid stuck at parsing terms other than array
+pTerm' :: ParserF Expr
+pTerm' = choice [pParen, pVar, pConst, pLit, pQuant] <?> "term"
 
 pParen :: ParserF Expr
 pParen = Paren <$> lexParenStart <*> pExpr' <*> lexParenEnd
+
+pArray :: ParserF Expr
+pArray = Arr <$> pTerm' <*> lexBracketStart <*> pTerm' <*> lexBracketEnd 
 
 pLit :: ParserF Expr
 pLit = Lit <$> lexLits

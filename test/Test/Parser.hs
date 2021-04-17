@@ -34,7 +34,7 @@ import Syntax.Parser.Token
 import Syntax.Concrete (Type(..), TBase (..),ToAbstract (toAbstract), Program (..))
 import Data.Loc (Located(locOf))
 import Text.Megaparsec (Stream(reachOffset), setOffset, getOffset, MonadParsec(updateParserState, getParserState, observing, lookAhead, try, eof), State(State, statePosState, stateInput, stateOffset), getInput, getSourcePos)
-import Control.Monad.Combinators (optional, many, (<|>))
+import Control.Monad.Combinators (optional, many, (<|>), choice)
 import qualified Data.Ord as Ord
 import Control.Monad (void)
 import Syntax.Parser.Util (parser, (↓), getCurLoc)
@@ -87,7 +87,7 @@ myTest =
       
 
       
-
+      
 -- | Expression
 expression :: TestTree
 expression =
@@ -121,6 +121,8 @@ expression =
       testCase "quant 4" $ run "<| + i : 0 <= i < k : F i |>",
       testCase "function application 1" $ run "(f   (  x      )) y",
       testCase "function application 2" $ run "f (x y)",
+      testCase "array indexing (app)" $ run "A i",
+      testCase "array indexing (bracket) : A[i]" $ run "A[i]",
       testCase "mixed 1" $ run "X * Y = N",
       testCase "mixed 2" $ run "X * Y => P = Q",
       testCase "mixed 3" $ run "X > Y && X > Y",

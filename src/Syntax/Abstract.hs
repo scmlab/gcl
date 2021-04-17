@@ -134,7 +134,6 @@ data Expr
   | Var Name Loc
   | Const Name Loc
   | Op Op Loc
-  -- | Chain Chain Loc
   | App Expr Expr Loc
   | Lam Text Expr Loc
   | Hole Loc

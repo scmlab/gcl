@@ -285,6 +285,12 @@ handleExpr (Chain x op y) =
     prettyWithLoc x
     <> prettyWithLoc op
     <> prettyWithLoc y
+handleExpr (Arr arr l i r) = 
+  return $
+    prettyWithLoc arr
+    <> prettyWithLoc l
+    <> prettyWithLoc i
+    <> prettyWithLoc r
 handleExpr (App p q) = case handleExpr p of
   Expect f -> f q
   Complete s -> do

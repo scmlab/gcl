@@ -221,6 +221,7 @@ data Expr
   | Const Name
   | Op Op
   | Chain Expr Op Expr                  -- Left Associative
+  | Arr Expr (Token "[") Expr (Token "]")
   | App Expr Expr
   | Quant
       (Either (Token "<|") (Token "⟨"))
@@ -240,6 +241,7 @@ instance Located Expr where
   locOf (Const x) = locOf x
   locOf (Op x) = locOf x
   locOf (Chain e1 op e2) = e1 <--> op <--> e2
+  locOf (Arr l _ _ r) = l <--> r
   locOf (App x y) = x <--> y
   locOf (Quant l _ _ _ _ _ _ r) = l <--> r
 
@@ -262,6 +264,7 @@ instance ToAbstract Expr A.Expr where
               (locOf x)
         _ -> 
           A.App (A.App (toAbstract (Op op)) (toAbstract a) (a <--> op)) (toAbstract b) (locOf x)
+    Arr arr _ i _ -> A.App (toAbstract arr) (toAbstract i) (locOf x)
     App a b -> A.App (toAbstract a) (toAbstract b) (locOf x)
     Quant _ a b _ c _ d _ -> A.Quant (either (toAbstract . Op) toAbstract a) (fmap toAbstract b) (toAbstract c) (toAbstract d) (locOf x)
 
