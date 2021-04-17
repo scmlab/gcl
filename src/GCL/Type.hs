@@ -156,14 +156,20 @@ inferExpr env e = do
   return $ closeOver s t
 
 inferDecl :: TypeEnv -> Declaration -> TM TypeEnv
-inferDecl env (ConstDecl ns t _ _) = do
+inferDecl env (ConstDecl ns t p _) = do
   checkType env t
-  foldM f env [n | Name n _ <- ns]
+  env' <- foldM f env [n | Name n _ <- ns]
+  case p of
+    Just prop -> checkExpr env' prop >> return env'
+    Nothing -> return env'
   where
     f env' n = env' `extend'` (n, generalize env' t)
-inferDecl env (VarDecl ns t _ _) = do
+inferDecl env (VarDecl ns t p _) = do
   checkType env t
-  foldM f env [n | Name n _ <- ns]
+  env' <- foldM f env [n | Name n _ <- ns]
+  case p of
+    Just prop -> checkExpr env' prop >> return env'
+    Nothing -> return env'
   where
     f env' n = env' `extend'` (n, generalize env' t)
 inferDecl env (LetDecl (Name n _) args expr _) = do
@@ -192,10 +198,6 @@ lookupEnv (Name n l) = do
     Just (ForallV vs t) -> instantiate (ForallV vs (typeWithLoc l t))
     Nothing -> throwError $ NotInScope n l
 
--- inEnv :: (TVar, Scheme) -> Infer a -> Infer a
--- inEnv (x, sc) m = do
---   let scope (TypeEnv e) = TypeEnv (Map.delete x e) `extend` (x, sc)
---   local scope m
 inEnv :: [(TVar, Scheme)] -> Infer a -> Infer a
 inEnv l m = do
   let scope (TypeEnv e) = TypeEnv $ foldl (\e' (x, sc) -> Map.insert x sc e') e l
