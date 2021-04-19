@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 1b3a6059decf54fa539ba2b905205c7c7ca232450b80df79add08fef0c7883e1
+-- hash: 129324302f9a4e39fca5f9515749aa5d6a068595351c974d390c59d5fdf8eba2
 
 name:           gcl
 version:        0.1.0.0
@@ -31,6 +31,7 @@ library
       GCL.Type
       GCL.WP
       LSP
+      LSP.CustomMethod
       LSP.Diagnostic
       LSP.ExportPO
       LSP.Handler
@@ -127,6 +128,7 @@ test-suite gcl-test
       GCL.Type
       GCL.WP
       LSP
+      LSP.CustomMethod
       LSP.Diagnostic
       LSP.ExportPO
       LSP.Handler
