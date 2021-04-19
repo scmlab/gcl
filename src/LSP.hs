@@ -125,7 +125,7 @@ handlers =
                 version <- case i of
                   IdInt n -> return n
                   IdString _ -> bumpCounter
-                sendDiagnostics2 filepath source version
+                checkAndSendDiagnostics filepath source version
                 -- convert Request to Response
                 kinds <- case kind of
                   ReqInspect selStart selEnd -> do
@@ -134,7 +134,7 @@ handlers =
                       asGlobalError $ do
                         (pos, _specs, _globalProps, _warnings) <- checkEverything filepath source (Just (selStart, selEnd))
                         return [ResInspect pos]
-                  ReqRefine2 selStart selEnd -> do
+                  ReqRefine selStart selEnd -> do
                     result' <- readLatestSource filepath
                     case result' of
                       Nothing -> return [ResConsoleLog "no source"]
@@ -173,24 +173,11 @@ handlers =
                                       Just source'' -> do 
                                         logText "after"
                                         version' <- bumpCounter
-                                        checkAndSendResult filepath source'' version'
-                                        sendDiagnostics2 filepath source'' version'
+                                        checkAndSendResponse filepath source'' version'
+                                        checkAndSendDiagnostics filepath source'' version'
 
                             _ <- sendRequest SWorkspaceApplyEdit applyWorkspaceEditParams responder'
                             return []
-                  ReqRefine index payload -> return $
-                    asLocalError index $ do
-                      _ <- refine payload
-                      return [ResResolve index]
-                  ReqRetreiveSpecPositions -> do
-                    result' <- readLatestSource filepath
-                    case result' of
-                      Nothing -> return []
-                      Just source' -> do
-                        return $
-                          ignoreError $ do
-                            locs <- tempGetSpecPositions filepath source'
-                            return [ResUpdateSpecPositions locs]
                   ReqSubstitute index expr _subst -> return $
                     asGlobalError $ do
                       A.Program _ _ defns _ _ <- parseProgram filepath source
@@ -214,12 +201,10 @@ handlers =
             case uriToFilePath uri of
               Nothing -> pure ()
               Just filepath -> do
-                -- debugging line for checking if the program has been correctly parsed
-                -- logStuff $ fmap pretty $ runM $ parseProgramC filepath source
                 updateSource filepath source
                 version <- bumpCounter
-                checkAndSendResult filepath source version
-                sendDiagnostics2 filepath source version,
+                checkAndSendResponse filepath source version
+                checkAndSendDiagnostics filepath source version,
       -- when the client opened the document
       notificationHandler STextDocumentDidOpen $ \ntf -> do
         logText " --> TextDocumentDidOpen"
@@ -229,12 +214,12 @@ handlers =
           Just filepath -> do
             updateSource filepath source
             version <- bumpCounter
-            checkAndSendResult filepath source version
-            sendDiagnostics2 filepath source version
+            checkAndSendResponse filepath source version
+            checkAndSendDiagnostics filepath source version
     ]
 
-checkAndSendResult :: FilePath -> Text -> Int -> ServerM ()
-checkAndSendResult filepath source version = do
+checkAndSendResponse :: FilePath -> Text -> Int -> ServerM ()
+checkAndSendResponse filepath source version = do
   lastSelection <- readLastSelection filepath
   let result = runM (checkEverything filepath source lastSelection)
   let response = case result of
@@ -242,11 +227,8 @@ checkAndSendResult filepath source version = do
         Right (pos, specs, globalProps, warnings) -> Res filepath [ResOK (IdInt version) pos specs globalProps warnings]
   sendNotification (SCustomMethod "guacamole") $ JSON.toJSON response
 
-sendDiagnostics :: FilePath -> Int -> [Diagnostic] -> ServerM ()
-sendDiagnostics filepath version diags = publishDiagnostics 100 (toNormalizedUri (filePathToUri filepath)) (Just version) (partitionBySource diags)
-
-sendDiagnostics2 :: FilePath -> Text -> Int -> ServerM ()
-sendDiagnostics2 filepath source version = do
+checkAndSendDiagnostics :: FilePath -> Text -> Int -> ServerM ()
+checkAndSendDiagnostics filepath source version = do
   -- send diagnostics
   diags <- do
     let result = runM $ checkEverything filepath source Nothing
@@ -254,6 +236,9 @@ sendDiagnostics2 filepath source version = do
       Left err -> toDiagnostics err
       Right (pos, _, _, warnings) -> concatMap toDiagnostics pos ++ concatMap toDiagnostics warnings
   sendDiagnostics filepath version diags
+
+sendDiagnostics :: FilePath -> Int -> [Diagnostic] -> ServerM ()
+sendDiagnostics filepath version diags = publishDiagnostics 100 (toNormalizedUri (filePathToUri filepath)) (Just version) (partitionBySource diags)
 
 --------------------------------------------------------------------------------
 
@@ -382,9 +367,7 @@ getSpecPayload source spec = case specLoc spec of
 -- | Request
 data ReqKind
   = ReqInspect Int Int
-  | ReqRefine Int Text
-  | ReqRefine2 Int Int
-  | ReqRetreiveSpecPositions
+  | ReqRefine Int Int
   | ReqSubstitute Int A.Expr A.Subst
   | ReqExportProofObligations
   | ReqDebug
@@ -395,8 +378,6 @@ instance FromJSON ReqKind
 instance Show ReqKind where
   show (ReqInspect x y) = "Inspect " <> show x <> " " <> show y
   show (ReqRefine i x) = "Refine #" <> show i <> " " <> show x
-  show (ReqRefine2 x y) = "Refine2 " <> show x <> " " <> show y
-  show ReqRetreiveSpecPositions = "RetreiveSpecPositions"
   show (ReqSubstitute i x y) = "Substitute #" <> show i <> " " <> show x <> " => " <> show y
   show ReqExportProofObligations = "ExportProofObligations"
   show ReqDebug = "Debug"
