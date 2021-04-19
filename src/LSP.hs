@@ -146,32 +146,37 @@ handlers =
                                 Nothing -> throwError $ Others "Cannot find pointed spec"
                                 Just spec' -> do
                                   let payload = getSpecPayload source' spec'
-                                  return (spec', payload)
+                                  let indentationOfSpec = case specLoc spec' of
+                                        NoLoc -> 0
+                                        Loc pos _ -> posCol pos - 1
+                                  let indentedPayload = Text.intercalate ("\n" <> Text.replicate indentationOfSpec " ") payload
+                                  _ <- refine indentedPayload
+                                  return (spec', indentedPayload)
                         case runM f of
                           Left err -> do
                             sendDiagnostics filepath 0 (toDiagnostics err)
                             return [ResError [globalError err]]
-                          Right (spec, payload) -> do
-                            let indentationOfSpec = case specLoc spec of
-                                  NoLoc -> 0
-                                  Loc pos _ -> posCol pos - 1
-                            let indentedPayload = Text.intercalate ("\n" <> Text.replicate indentationOfSpec " ") payload
-                            logStuff (specLoc spec)
-                            logStuff payload
-                            logStuff indentedPayload
+                          Right (spec, indentedPayload) -> do
                             let removeSpecOpen = TextEdit (locToRange (specLoc spec)) indentedPayload
                             let identifier = VersionedTextDocumentIdentifier (filePathToUri filepath) (Just 0)
                             let textDocumentEdit = TextDocumentEdit identifier (List [removeSpecOpen])
                             let change = InL textDocumentEdit
                             let workspaceEdit = WorkspaceEdit Nothing (Just (List [change]))
                             let applyWorkspaceEditParams = ApplyWorkspaceEditParams (Just "Resolve Spec") workspaceEdit
-
-                            -- Either ResponseError Value -> ServerM ()
                             let responder' response = case response of
                                   Left _responseError -> return ()
-                                  Right _value -> return ()
+                                  Right _value -> do 
+                                    -- ? ==> [!  !]
+                                    result'' <- readLatestSource filepath 
+                                    case result'' of 
+                                      Nothing -> return ()
+                                      Just source'' -> do 
+                                        logText "after"
+                                        version' <- bumpCounter
+                                        checkAndSendResult filepath source'' version'
+                                        sendDiagnostics2 filepath source'' version'
+
                             _ <- sendRequest SWorkspaceApplyEdit applyWorkspaceEditParams responder'
-                            -- (MessageParams m) (Either ResponseError (ResponseResult m) -> f ())
                             return []
                   ReqRefine index payload -> return $
                     asLocalError index $ do
@@ -182,7 +187,6 @@ handlers =
                     case result' of
                       Nothing -> return []
                       Just source' -> do
-                        logText source'
                         return $
                           ignoreError $ do
                             locs <- tempGetSpecPositions filepath source'
