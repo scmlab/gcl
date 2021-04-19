@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: f95bb6098879ce900140e88a500819c7d0c074fd5b54a83c6973e3e5cfa7ed9c
+-- hash: 1b3a6059decf54fa539ba2b905205c7c7ca232450b80df79add08fef0c7883e1
 
 name:           gcl
 version:        0.1.0.0
@@ -33,6 +33,7 @@ library
       LSP
       LSP.Diagnostic
       LSP.ExportPO
+      LSP.Handler
       LSP.Monad
       Pretty
       Pretty.Abstract
@@ -128,6 +129,7 @@ test-suite gcl-test
       LSP
       LSP.Diagnostic
       LSP.ExportPO
+      LSP.Handler
       LSP.Monad
       Pretty
       Pretty.Abstract
