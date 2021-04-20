@@ -132,7 +132,7 @@ tokProofEnd :: Text
 tokProofEnd = "-}"
 
 tokBackSlash :: Text
-tokBackSlash = ""
+tokBackSlash = "\\"
 
 tokDeclStart :: Text
 tokDeclStart = "{:"

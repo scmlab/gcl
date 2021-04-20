@@ -31,7 +31,7 @@ import Data.Int (Int64)
 import Prelude hiding (compare)
 import Control.Monad.Except (runExcept, withExcept, liftEither)
 import Syntax.Parser.Token
-import Syntax.Concrete (Type(..), TBase (..),ToAbstract (toAbstract), Program (..))
+import Syntax.Concrete (Type(..), TBase (..),ToAbstract (toAbstract), Program (..), Expr(..))
 import Data.Loc (Located(locOf))
 import Text.Megaparsec (Stream(reachOffset), setOffset, getOffset, MonadParsec(updateParserState, getParserState, observing, lookAhead, try, eof), State(State, statePosState, stateInput, stateOffset), getInput, getSourcePos)
 import Control.Monad.Combinators (optional, many, (<|>), choice)
@@ -73,18 +73,31 @@ myTest =
     "parse test"
     [
       testCase "1" $ run
-        "con A, B : Int\n\
-        \x := 1 +\n\
-        \skip"
+        "do x = 0 -> \n\
+        \  skip\n\
+        \  skip\n\
+        \ | y = 0 -> \n\
+        \  skip \n\
+        \  skip \n\
+        \od"
+
+      -- testCase "2" $ run
+      --   "= +"
     ]
     where
-      run t = show (parse pProgram t) @?= ""
-      wrap = do
-        decls <- many pDeclaration 
-        stmt1 <- pStmts
-        eof
-        return (Program decls stmt1)
-      
+      run t = show (parse pStmt t) @?= ""
+      quantWrap = (↓) pQuant scn
+      wrap = (↓) (do
+        v <- pVar
+        eq <- notFollowedBySymbol lexEQ
+        q <- pQuant 
+        return (App (App (Op eq) v) q)) scn
+
+      pNotFollowed = (↓) (do
+          notFollowedBySymbol lexEQ
+        ) scn
+
+     -- dawn surround ritual toward fun planet affair friend edge soap news marble 
 
       
       
@@ -119,6 +132,7 @@ expression =
       testCase "quant 2" $ run "⟨     + i :   i > 0   : f i ⟩",
       testCase "quant 3" $ run "⟨ max i j : 0 ≤ i < j < n : A i - A j ⟩",
       testCase "quant 4" $ run "<| + i : 0 <= i < k : F i |>",
+      testCase "quant 5" $ run "x = <| + i : 0 <= i < k : F i |>",
       testCase "function application 1" $ run "(f   (  x      )) y",
       testCase "function application 2" $ run "f (x y)",
       testCase "array indexing (app)" $ run "A i",
@@ -209,7 +223,8 @@ statement =
       testCase "conditional 2" $ run "if True ->    skip   \n | False -> abort \nfi",
       testCase "loop invariant" $ run "{ True ,     bnd      : a  }",
       testCase "loop body 1" $ run "do True -> skip od",
-      testCase "loop body 2" $ run "do True    →       skip od"
+      testCase "loop body 2" $ run "do True    →       skip od",
+      testCase "indentifier include keyword" $ run "{ Falsee }"
     ]
   where
     run = isomorphic pStmt

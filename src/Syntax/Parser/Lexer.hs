@@ -303,8 +303,11 @@ withLoc p = do
   loc <- locOf <$> p
   return (x, loc)
 
+-- NOTE : make sure no space consumed after parser m
 notFollowedBySymbol :: LexerF a -> LexerF a
-notFollowedBySymbol m = m <* notFollowedBy (satisfy isSymbol)
+notFollowedBySymbol m = ParseFunc (\sc' -> (↓) m (return ()) <* notFollowedBy (satisfy isSymbol) <* sc')
+  
+  -- m <* notFollowedBy (satisfy isSymbol)
 
 withPredicate :: (a -> Bool) -> Lexer a -> Lexer a
 withPredicate f p = do
