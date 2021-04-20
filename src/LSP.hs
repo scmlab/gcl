@@ -40,7 +40,8 @@ run devMode = do
     serverDefn :: Env -> ServerDefinition ()
     serverDefn env =
       ServerDefinition
-        { onConfigurationChange = const $ pure $ Right (),
+        { defaultConfig = (),
+          onConfigurationChange = const $ pure $ Right (),
           doInitialize = \ctxEnv _req -> pure $ Right ctxEnv,
           staticHandlers = handlers,
           interpretHandler = \ctxEnv -> Iso (runServerM env ctxEnv) liftIO,

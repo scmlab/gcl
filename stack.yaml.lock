@@ -12,29 +12,31 @@ packages:
   original:
     hackage: lexer-applicative-2.1.0.2
 - completed:
+    subdir: lsp
     name: lsp
-    version: 1.0.0.1
+    version: 1.2.0.0
     git: https://github.com/alanz/lsp.git
     pantry-tree:
-      size: 7224
-      sha256: c4fa42affca9073bdcf1f522672463a61351bbe3ff8ad59e6c1e83dadd461116
-    commit: 36b655d9cc538f79b14c847ca383d97ffcc18162
+      size: 1302
+      sha256: 7ce81cf71dd0add5180f174774a24da7b3c1295f36fc48208a1bdc0d2f46fa90
+    commit: 76b86d54040cfa6c8306433a29404fa6402a5f69
   original:
+    subdir: lsp
     git: https://github.com/alanz/lsp.git
-    commit: 36b655d9cc538f79b14c847ca383d97ffcc18162
+    commit: 76b86d54040cfa6c8306433a29404fa6402a5f69
 - completed:
     subdir: lsp-types
     name: lsp-types
-    version: 1.0.0.1
+    version: 1.2.0.0
     git: https://github.com/alanz/lsp.git
     pantry-tree:
-      size: 4004
-      sha256: f3b89018d72f45eb5cd0158196dec1f5bf158a9b0ee6e59dc587da9d5445b983
-    commit: 36b655d9cc538f79b14c847ca383d97ffcc18162
+      size: 3936
+      sha256: f7ded3dab56b72ed2f4aadbdc38bae4522d1968c18f29e823a9839834228ec39
+    commit: 76b86d54040cfa6c8306433a29404fa6402a5f69
   original:
     subdir: lsp-types
     git: https://github.com/alanz/lsp.git
-    commit: 36b655d9cc538f79b14c847ca383d97ffcc18162
+    commit: 76b86d54040cfa6c8306433a29404fa6402a5f69
 - completed:
     hackage: dependent-map-0.4.0.0@sha256:ca2b131046f4340a1c35d138c5a003fe4a5be96b14efc26291ed35fd08c62221,1657
     pantry-tree:

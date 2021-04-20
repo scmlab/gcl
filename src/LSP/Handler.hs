@@ -54,11 +54,12 @@ handlers =
                     Nothing 
                     Nothing 
                     (Just PlainText)
+                    (Just AsIs)
                     Nothing 
                     Nothing 
                     (Just (List ["l"]))
                     Nothing 
-                    Nothing
+                    Nothing  
             let isComplete = True
             let completionList = CompletionList isComplete (List [item])
             responder $ Right $ InR completionList
@@ -116,9 +117,9 @@ handlers =
                           Right (spec, indentedPayload) -> do
                             let removeSpecOpen = TextEdit (locToRange (specLoc spec)) indentedPayload
                             let identifier = VersionedTextDocumentIdentifier (filePathToUri filepath) (Just 0)
-                            let textDocumentEdit = TextDocumentEdit identifier (List [removeSpecOpen])
+                            let textDocumentEdit = TextDocumentEdit identifier (List [InL removeSpecOpen])
                             let change = InL textDocumentEdit
-                            let workspaceEdit = WorkspaceEdit Nothing (Just (List [change]))
+                            let workspaceEdit = WorkspaceEdit Nothing (Just (List [change])) Nothing 
                             let applyWorkspaceEditParams = ApplyWorkspaceEditParams (Just "Resolve Spec") workspaceEdit
                             let responder' response = case response of
                                   Left _responseError -> return ()
