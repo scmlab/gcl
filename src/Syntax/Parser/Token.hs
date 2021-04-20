@@ -3,9 +3,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Syntax.Parser.Token where
 
-import Data.Text.Lazy (Text, unpack)
-import qualified Data.Text.Lazy as T
-import Data.Char (isAlphaNum, isUpper, isLower)
+import Data.Text.Lazy (Text)
 
 ------------------------------------------
 -- tokens 

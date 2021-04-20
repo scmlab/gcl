@@ -12,6 +12,7 @@ import GCL.WP (StructError (..), StructWarning (..))
 import Language.LSP.Types hiding (TextDocumentSyncClientCapabilities (..))
 import Pretty
 import Syntax.Predicate (Origin (..), PO (..))
+import Data.Loc.Util (translate)
 
 class ToDiagnostics a where
   toDiagnostics :: a -> [Diagnostic]
@@ -102,9 +103,6 @@ locToRange (Loc start end) = Range (posToPosition start) (posToPosition (transla
   where
     posToPosition :: Pos -> Position
     posToPosition (Pos _path ln col _offset) = Position ((ln - 1) `max` 0) ((col - 1) `max` 0)
-
-translate :: Int -> Pos -> Pos
-translate n (Pos path ln col offset) = Pos path ln ((col + n) `max` 0) ((offset + n) `max` 0)
 
 locToLocation :: Loc -> Location
 locToLocation NoLoc = Location (Uri "") (locToRange NoLoc)
