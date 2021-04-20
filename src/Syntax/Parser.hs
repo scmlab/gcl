@@ -1,9 +1,10 @@
+{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PartialTypeSignatures #-}
 module Syntax.Parser where
 
-import Control.Applicative.Combinators (choice, many, sepBy1, (<|>), manyTill_, skipManyTill)
+import Control.Applicative.Combinators (choice, many, sepBy1, (<|>), manyTill_, optional)
 import Control.Monad.Combinators.Expr (Operator (..), makeExprParser)
 import Data.Loc (Located (locOf))
 import Data.Text.Lazy (Text)
@@ -11,11 +12,13 @@ import qualified Data.Ord as Ord
 import Syntax.Concrete (Declaration (..), EndpointClose (..), EndpointOpen (..), Expr (..), GdCmd (..), Interval (..), Name (..), Op (..), Program (..), SepBy (..), Stmt (..), TBase (..), Token (..), Type (..))
 import Syntax.Parser.Lexer
 import Syntax.Parser.Util
-import Text.Megaparsec (MonadParsec (..), parse, (<?>), anySingle, Pos, tokenToChunk, tokensToChunk)
+import Text.Megaparsec (MonadParsec (..), parse, (<?>), anySingle, Pos, tokensToChunk, unPos, mkPos)
 import qualified Text.Megaparsec.Char.Lexer as Lex
 import Control.Monad (void)
 import Control.Monad.Trans (lift)
 import Data.Data (Proxy(Proxy))
+import Data.Maybe (isJust)
+import Text.Megaparsec.Char (eol)
 
 type Parser = Lexer
 type ParserF = LexerF
@@ -159,17 +162,35 @@ pIf = do
     (tIf, gdcmds, tFi) <- pIfoDoHelper lexIf lexFi
     return $ If tIf gdcmds tFi
 
+-- pGdCmd :: ParserF GdCmd
+-- pGdCmd = (↑) (Lex.indentBlock scn . p)
+--   where
+--     p :: Parser () -> Parser (Lex.IndentOpt Parser GdCmd Stmt)
+--     p sc' = do
+--       gd <- pExpr
+--       arrow <- (↓) lexArrow sc
+--       sc'
+--       pos <- Lex.indentLevel
+--       s0 <- pStmt
+--       return $ Lex.IndentMany (Just pos) (\ss -> return $ GdCmd gd arrow (s0 : ss) ) pStmt
+
 pGdCmd :: ParserF GdCmd
-pGdCmd = (↑) (Lex.indentBlock scn . p)
+pGdCmd = do
+  gd <- pExpr'
+  arrow <- lexArrow
+  pos <- Lex.indentLevel 
+  stmt0 <- lift pStmt
+  -- check if is end of line, e.g. have statements more than one
+  isEol <- optional . try . lift $ eol
+  done <- isJust <$> optional eof
+  case (isEol, done) of
+    (Just _, False) -> do
+      stmts <- lift $ indentedItems (posMoveLeft pos 1) pos scn pStmt
+      return (GdCmd gd arrow (stmt0 : stmts))
+    _ -> return (GdCmd gd arrow [stmt0])
   where
-    p :: Parser () -> Parser (Lex.IndentOpt Parser GdCmd Stmt)
-    p sc' = do
-      gd <- pExpr
-      arrow <- (↓) lexArrow sc
-      sc'
-      pos <- Lex.indentLevel
-      s0 <- pStmt
-      return $ Lex.IndentMany (Just pos) (\ss -> return $ GdCmd gd arrow (s0 : ss) ) pStmt
+    posMoveLeft pos i = mkPos (unPos pos - i)
+
 
 pSpecQM :: ParserF Stmt
 pSpecQM = SpecQM . locOf <$> lexQM
@@ -394,12 +415,31 @@ pIndentSepBy start end (p, delim) = do
 
     parseP' gdPos delimPos ref = do
       void $ Lex.indentGuard sc Ord.EQ gdPos
-      -- x <- (↓) p sc
       x <- (↓) p . void $ Lex.indentGuard scn Ord.GT ref
       let g = do
             void $ Lex.indentGuard scn Ord.EQ delimPos
             Delim x <$> (↓) delim sc <*> parseP' gdPos delimPos ref
       try g <|> return (Head x)
-                  
+
+indentedItems ::
+  (MonadParsec e s m) =>
+  Pos -> Pos -> m () -> m b -> m [b]
+indentedItems ref lvl sc' p = go
+  where
+    go = do
+      sc'
+      pos <- Lex.indentLevel
+      done <- isJust <$> optional eof
+      if done
+        then return []
+        else
+          if
+              | pos <= ref -> return []
+              | pos == lvl -> (:) <$> p <*> go
+              | otherwise -> Lex.incorrectIndent Ord.EQ lvl pos
+
+
+
+
 indentGTE :: Pos -> Parser () -> Parser ()
 indentGTE ref sc' = void $ try (Lex.indentGuard sc' Ord.EQ ref) <|> Lex.indentGuard sc' Ord.GT ref
