@@ -28,7 +28,42 @@ import Syntax.Predicate
 handlers :: Handlers ServerM
 handlers =
   mconcat
-    [ -- custom methods, not part of LSP
+    [ -- autocompletion
+      requestHandler STextDocumentCompletion $ \req responder -> do
+        let RequestMessage _ _ _ params = req
+        let CompletionParams (TextDocumentIdentifier uri) position _progress _partial completionContext = params
+
+        logStuff completionContext
+        let triggered = case completionContext of
+              (Just (CompletionContext CtTriggerCharacter (Just "\\"))) -> True
+              _ -> False
+
+        if triggered
+          then do
+            -- CompletionList
+            let item =
+                  CompletionItem
+                    "⟨"
+                    (Just CiValue)
+                    Nothing 
+                    (Just "left angle bracket")
+                    (Just $ CompletionDocString "The Unicode variant of \"<|\"")
+                    Nothing 
+                    Nothing 
+                    Nothing 
+                    Nothing 
+                    Nothing 
+                    (Just PlainText)
+                    Nothing 
+                    Nothing 
+                    (Just (List ["l"]))
+                    Nothing 
+                    Nothing
+            let isComplete = True
+            let completionList = CompletionList isComplete (List [item])
+            responder $ Right $ InR completionList
+          else responder $ Right $ InR $ CompletionList True (List []),
+      -- custom methods, not part of LSP
       requestHandler (SCustomMethod "guacamole") $ \req responder -> do
         let RequestMessage _ i _ params = req
         -- JSON Value => Request => Response

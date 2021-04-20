@@ -51,6 +51,7 @@ run devMode = do
     lspOptions =
       defaultOptions
         { textDocumentSync = Just syncOptions
+        , completionTriggerCharacters = Just ['\\']
         }
 
     -- these `TextDocumentSyncOptions` are essential for receiving notifications from the client
