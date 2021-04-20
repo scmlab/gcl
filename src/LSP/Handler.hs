@@ -19,6 +19,7 @@ import LSP.Monad
 import Language.LSP.Diagnostics (partitionBySource)
 import Language.LSP.Server
 import Language.LSP.Types hiding (TextDocumentSyncClientCapabilities (..))
+import qualified Language.LSP.Types as LSP
 import qualified Syntax.Abstract as A
 import Syntax.Predicate
   ( Spec (..),
@@ -31,37 +32,54 @@ handlers =
     [ -- autocompletion
       requestHandler STextDocumentCompletion $ \req responder -> do
         let RequestMessage _ _ _ params = req
-        let CompletionParams (TextDocumentIdentifier uri) position _progress _partial completionContext = params
+        let CompletionParams (TextDocumentIdentifier _uri) position _progress _partial completionContext = params
 
-        logStuff completionContext
+        -- only gets triggered when a backslash "\" is typed, or when the previous completion is incomplete
         let triggered = case completionContext of
               (Just (CompletionContext CtTriggerCharacter (Just "\\"))) -> True
+              (Just (CompletionContext CtTriggerForIncompleteCompletions _)) -> True
               _ -> False
-
         if triggered
           then do
-            -- CompletionList
-            let item =
+            let Position line col = position
+            let replaceRange = LSP.Range (Position line (col - 1)) position
+            let removeSlash = Just $ List [TextEdit replaceRange ""]
+
+            let makeItem label kind symbol detail doc =
                   CompletionItem
-                    "⟨"
-                    (Just CiValue)
-                    Nothing 
-                    (Just "left angle bracket")
-                    (Just $ CompletionDocString "The Unicode variant of \"<|\"")
-                    Nothing 
-                    Nothing 
-                    Nothing 
-                    Nothing 
-                    Nothing 
+                    label
+                    kind
+                    Nothing
+                    (Just detail)
+                    (Just $ CompletionDocString doc)
+                    Nothing
+                    Nothing
+                    Nothing
+                    Nothing
+                    (Just symbol)
                     (Just PlainText)
-                    (Just AsIs)
-                    Nothing 
-                    Nothing 
-                    (Just (List ["l"]))
-                    Nothing 
-                    Nothing  
+                    Nothing
+                    Nothing
+                    removeSlash
+                    Nothing
+                    Nothing
+                    Nothing
+
+            let items =
+                  [ makeItem "to" (Just CiOperator) "→" "\"→\" Rightwards Arrow" "The Unicode variant of \"->\"",
+                    makeItem "neq" (Just CiOperator) "≠" "\"≠\" Not Equal To" "The Unicode variant of \"/=\"",
+                    makeItem "gte" (Just CiOperator) "≥" "\"≥\" Greater-Than or Equal To" "The Unicode variant of \">=\"",
+                    makeItem "lte" (Just CiOperator) "≤" "\"≤\" Less-Than or Equal To" "The Unicode variant of \"<=\"",
+                    makeItem "imp" (Just CiOperator) "⇒" "\"⇒\" Rightwards Double Arrow" "The Unicode variant of \"=>\"",
+                    makeItem "conj" (Just CiOperator) "∧" "\"∧\" Logical And" "The Unicode variant of \"&&\"",
+                    makeItem "disj" (Just CiOperator) "∨" "\"∨\" Logical Or" "The Unicode variant of \"||\"",
+                    makeItem "neg" (Just CiOperator) "¬" "\"¬\" Not Sign" "The Unicode variant of \"~\"",
+                    makeItem "leftanglebracket" (Just CiValue) "⟨" "\"⟨\" Left Angle Bracket" "The Unicode variant of \"<|\"",
+                    makeItem "rightanglebracket" (Just CiValue) "⟩" "\"⟩\" Right Angle Bracket" "The Unicode variant of \"|>\""
+                  ]
+
             let isComplete = True
-            let completionList = CompletionList isComplete (List [item])
+            let completionList = CompletionList isComplete (List items)
             responder $ Right $ InR completionList
           else responder $ Right $ InR $ CompletionList True (List []),
       -- custom methods, not part of LSP
@@ -119,7 +137,7 @@ handlers =
                             let identifier = VersionedTextDocumentIdentifier (filePathToUri filepath) (Just 0)
                             let textDocumentEdit = TextDocumentEdit identifier (List [InL removeSpecOpen])
                             let change = InL textDocumentEdit
-                            let workspaceEdit = WorkspaceEdit Nothing (Just (List [change])) Nothing 
+                            let workspaceEdit = WorkspaceEdit Nothing (Just (List [change])) Nothing
                             let applyWorkspaceEditParams = ApplyWorkspaceEditParams (Just "Resolve Spec") workspaceEdit
                             let responder' response = case response of
                                   Left _responseError -> return ()
