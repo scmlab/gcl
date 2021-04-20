@@ -73,12 +73,19 @@ myTest =
     "parse test"
     [
       testCase "1" $ run
-        "x = <| + i : 0 < i < 1 : A i |>"
+        "do x = 0 -> \n\
+        \  skip\n\
+        \  skip\n\
+        \ | y = 0 -> \n\
+        \  skip \n\
+        \  skip \n\
+        \od"
+
       -- testCase "2" $ run
       --   "= +"
     ]
     where
-      run t = show (parse pExpr t) @?= ""
+      run t = show (parse pStmt t) @?= ""
       quantWrap = (↓) pQuant scn
       wrap = (↓) (do
         v <- pVar
