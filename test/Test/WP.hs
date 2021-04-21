@@ -11,6 +11,7 @@ import qualified Data.Text.Lazy.Encoding as LazyText
 import Error
 import GCL.WP (StructWarning)
 import qualified LSP
+import qualified LSP.CustomMethod as LSP
 import Pretty ()
 import Syntax.Abstract
 import Syntax.Predicate

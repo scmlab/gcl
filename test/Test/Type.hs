@@ -17,6 +17,8 @@ import qualified Data.Map as Map
 import GCL.Type
 import Error
 import qualified LSP
+import qualified LSP.CustomMethod as LSP
+import qualified LSP.Monad as LSP
 import Syntax.Abstract
 import Test.Tasty
 import Test.Tasty.Golden
