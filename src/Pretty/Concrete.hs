@@ -15,6 +15,7 @@ import Pretty.Variadic
 import Syntax.Common (Fixity (..))
 import Syntax.Concrete
 import Prelude hiding (Ordering (..))
+import Syntax.Parser.Token
 
 --------------------------------------------------------------------------------
 
@@ -30,100 +31,106 @@ instance (PrettyWithLoc (Token sep), PrettyWithLoc a) => PrettyWithLoc (SepBy se
 
 -- | Tokens
 instance PrettyWithLoc (Token "con") where
-  prettyWithLoc (Token l r) = DocWithLoc "con" l r
+  prettyWithLoc (Token l r) = DocWithLoc (pretty tokCon) l r
 
 instance PrettyWithLoc (Token "var") where
-  prettyWithLoc (Token l r) = DocWithLoc "var" l r
+  prettyWithLoc (Token l r) = DocWithLoc (pretty tokVar) l r
 
 instance PrettyWithLoc (Token "let") where
-  prettyWithLoc (Token l r) = DocWithLoc "let" l r
+  prettyWithLoc (Token l r) = DocWithLoc (pretty tokLet) l r
 
 instance PrettyWithLoc (Token "{") where
-  prettyWithLoc (Token l r) = DocWithLoc "{" l r
+  prettyWithLoc (Token l r) = DocWithLoc (pretty tokBraceStart) l r
 
 instance PrettyWithLoc (Token "}") where
-  prettyWithLoc (Token l r) = DocWithLoc "}" l r
+  prettyWithLoc (Token l r) = DocWithLoc (pretty tokBraceEnd) l r
 
 instance PrettyWithLoc (Token "[") where
-  prettyWithLoc (Token l r) = DocWithLoc "[" l r
+  prettyWithLoc (Token l r) = DocWithLoc (pretty tokBracketStart) l r
 
 instance PrettyWithLoc (Token "]") where
-  prettyWithLoc (Token l r) = DocWithLoc "]" l r
+  prettyWithLoc (Token l r) = DocWithLoc (pretty tokBracketEnd) l r
 
 instance PrettyWithLoc (Token "(") where
-  prettyWithLoc (Token l r) = DocWithLoc "(" l r
+  prettyWithLoc (Token l r) = DocWithLoc (pretty tokParenStart) l r
 
 instance PrettyWithLoc (Token ")") where
-  prettyWithLoc (Token l r) = DocWithLoc ")" l r
+  prettyWithLoc (Token l r) = DocWithLoc (pretty tokParenEnd) l r
 
 instance PrettyWithLoc (Token "<|") where
-  prettyWithLoc (Token l r) = DocWithLoc "<|" l r
+  prettyWithLoc (Token l r) = DocWithLoc (pretty tokQuantStarts) l r
 
 instance PrettyWithLoc (Token "⟨") where
-  prettyWithLoc (Token l r) = DocWithLoc "⟨" l r
+  prettyWithLoc (Token l r) = DocWithLoc (pretty tokQuantStartU) l r
 
 instance PrettyWithLoc (Token "|>") where
-  prettyWithLoc (Token l r) = DocWithLoc "|>" l r
+  prettyWithLoc (Token l r) = DocWithLoc (pretty tokQuantEnds) l r
 
 instance PrettyWithLoc (Token "⟩") where
-  prettyWithLoc (Token l r) = DocWithLoc "⟩" l r
+  prettyWithLoc (Token l r) = DocWithLoc (pretty tokQuantEndU) l r
 
 instance PrettyWithLoc (Token "[!") where
-  prettyWithLoc (Token l r) = DocWithLoc "[!" l r
+  prettyWithLoc (Token l r) = DocWithLoc (pretty tokSpecStart) l r
 
 instance PrettyWithLoc (Token "!]") where
-  prettyWithLoc (Token l r) = DocWithLoc "!]" l r
+  prettyWithLoc (Token l r) = DocWithLoc (pretty tokSpecEnd) l r
 
 instance PrettyWithLoc (Token "{-") where
-  prettyWithLoc (Token l r) = DocWithLoc "{-" l r
+  prettyWithLoc (Token l r) = DocWithLoc (pretty tokBlockCommentStart) l r
 
 instance PrettyWithLoc (Token "-}") where
-  prettyWithLoc (Token l r) = DocWithLoc "-}" l r
+  prettyWithLoc (Token l r) = DocWithLoc (pretty tokBlockCommentEnd) l r
 
+instance PrettyWithLoc (Token "{:") where
+  prettyWithLoc (Token l r) = DocWithLoc (pretty tokDeclStart) l r
+
+instance PrettyWithLoc (Token ":}") where
+  prettyWithLoc (Token l r) = DocWithLoc (pretty tokDeclEnd) l r
+  
 instance PrettyWithLoc (Token ":") where
-  prettyWithLoc (Token l r) = DocWithLoc ":" l r
+  prettyWithLoc (Token l r) = DocWithLoc (pretty tokColon) l r
 
 instance PrettyWithLoc (Token ",") where
-  prettyWithLoc (Token l r) = DocWithLoc "," l r
+  prettyWithLoc (Token l r) = DocWithLoc (pretty tokComma) l r
 
 instance PrettyWithLoc (Token "..") where
-  prettyWithLoc (Token l r) = DocWithLoc ".." l r
+  prettyWithLoc (Token l r) = DocWithLoc (pretty tokRange) l r
 
 instance PrettyWithLoc (Token "array") where
-  prettyWithLoc (Token l r) = DocWithLoc "array" l r
+  prettyWithLoc (Token l r) = DocWithLoc (pretty tokArray) l r
 
 instance PrettyWithLoc (Token "of") where
-  prettyWithLoc (Token l r) = DocWithLoc "of" l r
+  prettyWithLoc (Token l r) = DocWithLoc (pretty tokOf) l r
 
 instance PrettyWithLoc (Token "bnd") where
-  prettyWithLoc (Token l r) = DocWithLoc "bnd" l r
+  prettyWithLoc (Token l r) = DocWithLoc (pretty tokBnd) l r
 
 instance PrettyWithLoc (Token "if") where
-  prettyWithLoc (Token l r) = DocWithLoc "if" l r
+  prettyWithLoc (Token l r) = DocWithLoc (pretty tokIf) l r
 
 instance PrettyWithLoc (Token "fi") where
-  prettyWithLoc (Token l r) = DocWithLoc "fi" l r
+  prettyWithLoc (Token l r) = DocWithLoc (pretty tokFi) l r
 
 instance PrettyWithLoc (Token "do") where
-  prettyWithLoc (Token l r) = DocWithLoc "do" l r
+  prettyWithLoc (Token l r) = DocWithLoc (pretty tokDo) l r
 
 instance PrettyWithLoc (Token "od") where
-  prettyWithLoc (Token l r) = DocWithLoc "od" l r
+  prettyWithLoc (Token l r) = DocWithLoc (pretty tokOd) l r
 
 instance PrettyWithLoc (Token ":=") where
-  prettyWithLoc (Token l r) = DocWithLoc ":=" l r
+  prettyWithLoc (Token l r) = DocWithLoc (pretty tokAssign) l r
 
 instance PrettyWithLoc (Token "=") where
-  prettyWithLoc (Token l r) = DocWithLoc "=" l r
+  prettyWithLoc (Token l r) = DocWithLoc (pretty tokEQ) l r
 
 instance PrettyWithLoc (Token "|") where
-  prettyWithLoc (Token l r) = DocWithLoc "|" l r
+  prettyWithLoc (Token l r) = DocWithLoc (pretty tokGuardBar) l r
 
 instance PrettyWithLoc (Token "->") where
-  prettyWithLoc (Token l r) = DocWithLoc "->" l r
+  prettyWithLoc (Token l r) = DocWithLoc (pretty tokArrow) l r
 
 instance PrettyWithLoc (Token "→") where
-  prettyWithLoc (Token l r) = DocWithLoc "→" l r
+  prettyWithLoc (Token l r) = DocWithLoc (pretty tokArrowU) l r
 
 --------------------------------------------------------------------------------
 
@@ -138,36 +145,56 @@ instance PrettyWithLoc Program where
 --------------------------------------------------------------------------------
 
 -- | Declaration
+instance Pretty Decl where
+  pretty = toDoc . prettyWithLoc
+
+instance PrettyWithLoc Decl where
+  prettyWithLoc (Decl (names, colon, t)) =
+    prettyWithLoc names
+    <> prettyWithLoc colon
+    <> prettyWithLoc t
+
+instance Pretty DeclProp where
+  pretty = toDoc . prettyWithLoc
+
+instance PrettyWithLoc DeclProp where
+  prettyWithLoc (DeclProp (l, p, r)) =
+    prettyWithLoc l
+    <> prettyWithLoc p
+    <> prettyWithLoc r
+
 instance Pretty Declaration where
   pretty = toDoc . prettyWithLoc
 
 instance PrettyWithLoc Declaration where
-  prettyWithLoc (ConstDecl con names colon t) =
+  prettyWithLoc (ConstDecl con decl) =
     prettyWithLoc con
-      <> prettyWithLoc names
-      <> prettyWithLoc colon
-      <> prettyWithLoc t
-  prettyWithLoc (ConstDeclWithProp con names colon t l p r) =
+      <> prettyWithLoc decl
+  prettyWithLoc (ConstDeclWithProp con decl declprop ) =
     prettyWithLoc con
-      <> prettyWithLoc names
-      <> prettyWithLoc colon
-      <> prettyWithLoc t
-      <> prettyWithLoc l
-      <> prettyWithLoc p
-      <> prettyWithLoc r
-  prettyWithLoc (VarDecl v names colon t) =
-    prettyWithLoc v <> prettyWithLoc names <> prettyWithLoc colon <> prettyWithLoc t
-  prettyWithLoc (VarDeclWithProp v names colon t l p r) =
-    prettyWithLoc v <> prettyWithLoc names <> prettyWithLoc colon <> prettyWithLoc t
-      <> prettyWithLoc l
-      <> prettyWithLoc p
-      <> prettyWithLoc r
+      <> prettyWithLoc decl
+      <> prettyWithLoc declprop
+  prettyWithLoc (VarDecl v decl) =
+    prettyWithLoc v <> prettyWithLoc decl 
+  prettyWithLoc (VarDeclWithProp v decl declprop) =
+    prettyWithLoc v <> prettyWithLoc decl <> prettyWithLoc declprop 
   prettyWithLoc (LetDecl a name args e expr) =
     prettyWithLoc a
       <> prettyWithLoc name
       <> mconcat (map prettyWithLoc args)
       <> prettyWithLoc e
       <> prettyWithLoc expr
+
+instance Pretty BlockDeclaration where
+  pretty = toDoc . prettyWithLoc
+
+instance PrettyWithLoc BlockDeclaration where
+  prettyWithLoc (BlockDecl l decls r) = prettyWithLoc l
+      <> mconcat (map (\(decl, declProp) -> 
+            prettyWithLoc decl 
+            <> maybe Empty (either prettyWithLoc prettyWithLoc) declProp
+          ) decls)
+      <> prettyWithLoc r
 
 --------------------------------------------------------------------------------
 
@@ -289,8 +316,14 @@ handleExpr (Op x) = handleOp x
 handleExpr (Chain x op y) =
   return $
     prettyWithLoc x
-      <> prettyWithLoc op
-      <> prettyWithLoc y
+    <> prettyWithLoc op
+    <> prettyWithLoc y
+handleExpr (Arr arr l i r) = 
+  return $
+    prettyWithLoc arr
+    <> prettyWithLoc l
+    <> prettyWithLoc i
+    <> prettyWithLoc r
 handleExpr (App p q) = case handleExpr p of
   Expect f -> f q
   Complete s -> do

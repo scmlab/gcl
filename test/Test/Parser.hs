@@ -34,13 +34,13 @@ import Syntax.Parser.Token
 import Syntax.Concrete (Type(..), TBase (..),ToAbstract (toAbstract), Program (..), Expr(..))
 import Data.Loc (Located(locOf))
 import Text.Megaparsec (Stream(reachOffset), setOffset, getOffset, MonadParsec(updateParserState, getParserState, observing, lookAhead, try, eof), State(State, statePosState, stateInput, stateOffset), getInput, getSourcePos)
-import Control.Monad.Combinators (optional, many, (<|>))
+import Control.Monad.Combinators (optional, many, (<|>), choice)
 import qualified Data.Ord as Ord
 import Control.Monad (void)
 import Syntax.Parser.Util (parser, (↓), getCurLoc)
 
 tests :: TestTree
--- tests = testGroup "Prettifier" [myTest]
+-- tests = testGroup "Prettifier" [declaration]
 tests = testGroup "Prettifier" [expression, type', declaration, statement, parseError, golden]
 
 --------------------------------------------------------------------------------
@@ -73,33 +73,19 @@ myTest =
     "parse test"
     [
       testCase "1" $ run
-        "do x = 0 -> \n\
-        \  skip\n\
-        \  skip\n\
-        \ | y = 0 -> \n\
-        \  skip \n\
-        \  skip \n\
-        \od"
+        "con N : Int\n\
+        \con A : array (0 .. N] of Int\n\
+        \{:\n\
+        \    X, Y : Int \n\
+        \      X > 0\n\
+        \    Z : array (0 .. N] of Bool\n\
+        \:}\n"
 
       -- testCase "2" $ run
       --   "= +"
     ]
     where
-      run t = show (parse pStmt t) @?= ""
-      quantWrap = (↓) pQuant scn
-      wrap = (↓) (do
-        v <- pVar
-        eq <- notFollowedBySymbol lexEQ
-        q <- pQuant 
-        return (App (App (Op eq) v) q)) scn
-
-      pNotFollowed = (↓) (do
-          notFollowedBySymbol lexEQ
-        ) scn
-
-     -- dawn surround ritual toward fun planet affair friend edge soap news marble 
-
-      
+      run t = show (parse pProgram t) @?= ""
 
 -- | Expression
 expression :: TestTree
@@ -135,6 +121,9 @@ expression =
       testCase "quant 5" $ run "x = <| + i : 0 <= i < k : F i |>",
       testCase "function application 1" $ run "(f   (  x      )) y",
       testCase "function application 2" $ run "f (x y)",
+      testCase "array indexing (app)" $ run "A i",
+      testCase "array indexing (bracket) : A[i]" $ run "A[i]",
+      testCase "array indexing (bracket) : A[A[i]]" $ run "A[A[i]]",
       testCase "mixed 1" $ run "X * Y = N",
       testCase "mixed 2" $ run "X * Y => P = Q",
       testCase "mixed 3" $ run "X > Y && X > Y",
@@ -199,11 +188,30 @@ declaration =
       testCase "constant" $ run "con X , Z,B, Y : Int",
       testCase "constant keyword collision 1" $ run' "con False : Int" "Error Syntactic Error [(<test>:1:5, using keyword as variable name )]\n",
       testCase "constant keyword collision 2" $ run "con Falsee : Int",
-      testCase "let binding" $ run " let  X   i  =  N  >   (0)  "
+      testCase "let binding" $ run " let  X   i  =  N  >   (0)  ",
+      testCase "block declaration 1" $ runBlock
+        "{:\n\
+        \   A, B : Int\n\
+        \:}",
+      testCase "block declaration 1" $ runBlock
+        "{:\n\
+        \   A, B : Int\n\
+        \     A > 0\n\
+        \:}",
+      testCase "block declaration 1" $ runBlock
+        "{:\n\
+        \   A, B : Int {A > 0}\n\
+        \:}",
+      testCase "block declaration 1" $ runBlock
+        "{:\n\
+        \   A, B : Int\n\
+        \     {A > 0}\n\
+        \:}"
     ]
   where
     run = isomorphic pDeclaration
     run' = compare pDeclaration
+    runBlock = isomorphic pBlockDeclaration 
 
 --------------------------------------------------------------------------------
 
@@ -221,7 +229,8 @@ statement =
       testCase "conditional 2" $ run "if True ->    skip   \n | False -> abort \nfi",
       testCase "loop invariant" $ run "{ True ,     bnd      : a  }",
       testCase "loop body 1" $ run "do True -> skip od",
-      testCase "loop body 2" $ run "do True    →       skip od"
+      testCase "loop body 2" $ run "do True    →       skip od",
+      testCase "indentifier include keyword" $ run "{ Falsee }"
     ]
   where
     run = isomorphic pStmt

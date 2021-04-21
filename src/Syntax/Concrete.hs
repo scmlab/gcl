@@ -3,6 +3,7 @@
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE KindSignatures #-}
 
+{-# LANGUAGE FlexibleInstances #-}
 module Syntax.Concrete where
 
 import Data.Loc (Loc(..), Pos, (<-->), Located(locOf) )
@@ -52,16 +53,16 @@ instance Located a => Located (SepBy sep a) where
 -- | Program / Declaration / Statement
 data Program
   = Program
-      [Declaration] -- constant and variable declarations
+      [Either Declaration BlockDeclaration] -- constant and variable declarations
       [Stmt] -- main program
   deriving (Eq, Show)
 
 instance ToAbstract Program A.Program where
   toAbstract (Program decls' stmts) =
-    let decls = map toAbstract decls'
+    let decls = concat $ mapM (either ((:[]) . toAbstract) toAbstract) decls'
         letBindings = ConstExpr.pickLetBindings decls
         (globProps, assertions) = ConstExpr.pickGlobals decls
-        pre = if null assertions then [] else [A.Assert (A.conjunct assertions) NoLoc]
+        pre = [A.Assert (A.conjunct assertions) NoLoc | not (null assertions)]
      in A.Program decls globProps letBindings (pre ++ fmap toAbstract stmts) (decls' <--> stmts)
 
 instance Located Program where
@@ -69,27 +70,43 @@ instance Located Program where
 
 type Defns = Map Text Expr
 
+newtype Decl = Decl (SepBy "," Name, Token ":", Type) deriving (Eq, Show)
+newtype DeclProp = DeclProp (Token "{", Expr, Token "}") deriving (Eq, Show)
+
 data Declaration
-  = ConstDecl (Token "con") (SepBy "," Name) (Token ":") Type
-  | ConstDeclWithProp (Token "con") (SepBy "," Name) (Token ":") Type (Token "{") Expr (Token "}")
-  | VarDecl (Token "var") (SepBy "," Name) (Token ":") Type
-  | VarDeclWithProp (Token "var") (SepBy "," Name) (Token ":") Type (Token "{") Expr (Token "}")
+  = ConstDecl (Token "con") Decl
+  | ConstDeclWithProp (Token "con") Decl DeclProp
+  | VarDecl (Token "var") Decl
+  | VarDeclWithProp (Token "var") Decl DeclProp
   | LetDecl (Token "let") Name [Name] (Token "=") Expr
   deriving (Eq, Show)
 
 instance ToAbstract Declaration A.Declaration where
-  toAbstract (ConstDecl l a _ b) = A.ConstDecl (toAbstract <$> fromSepBy a) (toAbstract b) Nothing (l <--> b)
-  toAbstract (ConstDeclWithProp x a _ b _ c r) = A.ConstDecl (toAbstract <$> fromSepBy a) (toAbstract b) (Just $ toAbstract c) (x <--> r)
-  toAbstract (VarDecl l a _ b) = A.VarDecl (toAbstract <$> fromSepBy a) (toAbstract b) Nothing (l <--> b)
-  toAbstract (VarDeclWithProp x a _ b _ c r) = A.VarDecl (toAbstract <$> fromSepBy a) (toAbstract b) (Just $ toAbstract c) (x <--> r)
+  toAbstract (ConstDecl l (Decl (a, _, b))) = A.ConstDecl (toAbstract <$> fromSepBy a) (toAbstract b) Nothing (l <--> b)
+  toAbstract (ConstDeclWithProp x (Decl (a, _, b)) (DeclProp (_, c, r))) = A.ConstDecl (toAbstract <$> fromSepBy a) (toAbstract b) (Just $ toAbstract c) (x <--> r)
+  toAbstract (VarDecl l (Decl (a, _, b))) = A.VarDecl (toAbstract <$> fromSepBy a) (toAbstract b) Nothing (l <--> b)
+  toAbstract (VarDeclWithProp x (Decl (a, _, b)) (DeclProp (_, c, r))) = A.VarDecl (toAbstract <$> fromSepBy a) (toAbstract b) (Just $ toAbstract c) (x <--> r)
   toAbstract (LetDecl l a b _ c) = A.LetDecl (toAbstract a) (map toAbstract b) (toAbstract c) (l <--> c)
 
 instance Located Declaration where
-  locOf (ConstDecl l _ _ r) = l <--> r
-  locOf (ConstDeclWithProp l _ _ _ _ _ r) = l <--> r
-  locOf (VarDecl l _ _ r) = l <--> r
-  locOf (VarDeclWithProp l _ _ _ _ _ r) = l <--> r
+  locOf (ConstDecl l (Decl (_, _, r))) = l <--> r
+  locOf (ConstDeclWithProp l _ (DeclProp (_, _, r))) = l <--> r
+  locOf (VarDecl l (Decl (_, _, r))) = l <--> r
+  locOf (VarDeclWithProp l _ (DeclProp (_, _, r))) = l <--> r
   locOf (LetDecl l _ _ _ r) = l <--> r
+
+data BlockDeclaration = BlockDecl (Token "{:") [(Decl, Maybe (Either DeclProp Expr))] (Token ":}") deriving (Eq, Show)
+
+instance ToAbstract BlockDeclaration [A.Declaration] where
+  toAbstract (BlockDecl _ decls _) = map (\(Decl (a, _, b), declprop) ->
+      case declprop of
+        Just (Left (DeclProp (_, c, r))) -> A.ConstDecl (toAbstract <$> fromSepBy a) (toAbstract b) (Just . toAbstract $ c) (a <--> r)
+        Just (Right prop) -> A.ConstDecl (toAbstract <$> fromSepBy a) (toAbstract b) (Just . toAbstract $ prop) (a <--> prop)
+        Nothing -> A.ConstDecl (toAbstract <$> fromSepBy a) (toAbstract b) Nothing (a <--> b)
+    ) decls
+
+instance Located BlockDeclaration where
+  locOf (BlockDecl l _ r) = l <--> r
 
 data Stmt
   = Skip Loc
@@ -172,10 +189,10 @@ instance Located Interval where
   locOf (Interval l _ r) = l <--> r
 
 -- | Base Type
-data TBase 
+data TBase
   = TInt Loc
-  | TBool Loc 
-  | TChar Loc 
+  | TBool Loc
+  | TChar Loc
   deriving (Eq, Show)
 
 instance Located TBase where
@@ -221,6 +238,7 @@ data Expr
   | Const Name
   | Op Op
   | Chain Expr Op Expr                  -- Left Associative
+  | Arr Expr (Token "[") Expr (Token "]")
   | App Expr Expr
   | Quant
       (Either (Token "<|") (Token "⟨"))
@@ -240,6 +258,7 @@ instance Located Expr where
   locOf (Const x) = locOf x
   locOf (Op x) = locOf x
   locOf (Chain e1 op e2) = e1 <--> op <--> e2
+  locOf (Arr l _ _ r) = l <--> r
   locOf (App x y) = x <--> y
   locOf (Quant l _ _ _ _ _ _ r) = l <--> r
 
@@ -250,18 +269,19 @@ instance ToAbstract Expr A.Expr where
     Var a -> A.Var (toAbstract a) (locOf x)
     Const a -> A.Const (toAbstract a) (locOf x)
     Op a -> A.Op (toAbstract a) (locOf x)
-    Chain a op b -> 
+    Chain a op b ->
       case a of
-        Chain {} -> 
+        Chain {} ->
           let ar = chainRightmost a in
             A.App
-              (A.App (A.Op A.Conj NoLoc) 
+              (A.App (A.Op A.Conj NoLoc)
                 (toAbstract a) (locOf a))
                 -- ar op b
                 (A.App (A.App (toAbstract (Op op)) (toAbstract ar) (locOf ar)) (toAbstract b) (ar <--> b))
               (locOf x)
-        _ -> 
+        _ ->
           A.App (A.App (toAbstract (Op op)) (toAbstract a) (a <--> op)) (toAbstract b) (locOf x)
+    Arr arr _ i _ -> A.App (toAbstract arr) (toAbstract i) (locOf x)
     App a b -> A.App (toAbstract a) (toAbstract b) (locOf x)
     Quant _ a b _ c _ d _ -> A.Quant (either (toAbstract . Op) toAbstract a) (fmap toAbstract b) (toAbstract c) (toAbstract d) (locOf x)
 

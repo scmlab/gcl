@@ -33,11 +33,11 @@ sc = Lex.space (void $ some spaceNotNewline) skipLineComment skipBlockComment
 
 -- Note: Should consume the newline character or not ?
 skipLineComment :: Lexer ()
-skipLineComment = Lex.skipLineComment "--"
+skipLineComment = Lex.skipLineComment tokLineComment 
 
 -- NOTE: Not sure what the symbol of block comment will be
 skipBlockComment :: Lexer ()
-skipBlockComment = Lex.skipBlockComment "--/" "/--"
+skipBlockComment = Lex.skipBlockComment tokBlockCommentStart tokBlockCommentEnd 
 
 -- wrapper of tokens
 lexeme :: Lexer a -> LexerF (a, Loc)
@@ -158,6 +158,12 @@ lexProofEnd = symbol tokProofEnd
 
 lexBackSlash :: LexerF (Token tokBackSlash)
 lexBackSlash = symbol tokBackSlash 
+
+lexDeclStart :: LexerF (Token tokDeclStart)
+lexDeclStart = symbol tokDeclStart 
+
+lexDeclEnd :: LexerF (Token tokDeclEnd)
+lexDeclEnd = symbol tokDeclEnd 
 
 ------------------------------------------
 -- Operators
