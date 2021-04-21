@@ -53,14 +53,13 @@ instance Located a => Located (SepBy sep a) where
 -- | Program / Declaration / Statement
 data Program
   = Program
-      [Declaration] -- constant and variable declarations
+      [Either Declaration BlockDeclaration] -- constant and variable declarations
       [Stmt] -- main program
   deriving (Eq, Show)
 
 instance ToAbstract Program A.Program where
   toAbstract (Program decls' stmts) =
-    -- let decls = foldl (\ds d -> either ((:ds) . toAbstract) ((++ds) . toAbstract) d) [] decls'
-    let decls = map toAbstract decls'
+    let decls = concat $ mapM (either ((:[]) . toAbstract) toAbstract) decls'
         letBindings = ConstExpr.pickLetBindings decls
         (globProps, assertions) = ConstExpr.pickGlobals decls
         pre = [A.Assert (A.conjunct assertions) NoLoc | not (null assertions)]
@@ -96,12 +95,13 @@ instance Located Declaration where
   locOf (VarDeclWithProp l _ (DeclProp (_, _, r))) = l <--> r
   locOf (LetDecl l _ _ _ r) = l <--> r
 
-data BlockDeclaration = BlockDecl (Token "{:") [(Decl, Maybe DeclProp)] (Token ":}") deriving (Eq, Show)
+data BlockDeclaration = BlockDecl (Token "{:") [(Decl, Maybe (Either DeclProp Expr))] (Token ":}") deriving (Eq, Show)
 
 instance ToAbstract BlockDeclaration [A.Declaration] where
   toAbstract (BlockDecl _ decls _) = map (\(Decl (a, _, b), declprop) ->
       case declprop of
-        Just (DeclProp (_, c, r)) -> A.ConstDecl (toAbstract <$> fromSepBy a) (toAbstract b) (Just . toAbstract $ c) (a <--> r)
+        Just (Left (DeclProp (_, c, r))) -> A.ConstDecl (toAbstract <$> fromSepBy a) (toAbstract b) (Just . toAbstract $ c) (a <--> r)
+        Just (Right prop) -> A.ConstDecl (toAbstract <$> fromSepBy a) (toAbstract b) (Just . toAbstract $ prop) (a <--> prop)
         Nothing -> A.ConstDecl (toAbstract <$> fromSepBy a) (toAbstract b) Nothing (a <--> b)
     ) decls
 

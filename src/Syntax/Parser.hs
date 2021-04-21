@@ -36,8 +36,7 @@ runParse p filepath s =
 pProgram :: Parser Program
 pProgram = do
   scn
-  Program <$> many pDeclaration <*> pStmts <* eof
-  -- Program <$> many (eitherP pDeclaration pBlockDeclaration) <*> pStmts <* eof
+  Program <$> many (eitherP pDeclaration pBlockDeclaration) <*> pStmts <* eof
 
 ------------------------------------------
 -- parse Declaration
@@ -57,11 +56,13 @@ pDeclaration = Lex.lineFold scn (parser p)
         <?> "declaration"
 
 pBlockDeclaration :: Parser BlockDeclaration 
-pBlockDeclaration = (↓) (do
-  bs <- lexDeclStart 
-  d <- many ((,) <$> pDecl upperName <*> optional pDeclProp)
-  be <- lexDeclEnd 
-  return (BlockDecl bs d be)) scn
+pBlockDeclaration = 
+  Lex.indentBlock scn p
+  where
+    d = Lex.lineFold scn (\sc' -> (,) <$> (↓) (pDecl upperName) sc' <*> (↓) (optional (eitherP pDeclProp pExpr')) sc')
+    p = do
+      bs <- (↓) lexDeclStart sc
+      return (Lex.IndentMany Nothing (\ds -> BlockDecl bs ds <$> (↓) lexDeclEnd scn) d)
 
 pDecl :: ParserF Name -> ParserF Decl
 pDecl name = Decl <$> (do
@@ -174,18 +175,6 @@ pIf = do
     (tIf, gdcmds, tFi) <- pIfoDoHelper lexIf lexFi
     return $ If tIf gdcmds tFi
 
--- pGdCmd :: ParserF GdCmd
--- pGdCmd = (↑) (Lex.indentBlock scn . p)
---   where
---     p :: Parser () -> Parser (Lex.IndentOpt Parser GdCmd Stmt)
---     p sc' = do
---       gd <- pExpr
---       arrow <- (↓) lexArrow sc
---       sc'
---       pos <- Lex.indentLevel
---       s0 <- pStmt
---       return $ Lex.IndentMany (Just pos) (\ss -> return $ GdCmd gd arrow (s0 : ss) ) pStmt
-
 pGdCmd :: ParserF GdCmd
 pGdCmd = do
   gd <- pExpr'
@@ -209,12 +198,12 @@ pSpecQM = SpecQM . locOf <$> lexQM
 
 pSpec :: Parser Stmt
 pSpec = do
-  (ts, t, te) <- pSpecProofHelper lexSpecStart lexSpecEnd
-  return $ Spec ts t te
+  (ts, t, te) <- pBlock lexSpecStart lexSpecEnd anySingle
+  return $ Spec ts (tokensToChunk (Proxy :: Proxy Text) t) te
 
 pProof :: Parser Stmt
 pProof = do
-  (ts, _, te) <- pSpecProofHelper lexProofStart lexProofEnd
+  (ts, _, te) <- pBlock lexProofStart lexProofEnd anySingle
   return $ Proof ts te
 
 ------------------------------------------
@@ -310,8 +299,9 @@ pTerm' = choice [pParen, pVar, pConst, pLit, pQuant] <?> "term"
 pParen :: ParserF Expr
 pParen = Paren <$> lexParenStart <*> pExpr' <*> lexParenEnd
 
+-- Allow A[A[i]]
 pArray :: ParserF Expr
-pArray = Arr <$> pTerm' <*> lexBracketStart <*> pTerm' <*> lexBracketEnd 
+pArray = Arr <$> pTerm' <*> lexBracketStart <*> pTerm <*> lexBracketEnd 
 
 pLit :: ParserF Expr
 pLit = Lit <$> lexLits
@@ -389,19 +379,24 @@ pIfoDoHelper ::
 pIfoDoHelper start end = 
   pIndentSepBy start end (pGdCmd, lexGuardBar)
 
-pSpecProofHelper ::
+
+------------------------------------------
+-- Dirty Indents
+------------------------------------------
+
+pBlock ::
   ParserF (Token s)
   -> ParserF (Token e)
-  -> Parser (Token s, Text, Token e)
-pSpecProofHelper start end = do
+  -> Parser a
+  -> Parser (Token s, [a], Token e)
+pBlock start end p = do
   ref <- Lex.indentLevel
   ts <- (↓) start sc
-  (t, te) <- manyTill_ anySingle ((↓) end sc)
+  (t, te) <- manyTill_ p ((↓) end sc)
   let pos = getTokenColumn te
   if compare pos ref == Ord.LT
     then Lex.incorrectIndent Ord.EQ pos ref
-    else return (ts, tokensToChunk (Proxy :: Proxy Text) t, te)
-
+    else return (ts, t, te)
 
 pIndentSepBy ::
   ParserF (Token s)
@@ -456,7 +451,6 @@ indentedItems ref lvl sc' p = go
               | pos <= ref -> return []
               | pos == lvl -> (:) <$> p <*> go
               | otherwise -> Lex.incorrectIndent Ord.EQ lvl pos
-
 
 
 

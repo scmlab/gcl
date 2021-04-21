@@ -192,7 +192,7 @@ instance PrettyWithLoc BlockDeclaration where
   prettyWithLoc (BlockDecl l decls r) = prettyWithLoc l
       <> mconcat (map (\(decl, declProp) -> 
             prettyWithLoc decl 
-            <> maybe Empty prettyWithLoc declProp
+            <> maybe Empty (either prettyWithLoc prettyWithLoc) declProp
           ) decls)
       <> prettyWithLoc r
 
