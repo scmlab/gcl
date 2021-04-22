@@ -3,13 +3,13 @@
 module Syntax.Abstract where
 
 import Data.Aeson
+import Data.Function (on)
 import Data.Loc
 import Data.Map (Map)
 import Data.Text (Text)
 import GHC.Generics (Generic)
+import Syntax.Common
 import Prelude hiding (Ordering (..))
-import Data.Function (on)
-import Syntax.Common 
 
 --------------------------------------------------------------------------------
 
@@ -34,7 +34,13 @@ data Program
 instance Located Program where
   locOf (Program _ _ _ _ l) = l
 
-type Defns = Map Name Expr
+data Defn = Defn
+  { defnName :: Name,
+    defnExpr :: Expr
+  }
+  deriving (Eq, Show)
+
+type Defns = Map Name Defn
 
 data Declaration
   = ConstDecl [Name] Type (Maybe Expr) Loc
@@ -74,10 +80,10 @@ extractAssertion (ConstDecl _ _ e _) = e
 extractAssertion (VarDecl _ _ e _) = e
 extractAssertion LetDecl {} = Nothing
 
-extractLetBinding :: Declaration -> Maybe (Name, Expr)
+extractLetBinding :: Declaration -> Maybe (Name, Defn)
 extractLetBinding ConstDecl {} = Nothing
 extractLetBinding VarDecl {} = Nothing
-extractLetBinding (LetDecl name args expr _) = Just (name, wrapLam (map nameToText args) expr)
+extractLetBinding (LetDecl name args expr _) = Just (name, Defn name (wrapLam (map nameToText args) expr))
 
 getGuards :: [GdCmd] -> [Expr]
 getGuards = fst . unzipGdCmds

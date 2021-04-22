@@ -61,7 +61,7 @@ ifInDefns :: DefsM m => Name -> (Expr -> m a) -> m a -> m a
 ifInDefns name f y = do
   defs <- askDefns
   case Map.lookup name defs of
-    Just e -> f e
+    Just e -> f (defnExpr e)
     Nothing -> y
 
 
@@ -87,7 +87,7 @@ freeSubst :: Subst -> Set Text
 freeSubst = Set.unions . Map.map free
 
 freeDefns :: Defns -> Set Text
-freeDefns = Set.unions . Map.map free
+freeDefns = Set.unions . Map.map (free . defnExpr)
 
 intersectSubst :: Set Text -> Subst -> Subst
 intersectSubst fs = Map.filterWithKey (const . (`elem` fs))
@@ -123,7 +123,7 @@ subst env v@(Var name _) = do
   --   _ -> subst env e'
   defs <- askDefns
   case Map.lookup name defs of
-    Just e  -> ifExpand (subst env e)
+    Just e  -> ifExpand (subst env (defnExpr e))
                 (return (applySubst v env))
     Nothing -> return $ fromMaybe v (Map.lookup (nameToText name) env)
 subst env c@(Const name  _) = do
@@ -135,7 +135,7 @@ subst env c@(Const name  _) = do
   --   _ -> subst env e'
   defs <- askDefns
   case Map.lookup name defs of
-    Just e  -> ifExpand (subst env e)
+    Just e  -> ifExpand (subst env (defnExpr e))
                 (return (applySubst c env))
     Nothing -> return $ fromMaybe c (Map.lookup (nameToText name) env)
 subst _   (Op    op l ) = return $ Op op l
