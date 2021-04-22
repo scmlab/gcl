@@ -32,7 +32,11 @@ instance FromJSON Loc where
   parseJSON = withObject "Loc" $ \v -> do
     result <- v .:? "tag" :: Parser (Maybe String)
     case result of
-      Just "Loc" -> Loc <$> v .: "start" <*> v .: "end"
+      Just "Loc" -> do 
+        positions <- (v .:? "contents") :: Parser (Maybe (Pos, Pos))
+        case positions of 
+          Just (start, end) -> return $ Loc start end 
+          Nothing -> return NoLoc
       _ -> return NoLoc
 
 --------------------------------------------------------------------------------
