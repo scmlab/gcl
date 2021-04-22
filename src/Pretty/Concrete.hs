@@ -12,7 +12,7 @@ import Data.Loc.Util (translateLoc)
 import Data.Text.Prettyprint.Doc (Pretty (pretty))
 import Pretty.Util
 import Pretty.Variadic
-import Syntax.Common (Fixity (..))
+import Syntax.Common
 import Syntax.Concrete
 import Prelude hiding (Ordering (..))
 import Syntax.Parser.Token

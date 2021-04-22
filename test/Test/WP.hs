@@ -14,6 +14,7 @@ import qualified LSP
 import qualified LSP.CustomMethod as LSP
 import Pretty ()
 import Syntax.Abstract
+import Syntax.Common
 import Syntax.Predicate
 import Test.Tasty
 import Test.Tasty.HUnit

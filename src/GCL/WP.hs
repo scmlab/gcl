@@ -20,10 +20,10 @@ import qualified Data.Map as Map
 import GCL.Expr (Fresh (freshVar))
 import qualified GCL.Expr as E
 import GHC.Generics
+import Syntax.Common (Name(..), nameToText)
 import Syntax.Abstract
   ( Defns,
     Expr,
-    Name,
     Stmt,
   )
 import qualified Syntax.Abstract as A
@@ -137,13 +137,13 @@ struct True inv (Just bnd) (A.Do gcmds l) post = do
       False
       ( Conjunct
           [ inv,
-            Bound (bnd `A.eqq` A.Var (A.Name oldbnd NoLoc) NoLoc) NoLoc,
+            Bound (bnd `A.eqq` A.Var (Name oldbnd NoLoc) NoLoc) NoLoc,
             guardLoop guard
           ]
       )
       Nothing
       body
-      (Bound (bnd `A.lt` A.Var (A.Name oldbnd NoLoc) NoLoc) NoLoc)
+      (Bound (bnd `A.lt` A.Var (Name oldbnd NoLoc) NoLoc) NoLoc)
 struct False inv _ (A.Do gcmds l) post = do
   let guards = A.getGuards gcmds
   obligate (Conjunct (inv : map (Negate . guardLoop) guards)) post (AtLoop l)
@@ -252,7 +252,7 @@ wp _ (A.Proof _) post = do
   return post -- banacorn: not sure if this is right
 
 assignmentEnv :: [Name] -> [Expr] -> A.Subst
-assignmentEnv xs es = Map.fromList (zip (map A.nameToText xs) es)
+assignmentEnv xs es = Map.fromList (zip (map nameToText xs) es)
 
 --------------------------------------------------------------------------------
 

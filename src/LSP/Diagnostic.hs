@@ -5,7 +5,6 @@ module LSP.Diagnostic where
 import Data.Loc
 import Data.Text (Text)
 import qualified Data.Text as Text
-import qualified Data.Text.Lazy as LazyText
 import Error (Error (..))
 import GCL.Type (TypeError (..))
 import GCL.WP (StructError (..), StructWarning (..))
@@ -30,7 +29,7 @@ instance ToDiagnostics Error where
   toDiagnostics _ = []
 
 instance ToDiagnostics TypeError where
-  toDiagnostics (NotInScope name loc) = [makeError loc "Not in scope" $ "The definition " <> LazyText.toStrict name <> " is not in scope"]
+  toDiagnostics (NotInScope name loc) = [makeError loc "Not in scope" $ "The definition " <> name <> " is not in scope"]
   toDiagnostics (UnifyFailed s t loc) =
     [ makeError loc "Cannot unify types" $
         renderStrict $

@@ -5,11 +5,11 @@ module Syntax.Abstract where
 import Data.Aeson
 import Data.Loc
 import Data.Map (Map)
-import Data.Text.Lazy (Text)
+import Data.Text (Text)
 import GHC.Generics (Generic)
-import Syntax.Common (Fixity (..))
 import Prelude hiding (Ordering (..))
 import Data.Function (on)
+import Syntax.Common 
 
 --------------------------------------------------------------------------------
 
@@ -150,29 +150,6 @@ instance FromJSON Expr
 wrapLam :: [Text] -> Expr -> Expr
 wrapLam [] body = body
 wrapLam (x : xs) body = Lam x (wrapLam xs body) NoLoc
-
---------------------------------------------------------------------------------
-
--- | Variables and stuff
-data Name = Name Text Loc
-  deriving (Show, Generic)
-
--- | Compare regardless of their locations 
-instance Eq Name where 
-  (==) = (==) `on` nameToText
-
-instance Located Name where
-  locOf (Name _ l) = l
-
-instance ToJSON Name
-
-instance FromJSON Name
-
-instance Ord Name where
-  compare (Name a _) (Name b _) = compare a b
-
-nameToText :: Name -> Text
-nameToText (Name x _) = x
 
 ----------------------------------------------------------------
 

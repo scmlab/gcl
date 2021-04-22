@@ -3,15 +3,15 @@
 module Test.Parser where
 
 import Data.Text.Prettyprint.Doc ( Pretty(pretty), defaultLayoutOptions, layoutPretty )
-import Data.Text.Prettyprint.Doc.Render.Text ( renderLazy )
+import Data.Text.Prettyprint.Doc.Render.Text ( renderStrict )
 
-import Data.Text.Lazy (Text)
-import qualified Data.Text.Lazy as Text
-import qualified Data.Text.Lazy.Encoding as Text
+import Data.Text (Text)
+import qualified Data.Text as Text
+import qualified Data.Text.Encoding as Text
 
-import Data.ByteString.Lazy (ByteString)
-import qualified Data.ByteString.Lazy as BS
-import qualified Data.ByteString.Lazy.Char8 as BS8
+import Data.ByteString (ByteString)
+import qualified Data.ByteString as BS
+import qualified Data.ByteString.Char8 as BS8
 
 import Error ( Error(..) )
 import qualified LSP 
@@ -38,6 +38,7 @@ import Control.Monad.Combinators (optional, many, (<|>), choice)
 import qualified Data.Ord as Ord
 import Control.Monad (void)
 import Syntax.Parser.Util (parser, (↓), getCurLoc)
+import qualified Data.ByteString.Lazy as BSL
 
 tests :: TestTree
 -- tests = testGroup "Prettifier" [declaration]
@@ -50,7 +51,7 @@ parse parser =
   runExcept . withExcept SyntacticError . liftEither . runParse parser "<test>" 
 
 render :: Pretty a => Either Error a -> Text
-render = renderLazy . layoutPretty defaultLayoutOptions . pretty
+render = renderStrict . layoutPretty defaultLayoutOptions . pretty
 
 
 isomorphic :: Pretty a => Parser a -> Text -> Assertion
@@ -312,11 +313,11 @@ golden =
         lastNonSpaceCharIndex = fromInteger . fst . BS8.foldl (\(acc, index) char -> if isSpace char then (acc, succ index) else (succ index, succ index)) (0, 0)
 
         stripEnd :: ByteString -> ByteString
-        stripEnd s = BS8.take (lastNonSpaceCharIndex s) s
+        stripEnd s = BS8.take (fromIntegral $ lastNonSpaceCharIndex s) s
 
     update :: (FilePath, FilePath, ByteString) -> IO ()
     update (filePath, fileName, input) = do
-      createDirectoriesAndWriteFile (filePath ++ "golden/" ++ fileName ++ ".ast.golden") (run input)
+      createDirectoriesAndWriteFile (filePath ++ "golden/" ++ fileName ++ ".ast.golden") (BSL.fromStrict $ run input)
 
     run :: ByteString -> ByteString
     run = Text.encodeUtf8 . render . parse pProgram . Text.decodeUtf8

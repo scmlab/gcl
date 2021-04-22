@@ -8,9 +8,9 @@ module Syntax.Concrete where
 
 import Data.Loc (Loc(..), Pos, (<-->), Located(locOf) )
 import Data.Map (Map)
-import Data.Text.Lazy (Text)
+import Data.Text (Text)
 import GHC.Generics (Generic)
-import Syntax.Common (Fixity(..))
+import Syntax.Common 
 import qualified Syntax.Abstract as A
 import qualified Syntax.ConstExpr as ConstExpr
 -- import Syntax.Parser.Lexer (Tok (..))
@@ -82,11 +82,11 @@ data Declaration
   deriving (Eq, Show)
 
 instance ToAbstract Declaration A.Declaration where
-  toAbstract (ConstDecl l (Decl (a, _, b))) = A.ConstDecl (toAbstract <$> fromSepBy a) (toAbstract b) Nothing (l <--> b)
-  toAbstract (ConstDeclWithProp x (Decl (a, _, b)) (DeclProp (_, c, r))) = A.ConstDecl (toAbstract <$> fromSepBy a) (toAbstract b) (Just $ toAbstract c) (x <--> r)
-  toAbstract (VarDecl l (Decl (a, _, b))) = A.VarDecl (toAbstract <$> fromSepBy a) (toAbstract b) Nothing (l <--> b)
-  toAbstract (VarDeclWithProp x (Decl (a, _, b)) (DeclProp (_, c, r))) = A.VarDecl (toAbstract <$> fromSepBy a) (toAbstract b) (Just $ toAbstract c) (x <--> r)
-  toAbstract (LetDecl l a b _ c) = A.LetDecl (toAbstract a) (map toAbstract b) (toAbstract c) (l <--> c)
+  toAbstract (ConstDecl l (Decl (a, _, b))) = A.ConstDecl (fromSepBy a) (toAbstract b) Nothing (l <--> b)
+  toAbstract (ConstDeclWithProp x (Decl (a, _, b)) (DeclProp (_, c, r))) = A.ConstDecl (fromSepBy a) (toAbstract b) (Just $ toAbstract c) (x <--> r)
+  toAbstract (VarDecl l (Decl (a, _, b))) = A.VarDecl (fromSepBy a) (toAbstract b) Nothing (l <--> b)
+  toAbstract (VarDeclWithProp x (Decl (a, _, b)) (DeclProp (_, c, r))) = A.VarDecl (fromSepBy a) (toAbstract b) (Just $ toAbstract c) (x <--> r)
+  toAbstract (LetDecl l a b _ c) = A.LetDecl a b (toAbstract c) (l <--> c)
 
 instance Located Declaration where
   locOf (ConstDecl l (Decl (_, _, r))) = l <--> r
@@ -100,9 +100,9 @@ data BlockDeclaration = BlockDecl (Token "{:") [(Decl, Maybe (Either DeclProp Ex
 instance ToAbstract BlockDeclaration [A.Declaration] where
   toAbstract (BlockDecl _ decls _) = map (\(Decl (a, _, b), declprop) ->
       case declprop of
-        Just (Left (DeclProp (_, c, r))) -> A.ConstDecl (toAbstract <$> fromSepBy a) (toAbstract b) (Just . toAbstract $ c) (a <--> r)
-        Just (Right prop) -> A.ConstDecl (toAbstract <$> fromSepBy a) (toAbstract b) (Just . toAbstract $ prop) (a <--> prop)
-        Nothing -> A.ConstDecl (toAbstract <$> fromSepBy a) (toAbstract b) Nothing (a <--> b)
+        Just (Left (DeclProp (_, c, r))) -> A.ConstDecl (fromSepBy a) (toAbstract b) (Just . toAbstract $ c) (a <--> r)
+        Just (Right prop) -> A.ConstDecl (fromSepBy a) (toAbstract b) (Just . toAbstract $ prop) (a <--> prop)
+        Nothing -> A.ConstDecl (fromSepBy a) (toAbstract b) Nothing (a <--> b)
     ) decls
 
 instance Located BlockDeclaration where
@@ -124,7 +124,7 @@ data Stmt
 instance ToAbstract Stmt A.Stmt where
   toAbstract (Skip l) = A.Skip l
   toAbstract (Abort l) = A.Abort l
-  toAbstract (Assign a _ b) = A.Assign (toAbstract <$> fromSepBy a) (toAbstract <$> fromSepBy b) (a <--> b)
+  toAbstract (Assign a _ b) = A.Assign (fromSepBy a) (toAbstract <$> fromSepBy b) (a <--> b)
   toAbstract (Assert l a r) = A.Assert (toAbstract a) (l <--> r)
   toAbstract (LoopInvariant l a _ _ _ b r) = A.LoopInvariant (toAbstract a) (toAbstract b) (l <--> r)
   toAbstract (Do l a r) = A.Do (toAbstract <$> fromSepBy a) (l <--> r)
@@ -219,7 +219,7 @@ instance ToAbstract Type A.Type where
   toAbstract (TBase a) = A.TBase (toAbstract a) (locOf a)
   toAbstract (TArray l a _ b) = A.TArray (toAbstract a) (toAbstract b) (l <--> b)
   toAbstract (TFunc a _ b) = A.TFunc (toAbstract a) (toAbstract b) (a <--> b)
-  toAbstract (TVar a) = A.TVar (toAbstract a) (locOf a)
+  toAbstract (TVar a) = A.TVar a (locOf a)
 
 instance Located Type where
   locOf (TParen l _ r) = l <--> r
@@ -266,8 +266,8 @@ instance ToAbstract Expr A.Expr where
   toAbstract x = case x of
     Paren _ a _ -> toAbstract a
     Lit a -> A.Lit (toAbstract a) (locOf x)
-    Var a -> A.Var (toAbstract a) (locOf x)
-    Const a -> A.Const (toAbstract a) (locOf x)
+    Var a -> A.Var a (locOf x)
+    Const a -> A.Const a (locOf x)
     Op a -> A.Op (toAbstract a) (locOf x)
     Chain a op b ->
       case a of
@@ -283,7 +283,7 @@ instance ToAbstract Expr A.Expr where
           A.App (A.App (toAbstract (Op op)) (toAbstract a) (a <--> op)) (toAbstract b) (locOf x)
     Arr arr _ i _ -> A.App (toAbstract arr) (toAbstract i) (locOf x)
     App a b -> A.App (toAbstract a) (toAbstract b) (locOf x)
-    Quant _ a b _ c _ d _ -> A.Quant (either (toAbstract . Op) toAbstract a) (fmap toAbstract b) (toAbstract c) (toAbstract d) (locOf x)
+    Quant _ a b _ c _ d _ -> A.Quant (either (toAbstract . Op) toAbstract a) b (toAbstract c) (toAbstract d) (locOf x)
 
 chainRightmost :: Expr -> Expr
 chainRightmost (Chain _ _ b) = chainRightmost b
@@ -303,21 +303,6 @@ instance Located Lit where
   locOf (LitInt _ l) = l
   locOf (LitBool _ l) = l
   locOf (LitChar _ l) = l
-
---------------------------------------------------------------------------------
-
--- | Names (both UPPER and LOWER cases)
-data Name = Name Text Loc
-  deriving (Eq, Show, Generic)
-
-instance Located Name where
-  locOf (Name _ l) = l
-
-instance ToAbstract Name A.Name where
-  toAbstract (Name a l) = A.Name a l
-
-nameToText :: Name -> Text
-nameToText (Name x _) = x
 
 --------------------------------------------------------------------------------
 

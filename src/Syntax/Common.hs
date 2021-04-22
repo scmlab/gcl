@@ -1,10 +1,37 @@
 {-# LANGUAGE OverloadedStrings #-}
 
+{-# LANGUAGE DeriveGeneric #-}
 module Syntax.Common where
 
 import Data.Aeson
 import Data.Aeson.Types (Parser)
 import Data.Loc
+import Data.Text (Text)
+import GHC.Generics (Generic)
+import Data.Function (on)
+
+--------------------------------------------------------------------------------
+
+-- | Variables and stuff
+data Name = Name Text Loc
+  deriving (Show, Generic)
+
+-- | Compare regardless of their locations 
+instance Eq Name where 
+  (==) = (==) `on` nameToText
+
+instance Located Name where
+  locOf (Name _ l) = l
+
+instance ToJSON Name
+
+instance FromJSON Name
+
+instance Ord Name where
+  compare (Name a _) (Name b _) = compare a b
+
+nameToText :: Name -> Text
+nameToText (Name x _) = x
 
 --------------------------------------------------------------------------------
 

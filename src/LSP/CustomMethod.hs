@@ -14,7 +14,6 @@ import Data.List (sort)
 import Data.Loc (Loc (..), Located (locOf), posCoff)
 import Data.Text (Text)
 import qualified Data.Text as Text
-import qualified Data.Text.Lazy as LazyText
 import Error
 import qualified GCL.Type as TypeChecking
 import GCL.WP (StructWarning)
@@ -122,7 +121,7 @@ asLocalError i program =
 
 -- | Parse with a parser
 parse :: Parser a -> FilePath -> Text -> M a
-parse p filepath = withExcept SyntacticError . liftEither . runParse p filepath . LazyText.fromStrict
+parse p filepath = withExcept SyntacticError . liftEither . runParse p filepath
 
 -- | Parse the whole program
 parseProgram :: FilePath -> Text -> M A.Program

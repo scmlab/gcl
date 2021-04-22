@@ -5,8 +5,8 @@ module Pretty.Abstract where
 import Data.Text.Prettyprint.Doc
 import Pretty.Util
 import Pretty.Variadic
-import Syntax.Common (Fixity (..))
 import Syntax.Abstract
+import Syntax.Common
 import Prelude hiding (Ordering (..))
 
 --------------------------------------------------------------------------------
@@ -93,14 +93,15 @@ instance Pretty GdCmd where
       <+> vsep (map pretty body)
 
 --------------------------------------------------------------------------------
--- | Literals
 
+-- | Literals
 instance Pretty Lit where
   pretty (Num i) = pretty $ show i
   pretty (Bol b) = pretty $ show b
   pretty (Chr c) = pretty $ show c
 
 --------------------------------------------------------------------------------
+
 -- | Expr
 instance Pretty Expr where
   pretty = prettyPrec 0
@@ -127,14 +128,14 @@ handleExpr _ (Lam p q _) = return $ "λ" <+> pretty p <+> "→" <+> pretty q
 handleExpr _ (Hole _) = return "{!!}"
 handleExpr _ (Quant op xs r t _) =
   return $
-      "⟨"
-        <> pretty op
-        <> mconcat (map pretty xs)
-        <> " : "
-        <> pretty r
-        <> " : "
-        <> pretty t
-        <> " ⟩"
+    "⟨"
+      <> pretty op
+      <> mconcat (map pretty xs)
+      <> " : "
+      <> pretty r
+      <> " : "
+      <> pretty t
+      <> " ⟩"
 handleExpr _ (Subst _ _) = return "Subst"
 
 --------------------------------------------------------------------------------
@@ -191,8 +192,7 @@ handleOp n op = case classify op of
     return $ parensIf n m $ pretty op <+> prettyPrec m p
   Postfix m -> do
     p <- var
-    return $ parensIf n m $ prettyPrec m p <+> pretty op 
-
+    return $ parensIf n m $ prettyPrec m p <+> pretty op
 
 --------------------------------------------------------------------------------
 

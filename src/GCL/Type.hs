@@ -2,18 +2,20 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module GCL.Type where
-import Syntax.Abstract
-import GHC.Generics (Generic)
+
+import Control.Monad.Except
+import Control.Monad.RWS hiding (Sum)
+import Data.Aeson (ToJSON)
+import Data.Loc
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
-import Data.Text.Lazy (Text)
-import qualified Data.Text.Lazy as Text
-import Data.Loc
-import Data.Aeson (ToJSON)
-import Control.Monad.Except
-import Control.Monad.RWS hiding (Sum)
+import Data.Text (Text)
+import qualified Data.Text as Text
+import GHC.Generics (Generic)
+import Syntax.Abstract
+import Syntax.Common
 import Prelude hiding (Ordering (..))
 
 type TM = Except TypeError
@@ -63,7 +65,7 @@ instance Substitutable Type where
   apply s (TFunc t1 t2 l) = TFunc (apply s t1) (apply s t2) l
   apply s t@(TVar (Name x _) _) = Map.findWithDefault t x s
 
-  fv (TBase _ _) = Set.empty 
+  fv (TBase _ _) = Set.empty
   fv (TArray _ t _) = fv t
   fv (TFunc t1 t2 _) = fv t1 `Set.union` fv t2
   fv (TVar (Name x _) _) = Set.singleton x
@@ -179,7 +181,7 @@ inferDecl env (LetDecl (Name n _) args expr _) = do
     expr' = foldr (\a e' -> Lam (nameToText a) e' (locOf e')) expr args
 
 instantiate :: Scheme -> Infer Type
-instantiate (ForallV vs t) = 
+instantiate (ForallV vs t) =
   flip apply t . Map.fromList . zip vs <$> mapM (const . fresh . locOf $ t) vs
 
 generalize :: TypeEnv -> Type -> Scheme
@@ -217,7 +219,7 @@ fresh l = flip TVar l . flip Name l <$> freshTVar
 ------------------------------------------
 
 checkName :: TypeEnv -> (Name, Expr) -> TM ()
-checkName env@(TypeEnv envM) (Name n l, expr) = 
+checkName env@(TypeEnv envM) (Name n l, expr) =
   case Map.lookup n envM of
     Nothing -> throwError $ NotInScope n l
     Just (ForallV _ t) -> do
@@ -262,14 +264,13 @@ checkStmt _ (SpecQM _) = return ()
 checkStmt _ (Spec _ _) = return ()
 checkStmt _ (Proof _) = return ()
 
-
 declsMap :: [Declaration] -> Map Name (Either Type Expr)
 declsMap [] = Map.empty
-declsMap (ConstDecl ns t _ _ : decls) = 
+declsMap (ConstDecl ns t _ _ : decls) =
   foldl (\m n -> Map.insert n (Left t) m) (declsMap decls) ns
-declsMap (VarDecl ns t _ _ : decls) = 
+declsMap (VarDecl ns t _ _ : decls) =
   foldl (\m n -> Map.insert n (Left t) m) (declsMap decls) ns
-declsMap (LetDecl n xs body _ : decls) = 
+declsMap (LetDecl n xs body _ : decls) =
   Map.insert n (Right expr') (declsMap decls)
   where
     expr' = foldr (\(Name x lx) b -> Lam x b (b <--> lx)) body xs
@@ -336,7 +337,7 @@ bind x t l
 -- helper functions
 ------------------------------------------
 
-litTypes :: Lit -> Loc -> Type 
+litTypes :: Lit -> Loc -> Type
 litTypes (Num _) l = TBase TInt l
 litTypes (Bol _) l = TBase TBool l
 litTypes (Chr _) l = TBase TChar l
@@ -357,6 +358,7 @@ opTypes Implies l = TFunc (TBase TBool l) (TFunc (TBase TBool l) (TBase TBool l)
 opTypes Conj l = TFunc (TBase TBool l) (TFunc (TBase TBool l) (TBase TBool l) l) l
 opTypes Disj l = TFunc (TBase TBool l) (TFunc (TBase TBool l) (TBase TBool l) l) l
 opTypes Neg l = TFunc (TBase TBool l) (TBase TBool l) l
+
 -- opTypes Sum l = _
 -- opTypes Forall l = _
 -- opTypes Exists l = _

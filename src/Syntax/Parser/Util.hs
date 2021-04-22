@@ -6,7 +6,7 @@
 {-# LANGUAGE NamedFieldPuns #-}
 module Syntax.Parser.Util where
 
-import Data.Text.Lazy (Text)
+import Data.Text (Text)
 import Text.Megaparsec (setParserState, MonadParsec(..),  unPos, SourcePos(..), errorOffset, Stream(..), ParseError(..), ParseErrorBundle(..), ShowErrorComponent, PosState(..), State (..), mkPos, Pos)
 import Text.Megaparsec.Error (parseErrorTextPretty)
 import Data.Loc (Loc(..), posCol)

@@ -3,7 +3,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Syntax.Parser.Token where
 
-import Data.Text.Lazy (Text)
+import Data.Text (Text)
 
 ------------------------------------------
 -- tokens 

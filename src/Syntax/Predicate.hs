@@ -9,13 +9,13 @@ import Data.Char (isUpper)
 
 import Data.Function (on)
 import Data.Loc
-import Data.Text.Lazy (Text)
-import qualified Data.Text.Lazy as Text
+import Data.Text (Text)
+import qualified Data.Text as Text
 import qualified GCL.Expr as E
 import GHC.Generics
+import Syntax.Common (Name)
 import Syntax.Abstract
   ( Expr,
-    Name,
     Subst,
   )
 import qualified Syntax.Abstract as A
