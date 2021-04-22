@@ -134,7 +134,7 @@ infer (App e1 e2 l) = do
   return v
 infer (Lam x e l) = do
   v <- fresh l
-  t <- inEnv [(x, ForallV [] v)] (infer e)
+  t <- inEnv [(nameToText x, ForallV [] v)] (infer e)
   return (TFunc v t l)
 infer (Hole l) = fresh l
 infer (Quant op iters rng t l) = do
@@ -149,7 +149,7 @@ infer (Quant op iters rng t l) = do
 infer (Subst expr sub) = do
   t <- infer expr
   s <- mapM infer sub
-  return $ apply s t
+  return $ apply (Map.mapKeys nameToText s) t
 
 inferExpr :: TypeEnv -> Expr -> TM Scheme
 inferExpr env e = do
@@ -178,7 +178,7 @@ inferDecl env (LetDecl (Name n _) args expr _) = do
   s <- inferExpr env expr'
   env `extend'` (n, s)
   where
-    expr' = foldr (\a e' -> Lam (nameToText a) e' (locOf e')) expr args
+    expr' = foldr (\a e' -> Lam a e' (locOf e')) expr args
 
 instantiate :: Scheme -> Infer Type
 instantiate (ForallV vs t) =
@@ -273,7 +273,7 @@ declsMap (VarDecl ns t _ _ : decls) =
 declsMap (LetDecl n xs body _ : decls) =
   Map.insert n (Right expr') (declsMap decls)
   where
-    expr' = foldr (\(Name x lx) b -> Lam x b (b <--> lx)) body xs
+    expr' = foldr (\x b -> Lam x b (b <--> locOf x)) body xs
 
 checkProg :: Program -> TM ()
 checkProg (Program decls exprs defs stmts _) = do

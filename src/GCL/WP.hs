@@ -20,7 +20,7 @@ import qualified Data.Map as Map
 import GCL.Expr (Fresh (freshVar))
 import qualified GCL.Expr as E
 import GHC.Generics
-import Syntax.Common (Name(..), nameToText)
+import Syntax.Common (Name(..))
 import Syntax.Abstract
   ( Defns,
     Expr,
@@ -252,7 +252,7 @@ wp _ (A.Proof _) post = do
   return post -- banacorn: not sure if this is right
 
 assignmentEnv :: [Name] -> [Expr] -> A.Subst
-assignmentEnv xs es = Map.fromList (zip (map nameToText xs) es)
+assignmentEnv xs es = Map.fromList (zip xs es)
 
 --------------------------------------------------------------------------------
 

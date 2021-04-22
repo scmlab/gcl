@@ -24,8 +24,10 @@ instance Located Name where
   locOf (Name _ l) = l
 
 instance ToJSON Name
+instance ToJSONKey Name
 
 instance FromJSON Name
+instance FromJSONKey Name
 
 instance Ord Name where
   compare (Name a _) (Name b _) = compare a b

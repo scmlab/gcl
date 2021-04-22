@@ -3,7 +3,6 @@
 module Syntax.Abstract where
 
 import Data.Aeson
-import Data.Function (on)
 import Data.Loc
 import Data.Map (Map)
 import Data.Text (Text)
@@ -83,7 +82,7 @@ extractAssertion LetDecl {} = Nothing
 extractLetBinding :: Declaration -> Maybe (Text, Defn)
 extractLetBinding ConstDecl {} = Nothing
 extractLetBinding VarDecl {} = Nothing
-extractLetBinding (LetDecl name args expr _) = Just (nameToText name, Defn name (wrapLam (map nameToText args) expr))
+extractLetBinding (LetDecl name args expr _) = Just (nameToText name, Defn name (wrapLam args expr))
 
 getGuards :: [GdCmd] -> [Expr]
 getGuards = fst . unzipGdCmds
@@ -141,19 +140,19 @@ data Expr
   | Const Name Loc
   | Op Op Loc
   | App Expr Expr Loc
-  | Lam Text Expr Loc
+  | Lam Name Expr Loc
   | Hole Loc
   | Quant Expr [Name] Expr Expr Loc
   | Subst Expr Subst -- internal. Location not necessary?
   deriving (Eq, Show, Generic)
 
-type Subst = Map Text Expr
+type Subst = Map Name Expr
 
 instance ToJSON Expr
 
 instance FromJSON Expr
 
-wrapLam :: [Text] -> Expr -> Expr
+wrapLam :: [Name] -> Expr -> Expr
 wrapLam [] body = body
 wrapLam (x : xs) body = Lam x (wrapLam xs body) NoLoc
 
