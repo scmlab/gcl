@@ -5,11 +5,8 @@
 
 module LSP.Handler (handlers) where
 
-import Control.Monad.Except hiding (guard)
 import qualified Data.Aeson as JSON
-import Data.Loc (Loc (..), posCol)
 import Data.Text (Text, pack)
-import qualified Data.Text as Text
 import Error
 import GCL.Expr (expand, runSubstM)
 import LSP.CustomMethod
@@ -24,6 +21,7 @@ import qualified Syntax.Abstract as A
 import Syntax.Predicate
   ( Spec (..),
   )
+import qualified Data.Text as Text
 
 -- handlers of the LSP server
 handlers :: Handlers ServerM
@@ -115,27 +113,18 @@ handlers =
                     case result' of
                       Nothing -> return [ResConsoleLog "no source"]
                       Just source' -> do
-                        logText source'
-                        let f = do
-                              spec <- findPointedSpec filepath source' (selStart, selEnd)
-                              case spec of
-                                Nothing -> throwError $ Others "Cannot find pointed spec"
-                                Just spec' -> do
-                                  let payload = getSpecPayload source' spec'
-                                  let indentationOfSpec = case specLoc spec' of
-                                        NoLoc -> 0
-                                        Loc pos _ -> posCol pos - 1
-                                  let indentedPayload = Text.intercalate ("\n" <> Text.replicate indentationOfSpec " ") payload
-                                  _ <- refine indentedPayload
-                                  return (spec', indentedPayload)
-                        case runM f of
+                        -- logText source'
+                        case runM (refine filepath source' (selStart, selEnd)) of
                           Left err -> do
                             sendDiagnostics filepath 0 (toDiagnostics err)
                             return [ResError [globalError err]]
-                          Right (spec, indentedPayload) -> do
-                            let removeSpecOpen = TextEdit (locToRange (specLoc spec)) indentedPayload
+                          Right (spec, payload) -> do
+                            logText " *** [ Refine ] Payload of the spec:"
+                            logText payload
+                            -- replace the Spec with its parsed payload
+                            let removeSpec = TextEdit (locToRange (specLoc spec)) (Text.stripStart payload)
                             let identifier = VersionedTextDocumentIdentifier (filePathToUri filepath) (Just 0)
-                            let textDocumentEdit = TextDocumentEdit identifier (List [InL removeSpecOpen])
+                            let textDocumentEdit = TextDocumentEdit identifier (List [InL removeSpec])
                             let change = InL textDocumentEdit
                             let workspaceEdit = WorkspaceEdit Nothing (Just (List [change])) Nothing
                             let applyWorkspaceEditParams = ApplyWorkspaceEditParams (Just "Resolve Spec") workspaceEdit

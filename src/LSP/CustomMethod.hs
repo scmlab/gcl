@@ -8,7 +8,6 @@ module LSP.CustomMethod where
 
 import Control.Monad.Except hiding (guard)
 import Data.Aeson (FromJSON, ToJSON)
-import qualified Data.Char as Char
 import Data.Foldable (find)
 import Data.List (sort)
 import Data.Loc (Loc (..), Located (locOf), posCoff)
@@ -28,7 +27,7 @@ import Syntax.Parser
 import Syntax.Predicate
   ( Origin (..),
     PO (..),
-    Spec (..),
+    Spec (..), specPayload
   )
 
 --------------------------------------------------------------------------------
@@ -131,8 +130,29 @@ parseProgramC :: FilePath -> Text -> M C.Program
 parseProgramC = parse pProgram
 
 -- | Try to parse a piece of text in a Spec
-refine :: Text -> M ()
-refine = void . parse pStmts "<specification>"
+refine :: FilePath -> Text -> (Int, Int) -> M (Spec, Text)
+refine filepath source selection = do 
+  result <- findPointedSpec
+  case result of
+    Nothing -> 
+      throwError $ Others "Cannot find pointed spec"
+    Just spec -> do
+      -- 
+      let payload = Text.unlines $ specPayload source spec
+      void $ parse pStmts "<specification>" payload
+      return (spec, payload)
+  where 
+    findPointedSpec :: M (Maybe Spec)
+    findPointedSpec = do
+      (_, specs, _) <- parseProgram filepath source >>= genPO
+      return $ find (pointed selection) specs
+      where
+        pointed :: (Int, Int) -> Spec -> Bool
+        pointed (start, end) spec = case specLoc spec of
+          NoLoc -> False
+          Loc open close ->
+            (posCoff open <= start && start <= posCoff close)
+              || (posCoff open <= end && end <= posCoff close)
 
 -- | Type check + generate POs and Specs
 checkEverything :: FilePath -> Text -> Maybe (Int, Int) -> M ([PO], [Spec], [A.Expr], [StructWarning])
@@ -149,34 +169,6 @@ typeCheck = withExcept TypeError . TypeChecking.checkProg
 
 genPO :: A.Program -> M ([PO], [Spec], [StructWarning])
 genPO = withExcept StructError . liftEither . POGen.sweep
-
-tempGetSpecPositions :: FilePath -> Text -> M [Loc]
-tempGetSpecPositions filepath source = do
-  (_, specs, _) <- parseProgram filepath source >>= genPO
-  return (map specLoc specs)
-
-findPointedSpec :: FilePath -> Text -> (Int, Int) -> M (Maybe Spec)
-findPointedSpec filepath source selection = do
-  (_, specs, _) <- parseProgram filepath source >>= genPO
-  return $ find (pointed selection) specs
-  where
-    pointed :: (Int, Int) -> Spec -> Bool
-    pointed (start, end) spec = case specLoc spec of
-      NoLoc -> False
-      Loc open close ->
-        (posCoff open <= start && start <= posCoff close)
-          || (posCoff open <= end && end <= posCoff close)
-
-getSpecPayload :: Text -> Spec -> [Text]
-getSpecPayload source spec = case specLoc spec of
-  NoLoc -> mempty
-  Loc start end ->
-    let payload = Text.drop (posCoff start) $ Text.take (posCoff end) source
-        indentedLines = init $ tail $ Text.lines payload
-        splittedIndentedLines = map (Text.break (not . Char.isSpace)) indentedLines
-        smallestIndentation = minimum $ map (Text.length . fst) splittedIndentedLines
-        trimmedLines = map (\(indentation, content) -> Text.drop smallestIndentation indentation <> content) splittedIndentedLines
-     in trimmedLines
 
 --------------------------------------------------------------------------------
 

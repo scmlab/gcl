@@ -19,6 +19,7 @@ import Syntax.Abstract
     Subst,
   )
 import qualified Syntax.Abstract as A
+import qualified Data.Char as Char
 
 --------------------------------------------------------------------------------
 
@@ -83,10 +84,10 @@ assertion x = Assertion x NoLoc
 loopInvariant :: Expr -> Text -> Pred
 loopInvariant x b = LoopInvariant x (bnd b) NoLoc
   where
-    bnd =
-      if Text.null b
-        then A.variable
-        else if isUpper (Text.head b) then A.constant else A.variable
+    bnd
+      | Text.null b = A.variable
+      | isUpper (Text.head b) = A.constant
+      | otherwise = A.variable
 
 guardIf :: Expr -> Pred
 guardIf x = GuardIf x NoLoc
@@ -252,3 +253,21 @@ data Spec = Specification
     specLoc :: Loc
   }
   deriving (Eq, Show, Generic)
+
+
+-- | Return lines within a Spec without indentation
+specPayload :: Text -> Spec -> [Text]
+specPayload source spec = case specLoc spec of
+  NoLoc -> mempty
+  Loc start end ->
+    let payload = Text.drop (posCoff start) $ Text.take (posCoff end) source
+     in init $ tail $ Text.lines payload
+
+-- | Return lines within a Spec without indentation
+specPayloadWithoutIndentation :: Text -> Spec -> [Text]
+specPayloadWithoutIndentation source spec = 
+  let linesWithIndentation = specPayload source spec
+      splittedIndentedLines = map (Text.break (not . Char.isSpace)) linesWithIndentation
+      smallestIndentation = minimum $ map (Text.length . fst) splittedIndentedLines
+      trimmedLines = map (\(indentation, content) -> Text.drop smallestIndentation indentation <> content) splittedIndentedLines
+  in trimmedLines
