@@ -62,7 +62,12 @@ pBlockDeclaration =
     d = Lex.lineFold scn (\sc' -> (,) <$> (↓) (pDecl upperName) sc' <*> (↓) (optional (eitherP pDeclProp pExpr')) sc')
     p = do
       bs <- (↓) lexDeclStart sc
-      return (Lex.IndentMany Nothing (\ds -> BlockDecl bs ds <$> (↓) lexDeclEnd scn) d)
+      d0 <- (try . optional) (scn >> ((,) <$> Lex.indentLevel <*> d)) <|> return Nothing
+      case d0 of
+        Just (pos, decl0) -> 
+          return (Lex.IndentMany (Just pos) (\ds -> BlockDecl bs (decl0 : ds) <$> (↓) lexDeclEnd scn) d)
+        Nothing -> do
+          return (Lex.IndentMany Nothing (\ds -> BlockDecl bs ds <$> (↓) lexDeclEnd scn) d)
 
 pDecl :: ParserF Name -> ParserF Decl
 pDecl name = Decl <$> (do
@@ -406,7 +411,7 @@ pIndentSepBy ::
 pIndentSepBy start end (p, delim) = do
   ref <- Lex.indentLevel
   -- parse start token and guard the indentation level
-  ts <- (↓) start sc
+  ts <- (↓) start scn
 
   -- start parsing p
   ps <- parseP ref

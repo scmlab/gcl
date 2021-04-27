@@ -34,14 +34,14 @@ import Syntax.Parser.Token
 import Syntax.Concrete (Type(..), TBase (..),ToAbstract (toAbstract), Program (..), Expr(..))
 import Data.Loc (Located(locOf))
 import Text.Megaparsec (Stream(reachOffset), setOffset, getOffset, MonadParsec(updateParserState, getParserState, observing, lookAhead, try, eof), State(State, statePosState, stateInput, stateOffset), getInput, getSourcePos)
-import Control.Monad.Combinators (optional, many, (<|>), choice)
+import Control.Monad.Combinators (optional, many, (<|>), choice, eitherP)
 import qualified Data.Ord as Ord
 import Control.Monad (void)
 import Syntax.Parser.Util (parser, (↓), getCurLoc)
 
 tests :: TestTree
--- tests = testGroup "Prettifier" [declaration]
-tests = testGroup "Prettifier" [expression, type', declaration, statement, parseError, golden]
+tests = testGroup "Prettifier" [myTest]
+-- tests = testGroup "Prettifier" [expression, type', declaration, statement, parseError, golden]
 
 --------------------------------------------------------------------------------
 
@@ -73,24 +73,27 @@ myTest =
     "parse test"
     [
       testCase "1" $ run
-        "con N : Int\n\
-        \con A : array (0 .. N] of Int\n\
+        "{:\n\
+        \  \n\
+        \:}\n\
+        \con A, B : Int\n",
+      testCase "2" $ run
+        "con A, B : Int\n\
         \{:\n\
-        \    X, Y : Int \n\
-        \      X > 0\n\
-        \    Z : array (0 .. N] of Bool\n\
+        \  \n\
         \:}\n"
 
       -- testCase "2" $ run
       --   "= +"
     ]
     where
-      run t = show (parse pProgram t) @?= ""
-      wrap = (↓) (do
-        v <- pVar
-        eq <- notFollowedBySymbol lexEQ
-        q <- pQuant 
-        return (App (App (Op eq) v) q)) scn
+      run t = show (parse wrap t) @?= ""
+      wrap = do
+        decls <- many (eitherP pDeclaration pBlockDeclaration)
+        return . map (either (\d -> [toAbstract d]) toAbstract) $ decls
+        -- return $ foldr (\decl ds -> either (\d -> toAbstract d : ds) (\b -> toAbstract b ++ ds) decl) [] decls
+        
+      d = Lex.lineFold scn (\sc' -> (,) <$> (↓) (pDecl upperName) sc' <*> (↓) (optional (eitherP pDeclProp pExpr')) sc')
 
      -- dawn surround ritual toward fun planet affair friend edge soap news marble 
 

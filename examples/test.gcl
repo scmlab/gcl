@@ -1,0 +1,18 @@
+con A, B : Int
+
+{:
+  A, B : Int
+:}
+
+var even, odd : Int -> Bool
+var x, y, z : Int
+
+x, y, z := A, B, 0
+{ x * y + z = A * B, bnd: y }
+do 
+  x = 0 ->
+    skip
+ 
+
+od
+{ z = A * B }

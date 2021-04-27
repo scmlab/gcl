@@ -59,7 +59,7 @@ data Program
 
 instance ToAbstract Program A.Program where
   toAbstract (Program decls' stmts) =
-    let decls = concat $ mapM (either ((:[]) . toAbstract) toAbstract) decls'
+    let decls = concatMap (either ((:[]) . toAbstract) toAbstract) decls'
         letBindings = ConstExpr.pickLetBindings decls
         (globProps, assertions) = ConstExpr.pickGlobals decls
         pre = [A.Assert (A.conjunct assertions) NoLoc | not (null assertions)]
