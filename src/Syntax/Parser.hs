@@ -9,7 +9,7 @@ import Control.Monad.Combinators.Expr (Operator (..), makeExprParser)
 import Data.Loc (Located (locOf))
 import Data.Text.Lazy (Text)
 import qualified Data.Ord as Ord
-import Syntax.Concrete (Declaration (..), EndpointClose (..), EndpointOpen (..), Expr (..), GdCmd (..), Interval (..), Name (..), Op (..), Program (..), SepBy (..), Stmt (..), TBase (..), Token (..), Type (..), Decl(..), DeclProp (..), BlockDeclaration (..))
+import Syntax.Concrete (Declaration (..), EndpointClose (..), EndpointOpen (..), Expr (..), GdCmd (..), Interval (..), Name (..), Op (..), Program (..), SepBy (..), Stmt (..), TBase (..), Token (..), Type (..), Decl(..), DeclProp (..), BlockDeclaration (..), DeclBody (..), BlockDecl (..))
 import Syntax.Parser.Lexer
 import Syntax.Parser.Util
 import Text.Megaparsec (MonadParsec (..), parse, (<?>), anySingle, Pos, tokensToChunk, unPos, mkPos)
@@ -55,70 +55,80 @@ pDeclaration = Lex.lineFold scn (parser p)
         <* lift scn
         <?> "declaration"
 
-pBlockDeclaration :: Parser BlockDeclaration 
-pBlockDeclaration = 
+pBlockDeclaration :: Parser BlockDeclaration
+pBlockDeclaration =
   Lex.indentBlock scn p
   where
-    d = Lex.lineFold scn (\sc' -> (,) <$> (↓) (pDecl upperName) sc' <*> (↓) (optional (eitherP pDeclProp pExpr')) sc')
     p = do
       bs <- (↓) lexDeclStart sc
-      d0 <- (try . optional) (scn >> ((,) <$> Lex.indentLevel <*> d)) <|> return Nothing
+      d0 <- (try . optional) (scn >> ((,) <$> Lex.indentLevel <*> pBlockDecl)) <|> return Nothing
       case d0 of
-        Just (pos, decl0) -> 
-          return (Lex.IndentMany (Just pos) (\ds -> BlockDecl bs (decl0 : ds) <$> (↓) lexDeclEnd scn) d)
+        Just (pos, decl0) ->
+          return (Lex.IndentMany (Just pos) (\ds -> BlockDeclaration bs (decl0 : ds) <$> (↓) lexDeclEnd scn) pBlockDecl)
         Nothing -> do
-          return (Lex.IndentMany Nothing (\ds -> BlockDecl bs ds <$> (↓) lexDeclEnd scn) d)
-
-pDecl :: ParserF Name -> ParserF Decl
-pDecl name = Decl <$> (do
-    ns <- pList name
-    col <- lexColon
-    t <- pType'
-    return (ns, col, t)
-  )
-
-pDeclProp :: ParserF DeclProp
-pDeclProp = DeclProp <$> (do
-    l <- lexBraceStart
-    p <- pExpr'
-    r <- lexBraceEnd
-    return (l, p, r)
-  )
+          return (Lex.IndentMany Nothing (\ds -> BlockDeclaration bs ds <$> (↓) lexDeclEnd scn) pBlockDecl)
 
 pConstDecl :: ParserF Declaration
 pConstDecl =
   ConstDecl
-    <$> lexCon
-    <*> pDecl upperName
+  <$> lexCon
+  <*> pDecl upperName
 
 pConstDeclWithProp :: ParserF Declaration
 pConstDeclWithProp =
   ConstDeclWithProp
-    <$> lexCon
-    <*> pDecl upperName
-    <*> pDeclProp
+  <$> lexCon
+  <*> pDecl upperName
+  <*> pDeclProp
 
 pVarDecl :: ParserF Declaration
 pVarDecl =
   VarDecl
-    <$> lexVar
-    <*> pDecl lowerName
+  <$> lexVar
+  <*> pDecl lowerName
 
 pVarDeclWithProp :: ParserF Declaration
 pVarDeclWithProp =
   VarDeclWithProp
-    <$> lexVar
-    <*> pDecl lowerName
-    <*> pDeclProp
+  <$> lexVar
+  <*> pDecl lowerName
+  <*> pDeclProp
 
 pLetDecl :: ParserF Declaration
 pLetDecl =
   LetDecl
-    <$> lexLet
-    <*> upperName
-    <*> many lowerName
-    <*> lexEQ'
-    <*> pExpr'
+  <$> lexLet
+  <*> pDeclBody
+
+pDecl :: ParserF Name -> ParserF Decl
+pDecl name =
+  Decl
+  <$> pList name
+  <*> lexColon
+  <*> pType'
+
+pDeclProp :: ParserF DeclProp
+pDeclProp =
+  DeclProp
+  <$> lexBraceStart
+  <*> pExpr'
+  <*> lexBraceEnd
+
+pDeclBody :: ParserF DeclBody
+pDeclBody =
+  DeclBody 
+  <$> upperName
+  <*> many lowerName
+  <*> lexEQ'
+  <*> pExpr'
+
+pBlockDecl :: Parser BlockDecl
+pBlockDecl = do
+  ref <- Lex.indentLevel
+  (decl, mDeclProp) <- Lex.lineFold scn (\sc' -> (,) <$> (↓) (pDecl upperName) sc' <*> (↓) (optional (eitherP pDeclProp pExpr')) sc') 
+  mDeclBody <- (try . optional) (Lex.indentGuard scn Ord.EQ ref >> (↓) pDeclBody sc) <|> return Nothing
+  return $ BlockDecl decl mDeclProp mDeclBody
+
 
 ------------------------------------------
 -- parse Stmt
@@ -129,7 +139,7 @@ pStmts = many (pStmt <* scn) <?> "statements"
 
 -- NOTE :: this function doesn't consume newline after finish parsing the statement
 pStmt :: Parser Stmt
-pStmt = Lex.lineFold scn ((↓) pStmt') <?> "statement"
+pStmt = Lex.lineFold scn (pStmt' ↓) <?> "statement"
 
 pStmt' :: ParserF Stmt
 pStmt' =
@@ -184,7 +194,7 @@ pGdCmd :: ParserF GdCmd
 pGdCmd = do
   gd <- pExpr'
   arrow <- lexArrow
-  pos <- Lex.indentLevel 
+  pos <- Lex.indentLevel
   stmt0 <- lift pStmt
   -- check if is end of line, e.g. have statements more than one
   isEol <- optional . try . lift $ eol
@@ -219,7 +229,7 @@ pType :: Parser Type
 pType = (↓) pType' scn <?> "type"
 
 pType' :: ParserF Type
-pType' = makeExprParser pType'Term [[InfixR pFunction]] <* 
+pType' = makeExprParser pType'Term [[InfixR pFunction]] <*
   (↑) (\sc' -> try sc' <|> sc) <?> "type"
 
 pType'Term :: ParserF Type
@@ -306,7 +316,7 @@ pParen = Paren <$> lexParenStart <*> pExpr' <*> lexParenEnd
 
 -- Allow A[A[i]]
 pArray :: ParserF Expr
-pArray = Arr <$> pTerm' <*> lexBracketStart <*> pTerm <*> lexBracketEnd 
+pArray = Arr <$> pTerm' <*> lexBracketStart <*> pTerm <*> lexBracketEnd
 
 pLit :: ParserF Expr
 pLit = Lit <$> lexLits
@@ -377,11 +387,11 @@ pSepBy delim p = do
 pList :: ParserF a -> ParserF (SepBy tokComma a)
 pList = pSepBy lexComma
 
-pIfoDoHelper :: 
+pIfoDoHelper ::
   ParserF (Token s)
   -> ParserF (Token e)
   -> Parser (Token s, SepBy sep GdCmd, Token e)
-pIfoDoHelper start end = 
+pIfoDoHelper start end =
   pIndentSepBy start end (pGdCmd, lexGuardBar)
 
 
@@ -427,7 +437,7 @@ pIndentSepBy start end (p, delim) = do
       x <- (↓) p . void $ Lex.indentGuard scn Ord.GT ref
       let g = do
             delimPos <- Lex.indentGuard scn Ord.GT ref
-            if compare delimPos gdPos == Ord.LT 
+            if compare delimPos gdPos == Ord.LT
               then Delim x <$> (↓) delim sc <*> parseP' gdPos delimPos ref
               else Lex.incorrectIndent Ord.LT gdPos delimPos
       try g <|> return (Head x)

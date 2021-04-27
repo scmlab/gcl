@@ -68,45 +68,79 @@ instance ToAbstract Program A.Program where
 instance Located Program where
   locOf (Program a b) = a <--> b
 
-type Defns = Map Text Expr
+data Decl = Decl (SepBy "," Name) (Token ":") Type deriving (Eq, Show)
 
-newtype Decl = Decl (SepBy "," Name, Token ":", Type) deriving (Eq, Show)
-newtype DeclProp = DeclProp (Token "{", Expr, Token "}") deriving (Eq, Show)
+instance ToAbstract Decl ([A.Name], A.Type) where
+  toAbstract (Decl a _ b) = (toAbstract <$> fromSepBy a, toAbstract b)
+
+instance Located Decl where
+  locOf (Decl l _ r) = l <--> r
+
+data DeclProp = DeclProp (Token "{") Expr (Token "}") deriving (Eq, Show)
+
+instance ToAbstract DeclProp A.Expr where
+  toAbstract (DeclProp _ e _) = toAbstract e
+
+instance Located DeclProp where
+  locOf (DeclProp l _ r) = l <--> r
+
+data DeclBody = DeclBody Name [Name] (Token "=") Expr deriving (Eq, Show)
+
+instance ToAbstract DeclBody (A.Name, [A.Name], A.Expr)  where
+  toAbstract (DeclBody n args _ b) = (toAbstract n, map toAbstract args, toAbstract b)
+
+instance Located DeclBody where
+  locOf (DeclBody l _ _ r) = l <--> r
 
 data Declaration
   = ConstDecl (Token "con") Decl
   | ConstDeclWithProp (Token "con") Decl DeclProp
   | VarDecl (Token "var") Decl
   | VarDeclWithProp (Token "var") Decl DeclProp
-  | LetDecl (Token "let") Name [Name] (Token "=") Expr
+  | LetDecl (Token "let") DeclBody
   deriving (Eq, Show)
 
 instance ToAbstract Declaration A.Declaration where
-  toAbstract (ConstDecl l (Decl (a, _, b))) = A.ConstDecl (toAbstract <$> fromSepBy a) (toAbstract b) Nothing (l <--> b)
-  toAbstract (ConstDeclWithProp x (Decl (a, _, b)) (DeclProp (_, c, r))) = A.ConstDecl (toAbstract <$> fromSepBy a) (toAbstract b) (Just $ toAbstract c) (x <--> r)
-  toAbstract (VarDecl l (Decl (a, _, b))) = A.VarDecl (toAbstract <$> fromSepBy a) (toAbstract b) Nothing (l <--> b)
-  toAbstract (VarDeclWithProp x (Decl (a, _, b)) (DeclProp (_, c, r))) = A.VarDecl (toAbstract <$> fromSepBy a) (toAbstract b) (Just $ toAbstract c) (x <--> r)
-  toAbstract (LetDecl l a b _ c) = A.LetDecl (toAbstract a) (map toAbstract b) (toAbstract c) (l <--> c)
+  toAbstract (ConstDecl l decl) = uncurry A.ConstDecl (toAbstract decl) Nothing (l <--> decl)
+  toAbstract (ConstDeclWithProp x decl prop) = uncurry A.ConstDecl (toAbstract decl)(Just $ toAbstract prop) (x <--> prop)
+  toAbstract (VarDecl l decl) = uncurry A.VarDecl (toAbstract decl) Nothing (l <--> decl)
+  toAbstract (VarDeclWithProp x decl prop) = uncurry A.VarDecl (toAbstract decl) (Just $ toAbstract prop) (x <--> prop)
+  toAbstract (LetDecl l declBody) = uncurry3 A.LetDecl (toAbstract declBody) (l <--> declBody)
+    where
+      uncurry3 f (a, b, c) = f a b c
 
 instance Located Declaration where
-  locOf (ConstDecl l (Decl (_, _, r))) = l <--> r
-  locOf (ConstDeclWithProp l _ (DeclProp (_, _, r))) = l <--> r
-  locOf (VarDecl l (Decl (_, _, r))) = l <--> r
-  locOf (VarDeclWithProp l _ (DeclProp (_, _, r))) = l <--> r
-  locOf (LetDecl l _ _ _ r) = l <--> r
+  locOf (ConstDecl l r) = l <--> r
+  locOf (ConstDeclWithProp l _ r) = l <--> r
+  locOf (VarDecl l r) = l <--> r
+  locOf (VarDeclWithProp l _ r) = l <--> r
+  locOf (LetDecl l r) = l <--> r
 
-data BlockDeclaration = BlockDecl (Token "{:") [(Decl, Maybe (Either DeclProp Expr))] (Token ":}") deriving (Eq, Show)
+data BlockDecl = BlockDecl Decl (Maybe (Either DeclProp Expr)) (Maybe DeclBody) deriving (Eq, Show)
+
+-- One BlockDecl can be parse into a ConstDecl or a ConstDecl and a LetDecl
+instance ToAbstract BlockDecl [A.Declaration] where
+  toAbstract (BlockDecl decl mDeclProp mDeclBody) = 
+    let constDecl = uncurry (uncurry A.ConstDecl (toAbstract decl)) $
+            case mDeclProp of
+              Just (Left declProp) ->  ((Just . toAbstract) declProp, decl <--> declProp)
+              Just (Right prop) -> ((Just . toAbstract) prop, decl <--> prop) 
+              Nothing -> (Nothing, locOf decl) 
+    in
+    constDecl : maybe [] (\declBody -> [uncurry3 A.LetDecl (toAbstract declBody) (locOf declBody)]) mDeclBody
+    where
+      uncurry3 f (a, b, c) = f a b c
+
+instance Located BlockDecl where
+  locOf (BlockDecl l _ r) = l <--> r
+
+data BlockDeclaration = BlockDeclaration (Token "{:") [BlockDecl] (Token ":}") deriving (Eq, Show)
 
 instance ToAbstract BlockDeclaration [A.Declaration] where
-  toAbstract (BlockDecl _ decls _) = map (\(Decl (a, _, b), declprop) ->
-      case declprop of
-        Just (Left (DeclProp (_, c, r))) -> A.ConstDecl (toAbstract <$> fromSepBy a) (toAbstract b) (Just . toAbstract $ c) (a <--> r)
-        Just (Right prop) -> A.ConstDecl (toAbstract <$> fromSepBy a) (toAbstract b) (Just . toAbstract $ prop) (a <--> prop)
-        Nothing -> A.ConstDecl (toAbstract <$> fromSepBy a) (toAbstract b) Nothing (a <--> b)
-    ) decls
+  toAbstract (BlockDeclaration _ decls _) = concatMap toAbstract decls
 
 instance Located BlockDeclaration where
-  locOf (BlockDecl l _ r) = l <--> r
+  locOf (BlockDeclaration l _ r) = l <--> r
 
 data Stmt
   = Skip Loc

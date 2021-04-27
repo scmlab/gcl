@@ -149,7 +149,7 @@ instance Pretty Decl where
   pretty = toDoc . prettyWithLoc
 
 instance PrettyWithLoc Decl where
-  prettyWithLoc (Decl (names, colon, t)) =
+  prettyWithLoc (Decl names colon t) =
     prettyWithLoc names
     <> prettyWithLoc colon
     <> prettyWithLoc t
@@ -158,10 +158,20 @@ instance Pretty DeclProp where
   pretty = toDoc . prettyWithLoc
 
 instance PrettyWithLoc DeclProp where
-  prettyWithLoc (DeclProp (l, p, r)) =
+  prettyWithLoc (DeclProp l p r) =
     prettyWithLoc l
     <> prettyWithLoc p
     <> prettyWithLoc r
+
+instance Pretty DeclBody where
+  pretty = toDoc . prettyWithLoc
+
+instance PrettyWithLoc DeclBody where
+  prettyWithLoc (DeclBody n args e b) =
+    prettyWithLoc n
+    <> mconcat (map prettyWithLoc args)
+    <> prettyWithLoc e
+    <> prettyWithLoc b
 
 instance Pretty Declaration where
   pretty = toDoc . prettyWithLoc
@@ -178,22 +188,25 @@ instance PrettyWithLoc Declaration where
     prettyWithLoc v <> prettyWithLoc decl 
   prettyWithLoc (VarDeclWithProp v decl declprop) =
     prettyWithLoc v <> prettyWithLoc decl <> prettyWithLoc declprop 
-  prettyWithLoc (LetDecl a name args e expr) =
+  prettyWithLoc (LetDecl a declBody) =
     prettyWithLoc a
-      <> prettyWithLoc name
-      <> mconcat (map prettyWithLoc args)
-      <> prettyWithLoc e
-      <> prettyWithLoc expr
+      <> prettyWithLoc declBody
+
+instance Pretty BlockDecl where
+  pretty = toDoc . prettyWithLoc
+
+instance PrettyWithLoc BlockDecl where
+  prettyWithLoc (BlockDecl decl mDeclProp mDeclBody) = 
+    prettyWithLoc decl
+    <> maybe Empty (either prettyWithLoc prettyWithLoc) mDeclProp
+    <> maybe Empty prettyWithLoc mDeclBody
 
 instance Pretty BlockDeclaration where
   pretty = toDoc . prettyWithLoc
 
 instance PrettyWithLoc BlockDeclaration where
-  prettyWithLoc (BlockDecl l decls r) = prettyWithLoc l
-      <> mconcat (map (\(decl, declProp) -> 
-            prettyWithLoc decl 
-            <> maybe Empty (either prettyWithLoc prettyWithLoc) declProp
-          ) decls)
+  prettyWithLoc (BlockDeclaration l decls r) = prettyWithLoc l
+      <> mconcat (map prettyWithLoc decls)
       <> prettyWithLoc r
 
 --------------------------------------------------------------------------------

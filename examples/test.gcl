@@ -1,18 +1,4 @@
-con A, B : Int
-
-{:
-  A, B : Int
+{: A, B : Int
+    A >= 0
+   B = 1
 :}
-
-var even, odd : Int -> Bool
-var x, y, z : Int
-
-x, y, z := A, B, 0
-{ x * y + z = A * B, bnd: y }
-do 
-  x = 0 ->
-    skip
- 
-
-od
-{ z = A * B }

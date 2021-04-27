@@ -74,26 +74,28 @@ myTest =
     [
       testCase "1" $ run
         "{:\n\
-        \  \n\
-        \:}\n\
-        \con A, B : Int\n",
-      testCase "2" $ run
-        "con A, B : Int\n\
-        \{:\n\
-        \  \n\
+        \  A, B : Int\n\
+        \   A = 0\n\
+        \  A = 0\n\
         \:}\n"
-
       -- testCase "2" $ run
       --   "= +"
     ]
     where
-      run t = show (parse wrap t) @?= ""
+      run t = show (parse (toAbstract <$> pBlockDeclaration) t) @?= ""
       wrap = do
-        decls <- many (eitherP pDeclaration pBlockDeclaration)
-        return . map (either (\d -> [toAbstract d]) toAbstract) $ decls
-        -- return $ foldr (\decl ds -> either (\d -> toAbstract d : ds) (\b -> toAbstract b ++ ds) decl) [] decls
+        (↓) lexDeclStart scn
+        bd <- pBlockDecl
+
+        -- ref <- Lex.indentLevel
+        -- (decl, mDeclProp) <- Lex.lineFold scn (\sc' -> (,) <$> (↓) (pDecl upperName) sc' <*> (↓) (optional (eitherP pDeclProp pExpr')) sc') 
+        -- mDeclBody <- (try . optional) (Lex.indentGuard scn Ord.EQ ref >> (↓) pDeclBody sc) <|> return Nothing
+        scn
+        (↓) lexDeclEnd scn
+        return bd
+        -- return mDeclProp
+
         
-      d = Lex.lineFold scn (\sc' -> (,) <$> (↓) (pDecl upperName) sc' <*> (↓) (optional (eitherP pDeclProp pExpr')) sc')
 
      -- dawn surround ritual toward fun planet affair friend edge soap news marble 
 
