@@ -8,7 +8,7 @@ import Control.Monad (void)
 import Control.Applicative.Combinators ((<|>), choice, some, many, skipMany)
 import Data.Void (Void)
 import Data.Proxy (Proxy(Proxy))
-import Data.Char (isSymbol, isSpace, isAlphaNum)
+import Data.Char (isSymbol, isSpace, isAlphaNum, isAlpha)
 import Data.Text (Text)
 import Data.Loc (Located(..), Loc(..), (<-->), Pos)
 import Text.Megaparsec (setOffset, getOffset, MonadParsec(try, notFollowedBy, tokens), getSourcePos, Stream(tokensToChunk), satisfy, (<?>), Parsec )
@@ -262,6 +262,12 @@ lexUpper =  lexeme . try . withPredicate notUpperKeywords $ do
 lexLower :: LexerF (Text, Loc)
 lexLower = lexeme . try . withPredicate notLowerKeywords $ do
   x <- lowerChar 
+  xs <- many . satisfy $ (\c -> isAlphaNum c || c == '_' || c == '\'')
+  return $ tokensToChunk (Proxy :: Proxy Text) (x : xs)
+
+lexText :: LexerF (Text, Loc)
+lexText = lexeme . try . withPredicate (\t -> notUpperKeywords t && notLowerKeywords t) $ do
+  x <- satisfy isAlpha
   xs <- many . satisfy $ (\c -> isAlphaNum c || c == '_' || c == '\'')
   return $ tokensToChunk (Proxy :: Proxy Text) (x : xs)
 

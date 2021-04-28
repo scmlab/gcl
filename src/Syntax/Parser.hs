@@ -76,13 +76,13 @@ pConstDecl :: ParserF Declaration
 pConstDecl =
   ConstDecl
   <$> lexCon
-  <*> pDecl upperName
+  <*> pDecl pName
 
 pConstDeclWithProp :: ParserF Declaration
 pConstDeclWithProp =
   ConstDeclWithProp
   <$> lexCon
-  <*> pDecl upperName
+  <*> pDecl pName
   <*> pDeclProp
 
 pVarDecl :: ParserF Declaration
@@ -341,7 +341,7 @@ pVar :: ParserF Expr
 pVar = Var <$> lowerName
 
 pConst :: ParserF Expr
-pConst = Const <$> upperName
+pConst = Const <$> pName
 
 pQuant :: ParserF Expr
 pQuant =
@@ -385,6 +385,10 @@ pUnary m = do
 ------------------------------------------
 -- combinators
 ------------------------------------------
+
+pName :: ParserF Name
+pName = uncurry Name <$> lexText
+
 upperName :: ParserF Name
 upperName = uncurry Name <$> lexUpper
 
