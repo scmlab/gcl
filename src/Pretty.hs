@@ -21,6 +21,7 @@ import Pretty.Concrete ()
 import Pretty.Predicate ()
 import Syntax.Parser.Lexer (LexicalError)
 import Prelude hiding (Ordering (..))
+import LSP.CustomMethod (Error2(..))
 
 renderStrict :: Doc ann -> Text
 renderStrict = Text.renderStrict . layoutPretty defaultLayoutOptions
@@ -37,6 +38,13 @@ instance (Pretty a, Pretty b) => Pretty (Either a b) where
 
 --------------------------------------------------------------------------------
 
+-- | Error2 
+instance Pretty Error2 where
+  pretty (ToClient err) = "ToClient " <+> pretty err
+  pretty (ToServer err) = "ToServer " <+> pretty err
+
+--------------------------------------------------------------------------------
+
 -- | Error
 instance Pretty Error where
   pretty (LexicalError err) = "Lexical Error" <+> pretty err
@@ -46,6 +54,7 @@ instance Pretty Error where
   pretty (StructError err) =
     "Struct Error" <+> pretty (locOf err) <> line <> pretty err
   pretty (CannotReadFile path) = "CannotReadFile" <+> pretty path
+  pretty (Others msg) = "Others" <+> pretty msg
 
 instance Pretty LexicalError where
   pretty = pretty . show
@@ -57,7 +66,6 @@ instance Pretty StructWarning where
 instance Pretty StructError where
   pretty (MissingAssertion loc) = "Missing Assertion" <+> pretty loc
   pretty (MissingPostcondition loc) = "Missing Postcondition" <+> pretty loc
-  pretty (DigHole loc) = "Dig Hole" <+> pretty loc
 
 instance Pretty TypeError where
   pretty (NotInScope name _) =

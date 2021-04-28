@@ -19,7 +19,6 @@ class ToDiagnostics a where
 instance ToDiagnostics StructError where
   toDiagnostics (MissingAssertion loc) = [makeError loc "Assertion Missing" "Assertion before the DO construct is missing"]
   toDiagnostics (MissingPostcondition loc) = [makeError loc "Postcondition Missing" "The last statement of the program should be an assertion"]
-  toDiagnostics (DigHole _) = []
 
 instance ToDiagnostics Error where
   toDiagnostics (LexicalError pos) = [makeError (Loc pos pos) "Lexical error" ""]

@@ -306,12 +306,10 @@ instance ToJSON StructWarning
 data StructError
   = MissingAssertion Loc
   | MissingPostcondition Loc
-  | DigHole Loc
   deriving (Eq, Show, Generic)
 
 instance Located StructError where
   locOf (MissingAssertion loc) = loc
   locOf (MissingPostcondition loc) = loc
-  locOf (DigHole loc) = loc
 
 instance ToJSON StructError

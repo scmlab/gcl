@@ -23,7 +23,7 @@ import Prelude hiding (Ordering (..))
 tests :: TestTree
 tests = testGroup "WP" [emptyProg, statements, issues]
 
-run :: Text -> Either Error ([PO], [Spec], [StructWarning])
+run :: Text -> Either LSP.Error2 ([PO], [Spec], [StructWarning])
 run text = LSP.runM $ do
   (pos, specs, warnings) <- LSP.parseProgram "<test>" text >>= LSP.genPO
   return (pos, specs, warnings)

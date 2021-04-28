@@ -7,6 +7,7 @@ module LSP.Handler (handlers) where
 
 import qualified Data.Aeson as JSON
 import Data.Text (Text, pack)
+import qualified Data.Text as Text
 import Error
 import GCL.Expr (expand, runSubstM)
 import LSP.CustomMethod
@@ -21,7 +22,7 @@ import qualified Syntax.Abstract as A
 import Syntax.Predicate
   ( Spec (..),
   )
-import qualified Data.Text as Text
+import Data.Aeson (Value)
 
 -- handlers of the LSP server
 handlers :: Handlers ServerM
@@ -81,43 +82,46 @@ handlers =
             responder $ Right $ InR completionList
           else responder $ Right $ InR $ CompletionList True (List []),
       -- custom methods, not part of LSP
-      requestHandler (SCustomMethod "guacamole") $ \req responder -> do
-        let RequestMessage _ i _ params = req
+      requestHandler (SCustomMethod "guacamole") $ \req responderPrim -> do
+        let responder = responderPrim . Right . JSON.toJSON
+        let RequestMessage _ _ _ params = req
         -- JSON Value => Request => Response
-        response <- case JSON.fromJSON params of
+        case JSON.fromJSON params of
           JSON.Error msg -> do
             logText " --> CustomMethod: CannotDecodeRequest"
-            return $ CannotDecodeRequest $ show msg ++ "\n" ++ show params
+            responder $ CannotDecodeRequest $ show msg ++ "\n" ++ show params
           JSON.Success request@(Req filepath kind) -> do
             logText $ " --> Custom Reqeust: " <> pack (show request)
 
             result <- readSavedSource filepath
             case result of
-              Nothing -> pure NotLoaded
+              Nothing -> responder NotLoaded 
               Just source -> do
-                -- send Diagnostics
-                version <- case i of
-                  IdInt n -> return n
-                  IdString _ -> bumpCounter
-                checkAndSendDiagnostics filepath source version
                 -- convert Request to Response
-                kinds <- case kind of
+                case kind of
+                  -- Inspect
                   ReqInspect selStart selEnd -> do
                     updateSelection filepath (selStart, selEnd)
-                    return $
-                      asGlobalError $ do
-                        (pos, _specs, _globalProps, _warnings) <- checkEverything filepath source (Just (selStart, selEnd))
-                        return [ResInspect pos]
+
+                    runStuff filepath (Just responder) $ do
+                      (pos, _specs, _globalProps, warnings) <- checkEverything filepath source (Just (selStart, selEnd))
+                      let diagnostics = concatMap toDiagnostics pos ++ concatMap toDiagnostics warnings
+                      let responses = [ResInspect pos]
+                      return (responses, diagnostics)
+
+                  -- Refine
                   ReqRefine selStart selEnd -> do
                     result' <- readLatestSource filepath
                     case result' of
-                      Nothing -> return [ResConsoleLog "no source"]
+                      Nothing -> responder $ Res filepath [ResError [globalError (Others "no source")]]
                       Just source' -> do
-                        -- logText source'
                         case runM (refine filepath source' (selStart, selEnd)) of
-                          Left err -> do
-                            sendDiagnostics filepath 0 (toDiagnostics err)
-                            return [ResError [globalError err]]
+                          Left (ToClient err) -> do
+                            sendDiagnostics filepath (toDiagnostics err)
+                            responder $ Res filepath [ResError [globalError err]]
+                          Left (ToServer loc) -> do
+                            logText "SHOULD DIG HOLE"
+                            responder $ Res filepath []
                           Right (spec, payload) -> do
                             logText " *** [ Refine ] Payload of the spec:"
                             logText payload
@@ -139,23 +143,29 @@ handlers =
                                         logText "after"
                                         version' <- bumpCounter
                                         checkAndSendResponse filepath source'' version'
-                                        checkAndSendDiagnostics filepath source'' version'
 
                             _ <- sendRequest SWorkspaceApplyEdit applyWorkspaceEditParams responder'
-                            return []
-                  ReqSubstitute index expr _subst -> return $
-                    asGlobalError $ do
-                      A.Program _ _ defns _ _ <- parseProgram filepath source
-                      let expr' = runSubstM (expand (A.Subst expr _subst)) defns 1
-                      return [ResSubstitute index expr']
-                  ReqExportProofObligations -> return $
-                    asGlobalError $ do
-                      return [ResConsoleLog "Export"]
-                  ReqDebug -> return $ error "crash!"
-                return $ Res filepath kinds
+                            responder $ Res filepath []
 
-        logText $ " <-- " <> pack (show response)
-        responder $ Right $ JSON.toJSON response,
+                  -- Substitute
+                  ReqSubstitute index expr _subst -> do
+                    let program = do
+                          A.Program _ _ defns _ _ <- parseProgram filepath source
+                          let expr' = runSubstM (expand (A.Subst expr _subst)) defns 1
+                          return [ResSubstitute index expr']
+                    case runM program of
+                      Left (ToClient err) -> do
+                        sendDiagnostics filepath (toDiagnostics err)
+                        responder $ Res filepath [ResError [globalError err]]
+                      Left (ToServer loc) -> do
+                        logText "SHOULD DIG HOLE"
+                        responder $ Res filepath []
+                      Right res -> responder $ Res filepath  res
+
+                  -- ExportProofObligations
+                  ReqExportProofObligations ->
+                    responder $ Res filepath [ResConsoleLog "Export"]
+                  ReqDebug -> return $ error "crash!",
       -- when the client saved the document, store the text for later use
       notificationHandler STextDocumentDidSave $ \ntf -> do
         logText " --> TextDocumentDidSave"
@@ -168,8 +178,7 @@ handlers =
               Just filepath -> do
                 updateSource filepath source
                 version <- bumpCounter
-                checkAndSendResponse filepath source version
-                checkAndSendDiagnostics filepath source version,
+                checkAndSendResponse filepath source version,
       -- when the client opened the document
       notificationHandler STextDocumentDidOpen $ \ntf -> do
         logText " --> TextDocumentDidOpen"
@@ -180,27 +189,43 @@ handlers =
             updateSource filepath source
             version <- bumpCounter
             checkAndSendResponse filepath source version
-            checkAndSendDiagnostics filepath source version
     ]
 
 checkAndSendResponse :: FilePath -> Text -> Int -> ServerM ()
 checkAndSendResponse filepath source version = do
   lastSelection <- readLastSelection filepath
-  let result = runM (checkEverything filepath source lastSelection)
-  let response = case result of
-        Left e -> Res filepath [ResError [globalError e]]
-        Right (pos, specs, globalProps, warnings) -> Res filepath [ResOK (IdInt version) pos specs globalProps warnings]
-  sendNotification (SCustomMethod "guacamole") $ JSON.toJSON response
+  runStuff filepath Nothing $ do
+    (pos, specs, globalProps, warnings) <- checkEverything filepath source lastSelection
+    let diagnostics = concatMap toDiagnostics pos ++ concatMap toDiagnostics warnings
+    let responses = [ResOK (IdInt version) pos specs globalProps warnings]
+    return (responses, diagnostics)
 
-checkAndSendDiagnostics :: FilePath -> Text -> Int -> ServerM ()
-checkAndSendDiagnostics filepath source version = do
-  -- send diagnostics
-  diags <- do
-    let result = runM $ checkEverything filepath source Nothing
-    return $ case result of
-      Left err -> toDiagnostics err
-      Right (pos, _, _, warnings) -> concatMap toDiagnostics pos ++ concatMap toDiagnostics warnings
-  sendDiagnostics filepath version diags
 
-sendDiagnostics :: FilePath -> Int -> [Diagnostic] -> ServerM ()
-sendDiagnostics filepath version diags = publishDiagnostics 100 (toNormalizedUri (filePathToUri filepath)) (Just version) (partitionBySource diags)
+runStuff :: FilePath -> Maybe (Response -> ServerM ()) -> M ([ResKind], [Diagnostic]) -> ServerM ()
+runStuff filepath responderM program = do
+  (responses, diagnostics) <- runStuff' filepath program 
+  sendDiagnostics filepath diagnostics
+  -- send responses to the responder if available 
+  -- else send as notification
+  case responderM of 
+    Nothing -> sendCustomResponse filepath responses
+    Just responder -> responder $ Res filepath responses
+
+runStuff' :: FilePath -> M ([ResKind], [Diagnostic]) -> ServerM ([ResKind], [Diagnostic])
+runStuff' filepath program =
+  case runM program of
+    Left (ToClient err) -> do
+      sendDiagnostics filepath (toDiagnostics err)
+      return ([ResError [globalError err]], [])
+    Left (ToServer loc) -> do
+      logText "SHOULD DIG HOLE"
+      return ([], [])
+    Right (responses, diagnostics) -> return (responses, diagnostics)
+
+sendDiagnostics :: FilePath -> [Diagnostic] -> ServerM ()
+sendDiagnostics filepath diags = do
+  version <- bumpCounter
+  publishDiagnostics 100 (toNormalizedUri (filePathToUri filepath)) (Just version) (partitionBySource diags)
+
+sendCustomResponse :: FilePath -> [ResKind] -> ServerM ()
+sendCustomResponse filepath responses = sendNotification (SCustomMethod "guacamole") $ JSON.toJSON $ Res filepath responses

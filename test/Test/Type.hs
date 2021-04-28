@@ -147,7 +147,7 @@ typeCheck (filepath, source) = renderStrict . layoutCompact . pretty $ result
     result =
       case LSP.runM (LSP.parseProgram filepath source) of
         Left err -> Left err
-        Right prog -> LSP.runM . withExcept TypeError $ checkProg prog
+        Right prog -> LSP.runM . withExcept (LSP.ToClient . TypeError) $ checkProg prog
 
 compareAndReport :: (FilePath, FilePath, Text) -> (FilePath, FilePath, Text) -> IO (Maybe String)
 compareAndReport (expectedPath, _, expectedRes) (actualPath, fileName, actualRaw) = do

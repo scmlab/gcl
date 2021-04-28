@@ -15,19 +15,19 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 import Error
 import qualified GCL.Type as TypeChecking
-import GCL.WP (StructWarning, StructError (DigHole))
+import GCL.WP (StructWarning)
 import qualified GCL.WP as POGen
 import GHC.Generics (Generic)
 import LSP.ExportPO ()
 import Language.LSP.Types hiding (TextDocumentSyncClientCapabilities (..))
 import qualified Syntax.Abstract as A
 import Syntax.Concrete (ToAbstract (toAbstract))
-import qualified Syntax.Concrete as C
 import Syntax.Parser
 import Syntax.Predicate
   ( Origin (..),
     PO (..),
-    Spec (..), specPayload
+    Spec (..),
+    specPayload,
   )
 
 --------------------------------------------------------------------------------
@@ -91,61 +91,66 @@ type ID = LspId ('CustomMethod :: Method 'FromClient 'Request)
 
 --------------------------------------------------------------------------------
 
-type M = Except Error
+-- | TODO: refactor this
+data Error2
+  = -- | Error that should be sent and handled by the client
+    ToClient Error
+  | -- | Error that should be handled here by the server
+    ToServer Loc
+  deriving (Show, Eq)
 
-runM :: M a -> Either Error a
+type M = Except Error2
+
+runM :: M a -> Either Error2 a
 runM = runExcept
 
-ignoreError :: M [ResKind] -> [ResKind]
-ignoreError program =
-  case runM program of
-    Left _err -> []
-    Right val -> val
+-- ignoreError :: M [ResKind] -> [ResKind]
+-- ignoreError program =
+--   case runM program of
+--     Left _err -> []
+--     Right val -> val
 
 -- catches Error and convert it into a global ResError
-asGlobalError :: M [ResKind] -> [ResKind]
-asGlobalError program =
-  case runM program of
-    Left err -> [ResError [globalError err]]
-    Right val -> val
+-- asGlobalError :: M [ResKind] -> CustomError
+-- asGlobalError program =
+--   case runM program of
+--     Left err -> ToClient $  [ResError [globalError err]]
+--     Right val -> val
 
 -- catches Error and convert it into a local ResError with Hole id
-asLocalError :: Int -> M [ResKind] -> [ResKind]
-asLocalError i program =
-  case runM program of
-    Left err -> [ResError [localError i err]]
-    Right val -> val
+-- asLocalError :: Int -> M [ResKind] -> [ResKind]
+-- asLocalError i program =
+--   case runM program of
+--     Left err -> [ResError [localError i err]]
+--     Right val -> val
 
 --------------------------------------------------------------------------------
 
 -- | Parse with a parser
 parse :: Parser a -> FilePath -> Text -> M a
-parse p filepath = withExcept SyntacticError . liftEither . runParse p filepath
+parse p filepath = withExcept (ToClient . SyntacticError) . liftEither . runParse p filepath
 
 -- | Parse the whole program
 parseProgram :: FilePath -> Text -> M A.Program
-parseProgram filepath source = do 
+parseProgram filepath source = do
   concrete <- parse pProgram filepath source
-  case runExcept (toAbstract concrete) of 
-    Left loc -> throwError $ StructError $ DigHole loc
-    Right program -> return program 
-
-parseProgramC :: FilePath -> Text -> M C.Program
-parseProgramC = parse pProgram
+  case runExcept (toAbstract concrete) of
+    Left loc -> throwError $ ToServer loc
+    Right program -> return program
 
 -- | Try to parse a piece of text in a Spec
 refine :: FilePath -> Text -> (Int, Int) -> M (Spec, Text)
-refine filepath source selection = do 
+refine filepath source selection = do
   result <- findPointedSpec
   case result of
-    Nothing -> 
-      throwError $ Others "Cannot find pointed spec"
+    Nothing ->
+      throwError $ ToClient $ Others "Cannot find pointed spec"
     Just spec -> do
-      -- 
+      --
       let payload = Text.unlines $ specPayload source spec
       void $ parse pStmts "<specification>" payload
       return (spec, payload)
-  where 
+  where
     findPointedSpec :: M (Maybe Spec)
     findPointedSpec = do
       (_, specs, _) <- parseProgram filepath source >>= genPO
@@ -169,10 +174,10 @@ checkEverything filepath source mouseSelection = do
     Just sel -> return (filterPOs sel pos, specs, globalProps, warings)
 
 typeCheck :: A.Program -> M ()
-typeCheck = withExcept TypeError . TypeChecking.checkProg
+typeCheck = withExcept (ToClient . TypeError) . TypeChecking.checkProg
 
 genPO :: A.Program -> M ([PO], [Spec], [StructWarning])
-genPO = withExcept StructError . liftEither . POGen.sweep
+genPO = withExcept (ToClient . StructError) . liftEither . POGen.sweep
 
 --------------------------------------------------------------------------------
 
