@@ -15,7 +15,7 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 import Error
 import qualified GCL.Type as TypeChecking
-import GCL.WP (StructWarning)
+import GCL.WP (StructWarning, StructError (DigHole))
 import qualified GCL.WP as POGen
 import GHC.Generics (Generic)
 import LSP.ExportPO ()
@@ -124,7 +124,11 @@ parse p filepath = withExcept SyntacticError . liftEither . runParse p filepath
 
 -- | Parse the whole program
 parseProgram :: FilePath -> Text -> M A.Program
-parseProgram filepath source = toAbstract <$> parse pProgram filepath source
+parseProgram filepath source = do 
+  concrete <- parse pProgram filepath source
+  case runExcept (toAbstract concrete) of 
+    Left loc -> throwError $ StructError $ DigHole loc
+    Right program -> return program 
 
 parseProgramC :: FilePath -> Text -> M C.Program
 parseProgramC = parse pProgram

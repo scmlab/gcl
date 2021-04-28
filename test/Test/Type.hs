@@ -101,16 +101,18 @@ inferTests =
     parse parser =
       runExcept . withExcept SyntacticError . liftEither . runParse parser "<test>"
     run' t = do
-      let res = case parse (toAbstract <$> pExpr) t of
-            Right expr -> do
+      let res = case parse (runExcept . toAbstract <$> pExpr) t of
+            Right (Right expr) -> do
               (t, cs) <- runInfer env (infer expr)
               runSolver cs
+            Right (Left loc) -> error "Unexpanded hole \"?\" in the program"
             Left err -> liftEither $ Left (NotInScope "" NoLoc)
        in res @?= liftEither (Left (NotInScope " test " NoLoc))
     run t =
       let res =
-            case parse (toAbstract <$> pExpr) t of
-              Right expr -> runExcept . withExcept TypeError . inferExpr env $ expr
+            case parse (runExcept . toAbstract <$> pExpr) t of
+              Right (Right expr) -> runExcept . withExcept TypeError . inferExpr env $ expr
+              Right (Left loc) -> error "Unexpanded hole \"?\" in the program"
               Left err -> Left err
        in res @?= Left (TypeError (NotInScope "" NoLoc))
 

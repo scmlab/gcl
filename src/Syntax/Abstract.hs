@@ -55,7 +55,6 @@ data Stmt
   | LoopInvariant Expr Expr Loc
   | Do [GdCmd] Loc
   | If [GdCmd] Loc
-  | SpecQM Loc -- ? to be rewritten as {!!} by the frontend
   | Spec Text Loc
   | Proof Loc
   deriving (Eq, Show)
@@ -68,7 +67,6 @@ instance Located Stmt where
   locOf (LoopInvariant _ _ l) = l
   locOf (Do _ l) = l
   locOf (If _ l) = l
-  locOf (SpecQM l) = l
   locOf (Spec _ l) = l
   locOf (Proof l) = l
 

@@ -46,7 +46,6 @@ execStmt (Abort l) = throwError (Aborted l)
 execStmt (Assign xs es l) = execAsgn xs es l
 execStmt (Assert _ _) = return ()
 execStmt (LoopInvariant _ _ _) = return ()
-execStmt (SpecQM _) = error "spec cannot be executed"
 execStmt (Spec _ _) = error "spec cannot be executed"
 execStmt (Proof _) = error "proof cannot be executed"
 execStmt (If gcmds l) =

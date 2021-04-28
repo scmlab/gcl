@@ -260,7 +260,6 @@ checkStmt env (Assert expr _) = void $ inferExpr env expr
 checkStmt env (LoopInvariant e1 e2 _) = void $ inferExpr env e1 >> inferExpr env e2
 checkStmt env (Do gdcmds _) = mapM_ (checkGdCmd env) gdcmds
 checkStmt env (If gdcmds _) = mapM_ (checkGdCmd env) gdcmds
-checkStmt _ (SpecQM _) = return ()
 checkStmt _ (Spec _ _) = return ()
 checkStmt _ (Proof _) = return ()
 

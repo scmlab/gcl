@@ -147,7 +147,6 @@ struct True inv (Just bnd) (A.Do gcmds l) post = do
 struct False inv _ (A.Do gcmds l) post = do
   let guards = A.getGuards gcmds
   obligate (Conjunct (inv : map (Negate . guardLoop) guards)) post (AtLoop l)
-struct _ _ _ (A.SpecQM l) _ = throwError $ DigHole l
 struct b pre _ (A.Spec _ l) post = when b (tellSpec pre post l)
 -- banacorn: what to do about this?
 struct _ _ _ (A.Proof _) _ = return ()
@@ -244,7 +243,6 @@ wp b (A.If gcmds _) post = do
       <$> wpStmts b body post
   return (conjunct (disGuards : pres))
 wp _ (A.Do _ l) _ = throwError (MissingAssertion l)
-wp _ (A.SpecQM l) _ = throwError $ DigHole l
 wp b (A.Spec _ l) post = do
   when b (tellSpec post post l)
   return post -- not quite right
