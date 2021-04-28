@@ -7,7 +7,6 @@
 module Syntax.Concrete where
 
 import Data.Loc (Loc(..), Pos, (<-->), Located(locOf) )
-import Data.Map (Map)
 import Data.Text (Text)
 import GHC.Generics (Generic)
 import Syntax.Common 
@@ -16,12 +15,13 @@ import qualified Syntax.ConstExpr as ConstExpr
 -- import Syntax.Parser.Lexer (Tok (..))
 import Prelude hiding (Ordering (..))
 import GHC.Base (Symbol)
+import Control.Monad.Except
 
 --------------------------------------------------------------------------------
 
 -- | Typeclass for converting from Syntax.Concrete to Syntax.Abstract
 class ToAbstract a b | a -> b where
-  toAbstract :: a -> b
+  toAbstract :: a -> Except Loc b
 
 --------------------------------------------------------------------------------
 
@@ -58,12 +58,17 @@ data Program
   deriving (Eq, Show)
 
 instance ToAbstract Program A.Program where
-  toAbstract (Program decls' stmts) =
-    let decls = concatMap (either ((:[]) . toAbstract) toAbstract) decls'
-        letBindings = ConstExpr.pickLetBindings decls
-        (globProps, assertions) = ConstExpr.pickGlobals decls
-        pre = [A.Assert (A.conjunct assertions) NoLoc | not (null assertions)]
-     in A.Program decls globProps letBindings (pre ++ fmap toAbstract stmts) (decls' <--> stmts)
+  toAbstract (Program decls' stmts') = do 
+    declss <- forM decls' $ \decl -> case decl of 
+              Left  d -> (:[]) <$> toAbstract d 
+              Right d -> toAbstract d 
+    let decls = concat declss
+    let letBindings = ConstExpr.pickLetBindings decls
+    let (globProps, assertions) = ConstExpr.pickGlobals decls
+    let pre = [A.Assert (A.conjunct assertions) NoLoc | not (null assertions)]
+    stmts <- mapM toAbstract stmts'
+
+    return $ A.Program decls globProps letBindings (pre ++ stmts) (decls' <--> stmts)
 
 instance Located Program where
   locOf (Program a b) = a <--> b
@@ -71,7 +76,9 @@ instance Located Program where
 data Decl = Decl (SepBy "," Name) (Token ":") Type deriving (Eq, Show)
 
 instance ToAbstract Decl ([Name], A.Type) where
-  toAbstract (Decl a _ b) = (fromSepBy a, toAbstract b)
+  toAbstract (Decl a _ b) = do 
+    b' <- toAbstract b
+    return (fromSepBy a, b')
 
 instance Located Decl where
   locOf (Decl l _ r) = l <--> r
@@ -87,7 +94,9 @@ instance Located DeclProp where
 data DeclBody = DeclBody Name [Name] (Token "=") Expr deriving (Eq, Show)
 
 instance ToAbstract DeclBody (Name, [Name], A.Expr)  where
-  toAbstract (DeclBody n args _ b) = (n, args, toAbstract b)
+  toAbstract (DeclBody n args _ b) = do 
+    b' <- toAbstract b
+    return (n, args, b')
 
 instance Located DeclBody where
   locOf (DeclBody l _ _ r) = l <--> r
@@ -101,13 +110,24 @@ data Declaration
   deriving (Eq, Show)
 
 instance ToAbstract Declaration A.Declaration where
-  toAbstract (ConstDecl l decl) = uncurry A.ConstDecl (toAbstract decl) Nothing (l <--> decl)
-  toAbstract (ConstDeclWithProp x decl prop) = uncurry A.ConstDecl (toAbstract decl)(Just $ toAbstract prop) (x <--> prop)
-  toAbstract (VarDecl l decl) = uncurry A.VarDecl (toAbstract decl) Nothing (l <--> decl)
-  toAbstract (VarDeclWithProp x decl prop) = uncurry A.VarDecl (toAbstract decl) (Just $ toAbstract prop) (x <--> prop)
-  toAbstract (LetDecl l declBody) = uncurry3 A.LetDecl (toAbstract declBody) (l <--> declBody)
-    where
-      uncurry3 f (a, b, c) = f a b c
+  toAbstract declaration = case declaration of 
+    ConstDecl _ decl -> do 
+      (name, body) <- toAbstract decl
+      return $ A.ConstDecl name body Nothing (locOf decl)
+    ConstDeclWithProp _ decl prop -> do 
+      (name, body) <- toAbstract decl
+      prop' <- toAbstract prop 
+      return $ A.ConstDecl name body (Just prop') (locOf decl)
+    VarDecl _ decl -> do 
+      (name, body) <- toAbstract decl
+      return $ A.VarDecl name body Nothing (locOf decl)
+    VarDeclWithProp _ decl prop -> do 
+      (name, body) <- toAbstract decl
+      prop' <- toAbstract prop 
+      return $ A.VarDecl  name body (Just prop') (locOf decl)
+    LetDecl _ decl -> do 
+      (name, args, body) <- toAbstract decl
+      return $ A.LetDecl name args body (locOf decl)
 
 instance Located Declaration where
   locOf (ConstDecl l r) = l <--> r
@@ -120,16 +140,25 @@ data BlockDecl = BlockDecl Decl (Maybe (Either DeclProp Expr)) (Maybe DeclBody) 
 
 -- One BlockDecl can be parse into a ConstDecl or a ConstDecl and a LetDecl
 instance ToAbstract BlockDecl [A.Declaration] where
-  toAbstract (BlockDecl decl mDeclProp mDeclBody) = 
-    let constDecl = uncurry (uncurry A.ConstDecl (toAbstract decl)) $
-            case mDeclProp of
-              Just (Left declProp) ->  ((Just . toAbstract) declProp, decl <--> declProp)
-              Just (Right prop) -> ((Just . toAbstract) prop, decl <--> prop) 
-              Nothing -> (Nothing, locOf decl) 
-    in
-    constDecl : maybe [] (\declBody -> [uncurry3 A.LetDecl (toAbstract declBody) (locOf declBody)]) mDeclBody
-    where
-      uncurry3 f (a, b, c) = f a b c
+  toAbstract declaration = case declaration of 
+    BlockDecl decl Nothing Nothing -> do 
+      (names, type') <- toAbstract decl 
+
+      declBody' <- toAbstract declBody
+      
+      return [A.ConstDecl names type' Nothing (locOf declaration), A.LetDecl declBody' (locOf declBody)]
+
+
+  -- toAbstract (BlockDecl decl mDeclProp mDeclBody) =
+  --   let constDecl = uncurry (uncurry A.ConstDecl (toAbstract decl)) $
+  --           case mDeclProp of
+  --             Just (Left declProp) ->  ((Just . toAbstract) declProp, decl <--> declProp)
+  --             Just (Right prop) -> ((Just . toAbstract) prop, decl <--> prop) 
+  --             Nothing -> (Nothing, locOf decl) 
+  --   in
+  --   constDecl : maybe [] (\declBody -> [uncurry3 A.LetDecl (toAbstract declBody) (locOf declBody)]) mDeclBody
+  --   where
+  --     uncurry3 f (a, b, c) = f a b c
 
 instance Located BlockDecl where
   locOf (BlockDecl l _ r) = l <--> r
