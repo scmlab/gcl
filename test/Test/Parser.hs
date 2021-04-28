@@ -34,14 +34,14 @@ import Syntax.Parser.Token
 import Syntax.Concrete (Type(..), TBase (..),ToAbstract (toAbstract), Program (..), Expr(..))
 import Data.Loc (Located(locOf))
 import Text.Megaparsec (Stream(reachOffset), setOffset, getOffset, MonadParsec(updateParserState, getParserState, observing, lookAhead, try, eof), State(State, statePosState, stateInput, stateOffset), getInput, getSourcePos)
-import Control.Monad.Combinators (optional, many, (<|>), choice)
+import Control.Monad.Combinators (optional, many, (<|>), choice, eitherP)
 import qualified Data.Ord as Ord
 import Control.Monad (void)
 import Syntax.Parser.Util (parser, (↓), getCurLoc)
 import qualified Data.ByteString.Lazy as BSL
 
 tests :: TestTree
--- tests = testGroup "Prettifier" [declaration]
+-- tests = testGroup "Prettifier" [myTest]
 tests = testGroup "Prettifier" [expression, type', declaration, statement, parseError, golden]
 
 --------------------------------------------------------------------------------
@@ -74,19 +74,16 @@ myTest =
     "parse test"
     [
       testCase "1" $ run
-        "con N : Int\n\
-        \con A : array (0 .. N] of Int\n\
-        \{:\n\
-        \    X, Y : Int \n\
-        \      X > 0\n\
-        \    Z : array (0 .. N] of Bool\n\
+        "{:\n\
+        \  A, B : Int\n\
+        \   A = 0\n\
+        \  A = 0\n\
         \:}\n"
-
       -- testCase "2" $ run
       --   "= +"
     ]
     where
-      run t = show (parse pProgram t) @?= ""
+      run t = show (parse (toAbstract <$> pProgram) t) @?= ""
 
 -- | Expression
 expression :: TestTree
