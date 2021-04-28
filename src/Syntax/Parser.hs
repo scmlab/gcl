@@ -14,8 +14,8 @@ import Data.Loc (Located (locOf))
 import Data.Maybe (isJust)
 import qualified Data.Ord as Ord
 import Data.Text (Text)
-import Syntax.Common (Name (..))
-import Syntax.Concrete (BlockDecl (..), BlockDeclaration (..), Decl (..), DeclProp (..), DeclBody (..), Declaration (..), EndpointClose (..), EndpointOpen (..), Expr (..), GdCmd (..), Interval (..), Op (..), Program (..), SepBy (..), Stmt (..), TBase (..), Token (..), Type (..))
+import Syntax.Common (Name (..), Op (..))
+import Syntax.Concrete (BlockDecl (..), BlockDeclaration (..), Decl (..), DeclProp (..), DeclBody (..), Declaration (..), EndpointClose (..), EndpointOpen (..), Expr (..), GdCmd (..), Interval (..), Program (..), SepBy (..), Stmt (..), TBase (..), Token (..), Type (..))
 import Syntax.Parser.Lexer
 import Syntax.Parser.Util
 import Text.Megaparsec (MonadParsec (..), Pos, anySingle, mkPos, parse, tokensToChunk, unPos, (<?>))

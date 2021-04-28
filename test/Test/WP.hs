@@ -59,12 +59,9 @@ statements =
                   0
                   (Assertion (Lit (Bol True) (Loc (pos 1 3 2) (pos 1 6 5))) (Loc (pos 1 1 0) (pos 1 8 7)))
                   ( Assertion
-                      ( App
-                          ( App
-                              (Op EQ (Loc (pos 3 5 28) (pos 3 5 28)))
-                              (Lit (Num 0) (Loc (pos 3 3 26) (pos 3 3 26)))
-                              (Loc (pos 3 3 26) (pos 3 5 28))
-                          )
+                      ( Chain
+                          (Lit (Num 0) (Loc (pos 3 3 26) (pos 3 3 26)))
+                          (EQ (Loc (pos 3 5 28) (pos 3 5 28)))
                           (Lit (Num 0) (Loc (pos 3 7 30) (pos 3 7 30)))
                           (Loc (pos 3 3 26) (pos 3 7 30))
                       )
@@ -107,12 +104,9 @@ statements =
                     0
                     (Assertion (Lit (Bol True) (Loc (pos 1 3 2) (pos 1 6 5))) (Loc (pos 1 1 0) (pos 1 8 7)))
                     ( Assertion
-                        ( App
-                            ( App
-                                (Op EQ (Loc (pos 3 5 28) (pos 3 5 28)))
-                                (Lit (Num 0) (Loc (pos 3 3 26) (pos 3 3 26)))
-                                (Loc (pos 3 3 26) (pos 3 5 28))
-                            )
+                        ( Chain
+                            (Lit (Num 0) (Loc (pos 3 3 26) (pos 3 3 26)))
+                            (EQ (Loc (pos 3 5 28) (pos 3 5 28)))
                             (Lit (Num 1) (Loc (pos 2 6 17) (pos 2 6 17)))
                             (Loc (pos 3 3 26) (pos 3 7 30))
                         )
@@ -136,7 +130,12 @@ statements =
               [ Specification
                   0
                   (Assertion (Lit (Bol True) (Loc (Pos "<test>" 1 3 2) (Pos "<test>" 1 6 5))) (Loc (Pos "<test>" 1 1 0) (Pos "<test>" 1 8 7)))
-                  (Assertion (App (App (Op EQ (Loc (Pos "<test>" 4 5 36) (Pos "<test>" 4 5 36))) (Lit (Num 0) (Loc (Pos "<test>" 4 3 34) (Pos "<test>" 4 3 34))) (Loc (Pos "<test>" 4 3 34) (Pos "<test>" 4 5 36))) (Lit (Num 0) (Loc (Pos "<test>" 4 7 38) (Pos "<test>" 4 7 38))) (Loc (Pos "<test>" 4 3 34) (Pos "<test>" 4 7 38))) (Loc (Pos "<test>" 4 1 32) (Pos "<test>" 4 9 40)))
+                  (Assertion (Chain 
+                    (Lit (Num 0) (Loc (Pos "<test>" 4 3 34) (Pos "<test>" 4 3 34))) 
+                    (EQ (Loc (Pos "<test>" 4 5 36) (Pos "<test>" 4 5 36)))  
+                    (Lit (Num 0) (Loc (Pos "<test>" 4 7 38) (Pos "<test>" 4 7 38))) 
+                    (Loc (Pos "<test>" 4 3 34) (Pos "<test>" 4 7 38))
+                  ) (Loc (Pos "<test>" 4 1 32) (Pos "<test>" 4 9 40)))
                   (Loc (Pos "<test>" 2 1 12) (Pos "<test>" 3 2 23))
               ],
               []
@@ -208,22 +207,19 @@ issue2 =
                   0
                   (Constant (Lit (Bol True) NoLoc))
                   ( Assertion
-                      ( App
-                          ( App
-                              (Op EQ (Loc (pos 3 5 37) (pos 3 5 37)))
-                              (Var (Name "z" (Loc (pos 3 3 35) (pos 3 3 35))) (Loc (pos 3 3 35) (pos 3 3 35)))
-                              (Loc (pos 3 3 35) (pos 3 5 37))
+                      (Chain 
+                        (Var (Name "z" (Loc (pos 3 3 35) (pos 3 3 35))) (Loc (pos 3 3 35) (pos 3 3 35)))
+                        (EQ (Loc (pos 3 5 37) (pos 3 5 37)))
+                        (App
+                          (App  
+                            (Op (Mul (Loc (pos 3 9 41) (pos 3 9 41))))
+                            (Const (Name "A" (Loc (pos 3 7 39) (pos 3 7 39))) (Loc (pos 3 7 39) (pos 3 7 39)))
+                            (Loc (pos 3 7 39) (pos 3 9 41))
                           )
-                          ( App
-                              ( App
-                                  (Op Mul (Loc (pos 3 9 41) (pos 3 9 41)))
-                                  (Const (Name "A" (Loc (pos 3 7 39) (pos 3 7 39))) (Loc (pos 3 7 39) (pos 3 7 39)))
-                                  (Loc (pos 3 7 39) (pos 3 9 41))
-                              )
-                              (Const (Name "B" (Loc (pos 3 11 43) (pos 3 11 43))) (Loc (pos 3 11 43) (pos 3 11 43)))
-                              (Loc (pos 3 7 39) (pos 3 11 43))
-                          )
-                          (Loc (pos 3 3 35) (pos 3 11 43))
+                          (Const (Name "B" (Loc (pos 3 11 43) (pos 3 11 43))) (Loc (pos 3 11 43) (pos 3 11 43)))
+                          (Loc (pos 3 7 39) (pos 3 11 43))
+                        )
+                        (Loc (pos 3 3 35) (pos 3 11 43))
                       )
                       (Loc (pos 3 1 33) (pos 3 13 45))
                   )
@@ -245,22 +241,19 @@ issue2 =
                   0
                   (Assertion (Lit (Bol True) (Loc (pos 3 3 35) (pos 3 6 38))) (Loc (pos 3 1 33) (pos 3 8 40)))
                   ( Assertion
-                      ( App
-                          ( App
-                              (Op EQ (Loc (pos 4 5 46) (pos 4 5 46)))
-                              (Var (Name "z" (Loc (pos 4 3 44) (pos 4 3 44))) (Loc (pos 4 3 44) (pos 4 3 44)))
-                              (Loc (pos 4 3 44) (pos 4 5 46))
-                          )
-                          ( App
-                              ( App
-                                  (Op Mul (Loc (pos 4 9 50) (pos 4 9 50)))
-                                  (Const (Name "A" (Loc (pos 4 7 48) (pos 4 7 48))) (Loc (pos 4 7 48) (pos 4 7 48)))
-                                  (Loc (pos 4 7 48) (pos 4 9 50))
-                              )
-                              (Const (Name "B" (Loc (pos 4 11 52) (pos 4 11 52))) (Loc (pos 4 11 52) (pos 4 11 52)))
-                              (Loc (pos 4 7 48) (pos 4 11 52))
-                          )
-                          (Loc (pos 4 3 44) (pos 4 11 52))
+                      (Chain 
+                        (Var (Name "z" (Loc (pos 4 3 44) (pos 4 3 44))) (Loc (pos 4 3 44) (pos 4 3 44)))
+                        (EQ (Loc (pos 4 5 46) (pos 4 5 46)))
+                        (App
+                            (App
+                                (Op (Mul (Loc (pos 4 9 50) (pos 4 9 50))))
+                                (Const (Name "A" (Loc (pos 4 7 48) (pos 4 7 48))) (Loc (pos 4 7 48) (pos 4 7 48)))
+                                (Loc (pos 4 7 48) (pos 4 9 50))
+                            )
+                            (Const (Name "B" (Loc (pos 4 11 52) (pos 4 11 52))) (Loc (pos 4 11 52) (pos 4 11 52)))
+                            (Loc (pos 4 7 48) (pos 4 11 52))
+                        )
+                        (Loc (pos 4 3 44) (pos 4 11 52))
                       )
                       (Loc (pos 4 1 42) (pos 4 13 54))
                   )

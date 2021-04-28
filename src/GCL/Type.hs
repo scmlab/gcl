@@ -125,7 +125,28 @@ infer :: Expr -> Infer Type
 infer (Lit lit l) = return (litTypes lit l)
 infer (Var x _) = lookupEnv x
 infer (Const c _) = lookupEnv c
-infer (Op o l) = return (opTypes o l)
+infer (Op o) = return (opTypes o)
+infer (Chain a op b l) = do
+  case a of
+    Chain _ _ r _ -> do
+      ta <- infer a
+      -- check type of a is bool
+      uni ta (TBase TBool l)
+
+      tr <- infer r
+      let top = opTypes op
+      tb <- infer b
+      -- check type of `r op b` is bool
+      uni top (TFunc tr (TFunc tb (TBase TBool NoLoc) (locOf b)) (r <--> b))
+      
+      return (TBase TBool l)
+    _ -> do
+      ta <- infer a
+      let top = opTypes op
+      tb <- infer b
+      uni top (TFunc ta (TFunc tb (TBase TBool NoLoc) (locOf b)) (a <--> b))
+      return (TBase TBool (a <--> b))
+
 infer (App e1 e2 l) = do
   t1 <- infer e1
   t2 <- infer e2
@@ -341,22 +362,29 @@ litTypes (Num _) l = TBase TInt l
 litTypes (Bol _) l = TBase TBool l
 litTypes (Chr _) l = TBase TChar l
 
-opTypes :: Op -> Loc -> Type
-opTypes EQ l = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TBool l) l) l
-opTypes NEQ l = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TBool l) l) l
-opTypes LTE l = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TBool l) l) l
-opTypes GTE l = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TBool l) l) l
-opTypes LT l = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TBool l) l) l
-opTypes GT l = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TBool l) l) l
-opTypes Add l = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TInt l) l) l
-opTypes Sub l = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TInt l) l) l
-opTypes Mul l = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TInt l) l) l
-opTypes Div l = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TInt l) l) l
-opTypes Mod l = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TInt l) l) l
-opTypes Implies l = TFunc (TBase TBool l) (TFunc (TBase TBool l) (TBase TBool l) l) l
-opTypes Conj l = TFunc (TBase TBool l) (TFunc (TBase TBool l) (TBase TBool l) l) l
-opTypes Disj l = TFunc (TBase TBool l) (TFunc (TBase TBool l) (TBase TBool l) l) l
-opTypes Neg l = TFunc (TBase TBool l) (TBase TBool l) l
+opTypes :: Op -> Type
+opTypes (EQ l) = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TBool l) l) l
+opTypes (NEQ l) = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TBool l) l) l
+opTypes (NEQU l) = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TBool l) l) l
+opTypes (LTE l) = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TBool l) l) l
+opTypes (LTEU l) = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TBool l) l) l
+opTypes (GTE l) = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TBool l) l) l
+opTypes (GTEU l) = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TBool l) l) l
+opTypes (LT l) = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TBool l) l) l
+opTypes (GT l) = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TBool l) l) l
+opTypes (Add l) = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TInt l) l) l
+opTypes (Sub l) = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TInt l) l) l
+opTypes (Mul l) = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TInt l) l) l
+opTypes (Div l) = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TInt l) l) l
+opTypes (Mod l) = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TInt l) l) l
+opTypes (Implies l) = TFunc (TBase TBool l) (TFunc (TBase TBool l) (TBase TBool l) l) l
+opTypes (ImpliesU l) = TFunc (TBase TBool l) (TFunc (TBase TBool l) (TBase TBool l) l) l
+opTypes (Conj l) = TFunc (TBase TBool l) (TFunc (TBase TBool l) (TBase TBool l) l) l
+opTypes (ConjU l) = TFunc (TBase TBool l) (TFunc (TBase TBool l) (TBase TBool l) l) l
+opTypes (Disj l) = TFunc (TBase TBool l) (TFunc (TBase TBool l) (TBase TBool l) l) l
+opTypes (DisjU l) = TFunc (TBase TBool l) (TFunc (TBase TBool l) (TBase TBool l) l) l
+opTypes (Neg l) = TFunc (TBase TBool l) (TBase TBool l) l
+opTypes (NegU l) = TFunc (TBase TBool l) (TBase TBool l) l
 
 -- opTypes Sum l = _
 -- opTypes Forall l = _

@@ -1,5 +1,7 @@
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 
+{-# LANGUAGE EmptyCase #-}
 module Test.Parser where
 
 import Data.Text.Prettyprint.Doc ( Pretty(pretty), defaultLayoutOptions, layoutPretty )
@@ -14,7 +16,7 @@ import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as BS8
 
 import Error ( Error(..) )
-import qualified LSP 
+import qualified LSP
 
 import Syntax.Parser
 import Syntax.Parser.Lexer
@@ -29,7 +31,6 @@ import Data.Char (isSpace)
 import Data.Int (Int64)
 
 import Prelude hiding (compare)
-import Control.Monad.Except (runExcept, withExcept, liftEither)
 import Syntax.Parser.Token
 import Syntax.Concrete (Type(..), TBase (..),ToAbstract (toAbstract), Program (..), Expr(..))
 import Data.Loc (Located(locOf))
@@ -37,8 +38,10 @@ import Text.Megaparsec (Stream(reachOffset), setOffset, getOffset, MonadParsec(u
 import Control.Monad.Combinators (optional, many, (<|>), choice, eitherP)
 import qualified Data.Ord as Ord
 import Control.Monad (void)
+import Control.Monad.Except
 import Syntax.Parser.Util (parser, (↓), getCurLoc)
 import qualified Data.ByteString.Lazy as BSL
+import qualified Syntax.ConstExpr as ConstExpr
 
 tests :: TestTree
 -- tests = testGroup "Prettifier" [myTest]
@@ -47,8 +50,8 @@ tests = testGroup "Prettifier" [expression, type', declaration, statement, parse
 --------------------------------------------------------------------------------
 
 parse :: Parser a -> Text -> Either Error a
-parse parser = 
-  runExcept . withExcept SyntacticError . liftEither . runParse parser "<test>" 
+parse parser =
+  runExcept . withExcept SyntacticError . liftEither . runParse parser "<test>"
 
 render :: Pretty a => Either Error a -> Text
 render = renderStrict . layoutPretty defaultLayoutOptions . pretty
@@ -69,21 +72,32 @@ compare parser actual expected = removeWhitespace (render (parse parser actual))
 
 
 myTest :: TestTree
-myTest = 
+myTest =
   testGroup
     "parse test"
     [
       testCase "1" $ run
         "{:\n\
-        \  A, B : Int\n\
-        \   A = 0\n\
-        \  A = 0\n\
+        \  A, B : Bool\n\
+        \   A\n\
+        \  A = True\n\
         \:}\n"
       -- testCase "2" $ run
       --   "= +"
     ]
     where
-      run t = show (parse (toAbstract <$> pProgram) t) @?= ""
+      run t = show (parse wrap t) @?= ""
+      wrap = do
+        Program decls' stmts' <- pProgram
+        let d = mapM (\case
+              Left d -> (: []) <$> toAbstract d
+              Right d -> toAbstract d) decls'
+        case runExcept d of
+          Left l -> error "loc"
+          Right decls'' -> return $ ConstExpr.pickGlobals (concat decls'')
+        -- let (globProps, assertions) = ConstExpr.pickGlobals decls''
+        -- return (globProps, assertions)
+
 
 -- | Expression
 expression :: TestTree
@@ -158,8 +172,8 @@ type' =
       testCase "array 1" $ run "array [0 .. N  )   of    Int",
       testCase "array 2" $ run "array (   0   ..  N   ] of Int",
       testCase "array 3" $ run "array [  0 .. N  ] of     Int",
-      testCase "array 4" $ run' 
-        "array (  0 .. (Int) ) of \n Int" 
+      testCase "array 4" $ run'
+        "array (  0 .. (Int) ) of \n Int"
         "Error Syntactic Error [(<test>:1:16, using keyword as variable name )]\n"
     ]
   where
@@ -174,7 +188,7 @@ declaration =
   testGroup
     "Declarations"
     [ testCase "variable" $ run "var   x     :   ( Int)",
-      testCase "variable keyword collision 1" $ 
+      testCase "variable keyword collision 1" $
         run' "var if : Int" "Error Syntactic Error [(<test>:1:5, using keyword as variable name )]\n",
       testCase "variable keyword collision 2" $ run "var iff : Int",
       testCase "variable (with newlines in between)" $
@@ -209,7 +223,7 @@ declaration =
   where
     run = isomorphic pDeclaration
     run' = compare pDeclaration
-    runBlock = isomorphic pBlockDeclaration 
+    runBlock = isomorphic pBlockDeclaration
 
 --------------------------------------------------------------------------------
 
@@ -289,23 +303,21 @@ golden =
       let actual = run actualRaw
       if removeTrailingWhitespace expected == removeTrailingWhitespace actual
         then return Nothing
-        else do
-          -- BS8.putStrLn expected
-          -- BS8.putStrLn actual
+        else
           return $
-            Just $
-              "expected (" ++ expectedPath ++ expectedFileName ++ ", " ++ show (length (BS8.unpack expected)) ++ " chars):\n" ++ BS8.unpack expected ++ "\n------------\n"
-                ++ "actual ("
-                ++ actualPath ++ actualFileName
-                ++ ", "
-                ++ show (length (BS8.unpack actual))
-                ++ " chars): \n"
-                ++ BS8.unpack actual
+        Just $
+          "expected (" ++ expectedPath ++ expectedFileName ++ ", " ++ show (length (BS8.unpack expected)) ++ " chars):\n" ++ BS8.unpack expected ++ "\n------------\n"
+            ++ "actual ("
+            ++ actualPath ++ actualFileName
+            ++ ", "
+            ++ show (length (BS8.unpack actual))
+            ++ " chars): \n"
+            ++ BS8.unpack actual
 
 
     removeTrailingWhitespace :: ByteString -> ByteString
     removeTrailingWhitespace = BS8.unlines . map stripEnd . BS8.lines
-      where 
+      where
         lastNonSpaceCharIndex :: ByteString -> Int64
         lastNonSpaceCharIndex = fromInteger . fst . BS8.foldl (\(acc, index) char -> if isSpace char then (acc, succ index) else (succ index, succ index)) (0, 0)
 
@@ -313,7 +325,7 @@ golden =
         stripEnd s = BS8.take (fromIntegral $ lastNonSpaceCharIndex s) s
 
     update :: (FilePath, FilePath, ByteString) -> IO ()
-    update (filePath, fileName, input) = do
+    update (filePath, fileName, input) =
       createDirectoriesAndWriteFile (filePath ++ "golden/" ++ fileName ++ ".ast.golden") (BSL.fromStrict $ run input)
 
     run :: ByteString -> ByteString

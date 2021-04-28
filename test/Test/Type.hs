@@ -65,7 +65,7 @@ app :: Expr -> Expr -> Expr
 app e1 e2 = App e1 e2 NoLoc
 
 op :: Op -> Expr
-op o = Op o NoLoc
+op = Op
 
 var :: Text -> Expr
 var t = Var (Name t NoLoc) NoLoc

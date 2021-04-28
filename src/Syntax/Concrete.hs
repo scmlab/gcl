@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -60,7 +61,7 @@ data Program
 
 instance ToAbstract Program A.Program where
   toAbstract (Program decls' stmts') = do
-    declss <- forM decls' $ \decl -> case decl of
+    declss <- forM decls' $ \case
       Left d -> (: []) <$> toAbstract d
       Right d -> toAbstract d
     let decls = concat declss
@@ -340,30 +341,30 @@ instance ToAbstract Expr A.Expr where
     Lit a -> A.Lit <$> toAbstract a <*> pure (locOf x)
     Var a -> pure $ A.Var a (locOf x)
     Const a -> pure $ A.Const a (locOf x)
-    Op a -> A.Op <$> toAbstract a <*> pure (locOf x)
-    Chain a op b ->
-      case a of
-        Chain {} -> do
-          let ar = chainRightmost a
-          A.App
-            <$> ( A.App (A.Op A.Conj NoLoc) <$> toAbstract a
-                    <*> pure (locOf a)
-                )
-            -- ar op b
-            <*> ( A.App <$> (A.App <$> toAbstract (Op op) <*> toAbstract ar <*> pure (locOf ar))
-                    <*> toAbstract b
-                    <*> pure (ar <--> b)
-                )
-            <*> pure (locOf x)
-        _ ->
-          A.App <$> (A.App <$> toAbstract (Op op) <*> toAbstract a <*> pure (a <--> op)) <*> toAbstract b <*> pure (locOf x)
+    Op a -> pure $ A.Op a
+    Chain a op b -> A.Chain <$> toAbstract a <*> pure op <*> toAbstract b <*> pure (locOf x)
+      -- case a of
+      --   Chain {} -> do
+      --     let ar = chainRightmost a
+      --     A.App
+      --       <$> ( A.App (Op (Conj NoLoc)) <$> toAbstract a
+      --               <*> pure (locOf a)
+      --           )
+      --       -- ar op b
+      --       <*> ( A.App <$> (A.App <$> toAbstract (Op op) <*> toAbstract ar <*> pure (locOf ar))
+      --               <*> toAbstract b
+      --               <*> pure (ar <--> b)
+      --           )
+      --       <*> pure (locOf x)
+      --   _ ->
+      --     A.App <$> (A.App <$> toAbstract (Op op) <*> toAbstract a <*> pure (a <--> op)) <*> toAbstract b <*> pure (locOf x)
     Arr arr _ i _ -> A.App <$> toAbstract arr <*> toAbstract i <*> pure (locOf x)
     App a b -> A.App <$> toAbstract a <*> toAbstract b <*> pure (locOf x)
     Quant _ a b _ c _ d _ -> A.Quant <$> either (toAbstract . Op) toAbstract a <*> pure b <*> toAbstract c <*> toAbstract d <*> pure (locOf x)
 
-chainRightmost :: Expr -> Expr
-chainRightmost (Chain _ _ b) = chainRightmost b
-chainRightmost expr = expr
+-- chainRightmost :: Expr -> Expr
+-- chainRightmost (Chain _ _ b) = chainRightmost b
+-- chainRightmost expr = expr
 
 --------------------------------------------------------------------------------
 
@@ -382,117 +383,3 @@ instance Located Lit where
   locOf (LitChar _ l) = l
 
 --------------------------------------------------------------------------------
-
--- | Operators
-data Op
-  = -- binary relations
-    EQ Loc
-  | NEQ Loc
-  | NEQU Loc
-  | LTE Loc
-  | LTEU Loc
-  | GTE Loc
-  | GTEU Loc
-  | LT Loc
-  | GT Loc
-  | -- logic operators
-    Implies Loc
-  | ImpliesU Loc
-  | Conj Loc
-  | ConjU Loc
-  | Disj Loc
-  | DisjU Loc
-  | -- arithmetics
-    Neg Loc
-  | NegU Loc
-  | Add Loc
-  | Sub Loc
-  | Mul Loc
-  | Div Loc
-  | Mod Loc
-  | -- For Quant
-    Sum Loc
-  | Forall Loc
-  | Exists Loc
-  deriving (Show, Eq, Generic)
-
-instance ToAbstract Op A.Op where
-  toAbstract (EQ _) = pure A.EQ
-  toAbstract (NEQ _) = pure A.NEQ
-  toAbstract (NEQU _) = pure A.NEQ
-  toAbstract (LTE _) = pure A.LTE
-  toAbstract (LTEU _) = pure A.LTE
-  toAbstract (GTE _) = pure A.GTE
-  toAbstract (GTEU _) = pure A.GTE
-  toAbstract (LT _) = pure A.LT
-  toAbstract (GT _) = pure A.GT
-  toAbstract (Implies _) = pure A.Implies
-  toAbstract (ImpliesU _) = pure A.Implies
-  toAbstract (Conj _) = pure A.Conj
-  toAbstract (ConjU _) = pure A.Conj
-  toAbstract (Disj _) = pure A.Disj
-  toAbstract (DisjU _) = pure A.Disj
-  toAbstract (Neg _) = pure A.Neg
-  toAbstract (NegU _) = pure A.Neg
-  toAbstract (Add _) = pure A.Add
-  toAbstract (Sub _) = pure A.Sub
-  toAbstract (Mul _) = pure A.Mul
-  toAbstract (Div _) = pure A.Div
-  toAbstract (Mod _) = pure A.Mod
-  toAbstract (Sum _) = pure A.Sum
-  toAbstract (Forall _) = pure A.Forall
-  toAbstract (Exists _) = pure A.Exists
-
-instance Located Op where
-  locOf (Implies l) = l
-  locOf (ImpliesU l) = l
-  locOf (Disj l) = l
-  locOf (DisjU l) = l
-  locOf (Conj l) = l
-  locOf (ConjU l) = l
-  locOf (Neg l) = l
-  locOf (NegU l) = l
-  locOf (EQ l) = l
-  locOf (NEQ l) = l
-  locOf (NEQU l) = l
-  locOf (LTE l) = l
-  locOf (LTEU l) = l
-  locOf (GTE l) = l
-  locOf (GTEU l) = l
-  locOf (LT l) = l
-  locOf (GT l) = l
-  locOf (Add l) = l
-  locOf (Sub l) = l
-  locOf (Mul l) = l
-  locOf (Div l) = l
-  locOf (Mod l) = l
-  locOf (Sum l) = l
-  locOf (Exists l) = l
-  locOf (Forall l) = l
-
-classify :: Op -> Fixity
-classify (Implies _) = InfixR 1
-classify (ImpliesU _) = InfixR 1
-classify (Disj _) = InfixL 2
-classify (DisjU _) = InfixL 2
-classify (Conj _) = InfixL 3
-classify (ConjU _) = InfixL 3
-classify (Neg _) = Prefix 4
-classify (NegU _) = Prefix 4
-classify (EQ _) = Infix 5
-classify (NEQ _) = Infix 6
-classify (NEQU _) = Infix 6
-classify (LTE _) = Infix 6
-classify (LTEU _) = Infix 6
-classify (GTE _) = Infix 6
-classify (GTEU _) = Infix 6
-classify (LT _) = Infix 6
-classify (GT _) = Infix 6
-classify (Add _) = InfixL 7
-classify (Sub _) = InfixL 7
-classify (Mul _) = InfixL 8
-classify (Div _) = InfixL 8
-classify (Mod _) = InfixL 9
-classify (Sum _) = Prefix 5
-classify (Exists _) = Prefix 6
-classify (Forall _) = Prefix 7

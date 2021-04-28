@@ -136,7 +136,8 @@ data Expr
   = Lit Lit Loc
   | Var Name Loc
   | Const Name Loc
-  | Op Op Loc
+  | Op Op
+  | Chain Expr Op Expr Loc
   | App Expr Expr Loc
   | Lam Name Expr Loc
   | Hole Loc
@@ -154,6 +155,10 @@ wrapLam :: [Name] -> Expr -> Expr
 wrapLam [] body = body
 wrapLam (x : xs) body = Lam x (wrapLam xs body) NoLoc
 
+chainRightMost :: Expr -> Expr
+chainRightMost (Chain _ _ r _) = r
+chainRightMost x = x
+
 ----------------------------------------------------------------
 
 -- | Literals
@@ -169,75 +174,25 @@ instance ToJSON Lit
 
 ----------------------------------------------------------------
 
--- | Operators
-data Op
-  = -- binary relations
-    EQ
-  | NEQ
-  | LTE
-  | GTE
-  | LT
-  | GT
-  | -- logic operators
-    Implies
-  | Conj
-  | Disj
-  | -- arithmetics
-    Neg
-  | Add
-  | Sub
-  | Mul
-  | Div
-  | Mod
-  | -- For Quant
-    Sum
-  | Forall
-  | Exists
-  deriving (Show, Eq, Generic)
-
-instance ToJSON Op
-
-instance FromJSON Op
-
-classify :: Op -> Fixity
-classify Implies = InfixR 1
-classify Disj = InfixL 2
-classify Conj = InfixL 3
-classify Neg = Prefix 4
-classify EQ = Infix 5
-classify NEQ = Infix 6
-classify LTE = Infix 6
-classify GTE = Infix 6
-classify LT = Infix 6
-classify GT = Infix 6
-classify Add = InfixL 7
-classify Sub = InfixL 7
-classify Mul = InfixL 8
-classify Div = InfixL 8
-classify Mod = InfixL 9
-classify Sum = Prefix 5
-classify Exists = Prefix 6
-classify Forall = Prefix 7
-
 -- | Constructors
 unary :: Op -> Expr -> Expr
-unary op x = App (Op op NoLoc) x NoLoc
+unary op x = App (Op op) x (x <--> op)
 
 binary :: Op -> Expr -> Expr -> Expr
-binary op x y = App (App (Op op NoLoc) x NoLoc) y (x <--> y)
+binary op x y = App (App (Op op) x (x <--> op)) y (x <--> y)
 
 lt, gt, gte, lte, eqq, conj, disj, implies :: Expr -> Expr -> Expr
-lt = binary LT
-gt = binary GT
-gte = binary GTE
-lte = binary LTE
-eqq = binary EQ
-conj = binary Conj
-disj = binary Disj
-implies = binary Implies
+lt = binary (LT NoLoc)
+gt = binary (GT NoLoc)
+gte = binary (GTE NoLoc)
+lte = binary (LTE NoLoc)
+eqq = binary (EQ NoLoc)
+conj = binary (Conj NoLoc)
+disj = binary (Disj NoLoc)
+implies = binary (Implies NoLoc)
 
 neg :: Expr -> Expr
-neg = unary Neg
+neg = unary (Neg NoLoc)
 
 true :: Expr
 true = Lit (Bol True) NoLoc
@@ -254,7 +209,7 @@ disjunct [] = false
 disjunct xs = foldl1 disj xs
 
 imply :: Expr -> Expr -> Expr
-imply p q = App (App (Op Implies NoLoc) p NoLoc) q NoLoc
+imply p q = App (App (Op (Implies NoLoc)) p (locOf p)) q (locOf q)
 
 predEq :: Expr -> Expr -> Bool
 predEq = (==)
@@ -275,7 +230,8 @@ instance Located Expr where
   locOf (Var _ l) = l
   locOf (Const _ l) = l
   locOf (Lit _ l) = l
-  locOf (Op _ l) = l
+  locOf (Op op) = locOf op
+  locOf (Chain _ _ _ l) = l
   locOf (App _ _ l) = l
   locOf (Lam _ _ l) = l
   locOf (Hole l) = l

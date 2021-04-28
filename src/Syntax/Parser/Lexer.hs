@@ -14,7 +14,8 @@ import Data.Loc (Located(..), Loc(..), (<-->), Pos)
 import Text.Megaparsec (setOffset, getOffset, MonadParsec(try, notFollowedBy, tokens), getSourcePos, Stream(tokensToChunk), satisfy, (<?>), Parsec )
 import Text.Megaparsec.Char (string, alphaNumChar, lowerChar, char, upperChar, space1)
 import qualified Text.Megaparsec.Char.Lexer as Lex
-import Syntax.Concrete (Lit(..),  Op(..), Token (..))
+import Syntax.Concrete (Lit(..), Token (..))
+import Syntax.Common
 import Syntax.Parser.Token
 import Syntax.Parser.Util
 
@@ -173,7 +174,7 @@ lexEQ' :: LexerF (Token tokEQ)
 lexEQ' = symbol tokEQ 
 
 lexEQ :: LexerF Op
-lexEQ = Syntax.Concrete.EQ . locOf <$> symbol tokEQ 
+lexEQ = Syntax.Common.EQ . locOf <$> symbol tokEQ 
 
 lexNEQ :: LexerF Op
 lexNEQ = NEQ . locOf <$> symbol tokNEQ 
@@ -182,7 +183,7 @@ lexNEQU :: LexerF Op
 lexNEQU = NEQU . locOf <$> symbol tokNEQU 
 
 lexGT :: LexerF Op
-lexGT =  Syntax.Concrete.GT . locOf <$> symbol tokGT
+lexGT =  Syntax.Common.GT . locOf <$> symbol tokGT
 
 lexGTE :: LexerF Op
 lexGTE = GTE . locOf <$> symbol tokGTE 
@@ -191,7 +192,7 @@ lexGTEU :: LexerF Op
 lexGTEU = GTEU . locOf <$> symbol tokGTEU 
 
 lexLT :: LexerF Op
-lexLT = Syntax.Concrete.LT . locOf <$> symbol tokLT 
+lexLT = Syntax.Common.LT . locOf <$> symbol tokLT 
 
 lexLTE :: LexerF Op
 lexLTE = LTE . locOf <$> symbol tokLTE 
