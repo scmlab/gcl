@@ -32,7 +32,8 @@ import Data.Int (Int64)
 
 import Prelude hiding (compare)
 import Syntax.Parser.Token
-import Syntax.Concrete (Type(..), TBase (..),ToAbstract (toAbstract), Program (..), Expr(..))
+import Syntax.Concrete (Type(..), TBase (..), Program (..), Expr(..))
+import Syntax.Concrete.ToAbstract (ToAbstract (toAbstract))
 import Data.Loc (Located(locOf))
 import Text.Megaparsec (Stream(reachOffset), setOffset, getOffset, MonadParsec(updateParserState, getParserState, observing, lookAhead, try, eof), State(State, statePosState, stateInput, stateOffset), getInput, getSourcePos)
 import Control.Monad.Combinators (optional, many, (<|>), choice, eitherP)

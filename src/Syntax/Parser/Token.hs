@@ -1,5 +1,4 @@
 {-# LANGUAGE OverloadedStrings #-}
-
 {-# LANGUAGE ScopedTypeVariables #-}
 module Syntax.Parser.Token where
 

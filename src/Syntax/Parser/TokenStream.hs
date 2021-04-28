@@ -2,7 +2,6 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE DefaultSignatures #-}
 
 
@@ -16,6 +15,7 @@ import qualified Data.List.NonEmpty            as NE
 import           Data.Proxy
 import           Language.Lexer.Applicative
 import           Text.Megaparsec         hiding ( Pos )
+import qualified Data.Maybe
 
 
 -- | How to print tokens
@@ -133,9 +133,8 @@ reachOffset' n posState =
       --   Just xs -> showTokens' xs
 
       resultLine :: String
-      resultLine = case lookup (posLine currentPos) focusedLines of
-        Nothing -> "<line not found>"
-        Just s  -> s
+      resultLine = Data.Maybe.fromMaybe
+        "<line not found>" (lookup (posLine currentPos) focusedLines)
 
       -- updated 'PosState'
       posState' = PosState { pstateInput      = post
@@ -190,7 +189,7 @@ toSourcePos (Pos filename line column _) =
 
 -- returns lines + line numbers of the string representation of tokens
 showTokenLines :: PrettyToken tok => NonEmpty (L tok) -> [(Int, String)]
-showTokenLines (x :| xs) = zipWith (,) lineNumbers (NE.toList body)
+showTokenLines (x :| xs) = zip lineNumbers (NE.toList body)
  where
   glued :: Chunk
   glued              = foldl glue (toChunk x) (map toChunk xs)

@@ -12,9 +12,10 @@ import Data.Loc.Util (translateLoc)
 import Data.Text.Prettyprint.Doc (Pretty (pretty))
 import Pretty.Util
 import Pretty.Variadic
-import Pretty.Common
+import Pretty.Common ()
 import Syntax.Common
 import Syntax.Concrete
+import Syntax.Concrete.Located ()
 import Prelude hiding (Ordering (..))
 import Syntax.Parser.Token
 

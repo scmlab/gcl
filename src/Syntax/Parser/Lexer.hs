@@ -15,6 +15,7 @@ import Text.Megaparsec (setOffset, getOffset, MonadParsec(try, notFollowedBy, to
 import Text.Megaparsec.Char (string, alphaNumChar, lowerChar, char, upperChar, space1)
 import qualified Text.Megaparsec.Char.Lexer as Lex
 import Syntax.Concrete (Lit(..), Token (..))
+import Syntax.Concrete.Located ()
 import Syntax.Common
 import Syntax.Parser.Token
 import Syntax.Parser.Util
@@ -292,7 +293,6 @@ lexTypeBool = symbol tokTypeBool
 lexTypeChar :: LexerF (Token tokTypeChar)
 lexTypeChar = symbol tokTypeChar
 
-
 ------------------------------------------
 -- helper combinators
 ------------------------------------------
@@ -313,8 +313,6 @@ withLoc p = do
 -- NOTE : make sure no space consumed after parser m
 notFollowedBySymbol :: LexerF a -> LexerF a
 notFollowedBySymbol m = ParseFunc (\sc' -> (↓) m (return ()) <* notFollowedBy (satisfy isSymbol) <* sc')
-  
-  -- m <* notFollowedBy (satisfy isSymbol)
 
 withPredicate :: (a -> Bool) -> Lexer a -> Lexer a
 withPredicate f p = do

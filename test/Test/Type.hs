@@ -22,7 +22,7 @@ import qualified LSP.CustomMethod as LSP
 import qualified LSP.Monad as LSP
 import Syntax.Abstract
 import Syntax.Common
-import Syntax.Concrete (ToAbstract (toAbstract))
+import Syntax.Concrete.ToAbstract (ToAbstract (toAbstract))
 import Syntax.Parser (Parser, pExpr, runParse)
 import Test.Tasty
 import Test.Tasty.Golden
