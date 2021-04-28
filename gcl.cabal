@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 3538812a9c16eea65d62600632b187237cb9068eef9cadb3df7c6b81a5ad0ee5
+-- hash: de8b9bdce3d72191a81c784022a6d23ea62c76f8fa1f429d0d869ef938efd37f
 
 name:           gcl
 version:        0.1.0.0
@@ -47,6 +47,8 @@ library
       Syntax.Abstract
       Syntax.Common
       Syntax.Concrete
+      Syntax.Concrete.Located
+      Syntax.Concrete.ToAbstract
       Syntax.ConstExpr
       Syntax.Parser
       Syntax.Parser.Lexer
@@ -146,6 +148,8 @@ test-suite gcl-test
       Syntax.Abstract
       Syntax.Common
       Syntax.Concrete
+      Syntax.Concrete.Located
+      Syntax.Concrete.ToAbstract
       Syntax.ConstExpr
       Syntax.Parser
       Syntax.Parser.Lexer

@@ -14,9 +14,6 @@ import Prelude hiding (Ordering (..))
 instance PrettyWithLoc Name where
   prettyWithLoc (Name n l) = fromDoc l (pretty n)
 
-
-
-
 -- | Operators
 instance Pretty Op where
   pretty = toDoc . prettyWithLoc

@@ -21,7 +21,7 @@ import GHC.Generics (Generic)
 import LSP.ExportPO ()
 import Language.LSP.Types hiding (TextDocumentSyncClientCapabilities (..))
 import qualified Syntax.Abstract as A
-import Syntax.Concrete (ToAbstract (toAbstract))
+import Syntax.Concrete.ToAbstract (ToAbstract (toAbstract))
 import qualified Syntax.Concrete as C
 import Syntax.Parser
 import Syntax.Predicate
