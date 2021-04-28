@@ -5,7 +5,10 @@
 
 module LSP.Handler (handlers) where
 
+import Control.Monad (void)
+import Data.Aeson (Value)
 import qualified Data.Aeson as JSON
+import Data.Loc
 import Data.Text (Text, pack)
 import qualified Data.Text as Text
 import Error
@@ -22,7 +25,8 @@ import qualified Syntax.Abstract as A
 import Syntax.Predicate
   ( Spec (..),
   )
-import Data.Aeson (Value)
+import Control.Concurrent
+import Control.Monad.Cont (liftIO)
 
 -- handlers of the LSP server
 handlers :: Handlers ServerM
@@ -95,7 +99,7 @@ handlers =
 
             result <- readSavedSource filepath
             case result of
-              Nothing -> responder NotLoaded 
+              Nothing -> responder NotLoaded
               Just source -> do
                 -- convert Request to Response
                 case kind of
@@ -103,7 +107,7 @@ handlers =
                   ReqInspect selStart selEnd -> do
                     updateSelection filepath (selStart, selEnd)
 
-                    runStuff filepath (Just responder) $ do
+                    runStuff filepath (Just responder) dontDigHole $ do
                       (pos, _specs, _globalProps, warnings) <- checkEverything filepath source (Just (selStart, selEnd))
                       let diagnostics = concatMap toDiagnostics pos ++ concatMap toDiagnostics warnings
                       let responses = [ResInspect pos]
@@ -120,32 +124,39 @@ handlers =
                             sendDiagnostics filepath (toDiagnostics err)
                             responder $ Res filepath [ResError [globalError err]]
                           Left (ToServer loc) -> do
-                            logText "SHOULD DIG HOLE"
+                            logText "SHOULD DIG HOLE 2"
                             responder $ Res filepath []
                           Right (spec, payload) -> do
                             logText " *** [ Refine ] Payload of the spec:"
                             logText payload
                             -- replace the Spec with its parsed payload
-                            let removeSpec = TextEdit (locToRange (specLoc spec)) (Text.stripStart payload)
-                            let identifier = VersionedTextDocumentIdentifier (filePathToUri filepath) (Just 0)
-                            let textDocumentEdit = TextDocumentEdit identifier (List [InL removeSpec])
-                            let change = InL textDocumentEdit
-                            let workspaceEdit = WorkspaceEdit Nothing (Just (List [change])) Nothing
-                            let applyWorkspaceEditParams = ApplyWorkspaceEditParams (Just "Resolve Spec") workspaceEdit
-                            let responder' response = case response of
-                                  Left _responseError -> return ()
-                                  Right _value -> do
-                                    -- ? ==> [!  !]
-                                    result'' <- readLatestSource filepath
-                                    case result'' of
-                                      Nothing -> return ()
-                                      Just source'' -> do
-                                        logText "after"
-                                        version' <- bumpCounter
-                                        checkAndSendResponse filepath source'' version'
+                            replaceText filepath (specLoc spec) (Text.stripStart payload) $ do
+                              result'' <- readLatestSource filepath
+                              case result'' of
+                                Nothing -> return ()
+                                Just source'' -> do
+                                  logText "after"
+                                  checkAndSendResponse filepath source''
 
-                            _ <- sendRequest SWorkspaceApplyEdit applyWorkspaceEditParams responder'
-                            responder $ Res filepath []
+                            -- let removeSpec = TextEdit (locToRange (specLoc spec)) (Text.stripStart payload)
+                            -- let identifier = VersionedTextDocumentIdentifier (filePathToUri filepath) (Just 0)
+                            -- let textDocumentEdit = TextDocumentEdit identifier (List [InL removeSpec])
+                            -- let change = InL textDocumentEdit
+                            -- let workspaceEdit = WorkspaceEdit Nothing (Just (List [change])) Nothing
+                            -- let applyWorkspaceEditParams = ApplyWorkspaceEditParams (Just "Resolve Spec") workspaceEdit
+                            -- let responder' response = case response of
+                            --       Left _responseError -> return ()
+                            --       Right _value -> do
+                            --         -- ? ==> [!  !]
+                            --         result'' <- readLatestSource filepath
+                            --         case result'' of
+                            --           Nothing -> return ()
+                            --           Just source'' -> do
+                            --             logText "after"
+                            --             version' <- bumpCounter
+                            --             checkAndSendResponse filepath source'' version'
+
+                            -- _ <- sendRequest SWorkspaceApplyEdit applyWorkspaceEditParams responder'
 
                   -- Substitute
                   ReqSubstitute index expr _subst -> do
@@ -158,9 +169,9 @@ handlers =
                         sendDiagnostics filepath (toDiagnostics err)
                         responder $ Res filepath [ResError [globalError err]]
                       Left (ToServer loc) -> do
-                        logText "SHOULD DIG HOLE"
+                        logText "SHOULD DIG HOLE 3"
                         responder $ Res filepath []
-                      Right res -> responder $ Res filepath  res
+                      Right res -> responder $ Res filepath res
 
                   -- ExportProofObligations
                   ReqExportProofObligations ->
@@ -177,8 +188,7 @@ handlers =
               Nothing -> pure ()
               Just filepath -> do
                 updateSource filepath source
-                version <- bumpCounter
-                checkAndSendResponse filepath source version,
+                checkAndSendResponse filepath source,
       -- when the client opened the document
       notificationHandler STextDocumentDidOpen $ \ntf -> do
         logText " --> TextDocumentDidOpen"
@@ -187,38 +197,79 @@ handlers =
           Nothing -> pure ()
           Just filepath -> do
             updateSource filepath source
-            version <- bumpCounter
-            checkAndSendResponse filepath source version
+            checkAndSendResponse filepath source
     ]
 
-checkAndSendResponse :: FilePath -> Text -> Int -> ServerM ()
-checkAndSendResponse filepath source version = do
+checkAndSendResponse :: FilePath -> Text -> ServerM ()
+checkAndSendResponse filepath source = do
   lastSelection <- readLastSelection filepath
-  runStuff filepath Nothing $ do
+  version <- bumpCounter
+  runStuff filepath Nothing (digHole filepath) $ do
     (pos, specs, globalProps, warnings) <- checkEverything filepath source lastSelection
     let diagnostics = concatMap toDiagnostics pos ++ concatMap toDiagnostics warnings
     let responses = [ResOK (IdInt version) pos specs globalProps warnings]
     return (responses, diagnostics)
 
+type Cont = ([ResKind], [Diagnostic]) -> ServerM ()
 
-runStuff :: FilePath -> Maybe (Response -> ServerM ()) -> M ([ResKind], [Diagnostic]) -> ServerM ()
-runStuff filepath responderM program = do
-  (responses, diagnostics) <- runStuff' filepath program 
-  sendDiagnostics filepath diagnostics
-  -- send responses to the responder if available 
-  -- else send as notification
-  case responderM of 
-    Nothing -> sendCustomResponse filepath responses
-    Just responder -> responder $ Res filepath responses
+-- replace the question mark "?" with a hole "[!  !]"
+digHole :: FilePath -> Loc -> Cont -> ServerM ()
+digHole _ilepath NoLoc _ = return ()
+digHole filepath (Loc start end) cont = do
+  let indent = Text.replicate (posCol start - 1) " "
+  let holeText = "[!\n" <> indent <> "\n" <> indent <> "!]"
+  replaceText filepath (Loc start end) holeText $ do
+  -- 
+    result <- readLatestSource filepath
+    case result of
+      Nothing -> return ()
+      Just source -> do
+        version <- bumpCounter
+        res <- runStuff' filepath (const (return ())) $ do
+          (pos, specs, globalProps, warnings) <- genPOsandSpecsOnly filepath source Nothing
+          let diagnostics = concatMap toDiagnostics pos ++ concatMap toDiagnostics warnings
+          let responses = [ResOK (IdInt version) pos specs globalProps warnings]
+          return (responses, diagnostics)
+        cont res
 
-runStuff' :: FilePath -> M ([ResKind], [Diagnostic]) -> ServerM ([ResKind], [Diagnostic])
-runStuff' filepath program =
+
+
+dontDigHole :: Loc -> Cont -> ServerM ()
+dontDigHole _ _ = return ()
+
+-- runEff' :: FilePath -> Maybe (Response -> ServerM ()) -> Eff a -> ServerM (Maybe a)
+-- runEff' filepath responderM program = do
+--   case runEff filepath program of
+--     Left loc -> do
+--       logText "SHOULD DIG HOLE"
+--       return Nothing
+--     Right a -> return (Just a)
+
+-- sendDiagnostics filepath diagnostics
+-- -- send responses to the responder if available
+-- -- else send as notification
+-- case responderM of
+--   Nothing -> sendCustomResponse filepath responses
+--   Just responder -> responder $ Res filepath responses
+
+runStuff :: FilePath -> Maybe (Response -> ServerM ()) -> (Loc -> Cont -> ServerM ()) -> M ([ResKind], [Diagnostic]) -> ServerM ()
+runStuff filepath responderM dig program = do
+  let cont (responses, diagnostics) = do
+        sendDiagnostics filepath diagnostics
+        case responderM of
+          Nothing -> sendCustomResponse filepath responses
+          Just responder -> responder $ Res filepath responses
+
+  runStuff' filepath (`dig` cont) program >>= cont
+
+runStuff' :: FilePath -> (Loc -> ServerM ()) -> M ([ResKind], [Diagnostic]) -> ServerM ([ResKind], [Diagnostic])
+runStuff' filepath dig program =
   case runM program of
     Left (ToClient err) -> do
       sendDiagnostics filepath (toDiagnostics err)
       return ([ResError [globalError err]], [])
     Left (ToServer loc) -> do
-      logText "SHOULD DIG HOLE"
+      dig loc
       return ([], [])
     Right (responses, diagnostics) -> return (responses, diagnostics)
 
@@ -229,3 +280,14 @@ sendDiagnostics filepath diags = do
 
 sendCustomResponse :: FilePath -> [ResKind] -> ServerM ()
 sendCustomResponse filepath responses = sendNotification (SCustomMethod "guacamole") $ JSON.toJSON $ Res filepath responses
+
+replaceText :: FilePath -> Loc -> Text -> ServerM () -> ServerM ()
+replaceText filepath loc text callback = do
+  let removeSpec = TextEdit (locToRange loc) text
+  let identifier = VersionedTextDocumentIdentifier (filePathToUri filepath) (Just 0)
+  let textDocumentEdit = TextDocumentEdit identifier (List [InL removeSpec])
+  let change = InL textDocumentEdit
+  let workspaceEdit = WorkspaceEdit Nothing (Just (List [change])) Nothing
+  let applyWorkspaceEditParams = ApplyWorkspaceEditParams (Just "Resolve Spec") workspaceEdit
+
+  void $ sendRequest SWorkspaceApplyEdit applyWorkspaceEditParams $ const callback

@@ -105,3 +105,16 @@ locToRange (Loc start end) = Range (posToPosition start) (posToPosition (transla
 locToLocation :: Loc -> Location
 locToLocation NoLoc = Location (Uri "") (locToRange NoLoc)
 locToLocation (Loc start end) = Location (Uri $ Text.pack $ posFile start) (locToRange (Loc start end))
+
+-- rangeToLSPRange :: Range -> LSP.Range
+-- rangeToLSPRange (Range start end) = LSP.Range (posToPosition start) (posToPosition (translate 1 end))
+--   where
+--     translate :: Int -> Pos -> Pos
+--     translate n (Pos path ln col offset) = Pos path ln ((col + n) `max` 0) ((offset + n) `max` 0)
+
+-- posToPosition :: Pos -> Position
+-- posToPosition (Pos _path ln col _offset) = Position ((ln - 1) `max` 0) ((col - 1) `max` 0)
+
+-- rangeToLocation :: Range -> Location
+-- rangeToLocation (Range start end) =
+--   Location (Uri $ Text.pack $ posFile start) (rangeToLSPRange (Range start end))

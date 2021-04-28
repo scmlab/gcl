@@ -29,6 +29,8 @@ import Syntax.Predicate
     Spec (..),
     specPayload,
   )
+import Control.Monad.Writer
+import LSP.Monad
 
 --------------------------------------------------------------------------------
 
@@ -104,6 +106,12 @@ type M = Except Error2
 runM :: M a -> Either Error2 a
 runM = runExcept
 
+
+type Eff a = ExceptT Loc (WriterT [Diagnostic] (WriterT [ResKind] ServerM)) a
+
+runEff :: Eff a -> ServerM ((Either Loc a, [Diagnostic]), [ResKind])
+runEff p = runWriterT (runWriterT (runExceptT p))
+
 -- ignoreError :: M [ResKind] -> [ResKind]
 -- ignoreError program =
 --   case runM program of
@@ -168,6 +176,15 @@ checkEverything :: FilePath -> Text -> Maybe (Int, Int) -> M ([PO], [Spec], [A.E
 checkEverything filepath source mouseSelection = do
   program@(A.Program _ globalProps _ _ _) <- parseProgram filepath source
   typeCheck program
+  (pos, specs, warings) <- genPO program
+  case mouseSelection of
+    Nothing -> return (pos, specs, globalProps, warings)
+    Just sel -> return (filterPOs sel pos, specs, globalProps, warings)
+
+-- | Only generate POs and Specs
+genPOsandSpecsOnly :: FilePath -> Text -> Maybe (Int, Int) -> M ([PO], [Spec], [A.Expr], [StructWarning])
+genPOsandSpecsOnly filepath source mouseSelection = do
+  program@(A.Program _ globalProps _ _ _) <- parseProgram filepath source
   (pos, specs, warings) <- genPO program
   case mouseSelection of
     Nothing -> return (pos, specs, globalProps, warings)
