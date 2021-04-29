@@ -4,7 +4,6 @@ var x, y, z : Int
 { z + x * y = A * B, bnd: y }
 do y /= 1 -> 
     [!
-    
     !]
 od
 { z = A * B }

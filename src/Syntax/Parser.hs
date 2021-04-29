@@ -5,7 +5,7 @@
 
 module Syntax.Parser where
 
-import Control.Applicative.Combinators (choice, eitherP, many, manyTill_, optional, sepBy1, (<|>))
+import Control.Applicative.Combinators (choice, eitherP, many, optional, sepBy1, (<|>), manyTill)
 import Control.Monad (void)
 import Control.Monad.Combinators.Expr (Operator (..), makeExprParser)
 import Control.Monad.Trans (lift)
@@ -22,6 +22,23 @@ import Syntax.Parser.Util
 import Text.Megaparsec (MonadParsec (..), Pos, anySingle, mkPos, parse, tokensToChunk, unPos, (<?>))
 import Text.Megaparsec.Char (eol)
 import qualified Text.Megaparsec.Char.Lexer as Lex
+
+-- The monad binding of ParserF will insert space consumer or indent guard inbetween, 
+-- which sould be convenient for handling linefold indentation. 
+
+-- Therefore, users are suggested to implement low level parsers, helper functions 
+-- under ParserF monad. For the sake of need not bother handling indentation for linefold, 
+-- which should be left for top level parsers to handle.
+
+-- Hence, the Parser monad is only restricted to top level parsers 
+-- (e.g. pProgram, pDeclaration, pBlockDeclaration, pStmts, pStmt, pExpr, pType ...)
+
+-- In some case, we may want to release the restriction of linefold under the ParserF monad,
+-- which can be achieve by `lift p` (p : Parser a), see `pBlock` for example.
+
+-- While we may want to do the opposite way under Parser monad in order to 
+-- specify the space consumer that we wanted to use, which can be achive by using the 
+-- downward coercion combinater `(↓) p sc` (p : ParserF a), see `pBlockDeclaration` for example.
 
 type Parser = Lexer
 
@@ -49,8 +66,7 @@ pProgram = do
 pDeclaration :: Parser Declaration
 pDeclaration = Lex.lineFold scn (parser p)
   where
-    p =
-      choice
+    p = choice
         [ try pConstDeclWithProp,
           pConstDecl,
           try pVarDeclWithProp,
@@ -61,17 +77,14 @@ pDeclaration = Lex.lineFold scn (parser p)
         <?> "declaration"
 
 pBlockDeclaration :: Parser BlockDeclaration
-pBlockDeclaration =
-  Lex.indentBlock scn p
-  where
-    p = do
-      bs <- (↓) lexDeclStart sc
-      d0 <- (try . optional) (scn >> ((,) <$> Lex.indentLevel <*> pBlockDecl)) <|> return Nothing
-      case d0 of
-        Just (pos, decl0) ->
-          return (Lex.IndentMany (Just pos) (\ds -> BlockDeclaration bs (decl0 : ds) <$> (↓) lexDeclEnd scn) pBlockDecl)
-        Nothing -> do
-          return (Lex.IndentMany Nothing (\ds -> BlockDeclaration bs ds <$> (↓) lexDeclEnd scn) pBlockDecl)
+pBlockDeclaration = (↓) pBlockDeclaration' scn
+
+pBlockDeclaration' :: ParserF BlockDeclaration
+pBlockDeclaration' =
+  BlockDeclaration
+  <$> lexDeclStart
+  <*> pIndentBlock pBlockDecl True
+  <*> lexDeclEnd
 
 pConstDecl :: ParserF Declaration
 pConstDecl =
@@ -121,18 +134,21 @@ pDeclProp =
 
 pDeclBody :: ParserF DeclBody
 pDeclBody =
-  DeclBody 
-  <$> upperName
+  DeclBody
+  <$> pName
   <*> many lowerName
   <*> lexEQ'
   <*> pExpr'
 
-pBlockDecl :: Parser BlockDecl
+pBlockDecl :: ParserF BlockDecl
 pBlockDecl = do
   ref <- Lex.indentLevel
-  (decl, mDeclProp) <- Lex.lineFold scn (\sc' -> (,) <$> (↓) (pDecl upperName) sc' <*> (↓) (optional (eitherP pDeclProp pExpr')) sc') 
-  mDeclBody <- (try . optional) (Lex.indentGuard scn Ord.EQ ref >> (↓) pDeclBody sc) <|> return Nothing
+  (decl, mDeclProp) <- lift $ Lex.lineFold scn (constDecl ↓)
+  mDeclBody <- (try . optional) (declBodyGuard ref >> pDeclBody) <|> return Nothing
   return $ BlockDecl decl mDeclProp mDeclBody
+  where
+    constDecl = (,) <$> pDecl pName <*> optional (eitherP pDeclProp pExpr')
+    declBodyGuard ref = lift $ Lex.indentGuard scn Ord.EQ ref
 
 
 ------------------------------------------
@@ -154,11 +170,11 @@ pStmt' =
       try pAssert,
       pLoopInvariant,
       pAssign,
-      lift pDo,
-      lift pIf,
+      pDo,
+      pIf,
       pSpecQM,
-      lift pSpec,
-      lift pProof
+      pSpec,
+      pProof
     ]
     <* lift sc
     <?> "statement"
@@ -186,56 +202,38 @@ pLoopInvariant =
     <*> pExpr'
     <*> lexBraceEnd
 
-pDo :: Parser Stmt
-pDo = do
-  (tDo, gdcmds, tOd) <- pIfoDoHelper lexDo lexOd
-  return $ Do tDo gdcmds tOd
+pDo :: ParserF Stmt
+pDo = 
+  Do
+  <$> lexDo
+  <*> pIndentSepBy pGdCmd lexGuardBar 
+  <*> lexOd
 
-pIf :: Parser Stmt
+pIf :: ParserF Stmt
 pIf = do
-  (tIf, gdcmds, tFi) <- pIfoDoHelper lexIf lexFi
-  return $ If tIf gdcmds tFi
-
--- pGdCmd :: ParserF GdCmd
--- pGdCmd = (↑) (Lex.indentBlock scn . p)
---   where
---     p :: Parser () -> Parser (Lex.IndentOpt Parser GdCmd Stmt)
---     p sc' = do
---       gd <- pExpr
---       arrow <- (↓) lexArrow sc
---       sc'
---       pos <- Lex.indentLevel
---       s0 <- pStmt
---       return $ Lex.IndentMany (Just pos) (\ss -> return $ GdCmd gd arrow (s0 : ss) ) pStmt
+  If
+  <$> lexIf
+  <*> pIndentSepBy pGdCmd lexGuardBar 
+  <*> lexFi
 
 pGdCmd :: ParserF GdCmd
-pGdCmd = do
-  gd <- pExpr'
-  arrow <- lexArrow
-  pos <- Lex.indentLevel
-  stmt0 <- lift pStmt
-  -- check if is end of line, e.g. have statements more than one
-  isEol <- optional . try . lift $ eol
-  done <- isJust <$> optional eof
-  case (isEol, done) of
-    (Just _, False) -> do
-      stmts <- lift $ indentedItems (posMoveLeft pos 1) pos scn pStmt
-      return (GdCmd gd arrow (stmt0 : stmts))
-    _ -> return (GdCmd gd arrow [stmt0])
-  where
-    posMoveLeft pos i = mkPos (unPos pos - i)
+pGdCmd =
+  GdCmd
+  <$> pExpr'
+  <*> lexArrow
+  <*> pIndentBlock (lift pStmt) False
 
 pSpecQM :: ParserF Stmt
 pSpecQM = SpecQM . locOf <$> lexQM
 
-pSpec :: Parser Stmt
+pSpec :: ParserF Stmt
 pSpec = do
-  (ts, t, te) <- pBlock lexSpecStart lexSpecEnd anySingle
+  (ts, t, te) <- pBlock lexSpecStart anySingle lexSpecEnd
   return $ Spec ts (tokensToChunk (Proxy :: Proxy Text) t) te
 
-pProof :: Parser Stmt
+pProof :: ParserF Stmt
 pProof = do
-  (ts, _, te) <- pBlock lexProofStart lexProofEnd anySingle
+  (ts, _, te) <- pBlock lexProofStart anySingle lexProofEnd
   return $ Proof ts te
 
 ------------------------------------------
@@ -278,12 +276,12 @@ pInterval = Interval <$> pEndpointOpen <*> lexRange <*> pEndpointClose
 pEndpointOpen :: ParserF EndpointOpen
 pEndpointOpen =
   (IncludingOpening <$> lexBracketStart <*> pExpr')
-    <|> (ExcludingOpening <$> lexParenStart <*> pExpr')
+  <|> (ExcludingOpening <$> lexParenStart <*> pExpr')
 
 pEndpointClose :: ParserF EndpointClose
 pEndpointClose =
   try (IncludingClosing <$> pExpr' <*> lexBracketEnd)
-    <|> (ExcludingClosing <$> pExpr' <*> lexParenEnd)
+  <|> (ExcludingClosing <$> pExpr' <*> lexParenEnd)
 
 ------------------------------------------
 -- parse Expr
@@ -347,14 +345,14 @@ pConst = Const <$> pName
 pQuant :: ParserF Expr
 pQuant =
   Quant
-    <$> lexQuantStarts
-    <*> qOp
-    <*> qNames
-    <*> lexColon
-    <*> pExpr'
-    <*> lexColon
-    <*> pExpr'
-    <*> lexQuantEnds
+  <$> lexQuantStarts
+  <*> qOp
+  <*> qNames
+  <*> lexColon
+  <*> pExpr'
+  <*> lexColon
+  <*> pExpr'
+  <*> lexQuantEnds
   where
     qOp = choice [Left <$> lexOps, Right <$> pTerm]
     qNames = sepBy1 lowerName . try . (↑) $ id
@@ -409,68 +407,87 @@ pSepBy delim p = do
 pList :: ParserF a -> ParserF (SepBy tokComma a)
 pList = pSepBy lexComma
 
-pIfoDoHelper ::
-  ParserF (Token s) ->
-  ParserF (Token e) ->
-  Parser (Token s, SepBy sep GdCmd, Token e)
-pIfoDoHelper start end =
-  pIndentSepBy start end (pGdCmd, lexGuardBar)
-
 ------------------------------------------
 -- Dirty Indents
 ------------------------------------------
 
+-- parse a block regardless of indentation
+-- e.g.
+--    start
+--  p0
+--            p1
+--      p2
+--  ...
+--    end
+-- 
 pBlock ::
-  ParserF (Token s) ->
-  ParserF (Token e) ->
-  Parser a ->
-  Parser (Token s, [a], Token e)
-pBlock start end p = do
-  ref <- Lex.indentLevel
-  ts <- (↓) start sc
-  (t, te) <- manyTill_ p ((↓) end sc)
-  let pos = getTokenColumn te
-  if compare pos ref == Ord.LT
-    then Lex.incorrectIndent Ord.EQ pos ref
-    else return (ts, t, te)
-
-pIndentSepBy ::
-  ParserF (Token s) ->
-  ParserF (Token e) ->
-  (ParserF a, ParserF (Token sep)) ->
-  Parser (Token s, SepBy sep a, Token e)
-pIndentSepBy start end (p, delim) = do
-  ref <- Lex.indentLevel
-  -- parse start token and guard the indentation level
-  ts <- (↓) start scn
-
-  -- start parsing p
-  ps <- parseP ref
-
-  -- guard the end token position
-  indentGTE ref scn
-  te <- (↓) end sc
-
-  return (ts, ps, te)
+  ParserF s ->                      -- start parser
+  ParserF a ->                      -- parser inbetween
+  ParserF e ->                      -- end parser
+  ParserF (s, [a], e)
+pBlock start p end = do
+  ts <- lift start'                        -- release linefold restriction 
+  t <- lift $ manyTill p' (lookAhead end') -- release linefold restriction
+  te <- end
+  return (ts, t, te)
   where
-    parseP ref = do
-      gdPos <- Lex.indentGuard scn Ord.GT ref
-      x <- (↓) p . void $ Lex.indentGuard scn Ord.GT ref
+    p' = (↓) p sc
+    start' = (↓) start sc
+    end' = (↓) end sc
+
+-- parse indentblock with delim
+pIndentSepBy ::
+  ParserF a ->                      -- parser to be indented
+  ParserF (Token sep) ->            -- delim parser
+  ParserF (SepBy sep a)
+pIndentSepBy p delim = do
+  gdPos <- Lex.indentLevel
+  x <- p
+  let g = do
+        delimPos <- Lex.indentLevel
+        if compare delimPos gdPos == Ord.LT
+          then Delim x <$> lift (delim' gdPos) <*> parseP gdPos delimPos
+          else Lex.incorrectIndent Ord.LT gdPos delimPos
+  try g <|> return (Head x)
+  where
+    -- make sure parser after delim start at the same position
+    delim' pos = (↓) delim (void $ Lex.indentGuard sc Ord.EQ pos)   
+
+    parseP gdPos delimPos = do
+      x <- p
       let g = do
-            delimPos <- Lex.indentGuard scn Ord.GT ref
-            if compare delimPos gdPos == Ord.LT
-              then Delim x <$> (↓) delim sc <*> parseP' gdPos delimPos ref
-              else Lex.incorrectIndent Ord.LT gdPos delimPos
+            -- make sure the delim parser start at the same position
+            lift . void $ Lex.indentGuard scn Ord.EQ delimPos         
+            Delim x <$> lift (delim' gdPos) <*> parseP gdPos delimPos
       try g <|> return (Head x)
 
-    parseP' gdPos delimPos ref = do
-      void $ Lex.indentGuard sc Ord.EQ gdPos
-      x <- (↓) p . void $ Lex.indentGuard scn Ord.GT ref
-      let g = do
-            void $ Lex.indentGuard scn Ord.EQ delimPos
-            Delim x <$> (↓) delim sc <*> parseP' gdPos delimPos ref
-      try g <|> return (Head x)
 
+pIndentBlock ::
+  ParserF a ->                      -- parser to be indented
+  Bool ->                           -- restriction of indentation, 
+                                    -- False if indented parser can have the same level as reference parser (e.g. GdCmd)
+                                    -- True if the parser have to be strictly indented
+  ParserF [a]
+pIndentBlock p restrict = do
+  pos <- Lex.indentLevel
+  p0 <- lift p'
+
+  isEol <- optional . try . lift $ eol
+  done <- isJust <$> optional eof
+  case (isEol, done) of
+    (Just _, False) -> do
+      let ref = if restrict
+          then pos
+          else posMoveLeft pos 1
+      ps <- lift $ indentedItems ref pos scn p'
+      return (p0 : ps)
+    _ -> return [p0]                          -- eof or no newline => only one indented element
+  where
+    p' = (↓) p sc                             -- make sure p doesn't parse newline
+    posMoveLeft pos i = mkPos (unPos pos - i) -- safe, since pos should be greater than ref,
+                                              -- by the definition of ParserF 
+
+-- copied from Text.Megaparsec.Char.Lexer
 indentedItems ::
   (MonadParsec e s m) =>
   Pos ->
@@ -491,6 +508,3 @@ indentedItems ref lvl sc' p = go
               | pos <= ref -> return []
               | pos == lvl -> (:) <$> p <*> go
               | otherwise -> Lex.incorrectIndent Ord.EQ lvl pos
-
-indentGTE :: Pos -> Parser () -> Parser ()
-indentGTE ref sc' = void $ try (Lex.indentGuard sc' Ord.EQ ref) <|> Lex.indentGuard sc' Ord.GT ref
