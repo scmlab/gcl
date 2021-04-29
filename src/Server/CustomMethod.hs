@@ -1,4 +1,6 @@
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DisambiguateRecordFields #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -7,7 +9,10 @@
 module Server.CustomMethod where
 
 import Control.Monad.Except hiding (guard)
+import Control.Monad.Free
+import Control.Monad.Writer
 import Data.Aeson (FromJSON, ToJSON)
+import qualified Data.Aeson as JSON
 import Data.Foldable (find)
 import Data.List (sort)
 import Data.Loc (Loc (..), Located (locOf), posCoff)
@@ -18,8 +23,11 @@ import qualified GCL.Type as TypeChecking
 import GCL.WP (StructWarning)
 import qualified GCL.WP as POGen
 import GHC.Generics (Generic)
-import Server.ExportPO ()
+import Language.LSP.Diagnostics (partitionBySource)
+import Language.LSP.Server
 import Language.LSP.Types hiding (TextDocumentSyncClientCapabilities (..))
+import Server.ExportPO ()
+import Server.Monad
 import qualified Syntax.Abstract as A
 import Syntax.Concrete (ToAbstract (toAbstract))
 import Syntax.Parser
@@ -29,8 +37,6 @@ import Syntax.Predicate
     Spec (..),
     specPayload,
   )
-import Control.Monad.Writer
-import Server.Monad
 
 --------------------------------------------------------------------------------
 
@@ -93,43 +99,58 @@ type ID = LspId ('CustomMethod :: Method 'FromClient 'Request)
 
 --------------------------------------------------------------------------------
 
+data Eff next
+  = ReportDiagnostic [Diagnostic] next
+  | EditTextDocument Range Text (Free Eff next) next
+  | SendResponse [ResKind]
+  deriving (Functor)
+
+type EffM = Free Eff
+
+reponrtDiagnostic :: [Diagnostic] -> EffM ()
+reponrtDiagnostic xs = liftF (ReportDiagnostic xs ())
+
+editTextDocument :: Range -> Text -> EffM () -> EffM ()
+editTextDocument range text again = liftF (EditTextDocument range text again ())
+
+sendResponse :: [ResKind] -> EffM ()
+sendResponse responses = liftF (SendResponse responses)
+
+type Responder = Response -> ServerM ()
+
+runEffM :: FilePath -> Maybe Responder -> EffM () -> ServerM ()
+runEffM _ _ (Pure ()) = logText "Improper termination"
+runEffM filepath responder (Free (ReportDiagnostic diagnostics next)) = do
+  version <- bumpCounter
+  publishDiagnostics 100 (toNormalizedUri (filePathToUri filepath)) (Just version) (partitionBySource diagnostics)
+  runEffM filepath responder next
+runEffM filepath responder (Free (EditTextDocument range text again next)) = do
+  -- apply edit 
+  let removeSpec = TextEdit range text
+  let identifier = VersionedTextDocumentIdentifier (filePathToUri filepath) (Just 0)
+  let textDocumentEdit = TextDocumentEdit identifier (List [InL removeSpec])
+  let change = InL textDocumentEdit
+  let workspaceEdit = WorkspaceEdit Nothing (Just (List [change])) Nothing
+  let applyWorkspaceEditParams = ApplyWorkspaceEditParams (Just "Resolve Spec") workspaceEdit
+  -- run "again" before continue on
+  let callback _ = runEffM filepath responder $ again >> next
+  void $ sendRequest SWorkspaceApplyEdit applyWorkspaceEditParams callback
+runEffM filepath Nothing (Free (SendResponse responses)) =
+  sendNotification (SCustomMethod "guacamole") $ JSON.toJSON $ Res filepath responses
+runEffM filepath (Just responder) (Free (SendResponse responses)) =
+  responder $ Res filepath responses
+
 -- | TODO: refactor this
 data Error2
   = ReportError Error
   | DigHole Loc
-  | RefineSpec Spec Text 
+  | RefineSpec Spec Text
   deriving (Show, Eq)
 
 type M = Except Error2
 
 runM :: M a -> Either Error2 a
 runM = runExcept
-
-
-type Eff a = ExceptT Loc (WriterT [Diagnostic] (WriterT [ResKind] ServerM)) a
-
-runEff :: Eff a -> ServerM ((Either Loc a, [Diagnostic]), [ResKind])
-runEff p = runWriterT (runWriterT (runExceptT p))
-
--- ignoreError :: M [ResKind] -> [ResKind]
--- ignoreError program =
---   case runM program of
---     Left _err -> []
---     Right val -> val
-
--- catches Error and convert it into a global ResError
--- asGlobalError :: M [ResKind] -> CustomError
--- asGlobalError program =
---   case runM program of
---     Left err -> ReportError $  [ResError [globalError err]]
---     Right val -> val
-
--- catches Error and convert it into a local ResError with Hole id
--- asLocalError :: Int -> M [ResKind] -> [ResKind]
--- asLocalError i program =
---   case runM program of
---     Left err -> [ResError [localError i err]]
---     Right val -> val
 
 --------------------------------------------------------------------------------
 
