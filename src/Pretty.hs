@@ -40,8 +40,8 @@ instance (Pretty a, Pretty b) => Pretty (Either a b) where
 
 -- | Error2 
 instance Pretty Error2 where
-  pretty (ToClient err) = "ToClient " <+> pretty err
-  pretty (ToServer err) = "ToServer " <+> pretty err
+  pretty (ReportError err) = "ReportError " <+> pretty err
+  pretty (DigHole err) = "DigHole " <+> pretty err
 
 --------------------------------------------------------------------------------
 

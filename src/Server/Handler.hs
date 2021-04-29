@@ -5,28 +5,28 @@
 
 module Server.Handler (handlers) where
 
-import Control.Monad (void)
-import Data.Aeson (Value)
+import Control.Monad.Cont
 import qualified Data.Aeson as JSON
 import Data.Loc
 import Data.Text (Text, pack)
 import qualified Data.Text as Text
 import Error
 import GCL.Expr (expand, runSubstM)
-import Server.CustomMethod
-import Server.Diagnostic (ToDiagnostics (toDiagnostics), locToRange)
-import Server.ExportPO ()
-import Server.Monad
 import Language.LSP.Diagnostics (partitionBySource)
 import Language.LSP.Server
-import Language.LSP.Types hiding (TextDocumentSyncClientCapabilities (..))
-import qualified Language.LSP.Types as LSP
-import qualified Syntax.Abstract as A
-import Syntax.Predicate
-  ( Spec (..),
+import Language.LSP.Types hiding
+  ( TextDocumentSyncClientCapabilities (..),
   )
-import Control.Concurrent
-import Control.Monad.Cont (liftIO)
+import qualified Language.LSP.Types as LSP
+import Server.CustomMethod
+import Server.Diagnostic
+  ( ToDiagnostics (toDiagnostics),
+    locToRange,
+  )
+import Server.ExportPO ()
+import Server.Monad
+import qualified Syntax.Abstract as A
+import Syntax.Predicate (Spec (..))
 
 -- handlers of the LSP server
 handlers :: Handlers ServerM
@@ -97,86 +97,77 @@ handlers =
           JSON.Success request@(Req filepath kind) -> do
             logText $ " --> Custom Reqeust: " <> pack (show request)
 
-            result <- readSavedSource filepath
-            case result of
-              Nothing -> responder NotLoaded
-              Just source -> do
-                -- convert Request to Response
-                case kind of
-                  -- Inspect
-                  ReqInspect selStart selEnd -> do
-                    updateSelection filepath (selStart, selEnd)
+            -- convert Request to Response
+            case kind of
+              -- Inspect
+              ReqInspect selStart selEnd -> do
+                updateSelection filepath (selStart, selEnd)
 
-                    runStuff filepath (Just responder) dontDigHole $ do
-                      (pos, _specs, _globalProps, warnings) <- checkEverything filepath source (Just (selStart, selEnd))
-                      let diagnostics = concatMap toDiagnostics pos ++ concatMap toDiagnostics warnings
-                      let responses = [ResInspect pos]
-                      return (responses, diagnostics)
-
-                  -- Refine
-                  ReqRefine selStart selEnd -> do
-                    result' <- readLatestSource filepath
-                    case result' of
-                      Nothing -> responder $ Res filepath [ResError [globalError (Others "no source")]]
-                      Just source' -> do
-                        case runM (refine filepath source' (selStart, selEnd)) of
-                          Left (ToClient err) -> do
-                            sendDiagnostics filepath (toDiagnostics err)
-                            responder $ Res filepath [ResError [globalError err]]
-                          Left (ToServer loc) -> do
-                            logText "SHOULD DIG HOLE 2"
-                            responder $ Res filepath []
-                          Right (spec, payload) -> do
-                            logText " *** [ Refine ] Payload of the spec:"
-                            logText payload
-                            -- replace the Spec with its parsed payload
-                            replaceText filepath (specLoc spec) (Text.stripStart payload) $ do
-                              result'' <- readLatestSource filepath
-                              case result'' of
-                                Nothing -> return ()
-                                Just source'' -> do
-                                  logText "after"
-                                  checkAndSendResponse filepath source''
-
-                            -- let removeSpec = TextEdit (locToRange (specLoc spec)) (Text.stripStart payload)
-                            -- let identifier = VersionedTextDocumentIdentifier (filePathToUri filepath) (Just 0)
-                            -- let textDocumentEdit = TextDocumentEdit identifier (List [InL removeSpec])
-                            -- let change = InL textDocumentEdit
-                            -- let workspaceEdit = WorkspaceEdit Nothing (Just (List [change])) Nothing
-                            -- let applyWorkspaceEditParams = ApplyWorkspaceEditParams (Just "Resolve Spec") workspaceEdit
-                            -- let responder' response = case response of
-                            --       Left _responseError -> return ()
-                            --       Right _value -> do
-                            --         -- ? ==> [!  !]
-                            --         result'' <- readLatestSource filepath
-                            --         case result'' of
-                            --           Nothing -> return ()
-                            --           Just source'' -> do
-                            --             logText "after"
-                            --             version' <- bumpCounter
-                            --             checkAndSendResponse filepath source'' version'
-
-                            -- _ <- sendRequest SWorkspaceApplyEdit applyWorkspaceEditParams responder'
-
-                  -- Substitute
-                  ReqSubstitute index expr _subst -> do
+                result <- readSavedSource filepath
+                case result of
+                  Nothing -> responder NotLoaded
+                  Just savedSource -> do
+                    let next = final filepath (Just responder)
                     let program = do
-                          A.Program _ _ defns _ _ <- parseProgram filepath source
-                          let expr' = runSubstM (expand (A.Subst expr _subst)) defns 1
-                          return [ResSubstitute index expr']
+                          (pos, _specs, _globalProps, warnings) <- checkEverything filepath savedSource (Just (selStart, selEnd))
+                          let diagnostics = concatMap toDiagnostics pos ++ concatMap toDiagnostics warnings
+                          let responses = [ResInspect pos]
+                          return (responses, diagnostics)
+
+                    runStuff filepath False program next
+
+              -- Refine
+              ReqRefine selStart selEnd -> do
+                result <- readLatestSource filepath
+                case result of
+                  Nothing -> responder $ Res filepath [ResError [globalError (Others "no source")]]
+                  Just latestSource -> do
+                    let program = refine filepath latestSource (selStart, selEnd)
                     case runM program of
-                      Left (ToClient err) -> do
+                      Left (ReportError err) -> do
                         sendDiagnostics filepath (toDiagnostics err)
                         responder $ Res filepath [ResError [globalError err]]
-                      Left (ToServer loc) -> do
+                      Left (DigHole loc) -> do
+                        logText "SHOULD DIG HOLE 2"
+                        responder $ Res filepath []
+                      Right (spec, payload) -> do
+                        logText " *** [ Refine ] Payload of the spec:"
+                        logText payload
+                        -- replace the Spec with its parsed payload
+                        replaceText filepath (specLoc spec) (Text.stripStart payload) $ do
+                          result'' <- readLatestSource filepath
+                          case result'' of
+                            Nothing -> return ()
+                            Just source'' -> do
+                              logText "after"
+                              checkAndSendResponse filepath source''
+
+              -- Substitute
+              ReqSubstitute index expr _subst -> do
+                result <- readSavedSource filepath
+                case result of
+                  Nothing -> responder NotLoaded
+                  Just savedSource -> do
+                    let program = do
+                          A.Program _ _ defns _ _ <- parseProgram filepath savedSource
+                          let expr' = runSubstM (expand (A.Subst expr _subst)) defns 1
+                          return [ResSubstitute index expr']
+
+                    -- runStuff filepath True program next
+
+                    case runM program of
+                      Left (ReportError err) -> do
+                        sendDiagnostics filepath (toDiagnostics err)
+                        responder $ Res filepath [ResError [globalError err]]
+                      Left (DigHole loc) -> do
                         logText "SHOULD DIG HOLE 3"
                         responder $ Res filepath []
                       Right res -> responder $ Res filepath res
 
-                  -- ExportProofObligations
-                  ReqExportProofObligations ->
-                    responder $ Res filepath [ResConsoleLog "Export"]
-                  ReqDebug -> return $ error "crash!",
+              -- ExportProofObligations
+              ReqExportProofObligations ->
+                responder $ Res filepath [ResConsoleLog "Export"]
+              ReqDebug -> return $ error "crash!",
       -- when the client saved the document, store the text for later use
       notificationHandler STextDocumentDidSave $ \ntf -> do
         logText " --> TextDocumentDidSave"
@@ -204,74 +195,59 @@ checkAndSendResponse :: FilePath -> Text -> ServerM ()
 checkAndSendResponse filepath source = do
   lastSelection <- readLastSelection filepath
   version <- bumpCounter
-  runStuff filepath Nothing (digHole filepath) $ do
-    (pos, specs, globalProps, warnings) <- checkEverything filepath source lastSelection
-    let diagnostics = concatMap toDiagnostics pos ++ concatMap toDiagnostics warnings
-    let responses = [ResOK (IdInt version) pos specs globalProps warnings]
-    return (responses, diagnostics)
 
-type Cont = ([ResKind], [Diagnostic]) -> ServerM ()
+  let next = final filepath Nothing
+  let program = do
+        (pos, specs, globalProps, warnings) <- checkEverything filepath source lastSelection
+        let diagnostics = concatMap toDiagnostics pos ++ concatMap toDiagnostics warnings
+        let responses = [ResOK (IdInt version) pos specs globalProps warnings]
+        return (responses, diagnostics)
+
+  runStuff filepath True program next
 
 -- replace the question mark "?" with a hole "[!  !]"
-digHole :: FilePath -> Loc -> Cont -> ServerM ()
+digHole :: FilePath -> Loc -> CCC Input () -> ServerM ()
 digHole _ilepath NoLoc _ = return ()
-digHole filepath (Loc start end) cont = do
+digHole filepath (Loc start end) next = do
   let indent = Text.replicate (posCol start - 1) " "
   let holeText = "[!\n" <> indent <> "\n" <> indent <> "!]"
   replaceText filepath (Loc start end) holeText $ do
-  -- 
+    --
     result <- readLatestSource filepath
     case result of
       Nothing -> return ()
       Just source -> do
         version <- bumpCounter
-        res <- runStuff' filepath (const (return ())) $ do
-          (pos, specs, globalProps, warnings) <- genPOsandSpecsOnly filepath source Nothing
-          let diagnostics = concatMap toDiagnostics pos ++ concatMap toDiagnostics warnings
-          let responses = [ResOK (IdInt version) pos specs globalProps warnings]
-          return (responses, diagnostics)
-        cont res
+
+        let program = do
+              (pos, specs, globalProps, warnings) <- genPOsandSpecsOnly filepath source Nothing
+              let diagnostics = concatMap toDiagnostics pos ++ concatMap toDiagnostics warnings
+              let responses = [ResOK (IdInt version) pos specs globalProps warnings]
+              return (responses, diagnostics)
+
+        runStuff filepath True program next
+
+final :: FilePath -> Maybe (Response -> ServerM ()) -> CCC Input ()
+final filepath responderM (responses, diagnostics) = do
+  sendDiagnostics filepath diagnostics
+  case responderM of
+    Nothing -> sendCustomResponse filepath responses
+    Just responder -> responder $ Res filepath responses
 
 
+type Input = ([ResKind], [Diagnostic])
+type CCC input a = input -> ServerM a
 
-dontDigHole :: Loc -> Cont -> ServerM ()
-dontDigHole _ _ = return ()
-
--- runEff' :: FilePath -> Maybe (Response -> ServerM ()) -> Eff a -> ServerM (Maybe a)
--- runEff' filepath responderM program = do
---   case runEff filepath program of
---     Left loc -> do
---       logText "SHOULD DIG HOLE"
---       return Nothing
---     Right a -> return (Just a)
-
--- sendDiagnostics filepath diagnostics
--- -- send responses to the responder if available
--- -- else send as notification
--- case responderM of
---   Nothing -> sendCustomResponse filepath responses
---   Just responder -> responder $ Res filepath responses
-
-runStuff :: FilePath -> Maybe (Response -> ServerM ()) -> (Loc -> Cont -> ServerM ()) -> M ([ResKind], [Diagnostic]) -> ServerM ()
-runStuff filepath responderM dig program = do
-  let cont (responses, diagnostics) = do
-        sendDiagnostics filepath diagnostics
-        case responderM of
-          Nothing -> sendCustomResponse filepath responses
-          Just responder -> responder $ Res filepath responses
-
-  runStuff' filepath (`dig` cont) program >>= cont
-
-runStuff' :: FilePath -> (Loc -> ServerM ()) -> M ([ResKind], [Diagnostic]) -> ServerM ([ResKind], [Diagnostic])
-runStuff' filepath dig program =
+runStuff :: FilePath -> Bool -> M Input -> CCC Input () -> ServerM ()
+runStuff filepath shouldDigHole program next =
   case runM program of
-    Left (ToClient err) -> do
+    Left (ReportError err) -> do
       sendDiagnostics filepath (toDiagnostics err)
-      return ([ResError [globalError err]], [])
-    Left (ToServer loc) -> do
-      dig loc
-      return ([], [])
-    Right (responses, diagnostics) -> return (responses, diagnostics)
+      next ([ResError [globalError err]], [])
+    Left (DigHole loc) -> do
+      when shouldDigHole $ do 
+        digHole filepath loc next
+    Right (responses, diagnostics) -> next (responses, diagnostics)
 
 sendDiagnostics :: FilePath -> [Diagnostic] -> ServerM ()
 sendDiagnostics filepath diags = do

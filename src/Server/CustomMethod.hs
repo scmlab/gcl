@@ -95,10 +95,8 @@ type ID = LspId ('CustomMethod :: Method 'FromClient 'Request)
 
 -- | TODO: refactor this
 data Error2
-  = -- | Error that should be sent and handled by the client
-    ToClient Error
-  | -- | Error that should be handled here by the server
-    ToServer Loc
+  = ReportError Error
+  | DigHole Loc
   deriving (Show, Eq)
 
 type M = Except Error2
@@ -122,7 +120,7 @@ runEff p = runWriterT (runWriterT (runExceptT p))
 -- asGlobalError :: M [ResKind] -> CustomError
 -- asGlobalError program =
 --   case runM program of
---     Left err -> ToClient $  [ResError [globalError err]]
+--     Left err -> ReportError $  [ResError [globalError err]]
 --     Right val -> val
 
 -- catches Error and convert it into a local ResError with Hole id
@@ -136,14 +134,14 @@ runEff p = runWriterT (runWriterT (runExceptT p))
 
 -- | Parse with a parser
 parse :: Parser a -> FilePath -> Text -> M a
-parse p filepath = withExcept (ToClient . SyntacticError) . liftEither . runParse p filepath
+parse p filepath = withExcept (ReportError . SyntacticError) . liftEither . runParse p filepath
 
 -- | Parse the whole program
 parseProgram :: FilePath -> Text -> M A.Program
 parseProgram filepath source = do
   concrete <- parse pProgram filepath source
   case runExcept (toAbstract concrete) of
-    Left loc -> throwError $ ToServer loc
+    Left loc -> throwError $ DigHole loc
     Right program -> return program
 
 -- | Try to parse a piece of text in a Spec
@@ -152,7 +150,7 @@ refine filepath source selection = do
   result <- findPointedSpec
   case result of
     Nothing ->
-      throwError $ ToClient $ Others "Cannot find pointed spec"
+      throwError $ ReportError $ Others "Cannot find pointed spec"
     Just spec -> do
       --
       let payload = Text.unlines $ specPayload source spec
@@ -191,10 +189,10 @@ genPOsandSpecsOnly filepath source mouseSelection = do
     Just sel -> return (filterPOs sel pos, specs, globalProps, warings)
 
 typeCheck :: A.Program -> M ()
-typeCheck = withExcept (ToClient . TypeError) . TypeChecking.checkProg
+typeCheck = withExcept (ReportError . TypeError) . TypeChecking.checkProg
 
 genPO :: A.Program -> M ([PO], [Spec], [StructWarning])
-genPO = withExcept (ToClient . StructError) . liftEither . POGen.sweep
+genPO = withExcept (ReportError . StructError) . liftEither . POGen.sweep
 
 --------------------------------------------------------------------------------
 
