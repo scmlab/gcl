@@ -122,25 +122,11 @@ handlers =
                 case result of
                   Nothing -> responder $ Res filepath [ResError [globalError (Others "no source")]]
                   Just latestSource -> do
-                    let program = refine filepath latestSource (selStart, selEnd)
-                    case runM program of
-                      Left (ReportError err) -> do
-                        sendDiagnostics filepath (toDiagnostics err)
-                        responder $ Res filepath [ResError [globalError err]]
-                      Left (DigHole loc) -> do
-                        logText "SHOULD DIG HOLE 2"
-                        responder $ Res filepath []
-                      Right (spec, payload) -> do
-                        logText " *** [ Refine ] Payload of the spec:"
-                        logText payload
-                        -- replace the Spec with its parsed payload
-                        replaceText filepath (specLoc spec) (Text.stripStart payload) $ do
-                          result'' <- readLatestSource filepath
-                          case result'' of
-                            Nothing -> return ()
-                            Just source'' -> do
-                              logText "after"
-                              checkAndSendResponse filepath source''
+                    let program = do 
+                          refine filepath latestSource (selStart, selEnd)
+                          return ([], [])
+                    let next = final filepath (Just responder)
+                    runStuff filepath True program next 
 
               -- Substitute
               ReqSubstitute index expr _subst -> do
@@ -148,21 +134,13 @@ handlers =
                 case result of
                   Nothing -> responder NotLoaded
                   Just savedSource -> do
+                    let next = final filepath (Just responder)
                     let program = do
                           A.Program _ _ defns _ _ <- parseProgram filepath savedSource
                           let expr' = runSubstM (expand (A.Subst expr _subst)) defns 1
-                          return [ResSubstitute index expr']
+                          return ([ResSubstitute index expr'], [])
 
-                    -- runStuff filepath True program next
-
-                    case runM program of
-                      Left (ReportError err) -> do
-                        sendDiagnostics filepath (toDiagnostics err)
-                        responder $ Res filepath [ResError [globalError err]]
-                      Left (DigHole loc) -> do
-                        logText "SHOULD DIG HOLE 3"
-                        responder $ Res filepath []
-                      Right res -> responder $ Res filepath res
+                    runStuff filepath True program next
 
               -- ExportProofObligations
               ReqExportProofObligations ->
@@ -247,6 +225,17 @@ runStuff filepath shouldDigHole program next =
     Left (DigHole loc) -> do
       when shouldDigHole $ do 
         digHole filepath loc next
+    Left (RefineSpec spec text) -> do
+      logText " *** [ Refine ] Payload of the spec:"
+      logText text
+      -- replace the Spec with its parsed text
+      replaceText filepath (specLoc spec) (Text.stripStart text) $ do
+        result'' <- readLatestSource filepath
+        case result'' of
+          Nothing -> return ()
+          Just source'' -> do
+            logText "after"
+            checkAndSendResponse filepath source''
     Right (responses, diagnostics) -> next (responses, diagnostics)
 
 sendDiagnostics :: FilePath -> [Diagnostic] -> ServerM ()

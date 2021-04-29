@@ -42,6 +42,7 @@ instance (Pretty a, Pretty b) => Pretty (Either a b) where
 instance Pretty Error2 where
   pretty (ReportError err) = "ReportError " <+> pretty err
   pretty (DigHole err) = "DigHole " <+> pretty err
+  pretty (RefineSpec spec text) = "RefineSpec " <+> pretty spec <+> pretty text
 
 --------------------------------------------------------------------------------
 

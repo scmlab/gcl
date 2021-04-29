@@ -97,6 +97,7 @@ type ID = LspId ('CustomMethod :: Method 'FromClient 'Request)
 data Error2
   = ReportError Error
   | DigHole Loc
+  | RefineSpec Spec Text 
   deriving (Show, Eq)
 
 type M = Except Error2
@@ -145,7 +146,7 @@ parseProgram filepath source = do
     Right program -> return program
 
 -- | Try to parse a piece of text in a Spec
-refine :: FilePath -> Text -> (Int, Int) -> M (Spec, Text)
+refine :: FilePath -> Text -> (Int, Int) -> M ()
 refine filepath source selection = do
   result <- findPointedSpec
   case result of
@@ -155,7 +156,7 @@ refine filepath source selection = do
       --
       let payload = Text.unlines $ specPayload source spec
       void $ parse pStmts "<specification>" payload
-      return (spec, payload)
+      throwError $ RefineSpec spec payload
   where
     findPointedSpec :: M (Maybe Spec)
     findPointedSpec = do
