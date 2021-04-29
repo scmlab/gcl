@@ -20,6 +20,11 @@ import Prelude hiding (Ordering (..))
 data Token (a :: Symbol) = Token Pos Pos
   deriving (Eq, Show)
 
+-- unicode token wraper
+type TokQuantStarts = Either (Token "<|") (Token "⟨")
+type TokQuantEnds = Either (Token "|>") (Token "⟩")
+type TokArrows = Either (Token "->") (Token "→")
+
 -- | A non-empty list of stuff seperated by commas
 data SepBy (sep :: Symbol) a = Head a | Delim a (Token sep) (SepBy sep a)
   deriving (Eq, Show)
@@ -56,7 +61,7 @@ data Stmt
   | Proof (Token "{-") (Token "-}")
   deriving (Eq, Show)
 
-data GdCmd = GdCmd Expr (Either (Token "->") (Token "→")) [Stmt] deriving (Eq, Show)
+data GdCmd = GdCmd Expr TokArrows [Stmt] deriving (Eq, Show)
 
 --------------------------------------------------------------------------------
 
@@ -99,7 +104,7 @@ data Type
   = TParen (Token "(") Type (Token ")")
   | TBase TBase
   | TArray (Token "array") Interval (Token "of") Type
-  | TFunc Type (Either (Token "->") (Token "→")) Type
+  | TFunc Type TokArrows Type
   | TVar Name
   deriving (Eq, Show)
 
@@ -116,16 +121,17 @@ data Expr
   | Arr Expr (Token "[") Expr (Token "]")
   | App Expr Expr
   | Quant
-      (Either (Token "<|") (Token "⟨"))
-      (Either Op Expr)
+      TokQuantStarts 
+      QuantOp
       [Name]
       (Token ":")
       Expr
       (Token ":")
       Expr
-      (Either (Token "|>") (Token "⟩"))
+      TokQuantEnds
   deriving (Eq, Show, Generic)
 
+type QuantOp = Either Op Expr
 --------------------------------------------------------------------------------
 
 -- | Literals (Integer / Boolean / Character)
