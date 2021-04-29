@@ -1,4 +1,4 @@
-module LSP.Monad where
+module Server.Monad where
 
 import Control.Concurrent (Chan, newChan, writeChan)
 import Control.Monad.Reader

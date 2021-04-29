@@ -14,7 +14,7 @@ import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as BS8
 
 import Error ( Error(..) )
-import qualified LSP 
+import qualified Server 
 
 import Syntax.Parser
 import Syntax.Parser.Lexer

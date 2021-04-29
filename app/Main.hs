@@ -2,11 +2,12 @@
 
 module Main where
 
-import LSP (run)
+-- import Server (run)
 import Pretty ()
 import System.Console.GetOpt
 import System.Environment
 import Prelude
+import Server (run)
 
 main :: IO ()
 main = do
@@ -14,7 +15,7 @@ main = do
   case optMode opts of
     ModeHelp -> putStrLn $ usageInfo usage options
     ModeLSP -> do
-      _ <- run False 
+      _ <- run False
       return ()
     ModeDev -> do 
       _ <- run True 

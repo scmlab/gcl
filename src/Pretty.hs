@@ -21,7 +21,7 @@ import Pretty.Concrete ()
 import Pretty.Predicate ()
 import Syntax.Parser.Lexer (LexicalError)
 import Prelude hiding (Ordering (..))
-import LSP.CustomMethod (Error2(..))
+import Server.CustomMethod (Error2(..))
 
 renderStrict :: Doc ann -> Text
 renderStrict = Text.renderStrict . layoutPretty defaultLayoutOptions

@@ -4,7 +4,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PolyKinds #-}
 
-module LSP.CustomMethod where
+module Server.CustomMethod where
 
 import Control.Monad.Except hiding (guard)
 import Data.Aeson (FromJSON, ToJSON)
@@ -18,7 +18,7 @@ import qualified GCL.Type as TypeChecking
 import GCL.WP (StructWarning)
 import qualified GCL.WP as POGen
 import GHC.Generics (Generic)
-import LSP.ExportPO ()
+import Server.ExportPO ()
 import Language.LSP.Types hiding (TextDocumentSyncClientCapabilities (..))
 import qualified Syntax.Abstract as A
 import Syntax.Concrete (ToAbstract (toAbstract))
@@ -30,7 +30,7 @@ import Syntax.Predicate
     specPayload,
   )
 import Control.Monad.Writer
-import LSP.Monad
+import Server.Monad
 
 --------------------------------------------------------------------------------
 

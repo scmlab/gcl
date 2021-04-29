@@ -10,8 +10,8 @@ import Data.Text.Lazy (fromStrict, toStrict)
 import qualified Data.Text.Lazy.Encoding as LazyText
 import Error
 import GCL.WP (StructWarning)
-import qualified LSP
-import qualified LSP.CustomMethod as LSP
+import qualified Server
+import qualified Server.CustomMethod as Server
 import Pretty ()
 import Syntax.Abstract
 import Syntax.Common
@@ -23,9 +23,9 @@ import Prelude hiding (Ordering (..))
 tests :: TestTree
 tests = testGroup "WP" [emptyProg, statements, issues]
 
-run :: Text -> Either LSP.Error2 ([PO], [Spec], [StructWarning])
-run text = LSP.runM $ do
-  (pos, specs, warnings) <- LSP.parseProgram "<test>" text >>= LSP.genPO
+run :: Text -> Either Server.Error2 ([PO], [Spec], [StructWarning])
+run text = Server.runM $ do
+  (pos, specs, warnings) <- Server.parseProgram "<test>" text >>= Server.genPO
   return (pos, specs, warnings)
 
 --------------------------------------------------------------------------------

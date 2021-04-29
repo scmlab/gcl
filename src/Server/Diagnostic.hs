@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module LSP.Diagnostic where
+module Server.Diagnostic where
 
 import Data.Loc
 import Data.Text (Text)

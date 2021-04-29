@@ -17,9 +17,9 @@ import Data.Text.Prettyprint.Doc.Internal
 import Data.Text.Prettyprint.Doc.Render.Text
 import Error
 import GCL.Type
-import qualified LSP
-import qualified LSP.CustomMethod as LSP
-import qualified LSP.Monad as LSP
+import qualified Server
+import qualified Server.CustomMethod as Server
+import qualified Server.Monad as Server
 import Syntax.Abstract
 import Syntax.Common
 import Syntax.Concrete (ToAbstract (toAbstract))
@@ -145,9 +145,9 @@ typeCheck :: (FilePath, Text) -> Text
 typeCheck (filepath, source) = renderStrict . layoutCompact . pretty $ result
   where
     result =
-      case LSP.runM (LSP.parseProgram filepath source) of
+      case Server.runM (Server.parseProgram filepath source) of
         Left err -> Left err
-        Right prog -> LSP.runM . withExcept (LSP.ToClient . TypeError) $ checkProg prog
+        Right prog -> Server.runM . withExcept (Server.ToClient . TypeError) $ checkProg prog
 
 compareAndReport :: (FilePath, FilePath, Text) -> (FilePath, FilePath, Text) -> IO (Maybe String)
 compareAndReport (expectedPath, _, expectedRes) (actualPath, fileName, actualRaw) = do

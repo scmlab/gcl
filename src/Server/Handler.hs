@@ -3,7 +3,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PolyKinds #-}
 
-module LSP.Handler (handlers) where
+module Server.Handler (handlers) where
 
 import Control.Monad (void)
 import Data.Aeson (Value)
@@ -13,10 +13,10 @@ import Data.Text (Text, pack)
 import qualified Data.Text as Text
 import Error
 import GCL.Expr (expand, runSubstM)
-import LSP.CustomMethod
-import LSP.Diagnostic (ToDiagnostics (toDiagnostics), locToRange)
-import LSP.ExportPO ()
-import LSP.Monad
+import Server.CustomMethod
+import Server.Diagnostic (ToDiagnostics (toDiagnostics), locToRange)
+import Server.ExportPO ()
+import Server.Monad
 import Language.LSP.Diagnostics (partitionBySource)
 import Language.LSP.Server
 import Language.LSP.Types hiding (TextDocumentSyncClientCapabilities (..))
