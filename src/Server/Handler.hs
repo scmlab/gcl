@@ -5,27 +5,23 @@
 
 module Server.Handler (handlers) where
 
-import Control.Monad.Cont
 import qualified Data.Aeson as JSON
-import Data.Loc
 import Data.Text (Text, pack)
 import qualified Data.Text as Text
-import Error
-import GCL.Expr (expand, runSubstM)
-import Language.LSP.Diagnostics (partitionBySource)
 import Language.LSP.Server
 import Language.LSP.Types hiding
   ( TextDocumentSyncClientCapabilities (..),
   )
 import qualified Language.LSP.Types as LSP
-import Server.CustomMethod
+import Server.CustomMethod (ReqKind (..), Request (..))
+-- import qualified Server.CustomMethod as Custom
 import Server.Diagnostic
   ( ToDiagnostics (toDiagnostics),
     locToRange,
   )
+import Server.Eff
 import Server.ExportPO ()
 import Server.Monad
-import qualified Syntax.Abstract as A
 import Syntax.Predicate (Spec (..))
 
 -- handlers of the LSP server
@@ -96,51 +92,69 @@ handlers =
             responder $ CannotDecodeRequest $ show msg ++ "\n" ++ show params
           JSON.Success request@(Req filepath kind) -> do
             logText $ " --> Custom Reqeust: " <> pack (show request)
-
+            let effEnv = EffEnv filepath (Just responder)
             -- convert Request to Response
             case kind of
               -- Inspect
               ReqInspect selStart selEnd -> do
                 updateSelection filepath (selStart, selEnd)
-
-                result <- readSavedSource filepath
-                case result of
-                  Nothing -> responder NotLoaded
-                  Just savedSource -> do
-                    let next = final filepath (Just responder)
-                    let program = do
-                          (pos, _specs, _globalProps, warnings) <- checkEverything filepath savedSource (Just (selStart, selEnd))
-                          let diagnostics = concatMap toDiagnostics pos ++ concatMap toDiagnostics warnings
-                          let responses = [ResInspect pos]
-                          return (responses, diagnostics)
-
-                    runStuff filepath False program next
+                interpret effEnv $ do
+                  source <- savedSource
+                  (pos, _specs, _globalProps, warnings) <- checkEverything source (Just (selStart, selEnd))
+                  let diagnostics = concatMap toDiagnostics pos ++ concatMap toDiagnostics warnings
+                  let responses = [ResInspect pos]
+                  terminate responses diagnostics
 
               -- Refine
               ReqRefine selStart selEnd -> do
-                result <- readLatestSource filepath
-                case result of
-                  Nothing -> responder $ Res filepath [ResError [globalError (Others "no source")]]
-                  Just latestSource -> do
-                    let program = do 
-                          refine filepath latestSource (selStart, selEnd)
-                          return ([], [])
-                    let next = final filepath (Just responder)
-                    runStuff filepath True program next 
+                lastSelection <- readLastSelection filepath
+                interpret effEnv $ do
+                  source <- latestSource
+                  (spec, text) <- refine source (selStart, selEnd)
+                  editText (locToRange $ specLoc spec) (Text.stripStart text)
+                  source' <- latestSource
+                  checkAndSendResponsePrim lastSelection source'
+
+              -- logText " *** [ Refine ] Payload of the spec:"
+              -- logText text
+              -- replace the Spec with its parsed text
+              --  $ do
+              --   result'' <- readLatestSource filepath
+              --   case result'' of
+              --     Nothing -> return ()
+              --     Just source'' -> do
+              --       logText "after"
+              --       checkAndSendResponse filepath source''
+
+              -- let diagnostics = concatMap toDiagnostics pos ++ concatMap toDiagnostics warnings
+              -- let responses = [ResInspect pos]
+              -- terminate responses diagnostics
+
+              -- result <- readLatestSource filepath
+              -- case result of
+              --   Nothing -> responder $ Res filepath [ResError [globalError (Others "no source")]]
+              --   Just latestSource -> do
+              --     let program = do
+              --           refine filepath latestSource (selStart, selEnd)
+              --           return ([], [])
+              --     let next = final filepath (Just responder)
+              --     runStuff filepath True program next
 
               -- Substitute
               ReqSubstitute index expr _subst -> do
-                result <- readSavedSource filepath
-                case result of
-                  Nothing -> responder NotLoaded
-                  Just savedSource -> do
-                    let next = final filepath (Just responder)
-                    let program = do
-                          A.Program _ _ defns _ _ <- parseProgram filepath savedSource
-                          let expr' = runSubstM (expand (A.Subst expr _subst)) defns 1
-                          return ([ResSubstitute index expr'], [])
+                responder $ Res filepath []
 
-                    runStuff filepath True program next
+              -- result <- readSavedSource filepath
+              -- case result of
+              --   Nothing -> responder NotLoaded
+              --   Just savedSource -> do
+              --     let next = final filepath (Just responder)
+              --     let program = do
+              --           A.Program _ _ defns _ _ <- parseProgram filepath savedSource
+              --           let expr' = runSubstM (expand (A.Subst expr _subst)) defns 1
+              --           return ([ResSubstitute index expr'], [])
+
+              --     runStuff filepath True program next
 
               -- ExportProofObligations
               ReqExportProofObligations ->
@@ -169,90 +183,16 @@ handlers =
             checkAndSendResponse filepath source
     ]
 
+checkAndSendResponsePrim :: Maybe (Int, Int) -> Text -> EffM ()
+checkAndSendResponsePrim lastSelection source = do
+  version <- bumpVersion
+  (pos, specs, globalProps, warnings) <- checkEverything source lastSelection
+  let diagnostics = concatMap toDiagnostics pos ++ concatMap toDiagnostics warnings
+  let responses = [ResOK (IdInt version) pos specs globalProps warnings]
+  terminate responses diagnostics
+
 checkAndSendResponse :: FilePath -> Text -> ServerM ()
 checkAndSendResponse filepath source = do
   lastSelection <- readLastSelection filepath
-  version <- bumpCounter
-
-  let next = final filepath Nothing
-  let program = do
-        (pos, specs, globalProps, warnings) <- checkEverything filepath source lastSelection
-        let diagnostics = concatMap toDiagnostics pos ++ concatMap toDiagnostics warnings
-        let responses = [ResOK (IdInt version) pos specs globalProps warnings]
-        return (responses, diagnostics)
-
-  runStuff filepath True program next
-
--- replace the question mark "?" with a hole "[!  !]"
-digHole :: FilePath -> Loc -> CCC Input () -> ServerM ()
-digHole _ilepath NoLoc _ = return ()
-digHole filepath (Loc start end) next = do
-  let indent = Text.replicate (posCol start - 1) " "
-  let holeText = "[!\n" <> indent <> "\n" <> indent <> "!]"
-  replaceText filepath (Loc start end) holeText $ do
-    --
-    result <- readLatestSource filepath
-    case result of
-      Nothing -> return ()
-      Just source -> do
-        version <- bumpCounter
-
-        let program = do
-              (pos, specs, globalProps, warnings) <- genPOsandSpecsOnly filepath source Nothing
-              let diagnostics = concatMap toDiagnostics pos ++ concatMap toDiagnostics warnings
-              let responses = [ResOK (IdInt version) pos specs globalProps warnings]
-              return (responses, diagnostics)
-
-        runStuff filepath True program next
-
-final :: FilePath -> Maybe (Response -> ServerM ()) -> CCC Input ()
-final filepath responderM (responses, diagnostics) = do
-  sendDiagnostics filepath diagnostics
-  case responderM of
-    Nothing -> sendCustomResponse filepath responses
-    Just responder -> responder $ Res filepath responses
-
-
-type Input = ([ResKind], [Diagnostic])
-type CCC input a = input -> ServerM a
-
-runStuff :: FilePath -> Bool -> M Input -> CCC Input () -> ServerM ()
-runStuff filepath shouldDigHole program next =
-  case runM program of
-    Left (ReportError err) -> do
-      sendDiagnostics filepath (toDiagnostics err)
-      next ([ResError [globalError err]], [])
-    Left (DigHole loc) -> do
-      when shouldDigHole $ do 
-        digHole filepath loc next
-    Left (RefineSpec spec text) -> do
-      logText " *** [ Refine ] Payload of the spec:"
-      logText text
-      -- replace the Spec with its parsed text
-      replaceText filepath (specLoc spec) (Text.stripStart text) $ do
-        result'' <- readLatestSource filepath
-        case result'' of
-          Nothing -> return ()
-          Just source'' -> do
-            logText "after"
-            checkAndSendResponse filepath source''
-    Right (responses, diagnostics) -> next (responses, diagnostics)
-
-sendDiagnostics :: FilePath -> [Diagnostic] -> ServerM ()
-sendDiagnostics filepath diags = do
-  version <- bumpCounter
-  publishDiagnostics 100 (toNormalizedUri (filePathToUri filepath)) (Just version) (partitionBySource diags)
-
-sendCustomResponse :: FilePath -> [ResKind] -> ServerM ()
-sendCustomResponse filepath responses = sendNotification (SCustomMethod "guacamole") $ JSON.toJSON $ Res filepath responses
-
-replaceText :: FilePath -> Loc -> Text -> ServerM () -> ServerM ()
-replaceText filepath loc text callback = do
-  let removeSpec = TextEdit (locToRange loc) text
-  let identifier = VersionedTextDocumentIdentifier (filePathToUri filepath) (Just 0)
-  let textDocumentEdit = TextDocumentEdit identifier (List [InL removeSpec])
-  let change = InL textDocumentEdit
-  let workspaceEdit = WorkspaceEdit Nothing (Just (List [change])) Nothing
-  let applyWorkspaceEditParams = ApplyWorkspaceEditParams (Just "Resolve Spec") workspaceEdit
-
-  void $ sendRequest SWorkspaceApplyEdit applyWorkspaceEditParams $ const callback
+  let effEnv = EffEnv filepath Nothing
+  interpret effEnv $ checkAndSendResponsePrim lastSelection source
