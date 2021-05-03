@@ -11,18 +11,22 @@ import qualified Data.Text as Text
 import Language.LSP.Server
 import Language.LSP.Types hiding
   ( TextDocumentSyncClientCapabilities (..),
+   Range 
   )
 import qualified Language.LSP.Types as LSP
 import Server.CustomMethod (ReqKind (..), Request (..))
 -- import qualified Server.CustomMethod as Custom
 import Server.Diagnostic
   ( ToDiagnostics (toDiagnostics),
-    locToRange,
   )
 import Server.Eff
 import Server.ExportPO ()
 import Server.Monad
 import Syntax.Predicate (Spec (..))
+import Data.Loc
+import Control.Monad.Except
+import Error
+import Data.Loc.Range
 
 -- handlers of the LSP server
 handlers :: Handlers ServerM
@@ -117,9 +121,18 @@ handlers =
                   source <- latestSource
                   -- refine (parse + sweep)
                   (spec, text) <- refine source (selStart, selEnd)
+
+                  logM "*** SPEC CONTENT ------"
+                  logM text
+                  logM "************"
+
                   -- remove the Spec 
-                  source' <- editText (locToRange $ specLoc spec) (Text.stripStart text)
-                  checkAndSendResponsePrim (Just (selStart, selEnd)) source'
+                  case specLoc spec of 
+                    NoLoc -> throwError $ Others "NoLoc in ReqRefine"
+                    Loc start end -> do 
+                      source' <- editText (Range start end) (Text.stripStart text)
+                      logM $ "*** AFTER REMOVING SPEC\n" <> source'
+                      checkAndSendResponsePrim (Just (selStart, selEnd)) source'
 
               -- Substitute
               ReqSubstitute index expr subst -> do

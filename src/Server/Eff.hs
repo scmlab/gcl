@@ -16,7 +16,7 @@ import Error
 import qualified GCL.Type as TypeChecking
 import GCL.WP (StructWarning)
 import Language.LSP.Server
-import Language.LSP.Types hiding (TextDocumentSyncClientCapabilities)
+import Language.LSP.Types hiding (TextDocumentSyncClientCapabilities, Range)
 import Server.Diagnostic
 import Server.Monad
 import qualified Syntax.Abstract as A
@@ -28,6 +28,10 @@ import Data.IORef
 import qualified GCL.WP as WP
 import GCL.Expr (runSubstM, expand)
 import qualified Language.LSP.VFS as VFS
+import Data.IntMap (IntMap)
+import Control.Monad.State
+import qualified Data.IntMap as IntMap
+import Data.Loc.Range
 
 data Eff next
   = EditText Range Text (Text -> next)
@@ -46,10 +50,10 @@ data EffEnv = EffEnv
     effEnvResponder :: Maybe Responder
   }
 
-type EffM = FreeT Eff (ExceptT Error (Reader EffEnv))
+type EffM = FreeT Eff (ExceptT Error (ReaderT EffEnv (State (IntMap Int))))
 
 runEffM :: EffEnv -> EffM a -> Either Error (FreeF Eff a (EffM a))
-runEffM env p = runReader (runExceptT (runFreeT p)) env
+runEffM env p = evalState (runReaderT (runExceptT (runFreeT p)) env) IntMap.empty
 
 handleError :: FilePath -> Maybe Responder -> Error -> ServerM ()
 handleError filepath responder err = do
@@ -66,7 +70,7 @@ interpret env@(EffEnv filepath responder) p = case runEffM env p of
   Right (Free (EditText range text next)) -> do
     logText "Before EditText"
     -- apply edit
-    let removeSpec = TextEdit range text
+    let removeSpec = TextEdit (rangeToRange range) text
     let identifier = VersionedTextDocumentIdentifier (filePathToUri filepath) (Just 0)
     let textDocumentEdit = TextDocumentEdit identifier (List [InL removeSpec])
     let change = InL textDocumentEdit
@@ -74,10 +78,13 @@ interpret env@(EffEnv filepath responder) p = case runEffM env p of
     let applyWorkspaceEditParams = ApplyWorkspaceEditParams (Just "Resolve Spec") workspaceEdit
     let callback _ = do
           logText "After EditText"
-          interpret env $ do 
-            -- update saved source after text editting 
+          interpret env $ do
+            -- update saved source
             newSource <- latestSource
-            updateSavedSource newSource 
+            updateSavedSource newSource
+            -- update the offset diff map 
+
+
             next newSource
 
     void $ sendRequest SWorkspaceApplyEdit applyWorkspaceEditParams callback
@@ -124,9 +131,9 @@ interpret env@(EffEnv filepath responder) p = case runEffM env p of
     -- send responses
     sendResponses filepath responder responses
   Left err -> do
-    logStuff err 
+    logStuff err
     handleError filepath responder err
-    
+
 editText :: Range -> Text -> EffM Text
 editText range text = liftF (EditText range text id)
 
@@ -145,8 +152,8 @@ updateLastMouseSelection selection = liftF (UpdateLastMouseSelection selection (
 readLastMouseSelection :: EffM (Maybe (Int, Int))
 readLastMouseSelection = liftF (ReadLastMouseSelection id)
 
-logM :: Show a => a -> EffM ()
-logM text = liftF (Log (Text.pack (show text)) ())
+logM :: Text -> EffM ()
+logM text = liftF (Log text ())
 
 bumpVersion :: EffM Int
 bumpVersion = liftF (BumpResponseVersion id)
@@ -157,15 +164,13 @@ terminate x y = liftF (Terminate x y)
 
 ------------------------------------------------------------------------------
 
-digHole :: Loc -> EffM ()
-digHole loc = do
-  filepath <- asks effEnvFilePath
-  case loc of
-    NoLoc -> throwError (CannotReadFile filepath)
-    Loc start _end -> do
-      let indent = Text.replicate (posCol start - 1) " "
-      let holeText = "[!\n" <> indent <> "\n" <> indent <> "!]"
-      void $ editText (locToRange loc) holeText
+-- converts the "?" at a given location to "[!   !]"
+-- and returns the modified source and the difference of source length 
+digHole :: Pos -> EffM Text
+digHole pos = do
+  let indent = Text.replicate (posCol pos - 1) " "
+  let holeText = "[!\n" <> indent <> "\n" <> indent <> "!]"
+  editText (Range pos pos) holeText
 
 -- | Try to parse a piece of text in a Spec
 refine :: Text -> (Int, Int) -> EffM (Spec, Text)
@@ -174,8 +179,13 @@ refine source selection = do
   case result of
     Nothing -> throwError $ Others "Please place the cursor in side a Spec to refine it"
     Just spec -> do
+
+      case specLoc spec of
+        NoLoc -> return ()
+        Loc start end -> logM $ Text.drop (posCoff start) $ Text.take (posCoff end) source
+
       let payload = Text.unlines $ specPayload source spec
-      -- HACK 
+      -- HACK, `pStmts` will kaput if we feed empty strings into it 
       let payloadIsEmpty = Text.null (Text.strip payload)
       if payloadIsEmpty
         then return ()
@@ -184,7 +194,8 @@ refine source selection = do
   where
     findPointedSpec :: EffM (Maybe Spec)
     findPointedSpec = do
-      (_, specs, _, _) <- parseProgram source >>= sweep
+      program <- parseProgram source
+      (_, specs, _, _) <- sweep program
       return $ find (pointed selection) specs
       where
         pointed :: (Int, Int) -> Spec -> Bool
@@ -195,8 +206,8 @@ refine source selection = do
               || (posCoff open <= end && end <= posCoff close + 1)
 
 -- 
-substitute :: A.Program -> A.Expr -> A.Subst -> A.Expr 
-substitute (A.Program _ _ defns _ _) expr subst = 
+substitute :: A.Program -> A.Expr -> A.Subst -> A.Expr
+substitute (A.Program _ _ defns _ _) expr subst =
   runSubstM (expand (A.Subst expr subst)) defns 1
 
 typeCheck :: A.Program -> EffM ()
@@ -205,10 +216,10 @@ typeCheck p = case runExcept (TypeChecking.checkProg p) of
   Right v -> return v
 
 sweep :: A.Program -> EffM ([PO], [Spec], [A.Expr], [StructWarning])
-sweep program@(A.Program _ globalProps _ _ _) = 
+sweep program@(A.Program _ globalProps _ _ _) =
   case WP.sweep program of
     Left e -> throwError $ StructError e
-    Right (pos, specs, warings) -> do 
+    Right (pos, specs, warings) -> do
       return (pos, specs, globalProps, warings)
 
 --------------------------------------------------------------------------------
@@ -222,13 +233,21 @@ parse p source = do
     Right val -> return val
 
 -- | Parse the whole program
+-- parseProgramWithDiff :: Text -> Int -> EffM (A.Program, Int)
+-- parseProgramWithDiff source diff = do
+--   concrete <- parse pProgram source
+--   case runExcept (toAbstract concrete) of
+--     Left loc -> do
+--       (source', diff') <- digHole loc
+--       parseProgramWithDiff source' diff'
+--     Right program -> return (program, diff)
+
 parseProgram :: Text -> EffM A.Program
 parseProgram source = do
   concrete <- parse pProgram source
   case runExcept (toAbstract concrete) of
-    Left loc -> do
-      digHole loc
-      latestSource >>= parseProgram
+    Left NoLoc -> throwError $ Others "NoLoc in parseProgram"
+    Left (Loc start _) -> digHole start >>= parseProgram
     Right program -> return program
 
 -- | Given an interval of mouse selection, calculate POs within the interval, ordered by their vicinity
