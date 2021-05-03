@@ -26,14 +26,18 @@ import Syntax.Predicate ( Spec (specLoc), PO, specPayload )
 import qualified Data.Map as Map
 import Data.IORef
 import qualified GCL.WP as WP
+import GCL.Expr (runSubstM, expand)
+import qualified Language.LSP.VFS as VFS
 
 data Eff next
-  = EditText Range Text next
+  = EditText Range Text (Text -> next)
+  | UpdateSavedSource Text next
   | ReadSavedSource (Text -> next)
   | ReadLatestSource (Text -> next)
   | UpdateLastMouseSelection (Int, Int) next
   | ReadLastMouseSelection (Maybe (Int, Int) -> next)
   | BumpResponseVersion (Int -> next)
+  | Log Text next
   | Terminate [ResKind] [Diagnostic]
   deriving (Functor)
 
@@ -58,7 +62,6 @@ handleError filepath responder err = do
 
 interpret :: EffEnv -> EffM () -> ServerM ()
 interpret env@(EffEnv filepath responder) p = case runEffM env p of
-  Left err -> handleError filepath responder err
   Right (Pure ()) -> logText "Improper termination"
   Right (Free (EditText range text next)) -> do
     logText "Before EditText"
@@ -71,25 +74,32 @@ interpret env@(EffEnv filepath responder) p = case runEffM env p of
     let applyWorkspaceEditParams = ApplyWorkspaceEditParams (Just "Resolve Spec") workspaceEdit
     let callback _ = do
           logText "After EditText"
-          -- update saved source after text editting 
-          readLatestSource filepath >>= mapM_ (updateSource filepath)
-          interpret env next
+          interpret env $ do 
+            -- update saved source after text editting 
+            newSource <- latestSource
+            updateSavedSource newSource 
+            next newSource
+
     void $ sendRequest SWorkspaceApplyEdit applyWorkspaceEditParams callback
   Right (Free (ReadSavedSource next)) -> do
-    result <- readSavedSource filepath
+    ref <- lift $ asks envSourceMap
+    mapping <- liftIO $ readIORef ref
+    let result = fst <$> Map.lookup filepath mapping
     case result of
       Nothing -> handleError filepath responder (CannotReadFile filepath)
       Just source -> do
         logText "ReadSavedSource"
-        logText source
         interpret env (next source)
+  Right (Free (UpdateSavedSource source next)) -> do
+    ref <- lift $ asks envSourceMap
+    liftIO $ modifyIORef' ref (Map.insertWith (\(src, _) (_, sel) -> (src, sel)) filepath (source, Nothing))
+    interpret env next
   Right (Free (ReadLatestSource next)) -> do
-    result <- readLatestSource filepath
+    result <- fmap VFS.virtualFileText <$> getVirtualFile (toNormalizedUri (filePathToUri filepath))
     case result of
       Nothing -> handleError filepath responder (CannotReadFile filepath)
       Just source -> do
         logText "ReadLatestSource"
-        logText source
         interpret env (next source)
   Right (Free (ReadLastMouseSelection next)) -> do
     ref <- lift $ asks envSourceMap
@@ -105,17 +115,26 @@ interpret env@(EffEnv filepath responder) p = case runEffM env p of
     n <- liftIO $ readIORef ref
     liftIO $ writeIORef ref (succ n)
     interpret env (next n)
+  Right (Free (Log text next)) -> do
+    logText text
+    interpret env next
   Right (Free (Terminate responses diagnostics)) -> do
     -- send diagnostics
     sendDiagnostics filepath diagnostics
     -- send responses
     sendResponses filepath responder responses
-
-editText :: Range -> Text -> EffM ()
-editText range text = liftF (EditText range text ())
+  Left err -> do
+    logStuff err 
+    handleError filepath responder err
+    
+editText :: Range -> Text -> EffM Text
+editText range text = liftF (EditText range text id)
 
 savedSource :: EffM Text
 savedSource = liftF (ReadSavedSource id)
+
+updateSavedSource :: Text -> EffM ()
+updateSavedSource source = liftF (UpdateSavedSource source ())
 
 latestSource :: EffM Text
 latestSource = liftF (ReadLatestSource id)
@@ -125,6 +144,9 @@ updateLastMouseSelection selection = liftF (UpdateLastMouseSelection selection (
 
 readLastMouseSelection :: EffM (Maybe (Int, Int))
 readLastMouseSelection = liftF (ReadLastMouseSelection id)
+
+logM :: Show a => a -> EffM ()
+logM text = liftF (Log (Text.pack (show text)) ())
 
 bumpVersion :: EffM Int
 bumpVersion = liftF (BumpResponseVersion id)
@@ -143,24 +165,21 @@ digHole loc = do
     Loc start _end -> do
       let indent = Text.replicate (posCol start - 1) " "
       let holeText = "[!\n" <> indent <> "\n" <> indent <> "!]"
-      editText (locToRange loc) holeText
-      source <- latestSource
-      program <- parseProgram source
-      (pos, specs, globalProps, warnings) <- sweep program
-      let diagnostics = concatMap toDiagnostics pos ++ concatMap toDiagnostics warnings
-      version <- bumpVersion
-      let responses = [ResOK (IdInt version) pos specs globalProps warnings]
-      terminate responses diagnostics
+      void $ editText (locToRange loc) holeText
 
 -- | Try to parse a piece of text in a Spec
 refine :: Text -> (Int, Int) -> EffM (Spec, Text)
 refine source selection = do
   result <- findPointedSpec
   case result of
-    Nothing -> throwError $ Others "Cannot find pointed spec"
+    Nothing -> throwError $ Others "Please place the cursor in side a Spec to refine it"
     Just spec -> do
       let payload = Text.unlines $ specPayload source spec
-      void $ parse pStmts payload
+      -- HACK 
+      let payloadIsEmpty = Text.null (Text.strip payload)
+      if payloadIsEmpty
+        then return ()
+        else void $ parse pStmts payload
       return (spec, payload)
   where
     findPointedSpec :: EffM (Maybe Spec)
@@ -172,27 +191,13 @@ refine source selection = do
         pointed (start, end) spec = case specLoc spec of
           NoLoc -> False
           Loc open close ->
-            (posCoff open <= start && start <= posCoff close)
-              || (posCoff open <= end && end <= posCoff close)
+            (posCoff open <= start && start <= posCoff close + 1)
+              || (posCoff open <= end && end <= posCoff close + 1)
 
--- | Type check + generate POs and Specs
--- checkEverything :: Text -> Maybe (Int, Int) -> EffM ([PO], [Spec], [A.Expr], [StructWarning])
--- checkEverything source mouseSelection = do
---   program@(A.Program _ globalProps _ _ _) <- parseProgram source
---   typeCheck program
---   (pos, specs, warings) <- genPO program
---   case mouseSelection of
---     Nothing -> return (pos, specs, globalProps, warings)
---     Just sel -> return (filterPOs sel pos, specs, globalProps, warings)
-
--- | Only generate POs and Specs
--- genPOsandSpecsOnly :: Text -> Maybe (Int, Int) -> EffM ([PO], [Spec], [A.Expr], [StructWarning])
--- genPOsandSpecsOnly source mouseSelection = do
---   program@(A.Program _ globalProps _ _ _) <- parseProgram source
---   (pos, specs, warings) <- genPO program
---   case mouseSelection of
---     Nothing -> return (pos, specs, globalProps, warings)
---     Just sel -> return (filterPOs sel pos, specs, globalProps, warings)
+-- 
+substitute :: A.Program -> A.Expr -> A.Subst -> A.Expr 
+substitute (A.Program _ _ defns _ _) expr subst = 
+  runSubstM (expand (A.Subst expr subst)) defns 1
 
 typeCheck :: A.Program -> EffM ()
 typeCheck p = case runExcept (TypeChecking.checkProg p) of
@@ -207,12 +212,6 @@ sweep program@(A.Program _ globalProps _ _ _) =
       return (pos, specs, globalProps, warings)
 
 --------------------------------------------------------------------------------
-
--- bumpVersion :: EffM Int
--- bumpVersion = do
---   n <- get
---   put (succ n)
---   return n
 
 -- | Parse with a parser
 parse :: Parser a -> Text -> EffM a

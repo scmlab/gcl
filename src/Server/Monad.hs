@@ -6,14 +6,13 @@ module Server.Monad where
 
 import Control.Concurrent (Chan, newChan, writeChan)
 import Control.Monad.Reader
-import Data.IORef (IORef, modifyIORef', newIORef, readIORef, writeIORef)
+import Data.IORef (IORef, newIORef, readIORef, writeIORef)
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Text (Text)
 import qualified Data.Text as Text
 import Language.LSP.Server
 import Language.LSP.Types hiding (TextDocumentSyncClientCapabilities (..))
-import qualified Language.LSP.VFS as VFS
 import Language.LSP.Diagnostics
 import Data.Aeson (ToJSON)
 import GHC.Generics (Generic)
@@ -60,22 +59,6 @@ logText :: Text -> ServerM ()
 logText text = do
   chan <- lift $ asks envChan
   liftIO $ writeChan chan text
-
---------------------------------------------------------------------------------
-
-updateSource :: FilePath -> Text -> ServerM ()
-updateSource filepath source = do
-  ref <- lift $ asks envSourceMap
-  liftIO $ modifyIORef' ref (Map.insertWith (\(src, _) (_, sel) -> (src, sel)) filepath (source, Nothing))
-
-readSavedSource :: FilePath -> ServerM (Maybe Text)
-readSavedSource filepath = do
-  ref <- lift $ asks envSourceMap
-  mapping <- liftIO $ readIORef ref
-  return $ fst <$> Map.lookup filepath mapping
-
-readLatestSource :: FilePath -> ServerM (Maybe Text)
-readLatestSource filepath = fmap VFS.virtualFileText <$> getVirtualFile (toNormalizedUri (filePathToUri filepath))
 
 --------------------------------------------------------------------------------
 

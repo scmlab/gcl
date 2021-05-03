@@ -113,28 +113,21 @@ handlers =
               -- Refine
               ReqRefine selStart selEnd -> do
                 interpret effEnv $ do
-                  lastSelection <- readLastMouseSelection
+                  updateLastMouseSelection (selStart, selEnd)
                   source <- latestSource
+                  -- refine (parse + sweep)
                   (spec, text) <- refine source (selStart, selEnd)
-                  editText (locToRange $ specLoc spec) (Text.stripStart text)
-                  source' <- latestSource
-                  checkAndSendResponsePrim lastSelection source'
+                  -- remove the Spec 
+                  source' <- editText (locToRange $ specLoc spec) (Text.stripStart text)
+                  checkAndSendResponsePrim (Just (selStart, selEnd)) source'
 
               -- Substitute
-              ReqSubstitute index expr _subst -> do
-                responder $ Res filepath []
-
-              -- result <- readSavedSource filepath
-              -- case result of
-              --   Nothing -> responder NotLoaded
-              --   Just savedSource -> do
-              --     let next = final filepath (Just responder)
-              --     let program = do
-              --           A.Program _ _ defns _ _ <- parseProgram filepath savedSource
-              --           let expr' = runSubstM (expand (A.Subst expr _subst)) defns 1
-              --           return ([ResSubstitute index expr'], [])
-
-              --     runStuff filepath True program next
+              ReqSubstitute index expr subst -> do
+                interpret effEnv $ do
+                  source <- savedSource 
+                  program <- parseProgram source 
+                  let expr' = substitute program expr subst 
+                  terminate [ResSubstitute index expr'] []
 
               -- ExportProofObligations
               ReqExportProofObligations ->
@@ -150,8 +143,11 @@ handlers =
             case uriToFilePath uri of
               Nothing -> pure ()
               Just filepath -> do
-                updateSource filepath source
-                checkAndSendResponse filepath source,
+                let effEnv = EffEnv filepath Nothing
+                interpret effEnv $ do 
+                  updateSavedSource source
+                  lastSelection <- readLastMouseSelection
+                  checkAndSendResponsePrim lastSelection source,
       -- when the client opened the document
       notificationHandler STextDocumentDidOpen $ \ntf -> do
         logText " --> TextDocumentDidOpen"
@@ -159,8 +155,12 @@ handlers =
         case uriToFilePath uri of
           Nothing -> pure ()
           Just filepath -> do
-            updateSource filepath source
-            checkAndSendResponse filepath source
+            let effEnv = EffEnv filepath Nothing
+            interpret effEnv $ do 
+              updateSavedSource source
+              lastSelection <- readLastMouseSelection
+              checkAndSendResponsePrim lastSelection source
+
     ]
 
 -- parse + type check + sweep
@@ -177,10 +177,3 @@ checkAndSendResponsePrim lastSelection source = do
   let responses = [ResOK (IdInt version) filteredPOs specs globalProps warnings]
 
   terminate responses diagnostics
-
-checkAndSendResponse :: FilePath -> Text -> ServerM ()
-checkAndSendResponse filepath source = do
-  let effEnv = EffEnv filepath Nothing
-  interpret effEnv $ do 
-    lastSelection <- readLastMouseSelection
-    checkAndSendResponsePrim lastSelection source
