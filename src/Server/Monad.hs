@@ -79,33 +79,12 @@ readLatestSource filepath = fmap VFS.virtualFileText <$> getVirtualFile (toNorma
 
 --------------------------------------------------------------------------------
 
-updateSelection :: FilePath -> (Int, Int) -> ServerM ()
-updateSelection filepath selection = do
-  ref <- lift $ asks envSourceMap
-  liftIO $ modifyIORef' ref (Map.update (\(source, _) -> Just (source, Just selection)) filepath)
-
-readLastSelection :: FilePath -> ServerM (Maybe (Int, Int))
-readLastSelection filepath = do
-  ref <- lift $ asks envSourceMap
-  mapping <- liftIO $ readIORef ref
-  return $ snd =<< Map.lookup filepath mapping
-
---------------------------------------------------------------------------------
-
-bumpCounter :: ServerM Int
-bumpCounter = do
-  ref <- lift $ asks envCounter
-  n <- liftIO $ readIORef ref
-  liftIO $ writeIORef ref (succ n)
-  return n
-
-
---------------------------------------------------------------------------------
-
 sendDiagnostics :: FilePath -> [Diagnostic] -> ServerM ()
 sendDiagnostics filepath diagnostics = do 
   -- send diagnostics
-  version <- bumpCounter
+  ref <- lift $ asks envCounter
+  version <- liftIO $ readIORef ref
+  liftIO $ writeIORef ref (succ version)
   publishDiagnostics 100 (toNormalizedUri (filePathToUri filepath)) (Just version) (partitionBySource diagnostics)
 
 type Responder = Response -> ServerM ()

@@ -7,7 +7,6 @@ module Server.Eff where
 import Control.Monad.Cont
 import Control.Monad.Except
 import Control.Monad.Reader
-import Control.Monad.State
 import Control.Monad.Trans.Free
 import Data.List ( sort, find )
 import Data.Loc
@@ -24,11 +23,16 @@ import qualified Syntax.Abstract as A
 import Syntax.Concrete (toAbstract)
 import Syntax.Parser (Parser, pProgram, runParse, pStmts)
 import Syntax.Predicate ( Spec (specLoc), PO, specPayload )
+import qualified Data.Map as Map
+import Data.IORef
 
 data Eff next
   = EditText Range Text next
   | ReadSavedSource (Text -> next)
   | ReadLatestSource (Text -> next)
+  | UpdateLastMouseSelection (Int, Int) next
+  | ReadLastMouseSelection (Maybe (Int, Int) -> next)
+  | BumpResponseVersion (Int -> next)
   | Terminate [ResKind] [Diagnostic]
   deriving (Functor)
 
@@ -37,11 +41,10 @@ data EffEnv = EffEnv
     effEnvResponder :: Maybe Responder
   }
 
-type EffM = FreeT Eff (ExceptT Error (ReaderT EffEnv (State Int)))
+type EffM = FreeT Eff (ExceptT Error (Reader EffEnv))
 
 runEffM :: EffEnv -> EffM a -> Either Error (FreeF Eff a (EffM a))
-runEffM env p = evalState (runReaderT (runExceptT (runFreeT p)) env) 0
-
+runEffM env p = runReader (runExceptT (runFreeT p)) env
 
 handleError :: FilePath -> Maybe Responder -> Error -> ServerM ()
 handleError filepath responder err = do
@@ -65,7 +68,7 @@ interpret env@(EffEnv filepath responder) p = case runEffM env p of
     let change = InL textDocumentEdit
     let workspaceEdit = WorkspaceEdit Nothing (Just (List [change])) Nothing
     let applyWorkspaceEditParams = ApplyWorkspaceEditParams (Just "Resolve Spec") workspaceEdit
-    let callback _ = do 
+    let callback _ = do
           logText "After EditText"
           -- update saved source after text editting 
           readLatestSource filepath >>= mapM_ (updateSource filepath)
@@ -75,7 +78,7 @@ interpret env@(EffEnv filepath responder) p = case runEffM env p of
     result <- readSavedSource filepath
     case result of
       Nothing -> handleError filepath responder (CannotReadFile filepath)
-      Just source -> do 
+      Just source -> do
         logText "ReadSavedSource"
         logText source
         interpret env (next source)
@@ -83,10 +86,24 @@ interpret env@(EffEnv filepath responder) p = case runEffM env p of
     result <- readLatestSource filepath
     case result of
       Nothing -> handleError filepath responder (CannotReadFile filepath)
-      Just source -> do 
+      Just source -> do
         logText "ReadLatestSource"
         logText source
         interpret env (next source)
+  Right (Free (ReadLastMouseSelection next)) -> do
+    ref <- lift $ asks envSourceMap
+    mapping <- liftIO $ readIORef ref
+    let selection = snd =<< Map.lookup filepath mapping
+    interpret env (next selection)
+  Right (Free (UpdateLastMouseSelection selection next)) -> do
+    ref <- lift $ asks envSourceMap
+    liftIO $ modifyIORef' ref (Map.update (\(source, _) -> Just (source, Just selection)) filepath)
+    interpret env next
+  Right (Free (BumpResponseVersion next)) -> do
+    ref <- lift $ asks envCounter
+    n <- liftIO $ readIORef ref
+    liftIO $ writeIORef ref (succ n)
+    interpret env (next n)
   Right (Free (Terminate responses diagnostics)) -> do
     -- send diagnostics
     sendDiagnostics filepath diagnostics
@@ -102,11 +119,18 @@ savedSource = liftF (ReadSavedSource id)
 latestSource :: EffM Text
 latestSource = liftF (ReadLatestSource id)
 
+updateLastMouseSelection :: (Int, Int) -> EffM ()
+updateLastMouseSelection selection = liftF (UpdateLastMouseSelection selection ())
+
+readLastMouseSelection :: EffM (Maybe (Int, Int))
+readLastMouseSelection = liftF (ReadLastMouseSelection id)
+
+bumpVersion :: EffM Int
+bumpVersion = liftF (BumpResponseVersion id)
+
 terminate :: [ResKind] -> [Diagnostic] -> EffM ()
 terminate x y = liftF (Terminate x y)
 
-throwErr :: Error -> EffM ()
-throwErr err = terminate [ResError [globalError err]] (toDiagnostics err)
 
 ------------------------------------------------------------------------------
 
@@ -170,7 +194,7 @@ genPOsandSpecsOnly source mouseSelection = do
 
 typeCheck :: A.Program -> EffM ()
 typeCheck p = case runExcept (TypeChecking.checkProg p) of
-  Left e -> throwErr $ TypeError e
+  Left e -> throwError $ TypeError e
   Right v -> return v
 
 genPO :: A.Program -> EffM ([PO], [Spec], [StructWarning])
@@ -180,11 +204,11 @@ genPO p = case sweep p of
 
 --------------------------------------------------------------------------------
 
-bumpVersion :: EffM Int
-bumpVersion = do
-  n <- get
-  put (succ n)
-  return n
+-- bumpVersion :: EffM Int
+-- bumpVersion = do
+--   n <- get
+--   put (succ n)
+--   return n
 
 -- | Parse with a parser
 parse :: Parser a -> Text -> EffM a

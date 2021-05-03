@@ -97,8 +97,8 @@ handlers =
             case kind of
               -- Inspect
               ReqInspect selStart selEnd -> do
-                updateSelection filepath (selStart, selEnd)
                 interpret effEnv $ do
+                  updateLastMouseSelection (selStart, selEnd)
                   source <- savedSource
                   (pos, _specs, _globalProps, warnings) <- checkEverything source (Just (selStart, selEnd))
                   let diagnostics = concatMap toDiagnostics pos ++ concatMap toDiagnostics warnings
@@ -107,38 +107,13 @@ handlers =
 
               -- Refine
               ReqRefine selStart selEnd -> do
-                lastSelection <- readLastSelection filepath
                 interpret effEnv $ do
+                  lastSelection <- readLastMouseSelection
                   source <- latestSource
                   (spec, text) <- refine source (selStart, selEnd)
                   editText (locToRange $ specLoc spec) (Text.stripStart text)
                   source' <- latestSource
                   checkAndSendResponsePrim lastSelection source'
-
-              -- logText " *** [ Refine ] Payload of the spec:"
-              -- logText text
-              -- replace the Spec with its parsed text
-              --  $ do
-              --   result'' <- readLatestSource filepath
-              --   case result'' of
-              --     Nothing -> return ()
-              --     Just source'' -> do
-              --       logText "after"
-              --       checkAndSendResponse filepath source''
-
-              -- let diagnostics = concatMap toDiagnostics pos ++ concatMap toDiagnostics warnings
-              -- let responses = [ResInspect pos]
-              -- terminate responses diagnostics
-
-              -- result <- readLatestSource filepath
-              -- case result of
-              --   Nothing -> responder $ Res filepath [ResError [globalError (Others "no source")]]
-              --   Just latestSource -> do
-              --     let program = do
-              --           refine filepath latestSource (selStart, selEnd)
-              --           return ([], [])
-              --     let next = final filepath (Just responder)
-              --     runStuff filepath True program next
 
               -- Substitute
               ReqSubstitute index expr _subst -> do
@@ -193,6 +168,7 @@ checkAndSendResponsePrim lastSelection source = do
 
 checkAndSendResponse :: FilePath -> Text -> ServerM ()
 checkAndSendResponse filepath source = do
-  lastSelection <- readLastSelection filepath
   let effEnv = EffEnv filepath Nothing
-  interpret effEnv $ checkAndSendResponsePrim lastSelection source
+  interpret effEnv $ do 
+    lastSelection <- readLastMouseSelection
+    checkAndSendResponsePrim lastSelection source
