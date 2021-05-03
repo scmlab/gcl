@@ -100,9 +100,14 @@ handlers =
                 interpret effEnv $ do
                   updateLastMouseSelection (selStart, selEnd)
                   source <- savedSource
-                  (pos, _specs, _globalProps, warnings) <- checkEverything source (Just (selStart, selEnd))
+                  -- parse + type check + sweep
+                  program <- parseProgram source
+                  typeCheck program
+                  (pos, _specs, _globalProps, warnings) <- sweep program
+                  -- display all POs 
                   let diagnostics = concatMap toDiagnostics pos ++ concatMap toDiagnostics warnings
-                  let responses = [ResInspect pos]
+                  -- response with only POs in the vinicity of the cursor
+                  let responses = [ResInspect (filterPOs (selStart, selEnd) pos)]
                   terminate responses diagnostics
 
               -- Refine
@@ -158,12 +163,19 @@ handlers =
             checkAndSendResponse filepath source
     ]
 
+-- parse + type check + sweep
 checkAndSendResponsePrim :: Maybe (Int, Int) -> Text -> EffM ()
 checkAndSendResponsePrim lastSelection source = do
   version <- bumpVersion
-  (pos, specs, globalProps, warnings) <- checkEverything source lastSelection
+  program <- parseProgram source
+  typeCheck program
+  (pos, specs, globalProps, warnings) <- sweep program
   let diagnostics = concatMap toDiagnostics pos ++ concatMap toDiagnostics warnings
-  let responses = [ResOK (IdInt version) pos specs globalProps warnings]
+  let filteredPOs = case lastSelection of 
+        Nothing -> pos 
+        Just sel -> filterPOs sel pos  
+  let responses = [ResOK (IdInt version) filteredPOs specs globalProps warnings]
+
   terminate responses diagnostics
 
 checkAndSendResponse :: FilePath -> Text -> ServerM ()

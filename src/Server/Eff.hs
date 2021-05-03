@@ -14,7 +14,7 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 import Error
 import qualified GCL.Type as TypeChecking
-import GCL.WP (StructWarning, sweep)
+import GCL.WP (StructWarning)
 import Language.LSP.Server
 import Language.LSP.Types hiding (TextDocumentSyncClientCapabilities)
 import Server.Diagnostic
@@ -25,6 +25,7 @@ import Syntax.Parser (Parser, pProgram, runParse, pStmts)
 import Syntax.Predicate ( Spec (specLoc), PO, specPayload )
 import qualified Data.Map as Map
 import Data.IORef
+import qualified GCL.WP as WP
 
 data Eff next
   = EditText Range Text next
@@ -144,7 +145,8 @@ digHole loc = do
       let holeText = "[!\n" <> indent <> "\n" <> indent <> "!]"
       editText (locToRange loc) holeText
       source <- latestSource
-      (pos, specs, globalProps, warnings) <- genPOsandSpecsOnly source Nothing
+      program <- parseProgram source
+      (pos, specs, globalProps, warnings) <- sweep program
       let diagnostics = concatMap toDiagnostics pos ++ concatMap toDiagnostics warnings
       version <- bumpVersion
       let responses = [ResOK (IdInt version) pos specs globalProps warnings]
@@ -163,7 +165,7 @@ refine source selection = do
   where
     findPointedSpec :: EffM (Maybe Spec)
     findPointedSpec = do
-      (_, specs, _) <- parseProgram source >>= genPO
+      (_, specs, _, _) <- parseProgram source >>= sweep
       return $ find (pointed selection) specs
       where
         pointed :: (Int, Int) -> Spec -> Bool
@@ -174,33 +176,35 @@ refine source selection = do
               || (posCoff open <= end && end <= posCoff close)
 
 -- | Type check + generate POs and Specs
-checkEverything :: Text -> Maybe (Int, Int) -> EffM ([PO], [Spec], [A.Expr], [StructWarning])
-checkEverything source mouseSelection = do
-  program@(A.Program _ globalProps _ _ _) <- parseProgram source
-  typeCheck program
-  (pos, specs, warings) <- genPO program
-  case mouseSelection of
-    Nothing -> return (pos, specs, globalProps, warings)
-    Just sel -> return (filterPOs sel pos, specs, globalProps, warings)
+-- checkEverything :: Text -> Maybe (Int, Int) -> EffM ([PO], [Spec], [A.Expr], [StructWarning])
+-- checkEverything source mouseSelection = do
+--   program@(A.Program _ globalProps _ _ _) <- parseProgram source
+--   typeCheck program
+--   (pos, specs, warings) <- genPO program
+--   case mouseSelection of
+--     Nothing -> return (pos, specs, globalProps, warings)
+--     Just sel -> return (filterPOs sel pos, specs, globalProps, warings)
 
 -- | Only generate POs and Specs
-genPOsandSpecsOnly :: Text -> Maybe (Int, Int) -> EffM ([PO], [Spec], [A.Expr], [StructWarning])
-genPOsandSpecsOnly source mouseSelection = do
-  program@(A.Program _ globalProps _ _ _) <- parseProgram source
-  (pos, specs, warings) <- genPO program
-  case mouseSelection of
-    Nothing -> return (pos, specs, globalProps, warings)
-    Just sel -> return (filterPOs sel pos, specs, globalProps, warings)
+-- genPOsandSpecsOnly :: Text -> Maybe (Int, Int) -> EffM ([PO], [Spec], [A.Expr], [StructWarning])
+-- genPOsandSpecsOnly source mouseSelection = do
+--   program@(A.Program _ globalProps _ _ _) <- parseProgram source
+--   (pos, specs, warings) <- genPO program
+--   case mouseSelection of
+--     Nothing -> return (pos, specs, globalProps, warings)
+--     Just sel -> return (filterPOs sel pos, specs, globalProps, warings)
 
 typeCheck :: A.Program -> EffM ()
 typeCheck p = case runExcept (TypeChecking.checkProg p) of
   Left e -> throwError $ TypeError e
   Right v -> return v
 
-genPO :: A.Program -> EffM ([PO], [Spec], [StructWarning])
-genPO p = case sweep p of
-  Left e -> throwError $ StructError e
-  Right v -> return v
+sweep :: A.Program -> EffM ([PO], [Spec], [A.Expr], [StructWarning])
+sweep program@(A.Program _ globalProps _ _ _) = 
+  case WP.sweep program of
+    Left e -> throwError $ StructError e
+    Right (pos, specs, warings) -> do 
+      return (pos, specs, globalProps, warings)
 
 --------------------------------------------------------------------------------
 
