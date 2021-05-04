@@ -24,11 +24,11 @@ import Syntax.Abstract
 import Syntax.Common
 import Syntax.Concrete.ToAbstract (ToAbstract (toAbstract))
 import Syntax.Parser (Parser, pExpr, runParse)
+import qualified Syntax.Parser as Parser
 import Test.Tasty
 import Test.Tasty.Golden
 import Test.Tasty.Golden.Advanced
 import Test.Tasty.HUnit
-import qualified Syntax.Parser as Parser
 
 tests :: TestTree
 -- tests = testGroup "Type" [inferTests]
@@ -145,8 +145,19 @@ typeCheckGolden name filePath fileName =
 typeCheck :: (FilePath, Text) -> Text
 typeCheck (filepath, source) = renderStrict . layoutCompact . pretty $ result
   where
-    effEnv = Server.EffEnv filepath Nothing
-    result = runParse Parser.pProgram filepath source
+    result = case runParse Parser.pProgram filepath source of
+      Left err -> Left (SyntacticError err)
+      Right ast -> case runExcept (toAbstract ast) of
+        Left err -> Left (Others "Should dig hole")
+        Right prog -> runExcept $ withExcept TypeError $ checkProg prog
+
+-- typeCheck :: (FilePath, Text) -> Text
+-- typeCheck (filepath, source) = renderStrict . layoutCompact . pretty $ result
+--   where
+--     result =
+--       case LSP.runM (LSP.parseProgram filepath source) of
+--         Left err -> Left err
+--         Right prog -> LSP.runM . withExcept TypeError $ checkProg prog
 
 compareAndReport :: (FilePath, FilePath, Text) -> (FilePath, FilePath, Text) -> IO (Maybe String)
 compareAndReport (expectedPath, _, expectedRes) (actualPath, fileName, actualRaw) = do
