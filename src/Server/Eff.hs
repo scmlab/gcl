@@ -28,10 +28,11 @@ import Data.IORef
 import qualified GCL.WP as WP
 import GCL.Expr (runSubstM, expand)
 import qualified Language.LSP.VFS as VFS
-import Data.IntMap (IntMap)
 import Control.Monad.State
-import qualified Data.IntMap as IntMap
 import Data.Loc.Range
+import Prelude hiding (span)
+import Server.DiffMap (DiffMap)
+import qualified Server.DiffMap as DiffMap
 
 data Eff next
   = EditText Range Text (Text -> next)
@@ -50,10 +51,10 @@ data EffEnv = EffEnv
     effEnvResponder :: Maybe Responder
   }
 
-type EffM = FreeT Eff (ExceptT Error (ReaderT EffEnv (State (IntMap Int))))
+type EffM = FreeT Eff (ExceptT Error (ReaderT EffEnv (State DiffMap)))
 
 runEffM :: EffEnv -> EffM a -> Either Error (FreeF Eff a (EffM a))
-runEffM env p = evalState (runReaderT (runExceptT (runFreeT p)) env) IntMap.empty
+runEffM env p = evalState (runReaderT (runExceptT (runFreeT p)) env) DiffMap.empty
 
 handleError :: FilePath -> Maybe Responder -> Error -> ServerM ()
 handleError filepath responder err = do
@@ -83,7 +84,9 @@ interpret env@(EffEnv filepath responder) p = case runEffM env p of
             newSource <- latestSource
             updateSavedSource newSource
             -- update the offset diff map 
-
+            let offset = posCoff (rangeStart range) 
+            let diff = Text.length text - span range 
+            modify' (DiffMap.insert offset diff)
 
             next newSource
 
@@ -174,17 +177,13 @@ digHole pos = do
 
 -- | Try to parse a piece of text in a Spec
 refine :: Text -> (Int, Int) -> EffM (Spec, Text)
-refine source selection = do
+refine source (start, end) = do
   result <- findPointedSpec
   case result of
     Nothing -> throwError $ Others "Please place the cursor in side a Spec to refine it"
     Just spec -> do
-
-      case specLoc spec of
-        NoLoc -> return ()
-        Loc start end -> logM $ Text.drop (posCoff start) $ Text.take (posCoff end) source
-
-      let payload = Text.unlines $ specPayload source spec
+      source' <- latestSource
+      let payload = Text.unlines $ specPayload source' spec
       -- HACK, `pStmts` will kaput if we feed empty strings into it 
       let payloadIsEmpty = Text.null (Text.strip payload)
       if payloadIsEmpty
@@ -196,14 +195,20 @@ refine source selection = do
     findPointedSpec = do
       program <- parseProgram source
       (_, specs, _, _) <- sweep program
-      return $ find (pointed selection) specs
+      -- adjust offsets of selections 
+      start' <- adjustOffset start 
+      end' <- adjustOffset end
+      logM $ Text.pack $ show (start, start')
+      logM $ Text.pack $ show (end, end')
+
+      return $ find (pointed (start', end')) specs
       where
         pointed :: (Int, Int) -> Spec -> Bool
-        pointed (start, end) spec = case specLoc spec of
+        pointed (x, y) spec = case specLoc spec of
           NoLoc -> False
           Loc open close ->
-            (posCoff open <= start && start <= posCoff close + 1)
-              || (posCoff open <= end && end <= posCoff close + 1)
+            (posCoff open <= x && x <= posCoff close + 1)
+              || (posCoff open <= y && y <= posCoff close + 1)
 
 -- 
 substitute :: A.Program -> A.Expr -> A.Subst -> A.Expr
@@ -222,7 +227,13 @@ sweep program@(A.Program _ globalProps _ _ _) =
     Right (pos, specs, warings) -> do
       return (pos, specs, globalProps, warings)
 
+
 --------------------------------------------------------------------------------
+
+adjustOffset :: Int -> EffM Int 
+adjustOffset offset = do 
+  diffMap <- get 
+  return $ DiffMap.adjust diffMap offset 
 
 -- | Parse with a parser
 parse :: Parser a -> Text -> EffM a

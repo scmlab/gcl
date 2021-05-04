@@ -120,18 +120,19 @@ handlers =
                   updateLastMouseSelection (selStart, selEnd)
                   source <- latestSource
                   -- refine (parse + sweep)
+
                   (spec, text) <- refine source (selStart, selEnd)
 
-                  logM "*** SPEC CONTENT ------"
-                  logM text
-                  logM "************"
+                  -- logM "*** SPEC CONTENT ------"
+                  -- logM text
+                  -- logM "************"
 
                   -- remove the Spec 
                   case specLoc spec of 
                     NoLoc -> throwError $ Others "NoLoc in ReqRefine"
                     Loc start end -> do 
                       source' <- editText (Range start end) (Text.stripStart text)
-                      logM $ "*** AFTER REMOVING SPEC\n" <> source'
+                      -- logM $ "*** AFTER REMOVING SPEC\n" <> source'
                       checkAndSendResponsePrim (Just (selStart, selEnd)) source'
 
               -- Substitute
