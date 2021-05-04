@@ -5,28 +5,28 @@
 
 module Server.Handler (handlers) where
 
+-- import qualified Server.CustomMethod as Custom
+
+import Control.Monad.Except
 import qualified Data.Aeson as JSON
+import Data.Loc
+import Data.Loc.Range
 import Data.Text (Text, pack)
 import qualified Data.Text as Text
+import Error
 import Language.LSP.Server
 import Language.LSP.Types hiding
-  ( TextDocumentSyncClientCapabilities (..),
-   Range 
+  ( Range,
+    TextDocumentSyncClientCapabilities (..),
   )
 import qualified Language.LSP.Types as LSP
-import Server.CustomMethod (ReqKind (..), Request (..))
--- import qualified Server.CustomMethod as Custom
+import Server.CustomMethod
 import Server.Diagnostic
   ( ToDiagnostics (toDiagnostics),
   )
-import Server.Eff
 import Server.ExportPO ()
 import Server.Monad
 import Syntax.Predicate (Spec (..))
-import Data.Loc
-import Control.Monad.Except
-import Error
-import Data.Loc.Range
 
 -- handlers of the LSP server
 handlers :: Handlers ServerM
@@ -108,7 +108,7 @@ handlers =
                   program <- parseProgram source
                   typeCheck program
                   (pos, _specs, _globalProps, warnings) <- sweep program
-                  -- display all POs 
+                  -- display all POs
                   let diagnostics = concatMap toDiagnostics pos ++ concatMap toDiagnostics warnings
                   -- response with only POs in the vinicity of the cursor
                   let responses = [ResInspect (filterPOs (selStart, selEnd) pos)]
@@ -127,10 +127,10 @@ handlers =
                   -- logM text
                   -- logM "************"
 
-                  -- remove the Spec 
-                  case specLoc spec of 
+                  -- remove the Spec
+                  case specLoc spec of
                     NoLoc -> throwError $ Others "NoLoc in ReqRefine"
-                    Loc start end -> do 
+                    Loc start end -> do
                       source' <- editText (Range start end) (Text.stripStart text)
                       -- logM $ "*** AFTER REMOVING SPEC\n" <> source'
                       checkAndSendResponsePrim (Just (selStart, selEnd)) source'
@@ -138,9 +138,9 @@ handlers =
               -- Substitute
               ReqSubstitute index expr subst -> do
                 interpret effEnv $ do
-                  source <- savedSource 
-                  program <- parseProgram source 
-                  let expr' = substitute program expr subst 
+                  source <- savedSource
+                  program <- parseProgram source
+                  let expr' = substitute program expr subst
                   terminate [ResSubstitute index expr'] []
 
               -- ExportProofObligations
@@ -158,7 +158,7 @@ handlers =
               Nothing -> pure ()
               Just filepath -> do
                 let effEnv = EffEnv filepath Nothing
-                interpret effEnv $ do 
+                interpret effEnv $ do
                   updateSavedSource source
                   lastSelection <- readLastMouseSelection
                   checkAndSendResponsePrim lastSelection source,
@@ -170,11 +170,10 @@ handlers =
           Nothing -> pure ()
           Just filepath -> do
             let effEnv = EffEnv filepath Nothing
-            interpret effEnv $ do 
+            interpret effEnv $ do
               updateSavedSource source
               lastSelection <- readLastMouseSelection
               checkAndSendResponsePrim lastSelection source
-
     ]
 
 -- parse + type check + sweep
@@ -185,9 +184,9 @@ checkAndSendResponsePrim lastSelection source = do
   typeCheck program
   (pos, specs, globalProps, warnings) <- sweep program
   let diagnostics = concatMap toDiagnostics pos ++ concatMap toDiagnostics warnings
-  let filteredPOs = case lastSelection of 
-        Nothing -> pos 
-        Just sel -> filterPOs sel pos  
+  let filteredPOs = case lastSelection of
+        Nothing -> pos
+        Just sel -> filterPOs sel pos
   let responses = [ResOK (IdInt version) filteredPOs specs globalProps warnings]
 
   terminate responses diagnostics

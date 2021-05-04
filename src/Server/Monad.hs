@@ -1,27 +1,28 @@
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE OverloadedStrings #-}
+
 module Server.Monad where
 
 import Control.Concurrent (Chan, newChan, writeChan)
 import Control.Monad.Reader
+import Data.Aeson (FromJSON, ToJSON)
+import qualified Data.Aeson as JSON
 import Data.IORef (IORef, newIORef, readIORef, writeIORef)
+import Data.Loc
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Text (Text)
 import qualified Data.Text as Text
+import Error
+import GCL.WP
+import GHC.Generics (Generic)
+import Language.LSP.Diagnostics
 import Language.LSP.Server
 import Language.LSP.Types hiding (TextDocumentSyncClientCapabilities (..))
-import Language.LSP.Diagnostics
-import Data.Aeson (ToJSON)
-import GHC.Generics (Generic)
 import qualified Syntax.Abstract as A
-import Data.Loc
-import Error
-import Syntax.Predicate (PO, Spec, Origin)
-import GCL.WP
-import qualified Data.Aeson as JSON
+import Syntax.Predicate (Origin, PO, Spec)
 
 --------------------------------------------------------------------------------
 
@@ -63,7 +64,7 @@ logText text = do
 --------------------------------------------------------------------------------
 
 sendDiagnostics :: FilePath -> [Diagnostic] -> ServerM ()
-sendDiagnostics filepath diagnostics = do 
+sendDiagnostics filepath diagnostics = do
   -- send diagnostics
   ref <- lift $ asks envCounter
   version <- liftIO $ readIORef ref
@@ -73,11 +74,11 @@ sendDiagnostics filepath diagnostics = do
 type Responder = Response -> ServerM ()
 
 sendResponses :: FilePath -> Maybe Responder -> [ResKind] -> ServerM ()
-sendResponses filepath responder responses = do 
-    -- send responses
-    case responder of
-      Nothing -> sendNotification (SCustomMethod "guacamole") $ JSON.toJSON $ Res filepath responses
-      Just f -> f $ Res filepath responses
+sendResponses filepath responder responses = do
+  -- send responses
+  case responder of
+    Nothing -> sendNotification (SCustomMethod "guacamole") $ JSON.toJSON $ Res filepath responses
+    Just f -> f $ Res filepath responses
 
 --------------------------------------------------------------------------------
 
@@ -126,6 +127,34 @@ instance Show Response where
   show (Res _path kinds) = show kinds
   show (CannotDecodeRequest s) = "CannotDecodeRequest " <> s
   show NotLoaded = "NotLoaded"
+
+--------------------------------------------------------------------------------
+
+-- | Request
+data ReqKind
+  = ReqInspect Int Int
+  | ReqRefine Int Int
+  | ReqSubstitute Int A.Expr A.Subst
+  | ReqExportProofObligations
+  | ReqDebug
+  deriving (Generic)
+
+instance FromJSON ReqKind
+
+instance Show ReqKind where
+  show (ReqInspect x y) = "Inspect " <> show x <> " " <> show y
+  show (ReqRefine i x) = "Refine #" <> show i <> " " <> show x
+  show (ReqSubstitute i x y) = "Substitute #" <> show i <> " " <> show x <> " => " <> show y
+  show ReqExportProofObligations = "ExportProofObligations"
+  show ReqDebug = "Debug"
+
+data Request = Req FilePath ReqKind
+  deriving (Generic)
+
+instance FromJSON Request
+
+instance Show Request where
+  show (Req _path kind) = show kind
 
 --------------------------------------------------------------------------------
 

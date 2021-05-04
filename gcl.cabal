@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 0ac7145866ce917da228937e5c2e538c623db7454e99519aa7c65692caa5fa84
+-- hash: 1d95b39a3cc1e2cbba57a3a3dc5a55bccdd8b1a3f9725fd14928609766915633
 
 name:           gcl
 version:        0.1.0.0
@@ -42,7 +42,6 @@ library
       Server.CustomMethod
       Server.Diagnostic
       Server.DiffMap
-      Server.Eff
       Server.ExportPO
       Server.Handler
       Server.Monad
@@ -143,7 +142,6 @@ test-suite gcl-test
       Server.CustomMethod
       Server.Diagnostic
       Server.DiffMap
-      Server.Eff
       Server.ExportPO
       Server.Handler
       Server.Monad
