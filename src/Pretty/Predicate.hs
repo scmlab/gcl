@@ -40,7 +40,7 @@ instance Pretty Struct where
       <> line
       <> braces (pretty pre)
       <> line
-      <> vsep (map (\x -> indent 2 (pretty x)) xs)
+      <> vsep (map (indent 2 . pretty) xs)
       <> line
       <> pretty next
   pretty (Postcond post) =

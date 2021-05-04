@@ -23,13 +23,27 @@ evalExpr :: ExecMonad m => Expr -> m Val
 evalExpr (Lit v _) = return (litToVal v)
 evalExpr (Const (Name x l) _) = lookupStore l x
 evalExpr (Var (Name x l) _) = lookupStore l x
-evalExpr (Op op l) = evalOp op l
+evalExpr (Op op) = evalOp op
+evalExpr (Chain a op b _) =       -- check later
+  case a of
+    Chain _ _ ar _ ->
+      evalOp (Conj NoLoc) >>= \case
+        VFun f1 -> evalExpr a >>= \va -> liftEither (f1 va) >>= \case
+          VFun f2 -> evalExpr (Chain ar op b (ar <--> b)) >>= \varb -> liftEither (f2 varb)
+          _ -> error "type error, shouldn't happen"
+        _ -> error "type error, shouldn't happen"
+    _ -> 
+      evalOp op >>= \case
+        VFun f1 -> evalExpr a >>= \va -> liftEither (f1 va) >>= \case
+          VFun f2 -> evalExpr b >>= \vb -> liftEither (f2 vb)
+          _ -> error "type error, shouldn't happen"
+        _ -> error "type error, shouldn't happen"
 evalExpr (App e1 e2 _) =
   evalExpr e1 >>= \case
     VFun f -> evalExpr e2 >>= \v -> liftEither (f v)
     _ -> error "type error, shouldn't happen"
-evalExpr (Lam _ _ _) = error "to be implemented"
-evalExpr (Quant _ _ _ _ _) = error "not supported"
+evalExpr Lam {} = error "to be implemented"
+evalExpr Quant {} = error "not supported"
 evalExpr (Hole _) = error "shouldn't happen"
 evalExpr (Subst _ _) = error "not supported"
 
@@ -45,7 +59,7 @@ execStmt (Skip _) = return ()
 execStmt (Abort l) = throwError (Aborted l)
 execStmt (Assign xs es l) = execAsgn xs es l
 execStmt (Assert _ _) = return ()
-execStmt (LoopInvariant _ _ _) = return ()
+execStmt LoopInvariant {} = return ()
 execStmt (Spec _ _) = error "spec cannot be executed"
 execStmt (Proof _) = error "proof cannot be executed"
 execStmt (If gcmds l) =
@@ -54,8 +68,7 @@ execStmt (Do gcmds l) =
   shuffle gcmds >>= pickGCmds (execStmt (Do gcmds l)) (return ())
 
 execStmts :: ExecMonad m => [Stmt] -> m ()
-execStmts [] = return ()
-execStmts (s : ss) = execStmt s >> execStmts ss
+execStmts = foldr ((>>) . execStmt) (return ())
 
 execAsgn :: ExecMonad m => [Name] -> [Expr] -> Loc -> m ()
 execAsgn xs es l = do
@@ -89,29 +102,36 @@ execProg (Program decls _ _ stmts _) = do
 
 declare :: ExecMonad m => Declaration -> m ()
 declare (ConstDecl cs _ _ _) =
-  mapM_ (\x -> updateStore NoLoc x Undef) (map nameToText cs)
+  mapM_ ((\x -> updateStore NoLoc x Undef) . nameToText) cs
 declare (VarDecl xs _ _ _) =
-  mapM_ (\x -> updateStore NoLoc x Undef) (map nameToText xs)
+  mapM_ ((\x -> updateStore NoLoc x Undef) . nameToText) xs
 declare (LetDecl c _ _ _) = updateStore NoLoc (nameToText c) Undef
 
 -- Lifting primitive operators.
 -- Should these be written with dependent type, or type family?
 
-evalOp :: ExecMonad m => Op -> Loc -> m Val
-evalOp EQ _ = return (liftOp2IRel (==))
-evalOp NEQ _ = return (liftOp2IRel (/=))
-evalOp LT _ = return (liftOp2IRel (<))
-evalOp LTE _ = return (liftOp2IRel (<=))
-evalOp GTE _ = return (liftOp2IRel (>=))
-evalOp GT _ = return (liftOp2IRel (>))
-evalOp Implies _ = return (liftOp2Bool (\p q -> not p || q))
-evalOp Conj _ = return (liftOp2Bool (&&))
-evalOp Disj _ = return (liftOp2Bool (||))
-evalOp Neg _ = return (liftOpBool not)
-evalOp Add _ = return (liftOp2Int (+))
-evalOp Sub _ = return (liftOp2Int (-))
-evalOp Mul _ = return (liftOp2Int (*))
-evalOp Div l =
+evalOp :: ExecMonad m => Op -> m Val
+evalOp (EQ _) = return (liftOp2IRel (==))
+evalOp (NEQ _) = return (liftOp2IRel (/=))
+evalOp (NEQU _) = return (liftOp2IRel (/=))
+evalOp (LT _) = return (liftOp2IRel (<))
+evalOp (LTE _) = return (liftOp2IRel (<=))
+evalOp (LTEU _) = return (liftOp2IRel (<=))
+evalOp (GTE _) = return (liftOp2IRel (>=))
+evalOp (GTEU _) = return (liftOp2IRel (>=))
+evalOp (GT _) = return (liftOp2IRel (>))
+evalOp (Implies _) = return (liftOp2Bool (\p q -> not p || q))
+evalOp (ImpliesU _) = return (liftOp2Bool (\p q -> not p || q))
+evalOp (Conj _) = return (liftOp2Bool (&&))
+evalOp (ConjU _) = return (liftOp2Bool (&&))
+evalOp (Disj _) = return (liftOp2Bool (||))
+evalOp (DisjU _) = return (liftOp2Bool (||))
+evalOp (Neg _) = return (liftOpBool not)
+evalOp (NegU _) = return (liftOpBool not)
+evalOp (Add _) = return (liftOp2Int (+))
+evalOp (Sub _) = return (liftOp2Int (-))
+evalOp (Mul _) = return (liftOp2Int (*))
+evalOp (Div l) =
   return $
     VFun
       ( \case
@@ -127,7 +147,7 @@ evalOp Div l =
             )
           _ -> error "type error, shouldn't happen"
       )
-evalOp Mod l = return $ modVFun l
+evalOp (Mod l) = return $ modVFun l
 
 modVFun :: Loc -> Val
 modVFun l =

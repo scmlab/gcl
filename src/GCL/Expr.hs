@@ -73,8 +73,9 @@ ifInDefns name f y = do
 free :: Expr -> Set Name
 free (Var x _) = Set.singleton x
 free (Const x _) = Set.singleton x
-free (Op _ _) = mempty
+free (Op _) = mempty
 free (Lit _ _) = mempty
+free (Chain a op b _) = free a <> free (Op op) <> free b
 free (App e1 e2 _) = free e1 <> free e2
 free (Lam x e _) = free e \\ Set.singleton x
 free (Quant op xs range term _) =
@@ -146,8 +147,12 @@ subst env c@(Const name _) = do
         (subst env (defnExpr e))
         (return (applySubst c env))
     Nothing -> return $ fromMaybe c (Map.lookup name env)
-subst _ (Op op l) = return $ Op op l
+subst _ (Op op) = return $ Op op
 subst _ (Lit n l) = return $ Lit n l
+subst env (Chain a op b l) = do
+  a' <- subst env a
+  b' <- subst env b
+  return (Chain a' op b' l)
 subst env (App e1 e2 l) = do
   e1' <- subst env e1
   e2' <- subst env e2
@@ -202,7 +207,11 @@ expand v@(Var name _) = do
   ifExpand
     (ifInDefns name expand (return v))
     (return v)
-expand op@(Op _ _) = return op
+expand op@(Op _) = return op
+expand (Chain a op b l) = do
+  a' <- expand a
+  b' <- expand b
+  return (Chain a' op b' l)
 expand (App e1 e2 l) = do
   e1' <- expand e1
   e2' <- expand e2

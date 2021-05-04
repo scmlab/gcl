@@ -5,6 +5,7 @@ module Pretty.Abstract where
 import Data.Text.Prettyprint.Doc
 import Pretty.Util
 import Pretty.Variadic
+import Pretty.Common ()
 import Syntax.Abstract
 import Syntax.Common
 import Prelude hiding (Ordering (..))
@@ -114,7 +115,11 @@ handleExpr :: Int -> Expr -> Variadic Expr (Doc ann)
 handleExpr _ (Var x _) = return $ pretty x
 handleExpr _ (Const x _) = return $ pretty x
 handleExpr _ (Lit x _) = return $ pretty x
-handleExpr n (Op x _) = handleOp n x
+handleExpr n (Op x) = handleOp n x
+handleExpr _ (Chain a op b _) = 
+  return $ pretty a
+    <> pretty op
+    <> pretty b
 handleExpr n (App p q _) = case handleExpr n p of
   Expect f -> f q
   Complete s -> do
@@ -138,27 +143,6 @@ handleExpr _ (Quant op xs r t _) =
 handleExpr _ (Subst _ _) = return "Subst"
 
 --------------------------------------------------------------------------------
-
--- | Operators
-instance Pretty Op where
-  pretty EQ = "="
-  pretty NEQ = "≠"
-  pretty LTE = "≤"
-  pretty GTE = "≥"
-  pretty LT = "<"
-  pretty GT = ">"
-  pretty Implies = "→"
-  pretty Conj = "∧"
-  pretty Disj = "∨"
-  pretty Neg = "¬"
-  pretty Add = "+"
-  pretty Sub = "-"
-  pretty Mul = "*"
-  pretty Div = "/"
-  pretty Mod = "%"
-  pretty Sum = "Σ"
-  pretty Forall = "∀"
-  pretty Exists = "∃"
 
 handleOp :: Int -> Op -> Variadic Expr (Doc ann)
 handleOp n op = case classify op of

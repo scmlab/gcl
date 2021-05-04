@@ -14,8 +14,9 @@ import Data.Loc (Located (locOf))
 import Data.Maybe (isJust)
 import qualified Data.Ord as Ord
 import Data.Text (Text)
-import Syntax.Common (Name (..))
-import Syntax.Concrete (BlockDecl (..), BlockDeclaration (..), Decl (..), DeclProp (..), DeclBody (..), Declaration (..), EndpointClose (..), EndpointOpen (..), Expr (..), GdCmd (..), Interval (..), Op (..), Program (..), SepBy (..), Stmt (..), TBase (..), Token (..), Type (..))
+import Syntax.Common (Name (..), Op (..))
+import Syntax.Concrete (BlockDecl (..), BlockDeclaration (..), Decl (..), DeclProp (..), DeclBody (..), Declaration (..), EndpointClose (..), EndpointOpen (..), Expr (..), GdCmd (..), Interval (..), Program (..), SepBy (..), Stmt (..), TBase (..), Token (..), Type (..))
+import Syntax.Concrete.Located ()
 import Syntax.Parser.Lexer
 import Syntax.Parser.Util
 import Text.Megaparsec (MonadParsec (..), Pos, anySingle, mkPos, parse, tokensToChunk, unPos, (<?>))
@@ -76,13 +77,13 @@ pConstDecl :: ParserF Declaration
 pConstDecl =
   ConstDecl
   <$> lexCon
-  <*> pDecl upperName
+  <*> pDecl pName
 
 pConstDeclWithProp :: ParserF Declaration
 pConstDeclWithProp =
   ConstDeclWithProp
   <$> lexCon
-  <*> pDecl upperName
+  <*> pDecl pName
   <*> pDeclProp
 
 pVarDecl :: ParserF Declaration
@@ -341,7 +342,7 @@ pVar :: ParserF Expr
 pVar = Var <$> lowerName
 
 pConst :: ParserF Expr
-pConst = Const <$> upperName
+pConst = Const <$> pName
 
 pQuant :: ParserF Expr
 pQuant =
@@ -385,6 +386,10 @@ pUnary m = do
 ------------------------------------------
 -- combinators
 ------------------------------------------
+
+pName :: ParserF Name
+pName = uncurry Name <$> lexText
+
 upperName :: ParserF Name
 upperName = uncurry Name <$> lexUpper
 

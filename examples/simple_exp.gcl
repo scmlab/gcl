@@ -1,5 +1,6 @@
 con N : Int { N ≥ 0 }
-var n, y : Int
+var n, x, y : Int
+var exp : Int -> Int -> Int
 
 x, n := 1, N
 { x = exp 2 n ∧ 0 ≤ n ≤ N, bnd : N - n}

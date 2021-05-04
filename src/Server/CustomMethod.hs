@@ -29,10 +29,11 @@ import Server.DiffMap (DiffMap)
 import qualified Server.DiffMap as DiffMap
 import Server.Monad
 import qualified Syntax.Abstract as A
-import Syntax.Concrete (toAbstract)
 import Syntax.Parser (Parser, pProgram, pStmts, runParse)
 import Syntax.Predicate (PO, Spec (specLoc), specPayload)
 import Prelude hiding (span)
+import Syntax.Concrete.ToAbstract
+import Control.Monad.Writer
 
 --------------------------------------------------------------------------------
 
@@ -47,6 +48,19 @@ data Eff next
   | Log Text next
   | Terminate [ResKind] [Diagnostic]
   deriving (Functor)
+
+-- for testing 
+data EffKind 
+  = EffEditText Range Text
+  | EffUpdateSavedSource Text
+  | EffReadSavedSource
+  | EffReadLatestSource
+  | EffUpdateLastMouseSelection (Int, Int)
+  | EffReadLastMouseSelection 
+  | EffBumpResponseVersion 
+  | EffLog Text
+  | EffTerminate [ResKind] [Diagnostic]
+  deriving (Eq, Show)
 
 data EffEnv = EffEnv
   { effEnvFilePath :: FilePath,
@@ -138,6 +152,48 @@ interpret env@(EffEnv filepath responder) p = case runEffM env p of
   Left err -> do
     logStuff err
     handleError filepath responder err
+
+
+runTest :: EffM a -> (Maybe a, [EffKind])
+runTest program = runWriter (interpret2 program)
+
+interpret2 :: EffM a -> Writer [EffKind] (Maybe a)
+interpret2 p = case runEffM (EffEnv "<test>" Nothing) p of
+  Right (Pure a) -> return (Just a)
+  Right (Free (EditText range text next)) -> do
+    tell [EffEditText range text]
+    interpret2 (next "")
+  Right (Free (ReadSavedSource next)) -> do
+    tell [EffReadSavedSource]
+    interpret2 (next "")
+  Right (Free (UpdateSavedSource source next)) -> do
+    tell [EffUpdateSavedSource source]
+    interpret2 next
+  Right (Free (ReadLatestSource next)) -> do
+    tell [EffReadLatestSource]
+    interpret2 (next "")
+  Right (Free (ReadLastMouseSelection next)) -> do
+    tell [EffReadLastMouseSelection]
+    interpret2 (next Nothing)
+  Right (Free (UpdateLastMouseSelection selection next)) -> do
+    tell [EffUpdateLastMouseSelection selection]
+    interpret2 next
+  Right (Free (BumpResponseVersion next)) -> do
+    tell [EffBumpResponseVersion]
+    interpret2 (next 0)
+  Right (Free (Log text next)) -> do
+    tell [EffLog text]
+    interpret2 next
+  Right (Free (Terminate responses diagnostics)) -> do
+    -- undefined 
+    tell [EffTerminate responses diagnostics]
+    return Nothing
+  Left err -> do
+    let responses = [ResError [globalError err]]
+    let diagnostics = toDiagnostics err
+    tell [EffTerminate responses diagnostics]
+    return Nothing
+
 
 editText :: Range -> Text -> EffM Text
 editText range text = liftF (EditText range text id)

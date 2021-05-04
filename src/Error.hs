@@ -23,7 +23,7 @@ import Syntax.Predicate (Spec)
 data Site
   = Global Loc -- source file
   | Local Loc Int -- spec-specific (no pun intended)
-  deriving (Show, Generic)
+  deriving (Eq, Show, Generic)
 
 instance ToJSON Site
 

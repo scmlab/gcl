@@ -22,12 +22,13 @@ import qualified Server.CustomMethod as Server
 import qualified Server.Monad as Server
 import Syntax.Abstract
 import Syntax.Common
-import Syntax.Concrete (ToAbstract (toAbstract))
+import Syntax.Concrete.ToAbstract (ToAbstract (toAbstract))
 import Syntax.Parser (Parser, pExpr, runParse)
 import Test.Tasty
 import Test.Tasty.Golden
 import Test.Tasty.Golden.Advanced
 import Test.Tasty.HUnit
+import qualified Syntax.Parser as Parser
 
 tests :: TestTree
 -- tests = testGroup "Type" [inferTests]
@@ -65,7 +66,7 @@ app :: Expr -> Expr -> Expr
 app e1 e2 = App e1 e2 NoLoc
 
 op :: Op -> Expr
-op o = Op o NoLoc
+op = Op
 
 var :: Text -> Expr
 var t = Var (Name t NoLoc) NoLoc
@@ -144,10 +145,8 @@ typeCheckGolden name filePath fileName =
 typeCheck :: (FilePath, Text) -> Text
 typeCheck (filepath, source) = renderStrict . layoutCompact . pretty $ result
   where
-    result =
-      case Server.runM (Server.parseProgram filepath source) of
-        Left err -> Left err
-        Right prog -> Server.runM . withExcept (Server.ToClient . TypeError) $ checkProg prog
+    effEnv = Server.EffEnv filepath Nothing
+    result = runParse Parser.pProgram filepath source
 
 compareAndReport :: (FilePath, FilePath, Text) -> (FilePath, FilePath, Text) -> IO (Maybe String)
 compareAndReport (expectedPath, _, expectedRes) (actualPath, fileName, actualRaw) = do

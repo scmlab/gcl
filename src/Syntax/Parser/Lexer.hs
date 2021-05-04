@@ -8,13 +8,15 @@ import Control.Monad (void)
 import Control.Applicative.Combinators ((<|>), choice, some, many, skipMany)
 import Data.Void (Void)
 import Data.Proxy (Proxy(Proxy))
-import Data.Char (isSymbol, isSpace, isAlphaNum)
+import Data.Char (isSymbol, isSpace, isAlphaNum, isAlpha)
 import Data.Text (Text)
 import Data.Loc (Located(..), Loc(..), (<-->), Pos)
 import Text.Megaparsec (setOffset, getOffset, MonadParsec(try, notFollowedBy, tokens), getSourcePos, Stream(tokensToChunk), satisfy, (<?>), Parsec )
 import Text.Megaparsec.Char (string, alphaNumChar, lowerChar, char, upperChar, space1)
 import qualified Text.Megaparsec.Char.Lexer as Lex
-import Syntax.Concrete (Lit(..),  Op(..), Token (..))
+import Syntax.Concrete (Lit(..), Token (..))
+import Syntax.Concrete.Located ()
+import Syntax.Common
 import Syntax.Parser.Token
 import Syntax.Parser.Util
 
@@ -173,7 +175,7 @@ lexEQ' :: LexerF (Token tokEQ)
 lexEQ' = symbol tokEQ 
 
 lexEQ :: LexerF Op
-lexEQ = Syntax.Concrete.EQ . locOf <$> symbol tokEQ 
+lexEQ = Syntax.Common.EQ . locOf <$> symbol tokEQ 
 
 lexNEQ :: LexerF Op
 lexNEQ = NEQ . locOf <$> symbol tokNEQ 
@@ -182,7 +184,7 @@ lexNEQU :: LexerF Op
 lexNEQU = NEQU . locOf <$> symbol tokNEQU 
 
 lexGT :: LexerF Op
-lexGT =  Syntax.Concrete.GT . locOf <$> symbol tokGT
+lexGT =  Syntax.Common.GT . locOf <$> symbol tokGT
 
 lexGTE :: LexerF Op
 lexGTE = GTE . locOf <$> symbol tokGTE 
@@ -191,7 +193,7 @@ lexGTEU :: LexerF Op
 lexGTEU = GTEU . locOf <$> symbol tokGTEU 
 
 lexLT :: LexerF Op
-lexLT = Syntax.Concrete.LT . locOf <$> symbol tokLT 
+lexLT = Syntax.Common.LT . locOf <$> symbol tokLT 
 
 lexLTE :: LexerF Op
 lexLTE = LTE . locOf <$> symbol tokLTE 
@@ -264,6 +266,12 @@ lexLower = lexeme . try . withPredicate notLowerKeywords $ do
   xs <- many . satisfy $ (\c -> isAlphaNum c || c == '_' || c == '\'')
   return $ tokensToChunk (Proxy :: Proxy Text) (x : xs)
 
+lexText :: LexerF (Text, Loc)
+lexText = lexeme . try . withPredicate (\t -> notUpperKeywords t && notLowerKeywords t) $ do
+  x <- satisfy isAlpha
+  xs <- many . satisfy $ (\c -> isAlphaNum c || c == '_' || c == '\'')
+  return $ tokensToChunk (Proxy :: Proxy Text) (x : xs)
+
 lexTrue :: LexerF Lit
 lexTrue = LitBool True . locOf <$> symbol tokTrue
 
@@ -285,7 +293,6 @@ lexTypeBool = symbol tokTypeBool
 lexTypeChar :: LexerF (Token tokTypeChar)
 lexTypeChar = symbol tokTypeChar
 
-
 ------------------------------------------
 -- helper combinators
 ------------------------------------------
@@ -306,8 +313,6 @@ withLoc p = do
 -- NOTE : make sure no space consumed after parser m
 notFollowedBySymbol :: LexerF a -> LexerF a
 notFollowedBySymbol m = ParseFunc (\sc' -> (↓) m (return ()) <* notFollowedBy (satisfy isSymbol) <* sc')
-  
-  -- m <* notFollowedBy (satisfy isSymbol)
 
 withPredicate :: (a -> Bool) -> Lexer a -> Lexer a
 withPredicate f p = do

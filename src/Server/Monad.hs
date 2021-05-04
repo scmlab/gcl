@@ -93,7 +93,7 @@ data ResKind
   | ResResolve Int -- resolves some Spec
   | ResSubstitute Int A.Expr
   | ResConsoleLog Text
-  deriving (Generic)
+  deriving (Eq, Generic)
 
 instance ToJSON ResKind
 
