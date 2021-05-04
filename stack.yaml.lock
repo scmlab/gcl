@@ -15,28 +15,28 @@ packages:
     subdir: lsp
     name: lsp
     version: 1.2.0.0
-    git: https://github.com/alanz/lsp.git
+    git: https://github.com/banacorn/lsp.git
     pantry-tree:
-      size: 1302
-      sha256: 7ce81cf71dd0add5180f174774a24da7b3c1295f36fc48208a1bdc0d2f46fa90
-    commit: 76b86d54040cfa6c8306433a29404fa6402a5f69
+      size: 1350
+      sha256: 337ac919300d03102766e4608d6a56ad261a3a9b3270e8e354b7b6ad7e992d62
+    commit: 66f3fc54680f77c3fe5c5379bff8ff2dd4a2b926
   original:
     subdir: lsp
-    git: https://github.com/alanz/lsp.git
-    commit: 76b86d54040cfa6c8306433a29404fa6402a5f69
+    git: https://github.com/banacorn/lsp.git
+    commit: 66f3fc54680f77c3fe5c5379bff8ff2dd4a2b926
 - completed:
     subdir: lsp-types
     name: lsp-types
     version: 1.2.0.0
-    git: https://github.com/alanz/lsp.git
+    git: https://github.com/banacorn/lsp.git
     pantry-tree:
-      size: 3936
-      sha256: f7ded3dab56b72ed2f4aadbdc38bae4522d1968c18f29e823a9839834228ec39
-    commit: 76b86d54040cfa6c8306433a29404fa6402a5f69
+      size: 3984
+      sha256: fed994498f8ec8753ea2b40baec554397b938b6f032c2c8fb9e0063e687f5bd8
+    commit: 66f3fc54680f77c3fe5c5379bff8ff2dd4a2b926
   original:
     subdir: lsp-types
-    git: https://github.com/alanz/lsp.git
-    commit: 76b86d54040cfa6c8306433a29404fa6402a5f69
+    git: https://github.com/banacorn/lsp.git
+    commit: 66f3fc54680f77c3fe5c5379bff8ff2dd4a2b926
 - completed:
     hackage: dependent-map-0.4.0.0@sha256:ca2b131046f4340a1c35d138c5a003fe4a5be96b14efc26291ed35fd08c62221,1657
     pantry-tree:
@@ -45,6 +45,13 @@ packages:
   original:
     hackage: dependent-map-0.4.0.0@sha256:ca2b131046f4340a1c35d138c5a003fe4a5be96b14efc26291ed35fd08c62221,1657
 - completed:
+    hackage: dependent-sum-0.7.1.0@sha256:0e419237f5b86da3659772afff9cab355c0f8d5b3fdb15a5b30e673d8dc83941,2147
+    pantry-tree:
+      size: 290
+      sha256: 009601e5d33e835c7a384e240c5c6ad12643bce9c54b2a0b07201daee3380e51
+  original:
+    hackage: dependent-sum-0.7.1.0@sha256:0e419237f5b86da3659772afff9cab355c0f8d5b3fdb15a5b30e673d8dc83941,2147
+- completed:
     hackage: dependent-sum-template-0.1.0.3@sha256:0bbbacdfbd3abf2a15aaf0cf2c27e5bdd159b519441fec39e1e6f2f54424adde,1682
     pantry-tree:
       size: 436
@@ -52,29 +59,22 @@ packages:
   original:
     hackage: dependent-sum-template-0.1.0.3@sha256:0bbbacdfbd3abf2a15aaf0cf2c27e5bdd159b519441fec39e1e6f2f54424adde,1682
 - completed:
-    hackage: constraints-extras-0.3.0.2@sha256:013b8d0392582c6ca068e226718a4fe8be8e22321cc0634f6115505bf377ad26,1853
-    pantry-tree:
-      size: 594
-      sha256: 3ce1012bfb02e4d7def9df19ce80b8cd2b472c691b25b181d9960638673fecd1
-  original:
-    hackage: constraints-extras-0.3.0.2@sha256:013b8d0392582c6ca068e226718a4fe8be8e22321cc0634f6115505bf377ad26,1853
-- completed:
-    hackage: dependent-sum-0.7.1.0@sha256:5599aa89637db434431b1dd3fa7c34bc3d565ee44f0519bfbc877be1927c2531,2068
-    pantry-tree:
-      size: 290
-      sha256: 9cbfb32b5a8a782b7a1c941803fd517633cb699159b851c1d82267a9e9391b50
-  original:
-    hackage: dependent-sum-0.7.1.0@sha256:5599aa89637db434431b1dd3fa7c34bc3d565ee44f0519bfbc877be1927c2531,2068
-- completed:
     hackage: unliftio-core-0.2.0.1@sha256:9b3e44ea9aacacbfc35b3b54015af450091916ac3618a41868ebf6546977659a,1082
     pantry-tree:
       size: 328
       sha256: e81c5a1e82ec2cd68cbbbec9cd60567363abe02257fa1370a906f6754b6818b8
   original:
     hackage: unliftio-core-0.2.0.1@sha256:9b3e44ea9aacacbfc35b3b54015af450091916ac3618a41868ebf6546977659a,1082
+- completed:
+    hackage: constraints-extras-0.3.1.0@sha256:12016ebb91ad5ed2c82bf7e48c6bd6947d164d33c9dca5ac3965de1bb6c780c0,1777
+    pantry-tree:
+      size: 595
+      sha256: 5fe01617233b7f66ba0e2aef95b218a19225a22e4193a8ed93999a3b7c43a4f3
+  original:
+    hackage: constraints-extras-0.3.1.0@sha256:12016ebb91ad5ed2c82bf7e48c6bd6947d164d33c9dca5ac3965de1bb6c780c0,1777
 snapshots:
 - completed:
-    size: 491373
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/15/3.yaml
-    sha256: 29e9ff61b8bf4b4fcff55cde3ac106ebb971f0d21331dccac9eee63374fa6ca8
-  original: lts-15.3
+    size: 534126
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/16/31.yaml
+    sha256: 637fb77049b25560622a224845b7acfe81a09fdb6a96a3c75997a10b651667f6
+  original: lts-16.31
