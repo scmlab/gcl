@@ -112,7 +112,8 @@ jobs:
         mkdir tmp
         cd tmp
         cp ~/.local/bin/gcl .
-        zip -r gcl gcl-ubuntu
+        zip -r gcl gcl
+        mv gcl.zip gcl-ubuntu.zip
 
     - name: Display all files
       run: ls -R
