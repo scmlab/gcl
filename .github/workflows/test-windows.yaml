@@ -1,0 +1,42 @@
+# modified from https://github.com/simonmichael/hledger/blob/master/.github/workflows/windows.yml
+
+name: CI (Windows)
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest]
+
+    runs-on: ${{ matrix.os }}
+    steps:
+    - name: 📥 Checkout repository
+      uses: actions/checkout@v2
+
+    - name: ⏬ Install stack
+      #if: steps.stack-programs-dir.outputs.cache-hit != 'true'
+      # this step is needed to get stack.exe into PATH, for now
+      run: |
+        curl -sL https://get.haskellstack.org/stable/windows-x86_64.zip -o stack.zip
+        7z x stack.zip stack.exe
+        which stack
+        stack --version
+        which ./stack
+        ./stack --version
+
+    - name: ⏬ Install GHC
+      # if: steps.stack-programs-dir.outputs.cache-hit != 'true'
+      # set PATH=C:\Users\runneradmin\AppData\Local\Programs\stack\local\bin;%PATH%
+      run: |
+        ./stack --no-terminal setup --install-ghc
+
+    - name: 📸 Build Snapshot
+      run: |
+        ./stack --no-terminal build --bench --only-snapshot
+
+    - name: 🧰 Build Dependencies
+      run: |
+        ./stack --no-terminal build --only-dependencies
