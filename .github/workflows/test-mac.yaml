@@ -65,22 +65,3 @@ jobs:
     - name: 🔨 Build and run tests
       run: |
         stack test
-
-
-    # artifacts:
-
-    # - name: Gather executables
-    #   run: |
-    #     mkdir tmp
-    #     cd tmp
-    #     mkdir hledger
-    #     cd hledger
-    #     cp ~/.local/bin/hledger .
-    #     cp ~/.local/bin/hledger-ui .
-    #     cp ~/.local/bin/hledger-web .
-    # # XXX intermittent upload failures
-    # - name: Upload executables artifact
-    #   uses: actions/upload-artifact@v2
-    #   with:
-    #     name: hledger-macos
-    #     path: tmp/hledger

@@ -1,6 +1,6 @@
-name: linux CI
+# modified from https://github.com/simonmichael/hledger/blob/master/.github/workflows/linux.yml
 
-name: CI (Windows)
+name: CI (Linux)
 
 on: [push, pull_request]
 
