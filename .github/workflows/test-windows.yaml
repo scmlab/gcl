@@ -81,16 +81,17 @@ jobs:
         ./stack test
 
     # artifacts:
-
-    - name: 📦 Gather executables
+    
+    - name: 📦 Install & Gather executables
       run: |
+        ./stack install
         mkdir tmp
         cd tmp
         mkdir gcl
         cd gcl
         copy C:\Users\runneradmin\AppData\Roaming\local\bin\gcl.exe .
              
-    - name: ⏫ Upload executables artifact
+    - name: ⏫ Upload executables
       uses: actions/upload-artifact@v2
       with:
         name: gcl-windows

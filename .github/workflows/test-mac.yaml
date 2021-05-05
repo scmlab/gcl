@@ -69,9 +69,10 @@ jobs:
 
     # artifacts:
 
-    - name: 📦 Gather executables
+    - name: 📦 Install & Gather executables
       id: exes
       run: |
+        stack install
         mkdir tmp
         cd tmp
         mkdir gcl
