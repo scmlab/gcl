@@ -109,8 +109,6 @@ jobs:
       id: exes
       run: |
         stack install
-        mkdir tmp
-        cd tmp
         cp ~/.local/bin/gcl .
         zip -r gcl gcl
         mv gcl.zip gcl-ubuntu.zip
