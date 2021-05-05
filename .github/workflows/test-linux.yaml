@@ -69,19 +69,19 @@ jobs:
       run: |
         stack test
 
-    # artifacts:
-    - name: 📦 Install & Gather executables
-      id: exes
-      run: |
-        stack install
-        mkdir tmp
-        cd tmp
-        mkdir gcl
-        cd gcl
-        cp ~/.local/bin/gcl .
+    # # artifacts:
+    # - name: 📦 Install & Gather executables
+    #   id: exes
+    #   run: |
+    #     stack install
+    #     mkdir tmp
+    #     cd tmp
+    #     mkdir gcl
+    #     cd gcl
+    #     cp ~/.local/bin/gcl .
 
-    - name: ⏫ Upload executables artifact
-      uses: actions/upload-artifact@v2
-      with:
-        name: gcl-ubuntu
-        path: tmp/gcl
+    # - name: ⏫ Upload executables artifact
+    #   uses: actions/upload-artifact@v2
+    #   with:
+    #     name: gcl-ubuntu
+    #     path: tmp/gcl

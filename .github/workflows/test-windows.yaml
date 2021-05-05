@@ -82,17 +82,17 @@ jobs:
 
     # artifacts:
     
-    - name: 📦 Install & Gather executables
-      run: |
-        ./stack install
-        mkdir tmp
-        cd tmp
-        mkdir gcl
-        cd gcl
-        copy C:\Users\runneradmin\AppData\Roaming\local\bin\gcl.exe .
+    # - name: 📦 Install & Gather executables
+    #   run: |
+    #     ./stack install
+    #     mkdir tmp
+    #     cd tmp
+    #     mkdir gcl
+    #     cd gcl
+    #     copy C:\Users\runneradmin\AppData\Roaming\local\bin\gcl.exe .
              
-    - name: ⏫ Upload executables
-      uses: actions/upload-artifact@v2
-      with:
-        name: gcl-windows
-        path: tmp/gcl
+    # - name: ⏫ Upload executables
+    #   uses: actions/upload-artifact@v2
+    #   with:
+    #     name: gcl-windows
+    #     path: tmp/gcl

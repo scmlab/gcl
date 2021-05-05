@@ -14,69 +14,137 @@ on:
 
 jobs:
   release:
+    name: Create Github Release
+    if: contains(github.ref, 'tags/v')
+    runs-on: ubuntu-latest
+    steps:
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1.0.0
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.ref }}
+        release_name: Release ${{ github.ref }}
+        draft: true
+        prerelease: true
+    - name: Output Release URL File
+      run: echo "${{ steps.create_release.outputs.upload_url }}" > release_url.txt
+    - name: Save Release URL File for publish
+      uses: actions/upload-artifact@v1
+      with:
+        name: release_url
+        path: release_url.txt
+
+  build-linux:
+    name: Build on Linux
+    if: contains(github.ref, 'tags/v')
+    needs: [release]
     runs-on: ubuntu-latest
     steps:
 
-      - name: Checkout code
-        uses: actions/checkout@v2
+    - name: 📥 Checkout repository
+      uses: actions/checkout@v2
 
-      - name: Create Release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # This token is provided by Actions, you do not need to create your own token
-        with:
-          tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref }}
-          draft: true
-          prerelease: true
-        
-      # - name: Upload Release Asset
-        # uses: softprops/action-gh-release@v1
-        # if: startsWith(github.ref, 'refs/tags/')
-        # with:
-        #   files: Release.txt
-        # env:
-        #   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    # things to be cached/restored:
+
+    - name: 💾 Cache stack global package db
+      id:   stack-global
+      uses: actions/cache@v2
+      with:
+        path: ~/.stack
+        key: ${{ runner.os }}-stack-global-${{ matrix.plan.ghc }}-${{ hashFiles('**.yaml') }}
+        restore-keys: |
+             ${{ runner.os }}-stack-global-${{ matrix.plan.ghc }}
+    - name: 💾 Cache stack-installed programs in ~/.local/bin
+      id:   stack-programs
+      uses: actions/cache@v2
+      with:
+        path: ~/.local/bin
+        key: ${{ runner.os }}-stack-programs-${{ matrix.plan.ghc }}-${{ hashFiles('**.yaml') }}
+        restore-keys: |
+             ${{ runner.os }}-stack-programs-${{ matrix.plan.ghc }}
+    - name: 💾 Cache .stack-work
+      uses: actions/cache@v2
+      with:
+        path: .stack-work
+        key: ${{ runner.os }}-stack-work-${{ matrix.plan.ghc }}-${{ hashFiles('**.yaml') }}
+        restore-keys: |
+             ${{ runner.os }}-stack-work-${{ matrix.plan.ghc }}
+    - name: 💾 Cache gcl/.stack-work
+      uses: actions/cache@v2
+      with:
+        path: gcl/.stack-work
+        key: ${{ runner.os }}-gcl-stack-work-${{ matrix.plan.ghc }}-${{ hashFiles('gcl/package.yaml') }}
+        restore-keys: |
+             ${{ runner.os }}-gcl-stack-work-${{ matrix.plan.ghc }}
 
 
+    # actions:
 
-      - uses: actions/download-artifact@v2
-          
-      - name: Display structure of downloaded files
-        run: ls -R
-        # working-directory: tmp/gcl
+    - name: ⏬ Install stack
+      run: |
+        mkdir -p ~/.local/bin
+        export PATH=~/.local/bin:$PATH
+        # curl -sL https://get.haskellstack.org/stable/linux-x86_64.tar.gz | tar xz --wildcards --strip-components=1 -C ~/.local/bin '*/stack'; chmod a+x ~/.local/bin/stack
+        if [[ ! -x ~/.local/bin/stack ]]; then curl -sL https://get.haskellstack.org/stable/linux-x86_64.tar.gz | tar xz --wildcards --strip-components=1 -C ~/.local/bin '*/stack'; chmod a+x ~/.local/bin/stack; fi
+        stack --version
+    - name: ⏬ Install GHC
+      run: |
+        df -h
+        stack setup --install-ghc
+        df -h
+
+    - name: ⏬ Install haskell deps
+      run: |
+        stack build --only-dependencies
+
+    - name: 🔨 Build and run tests
+      run: |
+        stack test
+
+    # artifacts:
+
+    - name: 📦 Install & Gather executables
+      id: exes
+      run: |
+        stack install
+        mkdir tmp
+        cd tmp
+        cp ~/.local/bin/gcl .
+        zip -r gcl gcl-ubuntu
+
+    - name: Display all files
+      run: ls -R
+
+    # - name: ⏫ Upload executables artifact
+    #   uses: actions/upload-artifact@v2
+    #   with:
+    #     name: gcl-ubuntu
+    #     path: tmp/gcl
 
 
-    # name: gcl-macos
-    # path: tmp/gcl
-      - name: Upload Assets
-        uses: softprops/action-gh-release@v1
-        if: startsWith(github.ref, 'refs/tags/')
-        with:
-          files: |
-            gcl-ubuntu
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - name: Load Release URL File from release job
+      uses: actions/download-artifact@v1
+      with:
+        name: release_url
 
-      # - name: Upload Release Asset
-      #   id: upload-release-asset 
-      #   uses: actions/upload-release-asset@v1
-      #   env:
-      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      #   with:
-      #     upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps 
-      #     asset_path: ./gcl-ubuntu.zip
-      #     asset_name: gcl-ubuntu.zip
-      #     asset_content_type: application/zip
-
-    # steps:
-    #   - name: Download math result for job 2
-    #     uses: actions/download-artifact@v2
-    #     with:
-    #       name: homework
-    #   - name: Print the final result
-    #     shell: bash
-    #     run: |
-    #       value=`cat math-homework.txt`
-    #       echo The result is $value
+    - name: Get Release File Name & Upload URL
+      id: get_release_info
+      run: |
+        echo ::set-output name=file_name::${REPOSITORY_NAME##*/}-${TAG_REF_NAME##*/v} # RepositoryName-v1.0.0
+        value=`cat release_url/release_url.txt`
+        echo ::set-output name=upload_url::$value
+      env:
+        TAG_REF_NAME: ${{ github.ref }}
+        REPOSITORY_NAME: ${{ github.repository }}
+    - name: Upload Release Asset
+      id: upload-release-asset 
+      uses: actions/upload-release-asset@v1.0.1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.get_release_info.outputs.upload_url }}
+        asset_path: gcl-ubuntu.zip
+        asset_name: ${{ steps.get_release_info.outputs.file_name }}-${{ matrix.rid }}.zip
+        asset_content_type: application/zip

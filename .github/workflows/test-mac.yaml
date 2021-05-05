@@ -69,18 +69,18 @@ jobs:
 
     # artifacts:
 
-    - name: 📦 Install & Gather executables
-      id: exes
-      run: |
-        stack install
-        mkdir tmp
-        cd tmp
-        mkdir gcl
-        cd gcl
-        cp ~/.local/bin/gcl .
+    # - name: 📦 Install & Gather executables
+    #   id: exes
+    #   run: |
+    #     stack install
+    #     mkdir tmp
+    #     cd tmp
+    #     mkdir gcl
+    #     cd gcl
+    #     cp ~/.local/bin/gcl .
 
-    - name: ⏫ Upload executables artifact
-      uses: actions/upload-artifact@v2
-      with:
-        name: gcl-macos
-        path: tmp/gcl
+    # - name: ⏫ Upload executables artifact
+    #   uses: actions/upload-artifact@v2
+    #   with:
+    #     name: gcl-macos
+    #     path: tmp/gcl
