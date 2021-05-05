@@ -4,7 +4,7 @@
 # See https://github.com/actions/create-release, still pretty rough as of 20200609.
 # see also: https://github.com/marketplace/actions/tag-release-on-push-action
 
-name: Create draft release
+name: Release
 
 # https://docs.github.com/en/actions/reference/workflow-syntax-for-github-actions#onpushpull_requestbranchestags
 on:
@@ -46,8 +46,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps 
-          asset_path: ./gcl-linux.zip
-          asset_name: gcl-linux.zip
+          asset_path: ./gcl-ubuntu.zip
+          asset_name: gcl-ubuntu.zip
           asset_content_type: application/zip
 
     # steps:
