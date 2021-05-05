@@ -79,3 +79,19 @@ jobs:
     - name: 🔨 Build and run tests
       run: |
         ./stack test
+
+    # artifacts:
+
+    - name: 📦 Gather executables
+      run: |
+        mkdir tmp
+        cd tmp
+        mkdir gcl
+        cd gcl
+        copy C:\Users\runneradmin\AppData\Roaming\local\bin\gcl.exe .
+             
+    - name: ⏫ Upload executables artifact
+      uses: actions/upload-artifact@v2
+      with:
+        name: gcl-windows
+        path: tmp/gcl

@@ -65,3 +65,21 @@ jobs:
     - name: 🔨 Build and run tests
       run: |
         stack test
+
+
+    # artifacts:
+
+    - name: 📦 Gather executables
+      id: exes
+      run: |
+        mkdir tmp
+        cd tmp
+        mkdir gcl
+        cd gcl
+        cp ~/.local/bin/gcl .
+
+    - name: ⏫ Upload executables artifact
+      uses: actions/upload-artifact@v2
+      with:
+        name: gcl-macos
+        path: tmp/gcl
