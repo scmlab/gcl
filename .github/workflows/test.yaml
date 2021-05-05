@@ -1,0 +1,43 @@
+# # modified from https://github.com/input-output-hk/cardano-addresses/blob/master/.github/workflows/main.yml
+# name: CI (Linux, macOS)
+
+# on: [push, pull_request]
+
+# jobs:
+#   build:
+#     strategy:
+#       fail-fast: false
+#       matrix:
+#         os: [ubuntu-latest]
+
+#     runs-on: ${{ matrix.os }}
+#     steps:  
+    
+#     - name: 👺 GitHub actions env workaround
+#       run: 'echo "ACTIONS_ALLOW_UNSECURE_COMMANDS=true" >> $GITHUB_ENV'
+      
+#     - name: 💽 Install OS Packages
+#       uses: mstksg/get-package@v1
+
+#     - name: 📥 Checkout repository
+#       uses: actions/checkout@v1
+
+#     - name: 🧰 Setup stack
+#       uses: mstksg/setup-stack@v1
+
+#     - name: 💾 Cache Dependencies
+#       id: cache
+#       uses: actions/cache@v1
+#       with:
+#         path: ~/.stack
+#         key: ${{ matrix.os }}-${{ hashFiles('stack.yaml') }}
+
+#     - name: 📸 Build Snapshot
+#       if: steps.cache.outputs.cache-hit != 'true'
+#       run: |
+#         stack --no-terminal build --bench --only-snapshot
+
+#     - name: 🔨 Build & Test 
+#       run: | 
+#         stack build --no-terminal --bench --haddock --no-haddock-deps --no-run-benchmarks
+#         stack test gcl:gcl-test --no-terminal --bench --haddock --no-haddock-deps --no-run-benchmarks
