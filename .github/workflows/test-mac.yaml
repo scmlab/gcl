@@ -82,5 +82,7 @@ jobs:
       if: startsWith(github.ref, 'refs/tags/') # so that only commits with a git tag would upload artifacts
       with:
         files: gcl-macos.zip
+        draft: true
+        prerelease: true
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
