@@ -113,48 +113,10 @@ jobs:
         zip -r gcl gcl
         mv gcl.zip gcl-ubuntu.zip
 
-    - name: Display all files
-      run: ls -R
-
-    # - name: ⏫ Upload executables artifact
-    #   uses: actions/upload-artifact@v2
-    #   with:
-    #     name: gcl-ubuntu
-    #     path: tmp/gcl
-
-
-    - name: Load Release URL File from release job
-      uses: actions/download-artifact@v1
-      with:
-        name: release_url
-
-    - name: Get Release File Name & Upload URL
-      id: get_release_info
-      run: |
-        echo ::set-output name=file_name::${REPOSITORY_NAME##*/}-${TAG_REF_NAME##*/v} # RepositoryName-v1.0.0
-        value=`cat release_url/release_url.txt`
-        echo ::set-output name=upload_url::$value
-      env:
-        TAG_REF_NAME: ${{ github.ref }}
-        REPOSITORY_NAME: ${{ github.repository }}
-
-
-    - name: Release
+    - name: 🚢 Release Artifacts
       uses: softprops/action-gh-release@v1
       if: startsWith(github.ref, 'refs/tags/')
       with:
         files: gcl-ubuntu.zip
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-
-    # - name: Upload Release Asset
-    #   id: upload-release-asset 
-    #   uses: actions/upload-release-asset@v1.0.1
-    #   env:
-    #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    #   with:
-    #     upload_url: ${{ steps.get_release_info.outputs.upload_url }}
-    #     asset_path: gcl-ubuntu.zip
-    #     asset_name: ${{ steps.get_release_info.outputs.file_name }}-${{ matrix.rid }}.zip
-    #     asset_content_type: application/zip

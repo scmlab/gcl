@@ -69,15 +69,21 @@ jobs:
 
     # artifacts:
 
-    # - name: 📦 Install & Gather executables
-    #   id: exes
-    #   run: |
-    #     stack install
-    #     mkdir tmp
-    #     cd tmp
-    #     mkdir gcl
-    #     cd gcl
-    #     cp ~/.local/bin/gcl .
+    - name: 📦 Install & Gather executables
+      id: exes
+      run: |
+        stack install
+        cp ~/.local/bin/gcl .
+        zip -r gcl gcl
+        mv gcl.zip gcl-macos.zip
+
+    - name: 🚢 Release Artifacts
+      uses: softprops/action-gh-release@v1
+      if: startsWith(github.ref, 'refs/tags/')
+      with:
+        files: gcl-macos.zip
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     # - name: ⏫ Upload executables artifact
     #   uses: actions/upload-artifact@v2
