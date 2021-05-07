@@ -125,7 +125,7 @@ infer :: Expr -> Infer Type
 infer (Lit lit l) = return (litTypes lit l)
 infer (Var x _) = lookupEnv x
 infer (Const c _) = lookupEnv c
-infer (Op o) = return (arithOpTypes o)
+infer (Op op) = return (arithOpTypes op)
 infer (Chain a op b l) = do
   case a of
     Chain _ _ r _ -> do
@@ -134,7 +134,7 @@ infer (Chain a op b l) = do
       uni ta (TBase TBool l)
 
       tr <- infer r
-      let top = chainOpTypes op
+      top <- inferChainOpTypes op
       tb <- infer b
       -- check type of `r op b` is bool
       uni top (TFunc tr (TFunc tb (TBase TBool NoLoc) (locOf b)) (r <--> b))
@@ -142,11 +142,10 @@ infer (Chain a op b l) = do
       return (TBase TBool l)
     _ -> do
       ta <- infer a
-      let top = chainOpTypes op
+      top <- inferChainOpTypes op
       tb <- infer b
       uni top (TFunc ta (TFunc tb (TBase TBool NoLoc) (locOf b)) (a <--> b))
       return (TBase TBool (a <--> b))
-
 infer (App e1 e2 l) = do
   t1 <- infer e1
   t2 <- infer e2
@@ -173,6 +172,20 @@ infer (Subst expr sub) = do
   t <- infer expr
   s <- mapM infer sub
   return $ apply (Map.mapKeys nameToText s) t
+
+inferChainOpTypes :: ChainOp -> Infer Type
+inferChainOpTypes op = 
+  case op of
+    (EQ l) -> f l
+    (NEQ l) -> f l
+    (NEQU l) -> f l
+    _ -> return (chainOpTypes op)
+  where
+    f l = do
+      v <- fresh l
+      return (TFunc v (TFunc v v l) l)
+
+
 
 inferExpr :: TypeEnv -> Expr -> TM Scheme
 inferExpr env e = do
@@ -232,7 +245,7 @@ freshTVar :: Infer TVar
 freshTVar = do
   i <- get
   put (i + 1)
-  return . Text.pack $ ("x" ++ show i)
+  return . Text.pack $ ("?m_" ++ show i)
 
 fresh :: Loc -> Infer Type
 fresh l = flip TVar l . flip Name l <$> freshTVar
@@ -364,6 +377,7 @@ litTypes (Num _) l = TBase TInt l
 litTypes (Bol _) l = TBase TBool l
 litTypes (Chr _) l = TBase TChar l
 
+-- NOTE : EQ, NEQ, NEQU is redundant here
 chainOpTypes :: ChainOp -> Type
 chainOpTypes (EQ l) = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TBool l) l) l
 chainOpTypes (NEQ l) = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TBool l) l) l
