@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module LSP.Diagnostic where
+module Server.Diagnostic where
 
 import Data.Loc
 import Data.Text (Text)
@@ -8,10 +8,12 @@ import qualified Data.Text as Text
 import Error (Error (..))
 import GCL.Type (TypeError (..))
 import GCL.WP (StructError (..), StructWarning (..))
-import Language.LSP.Types hiding (TextDocumentSyncClientCapabilities (..))
+import Language.LSP.Types hiding (TextDocumentSyncClientCapabilities (..), Range(..))
+import qualified Language.LSP.Types as LSP
 import Pretty
 import Syntax.Predicate (Origin (..), PO (..))
 import Data.Loc.Util (translate)
+import Data.Loc.Range
 
 class ToDiagnostics a where
   toDiagnostics :: a -> [Diagnostic]
@@ -19,7 +21,6 @@ class ToDiagnostics a where
 instance ToDiagnostics StructError where
   toDiagnostics (MissingAssertion loc) = [makeError loc "Assertion Missing" "Assertion before the DO construct is missing"]
   toDiagnostics (MissingPostcondition loc) = [makeError loc "Postcondition Missing" "The last statement of the program should be an assertion"]
-  toDiagnostics (DigHole _) = []
 
 instance ToDiagnostics Error where
   toDiagnostics (LexicalError pos) = [makeError (Loc pos pos) "Lexical error" ""]
@@ -96,13 +97,28 @@ makeDiagnostic severity loc title body =
     Nothing
     (Just $ List [DiagnosticRelatedInformation (locToLocation loc) body])
 
-locToRange :: Loc -> Range
-locToRange NoLoc = Range (Position 0 0) (Position 0 0)
-locToRange (Loc start end) = Range (posToPosition start) (posToPosition (translate 1 end))
-  where
-    posToPosition :: Pos -> Position
-    posToPosition (Pos _path ln col _offset) = Position ((ln - 1) `max` 0) ((col - 1) `max` 0)
+locToRange :: Loc -> LSP.Range
+locToRange NoLoc = LSP.Range (Position 0 0) (Position 0 0)
+locToRange (Loc start end) = LSP.Range (posToPosition start) (posToPosition (translate 1 end))
+
+
+
+rangeToRange :: Range -> LSP.Range
+rangeToRange (Range start end) = LSP.Range (posToPosition start) (posToPosition (translate 1 end))
 
 locToLocation :: Loc -> Location
 locToLocation NoLoc = Location (Uri "") (locToRange NoLoc)
 locToLocation (Loc start end) = Location (Uri $ Text.pack $ posFile start) (locToRange (Loc start end))
+
+-- rangeToLSPRange :: Range -> LSP.Range
+-- rangeToLSPRange (Range start end) = LSP.Range (posToPosition start) (posToPosition (translate 1 end))
+--   where
+--     translate :: Int -> Pos -> Pos
+--     translate n (Pos path ln col offset) = Pos path ln ((col + n) `max` 0) ((offset + n) `max` 0)
+
+posToPosition :: Pos -> Position
+posToPosition (Pos _path ln col _offset) = Position ((ln - 1) `max` 0) ((col - 1) `max` 0)
+
+-- rangeToLocation :: Range -> Location
+-- rangeToLocation (Range start end) =
+--   Location (Uri $ Text.pack $ posFile start) (rangeToLSPRange (Range start end))

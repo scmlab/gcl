@@ -15,6 +15,7 @@ import Syntax.Parser.Util ( SyntacticError )
 import Syntax.Parser.Lexer (LexicalError)
 import Syntax.Common ()
 import Data.Text (Text)
+import Syntax.Predicate (Spec)
 
 --------------------------------------------------------------------------------
 
@@ -22,7 +23,7 @@ import Data.Text (Text)
 data Site
   = Global Loc -- source file
   | Local Loc Int -- spec-specific (no pun intended)
-  deriving (Show, Generic)
+  deriving (Eq, Show, Generic)
 
 instance ToJSON Site
 
@@ -53,3 +54,12 @@ globalError :: Error -> (Site, Error)
 globalError e = (Global (locOf e), e)
 
 instance ToJSON Error
+
+
+
+-- | TODO: refactor this
+data Error2
+  = ReportError Error
+  | DigHole Loc
+  | RefineSpec Spec Text
+  deriving (Show, Eq)

@@ -1,7 +1,6 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-{-# LANGUAGE EmptyCase #-}
 module Test.Parser where
 
 import Data.Text.Prettyprint.Doc ( Pretty(pretty), defaultLayoutOptions, layoutPretty )
@@ -16,7 +15,7 @@ import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as BS8
 
 import Error ( Error(..) )
-import qualified LSP
+import qualified Server 
 
 import Syntax.Parser
 import Syntax.Parser.Lexer
