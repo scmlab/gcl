@@ -55,6 +55,7 @@ instance PrettyWithLoc QuantOp where
   prettyWithLoc (Exists l) = fromDoc l . pretty $ tokExists
   prettyWithLoc (Max l) = fromDoc l . pretty $ tokMax
   prettyWithLoc (Min l) = fromDoc l . pretty $ tokMin
+  prettyWithLoc (Hash l) = fromDoc l . pretty $ tokHash
 
 instance Pretty Op where
   pretty = toDoc . prettyWithLoc

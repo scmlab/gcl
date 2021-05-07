@@ -159,16 +159,26 @@ infer (Lam x e l) = do
   return (TFunc v t l)
 infer (Hole l) = fresh l
 infer (Quant qop iters rng t l) = do
-  x <- fresh l
-  to <- case qop of
-          Left op -> return (opTypes op)
-          Right qop' -> infer qop'
   tr <- inEnv [(n, ForallV [] (TBase TInt loc)) | Name n loc <- iters] (infer rng)
-  tt <- inEnv [(n, ForallV [] (TBase TInt loc)) | Name n loc <- iters] (infer t)
-  uni to (TFunc x (TFunc x x l) l)
   uni tr (TBase TBool (locOf rng))
-  uni tt x
-  return x
+
+  tt <- inEnv [(n, ForallV [] (TBase TInt loc)) | Name n loc <- iters] (infer t)
+  case qop of
+    Left (QuantOp (Hash _)) -> do
+      uni tt (TBase TBool (locOf t))
+      return (TBase TInt l)
+    Left op -> do
+      let to = opTypes op
+      f tt to
+    Right qop' -> do
+      to <- infer qop'
+      f tt to
+    where
+      f tt to = do
+        x <- fresh l
+        uni to (TFunc x (TFunc x x l) l)
+        uni tt x
+        return x
 infer (Subst expr sub) = do
   t <- infer expr
   s <- mapM infer sub
@@ -232,7 +242,7 @@ freshTVar :: Infer TVar
 freshTVar = do
   i <- get
   put (i + 1)
-  return . Text.pack $ ("x" ++ show i)
+  return . Text.pack $ ("?m_" ++ show i)
 
 fresh :: Loc -> Infer Type
 fresh l = flip TVar l . flip Name l <$> freshTVar
@@ -396,6 +406,7 @@ quantOpTypes (Forall l) = TFunc (TBase TBool l) (TFunc (TBase TBool l) (TBase TB
 quantOpTypes (Exists l) = TFunc (TBase TBool l) (TFunc (TBase TBool l) (TBase TBool l) l) l
 quantOpTypes (Max l) = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TInt l) l) l
 quantOpTypes (Min l) = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TInt l) l) l
+quantOpTypes (Hash l) = TFunc (TBase TBool l) (TBase TInt l) l
 
 opTypes :: Op -> Type
 opTypes (ChainOp op) = chainOpTypes op

@@ -255,6 +255,9 @@ lexMax = Max . locOf <$> symbol tokMax
 lexMin :: LexerF QuantOp 
 lexMin = Min . locOf <$> symbol tokMin
 
+lexHash :: LexerF QuantOp 
+lexHash = Min . locOf <$> symbol tokHash
+
 lexChainOps :: LexerF ChainOp 
 lexChainOps = choice [
     lexEQ, lexNEQ, lexNEQU, 
@@ -270,7 +273,7 @@ lexArithOps = choice [
 
 lexQuantOps :: LexerF QuantOp 
 lexQuantOps = choice [
-    lexSum, lexForall, lexExists, lexMax, lexMin
+    lexSum, lexForall, lexExists, lexMax, lexMin, lexHash
   ]
 
 

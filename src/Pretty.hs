@@ -12,6 +12,7 @@ where
 import Data.Text (Text)
 import Data.Text.Prettyprint.Doc
 import qualified Data.Text.Prettyprint.Doc.Render.Text as Text
+import Error ( Error )
 import Pretty.Error ()
 import Pretty.Abstract ()
 import Pretty.Concrete ()

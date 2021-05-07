@@ -14,7 +14,7 @@ import Data.Loc (Located (locOf))
 import Data.Maybe (isJust)
 import qualified Data.Ord as Ord
 import Data.Text (Text)
-import Syntax.Common (Name (..), Op (..), ChainOp, ArithOp)
+import Syntax.Common (Name (..), ChainOp, ArithOp)
 import Syntax.Concrete (BlockDecl (..), BlockDeclaration (..), Decl (..), DeclProp (..), DeclBody (..), Declaration (..), EndpointClose (..), EndpointOpen (..), Expr (..), GdCmd (..), Interval (..), Program (..), SepBy (..), Stmt (..), TBase (..), Token (..), Type (..))
 import Syntax.Concrete.Located ()
 import Syntax.Parser.Lexer
@@ -248,7 +248,7 @@ pType' = makeExprParser pType'Term [[InfixR pFunction]]
     <* (↑) (\sc' -> try sc' <|> sc) <?> "type"
 
 pType'Term :: ParserF Type
-pType'Term = choice [pParensType, pArrayType, pBase]
+pType'Term = choice [pParensType, pArrayType, pBase, pTVar]
 
 pFunction :: ParserF (Type -> Type -> Type)
 pFunction = do
@@ -269,6 +269,9 @@ pBase =
         TBool . locOf <$> lexTypeBool,
         TChar . locOf <$> lexTypeChar
       ]
+
+pTVar :: ParserF Type
+pTVar = TVar <$> upperName
 
 pInterval :: ParserF Interval
 pInterval = Interval <$> pEndpointOpen <*> lexRange <*> pEndpointClose
@@ -346,16 +349,16 @@ pQuant :: ParserF Expr
 pQuant =
   Quant
   <$> lexQuantStarts
-  <*> qOp
-  <*> qNames
+  <*> pQuantOp
+  <*> pQuantNames
   <*> lexColon
   <*> pExpr'
   <*> lexColon
   <*> pExpr'
   <*> lexQuantEnds
   where
-    qOp = choice [Left <$> lexOps, Right <$> pTerm]
-    qNames = sepBy1 lowerName . try . (↑) $ id
+    pQuantOp = choice [Left <$> lexOps, Right <$> pTerm]
+    pQuantNames = sepBy1 lowerName . try . (↑) $ id
 
 pApp :: ParserF (Expr -> Expr)
 pApp = do

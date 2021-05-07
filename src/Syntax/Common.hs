@@ -71,6 +71,7 @@ data QuantOp =
   | Exists Loc 
   | Max Loc
   | Min Loc
+  | Hash Loc
   deriving (Eq, Show, Generic)
 
 -- | Operators
@@ -109,6 +110,7 @@ instance Located QuantOp where
   locOf (Forall l) = l
   locOf (Max l) = l
   locOf (Min l) = l
+  locOf (Hash l) = l
 
 instance Located Op where
   locOf (ChainOp op) = locOf op
@@ -141,17 +143,18 @@ classifyArithOp (Mul _) = InfixL 8
 classifyArithOp (Div _) = InfixL 8
 classifyArithOp (Mod _) = InfixL 9
 
-classifyQuantOp :: QuantOp -> Fixity
-classifyQuantOp (Sum _) = Prefix 5
-classifyQuantOp (Exists _) = Prefix 6
-classifyQuantOp (Forall _) = Prefix 7
-classifyQuantOp (Max _) = Prefix 8
-classifyQuantOp (Min _) = Prefix 8
+-- classifyQuantOp :: QuantOp -> Fixity
+-- classifyQuantOp (Sum _) = Prefix 5
+-- classifyQuantOp (Exists _) = Prefix 6
+-- classifyQuantOp (Forall _) = Prefix 7
+-- classifyQuantOp (Max _) = Prefix 8
+-- classifyQuantOp (Min _) = Prefix 8
+-- classifyQuantOp (Hash _) = Prefix 8
 
-classify :: Op -> Fixity
-classify (ChainOp op) = classifyChainOp op
-classify (ArithOp op) = classifyArithOp op
-classify (QuantOp op) = classifyQuantOp op
+-- classify :: Op -> Fixity
+-- classify (ChainOp op) = classifyChainOp op
+-- classify (ArithOp op) = classifyArithOp op
+-- classify (QuantOp op) = classifyQuantOp op
 
 instance ToJSON ChainOp
 instance FromJSON ChainOp
