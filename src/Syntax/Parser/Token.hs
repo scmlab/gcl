@@ -209,6 +209,21 @@ tokDiv = "/"
 tokMod :: Text
 tokMod = "%"
 
+tokSum :: Text
+tokSum = "Σ"
+
+tokForall :: Text
+tokForall = "∀"
+
+tokExists :: Text
+tokExists = "∃"
+
+tokMax :: Text 
+tokMax = "↑"
+
+tokMin :: Text
+tokMin = "↓"
+
 ------------------------------------------
 -- literals
 ------------------------------------------

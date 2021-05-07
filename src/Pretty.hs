@@ -31,7 +31,7 @@ renderStrict = Text.renderStrict . layoutPretty defaultLayoutOptions
 --------------------------------------------------------------------------------
 
 -- | Misc
-instance (Pretty a, Pretty b) => Pretty (Either a b) where
+instance {-# OVERLAPPING #-} (Pretty a) => Pretty (Either Error a) where
   pretty (Left a) = "Error" <+> pretty a
   pretty (Right b) = pretty b
 
@@ -46,6 +46,7 @@ instance Pretty Error where
   pretty (StructError err) =
     "Struct Error" <+> pretty (locOf err) <> line <> pretty err
   pretty (CannotReadFile path) = "CannotReadFile" <+> pretty path
+  pretty (Others t) = "Others " <+> pretty t
 
 instance Pretty LexicalError where
   pretty = pretty . show

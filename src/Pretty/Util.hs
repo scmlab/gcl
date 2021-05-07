@@ -77,3 +77,15 @@ class PrettyPrec a where
 
 class PrettyWithLoc a where
   prettyWithLoc :: a -> DocWithLoc ann
+
+instance (PrettyWithLoc a, PrettyWithLoc b) => PrettyWithLoc (Either a b) where
+  prettyWithLoc (Left x) = prettyWithLoc x
+  prettyWithLoc (Right x) = prettyWithLoc x
+
+instance (PrettyPrec a, PrettyPrec b) => PrettyPrec (Either a b) where
+  prettyPrec i (Left x) = prettyPrec i x
+  prettyPrec i (Right x) = prettyPrec i x
+
+instance (Pretty a, Pretty b) => Pretty (Either a b) where
+  pretty (Left x) = pretty x
+  pretty (Right x) = pretty x

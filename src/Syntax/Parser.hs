@@ -14,7 +14,7 @@ import Data.Loc (Located (locOf))
 import Data.Maybe (isJust)
 import qualified Data.Ord as Ord
 import Data.Text (Text)
-import Syntax.Common (Name (..), Op (..))
+import Syntax.Common (Name (..), Op (..), ChainOp, ArithOp)
 import Syntax.Concrete (BlockDecl (..), BlockDeclaration (..), Decl (..), DeclProp (..), DeclBody (..), Declaration (..), EndpointClose (..), EndpointOpen (..), Expr (..), GdCmd (..), Interval (..), Program (..), SepBy (..), Stmt (..), TBase (..), Token (..), Type (..))
 import Syntax.Concrete.Located ()
 import Syntax.Parser.Lexer
@@ -301,10 +301,7 @@ chainOpTable =
       InfixL . pChain $ lexGT,
       InfixL . pChain . choice $ [lexGTE, lexGTEU]
     ],
-    [InfixL . pChain $ lexEQ],
-    [InfixL . pBinary . choice $ [lexConj, lexConjU]],
-    [InfixL . pBinary . choice $ [lexDisj, lexDisjU]],
-    [InfixL . pBinary . choice $ [lexImpl, lexImplU]]
+    [InfixL . pChain $ lexEQ]
   ]
 
 pExprArith :: ParserF Expr
@@ -316,7 +313,10 @@ arithTable =
     [InfixL (pBinary lexMod)],
     [InfixL (pBinary lexMul), InfixL (pBinary lexDiv)],
     [InfixL (pBinary lexAdd), InfixL (pBinary lexSub)],
-    [Prefix . pUnary . choice $ [lexNeg, lexNegU]]
+    [Prefix . pUnary . choice $ [lexNeg, lexNegU]],
+    [InfixL . pBinary . choice $ [lexConj, lexConjU]],
+    [InfixL . pBinary . choice $ [lexDisj, lexDisjU]],
+    [InfixL . pBinary . choice $ [lexImpl, lexImplU]]
   ]
 
 pTerm :: ParserF Expr
@@ -363,19 +363,19 @@ pApp = do
   return $ \func -> do
     foldl App func terms
 
-pChain :: ParserF Op -> ParserF (Expr -> Expr -> Expr)
+pChain :: ParserF ChainOp -> ParserF (Expr -> Expr -> Expr)
 pChain m = do
   -- NOTE: operator cannot be followed by any symbol
   op <- try (notFollowedBySymbol m)
   return $ \x y -> Chain x op y
 
-pBinary :: ParserF Op -> ParserF (Expr -> Expr -> Expr)
+pBinary :: ParserF ArithOp -> ParserF (Expr -> Expr -> Expr)
 pBinary m = do
   -- NOTE: operator cannot be followed by any symbol
   op <- try (notFollowedBySymbol m)
   return $ \x y -> App (App (Op op) x) y
 
-pUnary :: ParserF Op -> ParserF (Expr -> Expr)
+pUnary :: ParserF ArithOp -> ParserF (Expr -> Expr)
 pUnary m = do
   -- NOTE: operator cannot be followed by any symbol
   op <- try (notFollowedBySymbol m)

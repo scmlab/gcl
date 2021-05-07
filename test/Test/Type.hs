@@ -64,7 +64,7 @@ cons name = Const (Name name NoLoc) NoLoc
 app :: Expr -> Expr -> Expr
 app e1 e2 = App e1 e2 NoLoc
 
-op :: Op -> Expr
+op :: ArithOp -> Expr
 op = Op
 
 var :: Text -> Expr

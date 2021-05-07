@@ -136,14 +136,16 @@ data Expr
   = Lit Lit Loc
   | Var Name Loc
   | Const Name Loc
-  | Op Op
-  | Chain Expr Op Expr Loc
+  | Op ArithOp
+  | Chain Expr ChainOp Expr Loc
   | App Expr Expr Loc
   | Lam Name Expr Loc
   | Hole Loc
-  | Quant Expr [Name] Expr Expr Loc
+  | Quant QOp [Name] Expr Expr Loc
   | Subst Expr Subst -- internal. Location not necessary?
   deriving (Eq, Show, Generic)
+
+type QOp = Either Op Expr
 
 type Subst = Map Name Expr
 
@@ -154,10 +156,6 @@ instance FromJSON Expr
 wrapLam :: [Name] -> Expr -> Expr
 wrapLam [] body = body
 wrapLam (x : xs) body = Lam x (wrapLam xs body) NoLoc
-
-chainRightMost :: Expr -> Expr
-chainRightMost (Chain _ _ r _) = r
-chainRightMost x = x
 
 ----------------------------------------------------------------
 
@@ -175,24 +173,27 @@ instance ToJSON Lit
 ----------------------------------------------------------------
 
 -- | Constructors
-unary :: Op -> Expr -> Expr
+unary :: ArithOp -> Expr -> Expr
 unary op x = App (Op op) x (x <--> op)
 
-binary :: Op -> Expr -> Expr -> Expr
+binary :: ArithOp -> Expr -> Expr -> Expr
 binary op x y = App (App (Op op) x (x <--> op)) y (x <--> y)
 
+chain :: ChainOp -> Expr -> Expr -> Expr
+chain op x y = Chain x op y (x <--> y)
+
 lt, gt, gte, lte, eqq, conj, disj, implies :: Expr -> Expr -> Expr
-lt = binary (LT NoLoc)
-gt = binary (GT NoLoc)
-gte = binary (GTE NoLoc)
-lte = binary (LTE NoLoc)
-eqq = binary (EQ NoLoc)
-conj = binary (Conj NoLoc)
-disj = binary (Disj NoLoc)
-implies = binary (Implies NoLoc)
+lt = (chain . LT) NoLoc
+gt = (chain . GT) NoLoc
+gte = (chain . GTE) NoLoc
+lte = (chain . LTE) NoLoc
+eqq = (chain . EQ) NoLoc
+conj = (binary . Conj) NoLoc
+disj = (binary . Disj) NoLoc
+implies = (binary . Implies) NoLoc
 
 neg :: Expr -> Expr
-neg = unary (Neg NoLoc)
+neg = (unary . Neg) NoLoc
 
 true :: Expr
 true = Lit (Bol True) NoLoc
@@ -209,7 +210,7 @@ disjunct [] = false
 disjunct xs = foldl1 disj xs
 
 imply :: Expr -> Expr -> Expr
-imply p q = App (App (Op (Implies NoLoc)) p (locOf p)) q (locOf q)
+imply p q = App (App ((Op . Implies) NoLoc) p (locOf p)) q (locOf q)
 
 predEq :: Expr -> Expr -> Bool
 predEq = (==)

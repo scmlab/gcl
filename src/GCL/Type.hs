@@ -125,7 +125,7 @@ infer :: Expr -> Infer Type
 infer (Lit lit l) = return (litTypes lit l)
 infer (Var x _) = lookupEnv x
 infer (Const c _) = lookupEnv c
-infer (Op o) = return (opTypes o)
+infer (Op o) = return (arithOpTypes o)
 infer (Chain a op b l) = do
   case a of
     Chain _ _ r _ -> do
@@ -134,7 +134,7 @@ infer (Chain a op b l) = do
       uni ta (TBase TBool l)
 
       tr <- infer r
-      let top = opTypes op
+      let top = chainOpTypes op
       tb <- infer b
       -- check type of `r op b` is bool
       uni top (TFunc tr (TFunc tb (TBase TBool NoLoc) (locOf b)) (r <--> b))
@@ -142,7 +142,7 @@ infer (Chain a op b l) = do
       return (TBase TBool l)
     _ -> do
       ta <- infer a
-      let top = opTypes op
+      let top = chainOpTypes op
       tb <- infer b
       uni top (TFunc ta (TFunc tb (TBase TBool NoLoc) (locOf b)) (a <--> b))
       return (TBase TBool (a <--> b))
@@ -158,9 +158,11 @@ infer (Lam x e l) = do
   t <- inEnv [(nameToText x, ForallV [] v)] (infer e)
   return (TFunc v t l)
 infer (Hole l) = fresh l
-infer (Quant op iters rng t l) = do
+infer (Quant qop iters rng t l) = do
   x <- fresh l
-  to <- infer op
+  to <- case qop of
+          Left op -> return (opTypes op)
+          Right qop' -> infer qop'
   tr <- inEnv [(n, ForallV [] (TBase TInt loc)) | Name n loc <- iters] (infer rng)
   tt <- inEnv [(n, ForallV [] (TBase TInt loc)) | Name n loc <- iters] (infer t)
   uni to (TFunc x (TFunc x x l) l)
@@ -362,30 +364,40 @@ litTypes (Num _) l = TBase TInt l
 litTypes (Bol _) l = TBase TBool l
 litTypes (Chr _) l = TBase TChar l
 
-opTypes :: Op -> Type
-opTypes (EQ l) = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TBool l) l) l
-opTypes (NEQ l) = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TBool l) l) l
-opTypes (NEQU l) = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TBool l) l) l
-opTypes (LTE l) = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TBool l) l) l
-opTypes (LTEU l) = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TBool l) l) l
-opTypes (GTE l) = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TBool l) l) l
-opTypes (GTEU l) = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TBool l) l) l
-opTypes (LT l) = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TBool l) l) l
-opTypes (GT l) = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TBool l) l) l
-opTypes (Add l) = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TInt l) l) l
-opTypes (Sub l) = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TInt l) l) l
-opTypes (Mul l) = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TInt l) l) l
-opTypes (Div l) = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TInt l) l) l
-opTypes (Mod l) = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TInt l) l) l
-opTypes (Implies l) = TFunc (TBase TBool l) (TFunc (TBase TBool l) (TBase TBool l) l) l
-opTypes (ImpliesU l) = TFunc (TBase TBool l) (TFunc (TBase TBool l) (TBase TBool l) l) l
-opTypes (Conj l) = TFunc (TBase TBool l) (TFunc (TBase TBool l) (TBase TBool l) l) l
-opTypes (ConjU l) = TFunc (TBase TBool l) (TFunc (TBase TBool l) (TBase TBool l) l) l
-opTypes (Disj l) = TFunc (TBase TBool l) (TFunc (TBase TBool l) (TBase TBool l) l) l
-opTypes (DisjU l) = TFunc (TBase TBool l) (TFunc (TBase TBool l) (TBase TBool l) l) l
-opTypes (Neg l) = TFunc (TBase TBool l) (TBase TBool l) l
-opTypes (NegU l) = TFunc (TBase TBool l) (TBase TBool l) l
+chainOpTypes :: ChainOp -> Type
+chainOpTypes (EQ l) = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TBool l) l) l
+chainOpTypes (NEQ l) = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TBool l) l) l
+chainOpTypes (NEQU l) = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TBool l) l) l
+chainOpTypes (LTE l) = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TBool l) l) l
+chainOpTypes (LTEU l) = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TBool l) l) l
+chainOpTypes (GTE l) = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TBool l) l) l
+chainOpTypes (GTEU l) = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TBool l) l) l
+chainOpTypes (LT l) = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TBool l) l) l
+chainOpTypes (GT l) = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TBool l) l) l
 
--- opTypes Sum l = _
--- opTypes Forall l = _
--- opTypes Exists l = _
+arithOpTypes :: ArithOp -> Type
+arithOpTypes (Implies l) = TFunc (TBase TBool l) (TFunc (TBase TBool l) (TBase TBool l) l) l
+arithOpTypes (ImpliesU l) = TFunc (TBase TBool l) (TFunc (TBase TBool l) (TBase TBool l) l) l
+arithOpTypes (Conj l) = TFunc (TBase TBool l) (TFunc (TBase TBool l) (TBase TBool l) l) l
+arithOpTypes (ConjU l) = TFunc (TBase TBool l) (TFunc (TBase TBool l) (TBase TBool l) l) l
+arithOpTypes (Disj l) = TFunc (TBase TBool l) (TFunc (TBase TBool l) (TBase TBool l) l) l
+arithOpTypes (DisjU l) = TFunc (TBase TBool l) (TFunc (TBase TBool l) (TBase TBool l) l) l
+arithOpTypes (Neg l) = TFunc (TBase TBool l) (TBase TBool l) l
+arithOpTypes (NegU l) = TFunc (TBase TBool l) (TBase TBool l) l
+arithOpTypes (Add l) = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TInt l) l) l
+arithOpTypes (Sub l) = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TInt l) l) l
+arithOpTypes (Mul l) = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TInt l) l) l
+arithOpTypes (Div l) = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TInt l) l) l
+arithOpTypes (Mod l) = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TInt l) l) l
+
+quantOpTypes :: QuantOp -> Type
+quantOpTypes (Sum l) = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TInt l) l) l 
+quantOpTypes (Forall l) = TFunc (TBase TBool l) (TFunc (TBase TBool l) (TBase TBool l) l) l
+quantOpTypes (Exists l) = TFunc (TBase TBool l) (TFunc (TBase TBool l) (TBase TBool l) l) l
+quantOpTypes (Max l) = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TInt l) l) l
+quantOpTypes (Min l) = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TInt l) l) l
+
+opTypes :: Op -> Type
+opTypes (ChainOp op) = chainOpTypes op
+opTypes (ArithOp op) = arithOpTypes op
+opTypes (QuantOp op) = quantOpTypes op

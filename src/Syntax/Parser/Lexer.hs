@@ -174,80 +174,111 @@ lexDeclEnd = symbol tokDeclEnd
 lexEQ' :: LexerF (Token tokEQ)
 lexEQ' = symbol tokEQ 
 
-lexEQ :: LexerF Op
+lexEQ :: LexerF ChainOp
 lexEQ = Syntax.Common.EQ . locOf <$> symbol tokEQ 
 
-lexNEQ :: LexerF Op
+lexNEQ :: LexerF ChainOp
 lexNEQ = NEQ . locOf <$> symbol tokNEQ 
 
-lexNEQU :: LexerF Op
+lexNEQU :: LexerF ChainOp
 lexNEQU = NEQU . locOf <$> symbol tokNEQU 
 
-lexGT :: LexerF Op
+lexGT :: LexerF ChainOp
 lexGT =  Syntax.Common.GT . locOf <$> symbol tokGT
 
-lexGTE :: LexerF Op
+lexGTE :: LexerF ChainOp
 lexGTE = GTE . locOf <$> symbol tokGTE 
 
-lexGTEU :: LexerF Op
+lexGTEU :: LexerF ChainOp
 lexGTEU = GTEU . locOf <$> symbol tokGTEU 
 
-lexLT :: LexerF Op
+lexLT :: LexerF ChainOp
 lexLT = Syntax.Common.LT . locOf <$> symbol tokLT 
 
-lexLTE :: LexerF Op
+lexLTE :: LexerF ChainOp
 lexLTE = LTE . locOf <$> symbol tokLTE 
 
-lexLTEU :: LexerF Op
+lexLTEU :: LexerF ChainOp
 lexLTEU = LTEU . locOf <$> symbol tokLTEU 
 
-lexImpl :: LexerF Op
+lexImpl :: LexerF ArithOp
 lexImpl = Implies . locOf <$> symbol tokImpl
 
-lexImplU :: LexerF Op
+lexImplU :: LexerF ArithOp
 lexImplU = ImpliesU . locOf <$> symbol tokImplU
 
-lexConj :: LexerF Op
+lexConj :: LexerF ArithOp
 lexConj = Conj . locOf <$> symbol tokConj
 
-lexConjU :: LexerF Op
+lexConjU :: LexerF ArithOp
 lexConjU = ConjU . locOf <$> symbol tokConjU
 
-lexDisj :: LexerF Op
+lexDisj :: LexerF ArithOp
 lexDisj = Disj . locOf <$> symbol tokDisj
 
-lexDisjU :: LexerF Op
+lexDisjU :: LexerF ArithOp
 lexDisjU = DisjU . locOf <$> symbol tokDisjU
 
-lexNeg :: LexerF Op
+lexNeg :: LexerF ArithOp
 lexNeg = Neg . locOf <$> symbol tokNeg
 
-lexNegU :: LexerF Op
+lexNegU :: LexerF ArithOp
 lexNegU = NegU . locOf <$> symbol tokNegU
 
-lexAdd :: LexerF Op
+lexAdd :: LexerF ArithOp
 lexAdd = Add . locOf <$> symbol tokAdd
 
-lexSub :: LexerF Op
+lexSub :: LexerF ArithOp
 lexSub = Sub . locOf <$> symbol tokSub
 
-lexMul :: LexerF Op
+lexMul :: LexerF ArithOp
 lexMul = Mul . locOf <$> symbol tokMul
 
-lexDiv :: LexerF Op
+lexDiv :: LexerF ArithOp
 lexDiv = Div . locOf <$> symbol tokDiv
 
-lexMod :: LexerF Op
+lexMod :: LexerF ArithOp
 lexMod = Mod . locOf <$> symbol tokMod
+
+lexSum :: LexerF QuantOp
+lexSum = Sum . locOf <$> symbol tokSum
+
+lexForall :: LexerF QuantOp 
+lexForall = Forall . locOf <$> symbol tokForall
+
+lexExists :: LexerF QuantOp 
+lexExists = Exists . locOf <$> symbol tokExists
+
+lexMax :: LexerF QuantOp 
+lexMax = Max . locOf <$> symbol tokMax
+
+lexMin :: LexerF QuantOp 
+lexMin = Min . locOf <$> symbol tokMin
+
+lexChainOps :: LexerF ChainOp 
+lexChainOps = choice [
+    lexEQ, lexNEQ, lexNEQU, 
+    lexGT, lexGTE, lexGTEU,
+    lexLT, lexLTE, lexLTEU
+  ]
+
+lexArithOps :: LexerF ArithOp 
+lexArithOps = choice [
+    lexImpl, lexImplU, lexConj, lexConjU, lexDisj, lexDisjU,
+    lexNeg, lexNegU, lexAdd, lexSub, lexMul, lexDiv, lexMod
+  ]
+
+lexQuantOps :: LexerF QuantOp 
+lexQuantOps = choice [
+    lexSum, lexForall, lexExists, lexMax, lexMin
+  ]
+
 
 lexOps :: LexerF Op
 lexOps = choice [
-    lexEQ, lexNEQ, lexNEQU, 
-    lexGT, lexGTE, lexGTEU,
-    lexLT, lexLTE, lexLTEU,
-    lexImpl, lexImplU,
-    lexConj, lexConjU, lexDisj, lexDisjU,
-    lexNeg, lexNEQU, lexAdd, lexSub, lexMul, lexDiv, lexMod
+    ChainOp <$> lexChainOps,
+    ArithOp <$> lexArithOps,
+    QuantOp <$> lexQuantOps
   ] <?> "operators"
 
 ------------------------------------------

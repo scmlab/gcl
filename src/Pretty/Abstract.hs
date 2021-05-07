@@ -9,7 +9,6 @@ import Pretty.Common ()
 import Syntax.Abstract
 import Syntax.Common
 import Prelude hiding (Ordering (..))
-import Data.Loc ((<-->))
 
 --------------------------------------------------------------------------------
 
@@ -145,8 +144,8 @@ handleExpr _ (Subst _ _) = return "Subst"
 
 --------------------------------------------------------------------------------
 
-handleOp :: Int -> Op -> Variadic Expr (Doc ann)
-handleOp n op = case classify op of
+handleOp :: Int -> ArithOp -> Variadic Expr (Doc ann)
+handleOp n op = case classifyArithOp op of
   Infix m -> do
     p <- var
     q <- var

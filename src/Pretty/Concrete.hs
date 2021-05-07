@@ -21,10 +21,6 @@ import Syntax.Parser.Token
 
 --------------------------------------------------------------------------------
 
-instance (PrettyWithLoc a, PrettyWithLoc b) => PrettyWithLoc (Either a b) where
-  prettyWithLoc (Left x) = prettyWithLoc x
-  prettyWithLoc (Right x) = prettyWithLoc x
-
 -- | SepBy
 instance (PrettyWithLoc (Token sep), PrettyWithLoc a) => PrettyWithLoc (SepBy sep a) where
   prettyWithLoc (Head x) = prettyWithLoc x
@@ -213,8 +209,8 @@ instance PrettyWithLoc BlockDeclaration where
 
 --------------------------------------------------------------------------------
 -- | Literals
--- instance Pretty Lit where
---   pretty = toDoc . prettyWithLoc
+instance Pretty Lit where
+  pretty = toDoc . prettyWithLoc
 instance PrettyWithLoc Lit where
   prettyWithLoc (LitBool True l) = fromDoc l "True"
   prettyWithLoc (LitBool False l) = fromDoc l "False"
@@ -316,8 +312,8 @@ handleExpr (Quant open op xs m r n t close) =
       <> prettyWithLoc t
       <> prettyWithLoc close
 
-handleOp :: Op -> Variadic Expr (DocWithLoc ann)
-handleOp op = case classify op of
+handleOp :: ArithOp -> Variadic Expr (DocWithLoc ann)
+handleOp op = case classifyArithOp op of
   Infix _ -> do
     p <- var
     q <- var
@@ -360,8 +356,7 @@ instance PrettyWithLoc Type where
   prettyWithLoc (TBase (TChar l)) = fromDoc l "Char"
   prettyWithLoc (TFunc a l b) = prettyWithLoc a <> prettyWithLoc l <> prettyWithLoc b
   prettyWithLoc (TArray l a r b) =
-    prettyWithLoc l <> prettyWithLoc a <> prettyWithLoc r
-      <> prettyWithLoc b
+    prettyWithLoc l <> prettyWithLoc a <> prettyWithLoc r <> prettyWithLoc b
   prettyWithLoc (TVar i) = prettyWithLoc i
 
 --------------------------------------------------------------------------------

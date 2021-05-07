@@ -1,4 +1,3 @@
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE DataKinds #-}
@@ -8,7 +7,7 @@ module Syntax.Concrete.ToAbstract where
 
 import Control.Monad.Except ( Except, forM, throwError )
 import Data.Loc (Loc (..), (<-->), Located (locOf))
-import Syntax.Concrete 
+import Syntax.Concrete
 import Syntax.Concrete.Located()
 import qualified Syntax.Abstract as A
 import qualified Syntax.ConstExpr as ConstExpr
@@ -156,7 +155,13 @@ instance ToAbstract Expr A.Expr where
     Chain a op b -> A.Chain <$> toAbstract a <*> pure op <*> toAbstract b <*> pure (locOf x)
     Arr arr _ i _ -> A.App <$> toAbstract arr <*> toAbstract i <*> pure (locOf x)
     App a b -> A.App <$> toAbstract a <*> toAbstract b <*> pure (locOf x)
-    Quant _ a b _ c _ d _ -> A.Quant <$> either (toAbstract . Op) toAbstract a <*> pure b <*> toAbstract c <*> toAbstract d <*> pure (locOf x)
+    Quant _ a b _ c _ d _ -> A.Quant <$> toAbstractQOp a <*> pure b <*> toAbstract c <*> toAbstract d <*> pure (locOf x)
+      where
+        toAbstractQOp qop = case qop of
+              Left op -> return . Left $ op
+              Right expr -> do
+                expr' <- toAbstract expr
+                return . Right $ expr'
 
 -- | Literals (Integer / Boolean / Character)
 instance ToAbstract Lit A.Lit where

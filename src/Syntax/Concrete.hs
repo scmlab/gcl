@@ -11,7 +11,7 @@ import Data.Loc (Loc (..), Pos)
 import Data.Text (Text)
 import GHC.Base (Symbol)
 import GHC.Generics (Generic)
-import Syntax.Common ( Name, Op )
+import Syntax.Common ( Name, Op, ChainOp, ArithOp )
 import Prelude hiding (Ordering (..))
 
 --------------------------------------------------------------------------------
@@ -116,13 +116,13 @@ data Expr
   | Lit Lit
   | Var Name
   | Const Name
-  | Op Op
-  | Chain Expr Op Expr -- Left Associative
+  | Op ArithOp
+  | Chain Expr ChainOp Expr -- Left Associative
   | Arr Expr (Token "[") Expr (Token "]")
   | App Expr Expr
   | Quant
       TokQuantStarts 
-      QuantOp
+      QOp
       [Name]
       (Token ":")
       Expr
@@ -131,7 +131,7 @@ data Expr
       TokQuantEnds
   deriving (Eq, Show, Generic)
 
-type QuantOp = Either Op Expr
+type QOp = Either Op Expr
 --------------------------------------------------------------------------------
 
 -- | Literals (Integer / Boolean / Character)

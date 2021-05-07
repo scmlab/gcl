@@ -1,11 +1,7 @@
-{: 
-  A, B : Int
-    A = 0
-:}
+con A, B : Int {A}
 
-do A = 0 ->
-  [!
-  
-  !]
-od
-{ A = 0 }
+{True}
+[!
+
+!]
+{True}
