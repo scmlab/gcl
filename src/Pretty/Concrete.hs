@@ -9,7 +9,7 @@ module Pretty.Concrete where
 
 import Data.Loc (locOf, (<-->))
 import Data.Loc.Util (translateLoc)
-import Data.Text.Prettyprint.Doc (Pretty (pretty), (<+>))
+import Data.Text.Prettyprint.Doc (Pretty (pretty))
 import Pretty.Util
 import Pretty.Variadic
 import Pretty.Common ()

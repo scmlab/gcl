@@ -1,14 +1,11 @@
 module Syntax.Concrete.Located where
 
 import Syntax.Concrete
+import Syntax.Common.Located ()
 import Data.Loc (Located (locOf), (<-->))
 
 instance Located (Token a) where
   locOf (Token l r) = l <--> r
-
-instance (Located a, Located b) => Located (Either a b) where
-  locOf (Left x) = locOf x
-  locOf (Right x) = locOf x
 
 --------------------------------------------------------------------------------
 

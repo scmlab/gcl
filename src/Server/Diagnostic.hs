@@ -30,7 +30,7 @@ instance ToDiagnostics Error where
   toDiagnostics _ = []
 
 instance ToDiagnostics TypeError where
-  toDiagnostics (NotInScope name loc) = [makeError loc "Not in scope" $ "The definition " <> name <> " is not in scope"]
+  toDiagnostics (NotInScope name loc) = [makeError loc "Not in scope" $ renderStrict $ "The definition " <> pretty name <> " is not in scope"]
   toDiagnostics (UnifyFailed s t loc) =
     [ makeError loc "Cannot unify types" $
         renderStrict $

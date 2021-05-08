@@ -10,6 +10,7 @@ import Data.Loc (Loc (..), (<-->), Located (locOf))
 import Syntax.Concrete
 import Syntax.Concrete.Located()
 import qualified Syntax.Abstract as A
+import qualified Syntax.Abstract.Located as A
 import qualified Syntax.ConstExpr as ConstExpr
 import Syntax.Common (Name)
 

@@ -10,7 +10,7 @@ import Test.Tasty (TestTree, testGroup)
 import Test.Util (goldenFileTest, parseTest, render)
 import Test.Tasty.HUnit (testCase, (@?=), Assertion)
 import Control.Monad.Except (runExcept, withExcept, liftEither)
-import GCL.Type (TypeEnv(TypeEnv), TypeError (UnifyFailed, NotInScope), SubstT, emptySubstT, Scheme (ForallV), runInfer, lookupEnv, checkProg, runSolver', inferExpr, runSolver, infer, TM, checkStmt)
+import GCL.Type (TypeEnv(TypeEnv), TypeError (UnifyFailed, NotInScope), SubstT, emptySubstT, runInfer, lookupEnv, checkProg, runSolver', inferExpr, runSolver, infer, TM, checkStmt, checkType, inferDecl, emptyEnv)
 import Syntax.Concrete.ToAbstract ( ToAbstract(toAbstract) )
 import Syntax.Abstract
     ( Lit(..),
@@ -20,20 +20,21 @@ import Syntax.Abstract
       Interval(..),
       Endpoint(..) )
 import Syntax.Common ( ArithOp, Name(Name) )
-import Syntax.Parser (runParse, pExpr, pProgram, Parser, pStmt)
+import Syntax.Parser (runParse, pExpr, pProgram, Parser, pStmt, pType, pDeclaration, pBlockDeclaration)
 import Pretty ()
 import Error (Error(..))
 import Data.Text.Prettyprint.Doc.Internal (layoutCompact, Pretty (pretty))
 import Data.Text.Prettyprint.Doc.Render.Text (renderStrict)
 
 tests :: TestTree
-tests = testGroup "Type" [exprTests, stmtTests, fileTests]
+tests = testGroup "Type" [exprTests, typeTests, stmtTests, declarationTests, blockDeclarationTests, fileTests]
+
 
 exprTests :: TestTree
 exprTests =
   testGroup
-    "infer Expr"
-    [ 
+    "Infer Expr"
+    [
       testCase "Lit 1" $
         exprCheck "0" "Int",
       testCase "Lit 2" $
@@ -70,10 +71,37 @@ exprTests =
         exprCheck "<| + i : 0 ≤ i < N : F i |>" "Int"
     ]
 
-stmtTests :: TestTree
-stmtTests = 
+typeTests :: TestTree
+typeTests = 
   testGroup 
-    "check stmt" 
+    "Check Type" 
+    [
+      testCase "TBase 1" $
+        typeCheck' "Int",
+      testCase "TBase 2" $
+        typeCheck' "Bool",
+      testCase "TBase 3" $
+        typeCheck' "Char",
+      testCase "TArray 1" $
+        typeCheck' "array (0 .. N] of Int",
+      testCase "TArray 2" $
+        typeCheck' "array (0 .. 5) of Bool",
+      testCase "TArray 3" $
+        typeCheck' "array [0 .. N) of Char",
+      testCase "TFunc 1" $
+        typeCheck' "Int -> Bool",
+      testCase "TFunc 2" $
+        typeCheck' "Int -> Int -> Int -> Bool",
+      testCase "TFunc 3" $
+        typeCheck' "Char -> Bool -> Int -> array [0 .. N) of Int",
+      testCase "TVar" $
+        typeCheck' "T"
+    ]
+
+stmtTests :: TestTree
+stmtTests =
+  testGroup
+    "Check stmt"
     [
       testCase "skip" $
         stmtCheck' "skip",
@@ -96,18 +124,18 @@ stmtTests =
       -- testCase "loop invariant" $
       --   stmtCheck' "{i >= 0, bnd : P}"
       testCase "loop 1" $
-        stmtCheck' 
+        stmtCheck'
           "do i /= N ->\n\
           \   skip\n\
           \od",
       testCase "loop 2" $
-        stmtCheck' 
+        stmtCheck'
           "do i /= N ->\n\
           \   i := i + 1\n\
           \   skip\n\
           \od",
       testCase "loop 3" $
-        stmtCheck' 
+        stmtCheck'
           "do i /= N ->\n\
           \   i := i + 1\n\
           \   skip\n\
@@ -116,7 +144,7 @@ stmtTests =
           \   skip\n\
           \od",
       testCase "loop 4" $
-        stmtCheck' 
+        stmtCheck'
           "if i /= N ->\n\
           \   i := i + 1\n\
           \   skip\n\
@@ -141,12 +169,67 @@ stmtTests =
       -- testCase "proof" $
       --   stmtCheck' ""
     ]
+declarationTests :: TestTree
+declarationTests =
+  testGroup
+    "Check Declaration"
+    [
+      testCase "const declaration" $
+        declarationCheck "con A : Int" "[ ( A\n, Int ) ]",
+      testCase "const declaration w/ prop" $
+        declarationCheck "con A : Int { A > 0 }" "[ ( A\n, Int ) ]",
+      testCase "var declaration" $
+        declarationCheck "var x : Bool" "[ ( x\n, Bool ) ]",
+      testCase "var declaration w/ prop" $
+        declarationCheck "var x : Bool { x = True }" "[ ( x\n, Bool ) ]",
+      testCase "let declaration 1" $
+        declarationCheck "let N = 5" "[ ( N\n, Int ) ]",
+      testCase "let declaration 2" $
+        declarationCheck "let F i j = i + j" "[ ( F\n, Int → Int → Int ) ]"
+    ]
+
+blockDeclarationTests :: TestTree
+blockDeclarationTests = 
+  testGroup 
+    "" 
+    [
+      testCase "block declaration 1" $
+        blockDeclarationCheck 
+        "{:\n\
+        \  A, B : Int\
+        \:}" 
+        "[ [ ( A\n, Int )\n, ( B\n, Int ) ] ]",
+      testCase "block declaration 2" $
+        blockDeclarationCheck
+        "{:\n\
+        \  A, B : Int { A = 0 }\
+        \:}"
+        "[ [ ( A\n, Int )\n, ( B\n, Int ) ] ]",
+      testCase "block declaration 3" $
+        blockDeclarationCheck
+        "{:\n\
+        \  A, B : Int\n\
+        \    A = 0\n\
+        \:}"
+        "[ [ ( A\n, Int )\n, ( B\n, Int ) ] ]",
+      testCase "block declaration 4" $
+        blockDeclarationCheck
+        "{:\n\
+        \  A, B : Int\n\
+        \    A = 0\n\
+        \  F : Int -> Int -> Int\n\
+        \  P : Char -> Bool\n\
+        \:}"
+        "[ [ ( A\n, Int )\n, ( B\n, Int ) ]\n, [ ( F\n, Int → Int → Int ) ]\n, [ ( P\n, Char → Bool ) ] ]"
+    ]
+
 
 fileTests :: TestTree
 fileTests =
   testGroup
-    "Type Check"
-    [ typeCheckFile "2" "./test/source/" "2.gcl",
+    "Check file"
+    [ 
+      typeCheckFile "2" "./test/source/" "2.gcl",
       typeCheckFile "quant1" "./test/source/" "quant1.gcl",
       typeCheckFile "mss" "./test/source/" "mss.gcl",
       typeCheckFile "posnegpairs" "./test/source/examples/" "posnegpairs.gcl"
@@ -204,51 +287,66 @@ op = Op
 var :: Text -> Expr
 var t = Var (Name t NoLoc) NoLoc
 
+name :: Text -> Name
+name t = Name t NoLoc 
+
 env :: TypeEnv
 env =
   TypeEnv $
     Map.fromList
-      [ 
-        ("A", ForallV [] tint),
-        ("B", ForallV [] tint),
-        ("N", ForallV [] tint),
-        ("Arr", ForallV [] (tarr (Including (litNum 0)) (Excluding (cons "N")) tint)),
-        ("P", ForallV [] (tfunc tint tbool)),
-        ("F", ForallV [] (tfunc tint tint)),
-        ("Max", ForallV [] (tfunc tint (tfunc tint tbool))),
-        ("i", ForallV [] tint),
-        ("j", ForallV [] tint),
-        ("k", ForallV [] tint)
+      [
+        (name "A" , tint),
+        (name "B", tint),
+        (name "N", tint),
+        (name "Arr",tarr (Including (litNum 0)) (Excluding (cons "N")) tint),
+        (name "P", tfunc tint tbool),
+        (name "F", tfunc tint tint),
+        (name "Max", tfunc tint (tfunc tint tbool)),
+        (name "i", tint),
+        (name "j", tint),
+        (name "k", tint)
       ]
 
 runParser :: ToAbstract a b => Parser a -> Text -> Either (Either Error Loc) b
-runParser p t = 
+runParser p t =
   case runExcept . toAbstract <$> parseTest p t of
     Left errs -> Left . Left . SyntacticError $ errs
     Right (Left loc) -> Left . Right $ loc
     Right (Right expr) -> Right expr
 
-runInferExpr :: TypeEnv -> Expr -> Either Error Type
-runInferExpr env expr = 
-  case runExcept (inferExpr env expr) of
-    Left err -> Left . TypeError $ err
-    Right (ForallV _ t) -> Right t
-
-exprCheck :: Text -> Text -> Assertion
-exprCheck t1 t2 = 
-  render (runInferExpr env <$> runParser pExpr t1) @?= t2
-
-typeCheck' :: 
-  (TypeEnv -> a -> TM ()) ->
-  TypeEnv -> a -> Either Error ()
-typeCheck' check env e = 
+check ::
+  (TypeEnv -> a -> TM b) ->
+  TypeEnv -> a -> Either Error b
+check check env e =
   case runExcept (check env e) of
     Left err -> Left . TypeError $ err
-    Right _ -> Right ()
+    Right x -> Right x
+
+exprCheck :: Text -> Text -> Assertion
+exprCheck t1 t2 =
+  render (check inferExpr env <$> runParser pExpr t1) @?= t2
+
+typeCheck :: Text -> Text -> Assertion
+typeCheck t1 t2 =
+  render (check checkType env <$> runParser pType t1) @?= t2
+
+typeCheck' :: Text -> Assertion
+typeCheck' t = typeCheck t "()"
 
 stmtCheck :: Text -> Text -> Assertion
 stmtCheck t1 t2 =
-  render (typeCheck' checkStmt env <$> runParser pStmt t1) @?= t2
+  render (check checkStmt env <$> runParser pStmt t1) @?= t2
 
 stmtCheck' :: Text -> Assertion
 stmtCheck' t = stmtCheck t "()"
+
+instance Pretty TypeEnv where
+  pretty (TypeEnv env) = pretty $ Map.toList env
+
+declarationCheck :: Text -> Text -> Assertion 
+declarationCheck t1 t2 =
+  render (check inferDecl emptyEnv <$> runParser pDeclaration t1) @?= t2
+
+blockDeclarationCheck :: Text -> Text -> Assertion
+blockDeclarationCheck t1 t2 =
+  render (map (check inferDecl emptyEnv) <$> runParser pBlockDeclaration t1) @?= t2

@@ -143,7 +143,14 @@ declaration =
         "{:\n\
         \   A, B : Int\n\
         \     {A > 0}\n\
+        \:}",
+      testCase "block declaration 3" $ runBlock
+        "{:\n\
+        \   A, B : Int\n\
+        \     {A > 0}\n\
+        \   F : Int -> Int -> Int\n\
         \:}"
+      
     ]
   where
     run = parserIso pDeclaration

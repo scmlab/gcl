@@ -13,6 +13,7 @@ import Control.Monad.Except
 import Data.Loc
 import GCL.Exec.ExecMonad
 import Syntax.Abstract
+import Syntax.Abstract.Located()
 import Syntax.Common
 import Prelude hiding (Ordering (..))
 

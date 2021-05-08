@@ -83,7 +83,7 @@ pBlockDeclaration' :: ParserF BlockDeclaration
 pBlockDeclaration' =
   BlockDeclaration
   <$> lexDeclStart
-  <*> pIndentBlock pBlockDecl True
+  <*> pIndentBlock pBlockDecl
   <*> lexDeclEnd
 
 pConstDecl :: ParserF Declaration
@@ -221,7 +221,7 @@ pGdCmd =
   GdCmd
   <$> pExpr'
   <*> lexArrow
-  <*> pIndentBlock (lift pStmt) False
+  <*> pIndentBlock (lift pStmt)
 
 pSpecQM :: ParserF Stmt
 pSpecQM = SpecQM . locOf <$> lexQM
@@ -468,22 +468,16 @@ pIndentSepBy p delim = do
 
 pIndentBlock ::
   ParserF a ->                      -- parser to be indented
-  Bool ->                           -- restriction of indentation, 
-                                    -- False if indented parser can have the same level as reference parser (e.g. GdCmd)
-                                    -- True if the parser have to be strictly indented
   ParserF [a]
-pIndentBlock p restrict = do
+pIndentBlock p = lift $ do
   pos <- Lex.indentLevel
-  p0 <- lift p'
+  p0 <- p'
 
-  isEol <- optional . try . lift $ eol
+  isEol <- optional . try $ eol
   done <- isJust <$> optional eof
   case (isEol, done) of
     (Just _, False) -> do
-      let ref = if restrict
-          then pos
-          else posMoveLeft pos 1
-      ps <- lift $ indentedItems ref pos scn p'
+      ps <- indentedItems (posMoveLeft pos 1) pos scn p'
       return (p0 : ps)
     _ -> return [p0]                          -- eof or no newline => only one indented element
   where
