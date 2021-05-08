@@ -18,6 +18,8 @@ instance Pretty ChainOp where
   pretty = toDoc . prettyWithLoc
 
 instance PrettyWithLoc ChainOp where
+  prettyWithLoc (EQProp l) = fromDoc l . pretty $ tokEQProp
+  prettyWithLoc (EQPropU l) = fromDoc l . pretty $ tokEQPropU
   prettyWithLoc (EQ l) = fromDoc l . pretty $ tokEQ
   prettyWithLoc (NEQ l) = fromDoc l . pretty $ tokNEQ
   prettyWithLoc (NEQU l) = fromDoc l . pretty $ tokNEQU
@@ -55,6 +57,7 @@ instance PrettyWithLoc QuantOp where
   prettyWithLoc (Exists l) = fromDoc l . pretty $ tokExists
   prettyWithLoc (Max l) = fromDoc l . pretty $ tokMax
   prettyWithLoc (Min l) = fromDoc l . pretty $ tokMin
+  prettyWithLoc (Hash l) = fromDoc l . pretty $ tokHash
 
 instance Pretty Op where
   pretty = toDoc . prettyWithLoc

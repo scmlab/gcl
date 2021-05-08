@@ -1,103 +1,19 @@
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Test.Parser where
-
-import Data.Text.Prettyprint.Doc ( Pretty(pretty), defaultLayoutOptions, layoutPretty )
-import Data.Text.Prettyprint.Doc.Render.Text ( renderStrict )
-
-import Data.Text (Text)
-import qualified Data.Text as Text
-import qualified Data.Text.Encoding as Text
-
-import Data.ByteString (ByteString)
-import qualified Data.ByteString as BS
-import qualified Data.ByteString.Char8 as BS8
-
-import Error ( Error(..) )
-import qualified Server 
-
-import Syntax.Parser
-import Syntax.Parser.Lexer
-import Text.Megaparsec.Char
-import qualified Text.Megaparsec.Char.Lexer as Lex
-
-import Test.Tasty.Golden.Advanced (goldenTest)
-import Test.Tasty.Golden (createDirectoriesAndWriteFile)
+import Test.Util (goldenFileTest, render, parseTest, removeTrailingWhitespace)
 import Test.Tasty (TestTree, testGroup)
-import Test.Tasty.HUnit
-import Data.Char (isSpace)
-import Data.Int (Int64)
+import Data.Text.Prettyprint.Doc (Pretty)
+import Syntax.Parser (Parser, runParse, pProgram, pDeclaration, pType, pExpr, pBlockDeclaration, pStmt)
+import Syntax.Parser.Lexer ( scn )
+import Data.Text (Text)
+import Test.Tasty.HUnit (Assertion, testCase, (@?=))
 
-import Prelude hiding (compare)
-import Syntax.Parser.Token
-import Syntax.Concrete (Type(..), TBase (..), Program (..), Expr(..))
-import Syntax.Concrete.ToAbstract (ToAbstract (toAbstract))
-import Data.Loc (Located(locOf))
-import Text.Megaparsec (Stream(reachOffset), setOffset, getOffset, MonadParsec(updateParserState, getParserState, observing, lookAhead, try, eof), State(State, statePosState, stateInput, stateOffset), getInput, getSourcePos)
-import Control.Monad.Combinators (optional, many, (<|>), choice, eitherP)
-import qualified Data.Ord as Ord
-import Control.Monad (void)
-import Control.Monad.Except
-import Syntax.Parser.Util (parser, (↓), getCurLoc)
-import qualified Data.ByteString.Lazy as BSL
-import qualified Syntax.ConstExpr as ConstExpr
 
 tests :: TestTree
--- tests = testGroup "Prettifier" [myTest]
 tests = testGroup "Prettifier" [expression, type', declaration, statement, parseError, golden]
 
 --------------------------------------------------------------------------------
-
-parse :: Parser a -> Text -> Either Error a
-parse parser =
-  runExcept . withExcept SyntacticError . liftEither . runParse parser "<test>"
-
-render :: Pretty a => Either Error a -> Text
-render = renderStrict . layoutPretty defaultLayoutOptions . pretty
-
-
-isomorphic :: Pretty a => Parser a -> Text -> Assertion
-isomorphic parser raw = removeWhitespace (render (parse parser raw)) @?= removeWhitespace raw
-  where
-    removeWhitespace :: Text -> Text
-    removeWhitespace = Text.unlines . map Text.stripEnd . Text.lines
-
-
-compare :: Pretty a => Parser a -> Text -> Text -> Assertion
-compare parser actual expected = removeWhitespace (render (parse parser actual)) @?= removeWhitespace expected
-  where
-    removeWhitespace :: Text -> Text
-    removeWhitespace = Text.unlines . map Text.stripEnd . Text.lines
-
-
-myTest :: TestTree
-myTest =
-  testGroup
-    "parse test"
-    [
-      testCase "1" $ run
-        "{:\n\
-        \  A, B : Bool\n\
-        \   A\n\
-        \  A = True\n\
-        \:}\n"
-      -- testCase "2" $ run
-      --   "= +"
-    ]
-    where
-      run t = show (parse wrap t) @?= ""
-      wrap = do
-        Program decls' stmts' <- pProgram
-        let d = mapM (\case
-              Left d -> (: []) <$> toAbstract d
-              Right d -> toAbstract d) decls'
-        case runExcept d of
-          Left l -> error "loc"
-          Right decls'' -> return $ ConstExpr.pickGlobals (concat decls'')
-        -- let (globProps, assertions) = ConstExpr.pickGlobals decls''
-        -- return (globProps, assertions)
-
 
 -- | Expression
 expression :: TestTree
@@ -107,11 +23,20 @@ expression =
     [ testCase "literal (numbers)" $ run "1",
       testCase "literal (True)" $ run "True",
       testCase "literal (False)" $ run "False",
+      testCase "literal (Char)" $ run "'a'",
       testCase "variable" $ run "   x",
       testCase "constant" $ run " (X)",
       testCase "numeric 1" $ run "(1   \n  +  \n  (   \n   1))",
       testCase "numeric 2" $ run "A + X * Y",
       testCase "numeric 3" $ run "(A + X) * Y % 2",
+      testCase "equivalent (EQProp)" $ run
+        "a + b + c\n\
+        \≡ a + b + d\n\
+        \≡ a + b * e",
+      testCase "equivalent (EQPropU)" $ run
+        "a + b + c\n\
+        \<=> a + b + d\n\
+        \<=> a + b * e",
       testCase "relation (EQ)" $ run "A = B",
       testCase "relation (NEQ)" $ run "A /= B",
       testCase "relation (LT)" $ run "A < B",
@@ -131,6 +56,7 @@ expression =
       testCase "quant 3" $ run "⟨ max i j : 0 ≤ i < j < n : A i - A j ⟩",
       testCase "quant 4" $ run "<| + i : 0 <= i < k : F i |>",
       testCase "quant 5" $ run "x = <| + i : 0 <= i < k : F i |>",
+      testCase "quant 6 (hash)" $ run "x = <| # i : 0 < i < n : F i > 0 |>",
       testCase "function application 1" $ run "(f   (  x      )) y",
       testCase "function application 2" $ run "f (x y)",
       testCase "array indexing (app)" $ run "A i",
@@ -148,8 +74,8 @@ expression =
       testCase "mixed 10" $ run "3 / 2 + X"
     ]
   where
-    run = isomorphic (scn >> pExpr)
-
+    run = parserIso (scn >> pExpr)
+    
 --------------------------------------------------------------------------------
 
 -- | Type
@@ -171,14 +97,10 @@ type' =
           \           Int))",
       testCase "array 1" $ run "array [0 .. N  )   of    Int",
       testCase "array 2" $ run "array (   0   ..  N   ] of Int",
-      testCase "array 3" $ run "array [  0 .. N  ] of     Int",
-      testCase "array 4" $ run'
-        "array (  0 .. (Int) ) of \n Int"
-        "Error Syntactic Error [(<test>:1:16, using keyword as variable name )]\n"
+      testCase "array 3" $ run "array [  0 .. N  ] of     Int"
     ]
   where
-    run = isomorphic (scn >> pType)
-    run' = compare (scn >> pType)
+    run = parserIso (scn >> pType)
 
 --------------------------------------------------------------------------------
 
@@ -188,9 +110,10 @@ declaration =
   testGroup
     "Declarations"
     [ testCase "variable" $ run "var   x     :   ( Int)",
-      testCase "variable keyword collision 1" $
-        run' "var if : Int" "Error Syntactic Error [(<test>:1:5, using keyword as variable name )]\n",
-      testCase "variable keyword collision 2" $ run "var iff : Int",
+      testCase "variable keyword collision 1" $ run "var iff : Int",
+      testCase "variable keyword collision 2" $ run "var fif : Int",
+      testCase "variable keyword collision 3" $ run "var doo : Int",
+      testCase "variable keyword collision 4" $ run "var odd : Int",
       testCase "variable (with newlines in between)" $
         run
           "var\n\
@@ -198,8 +121,10 @@ declaration =
           \   : Int\n",
       testCase "variable with properties" $ run "var x : Int  {    True \n }",
       testCase "constant" $ run "con X , Z,B, Y : Int",
-      testCase "constant keyword collision 1" $ run' "con False : Int" "Error Syntactic Error [(<test>:1:5, using keyword as variable name )]\n",
-      testCase "constant keyword collision 2" $ run "con Falsee : Int",
+      testCase "constant keyword collision 1" $ run "con Falsee : Int",
+      testCase "constant keyword collision 2" $ run "con Trueu : Int",
+      testCase "constant keyword collision 3" $ run "con Intt : Int",
+      testCase "constant keyword collision 4" $ run "con Boola : Int",
       testCase "let binding" $ run " let  X   i  =  N  >   (0)  ",
       testCase "block declaration 1" $ runBlock
         "{:\n\
@@ -214,16 +139,15 @@ declaration =
         "{:\n\
         \   A, B : Int {A > 0}\n\
         \:}",
-      testCase "block declaration 1" $ runBlock
+      testCase "block declaration 2" $ runBlock
         "{:\n\
         \   A, B : Int\n\
         \     {A > 0}\n\
         \:}"
     ]
   where
-    run = isomorphic pDeclaration
-    run' = compare pDeclaration
-    runBlock = isomorphic pBlockDeclaration
+    run = parserIso pDeclaration
+    runBlock = parserIso pBlockDeclaration
 
 --------------------------------------------------------------------------------
 
@@ -245,7 +169,7 @@ statement =
       testCase "indentifier include keyword" $ run "{ Falsee }"
     ]
   where
-    run = isomorphic pStmt
+    run = parserIso pStmt
 
 --------------------------------------------------------------------------------
 
@@ -254,10 +178,24 @@ parseError :: TestTree
 parseError =
   testGroup
     "Parse error"
-    [ testCase "quant with parentheses" $ run "<| (+) i : i > 0 : f i |>" "Error Syntactic Error [(<test>:1:5, unexpected \"+) i \" expecting expression )]\n"
+    [
+      testCase "constant keyword collision" $ runDeclaration
+        "con False : Int"
+        "[ ( <test>:1:5\n, using keyword as variable name\n ) ]\n",
+      testCase "variable keyword collision" $ runDeclaration
+        "var if : Int"
+        "[ ( <test>:1:5\n, using keyword as variable name\n ) ]\n",
+      testCase "quant with parentheses" $ runExpr
+        "<| (+) i : i > 0 : f i |>"
+        "[ ( <test>:1:5\n, unexpected \"+) i \"\nexpecting expression\n ) ]\n",
+      testCase "array" $ runType
+        "array (  0 .. (Int) ) of \n Int"
+        "[ ( <test>:1:16\n, using keyword as variable name\n ) ]\n"
     ]
   where
-    run = compare pExpr
+    runDeclaration = parserCompare pDeclaration
+    runType = parserCompare pType
+    runExpr = parserCompare pExpr
 
 
 --------------------------------------------------------------------------------
@@ -267,67 +205,29 @@ golden :: TestTree
 golden =
   testGroup
     "Program"
-    [ ast "empty" "./test/source/" "empty.gcl",
-      ast "2" "./test/source/" "2.gcl",
-      ast "comment" "./test/source/" "comment.gcl",
-      ast "issue 1" "./test/source/" "issue1.gcl",
-      ast "issue 14" "./test/source/" "issue14.gcl",
-      ast "no-decl" "./test/source/" "no-decl.gcl",
-      ast "no-stmt" "./test/source/" "no-stmt.gcl",
-      ast "assign" "./test/source/" "assign.gcl",
-      ast "quant 1" "./test/source/" "quant1.gcl",
-      ast "spec" "./test/source/" "spec.gcl",
-      ast "gcd" "./test/source/examples/" "gcd.gcl"
+    [ parserGolden "empty" "./test/source/" "empty.gcl",
+      parserGolden "2" "./test/source/" "2.gcl",
+      parserGolden "comment" "./test/source/" "comment.gcl",
+      parserGolden "issue 1" "./test/source/" "issue1.gcl",
+      parserGolden "issue 14" "./test/source/" "issue14.gcl",
+      parserGolden "no-decl" "./test/source/" "no-decl.gcl",
+      parserGolden "no-stmt" "./test/source/" "no-stmt.gcl",
+      parserGolden "assign" "./test/source/" "assign.gcl",
+      parserGolden "quant 1" "./test/source/" "quant1.gcl",
+      parserGolden "spec" "./test/source/" "spec.gcl",
+      parserGolden "gcd" "./test/source/examples/" "gcd.gcl"
     ]
-  where
-    suffixGolden :: FilePath -> FilePath
-    suffixGolden filePath = filePath ++ ".ast.golden"
 
-    ast :: String -> FilePath -> FilePath -> TestTree
-    ast name filePath fileName =
-      goldenTest
-        name
-        (readFile (filePath ++ "golden/") (fileName ++ ".ast.golden"))
-        (readFile filePath fileName)
-        compareAndReport
-        update
+parserGolden :: String -> FilePath -> FilePath -> TestTree
+parserGolden name filePath fileName =
+  goldenFileTest ".ast.golden" name filePath fileName runFile
 
-    readFile :: FilePath -> FilePath -> IO (FilePath, FilePath, ByteString)
-    readFile filePath fileName = do
-      raw <- BS.readFile (filePath ++ fileName)
-      return (filePath, fileName, raw)
+runFile :: (FilePath, Text) -> Text
+runFile (filePath, source) = render $ runParse pProgram filePath source
 
-    compareAndReport ::
-      (FilePath, FilePath, ByteString) -> (FilePath, FilePath, ByteString) -> IO (Maybe String)
-    compareAndReport (expectedPath, expectedFileName, expected) (actualPath, actualFileName, actualRaw) = do
-      let actual = run actualRaw
-      if removeTrailingWhitespace expected == removeTrailingWhitespace actual
-        then return Nothing
-        else
-          return $
-        Just $
-          "expected (" ++ expectedPath ++ expectedFileName ++ ", " ++ show (length (BS8.unpack expected)) ++ " chars):\n" ++ BS8.unpack expected ++ "\n------------\n"
-            ++ "actual ("
-            ++ actualPath ++ actualFileName
-            ++ ", "
-            ++ show (length (BS8.unpack actual))
-            ++ " chars): \n"
-            ++ BS8.unpack actual
+parserCompare :: Pretty a => Parser a -> Text -> Text -> Assertion
+parserCompare parser actual expected = (removeTrailingWhitespace . render . parseTest parser) actual @?= removeTrailingWhitespace expected
 
-
-    removeTrailingWhitespace :: ByteString -> ByteString
-    removeTrailingWhitespace = BS8.unlines . map stripEnd . BS8.lines
-      where
-        lastNonSpaceCharIndex :: ByteString -> Int64
-        lastNonSpaceCharIndex = fromInteger . fst . BS8.foldl (\(acc, index) char -> if isSpace char then (acc, succ index) else (succ index, succ index)) (0, 0)
-
-        stripEnd :: ByteString -> ByteString
-        stripEnd s = BS8.take (fromIntegral $ lastNonSpaceCharIndex s) s
-
-    update :: (FilePath, FilePath, ByteString) -> IO ()
-    update (filePath, fileName, input) =
-      createDirectoriesAndWriteFile (filePath ++ "golden/" ++ fileName ++ ".ast.golden") (BSL.fromStrict $ run input)
-
-    run :: ByteString -> ByteString
-    run = Text.encodeUtf8 . render . parse pProgram . Text.decodeUtf8
+parserIso :: Pretty a => Parser a -> Text -> Assertion
+parserIso parser raw = parserCompare parser raw raw
 

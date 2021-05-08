@@ -143,6 +143,12 @@ tokDeclEnd = ":}"
 -- Operators
 ------------------------------------------
 
+tokEQProp :: Text
+tokEQProp = "<=>"
+
+tokEQPropU :: Text
+tokEQPropU = "≡"
+
 tokEQ :: Text
 tokEQ = "="
 
@@ -223,6 +229,9 @@ tokMax = "↑"
 
 tokMin :: Text
 tokMin = "↓"
+
+tokHash :: Text
+tokHash = "#"
 
 ------------------------------------------
 -- literals

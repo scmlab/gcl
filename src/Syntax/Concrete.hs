@@ -122,7 +122,7 @@ data Expr
   | App Expr Expr
   | Quant
       TokQuantStarts 
-      QOp
+      QuantOp'
       [Name]
       (Token ":")
       Expr
@@ -131,7 +131,7 @@ data Expr
       TokQuantEnds
   deriving (Eq, Show, Generic)
 
-type QOp = Either Op Expr
+type QuantOp' = Either Op Expr
 --------------------------------------------------------------------------------
 
 -- | Literals (Integer / Boolean / Character)

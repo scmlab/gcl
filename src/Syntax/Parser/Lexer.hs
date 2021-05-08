@@ -171,6 +171,12 @@ lexDeclEnd = symbol tokDeclEnd
 -- Operators
 ------------------------------------------
 
+lexEQProp :: LexerF ChainOp 
+lexEQProp = EQProp . locOf <$> symbol tokEQProp
+
+lexEQPropU :: LexerF ChainOp 
+lexEQPropU = EQPropU . locOf <$> symbol tokEQPropU
+
 lexEQ' :: LexerF (Token tokEQ)
 lexEQ' = symbol tokEQ 
 
@@ -255,8 +261,12 @@ lexMax = Max . locOf <$> symbol tokMax
 lexMin :: LexerF QuantOp 
 lexMin = Min . locOf <$> symbol tokMin
 
+lexHash :: LexerF QuantOp 
+lexHash = Hash . locOf <$> symbol tokHash
+
 lexChainOps :: LexerF ChainOp 
 lexChainOps = choice [
+    lexEQProp, lexEQPropU,
     lexEQ, lexNEQ, lexNEQU, 
     lexGT, lexGTE, lexGTEU,
     lexLT, lexLTE, lexLTEU
@@ -270,7 +280,7 @@ lexArithOps = choice [
 
 lexQuantOps :: LexerF QuantOp 
 lexQuantOps = choice [
-    lexSum, lexForall, lexExists, lexMax, lexMin
+    lexSum, lexForall, lexExists, lexMax, lexMin, lexHash
   ]
 
 
@@ -312,8 +322,11 @@ lexFalse = LitBool False . locOf <$> symbol tokFalse
 lexInt :: LexerF Lit
 lexInt = uncurry LitInt <$> lexeme Lex.decimal
 
+lexChar :: LexerF Lit
+lexChar = uncurry LitChar <$> lexeme (char '\'' *> Lex.charLiteral <* char '\'')
+
 lexLits :: LexerF Lit
-lexLits = choice [lexTrue, lexFalse, lexInt] <?> "literals"
+lexLits = choice [lexTrue, lexFalse, lexInt, lexChar] <?> "literals"
 
 lexTypeInt :: LexerF (Token tokTypeInt)
 lexTypeInt = symbol tokTypeInt

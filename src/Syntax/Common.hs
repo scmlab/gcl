@@ -38,7 +38,9 @@ nameToText (Name x _) = x
 
 --------------------------------------------------------------------------------
 data ChainOp = 
-    EQ Loc
+    EQProp Loc
+  | EQPropU Loc
+  | EQ Loc
   | NEQ Loc
   | NEQU Loc
   | LTE Loc
@@ -71,6 +73,7 @@ data QuantOp =
   | Exists Loc 
   | Max Loc
   | Min Loc
+  | Hash Loc
   deriving (Eq, Show, Generic)
 
 -- | Operators
@@ -78,6 +81,8 @@ data Op = ChainOp ChainOp | ArithOp ArithOp | QuantOp QuantOp
   deriving (Show, Eq, Generic)
 
 instance Located ChainOp where
+  locOf (EQProp l) = l
+  locOf (EQPropU l) = l
   locOf (EQ l) = l
   locOf (NEQ l) = l
   locOf (NEQU l) = l
@@ -109,6 +114,7 @@ instance Located QuantOp where
   locOf (Forall l) = l
   locOf (Max l) = l
   locOf (Min l) = l
+  locOf (Hash l) = l
 
 instance Located Op where
   locOf (ChainOp op) = locOf op
@@ -116,6 +122,8 @@ instance Located Op where
   locOf (QuantOp op) = locOf op
 
 classifyChainOp :: ChainOp -> Fixity
+classifyChainOp (EQProp _) = Infix 10
+classifyChainOp (EQPropU _) = Infix 10
 classifyChainOp (EQ _) = Infix 5
 classifyChainOp (NEQ _) = Infix 6
 classifyChainOp (NEQU _) = Infix 6
@@ -141,17 +149,18 @@ classifyArithOp (Mul _) = InfixL 8
 classifyArithOp (Div _) = InfixL 8
 classifyArithOp (Mod _) = InfixL 9
 
-classifyQuantOp :: QuantOp -> Fixity
-classifyQuantOp (Sum _) = Prefix 5
-classifyQuantOp (Exists _) = Prefix 6
-classifyQuantOp (Forall _) = Prefix 7
-classifyQuantOp (Max _) = Prefix 8
-classifyQuantOp (Min _) = Prefix 8
+-- classifyQuantOp :: QuantOp -> Fixity
+-- classifyQuantOp (Sum _) = Prefix 5
+-- classifyQuantOp (Exists _) = Prefix 6
+-- classifyQuantOp (Forall _) = Prefix 7
+-- classifyQuantOp (Max _) = Prefix 8
+-- classifyQuantOp (Min _) = Prefix 8
+-- classifyQuantOp (Hash _) = Prefix 8
 
-classify :: Op -> Fixity
-classify (ChainOp op) = classifyChainOp op
-classify (ArithOp op) = classifyArithOp op
-classify (QuantOp op) = classifyQuantOp op
+-- classify :: Op -> Fixity
+-- classify (ChainOp op) = classifyChainOp op
+-- classify (ArithOp op) = classifyArithOp op
+-- classify (QuantOp op) = classifyQuantOp op
 
 instance ToJSON ChainOp
 instance FromJSON ChainOp

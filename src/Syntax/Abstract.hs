@@ -141,11 +141,11 @@ data Expr
   | App Expr Expr Loc
   | Lam Name Expr Loc
   | Hole Loc
-  | Quant QOp [Name] Expr Expr Loc
+  | Quant QuantOp' [Name] Expr Expr Loc
   | Subst Expr Subst -- internal. Location not necessary?
   deriving (Eq, Show, Generic)
 
-type QOp = Either Op Expr
+type QuantOp' = Either Op Expr
 
 type Subst = Map Name Expr
 
