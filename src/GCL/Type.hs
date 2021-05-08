@@ -126,27 +126,26 @@ infer (Lit lit l) = return (litTypes lit l)
 infer (Var x _) = lookupEnv x
 infer (Const c _) = lookupEnv c
 infer (Op o) = return (arithOpTypes o)
-infer (Chain a op b l) = do
-  case a of
-    Chain _ _ r _ -> do
-      ta <- infer a
-      -- check type of a is bool
-      uni ta (TBase TBool l)
+infer (Chain a op b loc) = do
+  ta <- infer a
+  top <- inferChainOpTypes op
+  tb <- infer b
 
+  case (a, b) of
+    (Chain _ _ l _, Chain r _ _ _) -> do
+      tl <- infer l
       tr <- infer r
-      let top = chainOpTypes op
-      tb <- infer b
-      -- check type of `r op b` is bool
-      uni top (TFunc tr (TFunc tb (TBase TBool NoLoc) (locOf b)) (r <--> b))
-      
-      return (TBase TBool l)
-    _ -> do
-      ta <- infer a
-      let top = chainOpTypes op
-      tb <- infer b
-      uni top (TFunc ta (TFunc tb (TBase TBool NoLoc) (locOf b)) (a <--> b))
-      return (TBase TBool (a <--> b))
-
+      -- check type of `l op r` is bool
+      uni top (TFunc tl (TFunc tr (TBase TBool (locOf op)) (locOf r)) (l <--> r))
+    (Chain _ _ l _, _) -> do
+      tl <- infer l
+      uni top (TFunc tl (TFunc tb (TBase TBool (locOf op)) (locOf b)) (l <--> b))
+    (_, Chain r _ _ _) -> do
+      tr <- infer r
+      uni top (TFunc ta (TFunc tr (TBase TBool (locOf op)) (locOf r)) (a <--> r))
+    (_, _) -> do
+      uni top (TFunc ta (TFunc tb (TBase TBool (locOf op)) (locOf b)) (a <--> b))
+  return (TBase TBool loc)
 infer (App e1 e2 l) = do
   t1 <- infer e1
   t2 <- infer e2
@@ -279,7 +278,7 @@ checkExpr env expr = void $ inferExpr env expr
 checkGdCmd :: TypeEnv -> GdCmd -> TM ()
 checkGdCmd env (GdCmd expr stmts _) = do
   ForallV _ gd <- inferExpr env expr
-  void $ runSolver [(gd, TBase TBool NoLoc)]
+  void $ runSolver [(gd, TBase TBool (locOf expr))]
   mapM_ (checkStmt env) stmts
 
 checkStmt :: TypeEnv -> Stmt -> TM ()
@@ -289,8 +288,14 @@ checkStmt env (Assign ns es _)
   | length ns > length es = throwError $ error "Missing Expression"
   | length ns < length es = throwError $ error "Duplicated Assignment"
   | otherwise = forM_ (zip ns es) (checkName env)
-checkStmt env (Assert expr _) = void $ inferExpr env expr
-checkStmt env (LoopInvariant e1 e2 _) = void $ inferExpr env e1 >> inferExpr env e2
+checkStmt env (Assert expr l) = do 
+  ForallV _ t <- inferExpr env expr
+  void $ runSolver [(t, TBase TBool l)]
+checkStmt env (LoopInvariant e1 e2 _) = do
+  ForallV _ t1 <- inferExpr env e1
+  void $ runSolver [(t1, TBase TBool (locOf e1))]
+  ForallV _ t2 <- inferExpr env e2
+  void $ runSolver [(t2, TBase TInt (locOf e2))]
 checkStmt env (Do gdcmds _) = mapM_ (checkGdCmd env) gdcmds
 checkStmt env (If gdcmds _) = mapM_ (checkGdCmd env) gdcmds
 checkStmt _ (Spec _ _) = return ()
@@ -374,7 +379,22 @@ litTypes (Num _) l = TBase TInt l
 litTypes (Bol _) l = TBase TBool l
 litTypes (Chr _) l = TBase TChar l
 
+inferChainOpTypes :: ChainOp -> Infer Type
+inferChainOpTypes op = do
+  case op of
+    (EQ l) -> f l
+    (NEQ l) -> f l
+    (NEQU l) -> f l
+    _ -> return (chainOpTypes op)
+  where
+    f l = do
+      x <- fresh l
+      return (TFunc x (TFunc x (TBase TBool l) l) l)
+
+
 chainOpTypes :: ChainOp -> Type
+chainOpTypes (EQProp l) = TFunc (TBase TBool l) (TFunc (TBase TBool l) (TBase TBool l) l) l
+chainOpTypes (EQPropU l) = TFunc (TBase TBool l) (TFunc (TBase TBool l) (TBase TBool l) l) l
 chainOpTypes (EQ l) = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TBool l) l) l
 chainOpTypes (NEQ l) = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TBool l) l) l
 chainOpTypes (NEQU l) = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TBool l) l) l

@@ -38,7 +38,9 @@ nameToText (Name x _) = x
 
 --------------------------------------------------------------------------------
 data ChainOp = 
-    EQ Loc
+    EQProp Loc
+  | EQPropU Loc
+  | EQ Loc
   | NEQ Loc
   | NEQU Loc
   | LTE Loc
@@ -79,6 +81,8 @@ data Op = ChainOp ChainOp | ArithOp ArithOp | QuantOp QuantOp
   deriving (Show, Eq, Generic)
 
 instance Located ChainOp where
+  locOf (EQProp l) = l
+  locOf (EQPropU l) = l
   locOf (EQ l) = l
   locOf (NEQ l) = l
   locOf (NEQU l) = l
@@ -118,6 +122,8 @@ instance Located Op where
   locOf (QuantOp op) = locOf op
 
 classifyChainOp :: ChainOp -> Fixity
+classifyChainOp (EQProp _) = Infix 10
+classifyChainOp (EQPropU _) = Infix 10
 classifyChainOp (EQ _) = Infix 5
 classifyChainOp (NEQ _) = Infix 6
 classifyChainOp (NEQU _) = Infix 6

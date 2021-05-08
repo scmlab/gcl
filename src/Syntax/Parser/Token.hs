@@ -143,6 +143,12 @@ tokDeclEnd = ":}"
 -- Operators
 ------------------------------------------
 
+tokEQProp :: Text
+tokEQProp = "<=>"
+
+tokEQPropU :: Text
+tokEQPropU = "≡"
+
 tokEQ :: Text
 tokEQ = "="
 

@@ -9,7 +9,7 @@ module Pretty.Concrete where
 
 import Data.Loc (locOf, (<-->))
 import Data.Loc.Util (translateLoc)
-import Data.Text.Prettyprint.Doc (Pretty (pretty))
+import Data.Text.Prettyprint.Doc (Pretty (pretty), (<+>))
 import Pretty.Util
 import Pretty.Variadic
 import Pretty.Common ()
@@ -203,9 +203,10 @@ instance Pretty BlockDeclaration where
   pretty = toDoc . prettyWithLoc
 
 instance PrettyWithLoc BlockDeclaration where
-  prettyWithLoc (BlockDeclaration l decls r) = prettyWithLoc l
-      <> mconcat (map prettyWithLoc decls)
-      <> prettyWithLoc r
+  prettyWithLoc (BlockDeclaration l decls r) = 
+    prettyWithLoc l
+    <> mconcat (map prettyWithLoc decls)
+    <> prettyWithLoc r
 
 --------------------------------------------------------------------------------
 -- | Literals
@@ -215,7 +216,7 @@ instance PrettyWithLoc Lit where
   prettyWithLoc (LitBool True l) = fromDoc l "True"
   prettyWithLoc (LitBool False l) = fromDoc l "False"
   prettyWithLoc (LitInt n l) = fromDoc l (pretty n)
-  prettyWithLoc (LitChar c l) = fromDoc l (pretty [c])
+  prettyWithLoc (LitChar c l) = fromDoc l ("'" <> pretty [c] <> "'")
 
 --------------------------------------------------------------------------------
 

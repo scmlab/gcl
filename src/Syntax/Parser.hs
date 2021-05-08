@@ -304,8 +304,12 @@ chainOpTable =
       InfixL . pChain $ lexGT,
       InfixL . pChain . choice $ [lexGTE, lexGTEU]
     ],
-    [InfixL . pChain $ lexEQ]
-  ]
+    [InfixL . pBinary . choice $ [lexConj, lexConjU]],
+    [InfixL . pBinary . choice $ [lexDisj, lexDisjU]],
+    [InfixL . pBinary . choice $ [lexImpl, lexImplU]],
+    [InfixL . pChain $ lexEQ],
+    [InfixL . pChain $ lexEQProp, InfixL . pChain $ lexEQPropU]
+  ] 
 
 pExprArith :: ParserF Expr
 pExprArith = makeExprParser pTerm arithTable <* (↑) (\sc' -> try sc' <|> sc)
@@ -316,10 +320,7 @@ arithTable =
     [InfixL (pBinary lexMod)],
     [InfixL (pBinary lexMul), InfixL (pBinary lexDiv)],
     [InfixL (pBinary lexAdd), InfixL (pBinary lexSub)],
-    [Prefix . pUnary . choice $ [lexNeg, lexNegU]],
-    [InfixL . pBinary . choice $ [lexConj, lexConjU]],
-    [InfixL . pBinary . choice $ [lexDisj, lexDisjU]],
-    [InfixL . pBinary . choice $ [lexImpl, lexImplU]]
+    [Prefix . pUnary . choice $ [lexNeg, lexNegU]]
   ]
 
 pTerm :: ParserF Expr

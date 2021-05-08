@@ -98,7 +98,7 @@ instance Pretty GdCmd where
 instance Pretty Lit where
   pretty (Num i) = pretty $ show i
   pretty (Bol b) = pretty $ show b
-  pretty (Chr c) = pretty $ show c
+  pretty (Chr c) = pretty (show c)
 
 --------------------------------------------------------------------------------
 
