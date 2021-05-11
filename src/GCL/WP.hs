@@ -27,6 +27,7 @@ import Syntax.Abstract
     Stmt,
   )
 import qualified Syntax.Abstract as A
+import qualified Syntax.Abstract.Located as A
 import Syntax.Predicate hiding (Stmt)
 
 type SM =

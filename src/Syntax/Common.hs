@@ -1,5 +1,4 @@
 {-# LANGUAGE OverloadedStrings #-}
-
 {-# LANGUAGE DeriveGeneric #-}
 module Syntax.Common where
 
@@ -37,11 +36,10 @@ nameToText :: Name -> Text
 nameToText (Name x _) = x
 
 --------------------------------------------------------------------------------
-
--- | Operators
-data Op
-  = -- binary relations
-    EQ Loc
+data ChainOp = 
+    EQProp Loc
+  | EQPropU Loc
+  | EQ Loc
   | NEQ Loc
   | NEQU Loc
   | LTE Loc
@@ -50,83 +48,89 @@ data Op
   | GTEU Loc
   | LT Loc
   | GT Loc
-  | -- logic operators
-    Implies Loc
+  deriving (Eq, Show, Generic)
+
+data ArithOp =
+   Implies Loc
   | ImpliesU Loc
   | Conj Loc
   | ConjU Loc
   | Disj Loc
   | DisjU Loc
-  | -- arithmetics
-    Neg Loc
+  | Neg Loc
   | NegU Loc
   | Add Loc
   | Sub Loc
   | Mul Loc
   | Div Loc
-  | Mod Loc
-  | -- For Quant
+  | Mod Loc 
+  deriving (Eq, Show, Generic)
+
+data QuantOp = 
     Sum Loc
   | Forall Loc
-  | Exists Loc
+  | Exists Loc 
+  | Max Loc
+  | Min Loc
+  | Hash Loc
+  deriving (Eq, Show, Generic)
+
+-- | Operators
+data Op = ChainOp ChainOp | ArithOp ArithOp | QuantOp QuantOp
   deriving (Show, Eq, Generic)
 
-instance Located Op where
-  locOf (Implies l) = l
-  locOf (ImpliesU l) = l
-  locOf (Disj l) = l
-  locOf (DisjU l) = l
-  locOf (Conj l) = l
-  locOf (ConjU l) = l
-  locOf (Neg l) = l
-  locOf (NegU l) = l
-  locOf (EQ l) = l
-  locOf (NEQ l) = l
-  locOf (NEQU l) = l
-  locOf (LTE l) = l
-  locOf (LTEU l) = l
-  locOf (GTE l) = l
-  locOf (GTEU l) = l
-  locOf (LT l) = l
-  locOf (GT l) = l
-  locOf (Add l) = l
-  locOf (Sub l) = l
-  locOf (Mul l) = l
-  locOf (Div l) = l
-  locOf (Mod l) = l
-  locOf (Sum l) = l
-  locOf (Exists l) = l
-  locOf (Forall l) = l
 
-classify :: Op -> Fixity
-classify (Implies _) = InfixR 1
-classify (ImpliesU _) = InfixR 1
-classify (Disj _) = InfixL 2
-classify (DisjU _) = InfixL 2
-classify (Conj _) = InfixL 3
-classify (ConjU _) = InfixL 3
-classify (Neg _) = Prefix 4
-classify (NegU _) = Prefix 4
-classify (EQ _) = Infix 5
-classify (NEQ _) = Infix 6
-classify (NEQU _) = Infix 6
-classify (LTE _) = Infix 6
-classify (LTEU _) = Infix 6
-classify (GTE _) = Infix 6
-classify (GTEU _) = Infix 6
-classify (LT _) = Infix 6
-classify (GT _) = Infix 6
-classify (Add _) = InfixL 7
-classify (Sub _) = InfixL 7
-classify (Mul _) = InfixL 8
-classify (Div _) = InfixL 8
-classify (Mod _) = InfixL 9
-classify (Sum _) = Prefix 5
-classify (Exists _) = Prefix 6
-classify (Forall _) = Prefix 7
+classifyChainOp :: ChainOp -> Fixity
+classifyChainOp (EQProp _) = Infix 10
+classifyChainOp (EQPropU _) = Infix 10
+classifyChainOp (EQ _) = Infix 5
+classifyChainOp (NEQ _) = Infix 6
+classifyChainOp (NEQU _) = Infix 6
+classifyChainOp (LTE _) = Infix 6
+classifyChainOp (LTEU _) = Infix 6
+classifyChainOp (GTE _) = Infix 6
+classifyChainOp (GTEU _) = Infix 6
+classifyChainOp (LT _) = Infix 6
+classifyChainOp (GT _) = Infix 6
+
+classifyArithOp :: ArithOp -> Fixity
+classifyArithOp (Implies _) = InfixR 1
+classifyArithOp (ImpliesU _) = InfixR 1
+classifyArithOp (Disj _) = InfixL 2
+classifyArithOp (DisjU _) = InfixL 2
+classifyArithOp (Conj _) = InfixL 3
+classifyArithOp (ConjU _) = InfixL 3
+classifyArithOp (Neg _) = Prefix 4
+classifyArithOp (NegU _) = Prefix 4
+classifyArithOp (Add _) = InfixL 7
+classifyArithOp (Sub _) = InfixL 7
+classifyArithOp (Mul _) = InfixL 8
+classifyArithOp (Div _) = InfixL 8
+classifyArithOp (Mod _) = InfixL 9
+
+-- classifyQuantOp :: QuantOp -> Fixity
+-- classifyQuantOp (Sum _) = Prefix 5
+-- classifyQuantOp (Exists _) = Prefix 6
+-- classifyQuantOp (Forall _) = Prefix 7
+-- classifyQuantOp (Max _) = Prefix 8
+-- classifyQuantOp (Min _) = Prefix 8
+-- classifyQuantOp (Hash _) = Prefix 8
+
+-- classify :: Op -> Fixity
+-- classify (ChainOp op) = classifyChainOp op
+-- classify (ArithOp op) = classifyArithOp op
+-- classify (QuantOp op) = classifyQuantOp op
+
+instance ToJSON ChainOp
+instance FromJSON ChainOp
+
+instance ToJSON ArithOp
+instance FromJSON ArithOp
+
+instance ToJSON QuantOp
+instance FromJSON QuantOp
 
 instance ToJSON Op
-
 instance FromJSON Op
 
 --------------------------------------------------------------------------------

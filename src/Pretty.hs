@@ -12,6 +12,7 @@ where
 import Data.Text (Text)
 import Data.Text.Prettyprint.Doc
 import qualified Data.Text.Prettyprint.Doc.Render.Text as Text
+import Error ( Error )
 import Pretty.Error ()
 import Pretty.Abstract ()
 import Pretty.Concrete ()
@@ -27,7 +28,7 @@ renderStrict = Text.renderStrict . layoutPretty defaultLayoutOptions
 --------------------------------------------------------------------------------
 
 -- | Misc
-instance (Pretty a, Pretty b) => Pretty (Either a b) where
+instance {-# OVERLAPPING #-} (Pretty a) => Pretty (Either Error a) where
   pretty (Left a) = "Error" <+> pretty a
   pretty (Right b) = pretty b
 

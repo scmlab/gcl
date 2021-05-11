@@ -3,22 +3,23 @@
 
 module Syntax.Predicate where
 
-import Data.Aeson
+import Data.Aeson ( ToJSON )
 import Data.Char (isUpper)
 -- import           Syntax.Abstract                ( Fresh )
 
 import Data.Function (on)
 import Data.Loc
+    ( posCoff, posLine, unLoc, L, Loc(..), Located(locOf), Pos(..) )
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified GCL.Expr as E
-import GHC.Generics
+import GHC.Generics ( Generic )
 import Syntax.Common (Name)
 import Syntax.Abstract
   ( Expr,
     Subst,
   )
-import qualified Syntax.Abstract as A
+import qualified Syntax.Abstract.Located as A
 import qualified Data.Char as Char
 
 --------------------------------------------------------------------------------

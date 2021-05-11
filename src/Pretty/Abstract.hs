@@ -98,7 +98,7 @@ instance Pretty GdCmd where
 instance Pretty Lit where
   pretty (Num i) = pretty $ show i
   pretty (Bol b) = pretty $ show b
-  pretty (Chr c) = pretty $ show c
+  pretty (Chr c) = pretty (show c)
 
 --------------------------------------------------------------------------------
 
@@ -144,8 +144,8 @@ handleExpr _ (Subst _ _) = return "Subst"
 
 --------------------------------------------------------------------------------
 
-handleOp :: Int -> Op -> Variadic Expr (Doc ann)
-handleOp n op = case classify op of
+handleOp :: Int -> ArithOp -> Variadic Expr (Doc ann)
+handleOp n op = case classifyArithOp op of
   Infix m -> do
     p <- var
     q <- var

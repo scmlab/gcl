@@ -13,6 +13,7 @@ import Control.Monad.Except
 import Data.Loc
 import GCL.Exec.ExecMonad
 import Syntax.Abstract
+import Syntax.Abstract.Located()
 import Syntax.Common
 import Prelude hiding (Ordering (..))
 
@@ -23,17 +24,17 @@ evalExpr :: ExecMonad m => Expr -> m Val
 evalExpr (Lit v _) = return (litToVal v)
 evalExpr (Const (Name x l) _) = lookupStore l x
 evalExpr (Var (Name x l) _) = lookupStore l x
-evalExpr (Op op) = evalOp op
+evalExpr (Op op) = evalArithOp op
 evalExpr (Chain a op b _) =       -- check later
   case a of
     Chain _ _ ar _ ->
-      evalOp (Conj NoLoc) >>= \case
+      evalArithOp (Conj NoLoc) >>= \case
         VFun f1 -> evalExpr a >>= \va -> liftEither (f1 va) >>= \case
           VFun f2 -> evalExpr (Chain ar op b (ar <--> b)) >>= \varb -> liftEither (f2 varb)
           _ -> error "type error, shouldn't happen"
         _ -> error "type error, shouldn't happen"
-    _ -> 
-      evalOp op >>= \case
+    _ ->
+      evalChainOp op >>= \case
         VFun f1 -> evalExpr a >>= \va -> liftEither (f1 va) >>= \case
           VFun f2 -> evalExpr b >>= \vb -> liftEither (f2 vb)
           _ -> error "type error, shouldn't happen"
@@ -110,28 +111,30 @@ declare (LetDecl c _ _ _) = updateStore NoLoc (nameToText c) Undef
 -- Lifting primitive operators.
 -- Should these be written with dependent type, or type family?
 
-evalOp :: ExecMonad m => Op -> m Val
-evalOp (EQ _) = return (liftOp2IRel (==))
-evalOp (NEQ _) = return (liftOp2IRel (/=))
-evalOp (NEQU _) = return (liftOp2IRel (/=))
-evalOp (LT _) = return (liftOp2IRel (<))
-evalOp (LTE _) = return (liftOp2IRel (<=))
-evalOp (LTEU _) = return (liftOp2IRel (<=))
-evalOp (GTE _) = return (liftOp2IRel (>=))
-evalOp (GTEU _) = return (liftOp2IRel (>=))
-evalOp (GT _) = return (liftOp2IRel (>))
-evalOp (Implies _) = return (liftOp2Bool (\p q -> not p || q))
-evalOp (ImpliesU _) = return (liftOp2Bool (\p q -> not p || q))
-evalOp (Conj _) = return (liftOp2Bool (&&))
-evalOp (ConjU _) = return (liftOp2Bool (&&))
-evalOp (Disj _) = return (liftOp2Bool (||))
-evalOp (DisjU _) = return (liftOp2Bool (||))
-evalOp (Neg _) = return (liftOpBool not)
-evalOp (NegU _) = return (liftOpBool not)
-evalOp (Add _) = return (liftOp2Int (+))
-evalOp (Sub _) = return (liftOp2Int (-))
-evalOp (Mul _) = return (liftOp2Int (*))
-evalOp (Div l) =
+evalChainOp :: ExecMonad m => ChainOp -> m Val
+evalChainOp (EQ _) = return (liftOp2IRel (==))
+evalChainOp (NEQ _) = return (liftOp2IRel (/=))
+evalChainOp (NEQU _) = return (liftOp2IRel (/=))
+evalChainOp (LT _) = return (liftOp2IRel (<))
+evalChainOp (LTE _) = return (liftOp2IRel (<=))
+evalChainOp (LTEU _) = return (liftOp2IRel (<=))
+evalChainOp (GTE _) = return (liftOp2IRel (>=))
+evalChainOp (GTEU _) = return (liftOp2IRel (>=))
+evalChainOp (GT _) = return (liftOp2IRel (>))
+
+evalArithOp :: ExecMonad m => ArithOp -> m Val
+evalArithOp (Implies _) = return (liftOp2Bool (\p q -> not p || q))
+evalArithOp (ImpliesU _) = return (liftOp2Bool (\p q -> not p || q))
+evalArithOp (Conj _) = return (liftOp2Bool (&&))
+evalArithOp (ConjU _) = return (liftOp2Bool (&&))
+evalArithOp (Disj _) = return (liftOp2Bool (||))
+evalArithOp (DisjU _) = return (liftOp2Bool (||))
+evalArithOp (Neg _) = return (liftOpBool not)
+evalArithOp (NegU _) = return (liftOpBool not)
+evalArithOp (Add _) = return (liftOp2Int (+))
+evalArithOp (Sub _) = return (liftOp2Int (-))
+evalArithOp (Mul _) = return (liftOp2Int (*))
+evalArithOp (Div l) =
   return $
     VFun
       ( \case
@@ -147,7 +150,19 @@ evalOp (Div l) =
             )
           _ -> error "type error, shouldn't happen"
       )
-evalOp (Mod l) = return $ modVFun l
+evalArithOp (Mod l) = return $ modVFun l
+
+evalQuantOp :: ExecMonad m => QuantOp -> m Val
+evalQuantOp (Sum _) = return (liftOp2Int (+))
+evalQuantOp (Forall _) = return (liftOp2Bool (&&))
+evalQuantOp (Exists _) = return (liftOp2Bool (||))
+evalQuantOp (Max _) = return (liftOp2Bool max)
+evalQuantOp (Min _) = return (liftOp2Bool min)
+
+evalOp :: ExecMonad m => Op -> m Val
+evalOp (ChainOp op) = evalChainOp op
+evalOp (ArithOp op) = evalArithOp op
+evalOp (QuantOp op) = evalQuantOp op
 
 modVFun :: Loc -> Val
 modVFun l =

@@ -75,11 +75,11 @@ free (Var x _) = Set.singleton x
 free (Const x _) = Set.singleton x
 free (Op _) = mempty
 free (Lit _ _) = mempty
-free (Chain a op b _) = free a <> free (Op op) <> free b
+free (Chain a _ b _) = free a <> free b
 free (App e1 e2 _) = free e1 <> free e2
 free (Lam x e _) = free e \\ Set.singleton x
 free (Quant op xs range term _) =
-  (free op <> free range <> free term) \\ Set.fromList xs
+  (either (const mempty) free op <> free range <> free term) \\ Set.fromList xs
 free (Hole _) = mempty -- banacorn: `subs` has been always empty anyway
 -- concat (map freeSubst subs) -- correct?
 free (Subst e s) = (free e \\ Set.fromList (Map.keys s)) <> freeSubst s
@@ -164,8 +164,10 @@ subst env (Lam x e l) = do
   (x', e', conv) <- convLam (freeSubst env) x e
   let env' = if conv then env else subtractSubst [x] env
   Lam x' <$> subst env' e' <*> pure l
-subst env (Quant op xs range term l) = do
-  op' <- subst env op
+subst env (Quant qop xs range term l) = do
+  op' <- case qop of 
+          Left op -> return (Left op)
+          Right op -> Right <$> subst env op
   (xs', range', term') <- subLocal (freeSubst env) xs range term
   let env' = subtractSubst xs' env
   Quant op' xs' <$> subst env' range' <*> subst env' term' <*> pure l
