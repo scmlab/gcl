@@ -16,7 +16,6 @@ import qualified Data.Map as Map
 import Data.Text (Text)
 import qualified Data.Text as Text
 import Error
-import GCL.WP
 import GHC.Generics (Generic)
 import Language.LSP.Diagnostics
 import Language.LSP.Server
@@ -87,7 +86,7 @@ type ID = LspId ('CustomMethod :: Method 'FromClient 'Request)
 
 -- | Response
 data ResKind
-  = ResOK ID [PO] [Spec] [A.Expr] [StructWarning] [Element]
+  = ResOK ID [PO] [Spec] [A.Expr] [Block]
   | ResInspect [PO]
   | ResError [(Site, Error)]
   | ResUpdateSpecPositions [Loc]
@@ -99,7 +98,7 @@ data ResKind
 instance ToJSON ResKind
 
 instance Show ResKind where
-  show (ResOK i pos specs props warnings warnings') =
+  show (ResOK i pos specs props warnings) =
     "OK " <> show i <> " "
       <> show (length pos)
       <> " pos, "
@@ -109,8 +108,6 @@ instance Show ResKind where
       <> " props, "
       <> show (length warnings)
       <> " warnings"
-      <> show (length warnings')
-      <> " warnings'"
   show (ResInspect pos) = "Inspect " <> show (length pos) <> " POs"
   show (ResError errors) = "Error " <> show (length errors) <> " errors"
   show (ResUpdateSpecPositions locs) = "UpdateSpecPositions " <> show (length locs) <> " locs"

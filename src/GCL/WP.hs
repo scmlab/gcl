@@ -296,13 +296,11 @@ sweep (A.Program _ _ ds statements _) = do
 data StructWarning
   = MissingBound Loc
   | ExcessBound Loc
-  deriving (Eq, Show, Generic)
+  deriving (Eq, Show)
 
 instance Located StructWarning where
   locOf (MissingBound loc) = loc
   locOf (ExcessBound loc) = loc
-
-instance ToJSON StructWarning
 
 data StructError
   = MissingAssertion Loc

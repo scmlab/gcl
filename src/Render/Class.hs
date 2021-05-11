@@ -2,6 +2,7 @@
 
 module Render.Class
   ( Render (..),
+    RenderBlock(..)
     -- RenderTCM (..),
     -- renderM,
     -- renderP,
@@ -14,13 +15,21 @@ import Render.Element
 
 --------------------------------------------------------------------------------
 
--- | Typeclass for rendering Inline Element
+-- | Typeclass for rendering Inline Elements
 class Render a where
-  render :: a -> Element
-  renderPrec :: Int -> a -> Element
+  render :: a -> Inlines
+  renderPrec :: Int -> a -> Inlines
 
   render = renderPrec 0
   renderPrec = const render
+
+-- | Typeclass for rendering Block Elements
+class RenderBlock a where
+  renderBlock :: a -> Block
+  renderBlockPrec :: Int -> a -> Block
+
+  renderBlock = renderBlockPrec 0
+  renderBlockPrec = const renderBlock
 
 -- | Simply "pure . render"
 -- renderM :: (Applicative m, Render a) => a -> m Inlines

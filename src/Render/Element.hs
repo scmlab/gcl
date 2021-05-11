@@ -3,7 +3,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Render.Element
-  ( Element,
+  ( Block (..),
+    Inlines (..),
     space,
     text,
     text',
@@ -18,15 +19,23 @@ where
 
 import Data.Aeson (ToJSON (toJSON))
 import Data.Foldable (toList)
+import Data.Loc.Range
 import Data.Sequence (Seq (..))
 import qualified Data.Sequence as Seq
 import Data.String (IsString (..))
 import GHC.Generics (Generic)
--- import Data.Loc.Range
 
 --------------------------------------------------------------------------------
 
-type Element = Inlines
+data Block
+  = Unlabeled Inlines (Maybe String) (Maybe Range)
+  | -- headers
+    Header String
+  deriving (Eq, Generic)
+
+instance ToJSON Block 
+
+--------------------------------------------------------------------------------
 
 newtype Inlines = Inlines {unInlines :: Seq Inline}
   deriving (Eq)
@@ -63,8 +72,8 @@ instance Show Inlines where
   show (Inlines xs) = unwords $ map show $ toList xs
 
 -- | see if the rendered text is "empty"
-isEmpty :: Element -> Bool
-isEmpty element = all elemIsEmpty (Seq.viewl (unInlines element))
+isEmpty :: Inlines -> Bool
+isEmpty inlines = all elemIsEmpty (Seq.viewl (unInlines inlines))
   where
     elemIsEmpty :: Inline -> Bool
     elemIsEmpty (Icon _ _) = False
@@ -116,7 +125,6 @@ type ClassNames = [String]
 data Inline
   = Icon String ClassNames
   | Text String ClassNames
-  -- | Link Range Inlines ClassNames
   | -- | Horizontal grouping, wrap when there's no space
     Horz [Inlines]
   | -- | Vertical grouping, each children would end with a newline

@@ -27,7 +27,7 @@ import Server.Diagnostic
 import Server.ExportPO ()
 import Server.Monad
 import Syntax.Predicate (Spec (..))
-import Render (render)
+import Render
 
 -- handlers of the LSP server
 handlers :: Handlers ServerM
@@ -122,7 +122,7 @@ handlers =
                   source <- latestSource
                   -- refine (parse + sweep)
 
-                  (spec, text) <- refine source (selStart, selEnd)
+                  (spec, content) <- refine source (selStart, selEnd)
 
                   -- logM "*** SPEC CONTENT ------"
                   -- logM text
@@ -132,7 +132,7 @@ handlers =
                   case specLoc spec of
                     NoLoc -> throwError $ Others "NoLoc in ReqRefine"
                     Loc start end -> do
-                      source' <- editText (Range start end) (Text.stripStart text)
+                      source' <- editText (Range start end) (Text.stripStart content)
                       -- logM $ "*** AFTER REMOVING SPEC\n" <> source'
                       checkAndSendResponsePrim (Just (selStart, selEnd)) source'
 
@@ -151,8 +151,8 @@ handlers =
       -- when the client saved the document, store the text for later use
       notificationHandler STextDocumentDidSave $ \ntf -> do
         logText " --> TextDocumentDidSave"
-        let NotificationMessage _ _ (DidSaveTextDocumentParams (TextDocumentIdentifier uri) text) = ntf
-        case text of
+        let NotificationMessage _ _ (DidSaveTextDocumentParams (TextDocumentIdentifier uri) source') = ntf
+        case source' of
           Nothing -> pure ()
           Just source ->
             case uriToFilePath uri of
@@ -188,6 +188,6 @@ checkAndSendResponsePrim lastSelection source = do
   let filteredPOs = case lastSelection of
         Nothing -> pos
         Just sel -> filterPOs sel pos
-  let responses = [ResOK (IdInt version) filteredPOs specs globalProps warnings (map render warnings)]
+  let responses = [ResOK (IdInt version) filteredPOs specs globalProps (map renderBlock warnings)]
 
   terminate responses diagnostics
