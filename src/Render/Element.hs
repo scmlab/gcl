@@ -9,7 +9,7 @@ module Render.Element
     text,
     text',
     parens,
-    -- link,
+    link,
     icon,
     -- combinators
     (<+>),
@@ -79,7 +79,7 @@ isEmpty inlines = all elemIsEmpty (Seq.viewl (unInlines inlines))
     elemIsEmpty (Icon _ _) = False
     elemIsEmpty (Text "" _) = True
     elemIsEmpty (Text _ _) = False
-    -- elemIsEmpty (Link _ xs _) = all elemIsEmpty $ unInlines xs
+    elemIsEmpty (Link _ xs _) = all elemIsEmpty $ unInlines xs
     elemIsEmpty (Horz xs) = all isEmpty xs
     elemIsEmpty (Vert xs) = all isEmpty xs
     elemIsEmpty (Parn _) = False
@@ -112,6 +112,10 @@ parens others = Inlines $ Seq.singleton $ Parn others
 icon :: String -> Inlines
 icon s = Inlines $ Seq.singleton $ Icon s []
 
+link :: Range -> Inlines -> Inlines
+link range xs = Inlines $ Seq.singleton $ Link range xs []
+
+
 -- linkHole :: Int -> Inlines
 -- linkHole i = Inlines $ Seq.singleton $ Hole i
 
@@ -119,12 +123,11 @@ icon s = Inlines $ Seq.singleton $ Icon s []
 
 type ClassNames = [String]
 
---------------------------------------------------------------------------------
-
 -- | Internal type, to be converted to JSON values
 data Inline
   = Icon String ClassNames
   | Text String ClassNames
+  | Link Range Inlines ClassNames
   | -- | Horizontal grouping, wrap when there's no space
     Horz [Inlines]
   | -- | Vertical grouping, each children would end with a newline
@@ -140,7 +143,7 @@ instance ToJSON Inline
 instance Show Inline where
   show (Icon s _) = s
   show (Text s _) = s
-  -- show (Link _ xs _) = mconcat (map show $ toList $ unInlines xs)
+  show (Link _ xs _) = mconcat (map show $ toList $ unInlines xs)
   show (Horz xs) = unwords (map show $ toList xs)
   show (Vert xs) = unlines (map show $ toList xs)
   show (Parn x) = "(" <> show x <> ")"
