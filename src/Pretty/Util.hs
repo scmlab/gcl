@@ -15,12 +15,17 @@ import Data.Text (Text)
 import Data.Text.Prettyprint.Doc
 import qualified Data.Text.Prettyprint.Doc.Render.Text as Text
 import Prelude hiding (Ordering (..))
+import Data.Loc.Range
+
+renderStrict :: Doc ann -> Text
+renderStrict = Text.renderStrict . layoutPretty defaultLayoutOptions
+
+instance Pretty Range where
+  pretty (Range x y) = pretty $ displayPos x <> " " <> displayPos y
 
 instance Pretty Loc where
   pretty = pretty . displayLoc
 
-renderStrict :: Doc ann -> Text
-renderStrict = Text.renderStrict . layoutPretty defaultLayoutOptions
 
 --------------------------------------------------------------------------------
 
@@ -89,3 +94,4 @@ instance (PrettyPrec a, PrettyPrec b) => PrettyPrec (Either a b) where
 instance (Pretty a, Pretty b) => Pretty (Either a b) where
   pretty (Left x) = pretty x
   pretty (Right x) = pretty x
+

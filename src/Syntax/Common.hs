@@ -9,7 +9,7 @@ import Data.Text (Text)
 import GHC.Generics (Generic)
 import Data.Function (on)
 import Prelude hiding (Ordering (..))
-
+import Data.Loc.Range ()
 --------------------------------------------------------------------------------
 
 -- | Variables and stuff
@@ -136,13 +136,13 @@ instance FromJSON Op
 --------------------------------------------------------------------------------
 
 -- | Make Loc/Pos instances of FromJSON and ToJSON
-instance ToJSON Pos where
-  toJSON (Pos filepath line column offset) = toJSON (filepath, line, column, offset)
+-- instance ToJSON Pos where
+--   toJSON (Pos filepath line column offset) = toJSON (filepath, line, column, offset)
 
-instance FromJSON Pos where
-  parseJSON v = do
-    (filepath, line, column, offset) <- parseJSON v
-    return $ Pos filepath line column offset
+-- instance FromJSON Pos where
+--   parseJSON v = do
+--     (filepath, line, column, offset) <- parseJSON v
+--     return $ Pos filepath line column offset
 
 instance ToJSON Loc where
   toJSON NoLoc =

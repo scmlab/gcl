@@ -22,6 +22,10 @@ rangeStart (Range a _) = a
 rangeEnd :: Range -> Pos 
 rangeEnd (Range _ b) = b
 
+fromLoc :: Loc -> Maybe Range
+fromLoc NoLoc = Nothing 
+fromLoc (Loc x y) = Just (Range x y)
+
 -- | Calculates the distance between the two positions
 span :: Range -> Int 
 span (Range a b) = posCol b - posCol a + 1
@@ -29,6 +33,9 @@ span (Range a b) = posCol b - posCol a + 1
 -- | Compares the starting position
 instance Ord Range where 
   Range a _ `compare` Range b _ = a `compare` b
+
+instance Located Range where 
+  locOf (Range x y) = Loc x y
 
 -- | Merge two ranges by filling their gap
 instance Semigroup Range where 

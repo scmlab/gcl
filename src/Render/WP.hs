@@ -10,5 +10,5 @@ instance Render StructWarning where
 
 instance RenderBlock StructWarning where 
   renderBlock x = case x of 
-    MissingBound _loc -> Unlabeled (render x) (Just "Bound Missing") Nothing
-    ExcessBound _loc -> Unlabeled (render x) (Just "Excess Bound") Nothing
+    MissingBound range -> Unlabeled (render x) (Just "Bound Missing") (Just range)
+    ExcessBound range -> Unlabeled (render x) (Just "Excess Bound") (Just range)

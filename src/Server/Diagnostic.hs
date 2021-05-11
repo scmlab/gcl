@@ -50,8 +50,8 @@ instance ToDiagnostics TypeError where
     ]
 
 instance ToDiagnostics StructWarning where
-  toDiagnostics (MissingBound loc) = [makeWarning loc "Bound Missing" "Bound missing at the end of the assertion before the DO construct \" , bnd : ... }\""]
-  toDiagnostics (ExcessBound loc) = [makeWarning loc "Excess Bound" "Unnecessary bound annotation at this assertion"]
+  toDiagnostics (MissingBound range) = [makeWarning (locOf range) "Bound Missing" "Bound missing at the end of the assertion before the DO construct \" , bnd : ... }\""]
+  toDiagnostics (ExcessBound range) = [makeWarning (locOf range) "Excess Bound" "Unnecessary bound annotation at this assertion"]
 
 instance ToDiagnostics PO where
   toDiagnostics (PO _i _pre _post origin) = [makeWarning loc title ""]

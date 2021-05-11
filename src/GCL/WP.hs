@@ -29,6 +29,7 @@ import Syntax.Abstract
 import qualified Syntax.Abstract as A
 import qualified Syntax.Abstract.Located as A
 import Syntax.Predicate hiding (Stmt)
+import Data.Loc.Range
 
 type SM =
   ReaderT
@@ -81,7 +82,9 @@ struct True pre _ (A.Assert p l) post = do
   obligate (Assertion p l) post (AtAssertion l)
 struct False pre _ (A.Assert _ l) post = do
   obligate pre post (AtAssertion l)
-struct _ _ _ (A.LoopInvariant _ _ l) _ = throwWarning (ExcessBound l)
+struct _ _ _ (A.LoopInvariant _ _ l) _ = case fromLoc l of 
+  Nothing -> return ()
+  Just range -> throwWarning $ ExcessBound range
 struct _ pre _ (A.Assign xs es l) post = do
   let denv = assignmentEnv xs es -- E.extendSubstWithDefns (assignmentEnv xs es) ds
   post' <- runReaderT (subst denv post :: SMSubst Pred) 0
@@ -96,7 +99,9 @@ struct False pre _ (A.If gcmds _) post = do
 struct _ inv Nothing (A.Do gcmds l) post = do
   do
     -- warning user about missing "bnd"
-    throwWarning (MissingBound l)
+    case fromLoc l of 
+      Nothing -> return ()
+      Just range -> throwWarning (MissingBound range)
     -- base case
     let guards = A.getGuards gcmds
     obligate (Conjunct (inv : map (Negate . guardLoop) guards)) post (AtLoop l)
@@ -294,13 +299,13 @@ sweep (A.Program _ _ ds statements _) = do
   return (pos', specs, warnings)
 
 data StructWarning
-  = MissingBound Loc
-  | ExcessBound Loc
-  deriving (Eq, Show)
+  = MissingBound Range
+  | ExcessBound Range
+  deriving (Eq, Show, Generic)
 
 instance Located StructWarning where
-  locOf (MissingBound loc) = loc
-  locOf (ExcessBound loc) = loc
+  locOf (MissingBound range) = locOf range
+  locOf (ExcessBound range) = locOf range
 
 data StructError
   = MissingAssertion Loc

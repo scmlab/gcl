@@ -55,8 +55,6 @@ globalError e = (Global (locOf e), e)
 
 instance ToJSON Error
 
-
-
 -- | TODO: refactor this
 data Error2
   = ReportError Error
