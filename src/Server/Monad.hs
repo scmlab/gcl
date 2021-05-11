@@ -23,6 +23,7 @@ import Language.LSP.Server
 import Language.LSP.Types hiding (TextDocumentSyncClientCapabilities (..))
 import qualified Syntax.Abstract as A
 import Syntax.Predicate (Origin, PO, Spec)
+import Render
 
 --------------------------------------------------------------------------------
 
@@ -57,9 +58,9 @@ logStuff x = do
 
 -- | Logging Text
 logText :: Text -> ServerM ()
-logText text = do
+logText s = do
   chan <- lift $ asks envChan
-  liftIO $ writeChan chan text
+  liftIO $ writeChan chan s
 
 --------------------------------------------------------------------------------
 
@@ -86,7 +87,7 @@ type ID = LspId ('CustomMethod :: Method 'FromClient 'Request)
 
 -- | Response
 data ResKind
-  = ResOK ID [PO] [Spec] [A.Expr] [StructWarning]
+  = ResOK ID [PO] [Spec] [A.Expr] [StructWarning] [Element]
   | ResInspect [PO]
   | ResError [(Site, Error)]
   | ResUpdateSpecPositions [Loc]
@@ -98,7 +99,7 @@ data ResKind
 instance ToJSON ResKind
 
 instance Show ResKind where
-  show (ResOK i pos specs props warnings) =
+  show (ResOK i pos specs props warnings warnings') =
     "OK " <> show i <> " "
       <> show (length pos)
       <> " pos, "
@@ -108,6 +109,8 @@ instance Show ResKind where
       <> " props, "
       <> show (length warnings)
       <> " warnings"
+      <> show (length warnings')
+      <> " warnings'"
   show (ResInspect pos) = "Inspect " <> show (length pos) <> " POs"
   show (ResError errors) = "Error " <> show (length errors) <> " errors"
   show (ResUpdateSpecPositions locs) = "UpdateSpecPositions " <> show (length locs) <> " locs"

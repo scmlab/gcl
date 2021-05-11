@@ -27,6 +27,7 @@ import Server.Diagnostic
 import Server.ExportPO ()
 import Server.Monad
 import Syntax.Predicate (Spec (..))
+import Render (render)
 
 -- handlers of the LSP server
 handlers :: Handlers ServerM
@@ -187,6 +188,6 @@ checkAndSendResponsePrim lastSelection source = do
   let filteredPOs = case lastSelection of
         Nothing -> pos
         Just sel -> filterPOs sel pos
-  let responses = [ResOK (IdInt version) filteredPOs specs globalProps warnings]
+  let responses = [ResOK (IdInt version) filteredPOs specs globalProps warnings (map render warnings)]
 
   terminate responses diagnostics

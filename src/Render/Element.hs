@@ -22,13 +22,14 @@ import Data.Sequence (Seq (..))
 import qualified Data.Sequence as Seq
 import Data.String (IsString (..))
 import GHC.Generics (Generic)
-import Data.Loc.Range
+-- import Data.Loc.Range
 
 --------------------------------------------------------------------------------
 
 type Element = Inlines
 
 newtype Inlines = Inlines {unInlines :: Seq Inline}
+  deriving (Eq)
 
 -- Represent Inlines with String literals
 instance IsString Inlines where
@@ -62,14 +63,14 @@ instance Show Inlines where
   show (Inlines xs) = unwords $ map show $ toList xs
 
 -- | see if the rendered text is "empty"
-isEmpty :: Inlines -> Bool
-isEmpty (Inlines elems) = all elemIsEmpty (Seq.viewl elems)
+isEmpty :: Element -> Bool
+isEmpty element = all elemIsEmpty (Seq.viewl (unInlines element))
   where
     elemIsEmpty :: Inline -> Bool
     elemIsEmpty (Icon _ _) = False
     elemIsEmpty (Text "" _) = True
     elemIsEmpty (Text _ _) = False
-    elemIsEmpty (Link _ xs _) = all elemIsEmpty $ unInlines xs
+    -- elemIsEmpty (Link _ xs _) = all elemIsEmpty $ unInlines xs
     elemIsEmpty (Horz xs) = all isEmpty xs
     elemIsEmpty (Vert xs) = all isEmpty xs
     elemIsEmpty (Parn _) = False
@@ -115,7 +116,7 @@ type ClassNames = [String]
 data Inline
   = Icon String ClassNames
   | Text String ClassNames
-  | Link Range Inlines ClassNames
+  -- | Link Range Inlines ClassNames
   | -- | Horizontal grouping, wrap when there's no space
     Horz [Inlines]
   | -- | Vertical grouping, each children would end with a newline
@@ -124,14 +125,14 @@ data Inline
     Parn Inlines
   | -- | Parenthese around a Horizontal, special case
     PrHz [Inlines]
-  deriving (Generic)
+  deriving (Eq, Generic)
 
 instance ToJSON Inline
 
 instance Show Inline where
   show (Icon s _) = s
   show (Text s _) = s
-  show (Link _ xs _) = mconcat (map show $ toList $ unInlines xs)
+  -- show (Link _ xs _) = mconcat (map show $ toList $ unInlines xs)
   show (Horz xs) = unwords (map show $ toList xs)
   show (Vert xs) = unlines (map show $ toList xs)
   show (Parn x) = "(" <> show x <> ")"
