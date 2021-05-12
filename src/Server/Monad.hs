@@ -10,7 +10,6 @@ import Control.Monad.Reader
 import Data.Aeson (FromJSON, ToJSON)
 import qualified Data.Aeson as JSON
 import Data.IORef (IORef, newIORef, readIORef, writeIORef)
-import Data.Loc
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Text (Text)
@@ -85,11 +84,9 @@ type ID = LspId ('CustomMethod :: Method 'FromClient 'Request)
 
 -- | Response
 data ResKind
-  = ResOK ID [PO] [Spec] [A.Expr] [Block]
+  = ResOK ID [PO] [Spec] [Block]
   | ResInspect [PO]
   | ResDisplay [Block]
-  | ResUpdateSpecPositions [Loc]
-  | ResResolve Int -- resolves some Spec
   | ResSubstitute Int A.Expr
   | ResConsoleLog Text
   deriving (Eq, Generic)
@@ -97,20 +94,16 @@ data ResKind
 instance ToJSON ResKind
 
 instance Show ResKind where
-  show (ResOK i pos specs props warnings) =
+  show (ResOK i pos specs blocks) =
     "OK " <> show i <> " "
       <> show (length pos)
       <> " pos, "
       <> show (length specs)
       <> " specs, "
-      <> show (length props)
-      <> " props, "
-      <> show (length warnings)
-      <> " warnings"
+      <> show (length blocks)
+      <> " blocks"
   show (ResInspect pos) = "Inspect " <> show (length pos) <> " POs"
   show (ResDisplay errors) = "Display " <> show (length errors) <> " errors"
-  show (ResUpdateSpecPositions locs) = "UpdateSpecPositions " <> show (length locs) <> " locs"
-  show (ResResolve i) = "Resolve " <> show i
   show (ResSubstitute i _) = "Substitute " <> show i
   show (ResConsoleLog x) = "ConsoleLog " <> show x
 
