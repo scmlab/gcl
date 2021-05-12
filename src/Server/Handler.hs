@@ -190,7 +190,8 @@ checkAndSendResponsePrim lastSelection source = do
         Just sel -> filterPOs sel pos
   let warningsSection = if null warnings then [] else headerE "Warnings" : map renderBlock warnings
   let globalPropsSection = if null globalProps then [] else headerE "Global Properties" : map renderBlock globalProps
-  let blocks = mconcat [globalPropsSection, warningsSection]
-  let responses = [ResOK (IdInt version) filteredPOs specs blocks]
+  let specsSection = if null specs then [] else headerE "Specs" : map renderBlock specs
+  let blocks = mconcat [warningsSection, specsSection, globalPropsSection]
+  let responses = [ResOK (IdInt version) filteredPOs blocks]
 
   terminate responses diagnostics
