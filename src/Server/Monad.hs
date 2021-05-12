@@ -88,7 +88,7 @@ type ID = LspId ('CustomMethod :: Method 'FromClient 'Request)
 data ResKind
   = ResOK ID [PO] [Spec] [A.Expr] [Block]
   | ResInspect [PO]
-  | ResError [(Site, Error)]
+  | ResError [Error]
   | ResUpdateSpecPositions [Loc]
   | ResResolve Int -- resolves some Spec
   | ResSubstitute Int A.Expr

@@ -19,16 +19,6 @@ import Syntax.Predicate (Spec)
 
 --------------------------------------------------------------------------------
 
--- | Site of Error
-data Site
-  = Global Loc -- source file
-  | Local Loc Int -- spec-specific (no pun intended)
-  deriving (Eq, Show, Generic)
-
-instance ToJSON Site
-
---------------------------------------------------------------------------------
-
 -- | Error
 data Error
   = LexicalError LexicalError
@@ -46,12 +36,6 @@ instance Located Error where
   locOf (StructError e) = locOf e
   locOf (CannotReadFile _) = NoLoc
   locOf (Others _) = NoLoc
-
-localError :: Int -> Error -> (Site, Error)
-localError i e = (Local (locOf e) i, e)
-
-globalError :: Error -> (Site, Error)
-globalError e = (Global (locOf e), e)
 
 instance ToJSON Error
 
