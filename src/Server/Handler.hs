@@ -112,7 +112,8 @@ handlers =
                   -- display all POs
                   let diagnostics = concatMap toDiagnostics pos ++ concatMap toDiagnostics warnings
                   -- response with only POs in the vinicity of the cursor
-                  let responses = [ResInspect (filterPOs (selStart, selEnd) pos)]
+                  let filteredPOs = filterPOs (selStart, selEnd) pos
+                  let responses = [ResInspect (headerE "Proof Obligaitons" : map renderBlock filteredPOs)]
                   terminate responses diagnostics
 
               -- Refine
@@ -191,7 +192,8 @@ checkAndSendResponsePrim lastSelection source = do
   let warningsSection = if null warnings then [] else headerE "Warnings" : map renderBlock warnings
   let globalPropsSection = if null globalProps then [] else headerE "Global Properties" : map renderBlock globalProps
   let specsSection = if null specs then [] else headerE "Specs" : map renderBlock specs
-  let blocks = mconcat [warningsSection, specsSection, globalPropsSection]
-  let responses = [ResOK (IdInt version) filteredPOs blocks]
+  let poSection = if null filteredPOs then [] else headerE "Proof Obligations" : map renderBlock filteredPOs
+  let blocks = mconcat [warningsSection, specsSection, poSection, globalPropsSection]
+  let responses = [ResOK (IdInt version) blocks]
 
   terminate responses diagnostics

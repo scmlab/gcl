@@ -68,16 +68,8 @@ instance ToDiagnostics PO where
         AtIf l -> first2Char l
         others -> locOf others
 
-      title :: Text.Text
-      title = case origin of
-        AtAbort {} -> "Abort"
-        AtSpec {} -> "Spec"
-        AtAssignment {} -> "Assignment"
-        AtAssertion {} -> "Assertion"
-        AtIf {} -> "Conditional"
-        AtLoop {} -> "Loop Invariant"
-        AtTermination {} -> "Loop Termination"
-        AtSkip {} -> "Skip"
+      title :: Text
+      title = renderStrict $ pretty origin 
 
 makeError :: Loc -> Text -> Text -> Diagnostic
 makeError = makeDiagnostic (Just DsError)

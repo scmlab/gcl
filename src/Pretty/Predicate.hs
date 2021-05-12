@@ -70,16 +70,16 @@ instance Pretty GdCmd where
 
 --------------------------------------------------------------------------------
 
--- | ObliOrigin
+-- | Origin
 instance Pretty Origin where
-  pretty (AtAbort l) = "Abort" <+> pretty l
-  pretty (AtSkip l) = "Skip" <+> pretty l
-  pretty (AtSpec l) = "Spec" <+> pretty l
-  pretty (AtAssignment l) = "Assigment" <+> pretty l
-  pretty (AtAssertion l) = "Assertion" <+> pretty l
-  pretty (AtIf l) = "If" <+> pretty l
-  pretty (AtLoop l) = "Loop" <+> pretty l
-  pretty (AtTermination l) = "Termination" <+> pretty l
+  pretty AtAbort {} = "Abort"
+  pretty AtSkip {} = "Skip"
+  pretty AtSpec {} = "Spec"
+  pretty AtAssignment {} = "Assigment"
+  pretty AtAssertion {} = "Assertion"
+  pretty AtIf {} = "Conditional"
+  pretty AtLoop {} = "Loop Invariant"
+  pretty AtTermination {} = "Loop Termination"
 
 --------------------------------------------------------------------------------
 

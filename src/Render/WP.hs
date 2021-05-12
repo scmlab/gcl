@@ -2,8 +2,12 @@
 
 module Render.WP where
 
+import Data.Loc (locOf)
 import Data.Loc.Range (fromLoc)
+import qualified Data.Text as Text
 import GCL.WP
+import Pretty (pretty)
+import Pretty.Util (renderStrict)
 import Render.Class
 import Render.Element
 import Render.Syntax.Abstract ()
@@ -33,4 +37,9 @@ instance Render Pred where
     Bound p _ -> renderPrec n p
     Conjunct ps -> mconcat $ punctuateE " ∧ " (map render ps)
     Disjunct ps -> mconcat $ punctuateE " ∨ " (map render ps)
-    Negate p -> renderPrec n p
+    Negate p -> "¬" <+> renderPrec n p
+
+instance RenderBlock PO where
+  renderBlock (PO _ pre post origin) =
+    blockE (Just $ Text.unpack $ renderStrict $ pretty origin) (fromLoc (locOf origin)) $
+      render pre <+> "=>" <+> render post

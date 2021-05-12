@@ -84,8 +84,8 @@ type ID = LspId ('CustomMethod :: Method 'FromClient 'Request)
 
 -- | Response
 data ResKind
-  = ResOK ID [PO] [Block]
-  | ResInspect [PO]
+  = ResOK ID [Block]
+  | ResInspect [Block]
   | ResDisplay [Block]
   | ResSubstitute Int A.Expr
   | ResConsoleLog Text
@@ -94,10 +94,8 @@ data ResKind
 instance ToJSON ResKind
 
 instance Show ResKind where
-  show (ResOK i pos blocks) =
+  show (ResOK i blocks) =
     "OK " <> show i <> " "
-      <> show (length pos)
-      <> " pos, "
       <> show (length blocks)
       <> " blocks"
   show (ResInspect pos) = "Inspect " <> show (length pos) <> " POs"
