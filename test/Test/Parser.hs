@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Test.Parser where
-import Test.Util (goldenFileTest, render, parseTest, removeTrailingWhitespace)
+import Test.Util (goldenFileTest, toString, parseTest, removeTrailingWhitespace)
 import Test.Tasty (TestTree, testGroup)
 import Data.Text.Prettyprint.Doc (Pretty)
 import Syntax.Parser (Parser, runParse, pProgram, pDeclaration, pType, pExpr, pBlockDeclaration, pStmt)
@@ -24,8 +24,8 @@ expression =
       testCase "literal (True)" $ run "True",
       testCase "literal (False)" $ run "False",
       testCase "literal (Char)" $ run "'a'",
-      testCase "variable" $ run "   x",
-      testCase "constant" $ run " (X)",
+      testCase "variable" $ run "x",
+      testCase "constant" $ run "(X)",
       testCase "numeric 1" $ run "(1   \n  +  \n  (   \n   1))",
       testCase "numeric 2" $ run "A + X * Y",
       testCase "numeric 3" $ run "(A + X) * Y % 2",
@@ -85,7 +85,7 @@ type' =
     "Types"
     [ testCase "base types (Int)" $ run "Int",
       testCase "base types (Bool)" $ run "(Bool)",
-      testCase "base types (Bool)" $ run "  ((Bool))",
+      testCase "base types (Bool)" $ run "((Bool))",
       testCase "base types (Char)" $ run "Char",
       testCase "function types 1" $ run "(Char -> (Int   ))",
       testCase "function types 2" $ run "( Char →      Int) -> Int",
@@ -125,7 +125,7 @@ declaration =
       testCase "constant keyword collision 2" $ run "con Trueu : Int",
       testCase "constant keyword collision 3" $ run "con Intt : Int",
       testCase "constant keyword collision 4" $ run "con Boola : Int",
-      testCase "let binding" $ run " let  X   i  =  N  >   (0)  ",
+      testCase "let binding" $ run "let  X   i  =  N  >   (0)  ",
       testCase "block declaration 1" $ runBlock
         "{:\n\
         \   A, B : Int\n\
@@ -163,8 +163,8 @@ statement :: TestTree
 statement =
   testGroup
     "Single statement"
-    [ testCase "abort" $ run "     abort",
-      testCase "skip" $ run "  skip",
+    [ testCase "abort" $ run "abort",
+      testCase "skip" $ run "skip",
       testCase "assertion" $ run "{ \n True   }",
       testCase "assignment" $ run "x := 0",
       testCase "assignment (parallel)" $ run "x   , y  := 0    ,    1",
@@ -216,8 +216,8 @@ golden =
       parserGolden "2" "./test/source/" "2.gcl",
       parserGolden "comment" "./test/source/" "comment.gcl",
       parserGolden "issue 1" "./test/source/" "issue1.gcl",
-      parserGolden "issue 14" "./test/source/" "issue14.gcl",
-      parserGolden "no-decl" "./test/source/" "no-decl.gcl",
+      -- parserGolden "issue 14" "./test/source/" "issue14.gcl",
+      -- parserGolden "no-decl" "./test/source/" "no-decl.gcl",
       parserGolden "no-stmt" "./test/source/" "no-stmt.gcl",
       parserGolden "assign" "./test/source/" "assign.gcl",
       parserGolden "quant 1" "./test/source/" "quant1.gcl",
@@ -230,10 +230,10 @@ parserGolden name filePath fileName =
   goldenFileTest ".ast.golden" name filePath fileName runFile
 
 runFile :: (FilePath, Text) -> Text
-runFile (filePath, source) = render $ runParse pProgram filePath source
+runFile (filePath, source) = toString $ runParse pProgram filePath source
 
 parserCompare :: Pretty a => Parser a -> Text -> Text -> Assertion
-parserCompare parser actual expected = (removeTrailingWhitespace . render . parseTest parser) actual @?= removeTrailingWhitespace expected
+parserCompare parser actual expected = (removeTrailingWhitespace . toString . parseTest parser) actual @?= removeTrailingWhitespace expected
 
 parserIso :: Pretty a => Parser a -> Text -> Assertion
 parserIso parser raw = parserCompare parser raw raw
