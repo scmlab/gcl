@@ -71,38 +71,38 @@ handleExpr _ (Lit x _) = return $ render x
 handleExpr n (Op x) = handleOp n x
 handleExpr _ (Chain a op b _) = 
   return $ render a
-    <> render op
-    <> render b
+    <+> render op
+    <+> render b
 handleExpr n (App p q _) = case handleExpr n p of
   Expect f -> f q
   Complete s -> do
     t <- handleExpr n q
     -- see if the second argument is an application, apply parenthesis when needed
     return $ case q of
-      App {} -> s <> parensIf n 0 t
-      _ -> s <> t
+      App {} -> s <+> parensIf n 0 t
+      _ -> s <+> t
 handleExpr _ (Lam p q _) = return $ "λ" <+> render p <+> "→" <+> render q
 handleExpr _ (Hole _) = return "{!!}"
 handleExpr _ (Quant (Left op) xs r t _) =
   return $
     "⟨"
-      <> render op
-      <> mconcat (map render xs)
-      <> " : "
-      <> render r
-      <> " : "
-      <> render t
-      <> " ⟩"
+      <+> render op
+      <+> horzE (map render xs)
+      <+> ":"
+      <+> render r
+      <+> ":"
+      <+> render t
+      <+> "⟩"
 handleExpr _ (Quant (Right op) xs r t _) =
   return $
     "⟨"
-      <> render op
-      <> mconcat (map render xs)
-      <> " : "
-      <> render r
-      <> " : "
-      <> render t
-      <> " ⟩"
+      <+> render op
+      <+> horzE (map render xs)
+      <+> ":"
+      <+> render r
+      <+> ":"
+      <+> render t
+      <+> "⟩"
 handleExpr _ (Subst _ _) = return "Subst"
 
 --------------------------------------------------------------------------------

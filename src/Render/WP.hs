@@ -36,7 +36,7 @@ instance Render Pred where
     Assertion p _ -> renderPrec n p
     LoopInvariant p _ _ -> renderPrec n p
     Bound p _ -> renderPrec n p
-    Conjunct ps -> mconcat $ punctuateE " ∧ " (map render ps)
+    Conjunct ps -> horzE $ punctuateE " ∧ " (map render ps)
     Disjunct ps -> mconcat $ punctuateE " ∨ " (map render ps)
     Negate p -> "¬" <+> renderPrec n p
 

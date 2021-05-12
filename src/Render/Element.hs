@@ -13,6 +13,8 @@ module Render.Element
     parensE,
     linkE,
     iconE,
+    horzE, 
+    vertE,
     -- combinators
     (<+>),
     punctuateE,
@@ -141,6 +143,15 @@ iconE s = Inlines $ Seq.singleton $ Icon s []
 
 linkE :: Range -> Inlines -> Inlines
 linkE range xs = Inlines $ Seq.singleton $ Link range xs []
+
+-- | Horizontal listing
+horzE :: [Inlines] -> Inlines
+horzE = Inlines . pure . Horz
+
+-- | Vertical listing
+vertE :: [Inlines] -> Inlines
+vertE = Inlines . pure . Vert
+
 
 -- linkHole :: Int -> Inlines
 -- linkHole i = Inlines $ Seq.singleton $ Hole i
