@@ -28,6 +28,7 @@ import Server.ExportPO ()
 import Server.Monad
 import Syntax.Predicate (Spec (..))
 import Render
+import qualified Syntax.Abstract as A
 
 -- handlers of the LSP server
 handlers :: Handlers ServerM
@@ -105,17 +106,23 @@ handlers =
                 interpret effEnv $ do
                   updateLastMouseSelection (selStart, selEnd)
                   source <- savedSource
-                  -- parse + type check + sweep
                   program <- parseProgram source
-                  typeCheck program
-                  (pos, _specs, _globalProps, warnings) <- sweep program
-                  -- display all POs
-                  let diagnostics = concatMap toDiagnostics pos ++ concatMap toDiagnostics warnings
-                  -- response with only POs in the vinicity of the cursor
-                  let filteredPOs = filterPOs (selStart, selEnd) pos
-                  version <- bumpVersion
-                  let responses = [ResDisplay version (headerE "Proof Obligaitons" : map renderBlock filteredPOs)]
-                  terminate responses diagnostics
+
+                  -- typeCheck program
+                  -- (pos, _specs, _globalProps, warnings) <- sweep program
+                  -- -- display all POs
+                  -- let diagnostics = concatMap toDiagnostics pos ++ concatMap toDiagnostics warnings
+                  -- -- response with only POs in the vinicity of the cursor
+                  -- let filteredPOs = filterPOs (selStart, selEnd) pos
+                  -- version <- bumpVersion
+
+
+
+                  -- let responses = [ResDisplay version (headerE "Proof Obligaitons" : map renderBlock filteredPOs)]
+                  -- terminate responses diagnostics
+
+                  -- parse + type check + sweep
+                  temp program (Just (selStart, selEnd))
 
               -- Refine
               ReqRefine selStart selEnd -> do
@@ -179,22 +186,27 @@ handlers =
               checkAndSendResponsePrim lastSelection source
     ]
 
--- parse + type check + sweep
-checkAndSendResponsePrim :: Maybe (Int, Int) -> Text -> EffM ()
-checkAndSendResponsePrim lastSelection source = do
-  version <- bumpVersion
-  program <- parseProgram source
-  typeCheck program
-  (pos, specs, globalProps, warnings) <- sweep program
-  let diagnostics = concatMap toDiagnostics pos ++ concatMap toDiagnostics warnings
+temp :: A.Program -> Maybe (Int, Int) -> EffM ()
+temp program lastSelection = do 
+  (pos, _specs, globalProps, warnings) <- sweep program
   let filteredPOs = case lastSelection of
         Nothing -> pos
         Just sel -> filterPOs sel pos
   let warningsSection = if null warnings then [] else headerE "Warnings" : map renderBlock warnings
   let globalPropsSection = if null globalProps then [] else headerE "Global Properties" : map renderBlock globalProps
-  let specsSection = if null specs then [] else headerE "Specs" : map renderBlock specs
+  -- let specsSection = if null specs then [] else headerE "Specs" : map renderBlock specs
   let poSection = if null filteredPOs then [] else headerE "Proof Obligations" : map renderBlock filteredPOs
-  let blocks = mconcat [warningsSection, specsSection, poSection, globalPropsSection]
+  let blocks = mconcat [warningsSection, poSection, globalPropsSection]
+
+  version <- bumpVersion
   let responses = [ResDisplay version blocks]
+  let diagnostics = concatMap toDiagnostics pos ++ concatMap toDiagnostics warnings
 
   terminate responses diagnostics
+
+-- parse + type check + sweep
+checkAndSendResponsePrim :: Maybe (Int, Int) -> Text -> EffM ()
+checkAndSendResponsePrim lastSelection source = do
+  program <- parseProgram source
+  typeCheck program
+  temp program lastSelection

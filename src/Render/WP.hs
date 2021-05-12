@@ -2,8 +2,7 @@
 
 module Render.WP where
 
-import Data.Loc (locOf)
-import Data.Loc.Range (fromLoc)
+-- import Data.Loc (locOf)
 import qualified Data.Text as Text
 import GCL.WP
 import Pretty (pretty)
@@ -23,9 +22,11 @@ instance RenderBlock StructWarning where
     ExcessBound range -> blockE (Just "Excess Bound") (Just range) (render x)
 
 instance RenderBlock Spec where
-  renderBlock (Specification _ pre post loc) =
-    blockE Nothing (fromLoc loc) $
-      render pre <+> "=>" <+> render post
+  renderBlock (Specification _ pre post _loc) =
+    proofObligationE
+      Nothing
+      (render pre)
+      (render post)
 
 instance Render Pred where
   renderPrec n x = case x of
@@ -41,5 +42,7 @@ instance Render Pred where
 
 instance RenderBlock PO where
   renderBlock (PO _ pre post origin) =
-    blockE (Just $ Text.unpack $ renderStrict $ pretty origin) (fromLoc (locOf origin)) $
-      render pre <+> "=>" <+> render post
+    proofObligationE
+      (Just $ Text.unpack $ renderStrict $ pretty origin)
+      (render pre)
+      (render post)

@@ -5,6 +5,7 @@
 module Render.Element
   ( Block,
     blockE,
+    proofObligationE,
     headerE,
     Inlines (..),
     textE,
@@ -24,35 +25,43 @@ import Data.Loc.Range
 import Data.Sequence (Seq (..))
 import qualified Data.Sequence as Seq
 import Data.String (IsString (..))
-import GHC.Generics (Generic)
-import Data.Text.Prettyprint.Doc (Pretty(..))
 import Data.Text (Text)
 import qualified Data.Text as Text
+import Data.Text.Prettyprint.Doc (Pretty (..))
+import GHC.Generics (Generic)
 
 --------------------------------------------------------------------------------
 
 data Block
-  = Unlabeled Inlines (Maybe String) (Maybe Range)
-  | -- headers
+  = -- header + body
+    Block (Maybe String) (Maybe Range) Inlines
+  | -- precondition + post-condition
+    PO (Maybe String) Inlines Inlines
+  | -- "naked" header
     Header String
   deriving (Eq, Generic)
 
 -- Represent Block with String literals
 instance IsString Block where
-  fromString s = Unlabeled (fromString s) Nothing Nothing
+  fromString s = Block Nothing Nothing (fromString s)
 
-instance Show Block where 
-  show (Unlabeled body Nothing range) = show body <> "\nat " <> show range 
-  show (Unlabeled body (Just header) range) = "## " <> header <> "\n\n" <> show body <> "\nat " <> show range 
+instance Show Block where
+  show (Block Nothing range body) = show body <> "\nat " <> show range
+  show (Block (Just header) range body) = "## " <> header <> "\n\n" <> show body <> "\nat " <> show range
+  show (PO Nothing pre post) = show pre <> "\n=>\n" <> show post
+  show (PO (Just header) pre post) = "# " <> header <> "\n\n" <> show pre <> "\n=>\n" <> show post
   show (Header header) = "# " <> header
 
-instance Pretty Block where 
-  pretty = pretty . show 
+instance Pretty Block where
+  pretty = pretty . show
 
-instance ToJSON Block 
+instance ToJSON Block
 
 blockE :: Maybe String -> Maybe Range -> Inlines -> Block
-blockE header range body = Unlabeled body header range 
+blockE = Block
+
+proofObligationE :: Maybe String -> Inlines -> Inlines -> Block
+proofObligationE = PO
 
 headerE :: String -> Block
 headerE = Header
@@ -132,7 +141,6 @@ iconE s = Inlines $ Seq.singleton $ Icon s []
 
 linkE :: Range -> Inlines -> Inlines
 linkE range xs = Inlines $ Seq.singleton $ Link range xs []
-
 
 -- linkHole :: Int -> Inlines
 -- linkHole i = Inlines $ Seq.singleton $ Hole i
