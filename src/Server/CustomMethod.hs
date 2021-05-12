@@ -75,12 +75,21 @@ runEffM env p = evalState (runReaderT (runExceptT (runFreeT p)) env) DiffMap.emp
 
 handleErrors :: FilePath -> Maybe Responder -> [Error] -> ServerM ()
 handleErrors filepath responder errors = do
-  let responses = [ResDisplay (headerE "Errors" : map renderBlock errors)]
+  version <- bumpVersionM
+  -- (IdInt version) 
+  let responses = [ResDisplay version (headerE "Errors" : map renderBlock errors)]
   let diagnostics = errors >>= toDiagnostics
   -- send diagnostics
   sendDiagnostics filepath diagnostics
   -- send responses
   sendResponses filepath responder responses
+
+bumpVersionM :: ServerM Int 
+bumpVersionM = do 
+  ref <- lift $ asks envCounter
+  n <- liftIO $ readIORef ref
+  liftIO $ writeIORef ref (succ n)
+  return n
 
 interpret :: EffEnv -> EffM () -> ServerM ()
 interpret env@(EffEnv filepath responder) p = case runEffM env p of
@@ -113,7 +122,8 @@ interpret env@(EffEnv filepath responder) p = case runEffM env p of
     mapping <- liftIO $ readIORef ref
     let result = fst <$> Map.lookup filepath mapping
     case result of
-      Nothing -> handleErrors filepath responder [CannotReadFile filepath]
+      Nothing -> do 
+        handleErrors filepath responder [CannotReadFile filepath]
       Just source -> do
         logText "ReadSavedSource"
         interpret env (next source)
@@ -138,9 +148,7 @@ interpret env@(EffEnv filepath responder) p = case runEffM env p of
     liftIO $ modifyIORef' ref (Map.update (\(source, _) -> Just (source, Just selection)) filepath)
     interpret env next
   Right (Free (BumpResponseVersion next)) -> do
-    ref <- lift $ asks envCounter
-    n <- liftIO $ readIORef ref
-    liftIO $ writeIORef ref (succ n)
+    n <- bumpVersionM
     interpret env (next n)
   Right (Free (Log text next)) -> do
     logText text
@@ -190,7 +198,7 @@ interpret2 p = case runEffM (EffEnv "<test>" Nothing) p of
     tell [EffTerminate responses diagnostics]
     return Nothing
   Left errors -> do
-    let responses = [ResDisplay (headerE "Errors" : map renderBlock errors)]
+    let responses = [ResDisplay 0 (headerE "Errors" : map renderBlock errors)]
     let diagnostics = errors >>= toDiagnostics
     tell [EffTerminate responses diagnostics]
     return Nothing

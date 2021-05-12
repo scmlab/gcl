@@ -18,9 +18,9 @@ import GHC.Generics (Generic)
 import Language.LSP.Diagnostics
 import Language.LSP.Server
 import Language.LSP.Types hiding (TextDocumentSyncClientCapabilities (..))
+import Render
 import qualified Syntax.Abstract as A
 import Syntax.Predicate (Origin, PO, Spec)
-import Render
 
 --------------------------------------------------------------------------------
 
@@ -80,13 +80,9 @@ sendResponses filepath responder responses = do
 
 --------------------------------------------------------------------------------
 
-type ID = LspId ('CustomMethod :: Method 'FromClient 'Request)
-
 -- | Response
 data ResKind
-  = ResOK ID [Block]
-  | ResInspect [Block]
-  | ResDisplay [Block]
+  = ResDisplay Int [Block]
   | ResSubstitute Int A.Expr
   | ResConsoleLog Text
   deriving (Eq, Generic)
@@ -94,12 +90,11 @@ data ResKind
 instance ToJSON ResKind
 
 instance Show ResKind where
-  show (ResOK i blocks) =
+  show (ResDisplay i blocks) =
     "OK " <> show i <> " "
       <> show (length blocks)
       <> " blocks"
-  show (ResInspect pos) = "Inspect " <> show (length pos) <> " POs"
-  show (ResDisplay errors) = "Display " <> show (length errors) <> " errors"
+  -- show (ResDisplay errors) = "Display " <> show (length errors) <> " errors"
   show (ResSubstitute i _) = "Substitute " <> show i
   show (ResConsoleLog x) = "ConsoleLog " <> show x
 
