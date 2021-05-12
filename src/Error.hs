@@ -13,8 +13,7 @@ import GCL.WP (StructError)
 import GHC.Generics
 import Syntax.Parser.Util ( SyntacticError )
 import Syntax.Common ()
-import Data.Text (Text)
-import Syntax.Predicate (Spec)
+import Render (Block)
 
 --------------------------------------------------------------------------------
 
@@ -24,7 +23,7 @@ data Error
   | TypeError TypeError
   | StructError StructError
   | CannotReadFile FilePath
-  | Others Text
+  | Others Block
   deriving (Eq, Show, Generic)
 
 instance Located Error where
@@ -35,10 +34,3 @@ instance Located Error where
   locOf (Others _) = NoLoc
 
 instance ToJSON Error
-
--- | TODO: refactor this
-data Error2
-  = ReportError Error
-  | DigHole Loc
-  | RefineSpec Spec Text
-  deriving (Show, Eq)

@@ -3,17 +3,18 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Render.Element
-  ( Block (..),
+  ( Block,
+    blockE,
+    headerE,
     Inlines (..),
-    space,
-    text,
-    text',
-    parens,
-    link,
-    icon,
+    textE,
+    textE',
+    parensE,
+    linkE,
+    iconE,
     -- combinators
     (<+>),
-    punctuate,
+    punctuateE,
   )
 where
 
@@ -24,6 +25,7 @@ import Data.Sequence (Seq (..))
 import qualified Data.Sequence as Seq
 import Data.String (IsString (..))
 import GHC.Generics (Generic)
+import Data.Text.Prettyprint.Doc (Pretty(..))
 
 --------------------------------------------------------------------------------
 
@@ -33,7 +35,25 @@ data Block
     Header String
   deriving (Eq, Generic)
 
+-- Represent Block with String literals
+instance IsString Block where
+  fromString s = Unlabeled (fromString s) Nothing Nothing
+
+instance Show Block where 
+  show (Unlabeled body Nothing range) = show body <> "\nat " <> show range 
+  show (Unlabeled body (Just header) range) = "## " <> header <> "\n\n" <> show body <> "\nat " <> show range 
+  show (Header header) = "# " <> header
+
+instance Pretty Block where 
+  pretty = pretty . show 
+
 instance ToJSON Block 
+
+blockE :: Maybe String -> Maybe Range -> Inlines -> Block
+blockE header range body = Unlabeled body header range 
+
+headerE :: String -> Block
+headerE = Header
 
 --------------------------------------------------------------------------------
 
@@ -93,27 +113,23 @@ x <+> y
   | isEmpty y = x
   | otherwise = x <> " " <> y
 
--- | Whitespace
-space :: Inlines
-space = " "
-
-text :: String -> Inlines
-text s = Inlines $ Seq.singleton $ Text s mempty
+textE :: String -> Inlines
+textE s = Inlines $ Seq.singleton $ Text s mempty
 
 -- | `text` with `ClassNames`
-text' :: ClassNames -> String -> Inlines
-text' cs s = Inlines $ Seq.singleton $ Text s cs
+textE' :: ClassNames -> String -> Inlines
+textE' cs s = Inlines $ Seq.singleton $ Text s cs
 
 -- When there's only 1 Horz inside a Parn, convert it to PrHz
-parens :: Inlines -> Inlines
-parens (Inlines (Horz xs :<| Empty)) = Inlines $ Seq.singleton $ PrHz xs
-parens others = Inlines $ Seq.singleton $ Parn others
+parensE :: Inlines -> Inlines
+parensE (Inlines (Horz xs :<| Empty)) = Inlines $ Seq.singleton $ PrHz xs
+parensE others = Inlines $ Seq.singleton $ Parn others
 
-icon :: String -> Inlines
-icon s = Inlines $ Seq.singleton $ Icon s []
+iconE :: String -> Inlines
+iconE s = Inlines $ Seq.singleton $ Icon s []
 
-link :: Range -> Inlines -> Inlines
-link range xs = Inlines $ Seq.singleton $ Link range xs []
+linkE :: Range -> Inlines -> Inlines
+linkE range xs = Inlines $ Seq.singleton $ Link range xs []
 
 
 -- linkHole :: Int -> Inlines
@@ -152,8 +168,8 @@ instance Show Inline where
 --------------------------------------------------------------------------------
 
 -- | Utilities / Combinators
-punctuate :: Inlines -> [Inlines] -> [Inlines]
-punctuate _ [] = []
-punctuate delim xs = zipWith (<>) xs (replicate (length xs - 1) delim ++ [mempty])
+punctuateE :: Inlines -> [Inlines] -> [Inlines]
+punctuateE _ [] = []
+punctuateE delim xs = zipWith (<>) xs (replicate (length xs - 1) delim ++ [mempty])
 
 --------------------------------------------------------------------------------

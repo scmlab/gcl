@@ -43,13 +43,13 @@ class RenderBlock a where
 
 -- | Other instances of Render
 instance Render Int where
-  render = text . show
+  render = textE . show
 
 instance Render Integer where
-  render = text . show
+  render = textE . show
 
 instance Render Bool where
-  render = text . show
+  render = textE . show
 
 -- instance Render Doc where
 --   render = text . Doc.renderStrict . Doc.pretty

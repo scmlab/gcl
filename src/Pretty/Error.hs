@@ -41,9 +41,3 @@ instance Pretty TypeError where
     "Recursive type variable: " <+> pretty v <+> "in" <+> pretty a
   pretty (NotFunction a _) =
     "The type" <+> pretty a <+> "is not a function type"
-
--- | Error2
-instance Pretty Error2 where
-  pretty (ReportError err) = "ReportError " <+> pretty err
-  pretty (DigHole err) = "DigHole " <+> pretty err
-  pretty (RefineSpec spec text) = "RefineSpec " <+> pretty spec <+> pretty text
