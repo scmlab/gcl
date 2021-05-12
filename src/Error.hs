@@ -12,7 +12,6 @@ import GCL.Type (TypeError)
 import GCL.WP (StructError)
 import GHC.Generics
 import Syntax.Parser.Util ( SyntacticError )
-import Syntax.Parser.Lexer (LexicalError)
 import Syntax.Common ()
 import Data.Text (Text)
 import Syntax.Predicate (Spec)
@@ -21,8 +20,7 @@ import Syntax.Predicate (Spec)
 
 -- | Error
 data Error
-  = LexicalError LexicalError
-  | SyntacticError [SyntacticError]
+  = SyntacticError [SyntacticError]
   | TypeError TypeError
   | StructError StructError
   | CannotReadFile FilePath
@@ -30,7 +28,6 @@ data Error
   deriving (Eq, Show, Generic)
 
 instance Located Error where
-  locOf (LexicalError pos) = Loc pos pos
   locOf (SyntacticError es) = foldl (\l (m, _) -> l <--> m) NoLoc es
   locOf (TypeError e) = locOf e
   locOf (StructError e) = locOf e

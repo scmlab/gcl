@@ -23,7 +23,6 @@ instance ToDiagnostics StructError where
   toDiagnostics (MissingPostcondition loc) = [makeError loc "Postcondition Missing" "The last statement of the program should be an assertion"]
 
 instance ToDiagnostics Error where
-  toDiagnostics (LexicalError pos) = [makeError (Loc pos pos) "Lexical error" ""]
   toDiagnostics (SyntacticError errs) = map (\(loc, msg) -> makeError loc "Syntax error" (Text.pack msg)) errs
   toDiagnostics (StructError err) = toDiagnostics err
   toDiagnostics (TypeError err) = toDiagnostics err

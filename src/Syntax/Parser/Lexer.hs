@@ -20,7 +20,6 @@ import Syntax.Common
 import Syntax.Parser.Token
 import Syntax.Parser.Util
 
-type LexicalError = Pos
 type Lexer = Parsec Void Text
 type LexerF = ParseFunc Lexer
 
