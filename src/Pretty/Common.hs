@@ -8,8 +8,9 @@ import Syntax.Parser.Token
 
 
 -- | Name
--- instance Pretty Name where
---   pretty = toDoc . prettyWithLoc
+instance Pretty Name where
+  pretty = toDoc . prettyWithLoc
+  
 instance PrettyWithLoc Name where
   prettyWithLoc (Name n l) = fromDoc l (pretty n)
 

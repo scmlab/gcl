@@ -59,7 +59,8 @@ fromDoc NoLoc _ = Empty
 fromDoc (Loc a b) x = DocWithLoc x a b
 
 toDoc :: DocWithLoc ann -> Doc ann
-toDoc (DocWithLoc d a _) = fillGap (Pos (posFile a) 1 0 0) a <> d
+-- toDoc (DocWithLoc d a _) = fillGap (Pos (posFile a) 1 0 0) a <> d
+toDoc (DocWithLoc d _ _) = d
 toDoc Empty = mempty 
 
 -- generates newlines and spaces to fill the gap between to Pos

@@ -55,12 +55,6 @@ instance Pretty Declaration where
 
 --------------------------------------------------------------------------------
 
--- | Name
-instance Pretty Name where
-  pretty (Name n _) = pretty n
-
---------------------------------------------------------------------------------
-
 -- | Stmt
 instance Pretty Stmt where
   pretty (Skip _) = "skip"
