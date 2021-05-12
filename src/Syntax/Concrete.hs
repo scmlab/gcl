@@ -132,6 +132,7 @@ data Expr
   deriving (Eq, Show, Generic)
 
 type QuantOp' = Either Op Expr
+
 --------------------------------------------------------------------------------
 
 -- | Literals (Integer / Boolean / Character)

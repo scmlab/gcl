@@ -3,15 +3,19 @@
 
 module Render.Class
   ( Render (..),
-    RenderBlock(..)
+    RenderBlock(..), 
+    tempHandleLoc,
+    renderLocatedAndPrettified
   )
 where
 
 import Render.Element
-import Data.Text.Prettyprint.Doc (Doc)
 import qualified Pretty.Util as Doc
 import qualified Data.Text as Text
 import Data.Text (Text)
+import Data.Loc (Loc, Located (locOf))
+import Pretty
+import Data.Loc.Range (fromLoc)
 
 --------------------------------------------------------------------------------
 
@@ -31,13 +35,15 @@ class RenderBlock a where
   renderBlock = renderBlockPrec 0
   renderBlockPrec = const renderBlock
 
--- | Simply "pure . render"
--- renderM :: (Applicative m, Render a) => a -> m Inlines
--- renderM = pure . render
+--------------------------------------------------------------------------------
 
--- | Render instances of Pretty
--- renderP :: (Applicative m, Doc.Pretty a) => a -> m Inlines
--- renderP = pure . text . Doc.renderStrict . Doc.pretty
+tempHandleLoc :: Loc -> Inlines -> Inlines 
+tempHandleLoc loc t = case fromLoc loc of 
+  Nothing -> t 
+  Just range -> linkE range t 
+
+renderLocatedAndPrettified :: (Located a, Pretty a) => a -> Inlines 
+renderLocatedAndPrettified x = tempHandleLoc (locOf x) (render $ pretty x) 
 
 --------------------------------------------------------------------------------
 

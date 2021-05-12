@@ -6,10 +6,10 @@ import Data.Loc.Range
 import Error
 import GCL.Type (TypeError (..))
 import GCL.WP (StructError (..))
-import Pretty hiding ((<+>))
 import Render.Class
 import Render.Element
 import Render.Syntax.Common ()
+import Render.Syntax.Abstract ()
 
 instance RenderBlock Error where
   renderBlock (SyntacticError (loc, msg)) = blockE (Just "Parse Error") (fromLoc loc) (render msg)
@@ -24,16 +24,16 @@ instance RenderBlock TypeError where
       render name <+> "is not in scope"
   renderBlock (UnifyFailed s t loc) =
     blockE (Just "Cannot unify types") (fromLoc loc) $
-      "Cannot unify: " <> render (pretty s)
-        <> "\nwith        :" <+> render (pretty t)
+      "Cannot unify: " <> render s
+        <> "\nwith        :" <+> render t
   renderBlock (RecursiveType name t loc) =
     blockE (Just "Recursive type variable") (fromLoc loc) $
       render name
         <+> "is recursive in"
-        <+> render (pretty t)
+        <+> render t
   renderBlock (NotFunction t loc) =
     blockE (Just "Not a function") (fromLoc loc) $
-      "The type" <+> render (pretty t) <+> "is not a function type"
+      "The type" <+> render t <+> "is not a function type"
 
 instance RenderBlock StructError where
   renderBlock (MissingAssertion loc) =
