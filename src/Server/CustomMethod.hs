@@ -75,7 +75,7 @@ runEffM env p = evalState (runReaderT (runExceptT (runFreeT p)) env) DiffMap.emp
 
 handleErrors :: FilePath -> Maybe Responder -> [Error] -> ServerM ()
 handleErrors filepath responder errors = do
-  let responses = [ResError (headerE "Errors" : map renderBlock errors)]
+  let responses = [ResDisplay (headerE "Errors" : map renderBlock errors)]
   let diagnostics = errors >>= toDiagnostics
   -- send diagnostics
   sendDiagnostics filepath diagnostics
@@ -190,7 +190,7 @@ interpret2 p = case runEffM (EffEnv "<test>" Nothing) p of
     tell [EffTerminate responses diagnostics]
     return Nothing
   Left errors -> do
-    let responses = [ResError (headerE "Errors" : map renderBlock errors)]
+    let responses = [ResDisplay (headerE "Errors" : map renderBlock errors)]
     let diagnostics = errors >>= toDiagnostics
     tell [EffTerminate responses diagnostics]
     return Nothing
