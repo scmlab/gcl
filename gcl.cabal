@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 573c277c6d3413f96a13facca3687101c8acfea9a4e4bf72bda25e8c8c0ac093
+-- hash: ce69d3d388d9f9c4ec5f0bc31ac27e0fe0f3d1db2bca11a25c439790ae94f877
 
 name:           gcl
 version:        0.1.0.0
@@ -43,6 +43,7 @@ library
       Render.Class
       Render.Element
       Render.Error
+      Render.Syntax.Common
       Render.WP
       Server
       Server.CustomMethod
@@ -154,6 +155,7 @@ test-suite gcl-test
       Render.Class
       Render.Element
       Render.Error
+      Render.Syntax.Common
       Render.WP
       Server
       Server.CustomMethod

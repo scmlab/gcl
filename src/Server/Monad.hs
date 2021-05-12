@@ -15,7 +15,6 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Text (Text)
 import qualified Data.Text as Text
-import Error
 import GHC.Generics (Generic)
 import Language.LSP.Diagnostics
 import Language.LSP.Server
@@ -88,7 +87,7 @@ type ID = LspId ('CustomMethod :: Method 'FromClient 'Request)
 data ResKind
   = ResOK ID [PO] [Spec] [A.Expr] [Block]
   | ResInspect [PO]
-  | ResError [Error]
+  | ResError [Block]
   | ResUpdateSpecPositions [Loc]
   | ResResolve Int -- resolves some Spec
   | ResSubstitute Int A.Expr

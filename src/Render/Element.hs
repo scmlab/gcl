@@ -26,6 +26,8 @@ import qualified Data.Sequence as Seq
 import Data.String (IsString (..))
 import GHC.Generics (Generic)
 import Data.Text.Prettyprint.Doc (Pretty(..))
+import Data.Text (Text)
+import qualified Data.Text as Text
 
 --------------------------------------------------------------------------------
 
@@ -62,7 +64,7 @@ newtype Inlines = Inlines {unInlines :: Seq Inline}
 
 -- Represent Inlines with String literals
 instance IsString Inlines where
-  fromString s = Inlines (Seq.singleton (Text s mempty))
+  fromString s = Inlines (Seq.singleton (Text (Text.pack s) mempty))
 
 instance Semigroup Inlines where
   Inlines as <> Inlines bs = Inlines (merge as bs)
@@ -113,11 +115,11 @@ x <+> y
   | isEmpty y = x
   | otherwise = x <> " " <> y
 
-textE :: String -> Inlines
+textE :: Text -> Inlines
 textE s = Inlines $ Seq.singleton $ Text s mempty
 
 -- | `text` with `ClassNames`
-textE' :: ClassNames -> String -> Inlines
+textE' :: ClassNames -> Text -> Inlines
 textE' cs s = Inlines $ Seq.singleton $ Text s cs
 
 -- When there's only 1 Horz inside a Parn, convert it to PrHz
@@ -142,7 +144,7 @@ type ClassNames = [String]
 -- | Internal type, to be converted to JSON values
 data Inline
   = Icon String ClassNames
-  | Text String ClassNames
+  | Text Text ClassNames
   | Link Range Inlines ClassNames
   | -- | Horizontal grouping, wrap when there's no space
     Horz [Inlines]
@@ -158,7 +160,7 @@ instance ToJSON Inline
 
 instance Show Inline where
   show (Icon s _) = s
-  show (Text s _) = s
+  show (Text s _) = Text.unpack s
   show (Link _ xs _) = mconcat (map show $ toList $ unInlines xs)
   show (Horz xs) = unwords (map show $ toList xs)
   show (Vert xs) = unlines (map show $ toList xs)

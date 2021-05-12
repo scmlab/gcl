@@ -1,17 +1,17 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE FlexibleInstances #-}
 
 module Render.Class
   ( Render (..),
     RenderBlock(..)
-    -- RenderTCM (..),
-    -- renderM,
-    -- renderP,
-    -- renderA,
-    -- renderATop,
   )
 where
 
 import Render.Element
+import Data.Text.Prettyprint.Doc (Doc)
+import qualified Pretty.Util as Doc
+import qualified Data.Text as Text
+import Data.Text (Text)
 
 --------------------------------------------------------------------------------
 
@@ -42,17 +42,23 @@ class RenderBlock a where
 --------------------------------------------------------------------------------
 
 -- | Other instances of Render
+instance Render String where
+  render = textE . Text.pack
+
+instance Render Text where
+  render = textE
+
 instance Render Int where
-  render = textE . show
+  render = render . show
 
 instance Render Integer where
-  render = textE . show
+  render = render . show
 
 instance Render Bool where
-  render = textE . show
+  render = render . show
 
--- instance Render Doc where
---   render = text . Doc.renderStrict . Doc.pretty
+instance Render (Doc ann) where
+  render = textE . Doc.renderStrict
 
 -- instance Render a => Render [a] where
 --   render xs = "[" <> Inlines $ pure $ Horz (punctuate "," (map render xs)) <> "]"
