@@ -130,7 +130,7 @@ handlers =
 
                   -- remove the Spec
                   case specLoc spec of
-                    NoLoc -> throwError $ Others "NoLoc in ReqRefine"
+                    NoLoc -> throwError [Others "NoLoc in ReqRefine"]
                     Loc start end -> do
                       source' <- editText (Range start end) (Text.stripStart content)
                       -- logM $ "*** AFTER REMOVING SPEC\n" <> source'

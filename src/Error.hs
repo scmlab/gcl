@@ -13,21 +13,20 @@ import GCL.WP (StructError)
 import GHC.Generics
 import Syntax.Parser.Util ( SyntacticError )
 import Syntax.Common ()
-import Render (Block)
 
 --------------------------------------------------------------------------------
 
 -- | Error
 data Error
-  = SyntacticError [SyntacticError]
+  = SyntacticError SyntacticError
   | TypeError TypeError
   | StructError StructError
   | CannotReadFile FilePath
-  | Others Block
+  | Others String
   deriving (Eq, Show, Generic)
 
 instance Located Error where
-  locOf (SyntacticError es) = foldl (\l (m, _) -> l <--> m) NoLoc es
+  locOf (SyntacticError (l, _)) = l
   locOf (TypeError e) = locOf e
   locOf (StructError e) = locOf e
   locOf (CannotReadFile _) = NoLoc

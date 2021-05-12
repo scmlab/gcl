@@ -67,15 +67,15 @@ data EffEnv = EffEnv
     effEnvResponder :: Maybe Responder
   }
 
-type EffM = FreeT Eff (ExceptT Error (ReaderT EffEnv (State DiffMap)))
+type EffM = FreeT Eff (ExceptT [Error] (ReaderT EffEnv (State DiffMap)))
 
-runEffM :: EffEnv -> EffM a -> Either Error (FreeF Eff a (EffM a))
+runEffM :: EffEnv -> EffM a -> Either [Error] (FreeF Eff a (EffM a))
 runEffM env p = evalState (runReaderT (runExceptT (runFreeT p)) env) DiffMap.empty
 
-handleError :: FilePath -> Maybe Responder -> Error -> ServerM ()
-handleError filepath responder err = do
-  let responses = [ResError [err]]
-  let diagnostics = toDiagnostics err
+handleErrors :: FilePath -> Maybe Responder -> [Error] -> ServerM ()
+handleErrors filepath responder errors = do
+  let responses = [ResError errors]
+  let diagnostics = errors >>= toDiagnostics
   -- send diagnostics
   sendDiagnostics filepath diagnostics
   -- send responses
@@ -112,7 +112,7 @@ interpret env@(EffEnv filepath responder) p = case runEffM env p of
     mapping <- liftIO $ readIORef ref
     let result = fst <$> Map.lookup filepath mapping
     case result of
-      Nothing -> handleError filepath responder (CannotReadFile filepath)
+      Nothing -> handleErrors filepath responder [CannotReadFile filepath]
       Just source -> do
         logText "ReadSavedSource"
         interpret env (next source)
@@ -123,7 +123,7 @@ interpret env@(EffEnv filepath responder) p = case runEffM env p of
   Right (Free (ReadLatestSource next)) -> do
     result <- fmap VFS.virtualFileText <$> getVirtualFile (toNormalizedUri (filePathToUri filepath))
     case result of
-      Nothing -> handleError filepath responder (CannotReadFile filepath)
+      Nothing -> handleErrors filepath responder [CannotReadFile filepath]
       Just source -> do
         logText "ReadLatestSource"
         interpret env (next source)
@@ -149,9 +149,9 @@ interpret env@(EffEnv filepath responder) p = case runEffM env p of
     sendDiagnostics filepath diagnostics
     -- send responses
     sendResponses filepath responder responses
-  Left err -> do
-    logStuff err
-    handleError filepath responder err
+  Left errors -> do
+    logStuff errors
+    handleErrors filepath responder errors
 
 
 runTest :: EffM a -> (Maybe a, [EffKind])
@@ -188,9 +188,9 @@ interpret2 p = case runEffM (EffEnv "<test>" Nothing) p of
     -- undefined 
     tell [EffTerminate responses diagnostics]
     return Nothing
-  Left err -> do
-    let responses = [ResError [err]]
-    let diagnostics = toDiagnostics err
+  Left errors -> do
+    let responses = [ResError errors]
+    let diagnostics = errors >>= toDiagnostics
     tell [EffTerminate responses diagnostics]
     return Nothing
 
@@ -237,7 +237,7 @@ refine :: Text -> (Int, Int) -> EffM (Spec, Text)
 refine source (start, end) = do
   result <- findPointedSpec
   case result of
-    Nothing -> throwError $ Others "Please place the cursor in side a Spec to refine it"
+    Nothing -> throwError [Others "Please place the cursor in side a Spec to refine it"]
     Just spec -> do
       source' <- latestSource
       let payload = Text.unlines $ specPayload source' spec
@@ -274,13 +274,13 @@ substitute (A.Program _ _ defns _ _) expr subst =
 
 typeCheck :: A.Program -> EffM ()
 typeCheck p = case runExcept (TypeChecking.checkProg p) of
-  Left e -> throwError $ TypeError e
+  Left e -> throwError [TypeError e]
   Right v -> return v
 
 sweep :: A.Program -> EffM ([PO], [Spec], [A.Expr], [StructWarning])
 sweep program@(A.Program _ globalProps _ _ _) =
   case WP.sweep program of
-    Left e -> throwError $ StructError e
+    Left e -> throwError [StructError e]
     Right (pos, specs, warings) -> do
       return (pos, specs, globalProps, warings)
 
@@ -296,14 +296,14 @@ parse :: Parser a -> Text -> EffM a
 parse p source = do
   filepath <- asks effEnvFilePath
   case runParse p filepath source of
-    Left err -> throwError (SyntacticError err)
+    Left errors -> throwError $ map SyntacticError errors
     Right val -> return val
 
 parseProgram :: Text -> EffM A.Program
 parseProgram source = do
   concrete <- parse pProgram source
   case runExcept (toAbstract concrete) of
-    Left NoLoc -> throwError $ Others "NoLoc in parseProgram"
+    Left NoLoc -> throwError [Others "NoLoc in parseProgram"]
     Left (Loc start _) -> digHole start >>= parseProgram
     Right program -> return program
 

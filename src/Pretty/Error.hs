@@ -16,7 +16,7 @@ import GCL.Type (TypeError(..))
 
 -- | Error
 instance Pretty Error where
-  pretty (SyntacticError errors) = "Syntactic Error" <+> prettyList errors
+  pretty (SyntacticError err) = "Syntactic Error" <+> pretty err
   pretty (TypeError err) =
     "Type Error" <+> pretty (locOf err) <> line <> pretty err
   pretty (StructError err) =
