@@ -1,13 +1,14 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Test.Parser where
-import Test.Util (goldenFileTest, toString, parseTest, removeTrailingWhitespace)
+import Test.Util (goldenFileTest, parseTest, removeTrailingWhitespace)
 import Test.Tasty (TestTree, testGroup)
 import Data.Text.Prettyprint.Doc (Pretty)
 import Syntax.Parser (Parser, runParse, pProgram, pDeclaration, pType, pExpr, pBlockDeclaration, pStmt)
 import Syntax.Parser.Lexer ( scn )
 import Data.Text (Text)
 import Test.Tasty.HUnit (Assertion, testCase, (@?=))
+import Pretty (toString, toText)
 
 
 tests :: TestTree
@@ -230,10 +231,10 @@ parserGolden name filePath fileName =
   goldenFileTest ".ast.golden" name filePath fileName runFile
 
 runFile :: (FilePath, Text) -> Text
-runFile (filePath, source) = toString $ runParse pProgram filePath source
+runFile (filePath, source) = toText $ runParse pProgram filePath source
 
 parserCompare :: Pretty a => Parser a -> Text -> Text -> Assertion
-parserCompare parser actual expected = (removeTrailingWhitespace . toString . parseTest parser) actual @?= removeTrailingWhitespace expected
+parserCompare parser actual expected = (removeTrailingWhitespace . toText . parseTest parser) actual @?= removeTrailingWhitespace expected
 
 parserIso :: Pretty a => Parser a -> Text -> Assertion
 parserIso parser raw = parserCompare parser raw raw

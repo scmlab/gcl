@@ -66,8 +66,5 @@ update suffix (filePath, fileName, input) = createDirectoriesAndWriteFile (fileP
 removeTrailingWhitespace :: Text -> Text
 removeTrailingWhitespace = Text.unlines . map Text.stripEnd . Text.lines
 
-toString :: Pretty a => a -> Text
-toString = renderStrict . layoutCompact . pretty
-
 parseTest :: Parser a -> Text -> Either [SyntacticError] a
 parseTest parser = runParse parser "<test>"

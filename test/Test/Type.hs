@@ -7,7 +7,7 @@ import Data.Loc (Loc(..), Pos(..))
 import qualified Data.Map as Map
 import Data.Text (Text)
 import Test.Tasty (TestTree, testGroup)
-import Test.Util (goldenFileTest, parseTest, toString)
+import Test.Util (goldenFileTest, parseTest)
 import Test.Tasty.HUnit (testCase, (@?=), Assertion)
 import Control.Monad.Except (runExcept, withExcept, liftEither)
 import GCL.Type (TypeEnv(TypeEnv), TypeError (UnifyFailed, NotInScope), SubstT, emptySubstT, runInfer, lookupEnv, checkProg, runSolver', inferExpr, runSolver, infer, TM, checkStmt, checkType, inferDecl, emptyEnv)
@@ -21,7 +21,7 @@ import Syntax.Abstract
       Endpoint(..) )
 import Syntax.Common ( ArithOp, Name(Name) )
 import Syntax.Parser (runParse, pExpr, pProgram, Parser, pStmt, pType, pDeclaration, pBlockDeclaration)
-import Pretty ()
+import Pretty (toText)
 import Error (Error(..))
 import Data.Text.Prettyprint.Doc.Internal (layoutCompact, Pretty (pretty))
 
@@ -239,7 +239,7 @@ typeCheckFile name filePath fileName =
   goldenFileTest ".tc.golden" name filePath fileName fileCheck
 
 fileCheck :: (FilePath, Text) -> Text
-fileCheck (filepath, source) = toString result
+fileCheck (filepath, source) = toText result
   where
     result = case runParse pProgram filepath source of
       Left errors -> Left (map SyntacticError errors)
@@ -323,18 +323,18 @@ check check env e =
 
 exprCheck :: Text -> Text -> Assertion
 exprCheck t1 t2 =
-  toString (check inferExpr env <$> runParser pExpr t1) @?= t2
+  toText (check inferExpr env <$> runParser pExpr t1) @?= t2
 
 typeCheck :: Text -> Text -> Assertion
 typeCheck t1 t2 =
-  toString (check checkType env <$> runParser pType t1) @?= t2
+  toText (check checkType env <$> runParser pType t1) @?= t2
 
 typeCheck' :: Text -> Assertion
 typeCheck' t = typeCheck t "()"
 
 stmtCheck :: Text -> Text -> Assertion
 stmtCheck t1 t2 =
-  toString (check checkStmt env <$> runParser pStmt t1) @?= t2
+  toText (check checkStmt env <$> runParser pStmt t1) @?= t2
 
 stmtCheck' :: Text -> Assertion
 stmtCheck' t = stmtCheck t "()"
@@ -344,8 +344,8 @@ instance Pretty TypeEnv where
 
 declarationCheck :: Text -> Text -> Assertion 
 declarationCheck t1 t2 =
-  toString (check inferDecl emptyEnv <$> runParser pDeclaration t1) @?= t2
+  toText (check inferDecl emptyEnv <$> runParser pDeclaration t1) @?= t2
 
 blockDeclarationCheck :: Text -> Text -> Assertion
 blockDeclarationCheck t1 t2 =
-  toString (map (check inferDecl emptyEnv) <$> runParser pBlockDeclaration t1) @?= t2
+  toText (map (check inferDecl emptyEnv) <$> runParser pBlockDeclaration t1) @?= t2
