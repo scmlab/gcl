@@ -11,6 +11,8 @@ import Render.Class
 import Render.Element
 import Render.Syntax.Abstract ()
 import Syntax.Predicate
+import Data.Loc.Range (fromLoc)
+import Data.Loc (locOf)
 
 instance Render StructWarning where
   render (MissingBound _) = "Bound missing at the end of the assertion before the DO construct \" , bnd : ... }\""
@@ -22,9 +24,10 @@ instance RenderBlock StructWarning where
     ExcessBound range -> blockE (Just "Excess Bound") (Just range) (render x)
 
 instance RenderBlock Spec where
-  renderBlock (Specification _ pre post _loc) =
+  renderBlock (Specification _ pre post loc) =
     proofObligationE
       Nothing
+      (fromLoc loc)
       (render pre)
       (render post)
 
@@ -44,5 +47,6 @@ instance RenderBlock PO where
   renderBlock (PO _ pre post origin) =
     proofObligationE
       (Just $ Text.unpack $ renderStrict $ pretty origin)
+      (fromLoc (locOf origin))
       (render pre)
       (render post)

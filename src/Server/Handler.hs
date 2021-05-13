@@ -181,7 +181,7 @@ generateResponseAndDiagnostics program = do
         Just sel -> filterOverlapped sel specs
   let overlappedPOs = case lastSelection of
         Nothing -> pos
-        Just sel -> filterOverlapped sel pos
+        Just sel -> pos -- filterOverlapped sel pos
   -- render stuff
   let warningsSection = if null warnings then [] else headerE "Warnings" : map renderBlock warnings
   let globalPropsSection = if null globalProps then [] else headerE "Global Properties" : map renderBlock globalProps
