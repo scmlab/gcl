@@ -20,6 +20,7 @@ import Language.LSP.Types hiding
     TextDocumentSyncClientCapabilities (..),
   )
 import qualified Language.LSP.Types as LSP
+import Pretty
 import Render
 import Server.CustomMethod
 import Server.Diagnostic
@@ -29,7 +30,6 @@ import Server.ExportPO ()
 import Server.Monad
 import qualified Syntax.Abstract as A
 import Syntax.Predicate (Spec (..))
-import Pretty 
 
 -- handlers of the LSP server
 handlers :: Handlers ServerM
@@ -207,8 +207,9 @@ temp program lastSelection = do
           ]
 
   version <- bumpVersion
-  let specs' = map (\spec -> (specID spec, toText (specPreCond spec), toText (specPreCond spec), specLoc spec)) specs
-  let responses = [ResDisplay version blocks, ResUpdateSpecs specs']
+  let encodeSpec spec = (specID spec, toText $ render (specPreCond spec), toText $ render (specPostCond spec), specLoc spec)
+
+  let responses = [ResDisplay version blocks, ResUpdateSpecs (map encodeSpec specs)]
   let diagnostics = concatMap toDiagnostics pos ++ concatMap toDiagnostics warnings
 
   terminate responses diagnostics

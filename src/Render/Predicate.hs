@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Render.WP where
+module Render.Predicate where
 
 -- import Data.Loc (locOf)
 import qualified Data.Text as Text
@@ -36,8 +36,8 @@ instance Render Pred where
     Assertion p _ -> renderPrec n p
     LoopInvariant p _ _ -> renderPrec n p
     Bound p _ -> renderPrec n p
-    Conjunct ps -> horzE $ punctuateE " ∧ " (map render ps)
-    Disjunct ps -> mconcat $ punctuateE " ∨ " (map render ps)
+    Conjunct ps -> punctuateE " ∧" (map render ps)
+    Disjunct ps -> punctuateE " ∨" (map render ps)
     Negate p -> "¬" <+> renderPrec n p
 
 instance RenderBlock PO where

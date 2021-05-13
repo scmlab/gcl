@@ -9,7 +9,6 @@ module Render.Element
     headerE,
     Inlines (..),
     textE,
-    textE',
     parensE,
     linkE,
     iconE,
@@ -17,6 +16,7 @@ module Render.Element
     vertE,
     -- combinators
     (<+>),
+    punctuateAfterE,
     punctuateE,
   )
 where
@@ -34,12 +34,15 @@ import GHC.Generics (Generic)
 
 --------------------------------------------------------------------------------
 
+-- | Block elements
 data Block
-  = -- header + body
+  = -- for ordinary stuff
+    -- header + body
     Block (Maybe String) (Maybe Range) Inlines
-  | -- precondition + post-condition
+  | -- for Proof Obligations 
+    -- header + precondition + post-condition
     PO (Maybe String) Inlines Inlines
-  | -- "naked" header
+  | -- for headers
     Header String
   deriving (Eq, Generic)
 
@@ -59,17 +62,21 @@ instance Pretty Block where
 
 instance ToJSON Block
 
+-- | Constructor for `Block`
 blockE :: Maybe String -> Maybe Range -> Inlines -> Block
 blockE = Block
 
+-- | Constructor for `PO`
 proofObligationE :: Maybe String -> Inlines -> Inlines -> Block
 proofObligationE = PO
 
+-- | Constructor for `Header`
 headerE :: String -> Block
 headerE = Header
 
 --------------------------------------------------------------------------------
 
+-- | Datatype for representing a consecutive series of inline elements
 newtype Inlines = Inlines {unInlines :: Seq Inline}
   deriving (Eq)
 
@@ -77,6 +84,7 @@ newtype Inlines = Inlines {unInlines :: Seq Inline}
 instance IsString Inlines where
   fromString s = Inlines (Seq.singleton (Text (Text.pack s) mempty))
 
+-- | You can join two Inlines using `(<>)`
 instance Semigroup Inlines where
   Inlines as <> Inlines bs = Inlines (merge as bs)
     where
@@ -104,7 +112,10 @@ instance ToJSON Inlines where
 instance Show Inlines where
   show (Inlines xs) = unwords $ map show $ toList xs
 
--- | see if the rendered text is "empty"
+instance Pretty Inlines where
+  pretty = pretty . show
+
+-- | To see if the rendered text is "empty"
 isEmpty :: Inlines -> Bool
 isEmpty inlines = all elemIsEmpty (Seq.viewl (unInlines inlines))
   where
@@ -120,29 +131,28 @@ isEmpty inlines = all elemIsEmpty (Seq.viewl (unInlines inlines))
 
 infixr 6 <+>
 
+-- | Like `<>` but with a space in between
 (<+>) :: Inlines -> Inlines -> Inlines
 x <+> y
   | isEmpty x = y
   | isEmpty y = x
   | otherwise = x <> " " <> y
 
+-- | 
 textE :: Text -> Inlines
 textE s = Inlines $ Seq.singleton $ Text s mempty
 
--- | `text` with `ClassNames`
-textE' :: ClassNames -> Text -> Inlines
-textE' cs s = Inlines $ Seq.singleton $ Text s cs
+-- | Text with source location
+linkE :: Range -> Inlines -> Inlines
+linkE range xs = Inlines $ Seq.singleton $ Link range xs []
 
--- When there's only 1 Horz inside a Parn, convert it to PrHz
+-- | Note: when there's only 1 Horz inside a Parn, convert it to PrHz
 parensE :: Inlines -> Inlines
 parensE (Inlines (Horz xs :<| Empty)) = Inlines $ Seq.singleton $ PrHz xs
 parensE others = Inlines $ Seq.singleton $ Parn others
 
 iconE :: String -> Inlines
 iconE s = Inlines $ Seq.singleton $ Icon s []
-
-linkE :: Range -> Inlines -> Inlines
-linkE range xs = Inlines $ Seq.singleton $ Link range xs []
 
 -- | Horizontal listing
 horzE :: [Inlines] -> Inlines
@@ -152,9 +162,12 @@ horzE = Inlines . pure . Horz
 vertE :: [Inlines] -> Inlines
 vertE = Inlines . pure . Vert
 
+punctuateAfterE :: Inlines -> [Inlines] -> [Inlines]
+punctuateAfterE _ [] = []
+punctuateAfterE delim xs = zipWith (<>) xs (replicate (length xs - 1) delim ++ [mempty])
 
--- linkHole :: Int -> Inlines
--- linkHole i = Inlines $ Seq.singleton $ Hole i
+punctuateE :: Inlines -> [Inlines] -> Inlines
+punctuateE delim = horzE . punctuateAfterE delim
 
 --------------------------------------------------------------------------------
 
@@ -186,11 +199,6 @@ instance Show Inline where
   show (Parn x) = "(" <> show x <> ")"
   show (PrHz xs) = "(" <> unwords (map show $ toList xs) <> ")"
 
---------------------------------------------------------------------------------
+instance Pretty Inline where
+  pretty = pretty . show
 
--- | Utilities / Combinators
-punctuateE :: Inlines -> [Inlines] -> [Inlines]
-punctuateE _ [] = []
-punctuateE delim xs = zipWith (<>) xs (replicate (length xs - 1) delim ++ [mempty])
-
---------------------------------------------------------------------------------
