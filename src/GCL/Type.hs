@@ -24,16 +24,17 @@ type TM = Except TypeError
 -- type enviornment
 ------------------------------------------
 
-newtype TypeEnv = TypeEnv (Map Name Type) deriving (Eq, Show)
+-- newtype TypeEnv = TypeEnv (Map Name Type) deriving (Eq, Show)
+type TypeEnv = Map Name Type
 
 emptyEnv :: TypeEnv
-emptyEnv = TypeEnv Map.empty
+emptyEnv = Map.empty
 
 extend :: TypeEnv -> (Name, Type) -> TypeEnv
-extend (TypeEnv env) (x, s) = TypeEnv (Map.insert x s env)
+extend env (x, s) =  Map.insert x s env
 
 extend' :: TypeEnv -> (Name, Type) -> TM TypeEnv
-extend' e@(TypeEnv env) (x, s) =
+extend' e@env (x, s) =
   case Map.lookup x env of
     Nothing -> return $ e `extend` (x, s)
     Just t -> throwError $ RecursiveType x t (locOf t)
@@ -65,10 +66,10 @@ instance Substitutable Type where
   fv (TFunc t1 t2 _) = fv t1 `Set.union` fv t2
   fv (TVar x _) = Set.singleton x
 
-instance Substitutable TypeEnv where
-  apply s (TypeEnv env) = TypeEnv (Map.map (apply s) env)
+-- instance Substitutable TypeEnv where
+--   apply s env =  Map.map (apply s) env
 
-  fv (TypeEnv env) = foldl (flip (Set.union . fv)) Set.empty (Map.elems env)
+--   fv env = foldl (flip (Set.union . fv)) Set.empty (Map.elems env)
 
 occursT :: (Substitutable a) => Name -> a -> Bool
 occursT x s = x `Set.member` fv s
@@ -205,14 +206,14 @@ uni t1 t2 = tell [(t1, t2)]
 
 lookupEnv :: Name -> Infer Type
 lookupEnv n = do
-  (TypeEnv env) <- ask
+  env <- ask
   case Map.lookup n env of
     Just t -> return (typeWithLoc (locOf n) t)
     Nothing -> throwError $ NotInScope n (locOf n)
 
 inEnv :: [(Name, Type)] -> Infer a -> Infer a
 inEnv l m = do
-  let scope (TypeEnv e) = TypeEnv $ foldl (\e' (x, sc) -> Map.insert x sc e') e l
+  let scope e = foldl (\e' (x, sc) -> Map.insert x sc e') e l
   local scope m
 
 fresh :: Loc -> Infer Type
@@ -228,7 +229,7 @@ fresh l = flip TVar l . flip Name l <$> freshText
 ------------------------------------------
 
 checkName :: TypeEnv -> (Name, Expr) -> TM ()
-checkName env@(TypeEnv envM) (n, expr) =
+checkName env@envM (n, expr) =
   case Map.lookup n envM of
     Nothing -> throwError $ NotInScope n (locOf n)
     Just t -> do
@@ -240,7 +241,7 @@ checkIsType env expr t = do
   void $ runSolver (cs `mappend` [(eType, t)])
 
 checkPredicate :: TypeEnv -> Expr -> TM ()
-checkPredicate env p = 
+checkPredicate env p =
   checkIsType env p (TBase TBool NoLoc)
 
 checkType :: TypeEnv -> Type -> TM ()

@@ -4,6 +4,8 @@
 module GCL.Expr where
 
 import Control.Monad.Reader
+    ( ReaderT(runReaderT),
+      MonadReader(ask, local) )
 import Control.Monad.State
 import Data.Loc
 import qualified Data.Map as Map

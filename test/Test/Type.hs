@@ -10,7 +10,7 @@ import Test.Tasty (TestTree, testGroup)
 import Test.Util (goldenFileTest, parseTest, render)
 import Test.Tasty.HUnit (testCase, (@?=), Assertion)
 import Control.Monad.Except (runExcept, withExcept, liftEither)
-import GCL.Type (TypeEnv(TypeEnv), TypeError (UnifyFailed, NotInScope), SubstT, emptySubstT, runInfer, lookupEnv, checkProg, runSolver', inferExpr, runSolver, infer, TM, checkStmt, checkType, inferDecl, emptyEnv)
+import GCL.Type (TypeEnv, TypeError (UnifyFailed, NotInScope), SubstT, emptySubstT, runInfer, lookupEnv, checkProg, runSolver', inferExpr, runSolver, infer, TM, checkStmt, checkType, inferDecl, emptyEnv)
 import Syntax.Concrete.ToAbstract ( ToAbstract(toAbstract) )
 import Syntax.Abstract
     ( Lit(..),
@@ -25,6 +25,7 @@ import Pretty ()
 import Error (Error(..))
 import Data.Text.Prettyprint.Doc.Internal (layoutCompact, Pretty (pretty))
 import Data.Text.Prettyprint.Doc.Render.Text (renderStrict)
+import Data.Map (Map)
 
 tests :: TestTree
 tests = testGroup "Type" [exprTests, typeTests, stmtTests, declarationTests, blockDeclarationTests, fileTests]
@@ -292,7 +293,6 @@ name t = Name t NoLoc
 
 env :: TypeEnv
 env =
-  TypeEnv $
     Map.fromList
       [
         (name "A" , tint),
@@ -340,8 +340,8 @@ stmtCheck t1 t2 =
 stmtCheck' :: Text -> Assertion
 stmtCheck' t = stmtCheck t "()"
 
-instance Pretty TypeEnv where
-  pretty (TypeEnv env) = pretty $ Map.toList env
+instance (Pretty a, Pretty b) => Pretty (Map a b) where
+  pretty m = pretty $ Map.toList m
 
 declarationCheck :: Text -> Text -> Assertion 
 declarationCheck t1 t2 =
