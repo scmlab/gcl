@@ -103,61 +103,43 @@ handlers =
             logText $ " --> Custom Reqeust: " <> pack (show request)
             let effEnv = EffEnv filepath (Just responder)
             -- convert Request to Response
-            case kind of
-              -- Inspect
-              ReqInspect selStart selEnd -> do
-                interpret effEnv $ do
+            interpret effEnv $ do
+              case kind of
+                -- Inspect
+                ReqInspect selStart selEnd -> do
                   updateLastMouseSelection (selStart, selEnd)
                   source <- savedSource
                   program <- parseProgram source
+                  typeCheck program
+                  generateResponseAndDiagnostics program
 
-                  -- typeCheck program
-                  -- (pos, _specs, _globalProps, warnings) <- sweep program
-                  -- -- display all POs
-                  -- let diagnostics = concatMap toDiagnostics pos ++ concatMap toDiagnostics warnings
-                  -- -- response with only POs in the vinicity of the cursor
-                  -- let filteredPOs = filterPOs (selStart, selEnd) pos
-                  -- version <- bumpVersion
-
-                  -- let responses = [ResDisplay version (headerE "Proof Obligaitons" : map renderBlock filteredPOs)]
-                  -- terminate responses diagnostics
-
-                  -- parse + type check + sweep
-                  temp program (Just (selStart, selEnd))
-
-              -- Refine
-              ReqRefine selStart selEnd -> do
-                interpret effEnv $ do
+                -- Refine
+                ReqRefine selStart selEnd -> do
                   updateLastMouseSelection (selStart, selEnd)
                   source <- latestSource
-                  -- refine (parse + sweep)
-
                   (spec, content) <- refine source (selStart, selEnd)
 
-                  -- logM "*** SPEC CONTENT ------"
-                  -- logM text
-                  -- logM "************"
-
                   -- remove the Spec
-                  case specLoc spec of
+                  source' <- case specLoc spec of
                     NoLoc -> throwError [Others "NoLoc in ReqRefine"]
-                    Loc start end -> do
-                      source' <- editText (Range start end) (Text.stripStart content)
-                      -- logM $ "*** AFTER REMOVING SPEC\n" <> source'
-                      checkAndSendResponsePrim (Just (selStart, selEnd)) source'
+                    Loc start end -> editText (Range start end) (Text.stripStart content)
 
-              -- Substitute
-              ReqSubstitute index expr subst -> do
-                interpret effEnv $ do
+                  program <- parseProgram source'
+                  typeCheck program
+                  generateResponseAndDiagnostics program
+
+                -- Substitute
+                ReqSubstitute index expr subst -> do
                   source <- savedSource
                   program <- parseProgram source
                   let expr' = substitute program expr subst
                   terminate [ResSubstitute index expr'] []
 
-              -- ExportProofObligations
-              ReqExportProofObligations ->
-                responder $ Res filepath [ResConsoleLog "Export"]
-              ReqDebug -> return $ error "crash!",
+                -- ExportProofObligations
+                ReqExportProofObligations -> do
+                  terminate [ResConsoleLog "Export"] []
+                ReqDebug -> return $ error "crash!",
+
       -- when the client saved the document, store the text for later use
       notificationHandler STextDocumentDidSave $ \ntf -> do
         logText " --> TextDocumentDidSave"
@@ -171,8 +153,9 @@ handlers =
                 let effEnv = EffEnv filepath Nothing
                 interpret effEnv $ do
                   updateSavedSource source
-                  lastSelection <- readLastMouseSelection
-                  checkAndSendResponsePrim lastSelection source,
+                  program <- parseProgram source
+                  typeCheck program
+                  generateResponseAndDiagnostics program,
       -- when the client opened the document
       notificationHandler STextDocumentDidOpen $ \ntf -> do
         logText " --> TextDocumentDidOpen"
@@ -183,19 +166,23 @@ handlers =
             let effEnv = EffEnv filepath Nothing
             interpret effEnv $ do
               updateSavedSource source
-              lastSelection <- readLastMouseSelection
-              checkAndSendResponsePrim lastSelection source
+              program <- parseProgram source
+              typeCheck program
+              generateResponseAndDiagnostics program
     ]
 
-temp :: A.Program -> Maybe (Int, Int) -> EffM ()
-temp program lastSelection = do
+generateResponseAndDiagnostics :: A.Program -> EffM ()
+generateResponseAndDiagnostics program = do
   (pos, specs, globalProps, warnings) <- sweep program
+  -- leave only POs & Specs around the mouse selection
+  lastSelection <- readLastMouseSelection
   let overlappedSpecs = case lastSelection of
         Nothing -> specs
         Just sel -> filterOverlapped sel specs
   let overlappedPOs = case lastSelection of
         Nothing -> pos
         Just sel -> filterOverlapped sel pos
+  -- render stuff
   let warningsSection = if null warnings then [] else headerE "Warnings" : map renderBlock warnings
   let globalPropsSection = if null globalProps then [] else headerE "Global Properties" : map renderBlock globalProps
   let specsSection = if null overlappedSpecs then [] else headerE "Specs" : map renderBlock overlappedSpecs
@@ -215,10 +202,3 @@ temp program lastSelection = do
   let diagnostics = concatMap toDiagnostics pos ++ concatMap toDiagnostics warnings
 
   terminate responses diagnostics
-
--- parse + type check + sweep
-checkAndSendResponsePrim :: Maybe (Int, Int) -> Text -> EffM ()
-checkAndSendResponsePrim lastSelection source = do
-  program <- parseProgram source
-  typeCheck program
-  temp program lastSelection
