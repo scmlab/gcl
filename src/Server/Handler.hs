@@ -108,7 +108,7 @@ handlers =
                 -- Inspect
                 ReqInspect selStart selEnd -> do
                   updateLastMouseSelection (selStart, selEnd)
-                  source <- savedSource
+                  source <- latestSource
                   program <- parseProgram source
                   typeCheck program
                   generateResponseAndDiagnostics program
@@ -130,7 +130,7 @@ handlers =
 
                 -- Substitute
                 ReqSubstitute index expr subst -> do
-                  source <- savedSource
+                  source <- latestSource
                   program <- parseProgram source
                   let expr' = substitute program expr subst
                   terminate [ResSubstitute index expr'] []
@@ -181,7 +181,7 @@ generateResponseAndDiagnostics program = do
         Just sel -> filterOverlapped sel specs
   let overlappedPOs = case lastSelection of
         Nothing -> pos
-        Just sel -> pos -- filterOverlapped sel pos
+        Just sel -> filterOverlapped sel pos
   -- render stuff
   let warningsSection = if null warnings then [] else headerE "Warnings" : map renderBlock warnings
   let globalPropsSection = if null globalProps then [] else headerE "Global Properties" : map renderBlock globalProps

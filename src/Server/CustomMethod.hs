@@ -207,8 +207,8 @@ interpret2 p = case runEffM (EffEnv "<test>" Nothing) p of
 editText :: Range -> Text -> EffM Text
 editText range text = liftF (EditText range text id)
 
-savedSource :: EffM Text
-savedSource = liftF (ReadSavedSource id)
+-- savedSource :: EffM Text
+-- savedSource = liftF (ReadSavedSource id)
 
 updateSavedSource :: Text -> EffM ()
 updateSavedSource source = liftF (UpdateSavedSource source ())
