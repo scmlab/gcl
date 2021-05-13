@@ -72,16 +72,18 @@ handlers =
                     Nothing
 
             let items =
-                  [ makeItem "to" (Just CiOperator) "→" "\"→\" Rightwards Arrow" "The Unicode variant of \"->\"",
-                    makeItem "neq" (Just CiOperator) "≠" "\"≠\" Not Equal To" "The Unicode variant of \"/=\"",
-                    makeItem "gte" (Just CiOperator) "≥" "\"≥\" Greater-Than or Equal To" "The Unicode variant of \">=\"",
-                    makeItem "lte" (Just CiOperator) "≤" "\"≤\" Less-Than or Equal To" "The Unicode variant of \"<=\"",
-                    makeItem "imp" (Just CiOperator) "⇒" "\"⇒\" Rightwards Double Arrow" "The Unicode variant of \"=>\"",
-                    makeItem "conj" (Just CiOperator) "∧" "\"∧\" Logical And" "The Unicode variant of \"&&\"",
-                    makeItem "disj" (Just CiOperator) "∨" "\"∨\" Logical Or" "The Unicode variant of \"||\"",
-                    makeItem "neg" (Just CiOperator) "¬" "\"¬\" Not Sign" "The Unicode variant of \"~\"",
-                    makeItem "leftanglebracket" (Just CiValue) "⟨" "\"⟨\" Left Angle Bracket" "The Unicode variant of \"<|\"",
-                    makeItem "rightanglebracket" (Just CiValue) "⟩" "\"⟩\" Right Angle Bracket" "The Unicode variant of \"|>\""
+                  [ makeItem "->" (Just CiOperator) "→" "\"→\" Rightwards Arrow" "The Unicode variant of \"->\"",
+                    makeItem "/=" (Just CiOperator) "≠" "\"≠\" Not Equal To" "The Unicode variant of \"/=\"",
+                    makeItem ">=" (Just CiOperator) "≥" "\"≥\" Greater-Than or Equal To" "The Unicode variant of \">=\"",
+                    makeItem "<=" (Just CiOperator) "≤" "\"≤\" Less-Than or Equal To" "The Unicode variant of \"<=\"",
+                    makeItem "=>" (Just CiOperator) "⇒" "\"⇒\" Rightwards Double Arrow" "The Unicode variant of \"=>\"",
+                    makeItem "&&" (Just CiOperator) "∧" "\"∧\" Logical And" "The Unicode variant of \"&&\"",
+                    makeItem "||" (Just CiOperator) "∨" "\"∨\" Logical Or" "The Unicode variant of \"||\"",
+                    makeItem "~" (Just CiOperator) "¬" "\"¬\" Not Sign" "The Unicode variant of \"~\"",
+                    makeItem "<|" (Just CiValue) "⟨" "\"⟨\" Left Angle Bracket" "The Unicode variant of \"<|\"",
+                    makeItem "|>" (Just CiValue) "⟩" "\"⟩\" Right Angle Bracket" "The Unicode variant of \"|>\"",
+                    makeItem "min" (Just CiValue) "↓" "\"↓\" Downwards Arrow" "The Unicode variant of \"min\"",
+                    makeItem "max" (Just CiValue) "↑" "\"↑\" Upwards Arrow" "The Unicode variant of \"max\""
                   ]
 
             let isComplete = True
