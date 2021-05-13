@@ -21,6 +21,7 @@ import Language.LSP.Types hiding (TextDocumentSyncClientCapabilities (..))
 import Render
 import qualified Syntax.Abstract as A
 import Syntax.Predicate (Origin, PO, Spec)
+import Data.Loc (Loc)
 
 --------------------------------------------------------------------------------
 
@@ -83,6 +84,7 @@ sendResponses filepath responder responses = do
 -- | Response
 data ResKind
   = ResDisplay Int [Block]
+  | ResUpdateSpecs [(Int, Text, Text, Loc)]
   | ResSubstitute Int A.Expr
   | ResConsoleLog Text
   deriving (Eq, Generic)
@@ -90,11 +92,8 @@ data ResKind
 instance ToJSON ResKind
 
 instance Show ResKind where
-  show (ResDisplay i blocks) =
-    "OK " <> show i <> " "
-      <> show (length blocks)
-      <> " blocks"
-  -- show (ResDisplay errors) = "Display " <> show (length errors) <> " errors"
+  show (ResDisplay _ _) = "Display"
+  show (ResUpdateSpecs _) = "UpdateSpecs"
   show (ResSubstitute i _) = "Substitute " <> show i
   show (ResConsoleLog x) = "ConsoleLog " <> show x
 

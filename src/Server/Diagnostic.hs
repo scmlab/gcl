@@ -29,22 +29,22 @@ instance ToDiagnostics Error where
   toDiagnostics _ = []
 
 instance ToDiagnostics TypeError where
-  toDiagnostics (NotInScope name loc) = [makeError loc "Not in scope" $ renderStrict $ "The definition " <> pretty name <> " is not in scope"]
+  toDiagnostics (NotInScope name loc) = [makeError loc "Not in scope" $ docToText $ "The definition " <> pretty name <> " is not in scope"]
   toDiagnostics (UnifyFailed s t loc) =
     [ makeError loc "Cannot unify types" $
-        renderStrict $
+        docToText $
           "Cannot unify:" <+> pretty s <> line
             <> "with        :" <+> pretty t
     ]
   toDiagnostics (RecursiveType var t loc) =
     [ makeError loc "Recursive type variable" $
-        renderStrict $
+        docToText $
           "Recursive type variable:" <+> pretty var <> line
             <> "in type             :" <+> pretty t
     ]
   toDiagnostics (NotFunction t loc) =
     [ makeError loc "Not a function" $
-        renderStrict $
+        docToText $
           "The type" <+> pretty t <+> "is not a function type"
     ]
 
@@ -69,7 +69,7 @@ instance ToDiagnostics PO where
         others -> locOf others
 
       title :: Text
-      title = renderStrict $ pretty origin 
+      title = toText origin 
 
 makeError :: Loc -> Text -> Text -> Diagnostic
 makeError = makeDiagnostic (Just DsError)

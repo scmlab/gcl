@@ -20,15 +20,16 @@ import Language.LSP.Types hiding
     TextDocumentSyncClientCapabilities (..),
   )
 import qualified Language.LSP.Types as LSP
+import Render
 import Server.CustomMethod
 import Server.Diagnostic
   ( ToDiagnostics (toDiagnostics),
   )
 import Server.ExportPO ()
 import Server.Monad
-import Syntax.Predicate (Spec (..))
-import Render
 import qualified Syntax.Abstract as A
+import Syntax.Predicate (Spec (..))
+import Pretty 
 
 -- handlers of the LSP server
 handlers :: Handlers ServerM
@@ -46,8 +47,8 @@ handlers =
               _ -> False
         if triggered
           then do
-            let Position line col = position
-            let replaceRange = LSP.Range (Position line (col - 1)) position
+            let Position ln col = position
+            let replaceRange = LSP.Range (Position ln (col - 1)) position
             let removeSlash = Just $ List [TextEdit replaceRange ""]
 
             let makeItem label kind symbol detail doc =
@@ -115,8 +116,6 @@ handlers =
                   -- -- response with only POs in the vinicity of the cursor
                   -- let filteredPOs = filterPOs (selStart, selEnd) pos
                   -- version <- bumpVersion
-
-
 
                   -- let responses = [ResDisplay version (headerE "Proof Obligaitons" : map renderBlock filteredPOs)]
                   -- terminate responses diagnostics
@@ -187,19 +186,29 @@ handlers =
     ]
 
 temp :: A.Program -> Maybe (Int, Int) -> EffM ()
-temp program lastSelection = do 
-  (pos, _specs, globalProps, warnings) <- sweep program
-  let filteredPOs = case lastSelection of
+temp program lastSelection = do
+  (pos, specs, globalProps, warnings) <- sweep program
+  let overlappedSpecs = case lastSelection of
+        Nothing -> specs
+        Just sel -> filterOverlapped sel specs
+  let overlappedPOs = case lastSelection of
         Nothing -> pos
-        Just sel -> filterPOs sel pos
+        Just sel -> filterOverlapped sel pos
   let warningsSection = if null warnings then [] else headerE "Warnings" : map renderBlock warnings
   let globalPropsSection = if null globalProps then [] else headerE "Global Properties" : map renderBlock globalProps
-  -- let specsSection = if null specs then [] else headerE "Specs" : map renderBlock specs
-  let poSection = if null filteredPOs then [] else headerE "Proof Obligations" : map renderBlock filteredPOs
-  let blocks = mconcat [warningsSection, poSection, globalPropsSection]
+  let specsSection = if null overlappedSpecs then [] else headerE "Specs" : map renderBlock overlappedSpecs
+  let poSection = if null overlappedPOs then [] else headerE "Proof Obligations" : map renderBlock overlappedPOs
+  let blocks =
+        mconcat
+          [ warningsSection,
+            specsSection,
+            poSection,
+            globalPropsSection
+          ]
 
   version <- bumpVersion
-  let responses = [ResDisplay version blocks]
+  let specs' = map (\spec -> (specID spec, toText (specPreCond spec), toText (specPreCond spec), specLoc spec)) specs
+  let responses = [ResDisplay version blocks, ResUpdateSpecs specs']
   let diagnostics = concatMap toDiagnostics pos ++ concatMap toDiagnostics warnings
 
   terminate responses diagnostics

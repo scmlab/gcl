@@ -10,7 +10,7 @@ import Control.Monad.Reader
 import Control.Monad.State
 import Control.Monad.Trans.Free
 import Data.IORef
-import Data.List (find, sort)
+import Data.List (find, sortOn)
 import Data.Loc
 import Data.Loc.Range
 import qualified Data.Map as Map
@@ -316,11 +316,11 @@ parseProgram source = do
     Left (Loc start _) -> digHole start >>= parseProgram
     Right program -> return program
 
--- | Given an interval of mouse selection, calculate POs within the interval, ordered by their vicinity
-filterPOs :: (Int, Int) -> [PO] -> [PO]
-filterPOs (selStart, selEnd) pos = opverlappedPOs
+-- | Returns a list of stuff overlapped with mouse selection
+filterOverlapped :: Located a => (Int, Int) -> [a] -> [a]
+filterOverlapped (selStart, selEnd) items = opverlappedItems
   where
-    opverlappedPOs = reverse $ case overlapped of
+    opverlappedItems = case overlapped of
       [] -> []
       (x : _) -> case locOf x of
         NoLoc -> []
@@ -341,4 +341,4 @@ filterPOs (selStart, selEnd) pos = opverlappedPOs
                   || (selStart <= start && selEnd >= end) -- the selection covers the PO
                   || (selStart >= start && selEnd <= end) -- the selection is within the PO
                   -- sort them by comparing their starting position
-        overlapped = reverse $ sort $ filter isOverlapped pos
+        overlapped = sortOn locOf $ filter isOverlapped items
