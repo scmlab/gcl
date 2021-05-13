@@ -25,9 +25,9 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         tag_name: ${{ github.ref }}
-        release_name: Release ${{ github.ref }}
-        draft: true
-        prerelease: true
+        release_name: ${{ github.ref }}
+        draft: false
+        prerelease: false
 
   # build-linux:
   #   name: Build on Linux
