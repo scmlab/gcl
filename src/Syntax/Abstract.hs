@@ -30,13 +30,7 @@ data Program
       Loc
   deriving (Eq, Show)
 
-data Defn = Defn
-  { defnName :: Name,
-    defnExpr :: Expr
-  }
-  deriving (Eq, Show)
-
-type Defns = Map Text Defn
+type Defns = Map Name Expr 
 
 data Declaration
   = ConstDecl [Name] Type (Maybe Expr) Loc
@@ -58,21 +52,7 @@ data Stmt
 
 data GdCmd = GdCmd Expr [Stmt] Loc deriving (Eq, Show)
 
-extractAssertion :: Declaration -> Maybe Expr
-extractAssertion (ConstDecl _ _ e _) = e
-extractAssertion (VarDecl _ _ e _) = e
-extractAssertion LetDecl {} = Nothing
 
-extractLetBinding :: Declaration -> Maybe (Text, Defn)
-extractLetBinding ConstDecl {} = Nothing
-extractLetBinding VarDecl {} = Nothing
-extractLetBinding (LetDecl name args expr _) = Just (nameToText name, Defn name (wrapLam args expr))
-
-getGuards :: [GdCmd] -> [Expr]
-getGuards = fst . unzipGdCmds
-
-unzipGdCmds :: [GdCmd] -> ([Expr], [[Stmt]])
-unzipGdCmds = unzip . map (\(GdCmd x y _) -> (x, y))
 
 --------------------------------------------------------------------------------
 
@@ -126,10 +106,6 @@ type Subst = Map Name Expr
 instance ToJSON Expr
 
 instance FromJSON Expr
-
-wrapLam :: [Name] -> Expr -> Expr
-wrapLam [] body = body
-wrapLam (x : xs) body = Lam x (wrapLam xs body) NoLoc
 
 ----------------------------------------------------------------
 

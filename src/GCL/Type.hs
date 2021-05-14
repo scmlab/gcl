@@ -295,7 +295,7 @@ checkProg :: Program -> TM ()
 checkProg (Program decls exprs defs stmts _) = do
   env <- foldM inferDecl emptyEnv decls
   mapM_ (checkExpr env) exprs
-  mapM_ (checkName env . (\(Defn name expr) -> (name, expr))) (Map.elems defs)
+  mapM_ (checkName env) (Map.toList defs)
   mapM_ (checkStmt env) stmts
 
 ------------------------------------------

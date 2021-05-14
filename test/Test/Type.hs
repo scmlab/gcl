@@ -9,7 +9,7 @@ import Data.Text (Text)
 import Test.Tasty (TestTree, testGroup)
 import Test.Util (goldenFileTest, parseTest, toString)
 import Test.Tasty.HUnit (testCase, (@?=), Assertion)
-import Control.Monad.Except (runExcept, withExcept, liftEither)
+import Control.Monad.Except (runExcept, withExcept, liftEither, foldM)
 import GCL.Type (TypeEnv(TypeEnv), TypeError (UnifyFailed, NotInScope), SubstT, emptySubstT, runInfer, lookupEnv, checkProg, runSolver', inferExpr, runSolver, infer, TM, checkStmt, checkType, inferDecl, emptyEnv)
 import Syntax.Concrete.ToAbstract ( ToAbstract(toAbstract) )
 import Syntax.Abstract
@@ -197,20 +197,20 @@ blockDeclarationTests =
         "{:\n\
         \  A, B : Int\
         \:}" 
-        "[ [ ( A\n, Int )\n, ( B\n, Int ) ] ]",
+        "[ ( A\n, Int )\n, ( B\n, Int ) ]",
       testCase "block declaration 2" $
         blockDeclarationCheck
         "{:\n\
         \  A, B : Int { A = 0 }\
         \:}"
-        "[ [ ( A\n, Int )\n, ( B\n, Int ) ] ]",
+        "[ ( A\n, Int )\n, ( B\n, Int ) ]",
       testCase "block declaration 3" $
         blockDeclarationCheck
         "{:\n\
         \  A, B : Int\n\
         \    A = 0\n\
         \:}"
-        "[ [ ( A\n, Int )\n, ( B\n, Int ) ] ]",
+        "[ ( A\n, Int )\n, ( B\n, Int ) ]",
       testCase "block declaration 4" $
         blockDeclarationCheck
         "{:\n\
@@ -219,7 +219,7 @@ blockDeclarationTests =
         \  F : Int -> Int -> Int\n\
         \  P : Char -> Bool\n\
         \:}"
-        "[ [ ( A\n, Int )\n, ( B\n, Int ) ]\n, [ ( F\n, Int → Int → Int ) ]\n, [ ( P\n, Char → Bool ) ] ]"
+        "[ ( A\n, Int )\n, ( B\n, Int )\n, ( F\n, Int → Int → Int )\n, ( P\n, Char → Bool ) ]"
     ]
 
 
@@ -348,4 +348,14 @@ declarationCheck t1 t2 =
 
 blockDeclarationCheck :: Text -> Text -> Assertion
 blockDeclarationCheck t1 t2 =
-  toString (map (check inferDecl emptyEnv) <$> runParser pBlockDeclaration t1) @?= t2
+  -- toString (map (check inferDecl emptyEnv) <$> runParser pBlockDeclaration t1) @?= t2
+  toString wrap @?= t2
+  where
+    wrap = do
+      ds <- runParser pBlockDeclaration t1
+      foldM (\envM d -> 
+        case envM of
+          Left err -> return (Left err)
+          Right env -> return (check inferDecl env d)
+          ) (Right emptyEnv) ds
+  
