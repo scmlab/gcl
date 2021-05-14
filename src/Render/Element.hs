@@ -9,10 +9,11 @@ module Render.Element
     headerE,
     Inlines (..),
     textE,
-    parensE,
     linkE,
+    substE,
+    parensE,
     iconE,
-    horzE, 
+    horzE,
     vertE,
     -- combinators
     (<+>),
@@ -39,7 +40,7 @@ data Block
   = -- for ordinary stuff
     -- header + body
     Block (Maybe String) (Maybe Range) Inlines
-  | -- for Proof Obligations 
+  | -- for Proof Obligations
     -- header + precondition + post-condition
     PO (Maybe String) (Maybe Range) Inlines Inlines
   | -- for headers
@@ -124,6 +125,7 @@ isEmpty inlines = all elemIsEmpty (Seq.viewl (unInlines inlines))
     elemIsEmpty (Text "" _) = True
     elemIsEmpty (Text _ _) = False
     elemIsEmpty (Link _ xs _) = all elemIsEmpty $ unInlines xs
+    elemIsEmpty (Sbst xs ys _) = all elemIsEmpty $ unInlines xs <> unInlines ys
     elemIsEmpty (Horz xs) = all isEmpty xs
     elemIsEmpty (Vert xs) = all isEmpty xs
     elemIsEmpty (Parn _) = False
@@ -138,13 +140,17 @@ x <+> y
   | isEmpty y = x
   | otherwise = x <> " " <> y
 
--- | 
+-- |
 textE :: Text -> Inlines
 textE s = Inlines $ Seq.singleton $ Text s mempty
 
 -- | Text with source location
 linkE :: Range -> Inlines -> Inlines
 linkE range xs = Inlines $ Seq.singleton $ Link range xs []
+
+-- | Text that changes after clicked
+substE :: Inlines -> Inlines -> Inlines
+substE before after = Inlines $ Seq.singleton $ Sbst before after []
 
 -- | Note: when there's only 1 Horz inside a Parn, convert it to PrHz
 parensE :: Inlines -> Inlines
@@ -178,6 +184,8 @@ data Inline
   = Icon String ClassNames
   | Text Text ClassNames
   | Link Range Inlines ClassNames
+  | -- | For Subst
+    Sbst Inlines Inlines ClassNames
   | -- | Horizontal grouping, wrap when there's no space
     Horz [Inlines]
   | -- | Vertical grouping, each children would end with a newline
@@ -193,7 +201,8 @@ instance ToJSON Inline
 instance Show Inline where
   show (Icon s _) = s
   show (Text s _) = Text.unpack s
-  show (Link _ xs _) = mconcat (map show $ toList $ unInlines xs)
+  show (Link _ xs _) = show xs
+  show (Sbst xs _ _) = show xs
   show (Horz xs) = unwords (map show $ toList xs)
   show (Vert xs) = unlines (map show $ toList xs)
   show (Parn x) = "(" <> show x <> ")"
@@ -201,4 +210,3 @@ instance Show Inline where
 
 instance Pretty Inline where
   pretty = pretty . show
-
