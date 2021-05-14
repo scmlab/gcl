@@ -2,12 +2,11 @@
 import qualified Test.WP as WP
 import qualified Test.Type as Type
 import qualified Test.Parser as Parser
--- import qualified Test.Server as Server
+import qualified Test.Server as Server
 import Test.Tasty (TestTree, defaultMain, testGroup)
 
 main :: IO ()
 main = defaultMain tests
 
 tests :: TestTree
-tests = testGroup "Tests" [Parser.tests, WP.tests, Type.tests]
--- tests = testGroup "Tests" [Parser.tests, WP.tests, Type.tests, Server.tests]
+tests = testGroup "Tests" [Parser.tests, WP.tests, Type.tests, Server.tests]

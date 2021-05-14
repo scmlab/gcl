@@ -11,7 +11,6 @@ import Control.Monad.Except
 import qualified Data.Aeson as JSON
 import Data.Loc
 import Data.Loc.Range
-import Data.Text (Text, pack)
 import qualified Data.Text as Text
 import Error
 import Language.LSP.Server
@@ -100,7 +99,7 @@ handlers =
             logText " --> CustomMethod: CannotDecodeRequest"
             responder $ CannotDecodeRequest $ show msg ++ "\n" ++ show params
           JSON.Success request@(Req filepath kind) -> do
-            logText $ " --> Custom Reqeust: " <> pack (show request)
+            logText $ " --> Custom Reqeust: " <> Text.pack (show request)
             let effEnv = EffEnv filepath (Just responder)
             -- convert Request to Response
             interpret effEnv $ do
@@ -178,10 +177,10 @@ generateResponseAndDiagnostics program = do
   lastSelection <- readLastMouseSelection
   let overlappedSpecs = case lastSelection of
         Nothing -> specs
-        Just sel -> filterOverlapped sel specs
+        Just sel -> filter (withinMouseSelection sel) specs
   let overlappedPOs = case lastSelection of
         Nothing -> pos
-        Just sel -> pos -- filterOverlapped sel pos
+        Just sel -> filter (withinMouseSelection sel) pos
   -- render stuff
   let warningsSection = if null warnings then [] else headerE "Warnings" : map renderBlock warnings
   let globalPropsSection = if null globalProps then [] else headerE "Global Properties" : map renderBlock globalProps

@@ -9,6 +9,7 @@ import Control.Monad.Except
 import Control.Monad.Reader
 import Control.Monad.State
 import Control.Monad.Trans.Free
+import Control.Monad.Writer
 import Data.IORef
 import Data.List (find, sortOn)
 import Data.Loc
@@ -24,17 +25,16 @@ import qualified GCL.WP as WP
 import Language.LSP.Server
 import Language.LSP.Types hiding (Range, TextDocumentSyncClientCapabilities)
 import qualified Language.LSP.VFS as VFS
+import Render
 import Server.Diagnostic
 import Server.DiffMap (DiffMap)
 import qualified Server.DiffMap as DiffMap
 import Server.Monad
 import qualified Syntax.Abstract as A
+import Syntax.Concrete.ToAbstract
 import Syntax.Parser (Parser, pProgram, pStmts, runParse)
 import Syntax.Predicate (PO, Spec (specLoc), specPayload)
 import Prelude hiding (span)
-import Syntax.Concrete.ToAbstract
-import Control.Monad.Writer
-import Render
 
 --------------------------------------------------------------------------------
 
@@ -50,15 +50,15 @@ data Eff next
   | Terminate [ResKind] [Diagnostic]
   deriving (Functor)
 
--- for testing 
-data EffKind 
+-- for testing
+data EffKind
   = EffEditText Range Text
   | EffUpdateSavedSource Text
   | EffReadSavedSource
   | EffReadLatestSource
   | EffUpdateLastMouseSelection (Int, Int)
-  | EffReadLastMouseSelection 
-  | EffBumpResponseVersion 
+  | EffReadLastMouseSelection
+  | EffBumpResponseVersion
   | EffLog Text
   | EffTerminate [ResKind] [Diagnostic]
   deriving (Eq, Show)
@@ -76,7 +76,7 @@ runEffM env p = evalState (runReaderT (runExceptT (runFreeT p)) env) DiffMap.emp
 handleErrors :: FilePath -> Maybe Responder -> [Error] -> ServerM ()
 handleErrors filepath responder errors = do
   version <- bumpVersionM
-  -- (IdInt version) 
+  -- (IdInt version)
   let responses = [ResDisplay version (headerE "Errors" : map renderBlock errors)]
   let diagnostics = errors >>= toDiagnostics
   -- send diagnostics
@@ -84,8 +84,8 @@ handleErrors filepath responder errors = do
   -- send responses
   sendResponses filepath responder responses
 
-bumpVersionM :: ServerM Int 
-bumpVersionM = do 
+bumpVersionM :: ServerM Int
+bumpVersionM = do
   ref <- lift $ asks envCounter
   n <- liftIO $ readIORef ref
   liftIO $ writeIORef ref (succ n)
@@ -122,7 +122,7 @@ interpret env@(EffEnv filepath responder) p = case runEffM env p of
     mapping <- liftIO $ readIORef ref
     let result = fst <$> Map.lookup filepath mapping
     case result of
-      Nothing -> do 
+      Nothing -> do
         handleErrors filepath responder [CannotReadFile filepath]
       Just source -> do
         logText "ReadSavedSource"
@@ -162,7 +162,6 @@ interpret env@(EffEnv filepath responder) p = case runEffM env p of
     logStuff errors
     handleErrors filepath responder errors
 
-
 runTest :: EffM a -> (Maybe a, [EffKind])
 runTest program = runWriter (interpret2 program)
 
@@ -194,7 +193,7 @@ interpret2 p = case runEffM (EffEnv "<test>" Nothing) p of
     tell [EffLog text]
     interpret2 next
   Right (Free (Terminate responses diagnostics)) -> do
-    -- undefined 
+    -- undefined
     tell [EffTerminate responses diagnostics]
     return Nothing
   Left errors -> do
@@ -202,7 +201,6 @@ interpret2 p = case runEffM (EffEnv "<test>" Nothing) p of
     let diagnostics = errors >>= toDiagnostics
     tell [EffTerminate responses diagnostics]
     return Nothing
-
 
 editText :: Range -> Text -> EffM Text
 editText range text = liftF (EditText range text id)
@@ -291,7 +289,7 @@ sweep program@(A.Program _ globalProps _ _ _) =
   case WP.sweep program of
     Left e -> throwError [StructError e]
     Right (pos, specs, warings) -> do
-      return (pos, specs, globalProps, warings)
+      return (sortOn locOf pos, sortOn locOf specs, globalProps, warings)
 
 --------------------------------------------------------------------------------
 
@@ -316,29 +314,51 @@ parseProgram source = do
     Left (Loc start _) -> digHole start >>= parseProgram
     Right program -> return program
 
--- | Returns a list of stuff overlapped with mouse selection
-filterOverlapped :: Located a => (Int, Int) -> [a] -> [a]
-filterOverlapped (selStart, selEnd) items = opverlappedItems
-  where
-    opverlappedItems = case overlapped of
-      [] -> []
-      (x : _) -> case locOf x of
-        NoLoc -> []
-        Loc start _ ->
-          let same y = case locOf y of
-                NoLoc -> False
-                Loc start' _ -> start == start'
-           in filter same overlapped
-      where
-        -- find the POs whose Range overlaps with the selection
-        isOverlapped po = case locOf po of
-          NoLoc -> False
-          Loc start' end' ->
-            let start = posCoff start'
-                end = posCoff end' + 1
-             in (selStart <= start && selEnd >= start) -- the end of the selection overlaps with the start of PO
-                  || (selStart <= end && selEnd >= end) -- the start of the selection overlaps with the end of PO
-                  || (selStart <= start && selEnd >= end) -- the selection covers the PO
-                  || (selStart >= start && selEnd <= end) -- the selection is within the PO
-                  -- sort them by comparing their starting position
-        overlapped = sortOn locOf $ filter isOverlapped items
+-- | Compare the mouse position with something
+--  EQ: the mouse is placed within that thing
+--  LT: the mouse is placed BEFORE (but not touching) that thing
+--  GT: the mouse is placed AFTER (but not touching) that thing
+compareWithMousePosition :: Located a => Int -> a -> Ordering
+compareWithMousePosition offset x = case locOf x of
+  NoLoc -> EQ
+  Loc start end ->
+    if offset < posCoff start
+      then LT
+      else
+        if offset - 1 > posCoff end
+          then GT
+          else EQ
+
+-- | See if something is within the mouse selection
+withinMouseSelection :: Located a => (Int, Int) -> a -> Bool
+withinMouseSelection (left, right) x =
+  compareWithMousePosition left x == EQ
+    || compareWithMousePosition right x == EQ
+    || (compareWithMousePosition left x == LT && compareWithMousePosition right x == GT)
+
+-- -- | Returns a list of stuff overlapped with mouse selection
+-- filterOverlapped :: Located a => (Int, Int) -> [a] -> [a]
+-- filterOverlapped (selStart, selEnd) items = opverlappedItems
+--   where
+--     opverlappedItems = case overlapped of
+--       [] -> []
+--       (x : _) -> case locOf x of
+--         NoLoc -> []
+--         Loc start _ ->
+--           let same y = case locOf y of
+--                 NoLoc -> False
+--                 Loc start' _ -> start == start'
+--            in filter same overlapped
+--       where
+--         -- find the POs whose Range overlaps with the selection
+--         isOverlapped po = case locOf po of
+--           NoLoc -> False
+--           Loc start' end' ->
+--             let start = posCoff start'
+--                 end = posCoff end' + 1
+--              in (selStart <= start && selEnd >= start) -- the end of the selection overlaps with the start of PO
+--                   || (selStart <= end && selEnd >= end) -- the start of the selection overlaps with the end of PO
+--                   || (selStart <= start && selEnd >= end) -- the selection covers the PO
+--                   || (selStart >= start && selEnd <= end) -- the selection is within the PO
+--                   -- sort them by comparing their starting position
+--         overlapped = sortOn locOf $ filter isOverlapped items
