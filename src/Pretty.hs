@@ -4,26 +4,35 @@
 
 module Pretty
   ( module Data.Text.Prettyprint.Doc,
-    renderStrict,
-    -- renderLazy,
+    toText,
+    docToText,
+    toString,
+    docToString
   )
 where
 
 import Data.Text (Text)
+import qualified Data.Text as Text
 import Data.Text.Prettyprint.Doc
-import qualified Data.Text.Prettyprint.Doc.Render.Text as Text
-import Error ( Error )
-import Pretty.Error ()
+import Data.Text.Prettyprint.Doc.Render.Text (renderStrict)
+import Error (Error)
 import Pretty.Abstract ()
 import Pretty.Concrete ()
+import Pretty.Error ()
 import Pretty.Predicate ()
 import Prelude hiding (Ordering (..))
 
-renderStrict :: Doc ann -> Text
-renderStrict = Text.renderStrict . layoutPretty defaultLayoutOptions
+docToText :: Doc ann -> Text
+docToText = renderStrict . layoutCompact
 
--- renderLazy :: Doc ann -> Lazy.Text
--- renderLazy = Text.renderLazy . layoutPretty defaultLayoutOptions
+toText :: Pretty a => a -> Text
+toText = docToText . pretty
+
+docToString :: Doc ann -> String
+docToString = Text.unpack . docToText
+
+toString :: Pretty a => a -> String
+toString = Text.unpack . toText
 
 --------------------------------------------------------------------------------
 
@@ -31,13 +40,3 @@ renderStrict = Text.renderStrict . layoutPretty defaultLayoutOptions
 instance {-# OVERLAPPING #-} (Pretty a) => Pretty (Either Error a) where
   pretty (Left a) = "Error" <+> pretty a
   pretty (Right b) = pretty b
-
---------------------------------------------------------------------------------
-
---------------------------------------------------------------------------------
-
--- --------------------------------------------------------------------------------
--- -- | Val
---
--- instance Pretty Val where
---   pretty = pretty . show

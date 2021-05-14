@@ -1,7 +1,11 @@
 # Guacamole
 
-
 ## Installation
+
+Prebuilt binaries should come with [the VS Code Extension](https://marketplace.visualstudio.com/items?itemName=scmlab.guacamole). There's no need of building this project from source unless you are using platforms other than *Windows*, *macOS*, or *Ubuntu*.
+
+### Build from source
+
 
 1. If you have [`git`](https://git-scm.com/), please clone this repository from GitHub, and then checkout the latest [release](https://github.com/scmlab/gcl/releases) (e.g., `v0.0.17`): 
 ```shell

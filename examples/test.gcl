@@ -1,7 +1,6 @@
-con A, B : Int {A}
+var n : Int
 
-{True}
-[!
+{: P : Bool
+    P = (n < 1) :}
 
-!]
-{True}
+{ True }

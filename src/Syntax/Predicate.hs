@@ -255,6 +255,8 @@ data Spec = Specification
   }
   deriving (Eq, Show, Generic)
 
+instance Located Spec where 
+  locOf (Specification _ _ _ loc) = loc
 
 -- | Return lines within a Spec without indentation
 specPayload :: Text -> Spec -> [Text]

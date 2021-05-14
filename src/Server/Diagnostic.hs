@@ -23,35 +23,34 @@ instance ToDiagnostics StructError where
   toDiagnostics (MissingPostcondition loc) = [makeError loc "Postcondition Missing" "The last statement of the program should be an assertion"]
 
 instance ToDiagnostics Error where
-  toDiagnostics (LexicalError pos) = [makeError (Loc pos pos) "Lexical error" ""]
-  toDiagnostics (SyntacticError errs) = map (\(loc, msg) -> makeError loc "Syntax error" (Text.pack msg)) errs
+  toDiagnostics (SyntacticError (loc, msg)) = [makeError loc "Syntax error" (Text.pack msg)]
   toDiagnostics (StructError err) = toDiagnostics err
   toDiagnostics (TypeError err) = toDiagnostics err
   toDiagnostics _ = []
 
 instance ToDiagnostics TypeError where
-  toDiagnostics (NotInScope name loc) = [makeError loc "Not in scope" $ renderStrict $ "The definition " <> pretty name <> " is not in scope"]
+  toDiagnostics (NotInScope name loc) = [makeError loc "Not in scope" $ docToText $ "The definition " <> pretty name <> " is not in scope"]
   toDiagnostics (UnifyFailed s t loc) =
     [ makeError loc "Cannot unify types" $
-        renderStrict $
+        docToText $
           "Cannot unify:" <+> pretty s <> line
             <> "with        :" <+> pretty t
     ]
   toDiagnostics (RecursiveType var t loc) =
     [ makeError loc "Recursive type variable" $
-        renderStrict $
+        docToText $
           "Recursive type variable:" <+> pretty var <> line
             <> "in type             :" <+> pretty t
     ]
   toDiagnostics (NotFunction t loc) =
     [ makeError loc "Not a function" $
-        renderStrict $
+        docToText $
           "The type" <+> pretty t <+> "is not a function type"
     ]
 
 instance ToDiagnostics StructWarning where
-  toDiagnostics (MissingBound loc) = [makeWarning loc "Bound Missing" "Bound missing at the end of the assertion before the DO construct \" , bnd : ... }\""]
-  toDiagnostics (ExcessBound loc) = [makeWarning loc "Excess Bound" "Unnecessary bound annotation at this assertion"]
+  toDiagnostics (MissingBound range) = [makeWarning (locOf range) "Bound Missing" "Bound missing at the end of the assertion before the DO construct \" , bnd : ... }\""]
+  toDiagnostics (ExcessBound range) = [makeWarning (locOf range) "Excess Bound" "Unnecessary bound annotation at this assertion"]
 
 instance ToDiagnostics PO where
   toDiagnostics (PO _i _pre _post origin) = [makeWarning loc title ""]
@@ -69,16 +68,8 @@ instance ToDiagnostics PO where
         AtIf l -> first2Char l
         others -> locOf others
 
-      title :: Text.Text
-      title = case origin of
-        AtAbort {} -> "Abort"
-        AtSpec {} -> "Spec"
-        AtAssignment {} -> "Assignment"
-        AtAssertion {} -> "Assertion"
-        AtIf {} -> "Conditional"
-        AtLoop {} -> "Loop Invariant"
-        AtTermination {} -> "Loop Termination"
-        AtSkip {} -> "Skip"
+      title :: Text
+      title = toText origin 
 
 makeError :: Loc -> Text -> Text -> Diagnostic
 makeError = makeDiagnostic (Just DsError)

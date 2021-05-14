@@ -10,19 +10,18 @@ import Control.Monad.Reader
 import Data.Aeson (FromJSON, ToJSON)
 import qualified Data.Aeson as JSON
 import Data.IORef (IORef, newIORef, readIORef, writeIORef)
-import Data.Loc
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Text (Text)
 import qualified Data.Text as Text
-import Error
-import GCL.WP
 import GHC.Generics (Generic)
 import Language.LSP.Diagnostics
 import Language.LSP.Server
 import Language.LSP.Types hiding (TextDocumentSyncClientCapabilities (..))
+import Render
 import qualified Syntax.Abstract as A
 import Syntax.Predicate (Origin, PO, Spec)
+import Data.Loc (Loc)
 
 --------------------------------------------------------------------------------
 
@@ -57,9 +56,9 @@ logStuff x = do
 
 -- | Logging Text
 logText :: Text -> ServerM ()
-logText text = do
+logText s = do
   chan <- lift $ asks envChan
-  liftIO $ writeChan chan text
+  liftIO $ writeChan chan s
 
 --------------------------------------------------------------------------------
 
@@ -82,15 +81,10 @@ sendResponses filepath responder responses = do
 
 --------------------------------------------------------------------------------
 
-type ID = LspId ('CustomMethod :: Method 'FromClient 'Request)
-
 -- | Response
 data ResKind
-  = ResOK ID [PO] [Spec] [A.Expr] [StructWarning]
-  | ResInspect [PO]
-  | ResError [(Site, Error)]
-  | ResUpdateSpecPositions [Loc]
-  | ResResolve Int -- resolves some Spec
+  = ResDisplay Int [Block]
+  | ResUpdateSpecs [(Int, Text, Text, Loc)]
   | ResSubstitute Int A.Expr
   | ResConsoleLog Text
   deriving (Eq, Generic)
@@ -98,20 +92,8 @@ data ResKind
 instance ToJSON ResKind
 
 instance Show ResKind where
-  show (ResOK i pos specs props warnings) =
-    "OK " <> show i <> " "
-      <> show (length pos)
-      <> " pos, "
-      <> show (length specs)
-      <> " specs, "
-      <> show (length props)
-      <> " props, "
-      <> show (length warnings)
-      <> " warnings"
-  show (ResInspect pos) = "Inspect " <> show (length pos) <> " POs"
-  show (ResError errors) = "Error " <> show (length errors) <> " errors"
-  show (ResUpdateSpecPositions locs) = "UpdateSpecPositions " <> show (length locs) <> " locs"
-  show (ResResolve i) = "Resolve " <> show i
+  show (ResDisplay _ _) = "Display"
+  show (ResUpdateSpecs _) = "UpdateSpecs"
   show (ResSubstitute i _) = "Substitute " <> show i
   show (ResConsoleLog x) = "ConsoleLog " <> show x
 

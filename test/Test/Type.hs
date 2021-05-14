@@ -7,9 +7,9 @@ import Data.Loc (Loc(..), Pos(..))
 import qualified Data.Map as Map
 import Data.Text (Text)
 import Test.Tasty (TestTree, testGroup)
-import Test.Util (goldenFileTest, parseTest, render)
+import Test.Util (goldenFileTest, parseTest, toString)
 import Test.Tasty.HUnit (testCase, (@?=), Assertion)
-import Control.Monad.Except (runExcept, withExcept, liftEither)
+import Control.Monad.Except (runExcept, withExcept, liftEither, foldM)
 import GCL.Type (TypeEnv, TypeError (UnifyFailed, NotInScope), SubstT, emptySubstT, runInfer, lookupEnv, checkProg, runSolver', inferExpr, runSolver, infer, TM, checkStmt, checkType, inferDecl, emptyEnv)
 import Syntax.Concrete.ToAbstract ( ToAbstract(toAbstract) )
 import Syntax.Abstract
@@ -24,7 +24,6 @@ import Syntax.Parser (runParse, pExpr, pProgram, Parser, pStmt, pType, pDeclarat
 import Pretty ()
 import Error (Error(..))
 import Data.Text.Prettyprint.Doc.Internal (layoutCompact, Pretty (pretty))
-import Data.Text.Prettyprint.Doc.Render.Text (renderStrict)
 import Data.Map (Map)
 
 tests :: TestTree
@@ -52,8 +51,10 @@ exprTests =
         exprCheck "i = j >= k" "Bool",
       testCase "Chain 4" $
         exprCheck "i >= j <= k" "Bool",
-      testCase "Arr App 1" $
-        exprCheck "Arr" "array [ 0 .. N ) of Int",
+      testCase "Chain 5" $
+        exprCheck "b = (i < j)" "Bool",
+      -- testCase "Arr App 1" $
+      --   exprCheck "Arr" "array [ 0 .. N ) of Int",
       testCase "Arr App 2" $
         exprCheck "Arr[i]" "Int",
       testCase "Arr App 3" $
@@ -199,20 +200,20 @@ blockDeclarationTests =
         "{:\n\
         \  A, B : Int\
         \:}" 
-        "[ [ ( A\n, Int )\n, ( B\n, Int ) ] ]",
+        "[ ( A\n, Int )\n, ( B\n, Int ) ]",
       testCase "block declaration 2" $
         blockDeclarationCheck
         "{:\n\
         \  A, B : Int { A = 0 }\
         \:}"
-        "[ [ ( A\n, Int )\n, ( B\n, Int ) ] ]",
+        "[ ( A\n, Int )\n, ( B\n, Int ) ]",
       testCase "block declaration 3" $
         blockDeclarationCheck
         "{:\n\
         \  A, B : Int\n\
         \    A = 0\n\
         \:}"
-        "[ [ ( A\n, Int )\n, ( B\n, Int ) ] ]",
+        "[ ( A\n, Int )\n, ( B\n, Int ) ]",
       testCase "block declaration 4" $
         blockDeclarationCheck
         "{:\n\
@@ -221,7 +222,7 @@ blockDeclarationTests =
         \  F : Int -> Int -> Int\n\
         \  P : Char -> Bool\n\
         \:}"
-        "[ [ ( A\n, Int )\n, ( B\n, Int ) ]\n, [ ( F\n, Int → Int → Int ) ]\n, [ ( P\n, Char → Bool ) ] ]"
+        "[ ( A\n, Int )\n, ( B\n, Int )\n, ( F\n, Int → Int → Int )\n, ( P\n, Char → Bool ) ]"
     ]
 
 
@@ -231,9 +232,9 @@ fileTests =
     "Check file"
     [ 
       typeCheckFile "2" "./test/source/" "2.gcl",
-      typeCheckFile "quant1" "./test/source/" "quant1.gcl",
-      typeCheckFile "mss" "./test/source/" "mss.gcl",
-      typeCheckFile "posnegpairs" "./test/source/examples/" "posnegpairs.gcl"
+      typeCheckFile "quant1" "./test/source/" "quant1.gcl"
+      -- typeCheckFile "mss" "./test/source/" "mss.gcl",
+      -- typeCheckFile "posnegpairs" "./test/source/examples/" "posnegpairs.gcl"
     ]
 
 typeCheckFile :: String -> FilePath -> FilePath -> TestTree
@@ -241,13 +242,13 @@ typeCheckFile name filePath fileName =
   goldenFileTest ".tc.golden" name filePath fileName fileCheck
 
 fileCheck :: (FilePath, Text) -> Text
-fileCheck (filepath, source) = renderStrict . layoutCompact . pretty $ result
+fileCheck (filepath, source) = toString result
   where
     result = case runParse pProgram filepath source of
-      Left err -> Left (SyntacticError err)
+      Left errors -> Left (map SyntacticError errors)
       Right ast -> case runExcept (toAbstract ast) of
-        Left err -> Left (Others "Should dig hole")
-        Right prog -> runExcept $ withExcept TypeError $ checkProg prog
+        Left err -> Left [Others "Should dig hole"]
+        Right prog -> runExcept $ withExcept (pure . TypeError) $ checkProg prog
 
 tint :: Type
 tint = TBase TInt NoLoc
@@ -304,13 +305,14 @@ env =
         (name "Max", tfunc tint (tfunc tint tbool)),
         (name "i", tint),
         (name "j", tint),
-        (name "k", tint)
+        (name "k", tint),
+        (name "b", tbool)
       ]
 
-runParser :: ToAbstract a b => Parser a -> Text -> Either (Either Error Loc) b
+runParser :: ToAbstract a b => Parser a -> Text -> Either (Either [Error] Loc) b
 runParser p t =
   case runExcept . toAbstract <$> parseTest p t of
-    Left errs -> Left . Left . SyntacticError $ errs
+    Left errs -> Left $ Left $ map SyntacticError errs
     Right (Left loc) -> Left . Right $ loc
     Right (Right expr) -> Right expr
 
@@ -324,18 +326,18 @@ check check env e =
 
 exprCheck :: Text -> Text -> Assertion
 exprCheck t1 t2 =
-  render (check inferExpr env <$> runParser pExpr t1) @?= t2
+  toString (check inferExpr env <$> runParser pExpr t1) @?= t2
 
 typeCheck :: Text -> Text -> Assertion
 typeCheck t1 t2 =
-  render (check checkType env <$> runParser pType t1) @?= t2
+  toString (check checkType env <$> runParser pType t1) @?= t2
 
 typeCheck' :: Text -> Assertion
 typeCheck' t = typeCheck t "()"
 
 stmtCheck :: Text -> Text -> Assertion
 stmtCheck t1 t2 =
-  render (check checkStmt env <$> runParser pStmt t1) @?= t2
+  toString (check checkStmt env <$> runParser pStmt t1) @?= t2
 
 stmtCheck' :: Text -> Assertion
 stmtCheck' t = stmtCheck t "()"
@@ -345,8 +347,18 @@ instance (Pretty a, Pretty b) => Pretty (Map a b) where
 
 declarationCheck :: Text -> Text -> Assertion 
 declarationCheck t1 t2 =
-  render (check inferDecl emptyEnv <$> runParser pDeclaration t1) @?= t2
+  toString (check inferDecl emptyEnv <$> runParser pDeclaration t1) @?= t2
 
 blockDeclarationCheck :: Text -> Text -> Assertion
 blockDeclarationCheck t1 t2 =
-  render (map (check inferDecl emptyEnv) <$> runParser pBlockDeclaration t1) @?= t2
+  -- toString (map (check inferDecl emptyEnv) <$> runParser pBlockDeclaration t1) @?= t2
+  toString wrap @?= t2
+  where
+    wrap = do
+      ds <- runParser pBlockDeclaration t1
+      foldM (\envM d -> 
+        case envM of
+          Left err -> return (Left err)
+          Right env -> return (check inferDecl env d)
+          ) (Right emptyEnv) ds
+  

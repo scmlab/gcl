@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: d594c5c5c62f5061bea7d7ee04cb8a56abe3308aad02b2e5401d5372462f5ebe
+-- hash: 731f06b949f5920eeaee6504a4519809b076d318e0c8a2bbb8bd89f1a8336451
 
 name:           gcl
 version:        0.1.0.0
@@ -40,6 +40,13 @@ library
       Pretty.Predicate
       Pretty.Util
       Pretty.Variadic
+      Render
+      Render.Class
+      Render.Element
+      Render.Error
+      Render.Predicate
+      Render.Syntax.Abstract
+      Render.Syntax.Common
       Server
       Server.CustomMethod
       Server.Diagnostic
@@ -49,6 +56,7 @@ library
       Server.Monad
       Syntax.Abstract
       Syntax.Abstract.Located
+      Syntax.Abstract.Util
       Syntax.Common
       Syntax.Common.Located
       Syntax.Concrete
@@ -147,6 +155,13 @@ test-suite gcl-test
       Pretty.Predicate
       Pretty.Util
       Pretty.Variadic
+      Render
+      Render.Class
+      Render.Element
+      Render.Error
+      Render.Predicate
+      Render.Syntax.Abstract
+      Render.Syntax.Common
       Server
       Server.CustomMethod
       Server.Diagnostic
@@ -156,6 +171,7 @@ test-suite gcl-test
       Server.Monad
       Syntax.Abstract
       Syntax.Abstract.Located
+      Syntax.Abstract.Util
       Syntax.Common
       Syntax.Common.Located
       Syntax.Concrete

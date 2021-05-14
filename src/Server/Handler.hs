@@ -20,12 +20,15 @@ import Language.LSP.Types hiding
     TextDocumentSyncClientCapabilities (..),
   )
 import qualified Language.LSP.Types as LSP
+import Pretty
+import Render
 import Server.CustomMethod
 import Server.Diagnostic
   ( ToDiagnostics (toDiagnostics),
   )
 import Server.ExportPO ()
 import Server.Monad
+import qualified Syntax.Abstract as A
 import Syntax.Predicate (Spec (..))
 
 -- handlers of the LSP server
@@ -44,8 +47,8 @@ handlers =
               _ -> False
         if triggered
           then do
-            let Position line col = position
-            let replaceRange = LSP.Range (Position line (col - 1)) position
+            let Position ln col = position
+            let replaceRange = LSP.Range (Position ln (col - 1)) position
             let removeSlash = Just $ List [TextEdit replaceRange ""]
 
             let makeItem label kind symbol detail doc =
@@ -69,16 +72,18 @@ handlers =
                     Nothing
 
             let items =
-                  [ makeItem "to" (Just CiOperator) "→" "\"→\" Rightwards Arrow" "The Unicode variant of \"->\"",
-                    makeItem "neq" (Just CiOperator) "≠" "\"≠\" Not Equal To" "The Unicode variant of \"/=\"",
-                    makeItem "gte" (Just CiOperator) "≥" "\"≥\" Greater-Than or Equal To" "The Unicode variant of \">=\"",
-                    makeItem "lte" (Just CiOperator) "≤" "\"≤\" Less-Than or Equal To" "The Unicode variant of \"<=\"",
-                    makeItem "imp" (Just CiOperator) "⇒" "\"⇒\" Rightwards Double Arrow" "The Unicode variant of \"=>\"",
-                    makeItem "conj" (Just CiOperator) "∧" "\"∧\" Logical And" "The Unicode variant of \"&&\"",
-                    makeItem "disj" (Just CiOperator) "∨" "\"∨\" Logical Or" "The Unicode variant of \"||\"",
-                    makeItem "neg" (Just CiOperator) "¬" "\"¬\" Not Sign" "The Unicode variant of \"~\"",
-                    makeItem "leftanglebracket" (Just CiValue) "⟨" "\"⟨\" Left Angle Bracket" "The Unicode variant of \"<|\"",
-                    makeItem "rightanglebracket" (Just CiValue) "⟩" "\"⟩\" Right Angle Bracket" "The Unicode variant of \"|>\""
+                  [ makeItem "->" (Just CiOperator) "→" "\"→\" Rightwards Arrow" "The Unicode variant of \"->\"",
+                    makeItem "/=" (Just CiOperator) "≠" "\"≠\" Not Equal To" "The Unicode variant of \"/=\"",
+                    makeItem ">=" (Just CiOperator) "≥" "\"≥\" Greater-Than or Equal To" "The Unicode variant of \">=\"",
+                    makeItem "<=" (Just CiOperator) "≤" "\"≤\" Less-Than or Equal To" "The Unicode variant of \"<=\"",
+                    makeItem "=>" (Just CiOperator) "⇒" "\"⇒\" Rightwards Double Arrow" "The Unicode variant of \"=>\"",
+                    makeItem "&&" (Just CiOperator) "∧" "\"∧\" Logical And" "The Unicode variant of \"&&\"",
+                    makeItem "||" (Just CiOperator) "∨" "\"∨\" Logical Or" "The Unicode variant of \"||\"",
+                    makeItem "~" (Just CiOperator) "¬" "\"¬\" Not Sign" "The Unicode variant of \"~\"",
+                    makeItem "<|" (Just CiValue) "⟨" "\"⟨\" Left Angle Bracket" "The Unicode variant of \"<|\"",
+                    makeItem "|>" (Just CiValue) "⟩" "\"⟩\" Right Angle Bracket" "The Unicode variant of \"|>\"",
+                    makeItem "min" (Just CiValue) "↓" "\"↓\" Downwards Arrow" "The Unicode variant of \"min\"",
+                    makeItem "max" (Just CiValue) "↑" "\"↑\" Upwards Arrow" "The Unicode variant of \"max\""
                   ]
 
             let isComplete = True
@@ -104,15 +109,21 @@ handlers =
                 interpret effEnv $ do
                   updateLastMouseSelection (selStart, selEnd)
                   source <- savedSource
-                  -- parse + type check + sweep
                   program <- parseProgram source
-                  typeCheck program
-                  (pos, _specs, _globalProps, warnings) <- sweep program
-                  -- display all POs
-                  let diagnostics = concatMap toDiagnostics pos ++ concatMap toDiagnostics warnings
-                  -- response with only POs in the vinicity of the cursor
-                  let responses = [ResInspect (filterPOs (selStart, selEnd) pos)]
-                  terminate responses diagnostics
+
+                  -- typeCheck program
+                  -- (pos, _specs, _globalProps, warnings) <- sweep program
+                  -- -- display all POs
+                  -- let diagnostics = concatMap toDiagnostics pos ++ concatMap toDiagnostics warnings
+                  -- -- response with only POs in the vinicity of the cursor
+                  -- let filteredPOs = filterPOs (selStart, selEnd) pos
+                  -- version <- bumpVersion
+
+                  -- let responses = [ResDisplay version (headerE "Proof Obligaitons" : map renderBlock filteredPOs)]
+                  -- terminate responses diagnostics
+
+                  -- parse + type check + sweep
+                  temp program (Just (selStart, selEnd))
 
               -- Refine
               ReqRefine selStart selEnd -> do
@@ -121,7 +132,7 @@ handlers =
                   source <- latestSource
                   -- refine (parse + sweep)
 
-                  (spec, text) <- refine source (selStart, selEnd)
+                  (spec, content) <- refine source (selStart, selEnd)
 
                   -- logM "*** SPEC CONTENT ------"
                   -- logM text
@@ -129,9 +140,9 @@ handlers =
 
                   -- remove the Spec
                   case specLoc spec of
-                    NoLoc -> throwError $ Others "NoLoc in ReqRefine"
+                    NoLoc -> throwError [Others "NoLoc in ReqRefine"]
                     Loc start end -> do
-                      source' <- editText (Range start end) (Text.stripStart text)
+                      source' <- editText (Range start end) (Text.stripStart content)
                       -- logM $ "*** AFTER REMOVING SPEC\n" <> source'
                       checkAndSendResponsePrim (Just (selStart, selEnd)) source'
 
@@ -150,8 +161,8 @@ handlers =
       -- when the client saved the document, store the text for later use
       notificationHandler STextDocumentDidSave $ \ntf -> do
         logText " --> TextDocumentDidSave"
-        let NotificationMessage _ _ (DidSaveTextDocumentParams (TextDocumentIdentifier uri) text) = ntf
-        case text of
+        let NotificationMessage _ _ (DidSaveTextDocumentParams (TextDocumentIdentifier uri) source') = ntf
+        case source' of
           Nothing -> pure ()
           Just source ->
             case uriToFilePath uri of
@@ -176,17 +187,38 @@ handlers =
               checkAndSendResponsePrim lastSelection source
     ]
 
+temp :: A.Program -> Maybe (Int, Int) -> EffM ()
+temp program lastSelection = do
+  (pos, specs, globalProps, warnings) <- sweep program
+  let overlappedSpecs = case lastSelection of
+        Nothing -> specs
+        Just sel -> filterOverlapped sel specs
+  let overlappedPOs = case lastSelection of
+        Nothing -> pos
+        Just sel -> filterOverlapped sel pos
+  let warningsSection = if null warnings then [] else headerE "Warnings" : map renderBlock warnings
+  let globalPropsSection = if null globalProps then [] else headerE "Global Properties" : map renderBlock globalProps
+  let specsSection = if null overlappedSpecs then [] else headerE "Specs" : map renderBlock overlappedSpecs
+  let poSection = if null overlappedPOs then [] else headerE "Proof Obligations" : map renderBlock overlappedPOs
+  let blocks =
+        mconcat
+          [ warningsSection,
+            specsSection,
+            poSection,
+            globalPropsSection
+          ]
+
+  version <- bumpVersion
+  let encodeSpec spec = (specID spec, toText $ render (specPreCond spec), toText $ render (specPostCond spec), specLoc spec)
+
+  let responses = [ResDisplay version blocks, ResUpdateSpecs (map encodeSpec specs)]
+  let diagnostics = concatMap toDiagnostics pos ++ concatMap toDiagnostics warnings
+
+  terminate responses diagnostics
+
 -- parse + type check + sweep
 checkAndSendResponsePrim :: Maybe (Int, Int) -> Text -> EffM ()
 checkAndSendResponsePrim lastSelection source = do
-  version <- bumpVersion
   program <- parseProgram source
   typeCheck program
-  (pos, specs, globalProps, warnings) <- sweep program
-  let diagnostics = concatMap toDiagnostics pos ++ concatMap toDiagnostics warnings
-  let filteredPOs = case lastSelection of
-        Nothing -> pos
-        Just sel -> filterPOs sel pos
-  let responses = [ResOK (IdInt version) filteredPOs specs globalProps warnings]
-
-  terminate responses diagnostics
+  temp program lastSelection

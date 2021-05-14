@@ -65,9 +65,7 @@ instance ExpandM SubstM where
 ifInDefns :: DefsM m => Name -> (Expr -> m a) -> m a -> m a
 ifInDefns name f y = do
   defs <- askDefns
-  case Map.lookup (nameToText name) defs of
-    Just e -> f (defnExpr e)
-    Nothing -> y
+  maybe y f (Map.lookup name defs)
 
 --------------------------------------------------------------------------------
 
@@ -92,7 +90,7 @@ freeSubst :: Subst -> Set Name
 freeSubst = Set.unions . Map.map free
 
 freeDefns :: Defns -> Set Name
-freeDefns = Set.unions . Map.map (free . defnExpr)
+freeDefns = Set.unions . Map.map free
 
 intersectSubst :: Set Name -> Subst -> Subst
 intersectSubst fs = Map.filterWithKey (const . (`elem` fs))
@@ -129,10 +127,10 @@ subst env v@(Var name _) = do
   --                 (return $ fromMaybe v' (Map.lookup x env))
   --   _ -> subst env e'
   defs <- askDefns
-  case Map.lookup (nameToText name) defs of
+  case Map.lookup name defs of
     Just e ->
       ifExpand
-        (subst env (defnExpr e))
+        (subst env e)
         (return (applySubst v env))
     Nothing -> return $ fromMaybe v (Map.lookup name env)
 subst env c@(Const name _) = do
@@ -143,10 +141,10 @@ subst env c@(Const name _) = do
   --                 (return $ fromMaybe c' (Map.lookup x env))
   --   _ -> subst env e'
   defs <- askDefns
-  case Map.lookup (nameToText name) defs of
+  case Map.lookup name defs of
     Just e ->
       ifExpand
-        (subst env (defnExpr e))
+        (subst env e)
         (return (applySubst c env))
     Nothing -> return $ fromMaybe c (Map.lookup name env)
 subst _ (Op op) = return $ Op op
@@ -167,7 +165,7 @@ subst env (Lam x e l) = do
   let env' = if conv then env else subtractSubst [x] env
   Lam x' <$> subst env' e' <*> pure l
 subst env (Quant qop xs range term l) = do
-  op' <- case qop of 
+  op' <- case qop of
           Left op -> return (Left op)
           Right op -> Right <$> subst env op
   (xs', range', term') <- subLocal (freeSubst env) xs range term
