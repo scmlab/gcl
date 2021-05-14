@@ -112,6 +112,7 @@ runInfer :: TypeEnv -> Infer Type -> TM (Type, [Constraint])
 runInfer env m = evalRWST m env initInfer
 
 infer :: Expr -> Infer Type
+infer (Paren expr) = infer expr
 infer (Lit lit l) = return (litTypes lit l)
 infer (Var x _) = lookupEnv x
 infer (Const c _) = lookupEnv c

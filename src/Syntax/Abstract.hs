@@ -87,7 +87,8 @@ instance ToJSON Type
 
 -- | Expressions
 data Expr
-  = Lit Lit Loc
+  = Paren Expr
+  | Lit Lit Loc
   | Var Name Loc
   | Const Name Loc
   | Op ArithOp

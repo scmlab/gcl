@@ -50,6 +50,8 @@ exprTests =
         exprCheck "i = j >= k" "Bool",
       testCase "Chain 4" $
         exprCheck "i >= j <= k" "Bool",
+      testCase "Chain 5" $
+        exprCheck "b = (i < j)" "Bool",
       -- testCase "Arr App 1" $
       --   exprCheck "Arr" "array [ 0 .. N ) of Int",
       testCase "Arr App 2" $
@@ -303,7 +305,8 @@ env =
         (name "Max", tfunc tint (tfunc tint tbool)),
         (name "i", tint),
         (name "j", tint),
-        (name "k", tint)
+        (name "k", tint),
+        (name "b", tbool)
       ]
 
 runParser :: ToAbstract a b => Parser a -> Text -> Either (Either [Error] Loc) b
