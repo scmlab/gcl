@@ -168,7 +168,7 @@ infer (Quant qop iters rng t l) = do
         uni to (TFunc x (TFunc x x (locOf qop)) (locOf qop))
         uni tt x
         return x
-infer (Subst expr sub) = do
+infer (Subst expr sub _) = do
   t <- infer expr
   s <- mapM infer sub
   return $ apply s t

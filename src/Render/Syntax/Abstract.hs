@@ -103,7 +103,7 @@ handleExpr _ (Quant (Right op) xs r t _) =
       <+> ":"
       <+> render t
       <+> "⟩"
-handleExpr _ (Subst _ _) = return "Subst"
+handleExpr _ (Subst _ _ _) = return "Subst"
 
 --------------------------------------------------------------------------------
 

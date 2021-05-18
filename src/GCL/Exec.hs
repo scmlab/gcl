@@ -46,7 +46,7 @@ evalExpr (App e1 e2 _) =
 evalExpr Lam {} = error "to be implemented"
 evalExpr Quant {} = error "not supported"
 evalExpr (Hole _) = error "shouldn't happen"
-evalExpr (Subst _ _) = error "not supported"
+evalExpr (Subst _ _ _) = error "not supported"
 
 litToVal :: Lit -> Val
 litToVal (Num n) = VNum n

@@ -44,7 +44,7 @@ instance Located Expr where
   locOf (Lam _ _ l) = l
   locOf (Hole l) = l
   locOf (Quant _ _ _ _ l) = l
-  locOf (Subst _ _) = NoLoc
+  locOf (Subst _ _ x) = locOf x
 
 instance Located Lit where
   locOf _ = NoLoc

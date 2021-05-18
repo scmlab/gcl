@@ -82,7 +82,7 @@ free (Quant op xs range term _) =
   (either (const mempty) free op <> free range <> free term) \\ Set.fromList xs
 free (Hole _) = mempty -- banacorn: `subs` has been always empty anyway
 -- concat (map freeSubst subs) -- correct?
-free (Subst e s) = (free e \\ Set.fromList (Map.keys s)) <> freeSubst s
+free (Subst e s _) = (free e \\ Set.fromList (Map.keys s)) <> freeSubst s
 
 -- free variables in substitutions and list of definitions
 
@@ -101,7 +101,7 @@ subtractSubst xs = Map.filterWithKey (const . not . (`elem` xs))
 applySubst :: Expr -> Subst -> Expr
 applySubst e env
   | null env = e
-  | otherwise = Subst e env
+  | otherwise = Subst e env undefined 
 
 --------------------------------------------------------------------------------
 
@@ -165,7 +165,7 @@ subst env (Lam x e l) = do
   let env' = if conv then env else subtractSubst [x] env
   Lam x' <$> subst env' e' <*> pure l
 subst env (Quant qop xs range term l) = do
-  op' <- case qop of 
+  op' <- case qop of
           Left op -> return (Left op)
           Right op -> Right <$> subst env op
   (xs', range', term') <- subLocal (freeSubst env) xs range term
@@ -193,7 +193,7 @@ subst env (Quant qop xs range term l) = do
       | otherwise = first3 (i :) <$> subLocal freeInEnv' is r t
 
     first3 f (x, y, z) = (f x, y, z)
-subst env s@(Subst _ _) =
+subst env s@Subst {} =
   return $ applySubst s env -- (shrinkSubst (free s) env)
 
 --------------------------------------------------------------------------------
@@ -232,7 +232,7 @@ expand (Quant op xs range term l) = do
   range' <- expand range
   term' <- expand term
   return $ Quant op xs range' term' l
-expand (Subst e env) = do
+expand (Subst e env _) = do
   e' <- expand e
   subst env e'
 
