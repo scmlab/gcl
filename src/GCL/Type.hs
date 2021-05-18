@@ -1,6 +1,6 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings #-}
-
+{-# LANGUAGE FlexibleInstances #-}
 module GCL.Type where
 
 import Control.Monad.Except
@@ -9,84 +9,14 @@ import Data.Aeson (ToJSON)
 import Data.Loc
 import Data.Map (Map)
 import qualified Data.Map as Map
-import Data.Set (Set)
-import qualified Data.Set as Set
-import qualified Data.Text as Text
 import GHC.Generics (Generic)
 import Syntax.Abstract
 import Syntax.Abstract.Located ()
 import Syntax.Common
 import Prelude hiding (Ordering (..))
+import GCL.Common
 
 type TM = Except TypeError
-
-------------------------------------------
--- type enviornment
-------------------------------------------
-
--- newtype TypeEnv = TypeEnv (Map Name Type) deriving (Eq, Show)
-type TypeEnv = Map Name Type
-
-emptyEnv :: TypeEnv
-emptyEnv = Map.empty
-
-extend :: TypeEnv -> (Name, Type) -> TypeEnv
-extend env (x, s) =  Map.insert x s env
-
-extend' :: TypeEnv -> (Name, Type) -> TM TypeEnv
-extend' e@env (x, s) =
-  case Map.lookup x env of
-    Nothing -> return $ e `extend` (x, s)
-    Just t -> throwError $ RecursiveType x t (locOf t)
-
-------------------------------------------
--- Substitution
-------------------------------------------
-
-type SubstT = Map Name Type
-
-emptySubstT :: SubstT
-emptySubstT = Map.empty
-
-compose :: SubstT -> SubstT -> SubstT
-s1 `compose` s2 = s1 `Map.union` Map.map (apply s1) s2
-
-class Substitutable a where
-  apply :: SubstT -> a -> a
-  fv :: a -> Set Name
-
-instance Substitutable Type where
-  apply _ t@(TBase _ _) = t
-  apply s (TArray i t l) = TArray i (apply s t) l
-  apply s (TFunc t1 t2 l) = TFunc (apply s t1) (apply s t2) l
-  apply s t@(TVar x _) = Map.findWithDefault t x s
-
-  fv (TBase _ _) = Set.empty
-  fv (TArray _ t _) = fv t
-  fv (TFunc t1 t2 _) = fv t1 `Set.union` fv t2
-  fv (TVar x _) = Set.singleton x
-
--- instance Substitutable TypeEnv where
---   apply s env =  Map.map (apply s) env
-
---   fv env = foldl (flip (Set.union . fv)) Set.empty (Map.elems env)
-
-occursT :: (Substitutable a) => Name -> a -> Bool
-occursT x s = x `Set.member` fv s
-
-typeWithLoc :: Loc -> Type -> Type
-typeWithLoc l (TBase b _) = TBase b l
-typeWithLoc l (TArray i t _) = TArray i t l
-typeWithLoc l (TFunc t1 t2 _) = TFunc t1 t2 l
-typeWithLoc l (TVar n _) = TVar n l
-
-------------------------------------------
--- type inference
-------------------------------------------
-
-type Infer = RWST TypeEnv [Constraint] InferState TM
-
-type InferState = Int
 
 data TypeError
   = NotInScope Name Loc
@@ -103,20 +33,37 @@ instance Located TypeError where
   locOf (RecursiveType _ _ l) = l
   locOf (NotFunction _ l) = l
 
-initInfer :: InferState
-initInfer = 0
+------------------------------------------
+-- type enviornment
+------------------------------------------
 
-runInfer' :: TypeEnv -> Infer Type -> Either TypeError (Type, [Constraint])
-runInfer' env m = runExcept $ evalRWST m env initInfer
+extend' :: Env Type -> (Name, Type) -> TM (Env Type)
+extend' env (x, s) =
+  case Map.lookup x env of
+    Nothing -> return $ env `extend` (x, s)
+    Just t -> throwError $ RecursiveType x t (locOf t)
 
-runInfer :: TypeEnv -> Infer Type -> TM (Type, [Constraint])
-runInfer env m = evalRWST m env initInfer
+------------------------------------------
+-- Substitution
+------------------------------------------
+
+typeWithLoc :: Loc -> Type -> Type
+typeWithLoc l (TBase b _) = TBase b l
+typeWithLoc l (TArray i t _) = TArray i t l
+typeWithLoc l (TFunc t1 t2 _) = TFunc t1 t2 l
+typeWithLoc l (TVar n _) = TVar n l
+
+------------------------------------------
+-- type inference
+------------------------------------------
+
+type Infer = Solver TM Type
 
 infer :: Expr -> Infer Type
 infer (Paren expr) = infer expr
 infer (Lit lit l) = return (litTypes lit l)
-infer (Var x _) = lookupEnv x
-infer (Const c _) = lookupEnv c
+infer (Var x _) = lookupInferEnv x
+infer (Const c _) = lookupInferEnv c
 infer (Op o) = return (arithOpTypes o)
 infer (Chain a op b loc) = do
   ta <- infer a
@@ -141,14 +88,14 @@ infer (Chain a op b loc) = do
 infer (App e1 e2 l) = do
   t1 <- infer e1
   t2 <- infer e2
-  v <- fresh l
+  v <- freshVar l
   uni t1 (TFunc t2 v l)
   return v
 infer (Lam x e l) = do
-  v <- fresh l
+  v <- freshVar l
   t <- inEnv [(x, v)] (infer e)
   return (TFunc v t l)
-infer (Hole l) = fresh l
+infer (Hole l) = freshVar l
 infer (Quant qop iters rng t l) = do
   tr <- inEnv [(n, TBase TInt (locOf n)) | n <- iters] (infer rng)
   uni tr (TBase TBool (locOf rng))
@@ -166,7 +113,7 @@ infer (Quant qop iters rng t l) = do
       f tt to
     where
       f tt to = do
-        x <- fresh l
+        x <- freshVar l
         uni to (TFunc x (TFunc x x (locOf qop)) (locOf qop))
         uni tt x
         return x
@@ -175,13 +122,13 @@ infer (Subst expr sub) = do
   s <- mapM infer sub
   return $ apply s t
 
-inferExpr :: TypeEnv -> Expr -> TM Type
+inferExpr :: Env Type -> Expr -> TM Type
 inferExpr env e = do
-  (t, cs) <- runInfer env (infer e)
-  s <- runSolver cs
+  (t, cs) <- runSolver env (infer e)
+  s <- solveConstraints cs
   return $ apply s t
 
-inferDecl :: TypeEnv -> Declaration -> TM TypeEnv
+inferDecl :: Env Type -> Declaration -> TM (Env Type)
 inferDecl env (ConstDecl ns t p _) = do
   checkType env t
   env' <- foldM f env ns
@@ -202,50 +149,38 @@ inferDecl env (LetDecl n args expr _) = do
   where
     expr' = foldr (\a e' -> Lam a e' (locOf e')) expr args
 
-uni :: Type -> Type -> Infer ()
-uni t1 t2 = tell [(t1, t2)]
+lookupInferEnv :: Name -> Infer Type
+lookupInferEnv n = do
+  lookupEnv n 
+    (throwError $ NotInScope n (locOf n))
+    (return . typeWithLoc (locOf n))
 
-lookupEnv :: Name -> Infer Type
-lookupEnv n = do
-  env <- ask
-  case Map.lookup n env of
-    Just t -> return (typeWithLoc (locOf n) t)
-    Nothing -> throwError $ NotInScope n (locOf n)
-
-inEnv :: [(Name, Type)] -> Infer a -> Infer a
-inEnv l m = do
-  let scope e = foldl (\e' (x, sc) -> Map.insert x sc e') e l
-  local scope m
-
-fresh :: Loc -> Infer Type
-fresh l = flip TVar l . flip Name l <$> freshText
-  where
-    freshText = do
-      i <- get
-      put (i + 1)
-      return . Text.pack $ ("?m_" ++ show i)
+freshVar :: Loc -> Infer Type
+freshVar l = do
+  t <- freshText
+  return (TVar (Name t l) l)
 
 ------------------------------------------
 -- type check
 ------------------------------------------
 
-checkName :: TypeEnv -> (Name, Expr) -> TM ()
-checkName env@envM (n, expr) =
-  case Map.lookup n envM of
+checkAssign :: Env Type -> (Name, Expr) -> TM ()
+checkAssign env (n, expr) =
+  case Map.lookup n env of
     Nothing -> throwError $ NotInScope n (locOf n)
     Just t -> do
       checkIsType env expr t
 
-checkIsType :: TypeEnv -> Expr -> Type -> TM ()
+checkIsType :: Env Type -> Expr -> Type -> TM ()
 checkIsType env expr t = do
-  (eType, cs) <- runInfer env (infer expr)
-  void $ runSolver (cs `mappend` [(eType, t)])
+  (eType, cs) <- runSolver env (infer expr)
+  void $ solveConstraints (cs `mappend` [(eType, t)])
 
-checkPredicate :: TypeEnv -> Expr -> TM ()
+checkPredicate :: Env Type -> Expr -> TM ()
 checkPredicate env p =
   checkIsType env p (TBase TBool NoLoc)
 
-checkType :: TypeEnv -> Type -> TM ()
+checkType :: Env Type -> Type -> TM ()
 checkType _ (TBase _ _) = return ()
 checkType env (TArray (Interval e1 e2 _) t _) = do
   checkIsType env (getEndpointExpr e1) (TBase TInt NoLoc)
@@ -257,21 +192,21 @@ checkType env (TArray (Interval e1 e2 _) t _) = do
 checkType env (TFunc t1 t2 _) = checkType env t1 >> checkType env t2
 checkType _ (TVar _ _) = return ()
 
-checkExpr :: TypeEnv -> Expr -> TM ()
+checkExpr :: Env Type -> Expr -> TM ()
 checkExpr env expr = void $ inferExpr env expr
 
-checkGdCmd :: TypeEnv -> GdCmd -> TM ()
+checkGdCmd :: Env Type -> GdCmd -> TM ()
 checkGdCmd env (GdCmd expr stmts _) = do
   checkPredicate env expr
   mapM_ (checkStmt env) stmts
 
-checkStmt :: TypeEnv -> Stmt -> TM ()
+checkStmt :: Env Type -> Stmt -> TM ()
 checkStmt _ (Skip _) = return ()
 checkStmt _ (Abort _) = return ()
 checkStmt env (Assign ns es _)            -- NOTE : Not sure if Assign work this way
   | length ns > length es = throwError $ error "Missing Expression"
   | length ns < length es = throwError $ error "Duplicated Assignment"
-  | otherwise = forM_ (zip ns es) (checkName env)
+  | otherwise = forM_ (zip ns es) (checkAssign env)
 checkStmt env (Assert expr _) = do
   checkPredicate env expr
 checkStmt env (LoopInvariant e1 e2 _) = do
@@ -283,7 +218,7 @@ checkStmt _ (Spec _ _) = return ()
 checkStmt _ (Proof _) = return ()
 
 declsMap :: [Declaration] -> Map Name (Either Type Expr)
-declsMap [] = Map.empty
+declsMap [] = mempty
 declsMap (ConstDecl ns t _ _ : decls) =
   foldl (\m n -> Map.insert n (Left t) m) (declsMap decls) ns
 declsMap (VarDecl ns t _ _ : decls) =
@@ -297,7 +232,7 @@ checkProg :: Program -> TM ()
 checkProg (Program decls exprs defs stmts _) = do
   env <- foldM inferDecl emptyEnv decls
   mapM_ (checkExpr env) exprs
-  mapM_ (checkName env) (Map.toList defs)
+  mapM_ (checkAssign env) (Map.toList defs)
   mapM_ (checkStmt env) stmts
 
 ------------------------------------------
@@ -306,14 +241,14 @@ checkProg (Program decls exprs defs stmts _) = do
 
 type Constraint = (Type, Type)
 
-type Unifier = (SubstT, [Constraint])
+type Unifier = (Subs Type, [Constraint])
 
 emptyUnifier :: Unifier
-emptyUnifier = (emptySubstT, [])
+emptyUnifier = (emptySubs, [])
 
-unifies :: Type -> Type -> TM SubstT
+unifies :: Type -> Type -> TM (Subs Type)
 unifies (TBase t1 _) (TBase t2 _)
-  | t1 == t2 = return emptySubstT
+  | t1 == t2 = return emptySubs
 unifies (TArray i1 t1 _) (TArray i2 t2 _)
   | i1 == i2 = unifies t1 t2
 -- view array of type `t` as function type of `Int -> t`
@@ -327,25 +262,25 @@ unifies (TVar x l) t = bind x t l
 unifies t (TVar x _) = bind x t (locOf t)
 unifies t1 t2 = throwError $ UnifyFailed t1 t2 (locOf t1)
 
-runSolver' :: [Constraint] -> Either TypeError SubstT
-runSolver' cs = runExcept . solver $ (emptySubstT, cs)
+solveConstraints' :: [Constraint] -> Either TypeError (Subs Type)
+solveConstraints' cs = runExcept . solveUnifier $ (emptySubs, cs)
 
-runSolver :: [Constraint] -> TM SubstT
-runSolver cs = solver (emptySubstT, cs)
+solveConstraints :: [Constraint] -> TM (Subs Type)
+solveConstraints cs = solveUnifier (emptySubs, cs)
 
-solver :: Unifier -> TM SubstT
-solver (s, []) = return s
-solver (s, (t1, t2) : cs) = do
-  su <- unifies t1 t2
-  solver (su `compose` s, map (f (apply su)) cs)
+solveUnifier :: Unifier -> TM (Subs Type)
+solveUnifier (s, []) = return s
+solveUnifier (s, c : cs) = do
+  su <- uncurry unifies c
+  solveUnifier (su `compose` s, map (f (apply su)) cs)
   where
     f g (a, b) = (g a, g b)
 
-bind :: Name -> Type -> Loc -> TM SubstT
+bind :: Name -> Type -> Loc -> TM (Subs Type)
 bind x (TVar y _) _
-  | x == y = return emptySubstT
+  | x == y = return emptySubs
 bind x t l
-  | occursT x t = throwError $ RecursiveType x t l
+  | occurs x t = throwError $ RecursiveType x t l
   | otherwise = return (Map.singleton x (typeWithLoc l t))
 
 ------------------------------------------
@@ -367,7 +302,7 @@ inferChainOpTypes op = do
     _ -> return (chainOpTypes op)
   where
     f l = do
-      x <- fresh l
+      x <- freshVar l
       return (TFunc x (TFunc x (TBase TBool l) l) l)
 
 

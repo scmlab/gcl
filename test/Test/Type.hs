@@ -1,5 +1,4 @@
 {-# LANGUAGE OverloadedStrings #-}
-
 {-# LANGUAGE FlexibleContexts #-}
 module Test.Type where
 
@@ -9,8 +8,10 @@ import Data.Text (Text)
 import Test.Tasty (TestTree, testGroup)
 import Test.Util (goldenFileTest, parseTest, toString)
 import Test.Tasty.HUnit (testCase, (@?=), Assertion)
-import Control.Monad.Except (runExcept, withExcept, liftEither, foldM)
-import GCL.Type (TypeEnv, TypeError (UnifyFailed, NotInScope), SubstT, emptySubstT, runInfer, lookupEnv, checkProg, runSolver', inferExpr, runSolver, infer, TM, checkStmt, checkType, inferDecl, emptyEnv)
+import Control.Monad.Except (foldM, runExcept, withExcept, liftEither)
+import GCL.Type
+    ( TM, inferExpr, inferDecl, checkType, checkStmt, checkProg )
+import GCL.Common ( Env, emptyEnv )
 import Syntax.Concrete.ToAbstract ( ToAbstract(toAbstract) )
 import Syntax.Abstract
     ( Lit(..),
@@ -292,7 +293,7 @@ var t = Var (Name t NoLoc) NoLoc
 name :: Text -> Name
 name t = Name t NoLoc 
 
-env :: TypeEnv
+env :: Env Type
 env =
     Map.fromList
       [
@@ -317,8 +318,8 @@ runParser p t =
     Right (Right expr) -> Right expr
 
 check ::
-  (TypeEnv -> a -> TM b) ->
-  TypeEnv -> a -> Either Error b
+  (Env Type -> a -> TM b) ->
+  Env Type -> a -> Either Error b
 check check env e =
   case runExcept (check env e) of
     Left err -> Left . TypeError $ err
