@@ -98,10 +98,11 @@ intersectSubst fs = Map.filterWithKey (const . (`elem` fs))
 subtractSubst :: [Name] -> Subst -> Subst
 subtractSubst xs = Map.filterWithKey (const . not . (`elem` xs))
 
-applySubst :: Expr -> Subst -> Expr
-applySubst e env
-  | null env = e
-  | otherwise = Subst e env undefined 
+applySubst :: ExpandM m => Expr -> Subst -> m Expr -> m Expr
+applySubst before env after
+  | null env = return before
+  | otherwise = do
+    Subst before env <$> after
 
 --------------------------------------------------------------------------------
 
@@ -131,7 +132,7 @@ subst env v@(Var name _) = do
     Just e ->
       ifExpand
         (subst env (defnExpr e))
-        (return (applySubst v env))
+        (applySubst v env (subst env (defnExpr e)))
     Nothing -> return $ fromMaybe v (Map.lookup name env)
 subst env c@(Const name _) = do
   -- e' <- expand c
@@ -145,7 +146,7 @@ subst env c@(Const name _) = do
     Just e ->
       ifExpand
         (subst env (defnExpr e))
-        (return (applySubst c env))
+        (applySubst c env (subst env (defnExpr e)))
     Nothing -> return $ fromMaybe c (Map.lookup name env)
 subst _ (Op op) = return $ Op op
 subst _ (Lit n l) = return $ Lit n l
@@ -193,8 +194,9 @@ subst env (Quant qop xs range term l) = do
       | otherwise = first3 (i :) <$> subLocal freeInEnv' is r t
 
     first3 f (x, y, z) = (f x, y, z)
-subst env s@Subst {} =
-  return $ applySubst s env -- (shrinkSubst (free s) env)
+subst env s@(Subst _ env' e) = do 
+  e' <- subst env e
+  applySubst s env (subst env' e') 
 
 --------------------------------------------------------------------------------
 

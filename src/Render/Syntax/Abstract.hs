@@ -1,15 +1,17 @@
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module Render.Syntax.Abstract where 
+module Render.Syntax.Abstract where
 
+import Data.Loc (locOf)
+import Data.Loc.Range
+import qualified Data.Map as Map
+import Pretty.Variadic (Variadic (..), var)
 import Render.Class
-import Syntax.Abstract
-import Pretty.Variadic (Variadic(..), var)
 import Render.Element
 import Render.Syntax.Common ()
+import Syntax.Abstract
 import Syntax.Common (ArithOp, Fixity (..), classifyArithOp)
-import Data.Loc.Range
-import Data.Loc (locOf)
 
 --------------------------------------------------------------------------------
 
@@ -69,10 +71,11 @@ handleExpr _ (Var x _) = return $ render x
 handleExpr _ (Const x _) = return $ render x
 handleExpr _ (Lit x _) = return $ render x
 handleExpr n (Op x) = handleOp n x
-handleExpr _ (Chain a op b _) = 
-  return $ render a
-    <+> render op
-    <+> render b
+handleExpr _ (Chain a op b _) =
+  return $
+    render a
+      <+> render op
+      <+> render b
 handleExpr n (App p q _) = case handleExpr n p of
   Expect f -> f q
   Complete s -> do
@@ -103,7 +106,15 @@ handleExpr _ (Quant (Right op) xs r t _) =
       <+> ":"
       <+> render t
       <+> "⟩"
-handleExpr _ (Subst _ _ _) = return "Subst"
+handleExpr _ (Subst before env after) =
+  return $
+    render before <+> render env <+> "{{" <+> render after <+> "}}"
+
+instance Render Subst where
+  render env = "[" <+> exprs <+> "/" <+> vars <+> "]"
+    where
+      vars = punctuateE "," $ map render $ Map.keys env
+      exprs = punctuateE "," $ map render $ Map.elems env
 
 --------------------------------------------------------------------------------
 
@@ -153,6 +164,6 @@ instance Render Interval where
 --------------------------------------------------------------------------------
 
 parensIf :: Int -> Int -> Inlines -> Inlines
-parensIf n m | n > m     = parensE
-             | otherwise = id
-
+parensIf n m
+  | n > m = parensE
+  | otherwise = id

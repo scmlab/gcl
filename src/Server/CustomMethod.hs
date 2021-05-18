@@ -35,6 +35,7 @@ import Syntax.Concrete.ToAbstract
 import Syntax.Parser (Parser, pProgram, pStmts, runParse)
 import Syntax.Predicate (PO, Spec (specLoc), specPayload)
 import Prelude hiding (span)
+import qualified GCL.Expr as E
 
 --------------------------------------------------------------------------------
 
@@ -276,8 +277,8 @@ refine source (start, end) = do
 
 --
 substitute :: A.Program -> A.Expr -> A.Subst -> A.Expr
-substitute (A.Program _ _ defns _ _) expr subst =
-  runSubstM (expand (A.Subst expr subst)) defns 1
+substitute (A.Program _ _ defns _ _) expr env =
+  runSubstM (expand expr >>= E.subst env) defns 1
 
 typeCheck :: A.Program -> EffM ()
 typeCheck p = case runExcept (TypeChecking.checkProg p) of

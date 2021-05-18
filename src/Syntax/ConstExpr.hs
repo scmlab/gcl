@@ -25,7 +25,7 @@ constExpr bvars (Quant op bvs range body _) =
       constExprQOp qop = case qop of
           Left _ -> True
           Right expr -> constExpr bvars expr
-constExpr _ (Subst _ _) = error "constExpr Subst to be implemented"
+constExpr _ Subst {} = error "constExpr Subst to be implemented"
 
 -- extract assertions from declarations
 pickGlobals :: [Declaration] -> ([Expr], [Expr])
