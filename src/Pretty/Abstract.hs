@@ -110,7 +110,7 @@ handleExpr _ (Var x _) = return $ pretty x
 handleExpr _ (Const x _) = return $ pretty x
 handleExpr _ (Lit x _) = return $ pretty x
 handleExpr n (Op x) = handleOp n x
-handleExpr _ (Chain a op b _) = 
+handleExpr _ (Chain a op b _) =
   return $ pretty a
     <> pretty op
     <> pretty b
@@ -134,7 +134,7 @@ handleExpr _ (Quant op xs r t _) =
       <> " : "
       <> pretty t
       <> " ⟩"
-handleExpr _ (Subst _  _ _) = return "Subst"
+handleExpr _ Subst {} = return "Subst"
 
 --------------------------------------------------------------------------------
 

@@ -107,8 +107,11 @@ handleExpr _ (Quant (Right op) xs r t _) =
       <+> render t
       <+> "⟩"
 handleExpr _ (Subst before env after) =
-  return $
-    render before <+> render env <+> "{{" <+> render after <+> "}}"
+  return $ substE (render before <+> render env) (if isLam after then parensE (render after) else render after)
+  where
+    isLam :: Expr -> Bool
+    isLam Lam {} = True
+    isLam _ = False
 
 instance Render Subst where
   render env = "[" <+> exprs <+> "/" <+> vars <+> "]"
