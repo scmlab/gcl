@@ -4,7 +4,8 @@
 module Render.Class
   ( Render (..),
     RenderBlock(..), 
-    tempHandleLoc
+    tempHandleLoc,
+    renderManySepByComma
   )
 where
 
@@ -66,5 +67,10 @@ instance Render Bool where
 instance Render (Doc ann) where
   render = textE . Text.renderStrict . Doc.layoutPretty Doc.defaultLayoutOptions
 
+-- seperated by commas
 -- instance Render a => Render [a] where
---   render xs = "[" <> Inlines $ pure $ Horz (punctuate "," (map render xs)) <> "]"
+--   render = punctuateE "," . map render
+      -- "[" <> Inlines $ pure $ Horz (punctuate "," (map render xs)) <> "]"
+
+renderManySepByComma :: Render a => [a] -> Inlines
+renderManySepByComma = punctuateE "," . map render

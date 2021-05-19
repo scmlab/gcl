@@ -6,6 +6,8 @@ module GCL.Type where
 import Control.Monad.Except
 import Control.Monad.RWS hiding (Sum)
 import Data.Aeson (ToJSON)
+import Data.List.NonEmpty (NonEmpty)
+import qualified Data.List.NonEmpty as NE
 import Data.Loc
 import Data.Map (Map)
 import qualified Data.Map as Map
@@ -92,6 +94,9 @@ data TypeError
   | UnifyFailed Type Type Loc
   | RecursiveType Name Type Loc
   | NotFunction Type Loc
+  | -- TODO: move these to scope checking
+    NotEnoughExprsInAssigment (NonEmpty Name) Loc
+  | TooManyExprsInAssigment (NonEmpty Expr) Loc
   deriving (Show, Eq, Generic)
 
 instance ToJSON TypeError
@@ -101,6 +106,8 @@ instance Located TypeError where
   locOf (UnifyFailed _ _ l) = l
   locOf (RecursiveType _ _ l) = l
   locOf (NotFunction _ l) = l
+  locOf (NotEnoughExprsInAssigment _ l) = l
+  locOf (TooManyExprsInAssigment _ l) = l
 
 initInfer :: InferState
 initInfer = 0
@@ -162,12 +169,12 @@ infer (Quant qop iters rng t l) = do
     Right qop' -> do
       to <- infer qop'
       f tt to
-    where
-      f tt to = do
-        x <- fresh l
-        uni to (TFunc x (TFunc x x (locOf qop)) (locOf qop))
-        uni tt x
-        return x
+  where
+    f tt to = do
+      x <- fresh l
+      uni to (TFunc x (TFunc x x (locOf qop)) (locOf qop))
+      uni tt x
+      return x
 infer (Subst expr sub _) = do
   t <- infer expr
   s <- mapM infer sub
@@ -240,7 +247,7 @@ checkIsType env expr t = do
   void $ runSolver (cs `mappend` [(eType, t)])
 
 checkPredicate :: TypeEnv -> Expr -> TM ()
-checkPredicate env p = 
+checkPredicate env p =
   checkIsType env p (TBase TBool NoLoc)
 
 checkType :: TypeEnv -> Type -> TM ()
@@ -266,9 +273,19 @@ checkGdCmd env (GdCmd expr stmts _) = do
 checkStmt :: TypeEnv -> Stmt -> TM ()
 checkStmt _ (Skip _) = return ()
 checkStmt _ (Abort _) = return ()
-checkStmt env (Assign ns es _)            -- NOTE : Not sure if Assign work this way
-  | length ns > length es = throwError $ error "Missing Expression"
-  | length ns < length es = throwError $ error "Duplicated Assignment"
+checkStmt env (Assign ns es loc) -- NOTE : Not sure if Assign work this way
+  | length ns > length es = let extraVars = drop (length es) ns in 
+    throwError $
+      NotEnoughExprsInAssigment
+        (NE.fromList extraVars)
+        -- (locOf $ mergeRangesUnsafe (fromLocs $ map locOf extraVars))
+        loc
+  | length ns < length es = let extraExprs = drop (length ns) es in
+    throwError $
+      TooManyExprsInAssigment
+        (NE.fromList extraExprs)
+        -- (locOf $ mergeRangesUnsafe (fromLocs $ map locOf extraExprs))
+        loc
   | otherwise = forM_ (zip ns es) (checkName env)
 checkStmt env (Assert expr _) = do
   checkPredicate env expr
@@ -367,7 +384,6 @@ inferChainOpTypes op = do
     f l = do
       x <- fresh l
       return (TFunc x (TFunc x (TBase TBool l) l) l)
-
 
 chainOpTypes :: ChainOp -> Type
 chainOpTypes (EQProp l) = TFunc (TBase TBool l) (TFunc (TBase TBool l) (TBase TBool l) l) l

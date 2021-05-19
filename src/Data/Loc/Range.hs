@@ -7,8 +7,9 @@ module Data.Loc.Range where
 import Data.Aeson (FromJSON (..), ToJSON (..))
 import Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NE
-import Data.Loc
+import Data.Loc hiding (fromLoc)
 import GHC.Generics (Generic)
+import Data.Maybe (mapMaybe)
 
 -- | Invariant: the second position should be greater than the first position
 data Range = Range Pos Pos
@@ -44,9 +45,20 @@ rangeStart (Range a _) = a
 rangeEnd :: Range -> Pos
 rangeEnd (Range _ b) = b
 
+-- | Loc -> Maybe Range
 fromLoc :: Loc -> Maybe Range
 fromLoc NoLoc = Nothing
 fromLoc (Loc x y) = Just (Range x y)
+
+-- | [Loc] -> [Range]
+fromLocs :: [Loc] -> [Range]
+fromLocs = mapMaybe fromLoc
+
+mergeRangesUnsafe :: [Range] -> Range
+mergeRangesUnsafe xs = foldl (<>) (head xs) xs
+
+mergeRanges :: NonEmpty Range -> Range
+mergeRanges xs = foldl (<>) (NE.head xs) xs
 
 -- | Calculates the distance between the two positions
 span :: Range -> Int
