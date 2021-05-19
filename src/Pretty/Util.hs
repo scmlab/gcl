@@ -1,5 +1,4 @@
 {-# LANGUAGE OverloadedStrings #-}
-
 module Pretty.Util
   ( renderStrict,
     PrettyPrec (..),
@@ -7,6 +6,8 @@ module Pretty.Util
     DocWithLoc (..),
     toDoc,
     fromDoc,
+    fromRender,
+    fromRenderAndLocated
   )
 where
 
@@ -16,6 +17,7 @@ import Data.Text.Prettyprint.Doc
 import qualified Data.Text.Prettyprint.Doc.Render.Text as Text
 import Prelude hiding (Ordering (..))
 import Data.Loc.Range
+import Render
 
 renderStrict :: Doc ann -> Text
 renderStrict = Text.renderStrict . layoutPretty defaultLayoutOptions
@@ -61,7 +63,17 @@ fromDoc (Loc a b) x = DocWithLoc x a b
 toDoc :: DocWithLoc ann -> Doc ann
 -- toDoc (DocWithLoc d a _) = fillGap (Pos (posFile a) 1 0 0) a <> d
 toDoc (DocWithLoc d _ _) = d
-toDoc Empty = mempty 
+toDoc Empty = mempty
+
+-- | If something can be rendered, then make it a Doc
+fromRender :: Render a => a -> Doc ann
+fromRender x = pretty (render x)
+
+-- | If something can be rendered and located, then make it a DocWithLoc
+fromRenderAndLocated :: (Located a, Render a) => a -> DocWithLoc ann
+fromRenderAndLocated x = case locOf x of
+  NoLoc -> mempty
+  Loc a b -> DocWithLoc (pretty (render x)) a b
 
 -- generates newlines and spaces to fill the gap between to Pos
 fillGap :: Pos -> Pos -> Doc ann

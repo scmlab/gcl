@@ -2,11 +2,7 @@
 
 module Render.Predicate where
 
--- import Data.Loc (locOf)
-import qualified Data.Text as Text
 import GCL.WP
-import Pretty (pretty)
-import Pretty.Util (renderStrict)
 import Render.Class
 import Render.Element
 import Render.Syntax.Abstract ()
@@ -46,7 +42,17 @@ instance Render Pred where
 instance RenderBlock PO where
   renderBlock (PO _ pre post origin) =
     proofObligationE
-      (Just $ Text.unpack $ renderStrict $ pretty origin)
+      (Just $ show $ render origin)
       (fromLoc (locOf origin))
       (render pre)
       (render post)
+
+instance Render Origin where
+  render AtAbort {} = "Abort"
+  render AtSkip {} = "Skip"
+  render AtSpec {} = "Spec"
+  render AtAssignment {} = "Assigment"
+  render AtAssertion {} = "Assertion"
+  render AtIf {} = "Conditional"
+  render AtLoop {} = "Loop Invariant"
+  render AtTermination {} = "Loop Termination"

@@ -9,12 +9,13 @@ module Render.Class
 where
 
 import Render.Element
-import qualified Pretty.Util as Doc
 import qualified Data.Text as Text
 import Data.Text (Text)
 import Data.Loc.Range (fromLoc)
 import Data.Loc (Loc)
 import Data.Text.Prettyprint.Doc (Doc)
+import qualified Data.Text.Prettyprint.Doc.Render.Text as Text
+import qualified Data.Text.Prettyprint.Doc as Doc
 
 --------------------------------------------------------------------------------
 
@@ -63,7 +64,7 @@ instance Render Bool where
   render = render . show
 
 instance Render (Doc ann) where
-  render = textE . Doc.renderStrict
+  render = textE . Text.renderStrict . Doc.layoutPretty Doc.defaultLayoutOptions
 
 -- instance Render a => Render [a] where
 --   render xs = "[" <> Inlines $ pure $ Horz (punctuate "," (map render xs)) <> "]"

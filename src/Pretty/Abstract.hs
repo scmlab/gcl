@@ -90,9 +90,7 @@ instance Pretty GdCmd where
 
 -- | Literals
 instance Pretty Lit where
-  pretty (Num i) = pretty $ show i
-  pretty (Bol b) = pretty $ show b
-  pretty (Chr c) = pretty (show c)
+  pretty = fromRender
 
 --------------------------------------------------------------------------------
 
@@ -175,22 +173,10 @@ handleOp n op = case classifyArithOp op of
 
 -- | Type
 instance Pretty Type where
-  pretty (TBase TInt _) = "Int"
-  pretty (TBase TBool _) = "Bool"
-  pretty (TBase TChar _) = "Char"
-  pretty (TFunc a b _) = pretty a <+> "→" <+> pretty b
-  pretty (TArray i b _) = "array" <+> pretty i <+> "of" <+> pretty b
-  pretty (TVar i _) = "TVar" <+> pretty i
+  pretty = fromRender
 
 --------------------------------------------------------------------------------
 
 -- | Interval
 instance Pretty Interval where
-  pretty (Interval (Including a) (Including b) _) =
-    "[" <+> pretty a <+> ".." <+> pretty b <+> "]"
-  pretty (Interval (Including a) (Excluding b) _) =
-    "[" <+> pretty a <+> ".." <+> pretty b <+> ")"
-  pretty (Interval (Excluding a) (Including b) _) =
-    "(" <+> pretty a <+> ".." <+> pretty b <+> "]"
-  pretty (Interval (Excluding a) (Excluding b) _) =
-    "(" <+> pretty a <+> ".." <+> pretty b <+> ")"
+  pretty = fromRender
