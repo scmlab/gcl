@@ -39,7 +39,7 @@ class RenderBlock a where
 
 tempHandleLoc :: Loc -> Inlines -> Inlines 
 tempHandleLoc loc t = case fromLoc loc of 
-  Nothing -> t 
+  Nothing -> t
   Just range -> linkE range t 
 
 -- renderLocatedAndPrettified :: (Located a, Pretty a) => a -> Inlines 

@@ -96,15 +96,6 @@ guardIf x = GuardIf x NoLoc
 guardLoop :: Expr -> Pred
 guardLoop x = GuardLoop x NoLoc
 
-boundEq :: Expr -> Expr -> Pred
-boundEq x var = Bound (x `A.eqq` var) NoLoc
-
-boundLT :: Expr -> Expr -> Pred
-boundLT x var = Bound (x `A.lt` var) NoLoc
-
-boundGTE :: Expr -> Expr -> Pred
-boundGTE x var = Bound (x `A.gte` var) NoLoc
-
 (===) :: Int -> Int -> Expr
 x === y = A.number x `A.eqq` A.number y
 
