@@ -25,7 +25,6 @@ import Server.CustomMethod
 import Server.Diagnostic
   ( ToDiagnostics (toDiagnostics),
   )
-import Server.ExportPO ()
 import Server.Monad
 import qualified Syntax.Abstract as A
 import Syntax.Predicate (Spec (..))

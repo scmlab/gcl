@@ -7,7 +7,6 @@ module Server.CustomMethod where
 import Control.Monad.Cont
 import Control.Monad.Except
 import Control.Monad.Reader
-import Control.Monad.State
 import Control.Monad.Trans.Free
 import Control.Monad.Writer
 import Data.IORef
@@ -26,8 +25,6 @@ import Language.LSP.Types hiding (Range, TextDocumentSyncClientCapabilities)
 import qualified Language.LSP.VFS as VFS
 import Render
 import Server.Diagnostic
-import Server.DiffMap (DiffMap)
-import qualified Server.DiffMap as DiffMap
 import Server.Monad
 import qualified Syntax.Abstract as A
 import Syntax.Concrete.ToAbstract
@@ -53,10 +50,10 @@ data CmdEnv = CmdEnv
     cmdEnvResponder :: Maybe Responder
   }
 
-type CmdM = FreeT Cmd (ExceptT [Error] (ReaderT CmdEnv (State DiffMap)))
+type CmdM = FreeT Cmd (ExceptT [Error] (Reader CmdEnv))
 
 runCmdM :: CmdEnv -> CmdM a -> Either [Error] (FreeF Cmd a (CmdM a))
-runCmdM env p = evalState (runReaderT (runExceptT (runFreeT p)) env) DiffMap.empty
+runCmdM env p = runReader (runExceptT (runFreeT p)) env
 
 editText :: Range -> Text -> CmdM Text
 editText range text = liftF (EditText range text id)
@@ -110,12 +107,12 @@ refine source (start, end) = do
       program <- parseProgram source
       (_, specs, _, _) <- sweep program
       -- adjust offsets of selections
-      start' <- adjustOffset start
-      end' <- adjustOffset end
-      logM $ Text.pack $ show (start, start')
-      logM $ Text.pack $ show (end, end')
+      -- start' <- adjustOffset start
+      -- end' <- adjustOffset end
+      -- logM $ Text.pack $ show (start, start')
+      -- logM $ Text.pack $ show (end, end')
 
-      return $ find (pointed (start', end')) specs
+      return $ find (pointed (start, end)) specs
       where
         pointed :: (Int, Int) -> Spec -> Bool
         pointed (x, y) spec = case specLoc spec of
@@ -138,10 +135,10 @@ sweep program@(A.Program _ globalProps _ _ _) =
 
 --------------------------------------------------------------------------------
 
-adjustOffset :: Int -> CmdM Int
-adjustOffset offset = do
-  diffMap <- get
-  return $ DiffMap.adjust diffMap offset
+-- adjustOffset :: Int -> CmdM Int
+-- adjustOffset offset = do
+--   diffMap <- get
+--   return $ DiffMap.adjust diffMap offset
 
 -- | Parse with a parser
 parse :: Parser a -> Text -> CmdM a
@@ -219,9 +216,9 @@ interpret env@(CmdEnv filepath responder) p = case runCmdM env p of
             -- update saved source
             newSource <- readSource
             -- update the offset diff map
-            let offset = posCoff (rangeStart range)
-            let diff = Text.length text - span range
-            modify' (DiffMap.insert offset diff)
+            -- let offset = posCoff (rangeStart range)
+            -- let diff = Text.length text - span range
+            -- modify' (DiffMap.insert offset diff)
 
             next newSource
 
@@ -236,11 +233,11 @@ interpret env@(CmdEnv filepath responder) p = case runCmdM env p of
   Right (Free (ReadLastMouseSelection next)) -> do
     ref <- lift $ asks envSourceMap
     mapping <- liftIO $ readIORef ref
-    let selection = snd =<< Map.lookup filepath mapping
+    let selection = join $ Map.lookup filepath mapping
     interpret env (next selection)
   Right (Free (UpdateLastMouseSelection selection next)) -> do
     ref <- lift $ asks envSourceMap
-    liftIO $ modifyIORef' ref (Map.update (\(source, _) -> Just (source, Just selection)) filepath)
+    liftIO $ modifyIORef' ref (Map.update (\_ -> Just (Just selection)) filepath)
     interpret env next
   Right (Free (BumpResponseVersion next)) -> do
     n <- bumpVersionM

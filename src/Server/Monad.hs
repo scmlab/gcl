@@ -26,17 +26,13 @@ import Syntax.Predicate (Origin, PO, Spec)
 
 data Env = Env
   { envChan :: Chan Text,
-    envDevMode :: Bool,
-    -- | We maintain our own Uri-Source mapping
-    --   instead of using the built-in LSP VFS
-    --   to have better control of update management
-    envSourceMap :: IORef (Map FilePath (Text, Maybe (Int, Int))),
+    envSourceMap :: IORef (Map FilePath (Maybe (Int, Int))),
     -- | Counter for generating fresh numbers
     envCounter :: IORef Int
   }
 
-initEnv :: Bool -> IO Env
-initEnv devMode = Env <$> newChan <*> pure devMode <*> newIORef Map.empty <*> newIORef 0
+initEnv :: IO Env
+initEnv = Env <$> newChan <*> newIORef Map.empty <*> newIORef 0
 
 --------------------------------------------------------------------------------
 
