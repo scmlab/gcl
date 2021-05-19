@@ -27,13 +27,13 @@ tests = testGroup "WP" [emptyProg, statements, issues]
 type Result = (Maybe ([PO], [Spec], [Expr], [StructWarning]), [CmdKind])
 
 run :: Text -> Result
-run text = runTest $ parseProgram text >>= sweep
+run text = runTest "<test>" $ parseProgram text >>= sweep
 
 fromPOs :: [PO] -> Result
-fromPOs pos = (Just (pos, [], [], []), [])
+fromPOs pos = (Just (pos, [], [], []), [CmdGetFilePath])
 
 fromSpecs :: [Spec] -> Result
-fromSpecs specs = (Just ([], specs, [], []), [])
+fromSpecs specs = (Just ([], specs, [], []), [CmdGetFilePath])
 
 --------------------------------------------------------------------------------
 

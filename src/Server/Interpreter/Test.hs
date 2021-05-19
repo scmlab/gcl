@@ -13,7 +13,7 @@ import Render
 
 data CmdKind
   = CmdEditText Range Text
-  | CmdAskFilePath
+  | CmdGetFilePath
   | CmdGetSource
   | CmdPutLastSelection (Int, Int)
   | CmdGetLastSelection
@@ -22,33 +22,33 @@ data CmdKind
   | CmdTerminate [ResKind] [Diagnostic]
   deriving (Eq, Show)
 
-runTest :: CmdM a -> (Maybe a, [CmdKind])
-runTest program = runWriter (interpret program)
+runTest :: FilePath -> CmdM a -> (Maybe a, [CmdKind])
+runTest filepath program = runWriter (interpret filepath program)
 
-interpret :: CmdM a -> Writer [CmdKind] (Maybe a)
-interpret p = case runCmdM p of
+interpret :: FilePath -> CmdM a -> Writer [CmdKind] (Maybe a)
+interpret filepath p = case runCmdM p of
   Right (Pure a) -> return (Just a)
   Right (Free (EditText range text next)) -> do
     tell [CmdEditText range text]
-    interpret (next "")
+    interpret filepath (next "")
   Right (Free (GetFilePath next)) -> do
-    tell [CmdAskFilePath]
-    interpret (next "")
+    tell [CmdGetFilePath]
+    interpret filepath (next filepath)
   Right (Free (GetSource next)) -> do
     tell [CmdGetSource]
-    interpret (next "")
+    interpret filepath (next "")
   Right (Free (GetLastSelection next)) -> do
     tell [CmdGetLastSelection]
-    interpret (next Nothing)
+    interpret filepath (next Nothing)
   Right (Free (PutLastSelection selection next)) -> do
     tell [CmdPutLastSelection selection]
-    interpret next
+    interpret filepath next
   Right (Free (BumpResponseVersion next)) -> do
     tell [CmdBumpResponseVersion]
-    interpret (next 0)
+    interpret filepath (next 0)
   Right (Free (Log text next)) -> do
     tell [CmdLog text]
-    interpret next
+    interpret filepath next
   Right (Free (Terminate responses diagnostics)) -> do
     -- undefined
     tell [CmdTerminate responses diagnostics]
