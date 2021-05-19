@@ -83,7 +83,7 @@ handleExpr n (App p q _) = case handleExpr n p of
     t <- handleExpr n q
     -- see if the second argument is an application, apply parenthesis when needed
     return $ case q of
-      App {} -> s <+> parensIf n 0 t
+      App {} -> s <+> parensIf n (-1) t
       _ -> s <+> t
 handleExpr _ (Lam p q _) = return $ "λ" <+> render p <+> "→" <+> render q
 handleExpr _ (Hole _) = return "{!!}"
