@@ -7,6 +7,7 @@ module Pretty.Util
     toDoc,
     fromDoc,
     fromRender,
+    fromRenderPrec,
     fromRenderAndLocated
   )
 where
@@ -68,6 +69,10 @@ toDoc Empty = mempty
 -- | If something can be rendered, then make it a Doc
 fromRender :: Render a => a -> Doc ann
 fromRender x = pretty (render x)
+
+-- | If something can be rendered with precedence, then make it a Doc
+fromRenderPrec :: Render a => Int -> a -> Doc ann
+fromRenderPrec n x = pretty (renderPrec n x)
 
 -- | If something can be rendered and located, then make it a DocWithLoc
 fromRenderAndLocated :: (Located a, Render a) => a -> DocWithLoc ann

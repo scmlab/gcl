@@ -1,13 +1,11 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Pretty.Abstract where
+module Pretty.Abstract () where
 
 import Data.Text.Prettyprint.Doc
-import Pretty.Util
-import Pretty.Variadic
 import Pretty.Common ()
+import Pretty.Util
 import Syntax.Abstract
-import Syntax.Common
 import Prelude hiding (Ordering (..))
 
 --------------------------------------------------------------------------------
@@ -99,75 +97,7 @@ instance Pretty Expr where
   pretty = prettyPrec 0
 
 instance PrettyPrec Expr where
-  prettyPrec n expr = case handleExpr n expr of
-    Expect _ -> mempty
-    Complete s -> s
-
-handleExpr :: Int -> Expr -> Variadic Expr (Doc ann)
-handleExpr _ (Var x _) = return $ pretty x
-handleExpr _ (Const x _) = return $ pretty x
-handleExpr _ (Lit x _) = return $ pretty x
-handleExpr n (Op x) = handleOp n x
-handleExpr _ (Chain a op b _) =
-  return $ pretty a
-    <> pretty op
-    <> pretty b
-handleExpr n (App p q _) = case handleExpr n p of
-  Expect f -> f q
-  Complete s -> do
-    t <- handleExpr n q
-    -- see if the second argument is an application, apply parenthesis when needed
-    return $ case q of
-      App {} -> s <> parensIf n 0 t
-      _ -> s <> t
-handleExpr _ (Lam p q _) = return $ "λ" <+> pretty p <+> "→" <+> pretty q
-handleExpr _ (Hole _) = return "{!!}"
-handleExpr _ (Quant op xs r t _) =
-  return $
-    "⟨"
-      <> pretty op
-      <> mconcat (map pretty xs)
-      <> " : "
-      <> pretty r
-      <> " : "
-      <> pretty t
-      <> " ⟩"
-handleExpr _ Subst {} = return "Subst"
-
---------------------------------------------------------------------------------
-
-handleOp :: Int -> ArithOp -> Variadic Expr (Doc ann)
-handleOp n op = case classifyArithOp op of
-  Infix m -> do
-    p <- var
-    q <- var
-    return $
-      parensIf n m $
-        prettyPrec (succ m) p
-          <+> pretty op
-          <+> prettyPrec (succ m) q
-  InfixL m -> do
-    p <- var
-    q <- var
-    return $
-      parensIf n m $
-        prettyPrec m p
-          <+> pretty op
-          <+> prettyPrec (succ m) q
-  InfixR m -> do
-    p <- var
-    q <- var
-    return $
-      parensIf n m $
-        prettyPrec (succ m) p
-          <+> pretty op
-          <+> prettyPrec m q
-  Prefix m -> do
-    p <- var
-    return $ parensIf n m $ pretty op <+> prettyPrec m p
-  Postfix m -> do
-    p <- var
-    return $ parensIf n m $ prettyPrec m p <+> pretty op
+  prettyPrec = fromRenderPrec
 
 --------------------------------------------------------------------------------
 
