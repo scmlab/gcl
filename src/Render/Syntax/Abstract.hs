@@ -11,6 +11,7 @@ import Render.Class
 import Render.Element
 import Render.Syntax.Common ()
 import Syntax.Abstract
+import Syntax.Abstract.Located ()
 import Syntax.Common (ArithOp, Fixity (..), classifyArithOp)
 
 --------------------------------------------------------------------------------
@@ -158,11 +159,23 @@ handleOp n op = case classifyArithOp op of
 
 -- | Type
 instance Render Type where
-  render = renderLocatedAndPrettified
+  render (TBase TInt _) = "Int"
+  render (TBase TBool _) = "Bool"
+  render (TBase TChar _) = "Char"
+  render (TFunc a b _) = render a <+> "→" <+> render b
+  render (TArray i b _) = "array" <+> render i <+> "of" <+> render b
+  render (TVar i _) = "TVar" <+> render i
 
 -- | Interval
 instance Render Interval where
-  render = renderLocatedAndPrettified
+  render (Interval (Including a) (Including b) _) =
+    "[" <+> render a <+> ".." <+> render b <+> "]"
+  render (Interval (Including a) (Excluding b) _) =
+    "[" <+> render a <+> ".." <+> render b <+> ")"
+  render (Interval (Excluding a) (Including b) _) =
+    "(" <+> render a <+> ".." <+> render b <+> "]"
+  render (Interval (Excluding a) (Excluding b) _) =
+    "(" <+> render a <+> ".." <+> render b <+> ")"
 
 --------------------------------------------------------------------------------
 

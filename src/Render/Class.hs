@@ -4,8 +4,7 @@
 module Render.Class
   ( Render (..),
     RenderBlock(..), 
-    tempHandleLoc,
-    renderLocatedAndPrettified
+    tempHandleLoc
   )
 where
 
@@ -13,9 +12,9 @@ import Render.Element
 import qualified Pretty.Util as Doc
 import qualified Data.Text as Text
 import Data.Text (Text)
-import Data.Loc (Loc, Located (locOf))
-import Pretty
 import Data.Loc.Range (fromLoc)
+import Data.Loc (Loc)
+import Data.Text.Prettyprint.Doc (Doc)
 
 --------------------------------------------------------------------------------
 
@@ -42,8 +41,8 @@ tempHandleLoc loc t = case fromLoc loc of
   Nothing -> t 
   Just range -> linkE range t 
 
-renderLocatedAndPrettified :: (Located a, Pretty a) => a -> Inlines 
-renderLocatedAndPrettified x = tempHandleLoc (locOf x) (render $ pretty x) 
+-- renderLocatedAndPrettified :: (Located a, Pretty a) => a -> Inlines 
+-- renderLocatedAndPrettified x = tempHandleLoc (locOf x) (render $ pretty x) 
 
 --------------------------------------------------------------------------------
 
