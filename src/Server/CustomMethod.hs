@@ -18,7 +18,6 @@ import qualified Data.Map as Map
 import Data.Text (Text)
 import qualified Data.Text as Text
 import Error
-import GCL.Expr (expand, runSubstM)
 import qualified GCL.Type as TypeChecking
 import GCL.WP (StructWarning)
 import qualified GCL.WP as WP
@@ -35,7 +34,6 @@ import Syntax.Concrete.ToAbstract
 import Syntax.Parser (Parser, pProgram, pStmts, runParse)
 import Syntax.Predicate (PO, Spec (specLoc), specPayload)
 import Prelude hiding (span)
-import qualified GCL.Expr as E
 
 --------------------------------------------------------------------------------
 
@@ -275,11 +273,6 @@ refine source (start, end) = do
             (posCoff open <= x && x <= posCoff close + 1)
               || (posCoff open <= y && y <= posCoff close + 1)
 
---
-substitute :: A.Program -> A.Expr -> A.Subst -> A.Expr
-substitute (A.Program _ _ defns _ _) expr env =
-  runSubstM (expand expr >>= E.subst env) defns 1
-
 typeCheck :: A.Program -> EffM ()
 typeCheck p = case runExcept (TypeChecking.checkProg p) of
   Left e -> throwError [TypeError e]
@@ -336,30 +329,3 @@ withinMouseSelection (left, right) x =
   compareWithMousePosition left x == EQ
     || compareWithMousePosition right x == EQ
     || (compareWithMousePosition left x == LT && compareWithMousePosition right x == GT)
-
--- -- | Returns a list of stuff overlapped with mouse selection
--- filterOverlapped :: Located a => (Int, Int) -> [a] -> [a]
--- filterOverlapped (selStart, selEnd) items = opverlappedItems
---   where
---     opverlappedItems = case overlapped of
---       [] -> []
---       (x : _) -> case locOf x of
---         NoLoc -> []
---         Loc start _ ->
---           let same y = case locOf y of
---                 NoLoc -> False
---                 Loc start' _ -> start == start'
---            in filter same overlapped
---       where
---         -- find the POs whose Range overlaps with the selection
---         isOverlapped po = case locOf po of
---           NoLoc -> False
---           Loc start' end' ->
---             let start = posCoff start'
---                 end = posCoff end' + 1
---              in (selStart <= start && selEnd >= start) -- the end of the selection overlaps with the start of PO
---                   || (selStart <= end && selEnd >= end) -- the start of the selection overlaps with the end of PO
---                   || (selStart <= start && selEnd >= end) -- the selection covers the PO
---                   || (selStart >= start && selEnd <= end) -- the selection is within the PO
---                   -- sort them by comparing their starting position
---         overlapped = sortOn locOf $ filter isOverlapped items

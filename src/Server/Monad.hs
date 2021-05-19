@@ -10,6 +10,7 @@ import Control.Monad.Reader
 import Data.Aeson (FromJSON, ToJSON)
 import qualified Data.Aeson as JSON
 import Data.IORef (IORef, newIORef, readIORef, writeIORef)
+import Data.Loc (Loc)
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Text (Text)
@@ -19,9 +20,7 @@ import Language.LSP.Diagnostics
 import Language.LSP.Server
 import Language.LSP.Types hiding (TextDocumentSyncClientCapabilities (..))
 import Render
-import qualified Syntax.Abstract as A
 import Syntax.Predicate (Origin, PO, Spec)
-import Data.Loc (Loc)
 
 --------------------------------------------------------------------------------
 
@@ -85,7 +84,6 @@ sendResponses filepath responder responses = do
 data ResKind
   = ResDisplay Int [Block]
   | ResUpdateSpecs [(Int, Text, Text, Loc)]
-  | ResSubstitute Int A.Expr
   | ResConsoleLog Text
   deriving (Eq, Generic)
 
@@ -94,7 +92,6 @@ instance ToJSON ResKind
 instance Show ResKind where
   show (ResDisplay _ _) = "Display"
   show (ResUpdateSpecs _) = "UpdateSpecs"
-  show (ResSubstitute i _) = "Substitute " <> show i
   show (ResConsoleLog x) = "ConsoleLog " <> show x
 
 data Response
@@ -116,8 +113,6 @@ instance Show Response where
 data ReqKind
   = ReqInspect Int Int
   | ReqRefine Int Int
-  | ReqSubstitute Int A.Expr A.Subst
-  | ReqExportProofObligations
   | ReqDebug
   deriving (Generic)
 
@@ -126,8 +121,6 @@ instance FromJSON ReqKind
 instance Show ReqKind where
   show (ReqInspect x y) = "Inspect " <> show x <> " " <> show y
   show (ReqRefine i x) = "Refine #" <> show i <> " " <> show x
-  show (ReqSubstitute i x y) = "Substitute #" <> show i <> " " <> show x <> " => " <> show y
-  show ReqExportProofObligations = "ExportProofObligations"
   show ReqDebug = "Debug"
 
 data Request = Req FilePath ReqKind

@@ -126,19 +126,7 @@ handlers =
                   program <- parseProgram source'
                   typeCheck program
                   generateResponseAndDiagnostics program
-
-                -- Substitute
-                ReqSubstitute index expr subst -> do
-                  source <- latestSource
-                  program <- parseProgram source
-                  let expr' = substitute program expr subst
-                  terminate [ResSubstitute index expr'] []
-
-                -- ExportProofObligations
-                ReqExportProofObligations -> do
-                  terminate [ResConsoleLog "Export"] []
                 ReqDebug -> return $ error "crash!",
-
       -- when the client saved the document, store the text for later use
       notificationHandler STextDocumentDidSave $ \ntf -> do
         logText " --> TextDocumentDidSave"
