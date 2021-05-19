@@ -142,6 +142,18 @@ handlers =
       --             typeCheck program
       --             generateResponseAndDiagnostics program,
       -- when the client opened the document
+
+      notificationHandler STextDocumentDidChange $ \ntf -> do
+        logText " --> TextDocumentDidOpen"
+        let NotificationMessage _ _ (DidChangeTextDocumentParams (VersionedTextDocumentIdentifier uri _) _) = ntf
+        case uriToFilePath uri of
+          Nothing -> pure ()
+          Just filepath -> do
+            interpret filepath Nothing $ do
+              source <- getSource
+              program <- parseProgram source
+              typeCheck program
+              generateResponseAndDiagnostics program,
       notificationHandler STextDocumentDidOpen $ \ntf -> do
         logText " --> TextDocumentDidOpen"
         let NotificationMessage _ _ (DidOpenTextDocumentParams (TextDocumentItem uri _ _ source)) = ntf
