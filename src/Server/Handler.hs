@@ -21,11 +21,12 @@ import Language.LSP.Types hiding
 import qualified Language.LSP.Types as LSP
 import Pretty
 import Render
+import Server.DSL
 import Server.CustomMethod
 import Server.Diagnostic
   ( ToDiagnostics (toDiagnostics),
   )
-import Server.Monad
+import Server.Interpreter.RealWorld
 import qualified Syntax.Abstract as A
 import Syntax.Predicate (Spec (..))
 
@@ -99,22 +100,21 @@ handlers =
             responder $ CannotDecodeRequest $ show msg ++ "\n" ++ show params
           JSON.Success request@(Req filepath kind) -> do
             logText $ " --> Custom Reqeust: " <> Text.pack (show request)
-            let cmdEnv = CmdEnv filepath (Just responder)
             -- convert Request to Response
-            interpret cmdEnv $ do
+            interpret filepath (Just responder) $ do
               case kind of
                 -- Inspect
                 ReqInspect selStart selEnd -> do
-                  updateLastMouseSelection (selStart, selEnd)
-                  source <- readSource
+                  setLastSelection (selStart, selEnd)
+                  source <- getSource
                   program <- parseProgram source
                   typeCheck program
                   generateResponseAndDiagnostics program
 
                 -- Refine
                 ReqRefine selStart selEnd -> do
-                  updateLastMouseSelection (selStart, selEnd)
-                  source <- readSource
+                  setLastSelection (selStart, selEnd)
+                  source <- getSource
                   (spec, content) <- refine source (selStart, selEnd)
 
                   -- remove the Spec
@@ -148,8 +148,7 @@ handlers =
         case uriToFilePath uri of
           Nothing -> pure ()
           Just filepath -> do
-            let cmdEnv = CmdEnv filepath Nothing
-            interpret cmdEnv $ do
+            interpret filepath Nothing $ do
               program <- parseProgram source
               typeCheck program
               generateResponseAndDiagnostics program
@@ -159,7 +158,7 @@ generateResponseAndDiagnostics :: A.Program -> CmdM ()
 generateResponseAndDiagnostics program = do
   (pos, specs, globalProps, warnings) <- sweep program
   -- leave only POs & Specs around the mouse selection
-  lastSelection <- readLastMouseSelection
+  lastSelection <- getLastSelection
   let overlappedSpecs = case lastSelection of
         Nothing -> specs
         Just sel -> filter (withinMouseSelection sel) specs

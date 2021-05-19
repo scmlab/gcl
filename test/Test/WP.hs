@@ -12,7 +12,8 @@ import Error
 import GCL.WP (StructWarning)
 import Pretty ()
 import qualified Server
-import qualified Server.CustomMethod as Server
+import Server.DSL (parseProgram, sweep)
+import Server.Interpreter.Test
 import Syntax.Abstract
 import Syntax.Common
 import Syntax.Predicate
@@ -23,10 +24,10 @@ import Prelude hiding (Ordering (..))
 tests :: TestTree
 tests = testGroup "WP" [emptyProg, statements, issues]
 
-type Result = (Maybe ([PO], [Spec], [Expr], [StructWarning]), [Server.EffKind])
+type Result = (Maybe ([PO], [Spec], [Expr], [StructWarning]), [CmdKind])
 
 run :: Text -> Result
-run text = Server.runTest $ Server.parseProgram text >>= Server.sweep
+run text = runTest $ parseProgram text >>= sweep
 
 fromPOs :: [PO] -> Result
 fromPOs pos = (Just (pos, [], [], []), [])

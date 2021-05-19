@@ -3,7 +3,7 @@
 module Test.Server where
 
 import Data.Loc
-import Server.CustomMethod (compareWithMousePosition, withinMouseSelection)
+import Server.DSL (compareWithMousePosition, withinMouseSelection)
 import Syntax.Predicate (PO)
 import Test.Tasty
 import Test.Tasty.HUnit
