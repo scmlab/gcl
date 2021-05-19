@@ -92,7 +92,7 @@ handleErrors :: FilePath -> Maybe Responder -> [Error] -> ServerM ()
 handleErrors filepath responder errors = do
   version <- bumpVersionM
   -- (IdInt version)
-  let responses = [ResDisplay version (headerE "Errors" : map renderBlock errors)]
+  let responses = [ResDisplay version (headerE "Errors" : map renderBlock errors), ResUpdateSpecs []]
   let diagnostics = errors >>= toDiagnostics
   -- send diagnostics
   sendDiagnostics filepath diagnostics
