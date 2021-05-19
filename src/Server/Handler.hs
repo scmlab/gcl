@@ -100,14 +100,14 @@ handlers =
             responder $ CannotDecodeRequest $ show msg ++ "\n" ++ show params
           JSON.Success request@(Req filepath kind) -> do
             logText $ " --> Custom Reqeust: " <> Text.pack (show request)
-            let effEnv = EffEnv filepath (Just responder)
+            let cmdEnv = CmdEnv filepath (Just responder)
             -- convert Request to Response
-            interpret effEnv $ do
+            interpret cmdEnv $ do
               case kind of
                 -- Inspect
                 ReqInspect selStart selEnd -> do
                   updateLastMouseSelection (selStart, selEnd)
-                  source <- latestSource
+                  source <- readSource
                   program <- parseProgram source
                   typeCheck program
                   generateResponseAndDiagnostics program
@@ -115,7 +115,7 @@ handlers =
                 -- Refine
                 ReqRefine selStart selEnd -> do
                   updateLastMouseSelection (selStart, selEnd)
-                  source <- latestSource
+                  source <- readSource
                   (spec, content) <- refine source (selStart, selEnd)
 
                   -- remove the Spec
@@ -128,21 +128,20 @@ handlers =
                   generateResponseAndDiagnostics program
                 ReqDebug -> return $ error "crash!",
       -- when the client saved the document, store the text for later use
-      notificationHandler STextDocumentDidSave $ \ntf -> do
-        logText " --> TextDocumentDidSave"
-        let NotificationMessage _ _ (DidSaveTextDocumentParams (TextDocumentIdentifier uri) source') = ntf
-        case source' of
-          Nothing -> pure ()
-          Just source ->
-            case uriToFilePath uri of
-              Nothing -> pure ()
-              Just filepath -> do
-                let effEnv = EffEnv filepath Nothing
-                interpret effEnv $ do
-                  updateSavedSource source
-                  program <- parseProgram source
-                  typeCheck program
-                  generateResponseAndDiagnostics program,
+      -- notificationHandler STextDocumentDidSave $ \ntf -> do
+      --   logText " --> TextDocumentDidSave"
+      --   let NotificationMessage _ _ (DidSaveTextDocumentParams (TextDocumentIdentifier uri) source') = ntf
+      --   case source' of
+      --     Nothing -> pure ()
+      --     Just source ->
+      --       case uriToFilePath uri of
+      --         Nothing -> pure ()
+      --         Just filepath -> do
+      --           let cmdEnv = CmdEnv filepath Nothing
+      --           interpret cmdEnv $ do
+      --             program <- parseProgram source
+      --             typeCheck program
+      --             generateResponseAndDiagnostics program,
       -- when the client opened the document
       notificationHandler STextDocumentDidOpen $ \ntf -> do
         logText " --> TextDocumentDidOpen"
@@ -150,15 +149,14 @@ handlers =
         case uriToFilePath uri of
           Nothing -> pure ()
           Just filepath -> do
-            let effEnv = EffEnv filepath Nothing
-            interpret effEnv $ do
-              updateSavedSource source
+            let cmdEnv = CmdEnv filepath Nothing
+            interpret cmdEnv $ do
               program <- parseProgram source
               typeCheck program
               generateResponseAndDiagnostics program
     ]
 
-generateResponseAndDiagnostics :: A.Program -> EffM ()
+generateResponseAndDiagnostics :: A.Program -> CmdM ()
 generateResponseAndDiagnostics program = do
   (pos, specs, globalProps, warnings) <- sweep program
   -- leave only POs & Specs around the mouse selection
