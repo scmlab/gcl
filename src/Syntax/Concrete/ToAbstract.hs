@@ -148,7 +148,7 @@ instance ToAbstract Type A.Type where
 -- | Expressions
 instance ToAbstract Expr A.Expr where
   toAbstract x = case x of
-    Paren _ a _ -> toAbstract a
+    Paren _ a _ -> A.Paren <$> toAbstract a
     Lit a -> A.Lit <$> toAbstract a <*> pure (locOf x)
     Var a -> pure $ A.Var a (locOf x)
     Const a -> pure $ A.Const a (locOf x)

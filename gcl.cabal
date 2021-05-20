@@ -55,6 +55,7 @@ library
       Server.Interpreter.Test
       Syntax.Abstract
       Syntax.Abstract.Located
+      Syntax.Abstract.Util
       Syntax.Common
       Syntax.Common.Located
       Syntax.Concrete
@@ -169,6 +170,7 @@ test-suite gcl-test
       Server.Interpreter.Test
       Syntax.Abstract
       Syntax.Abstract.Located
+      Syntax.Abstract.Util
       Syntax.Common
       Syntax.Common.Located
       Syntax.Concrete

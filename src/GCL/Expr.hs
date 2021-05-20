@@ -63,14 +63,13 @@ instance ExpandM SubstM where
 ifInDefns :: DefsM m => Name -> (Expr -> m a) -> m a -> m a
 ifInDefns name f y = do
   defs <- askDefns
-  case Map.lookup (nameToText name) defs of
-    Just e -> f (defnExpr e)
-    Nothing -> y
+  maybe y f (Map.lookup name defs)
 
 --------------------------------------------------------------------------------
 
 -- | Free Names
 free :: Expr -> Set Name
+free (Paren e) = free e
 free (Var x _) = Set.singleton x
 free (Const x _) = Set.singleton x
 free (Op _) = mempty
@@ -90,7 +89,7 @@ freeSubst :: Subst -> Set Name
 freeSubst = Set.unions . Map.map free
 
 freeDefns :: Defns -> Set Name
-freeDefns = Set.unions . Map.map (free . defnExpr)
+freeDefns = Set.unions . Map.map free
 
 intersectSubst :: Set Name -> Subst -> Subst
 intersectSubst fs = Map.filterWithKey (const . (`elem` fs))
@@ -120,6 +119,7 @@ convLam xs x e
   | otherwise = return (x, e, False)
 
 subst :: ExpandM m => Subst -> Expr -> m Expr
+subst env (Paren e) = subst env e
 subst env v@(Var name _) = do
   -- e' <- expand v
   -- case e' of
@@ -128,11 +128,11 @@ subst env v@(Var name _) = do
   --                 (return $ fromMaybe v' (Map.lookup x env))
   --   _ -> subst env e'
   defs <- askDefns
-  case Map.lookup (nameToText name) defs of
+  case Map.lookup name defs of
     Just e ->
       ifExpand
-        (subst env (defnExpr e))
-        (applySubst v env (subst env (defnExpr e)))
+        (subst env e)
+        (applySubst v env (subst env e))
     Nothing -> return $ fromMaybe v (Map.lookup name env)
 subst env c@(Const name _) = do
   -- e' <- expand c
@@ -142,11 +142,11 @@ subst env c@(Const name _) = do
   --                 (return $ fromMaybe c' (Map.lookup x env))
   --   _ -> subst env e'
   defs <- askDefns
-  case Map.lookup (nameToText name) defs of
+  case Map.lookup name defs of
     Just e ->
       ifExpand
-        (subst env (defnExpr e))
-        (applySubst c env (subst env (defnExpr e)))
+        (subst env e)
+        (applySubst c env (subst env e))
     Nothing -> return $ fromMaybe c (Map.lookup name env)
 subst _ (Op op) = return $ Op op
 subst _ (Lit n l) = return $ Lit n l
@@ -202,6 +202,7 @@ subst env s@(Subst _ env' e) = do
 
 -- | Expansion
 expand :: ExpandM m => Expr -> m Expr
+expand (Paren e) = expand e
 expand (Lit v l) = return $ Lit v l
 expand c@(Const name _) = do
   ifExpand
