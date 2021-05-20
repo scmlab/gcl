@@ -101,8 +101,6 @@ locToRange :: Loc -> LSP.Range
 locToRange NoLoc = LSP.Range (Position 0 0) (Position 0 0)
 locToRange (Loc start end) = LSP.Range (posToPosition start) (posToPosition (translate 1 end))
 
-
-
 rangeToRange :: Range -> LSP.Range
 rangeToRange (Range start end) = LSP.Range (posToPosition start) (posToPosition (translate 1 end))
 

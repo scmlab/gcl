@@ -20,7 +20,11 @@ instance Show Range where
     if posLine start == posLine end
       then
         posFile start
-          <> " "
+          <> " ["
+          <> show (posCoff start)
+          <> "-"
+          <> show (posCoff end)
+          <> "] "
           <> show (posLine start)
           <> ":"
           <> show (posCol start)
@@ -28,7 +32,11 @@ instance Show Range where
           <> show (posCol end)
       else
         posFile start
-          <> " "
+          <> " ["
+          <> show (posCoff start)
+          <> "-"
+          <> show (posCoff end)
+          <> "] "
           <> show (posLine start)
           <> ":"
           <> show (posCol start)

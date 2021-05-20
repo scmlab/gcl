@@ -3,36 +3,69 @@
 module Test.Server where
 
 import Data.Loc
-import Server.DSL (compareWithPosition, withinSelection)
-import Syntax.Predicate (PO)
+import qualified Data.Text.IO as Text
+import Pretty (pretty)
+import Server.DSL
+import Server.Interpreter.Test
+import qualified Server.Interpreter.Test as Server
+import Syntax.Predicate (PO, Spec (Specification))
 import Test.Tasty
 import Test.Tasty.HUnit
+import Data.Loc.Range
 
 tests :: TestTree
-tests = testGroup "Server" [utilTests]
-
-utilTests :: TestTree
-utilTests = testGroup "Utils" [compareWithPositionTests, withinSelectionTests]
+tests = testGroup "Server" [utils, instantiateSpec]
 
 --------------------------------------------------------------------------------
 
--- | For testing selection related stuff
-newtype Item = Item {unItem :: Loc}
-  deriving (Eq)
+instantiateSpec :: TestTree
+instantiateSpec =
+  testGroup
+    "Instantiate Specs" []
+    -- [ run "top level" "spec-qm.gcl"
+    -- ]
+  where
+    run :: String -> FilePath -> TestTree
+    run name path =
+      testCase name $ do
+        let goldenFilePath = "./test/source/golden" <> path <> ".golden"
+        let sourceFilePath = "./test/source/" <> path
+        -- perform IO to read file
+        source <- Text.readFile sourceFilePath
 
-instance Show Item where
-  show item = case locOf item of
-    NoLoc -> "Item"
-    Loc start end -> "Item " <> show (posCoff start) <> " " <> show (posCoff end)
+        let makeRange (offsetA, lineA, colA) (offsetB, lineB, colB) =
+              Range
+                (Pos sourceFilePath lineA colA offsetA)
+                (Pos sourceFilePath lineB colB offsetB)
+        --
+        let (_, trace) = runTest sourceFilePath source $ do
+              program <- parseProgram source
+              _ <- sweep program
+              return ()
 
-make :: Int -> Int -> Item
-make start end = Item (Loc (Pos "" 1 1 start) (Pos "" 1 1 end))
+        -- let spec = Specification 0 Pred Pred Loc
 
-instance Located Item where
-  locOf = unItem
+        trace
+          @?= [ CmdGetFilePath,
+                CmdEditText (makeRange (0, 1, 1) (0, 1, 1)) "[!\n\n!]",
+                CmdGetFilePath,
+                CmdEditText (makeRange (6, 3, 3) (6, 3, 3)) "[!\n  \n  !]",
+                CmdGetFilePath
+              ]
+
+-- -- goldenTest
+-- -- assertion no. 1 (passes)
+-- 2 + 2 @?= 4
+-- -- assertion no. 2 (fails)
+-- assertBool "the list is not empty" $ null [1]
+-- -- assertion no. 3 (would have failed, but won't be executed because
+-- -- the previous assertion has already failed)
+-- "foo" @?= "bar"
 
 --------------------------------------------------------------------------------
-  
+
+utils :: TestTree
+utils = testGroup "Utils" [compareWithPositionTests, withinSelectionTests]
 
 compareWithPositionTests :: TestTree
 compareWithPositionTests =
@@ -50,7 +83,7 @@ compareWithPositionTests =
     ]
   where
     run :: Int -> Item -> Ordering
-    run = compareWithPosition  
+    run = compareWithPosition
 
 --------------------------------------------------------------------------------
 
@@ -72,3 +105,18 @@ withinSelectionTests =
   where
     run :: (Int, Int) -> Item -> Bool
     run = withinSelection
+
+-- | For testing selection related stuff
+newtype Item = Item {unItem :: Loc}
+  deriving (Eq)
+
+instance Show Item where
+  show item = case locOf item of
+    NoLoc -> "Item"
+    Loc start end -> "Item " <> show (posCoff start) <> " " <> show (posCoff end)
+
+make :: Int -> Int -> Item
+make start end = Item (Loc (Pos "" 1 1 start) (Pos "" 1 1 end))
+
+instance Located Item where
+  locOf = unItem

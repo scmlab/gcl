@@ -35,7 +35,9 @@ interpret filepath source p = case runCmdM p of
     let (before, rest) = Text.splitAt (posCoff start) source 
     let (_, after) = Text.splitAt (posCoff end) rest 
     let newSource = before <> text <> after
-    tell [CmdEditText range text]
+    let msg = "original: {" <> source <> "} before: {" <> before <> "} text: {" <> text <> "} after: {" <> after <> "}"
+    -- let msg = "total: " <> Text.pack (show (Text.length text)) <> " " <> Text.pack (show (posCoff start, posCoff end)) <> " " <> text
+    tell [CmdLog msg, CmdEditText range text]
     interpret filepath newSource (next newSource)
   Right (Free (GetFilePath next)) -> do
     tell [CmdGetFilePath]
