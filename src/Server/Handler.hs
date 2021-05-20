@@ -173,10 +173,10 @@ generateResponseAndDiagnostics program = do
   lastSelection <- getLastSelection
   let overlappedSpecs = case lastSelection of
         Nothing -> specs
-        Just sel -> filter (withinMouseSelection sel) specs
+        Just sel -> filter (withinSelection sel) specs
   let overlappedPOs = case lastSelection of
         Nothing -> pos
-        Just sel -> filter (withinMouseSelection sel) pos
+        Just sel -> filter (withinSelection sel) pos
   -- render stuff
   let warningsSection = if null warnings then [] else headerE "Warnings" : map renderBlock warnings
   let globalPropsSection = if null globalProps then [] else headerE "Global Properties" : map renderBlock globalProps

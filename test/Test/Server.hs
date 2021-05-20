@@ -3,17 +3,20 @@
 module Test.Server where
 
 import Data.Loc
-import Server.DSL (compareWithMousePosition, withinMouseSelection)
+import Server.DSL (compareWithPosition, withinSelection)
 import Syntax.Predicate (PO)
 import Test.Tasty
 import Test.Tasty.HUnit
 
 tests :: TestTree
-tests = testGroup "Server" [compareWithMousePositionTests, withinMouseSelectionTests]
+tests = testGroup "Server" [utilTests]
+
+utilTests :: TestTree
+utilTests = testGroup "Utils" [compareWithPositionTests, withinSelectionTests]
 
 --------------------------------------------------------------------------------
 
--- | For testing mouse selection related stuff
+-- | For testing selection related stuff
 newtype Item = Item {unItem :: Loc}
   deriving (Eq)
 
@@ -31,8 +34,8 @@ instance Located Item where
 --------------------------------------------------------------------------------
   
 
-compareWithMousePositionTests :: TestTree
-compareWithMousePositionTests =
+compareWithPositionTests :: TestTree
+compareWithPositionTests =
   testGroup
     "compareWithMouse"
     [ testCase "1" $ run 0 (make 10 20) @?= LT,
@@ -47,12 +50,12 @@ compareWithMousePositionTests =
     ]
   where
     run :: Int -> Item -> Ordering
-    run = compareWithMousePosition  
+    run = compareWithPosition  
 
 --------------------------------------------------------------------------------
 
-withinMouseSelectionTests :: TestTree
-withinMouseSelectionTests =
+withinSelectionTests :: TestTree
+withinSelectionTests =
   testGroup
     "withinMouseSelection"
     [ testCase "1" $ run (0, 0) (make 10 20) @?= False,
@@ -68,4 +71,4 @@ withinMouseSelectionTests =
     ]
   where
     run :: (Int, Int) -> Item -> Bool
-    run = withinMouseSelection
+    run = withinSelection

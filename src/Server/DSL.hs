@@ -137,12 +137,12 @@ parseProgram source = do
     Left (Loc start _) -> digHole start >>= parseProgram
     Right program -> return program
 
--- | Compare the mouse position with something
---  EQ: the mouse is placed within that thing
---  LT: the mouse is placed BEFORE (but not touching) that thing
---  GT: the mouse is placed AFTER (but not touching) that thing
-compareWithMousePosition :: Located a => Int -> a -> Ordering
-compareWithMousePosition offset x = case locOf x of
+-- | Compare the cursor position with something
+--  EQ: the cursor is placed within that thing
+--  LT: the cursor is placed BEFORE (but not touching) that thing
+--  GT: the cursor is placed AFTER (but not touching) that thing
+compareWithPosition :: Located a => Int -> a -> Ordering
+compareWithPosition offset x = case locOf x of
   NoLoc -> EQ
   Loc start end ->
     if offset < posCoff start
@@ -152,12 +152,12 @@ compareWithMousePosition offset x = case locOf x of
           then GT
           else EQ
 
--- | See if something is within the mouse selection
-withinMouseSelection :: Located a => (Int, Int) -> a -> Bool
-withinMouseSelection (left, right) x =
-  compareWithMousePosition left x == EQ
-    || compareWithMousePosition right x == EQ
-    || (compareWithMousePosition left x == LT && compareWithMousePosition right x == GT)
+-- | See if something is within the selection
+withinSelection :: Located a => (Int, Int) -> a -> Bool
+withinSelection (left, right) x =
+  compareWithPosition left x == EQ
+    || compareWithPosition right x == EQ
+    || (compareWithPosition left x == LT && compareWithPosition right x == GT)
 
 --------------------------------------------------------------------------------
 
