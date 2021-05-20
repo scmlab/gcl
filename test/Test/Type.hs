@@ -52,6 +52,10 @@ exprTests =
         exprCheck "i >= j <= k" "Bool",
       testCase "Chain 5" $
         exprCheck "b = (i < j)" "Bool",
+      testCase "Chain 6" $
+        exprCheck "i = j ∧ i = k" "Bool",
+      testCase "Chain 7" $
+        exprCheck "i = j ∧ i ≤ k" "Bool",
       -- testCase "Arr App 1" $
       --   exprCheck "Arr" "array [ 0 .. N ) of Int",
       testCase "Arr App 2" $
