@@ -12,7 +12,7 @@ import Pretty (toString, toText)
 
 
 tests :: TestTree
-tests = testGroup "Prettifier" [expression, type', declaration, statement, parseError, golden]
+tests = testGroup "Parser" [expression, type', declaration, statement, parseError, golden]
 
 --------------------------------------------------------------------------------
 

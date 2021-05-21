@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Test.Server where
+module Test.Server (tests) where
 
 import Data.Loc
 import Data.Loc.Range
@@ -22,10 +22,9 @@ instantiateSpec :: TestTree
 instantiateSpec =
   testGroup
     "Instantiate Specs"
-    []
+    [ run "top level" "spec-qm.gcl"
+    ]
   where
-    -- [ run "top level" "spec-qm.gcl"
-    -- ]
 
     run :: String -> FilePath -> TestTree
     run name path =
@@ -40,17 +39,17 @@ instantiateSpec =
                 (Pos sourceFilePath lineA colA offsetA)
                 (Pos sourceFilePath lineB colB offsetB)
         --
-        let (_, trace) = runTest sourceFilePath source $ do
+        let ((_, source'), trace) = runTest sourceFilePath source $ do
               program <- parseProgram source
               _ <- sweep program
               return ()
+        print trace
+        print source'
 
         -- see if the traces are right 
         trace
           @?= [ CmdGetFilePath,
-                CmdEditText (makeRange (0, 1, 1) (0, 1, 1)) "[!\n\n!]",
-                CmdGetFilePath,
-                CmdEditText (makeRange (6, 3, 3) (6, 3, 3)) "[!\n  \n  !]",
+                CmdEditText (makeRange (0, 1, 1) (1, 1, 2)) "[!\n\n!]",
                 CmdGetFilePath
               ]
 

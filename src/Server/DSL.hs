@@ -72,11 +72,11 @@ terminate x y = liftF (Terminate x y)
 
 -- converts the "?" at a given location to "[!   !]"
 -- and returns the modified source and the difference of source length
-digHole :: Pos -> CmdM Text
-digHole pos = do
-  let indent = Text.replicate (posCol pos - 1) " "
+digHole :: Range -> CmdM Text
+digHole range = do
+  let indent = Text.replicate (posCol (rangeStart range) - 1) " "
   let holeText = "[!\n" <> indent <> "\n" <> indent <> "!]"
-  editText (Range pos pos) holeText
+  editText range holeText
 
 -- | Try to parse a piece of text in a Spec
 refine :: Text -> Range -> CmdM (Spec, Text)
@@ -127,7 +127,7 @@ parseProgram source = do
   concrete <- parse pProgram source
   case runExcept (toAbstract concrete) of
     Left NoLoc -> throwError [Others "NoLoc in parseProgram"]
-    Left (Loc start _) -> digHole start >>= parseProgram
+    Left (Loc start end) -> digHole (Range start end) >>= parseProgram
     Right program -> return program
 
 --------------------------------------------------------------------------------

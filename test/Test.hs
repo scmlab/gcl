@@ -10,4 +10,5 @@ main :: IO ()
 main = defaultMain tests
 
 tests :: TestTree
+-- tests = testGroup "Tests" [Server.tests]
 tests = testGroup "Tests" [Parser.tests, WP.tests, Type.tests, SrcLoc.tests, Server.tests]
