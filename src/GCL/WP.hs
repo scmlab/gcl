@@ -28,6 +28,7 @@ import Syntax.Abstract
   )
 import qualified Syntax.Abstract as A
 import qualified Syntax.Abstract.Located as A
+import qualified Syntax.Abstract.Util as A
 import Syntax.Predicate hiding (Stmt)
 import Data.Loc.Range
 

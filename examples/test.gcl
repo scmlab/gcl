@@ -1,7 +1,18 @@
-con A, B : Int {A}
+con N : Int { N ≥ 1 }
+con a : array [0..N) of Int
+con inf : Int
+var r, s, n : Int
 
-{True}
-[!
+let P = True
 
-!]
-{True}
+r, s, n := 0-inf, 0 - inf, 0
+{ r = s ∧ 0 ≤ n, bnd : N -n}
+skip
+{ True }
+
+{-
+
+    ⟨ ↑ i j : 0 ≤ i < j < n + 1 : a i - a j ⟩
+ =  ↑ ⟨ ↑ i j : 0 ≤ i < j < n : a i - a j ⟩ (↑ ⟨ i : 0 ≤ i < n : a i - a n ⟩ )  
+
+-}
