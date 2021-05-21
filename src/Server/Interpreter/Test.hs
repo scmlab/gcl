@@ -17,7 +17,7 @@ data CmdKind
   = CmdEditText Range Text
   | CmdGetFilePath
   | CmdGetSource
-  | CmdPutLastSelection (Int, Int)
+  | CmdPutLastSelection Range
   | CmdGetLastSelection
   | CmdBumpResponseVersion
   | CmdLog Text

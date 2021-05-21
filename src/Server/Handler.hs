@@ -105,9 +105,7 @@ handlers =
               case kind of
                 -- Inspect
                 ReqInspect range -> do
-                  let selStart = posCoff $ rangeStart range
-                  let selEnd = posCoff $ rangeEnd range
-                  setLastSelection (selStart, selEnd)
+                  setLastSelection range
                   source <- getSource
                   program <- parseProgram source
                   typeCheck program
@@ -115,11 +113,9 @@ handlers =
 
                 -- Refine
                 ReqRefine range -> do
-                  let selStart = posCoff $ rangeStart range
-                  let selEnd = posCoff $ rangeEnd range
-                  setLastSelection (selStart, selEnd)
+                  setLastSelection range
                   source <- getSource
-                  (spec, content) <- refine source (selStart, selEnd)
+                  (spec, content) <- refine source range
 
                   -- remove the Spec
                   source' <- case specLoc spec of
@@ -177,10 +173,10 @@ generateResponseAndDiagnostics program = do
   lastSelection <- getLastSelection
   let overlappedSpecs = case lastSelection of
         Nothing -> specs
-        Just sel -> filter (withinSelection sel) specs
+        Just sel -> filter (withinRange sel) specs
   let overlappedPOs = case lastSelection of
         Nothing -> pos
-        Just sel -> filter (withinSelection sel) pos
+        Just sel -> filter (withinRange sel) pos
   -- render stuff
   let warningsSection = if null warnings then [] else headerE "Warnings" : map renderBlock warnings
   let globalPropsSection = if null globalProps then [] else headerE "Global Properties" : map renderBlock globalProps

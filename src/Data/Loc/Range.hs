@@ -160,3 +160,27 @@ instance FromJSON Pos where
 instance FromJSON Range
 
 instance ToJSON Range
+
+--------------------------------------------------------------------------------
+
+-- | Compare the cursor position with something
+--  EQ: the cursor is placed within that thing
+--  LT: the cursor is placed BEFORE (but not touching) that thing
+--  GT: the cursor is placed AFTER (but not touching) that thing
+compareWithPosition :: Located a => Pos -> a -> Ordering
+compareWithPosition pos x = case locOf x of
+  NoLoc -> EQ
+  Loc start end ->
+    if posCoff pos < posCoff start
+      then LT
+      else
+        if posCoff pos > posCoff end
+          then GT
+          else EQ
+
+-- | See if something is within the selection
+withinRange :: Located a => Range -> a -> Bool
+withinRange (Range left right) x =
+  compareWithPosition left x == EQ
+    || compareWithPosition right x == EQ
+    || (compareWithPosition left x == LT && compareWithPosition right x == GT)

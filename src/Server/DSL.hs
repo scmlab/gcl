@@ -32,8 +32,8 @@ data Cmd next
   = EditText Range Text (Text -> next)
   | GetFilePath (FilePath -> next)
   | GetSource (Text -> next)
-  | PutLastSelection (Int, Int) next
-  | GetLastSelection (Maybe (Int, Int) -> next)
+  | PutLastSelection Range next
+  | GetLastSelection (Maybe Range -> next)
   | BumpResponseVersion (Int -> next)
   | Log Text next
   | Terminate [ResKind] [Diagnostic]
@@ -53,10 +53,10 @@ getFilePath = liftF (GetFilePath id)
 getSource :: CmdM Text
 getSource = liftF (GetSource id)
 
-setLastSelection :: (Int, Int) -> CmdM ()
+setLastSelection :: Range -> CmdM ()
 setLastSelection selection = liftF (PutLastSelection selection ())
 
-getLastSelection :: CmdM (Maybe (Int, Int))
+getLastSelection :: CmdM (Maybe Range)
 getLastSelection = liftF (GetLastSelection id)
 
 logM :: Text -> CmdM ()
@@ -79,8 +79,8 @@ digHole pos = do
   editText (Range pos pos) holeText
 
 -- | Try to parse a piece of text in a Spec
-refine :: Text -> (Int, Int) -> CmdM (Spec, Text)
-refine source (start, end) = do
+refine :: Text -> Range -> CmdM (Spec, Text)
+refine source range  = do
   result <- findPointedSpec
   case result of
     Nothing -> throwError [Others "Please place the cursor in side a Spec to refine it"]
@@ -98,14 +98,7 @@ refine source (start, end) = do
     findPointedSpec = do
       program <- parseProgram source
       (_, specs, _, _) <- sweep program
-      return $ find (pointed (start, end)) specs
-      where
-        pointed :: (Int, Int) -> Spec -> Bool
-        pointed (x, y) spec = case specLoc spec of
-          NoLoc -> False
-          Loc open close ->
-            (posCoff open <= x && x <= posCoff close + 1)
-              || (posCoff open <= y && y <= posCoff close + 1)
+      return $ find (withinRange range) specs
 
 typeCheck :: A.Program -> CmdM ()
 typeCheck p = case runExcept (TypeChecking.checkProg p) of
@@ -136,28 +129,6 @@ parseProgram source = do
     Left NoLoc -> throwError [Others "NoLoc in parseProgram"]
     Left (Loc start _) -> digHole start >>= parseProgram
     Right program -> return program
-
--- | Compare the cursor position with something
---  EQ: the cursor is placed within that thing
---  LT: the cursor is placed BEFORE (but not touching) that thing
---  GT: the cursor is placed AFTER (but not touching) that thing
-compareWithPosition :: Located a => Int -> a -> Ordering
-compareWithPosition offset x = case locOf x of
-  NoLoc -> EQ
-  Loc start end ->
-    if offset < posCoff start
-      then LT
-      else
-        if offset - 1 > posCoff end
-          then GT
-          else EQ
-
--- | See if something is within the selection
-withinSelection :: Located a => (Int, Int) -> a -> Bool
-withinSelection (left, right) x =
-  compareWithPosition left x == EQ
-    || compareWithPosition right x == EQ
-    || (compareWithPosition left x == LT && compareWithPosition right x == GT)
 
 --------------------------------------------------------------------------------
 

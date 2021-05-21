@@ -24,13 +24,14 @@ import qualified Data.Text as Text
 import Error
 import Language.LSP.Diagnostics
 import Language.LSP.Server
-import Language.LSP.Types hiding (TextDocumentSyncClientCapabilities (..))
+import Language.LSP.Types hiding (TextDocumentSyncClientCapabilities (..), Range(..))
 import qualified Language.LSP.VFS as VFS
 import Render
 import Server.CustomMethod
 import Server.DSL (runCmdM, CmdM, Cmd(..))
 import Server.Diagnostic
 import qualified Server.DSL as DSL
+import Data.Loc.Range (Range)
 
 --------------------------------------------------------------------------------
 
@@ -39,7 +40,7 @@ data GlobalEnv = GlobalEnv
   { -- Channel for printint log
     globalChan :: Chan Text,
     -- Keep tracks of all text selections (including cursor position)
-    globalSelectionMap :: IORef (Map FilePath (Maybe (Int, Int))),
+    globalSelectionMap :: IORef (Map FilePath (Maybe Range)),
     -- Counter for generating fresh numbers
     globalCounter :: IORef Int
   }
