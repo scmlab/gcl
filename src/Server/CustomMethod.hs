@@ -10,6 +10,7 @@ import Data.Text (Text)
 import GHC.Generics (Generic)
 import Render
 import Syntax.Predicate (Origin, PO, Spec)
+import Data.Loc.Selection (Selection)
 
 --------------------------------------------------------------------------------
 
@@ -45,6 +46,7 @@ instance Show Response where
 -- | Request
 data ReqKind
   = ReqInspect Int Int
+  | ReqInspect2 Selection
   | ReqRefine Int Int
   | ReqDebug
   deriving (Generic)
@@ -53,6 +55,7 @@ instance FromJSON ReqKind
 
 instance Show ReqKind where
   show (ReqInspect x y) = "Inspect " <> show x <> " " <> show y
+  show (ReqInspect2 selection) = "Inspect2 " <> show selection
   show (ReqRefine i x) = "Refine #" <> show i <> " " <> show x
   show ReqDebug = "Debug"
 

@@ -111,6 +111,8 @@ handlers =
                   typeCheck program
                   generateResponseAndDiagnostics program
 
+                ReqInspect2 selection -> logM $ Text.pack $ show selection
+
                 -- Refine
                 ReqRefine selStart selEnd -> do
                   setLastSelection (selStart, selEnd)
