@@ -13,7 +13,7 @@ import GCL.WP (StructWarning)
 import Pretty ()
 import qualified Server
 import Server.DSL (parseProgram, sweep)
-import Server.Interpreter.Test
+import Server.Interpreter.Test 
 import Syntax.Abstract
 import Syntax.Common
 import Syntax.Predicate
@@ -26,14 +26,14 @@ tests = testGroup "WP" [emptyProg, statements, issues]
 
 type Result = ((Maybe ([PO], [Spec], [Expr], [StructWarning]), Text), [CmdKind])
 
-run :: Text -> Result
+run :: Text -> TestResult (Maybe ([PO], [Spec], [Expr], [StructWarning]))
 run text = runTest "<test>" text $ parseProgram text >>= sweep
 
-fromPOs :: Text -> [PO] -> Result
-fromPOs source pos = ((Just (pos, [], [], []), source), [CmdGetFilePath])
+fromPOs :: Text -> [PO] -> TestResult (Maybe ([PO], [Spec], [Expr], [StructWarning]))
+fromPOs source pos = TestResult ((Just (pos, [], [], []), source), [CmdGetFilePath])
 
-fromSpecs :: Text -> [Spec] -> Result
-fromSpecs source specs = ((Just ([], specs, [], []), source), [CmdGetFilePath])
+fromSpecs :: Text -> [Spec] -> TestResult (Maybe ([PO], [Spec], [Expr], [StructWarning]))
+fromSpecs source specs = TestResult ((Just ([], specs, [], []), source), [CmdGetFilePath])
 
 --------------------------------------------------------------------------------
 
@@ -55,13 +55,14 @@ statements =
   testGroup
     "simple program"
     [ testCase "skip" $ do
-        let source = 
-                "{ True }   \n\
-                \skip       \n\
-                \{ 0 = 0 }"
+        let source =
+              "{ True }   \n\
+              \skip       \n\
+              \{ 0 = 0 }"
         let actual = run source
         actual
-          @?= fromPOs source
+          @?= fromPOs
+            source
             [ PO
                 0
                 (Assertion (Lit (Bol True) (Loc (pos 1 3 2) (pos 1 7 6))) (Loc (pos 1 1 0) (pos 1 9 8)))
@@ -79,12 +80,13 @@ statements =
       testCase "abort" $
         do
           let source =
-                  "{ True }   \n\
-                  \abort      \n\
-                  \{ True }"
+                "{ True }   \n\
+                \abort      \n\
+                \{ True }"
           let actual = run source
           actual
-            @?= fromPOs source
+            @?= fromPOs
+              source
               [ PO
                   0
                   (Assertion (Lit (Bol True) (Loc (pos 1 3 2) (pos 1 7 6))) (Loc (pos 1 1 0) (pos 1 9 8)))
@@ -95,12 +97,13 @@ statements =
         "assignment"
         $ do
           let source =
-                  "{ True }   \n\
-                  \x := 1     \n\
-                  \{ 0 = x }"
+                "{ True }   \n\
+                \x := 1     \n\
+                \{ 0 = x }"
           let actual = run source
           actual
-            @?= fromPOs source
+            @?= fromPOs
+              source
               [ PO
                   0
                   (Assertion (Lit (Bol True) (Loc (pos 1 3 2) (pos 1 7 6))) (Loc (pos 1 1 0) (pos 1 9 8)))
@@ -117,13 +120,14 @@ statements =
               ],
       testCase "spec" $ do
         let source =
-                "{ True }   \n\
-                \[!       \n\
-                \!]       \n\
-                \{ 0 = 0 }"
+              "{ True }   \n\
+              \[!       \n\
+              \!]       \n\
+              \{ 0 = 0 }"
         let actual = run source
         actual
-          @?= fromSpecs source
+          @?= fromSpecs
+            source
             [ Specification
                 0
                 (Assertion (Lit (Bol True) (Loc (Pos "<test>" 1 3 2) (Pos "<test>" 1 7 6))) (Loc (Pos "<test>" 1 1 0) (Pos "<test>" 1 9 8)))
@@ -195,12 +199,13 @@ issue2 =
     "Issue #2"
     [ testCase "Postcondition only" $ do
         let source =
-                "con A, B : Int\n\
-                \var x, y, z : Int\n\
-                \{ z = A * B }"
+              "con A, B : Int\n\
+              \var x, y, z : Int\n\
+              \{ z = A * B }"
         let actual = run source
         actual
-          @?= fromPOs source
+          @?= fromPOs
+            source
             [ PO
                 0
                 (Constant (Lit (Bol True) NoLoc))
@@ -225,13 +230,14 @@ issue2 =
             ],
       testCase "Postcondition + precondition" $ do
         let source =
-                "con A, B : Int\n\
-                \var x, y, z : Int\n\
-                \{ True }\n\
-                \{ z = A * B }"
+              "con A, B : Int\n\
+              \var x, y, z : Int\n\
+              \{ True }\n\
+              \{ z = A * B }"
         let actual = run source
         actual
-          @?= fromPOs source
+          @?= fromPOs
+            source
             [ PO
                 0
                 (Assertion (Lit (Bol True) (Loc (pos 3 3 35) (pos 3 7 39))) (Loc (pos 3 1 33) (pos 3 9 41)))

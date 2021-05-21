@@ -42,7 +42,7 @@ instantiateSpec =
               (Pos sourcePath lineA colA offsetA)
               (Pos sourcePath lineB colB offsetB)
       --
-      let ((_, source'), trace) = runTest sourcePath source $ do
+      let testResult = runTest sourcePath source $ do
             program <- parseProgram source
             _ <- sweep program
             return ()
@@ -59,7 +59,7 @@ instantiateSpec =
               CmdGetFilePath
             ]
 
-      return $ Text.encodeUtf8 $ Text.fromStrict $ source' <> "\n" <> traces
+      return $ Text.encodeUtf8 $ Text.fromStrict $ StrictText.pack $ show testResult
 
 runGoldenTest :: FilePath -> (FilePath -> IO ByteString) -> String -> FilePath -> TestTree
 runGoldenTest dir test name path = do

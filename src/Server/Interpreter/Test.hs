@@ -1,5 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
-module Server.Interpreter.Test (CmdKind(..), runTest) where
+module Server.Interpreter.Test (CmdKind(..), TestResult(..), runTest) where
 
 import Control.Monad.Trans.Free
 import Control.Monad.Trans.Writer
@@ -27,8 +27,14 @@ data CmdKind
 
 type TestM = StateT Text (Writer [CmdKind])
 
-runTest :: FilePath -> Text -> CmdM a -> ((Maybe a, Text), [CmdKind])
-runTest filepath source program = runWriter (runStateT (interpret filepath program) source)
+newtype TestResult a = TestResult ((a, Text), [CmdKind])
+  deriving (Eq)
+
+instance Show a => Show (TestResult a) where 
+  show (TestResult ((value, source), trace)) = "### Result\n\n" <> show value <> "\n\n### Source\n\n" <> Text.unpack source <> "\n\n### Trace\n\n" <> unlines (map show trace)
+
+runTest :: FilePath -> Text -> CmdM a -> TestResult (Maybe a)
+runTest filepath source program = TestResult $ runWriter (runStateT (interpret filepath program) source)
 
 interpret :: FilePath -> CmdM a -> TestM (Maybe a)
 interpret filepath p = case runCmdM p of
