@@ -68,7 +68,8 @@ mergeRangesUnsafe xs = foldl (<>) (head xs) xs
 mergeRanges :: NonEmpty Range -> Range
 mergeRanges xs = foldl (<>) (NE.head xs) xs
 
--- | Calculates the distance between the two positions
+-- | Calculates the length coverted by a range
+-- | Note that, the length is always > 0
 span :: Range -> Int
 span (Range a b) = posCol b - posCol a + 1
 
