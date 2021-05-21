@@ -22,7 +22,7 @@ import Server.CustomMethod
 import qualified Syntax.Abstract as A
 import Syntax.Concrete.ToAbstract
 import Syntax.Parser (Parser, pProgram, pStmts, runParse)
-import Syntax.Predicate (PO, Spec (specLoc), specPayload)
+import Syntax.Predicate (PO, Spec, specPayload)
 import Prelude hiding (span)
 
 --------------------------------------------------------------------------------

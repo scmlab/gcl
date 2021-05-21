@@ -45,8 +45,7 @@ instantiateSpec =
               _ <- sweep program
               return ()
 
-        -- let spec = Specification 0 Pred Pred Loc
-
+        -- see if the traces are right 
         trace
           @?= [ CmdGetFilePath,
                 CmdEditText (makeRange (0, 1, 1) (0, 1, 1)) "[!\n\n!]",

@@ -24,16 +24,16 @@ import Prelude hiding (Ordering (..))
 tests :: TestTree
 tests = testGroup "WP" [emptyProg, statements, issues]
 
-type Result = (Maybe ([PO], [Spec], [Expr], [StructWarning]), [CmdKind])
+type Result = ((Maybe ([PO], [Spec], [Expr], [StructWarning]), Text), [CmdKind])
 
 run :: Text -> Result
 run text = runTest "<test>" text $ parseProgram text >>= sweep
 
-fromPOs :: [PO] -> Result
-fromPOs pos = (Just (pos, [], [], []), [CmdGetFilePath])
+fromPOs :: Text -> [PO] -> Result
+fromPOs source pos = ((Just (pos, [], [], []), source), [CmdGetFilePath])
 
-fromSpecs :: [Spec] -> Result
-fromSpecs specs = (Just ([], specs, [], []), [CmdGetFilePath])
+fromSpecs :: Text -> [Spec] -> Result
+fromSpecs source specs = ((Just ([], specs, [], []), source), [CmdGetFilePath])
 
 --------------------------------------------------------------------------------
 
@@ -44,7 +44,7 @@ emptyProg =
     "empty"
     [ testCase "empty" $ do
         let actual = run ""
-        actual @?= fromPOs []
+        actual @?= fromPOs "" []
     ]
 
 --------------------------------------------------------------------------------
@@ -55,13 +55,13 @@ statements =
   testGroup
     "simple program"
     [ testCase "skip" $ do
-        let actual =
-              run
+        let source = 
                 "{ True }   \n\
                 \skip       \n\
                 \{ 0 = 0 }"
+        let actual = run source
         actual
-          @?= fromPOs
+          @?= fromPOs source
             [ PO
                 0
                 (Assertion (Lit (Bol True) (Loc (pos 1 3 2) (pos 1 6 5))) (Loc (pos 1 1 0) (pos 1 8 7)))
@@ -78,13 +78,13 @@ statements =
             ],
       testCase "abort" $
         do
-          let actual =
-                run
+          let source =
                   "{ True }   \n\
                   \abort      \n\
                   \{ True }"
+          let actual = run source
           actual
-            @?= fromPOs
+            @?= fromPOs source
               [ PO
                   0
                   (Assertion (Lit (Bol True) (Loc (pos 1 3 2) (pos 1 6 5))) (Loc (pos 1 1 0) (pos 1 8 7)))
@@ -94,13 +94,13 @@ statements =
       testCase
         "assignment"
         $ do
-          let actual =
-                run
+          let source =
                   "{ True }   \n\
                   \x := 1     \n\
                   \{ 0 = x }"
+          let actual = run source
           actual
-            @?= fromPOs
+            @?= fromPOs source
               [ PO
                   0
                   (Assertion (Lit (Bol True) (Loc (pos 1 3 2) (pos 1 6 5))) (Loc (pos 1 1 0) (pos 1 8 7)))
@@ -116,14 +116,14 @@ statements =
                   (AtAssignment (Loc (pos 2 1 12) (pos 2 6 17)))
               ],
       testCase "spec" $ do
-        let actual =
-              run
+        let source =
                 "{ True }   \n\
                 \[!       \n\
                 \!]       \n\
                 \{ 0 = 0 }"
+        let actual = run source
         actual
-          @?= fromSpecs
+          @?= fromSpecs source
             [ Specification
                 0
                 (Assertion (Lit (Bol True) (Loc (Pos "<test>" 1 3 2) (Pos "<test>" 1 6 5))) (Loc (Pos "<test>" 1 1 0) (Pos "<test>" 1 8 7)))
@@ -194,13 +194,13 @@ issue2 =
   testGroup
     "Issue #2"
     [ testCase "Postcondition only" $ do
-        let actual =
-              run
+        let source =
                 "con A, B : Int\n\
                 \var x, y, z : Int\n\
                 \{ z = A * B }"
+        let actual = run source
         actual
-          @?= fromPOs
+          @?= fromPOs source
             [ PO
                 0
                 (Constant (Lit (Bol True) NoLoc))
@@ -224,14 +224,14 @@ issue2 =
                 (AtAssertion (Loc (pos 3 1 33) (pos 3 13 45)))
             ],
       testCase "Postcondition + precondition" $ do
-        let actual =
-              run
+        let source =
                 "con A, B : Int\n\
                 \var x, y, z : Int\n\
                 \{ True }\n\
                 \{ z = A * B }"
+        let actual = run source
         actual
-          @?= fromPOs
+          @?= fromPOs source
             [ PO
                 0
                 (Assertion (Lit (Bol True) (Loc (pos 3 3 35) (pos 3 6 38))) (Loc (pos 3 1 33) (pos 3 8 40)))
