@@ -10,6 +10,7 @@ import Data.Text (Text)
 import GHC.Generics (Generic)
 import Render
 import Syntax.Predicate (Origin, PO, Spec)
+import Data.Loc.Range
 
 --------------------------------------------------------------------------------
 
@@ -44,16 +45,16 @@ instance Show Response where
 
 -- | Request
 data ReqKind
-  = ReqInspect Int Int
-  | ReqRefine Int Int
+  = ReqInspect Range
+  | ReqRefine Range
   | ReqDebug
   deriving (Generic)
 
 instance FromJSON ReqKind
 
 instance Show ReqKind where
-  show (ReqInspect x y) = "Inspect " <> show x <> " " <> show y
-  show (ReqRefine i x) = "Refine #" <> show i <> " " <> show x
+  show (ReqInspect range) = "Inspect " <> show range
+  show (ReqRefine range) = "Refine " <> show range
   show ReqDebug = "Debug"
 
 data Request = Req FilePath ReqKind

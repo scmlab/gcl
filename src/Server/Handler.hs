@@ -104,7 +104,9 @@ handlers =
             interpret filepath (Just responder) $ do
               case kind of
                 -- Inspect
-                ReqInspect selStart selEnd -> do
+                ReqInspect range -> do
+                  let selStart = posCoff $ rangeStart range
+                  let selEnd = posCoff $ rangeEnd range
                   setLastSelection (selStart, selEnd)
                   source <- getSource
                   program <- parseProgram source
@@ -112,7 +114,9 @@ handlers =
                   generateResponseAndDiagnostics program
 
                 -- Refine
-                ReqRefine selStart selEnd -> do
+                ReqRefine range -> do
+                  let selStart = posCoff $ rangeStart range
+                  let selEnd = posCoff $ rangeEnd range
                   setLastSelection (selStart, selEnd)
                   source <- getSource
                   (spec, content) <- refine source (selStart, selEnd)
