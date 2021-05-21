@@ -1,11 +1,11 @@
-{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
 
 module Data.Loc.Selection where
 
-import GHC.Generics (Generic)
 import Data.Loc.Range ( Range(..) )
 import qualified Data.Loc.Range as Range
+import Data.Loc (posCoff)
+import Data.Aeson ( FromJSON(parseJSON), ToJSON (toJSON) )
 
 -- | Represents a cursor selection
 --
@@ -22,7 +22,16 @@ import qualified Data.Loc.Range as Range
 --      and the second `Pos` to represent what is actually the right endpoint of that `Pos`
 
 newtype Selection = Selection { unSelection :: Range }
-  deriving (Eq, Generic)
+  deriving (Eq)
+
+instance Show Selection where 
+  show (Selection (Range start end)) = show (posCoff start) <> "-" <> show (posCoff end) 
+
+instance FromJSON Selection where
+  parseJSON x = Selection <$> parseJSON x
+
+instance ToJSON Selection where
+  toJSON = toJSON . unSelection
 
 -- | Calculates the length coverted by a selection
 span :: Selection -> Int
