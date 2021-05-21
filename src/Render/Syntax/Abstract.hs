@@ -68,6 +68,7 @@ instance Render Expr where
     Complete s -> s
 
 handleExpr :: Int -> Expr -> Variadic Expr Inlines
+handleExpr _ (Paren x) = return $ render x
 handleExpr _ (Var x _) = return $ render x
 handleExpr _ (Const x _) = return $ render x
 handleExpr _ (Lit x _) = return $ render x
