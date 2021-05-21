@@ -11,7 +11,29 @@ import Data.Loc hiding (fromLoc)
 import GHC.Generics (Generic)
 import Data.Maybe (mapMaybe)
 
--- | Invariant: the second position should be greater than the first position
+-- | Represents an interval of two source locations
+--
+--  Very much like `Loc`, except that:
+--    1. There's no `NoLoc`
+--    2. Cursors is placed IN-BETWEEN two characters rather than ON a character
+--
+--  For example: to represent the selection of "ABC" in "ABCD" 
+--    (here we use the tip of ">" and "<" to represent a cursor between two characters)
+--
+--    charactor offset    :   0123
+--    charactors          :   ABCD   
+-------------------------------------------------------
+--    Loc       of "ABC"  :   ^^^     Loc   (Pos ... 0) (Pos ... 2)
+--    Range     of "ABC"  :  >   <    Range (Pos ... 0) (Pos ... 3)
+--
+--    Loc       of "AB"   :   ^^      Loc   (Pos ... 0) (Pos ... 1)
+--    Range     of "AB"   :  >  <     Range (Pos ... 0) (Pos ... 2)
+--
+--    Loc       of ""     :  ####### UNREPRESENTABLE ###################
+--    Range     of ""     :  ><       Range (Pos ... 0) (Pos ... 0)
+--
+--  We abuse `Pos` to represent what is actually the left endpoint of that `Pos`
+
 data Range = Range Pos Pos
   deriving (Eq, Generic)
 
@@ -68,10 +90,9 @@ mergeRangesUnsafe xs = foldl (<>) (head xs) xs
 mergeRanges :: NonEmpty Range -> Range
 mergeRanges xs = foldl (<>) (NE.head xs) xs
 
--- | Calculates the length coverted by a range
--- | Note that, the length is always > 0
+-- | Calculates the length covered by a range
 span :: Range -> Int
-span (Range a b) = posCol b - posCol a + 1
+span (Range a b) = posCol b - posCol a
 
 -- | Compares the starting position
 instance Ord Range where

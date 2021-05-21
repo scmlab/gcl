@@ -180,7 +180,7 @@ punctuateE delim = horzE . punctuateAfterE delim
 type ClassNames = [String]
 
 -- | Internal type, to be converted to JSON values
-data Inline
+data Inline 
   = Icon String ClassNames
   | Text Text ClassNames
   | Link Range Inlines ClassNames
