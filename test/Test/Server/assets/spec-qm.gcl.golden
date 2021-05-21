@@ -1,0 +1,6 @@
+[!
+
+!]
+
+{ True }
+[CmdGetFilePath,CmdEditText ./test/Test/Server/assets/spec-qm.gcl [0-1] 1:1-2 "[!\n\n!]",CmdGetFilePath]

@@ -2,16 +2,25 @@
 
 module Test.Server (tests) where
 
+import Data.ByteString.Lazy (ByteString)
+import qualified Data.ByteString.Lazy as BS
 import Data.Loc
 import Data.Loc.Range
 import qualified Data.Text.IO as Text
+import qualified Data.Text.Lazy as Text
+import qualified Data.Text.Lazy.Encoding as Text
+import qualified Data.Text.Prettyprint.Doc as Doc
+import qualified Data.Text.Prettyprint.Doc.Render.Text as Doc
 import Pretty (pretty)
 import Server.DSL
 import Server.Interpreter.Test
 import qualified Server.Interpreter.Test as Server
 import Syntax.Predicate (PO, Spec (Specification))
 import Test.Tasty
+import Test.Tasty.Golden (createDirectoriesAndWriteFile)
+import qualified Test.Tasty.Golden as Golden
 import Test.Tasty.HUnit
+import qualified Data.Text as StrictText
 
 tests :: TestTree
 tests = testGroup "Server" [instantiateSpec]
@@ -25,39 +34,35 @@ instantiateSpec =
     [ run "top level" "spec-qm.gcl"
     ]
   where
-
     run :: String -> FilePath -> TestTree
-    run name path =
-      testCase name $ do
-        let goldenFilePath = "./test/source/golden" <> path <> ".golden"
-        let sourceFilePath = "./test/source/" <> path
-        -- perform IO to read file
-        source <- Text.readFile sourceFilePath
+    run = runGoldenTest "Server/assets/" $ \sourcePath -> do
+      source <- Text.readFile sourcePath
+      let makeRange (offsetA, lineA, colA) (offsetB, lineB, colB) =
+            Range
+              (Pos sourcePath lineA colA offsetA)
+              (Pos sourcePath lineB colB offsetB)
+      --
+      let ((_, source'), trace) = runTest sourcePath source $ do
+            program <- parseProgram source
+            _ <- sweep program
+            return ()
 
-        let makeRange (offsetA, lineA, colA) (offsetB, lineB, colB) =
-              Range
-                (Pos sourceFilePath lineA colA offsetA)
-                (Pos sourceFilePath lineB colB offsetB)
-        --
-        let ((_, source'), trace) = runTest sourceFilePath source $ do
-              program <- parseProgram source
-              _ <- sweep program
-              return ()
-        print trace
-        print source'
+      let makeRange (offsetA, lineA, colA) (offsetB, lineB, colB) =
+            Range
+              (Pos sourcePath lineA colA offsetA)
+              (Pos sourcePath lineB colB offsetB)
 
-        -- see if the traces are right 
-        trace
-          @?= [ CmdGetFilePath,
-                CmdEditText (makeRange (0, 1, 1) (1, 1, 2)) "[!\n\n!]",
-                CmdGetFilePath
-              ]
+      -- see if the traces are right
+      let traces = StrictText.pack $ show 
+            [ CmdGetFilePath,
+              CmdEditText (makeRange (0, 1, 1) (1, 1, 2)) "[!\n\n!]",
+              CmdGetFilePath
+            ]
 
--- -- goldenTest
--- -- assertion no. 1 (passes)
--- 2 + 2 @?= 4
--- -- assertion no. 2 (fails)
--- assertBool "the list is not empty" $ null [1]
--- -- assertion no. 3 (would have failed, but won't be executed because
--- -- the previous assertion has already failed)
--- "foo" @?= "bar"
+      return $ Text.encodeUtf8 $ Text.fromStrict $ source' <> "\n" <> traces
+
+runGoldenTest :: FilePath -> (FilePath -> IO ByteString) -> String -> FilePath -> TestTree
+runGoldenTest dir test name path = do
+  let goldenPath = "./test/Test/" <> dir <> path <> ".golden"
+  let sourcePath = "./test/Test/" <> dir <> path
+  Golden.goldenVsStringDiff name (\ref new -> ["diff", "-u", ref, new]) goldenPath (test sourcePath)
