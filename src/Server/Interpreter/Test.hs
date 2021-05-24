@@ -61,10 +61,10 @@ interpret filepath p = case runCmdM p of
   Right (Free (PutLastSelection selection next)) -> do
     lift $ tell [CmdPutLastSelection selection]
     interpret filepath next
-  Right (Free (GetProgram next)) -> do
+  Right (Free (ReadCachedResult next)) -> do
     lift $ tell []
-    interpret filepath (next Nothing)
-  Right (Free (PutProgram program next)) -> do
+    interpret filepath (next (Right ([], [], [], [])))
+  Right (Free (CacheResult _ next)) -> do
     lift $ tell []
     interpret filepath next
   Right (Free (BumpResponseVersion next)) -> do

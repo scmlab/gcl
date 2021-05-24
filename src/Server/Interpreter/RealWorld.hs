@@ -29,12 +29,11 @@ import Language.LSP.Types hiding (TextDocumentSyncClientCapabilities (..), Range
 import qualified Language.LSP.VFS as VFS
 import Render
 import Server.CustomMethod
-import Server.DSL (runCmdM, CmdM, Cmd(..))
+import Server.DSL (runCmdM, CmdM, Cmd(..), Result)
 import Server.Diagnostic
 import qualified Server.DSL as DSL
 import Data.Loc.Range (Range)
 import Pretty (toText)
-import Syntax.Abstract (Program)
 
 --------------------------------------------------------------------------------
 
@@ -49,12 +48,12 @@ data GlobalEnv = GlobalEnv
     -- 
     globalMute :: IORef Bool,
 
-    globalCachedProgram :: IORef (Maybe Program)
+    globalCachedResult :: IORef Result
   }
 
 -- | Constructs an initial global state
 initGlobalEnv :: IO GlobalEnv
-initGlobalEnv = GlobalEnv <$> newChan <*> newIORef Map.empty <*> newIORef 0 <*> newIORef False <*> newIORef Nothing
+initGlobalEnv = GlobalEnv <$> newChan <*> newIORef Map.empty <*> newIORef 0 <*> newIORef False <*> newIORef (Right ([], [], [], []))
 
 --------------------------------------------------------------------------------
 
@@ -124,14 +123,14 @@ setMute b = do
   ref <- lift $ asks globalMute
   liftIO $ writeIORef ref b
 
-cacheProgram :: Program -> ServerM ()
-cacheProgram program = do
-  ref <- lift $ asks globalCachedProgram
-  liftIO $ writeIORef ref (Just program)
+cacheResult :: Result -> ServerM ()
+cacheResult result = do
+  ref <- lift $ asks globalCachedResult
+  liftIO $ writeIORef ref result
 
-readCachedProgram :: ServerM (Maybe Program)
-readCachedProgram = do
-  ref <- lift $ asks globalCachedProgram
+readCachedResult :: ServerM Result
+readCachedResult = do
+  ref <- lift $ asks globalCachedResult
   liftIO $ readIORef ref
 
 --------------------------------------------------------------------------------
@@ -143,7 +142,7 @@ interpret filepath responder p = case runCmdM p of
     -- send responses
     sendResponses filepath responder responses
   Right (Free (EditText range text next)) -> do
-    logText $ " ### EditText " <> toText range <> " " <> text 
+    logText $ " ### EditText " <> toText range <> " " <> text
     -- apply edit
     let removeSpec = TextEdit (rangeToRange range) text
     let identifier = VersionedTextDocumentIdentifier (filePathToUri filepath) (Just 0)
@@ -153,10 +152,10 @@ interpret filepath responder p = case runCmdM p of
     let applyWorkspaceEditParams = ApplyWorkspaceEditParams (Just "Resolve Spec") workspaceEdit
     let callback _ = do
           interpret filepath responder $ do
-            DSL.getSource >>= next 
+            DSL.getSource >>= next
 
     void $ sendRequest SWorkspaceApplyEdit applyWorkspaceEditParams callback
-  Right (Free (Mute b next)) -> do 
+  Right (Free (Mute b next)) -> do
     setMute b
     interpret filepath responder next
   Right (Free (GetFilePath next)) -> interpret filepath responder (next filepath)
@@ -174,11 +173,11 @@ interpret filepath responder p = case runCmdM p of
     ref <- lift $ asks globalSelectionMap
     liftIO $ modifyIORef' ref (Map.insert filepath (Just selection))
     interpret filepath responder next
-  Right (Free (GetProgram next)) -> do
-    program <- readCachedProgram
-    interpret filepath responder (next program)
-  Right (Free (PutProgram program next)) -> do
-    cacheProgram program
+  Right (Free (ReadCachedResult next)) -> do
+    result <- readCachedResult
+    interpret filepath responder (next result)
+  Right (Free (CacheResult result next)) -> do
+    cacheResult result
     interpret filepath responder next
   Right (Free (BumpResponseVersion next)) -> do
     n <- bumpVersionM
@@ -191,5 +190,6 @@ interpret filepath responder p = case runCmdM p of
     sendDiagnostics filepath diagnostics
     interpret filepath responder next
   Left errors -> do
+    cacheResult (Left errors)
     logStuff errors
     handleErrors filepath responder errors

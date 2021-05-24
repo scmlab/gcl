@@ -27,6 +27,8 @@ import Pretty (toText)
 
 --------------------------------------------------------------------------------
 
+type Result = Either [Error] ([PO], [Spec], [A.Expr], [StructWarning])
+
 -- The "Syntax" of the DSL for handling LSP requests and responses
 data Cmd next
   = EditText Range Text (Text -> next)
@@ -37,8 +39,8 @@ data Cmd next
   | GetLastSelection (Maybe Range -> next)
   | BumpResponseVersion (Int -> next)
   | Log Text next
-  | PutProgram A.Program next
-  | GetProgram (Maybe A.Program -> next)
+  | CacheResult Result next
+  | ReadCachedResult (Result -> next)
   | SendDiagnostics [Diagnostic] next
   deriving (Functor)
 
@@ -65,11 +67,11 @@ setLastSelection selection = liftF (PutLastSelection selection ())
 getLastSelection :: CmdM (Maybe Range)
 getLastSelection = liftF (GetLastSelection id)
 
-setProgram :: A.Program -> CmdM ()
-setProgram program = liftF (PutProgram program ())
+cacheResult :: Result -> CmdM ()
+cacheResult result = liftF (CacheResult result ())
 
-getProgram :: CmdM (Maybe A.Program)
-getProgram = liftF (GetProgram id)
+readCachedResult :: CmdM Result
+readCachedResult = liftF (ReadCachedResult id)
 
 logM :: Text -> CmdM ()
 logM text = liftF (Log text ())

@@ -27,7 +27,6 @@ import Server.Diagnostic
   ( ToDiagnostics (toDiagnostics),
   )
 import Server.Interpreter.RealWorld
-import qualified Syntax.Abstract as A
 import Syntax.Predicate (Spec (..))
 
 -- handlers of the LSP server
@@ -106,16 +105,8 @@ handlers =
                 -- Inspect
                 ReqInspect range -> do
                   setLastSelection range
-                  result <- getProgram  
-                  case result of 
-                    Nothing -> do 
-                      logM "no cached program"
-                      return []
-                    Just program -> do 
-                      logM "program"
-                      typeCheck program
-                      generateResponseAndDiagnostics program
-
+                  result <- readCachedResult   
+                  generateResponseAndDiagnosticsFromResult result 
 
                 -- Refine
                 ReqRefine range -> do
@@ -131,11 +122,11 @@ handlers =
                     Loc start end -> editText (Range start end) (Text.stripStart content)
 
                   program <- parseProgram source'
-                  setProgram program 
                   typeCheck program
                   mute False
-                  generateResponseAndDiagnostics program
-
+                  result <- sweep program 
+                  cacheResult (Right result) 
+                  generateResponseAndDiagnosticsFromResult (Right result) 
 
                 ReqDebug -> return $ error "crash!",
       -- when the client saved the document, store the text for later use
@@ -167,9 +158,10 @@ handlers =
               interpret filepath Nothing $ do
                 source <- getSource
                 program <- parseProgram source
-                setProgram program 
                 typeCheck program
-                generateResponseAndDiagnostics program,
+                result <- sweep program
+                cacheResult (Right result)
+                generateResponseAndDiagnosticsFromResult (Right result),
 
       notificationHandler STextDocumentDidOpen $ \ntf -> do
         logText " --> TextDocumentDidOpen"
@@ -179,14 +171,15 @@ handlers =
           Just filepath -> do
             interpret filepath Nothing $ do
               program <- parseProgram source
-              setProgram program 
               typeCheck program
-              generateResponseAndDiagnostics program
+              result <- sweep program
+              cacheResult (Right result)
+              generateResponseAndDiagnosticsFromResult (Right result)
     ]
 
-generateResponseAndDiagnostics :: A.Program -> CmdM [ResKind]
-generateResponseAndDiagnostics program = do
-  (pos, specs, globalProps, warnings) <- sweep program
+generateResponseAndDiagnosticsFromResult :: Result -> CmdM [ResKind]
+generateResponseAndDiagnosticsFromResult (Left errors) = throwError errors
+generateResponseAndDiagnosticsFromResult (Right (pos, specs, globalProps, warnings)) = do 
   -- leave only POs & Specs around the mouse selection
   lastSelection <- getLastSelection
   let overlappedSpecs = case lastSelection of
