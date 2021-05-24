@@ -21,7 +21,7 @@ data CmdKind
   | CmdGetLastSelection
   | CmdBumpResponseVersion
   | CmdLog Text
-  | CmdTerminate [ResKind] [Diagnostic]
+  | CmdTerminate [Diagnostic]
   deriving (Eq, Show)
 
 type TestM = StateT Text (Writer [CmdKind])
@@ -32,12 +32,12 @@ newtype TestResult a = TestResult ((a, Text), [CmdKind])
 instance Show a => Show (TestResult a) where
   show (TestResult ((value, source), trace)) = "### Result\n\n" <> show value <> "\n\n### Source\n\n" <> Text.unpack source <> "\n\n### Trace\n\n" <> unlines (map show trace)
 
-runTest :: FilePath -> Text -> CmdM a -> TestResult (Maybe a)
+runTest :: FilePath -> Text -> CmdM [ResKind] -> TestResult [ResKind]
 runTest filepath source program = TestResult $ runWriter (runStateT (interpret filepath program) source)
 
-interpret :: FilePath -> CmdM a -> TestM (Maybe a)
+interpret :: FilePath -> CmdM [ResKind] -> TestM [ResKind]
 interpret filepath p = case runCmdM p of
-  Right (Pure a) -> return $ Just a
+  Right (Pure responses) -> return responses
   Right (Free (EditText range text next)) -> do
     let Range start end = range
     source <- get
@@ -67,12 +67,12 @@ interpret filepath p = case runCmdM p of
   Right (Free (Log text next)) -> do
     lift $ tell [CmdLog text]
     interpret filepath next
-  Right (Free (Terminate responses diagnostics)) -> do
+  Right (Free (Terminate diagnostics)) -> do
     -- undefined
-    lift $ tell [CmdTerminate responses diagnostics]
-    return Nothing
+    lift $ tell [CmdTerminate diagnostics]
+    return []
   Left errors -> do
     let responses = [ResDisplay 0 (headerE "Errors" : map renderBlock errors)]
     let diagnostics = errors >>= toDiagnostics
-    lift $ tell [CmdTerminate responses diagnostics]
-    return Nothing
+    lift $ tell [CmdTerminate diagnostics]
+    return responses

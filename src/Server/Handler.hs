@@ -106,7 +106,9 @@ handlers =
                 -- Inspect
                 ReqInspect range -> do
                   setLastSelection range
-                  terminate [] []
+                  terminate []
+
+                  return []
 
                 -- Refine
                 ReqRefine range -> do
@@ -125,8 +127,6 @@ handlers =
                   typeCheck program
                   mute False
                   generateResponseAndDiagnostics program
-
-
 
 
                 ReqDebug -> return $ error "crash!",
@@ -174,7 +174,7 @@ handlers =
               generateResponseAndDiagnostics program
     ]
 
-generateResponseAndDiagnostics :: A.Program -> CmdM ()
+generateResponseAndDiagnostics :: A.Program -> CmdM [ResKind]
 generateResponseAndDiagnostics program = do
   (pos, specs, globalProps, warnings) <- sweep program
   -- leave only POs & Specs around the mouse selection
@@ -204,4 +204,6 @@ generateResponseAndDiagnostics program = do
   let responses = [ResDisplay version blocks, ResUpdateSpecs (map encodeSpec specs)]
   let diagnostics = concatMap toDiagnostics pos ++ concatMap toDiagnostics warnings
 
-  terminate responses diagnostics
+  terminate diagnostics
+
+  return responses

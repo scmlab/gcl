@@ -123,9 +123,11 @@ setMute b = do
 
 --------------------------------------------------------------------------------
 
-interpret :: FilePath -> Maybe Responder -> CmdM () -> ServerM ()
+interpret :: FilePath -> Maybe Responder -> CmdM [ResKind] -> ServerM ()
 interpret filepath responder p = case runCmdM p of
-  Right (Pure ()) -> logText " ### Improper termination"
+  Right (Pure responses) -> do
+    -- send responses
+    sendResponses filepath responder responses
   Right (Free (EditText range text next)) -> do
     logText $ " ### EditText " <> toText range <> " " <> text 
     -- apply edit
@@ -164,11 +166,9 @@ interpret filepath responder p = case runCmdM p of
   Right (Free (Log text next)) -> do
     logText text
     interpret filepath responder next
-  Right (Free (Terminate responses diagnostics)) -> do
+  Right (Free (Terminate diagnostics)) -> do
     -- send diagnostics
     sendDiagnostics filepath diagnostics
-    -- send responses
-    sendResponses filepath responder responses
   Left errors -> do
     logStuff errors
     handleErrors filepath responder errors

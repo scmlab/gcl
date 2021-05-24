@@ -18,7 +18,6 @@ import qualified GCL.Type as TypeChecking
 import GCL.WP (StructWarning)
 import qualified GCL.WP as WP
 import Language.LSP.Types ( Diagnostic )
-import Server.CustomMethod
 import qualified Syntax.Abstract as A
 import Syntax.Concrete.ToAbstract
 import Syntax.Parser (Parser, pProgram, pStmts, runParse)
@@ -38,7 +37,7 @@ data Cmd next
   | GetLastSelection (Maybe Range -> next)
   | BumpResponseVersion (Int -> next)
   | Log Text next
-  | Terminate [ResKind] [Diagnostic]
+  | Terminate [Diagnostic]
   deriving (Functor)
 
 type CmdM = FreeT Cmd (Except [Error])
@@ -70,8 +69,8 @@ logM text = liftF (Log text ())
 bumpVersion :: CmdM Int
 bumpVersion = liftF (BumpResponseVersion id)
 
-terminate :: [ResKind] -> [Diagnostic] -> CmdM ()
-terminate x y = liftF (Terminate x y)
+terminate :: [Diagnostic] -> CmdM ()
+terminate x = liftF (Terminate x)
 
 ------------------------------------------------------------------------------
 
