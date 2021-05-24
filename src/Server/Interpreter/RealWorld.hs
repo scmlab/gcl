@@ -156,7 +156,7 @@ interpret filepath responder p = case runCmdM p of
     interpret filepath responder (next selection)
   Right (Free (PutLastSelection selection next)) -> do
     ref <- lift $ asks globalSelectionMap
-    liftIO $ modifyIORef' ref (Map.update (\_ -> Just (Just selection)) filepath)
+    liftIO $ modifyIORef' ref (Map.insert filepath (Just selection))
     interpret filepath responder next
   Right (Free (BumpResponseVersion next)) -> do
     n <- bumpVersionM
