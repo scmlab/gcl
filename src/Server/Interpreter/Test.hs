@@ -61,15 +61,21 @@ interpret filepath p = case runCmdM p of
   Right (Free (PutLastSelection selection next)) -> do
     lift $ tell [CmdPutLastSelection selection]
     interpret filepath next
+  Right (Free (GetProgram next)) -> do
+    lift $ tell []
+    interpret filepath (next Nothing)
+  Right (Free (PutProgram program next)) -> do
+    lift $ tell []
+    interpret filepath next
   Right (Free (BumpResponseVersion next)) -> do
     lift $ tell [CmdBumpResponseVersion]
     interpret filepath (next 0)
   Right (Free (Log text next)) -> do
     lift $ tell [CmdLog text]
     interpret filepath next
-  Right (Free (SendDiagnostics diagnostics)) -> do
+  Right (Free (SendDiagnostics diagnostics next)) -> do
     lift $ tell [CmdSendDiagnostics diagnostics]
-    return []
+    interpret filepath next
   Left errors -> do
     let responses = [ResDisplay 0 (headerE "Errors" : map renderBlock errors)]
     let diagnostics = errors >>= toDiagnostics

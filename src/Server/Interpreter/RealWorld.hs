@@ -34,6 +34,7 @@ import Server.Diagnostic
 import qualified Server.DSL as DSL
 import Data.Loc.Range (Range)
 import Pretty (toText)
+import Syntax.Abstract (Program)
 
 --------------------------------------------------------------------------------
 
@@ -46,12 +47,14 @@ data GlobalEnv = GlobalEnv
     -- Counter for generating fresh numbers
     globalCounter :: IORef Int,
     -- 
-    globalMute :: IORef Bool 
+    globalMute :: IORef Bool,
+
+    globalCachedProgram :: IORef (Maybe Program)
   }
 
 -- | Constructs an initial global state
 initGlobalEnv :: IO GlobalEnv
-initGlobalEnv = GlobalEnv <$> newChan <*> newIORef Map.empty <*> newIORef 0 <*> newIORef False
+initGlobalEnv = GlobalEnv <$> newChan <*> newIORef Map.empty <*> newIORef 0 <*> newIORef False <*> newIORef Nothing
 
 --------------------------------------------------------------------------------
 
@@ -121,11 +124,22 @@ setMute b = do
   ref <- lift $ asks globalMute
   liftIO $ writeIORef ref b
 
+cacheProgram :: Program -> ServerM ()
+cacheProgram program = do
+  ref <- lift $ asks globalCachedProgram
+  liftIO $ writeIORef ref (Just program)
+
+readCachedProgram :: ServerM (Maybe Program)
+readCachedProgram = do
+  ref <- lift $ asks globalCachedProgram
+  liftIO $ readIORef ref
+
 --------------------------------------------------------------------------------
 
 interpret :: FilePath -> Maybe Responder -> CmdM [ResKind] -> ServerM ()
 interpret filepath responder p = case runCmdM p of
   Right (Pure responses) -> do
+    logText $ " ### SendResponses " <> toText (show responses)
     -- send responses
     sendResponses filepath responder responses
   Right (Free (EditText range text next)) -> do
@@ -160,15 +174,22 @@ interpret filepath responder p = case runCmdM p of
     ref <- lift $ asks globalSelectionMap
     liftIO $ modifyIORef' ref (Map.insert filepath (Just selection))
     interpret filepath responder next
+  Right (Free (GetProgram next)) -> do
+    program <- readCachedProgram
+    interpret filepath responder (next program)
+  Right (Free (PutProgram program next)) -> do
+    cacheProgram program
+    interpret filepath responder next
   Right (Free (BumpResponseVersion next)) -> do
     n <- bumpVersionM
     interpret filepath responder (next n)
   Right (Free (Log text next)) -> do
     logText text
     interpret filepath responder next
-  Right (Free (SendDiagnostics diagnostics)) -> do
+  Right (Free (SendDiagnostics diagnostics next)) -> do
     -- send diagnostics
     sendDiagnostics filepath diagnostics
+    interpret filepath responder next
   Left errors -> do
     logStuff errors
     handleErrors filepath responder errors

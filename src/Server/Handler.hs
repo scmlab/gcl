@@ -106,7 +106,16 @@ handlers =
                 -- Inspect
                 ReqInspect range -> do
                   setLastSelection range
-                  return []
+                  result <- getProgram  
+                  case result of 
+                    Nothing -> do 
+                      logM "no cached program"
+                      return []
+                    Just program -> do 
+                      logM "program"
+                      typeCheck program
+                      generateResponseAndDiagnostics program
+
 
                 -- Refine
                 ReqRefine range -> do
@@ -122,6 +131,7 @@ handlers =
                     Loc start end -> editText (Range start end) (Text.stripStart content)
 
                   program <- parseProgram source'
+                  setProgram program 
                   typeCheck program
                   mute False
                   generateResponseAndDiagnostics program
@@ -157,6 +167,7 @@ handlers =
               interpret filepath Nothing $ do
                 source <- getSource
                 program <- parseProgram source
+                setProgram program 
                 typeCheck program
                 generateResponseAndDiagnostics program,
 
@@ -168,6 +179,7 @@ handlers =
           Just filepath -> do
             interpret filepath Nothing $ do
               program <- parseProgram source
+              setProgram program 
               typeCheck program
               generateResponseAndDiagnostics program
     ]
@@ -201,7 +213,6 @@ generateResponseAndDiagnostics program = do
 
   let responses = [ResDisplay version blocks, ResUpdateSpecs (map encodeSpec specs)]
   let diagnostics = concatMap toDiagnostics pos ++ concatMap toDiagnostics warnings
-
   sendDiagnostics diagnostics
 
   return responses

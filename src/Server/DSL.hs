@@ -37,7 +37,9 @@ data Cmd next
   | GetLastSelection (Maybe Range -> next)
   | BumpResponseVersion (Int -> next)
   | Log Text next
-  | SendDiagnostics [Diagnostic]
+  | PutProgram A.Program next
+  | GetProgram (Maybe A.Program -> next)
+  | SendDiagnostics [Diagnostic] next
   deriving (Functor)
 
 type CmdM = FreeT Cmd (Except [Error])
@@ -63,6 +65,12 @@ setLastSelection selection = liftF (PutLastSelection selection ())
 getLastSelection :: CmdM (Maybe Range)
 getLastSelection = liftF (GetLastSelection id)
 
+setProgram :: A.Program -> CmdM ()
+setProgram program = liftF (PutProgram program ())
+
+getProgram :: CmdM (Maybe A.Program)
+getProgram = liftF (GetProgram id)
+
 logM :: Text -> CmdM ()
 logM text = liftF (Log text ())
 
@@ -70,9 +78,9 @@ bumpVersion :: CmdM Int
 bumpVersion = liftF (BumpResponseVersion id)
 
 sendDiagnostics :: [Diagnostic] -> CmdM ()
-sendDiagnostics xs = do 
+sendDiagnostics xs = do
   logM $ " ### Diagnostic " <> toText (length xs)
-  liftF (SendDiagnostics xs)
+  liftF (SendDiagnostics xs ())
 
 ------------------------------------------------------------------------------
 
