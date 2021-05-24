@@ -21,7 +21,7 @@ data CmdKind
   | CmdGetLastSelection
   | CmdBumpResponseVersion
   | CmdLog Text
-  | CmdTerminate [Diagnostic]
+  | CmdSendDiagnostics [Diagnostic]
   deriving (Eq, Show)
 
 type TestM = StateT Text (Writer [CmdKind])
@@ -67,12 +67,11 @@ interpret filepath p = case runCmdM p of
   Right (Free (Log text next)) -> do
     lift $ tell [CmdLog text]
     interpret filepath next
-  Right (Free (Terminate diagnostics)) -> do
-    -- undefined
-    lift $ tell [CmdTerminate diagnostics]
+  Right (Free (SendDiagnostics diagnostics)) -> do
+    lift $ tell [CmdSendDiagnostics diagnostics]
     return []
   Left errors -> do
     let responses = [ResDisplay 0 (headerE "Errors" : map renderBlock errors)]
     let diagnostics = errors >>= toDiagnostics
-    lift $ tell [CmdTerminate diagnostics]
+    lift $ tell [CmdSendDiagnostics diagnostics]
     return responses

@@ -106,8 +106,6 @@ handlers =
                 -- Inspect
                 ReqInspect range -> do
                   setLastSelection range
-                  terminate []
-
                   return []
 
                 -- Refine
@@ -204,6 +202,6 @@ generateResponseAndDiagnostics program = do
   let responses = [ResDisplay version blocks, ResUpdateSpecs (map encodeSpec specs)]
   let diagnostics = concatMap toDiagnostics pos ++ concatMap toDiagnostics warnings
 
-  terminate diagnostics
+  sendDiagnostics diagnostics
 
   return responses

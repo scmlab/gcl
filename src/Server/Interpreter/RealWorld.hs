@@ -166,7 +166,7 @@ interpret filepath responder p = case runCmdM p of
   Right (Free (Log text next)) -> do
     logText text
     interpret filepath responder next
-  Right (Free (Terminate diagnostics)) -> do
+  Right (Free (SendDiagnostics diagnostics)) -> do
     -- send diagnostics
     sendDiagnostics filepath diagnostics
   Left errors -> do

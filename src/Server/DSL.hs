@@ -37,7 +37,7 @@ data Cmd next
   | GetLastSelection (Maybe Range -> next)
   | BumpResponseVersion (Int -> next)
   | Log Text next
-  | Terminate [Diagnostic]
+  | SendDiagnostics [Diagnostic]
   deriving (Functor)
 
 type CmdM = FreeT Cmd (Except [Error])
@@ -69,8 +69,10 @@ logM text = liftF (Log text ())
 bumpVersion :: CmdM Int
 bumpVersion = liftF (BumpResponseVersion id)
 
-terminate :: [Diagnostic] -> CmdM ()
-terminate x = liftF (Terminate x)
+sendDiagnostics :: [Diagnostic] -> CmdM ()
+sendDiagnostics xs = do 
+  logM $ " ### Diagnostic " <> toText (length xs)
+  liftF (SendDiagnostics xs)
 
 ------------------------------------------------------------------------------
 
