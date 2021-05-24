@@ -6,10 +6,8 @@ import Control.Monad.Trans.Writer
 import Data.Loc.Range
 import Data.Text (Text)
 import Language.LSP.Types (Diagnostic)
-import Server.CustomMethod
 import Server.DSL
 import Server.Diagnostic (toDiagnostics)
-import Render
 import qualified Data.Text as Text
 import Data.Loc
 import Control.Monad.State
@@ -32,10 +30,10 @@ newtype TestResult a = TestResult ((a, Text), [CmdKind])
 instance Show a => Show (TestResult a) where
   show (TestResult ((value, source), trace)) = "### Result\n\n" <> show value <> "\n\n### Source\n\n" <> Text.unpack source <> "\n\n### Trace\n\n" <> unlines (map show trace)
 
-runTest :: FilePath -> Text -> CmdM [ResKind] -> TestResult [ResKind]
+runTest :: FilePath -> Text -> CmdM (Maybe a) -> TestResult (Maybe a)
 runTest filepath source program = TestResult $ runWriter (runStateT (interpret filepath program) source)
 
-interpret :: FilePath -> CmdM [ResKind] -> TestM [ResKind]
+interpret :: FilePath -> CmdM (Maybe a) -> TestM (Maybe a)
 interpret filepath p = case runCmdM p of
   Right (Pure responses) -> return responses
   Right (Free (EditText range text next)) -> do
@@ -77,7 +75,7 @@ interpret filepath p = case runCmdM p of
     lift $ tell [CmdSendDiagnostics diagnostics]
     interpret filepath next
   Left errors -> do
-    let responses = [ResDisplay 0 (headerE "Errors" : map renderBlock errors)]
+    -- let responses = [ResDisplay 0 (headerE "Errors" : map renderBlock errors)]
     let diagnostics = errors >>= toDiagnostics
     lift $ tell [CmdSendDiagnostics diagnostics]
-    return responses
+    return Nothing

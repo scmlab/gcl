@@ -27,7 +27,9 @@ tests = testGroup "WP" [emptyProg, statements, issues]
 type Result = ((Maybe ([PO], [Spec], [Expr], [StructWarning]), Text), [CmdKind])
 
 run :: Text -> TestResult (Maybe ([PO], [Spec], [Expr], [StructWarning]))
-run text = runTest "<test>" text $ parseProgram text >>= sweep
+run text = runTest "<test>" text $ do 
+  program <- parseProgram text
+  Just <$> sweep program
 
 fromPOs :: Text -> [PO] -> TestResult (Maybe ([PO], [Spec], [Expr], [StructWarning]))
 fromPOs source pos = TestResult ((Just (pos, [], [], []), source), [])

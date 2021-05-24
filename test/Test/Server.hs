@@ -44,8 +44,7 @@ instantiateSpec =
 
       let testResult = runTest sourcePath source $ do
             program <- parseProgram source
-            _ <- sweep program
-            return ()
+            Just <$> sweep program
 
       let makeRange (offsetA, lineA, colA) (offsetB, lineB, colB) =
             Range
