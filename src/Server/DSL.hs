@@ -24,12 +24,14 @@ import Syntax.Concrete.ToAbstract
 import Syntax.Parser (Parser, pProgram, pStmts, runParse)
 import Syntax.Predicate (PO, Spec, specPayload)
 import Prelude hiding (span)
+import Pretty (toText)
 
 --------------------------------------------------------------------------------
 
 -- The "Syntax" of the DSL for handling LSP requests and responses
 data Cmd next
   = EditText Range Text (Text -> next)
+  | Mute Bool next
   | GetFilePath (FilePath -> next)
   | GetSource (Text -> next)
   | PutLastSelection Range next
@@ -46,6 +48,9 @@ runCmdM = runExcept . runFreeT
 
 editText :: Range -> Text -> CmdM Text
 editText range text = liftF (EditText range text id)
+
+mute :: Bool -> CmdM ()
+mute b = liftF (Mute b ())
 
 getFilePath :: CmdM FilePath
 getFilePath = liftF (GetFilePath id)
@@ -74,6 +79,7 @@ terminate x y = liftF (Terminate x y)
 -- and returns the modified source and the difference of source length
 digHole :: Range -> CmdM Text
 digHole range = do
+  logM $ " ### DigHole " <> toText range
   let indent = Text.replicate (posCol (rangeStart range) - 1) " "
   let holeText = "[!\n" <> indent <> "\n" <> indent <> "!]"
   editText range holeText

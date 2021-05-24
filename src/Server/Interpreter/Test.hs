@@ -29,7 +29,7 @@ type TestM = StateT Text (Writer [CmdKind])
 newtype TestResult a = TestResult ((a, Text), [CmdKind])
   deriving (Eq)
 
-instance Show a => Show (TestResult a) where 
+instance Show a => Show (TestResult a) where
   show (TestResult ((value, source), trace)) = "### Result\n\n" <> show value <> "\n\n### Source\n\n" <> Text.unpack source <> "\n\n### Trace\n\n" <> unlines (map show trace)
 
 runTest :: FilePath -> Text -> CmdM a -> TestResult (Maybe a)
@@ -37,16 +37,18 @@ runTest filepath source program = TestResult $ runWriter (runStateT (interpret f
 
 interpret :: FilePath -> CmdM a -> TestM (Maybe a)
 interpret filepath p = case runCmdM p of
-  Right (Pure a) -> return $ Just a 
+  Right (Pure a) -> return $ Just a
   Right (Free (EditText range text next)) -> do
     let Range start end = range
     source <- get
-    let (before, rest) = Text.splitAt (posCoff start) source 
-    let (_, after) = Text.splitAt (posCoff end - posCoff start) rest 
+    let (before, rest) = Text.splitAt (posCoff start) source
+    let (_, after) = Text.splitAt (posCoff end - posCoff start) rest
     let newSource = before <> text <> after
     put newSource
     lift $ tell [CmdEditText range text]
     interpret filepath (next newSource)
+  Right (Free (Mute _ next)) -> do
+    interpret filepath next
   Right (Free (GetFilePath next)) -> do
     interpret filepath (next filepath)
   Right (Free (GetSource next)) -> do

@@ -105,17 +105,22 @@ handlers =
               case kind of
                 -- Inspect
                 ReqInspect range -> do
+
+                  mute True
                   setLastSelection range
                   source <- getSource
                   program <- parseProgram source
                   typeCheck program
+                  mute False
                   generateResponseAndDiagnostics program
 
                 -- Refine
                 ReqRefine range -> do
+                  mute True
                   setLastSelection range
                   source <- getSource
                   (spec, content) <- refine source range
+                  
 
                   -- remove the Spec
                   source' <- case specLoc spec of
@@ -124,7 +129,12 @@ handlers =
 
                   program <- parseProgram source'
                   typeCheck program
+                  mute False
                   generateResponseAndDiagnostics program
+
+
+
+
                 ReqDebug -> return $ error "crash!",
       -- when the client saved the document, store the text for later use
       -- notificationHandler STextDocumentDidSave $ \ntf -> do
@@ -144,16 +154,23 @@ handlers =
       -- when the client opened the document
 
       notificationHandler STextDocumentDidChange $ \ntf -> do
-        logText " --> TextDocumentDidOpen"
-        let NotificationMessage _ _ (DidChangeTextDocumentParams (VersionedTextDocumentIdentifier uri _) _) = ntf
-        case uriToFilePath uri of
-          Nothing -> pure ()
-          Just filepath -> do
-            interpret filepath Nothing $ do
-              source <- getSource
-              program <- parseProgram source
-              typeCheck program
-              generateResponseAndDiagnostics program,
+        logText " --> TextDocumentDidChange"
+
+        m <- getMute
+        logText $ " --> Mute: " <> Text.pack (show m)
+
+        unless m $ do 
+          let NotificationMessage _ _ (DidChangeTextDocumentParams (VersionedTextDocumentIdentifier uri _) change) = ntf
+          logText $ Text.pack $ " --> " <> show change
+          case uriToFilePath uri of
+            Nothing -> pure ()
+            Just filepath -> do
+              interpret filepath Nothing $ do
+                source <- getSource
+                program <- parseProgram source
+                typeCheck program
+                generateResponseAndDiagnostics program,
+
       notificationHandler STextDocumentDidOpen $ \ntf -> do
         logText " --> TextDocumentDidOpen"
         let NotificationMessage _ _ (DidOpenTextDocumentParams (TextDocumentItem uri _ _ source)) = ntf

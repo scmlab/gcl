@@ -8,7 +8,8 @@ module Server.Interpreter.RealWorld
     initGlobalEnv,
     runServerM,
     logText, logStuff,
-    interpret
+    interpret,
+    getMute
   )
 where
 
@@ -32,6 +33,7 @@ import Server.DSL (runCmdM, CmdM, Cmd(..))
 import Server.Diagnostic
 import qualified Server.DSL as DSL
 import Data.Loc.Range (Range)
+import Pretty (toText)
 
 --------------------------------------------------------------------------------
 
@@ -42,12 +44,14 @@ data GlobalEnv = GlobalEnv
     -- Keep tracks of all text selections (including cursor position)
     globalSelectionMap :: IORef (Map FilePath (Maybe Range)),
     -- Counter for generating fresh numbers
-    globalCounter :: IORef Int
+    globalCounter :: IORef Int,
+    -- 
+    globalMute :: IORef Bool 
   }
 
 -- | Constructs an initial global state
 initGlobalEnv :: IO GlobalEnv
-initGlobalEnv = GlobalEnv <$> newChan <*> newIORef Map.empty <*> newIORef 0
+initGlobalEnv = GlobalEnv <$> newChan <*> newIORef Map.empty <*> newIORef 0 <*> newIORef False
 
 --------------------------------------------------------------------------------
 
@@ -107,13 +111,23 @@ bumpVersionM = do
   liftIO $ writeIORef ref (succ n)
   return n
 
+getMute :: ServerM Bool
+getMute = do
+  ref <- lift $ asks globalMute
+  liftIO $ readIORef ref
+
+setMute :: Bool -> ServerM ()
+setMute b = do
+  ref <- lift $ asks globalMute
+  liftIO $ writeIORef ref b
+
 --------------------------------------------------------------------------------
 
 interpret :: FilePath -> Maybe Responder -> CmdM () -> ServerM ()
 interpret filepath responder p = case runCmdM p of
-  Right (Pure ()) -> logText "Improper termination"
+  Right (Pure ()) -> logText " ### Improper termination"
   Right (Free (EditText range text next)) -> do
-    logText "Before EditText"
+    logText $ " ### EditText " <> toText range <> " " <> text 
     -- apply edit
     let removeSpec = TextEdit (rangeToRange range) text
     let identifier = VersionedTextDocumentIdentifier (filePathToUri filepath) (Just 0)
@@ -122,19 +136,19 @@ interpret filepath responder p = case runCmdM p of
     let workspaceEdit = WorkspaceEdit Nothing (Just (List [change])) Nothing
     let applyWorkspaceEditParams = ApplyWorkspaceEditParams (Just "Resolve Spec") workspaceEdit
     let callback _ = do
-          logText "After EditText"
           interpret filepath responder $ do
             DSL.getSource >>= next 
 
     void $ sendRequest SWorkspaceApplyEdit applyWorkspaceEditParams callback
+  Right (Free (Mute b next)) -> do 
+    setMute b
+    interpret filepath responder next
   Right (Free (GetFilePath next)) -> interpret filepath responder (next filepath)
   Right (Free (GetSource next)) -> do
     result <- fmap VFS.virtualFileText <$> getVirtualFile (toNormalizedUri (filePathToUri filepath))
     case result of
       Nothing -> handleErrors filepath responder [CannotReadFile filepath]
-      Just source -> do
-        logText "GetSource"
-        interpret filepath responder (next source)
+      Just source -> interpret filepath responder (next source)
   Right (Free (GetLastSelection next)) -> do
     ref <- lift $ asks globalSelectionMap
     mapping <- liftIO $ readIORef ref

@@ -24,7 +24,34 @@ renderStrict :: Doc ann -> Text
 renderStrict = Text.renderStrict . layoutPretty defaultLayoutOptions
 
 instance Pretty Range where
-  pretty (Range x y) = pretty $ displayPos x <> " " <> displayPos y
+  pretty (Range start end) =
+    if posLine start == posLine end
+      then
+        pretty (posFile start)
+          <> " ["
+          <> pretty (posCoff start)
+          <> "-"
+          <> pretty (posCoff end)
+          <> "] "
+          <> pretty (posLine start)
+          <> ":"
+          <> pretty (posCol start)
+          <> "-"
+          <> pretty (posCol end)
+      else
+        pretty (posFile start)
+          <> " ["
+          <> pretty (posCoff start)
+          <> "-"
+          <> pretty (posCoff end)
+          <> "] "
+          <> pretty (posLine start)
+          <> ":"
+          <> pretty (posCol start)
+          <> "-"
+          <> pretty(posLine end)
+          <> ":"
+          <> pretty (posCol end)
 
 instance Pretty Loc where
   pretty = pretty . displayLoc
