@@ -1,0 +1,21 @@
+### Result
+
+Just ()
+
+### Source
+
+con N : Int
+con f : array [0..N) of Int
+var n : Int
+
+{ f[n] = 0, bnd: N - n }
+do n ≠ N -> n := n + 1
+            [!
+            
+            !]
+od 
+{ True } 
+
+### Trace
+
+CmdEditText ./test/Test/Server/assets/spec-qm-5.gcl [113-114] 7:13-14 "[!\n            \n            !]"

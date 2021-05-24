@@ -30,10 +30,10 @@ run :: Text -> TestResult (Maybe ([PO], [Spec], [Expr], [StructWarning]))
 run text = runTest "<test>" text $ parseProgram text >>= sweep
 
 fromPOs :: Text -> [PO] -> TestResult (Maybe ([PO], [Spec], [Expr], [StructWarning]))
-fromPOs source pos = TestResult ((Just (pos, [], [], []), source), [CmdGetFilePath])
+fromPOs source pos = TestResult ((Just (pos, [], [], []), source), [])
 
 fromSpecs :: Text -> [Spec] -> TestResult (Maybe ([PO], [Spec], [Expr], [StructWarning]))
-fromSpecs source specs = TestResult ((Just ([], specs, [], []), source), [CmdGetFilePath])
+fromSpecs source specs = TestResult ((Just ([], specs, [], []), source), [])
 
 --------------------------------------------------------------------------------
 

@@ -31,17 +31,17 @@ instantiateSpec :: TestTree
 instantiateSpec =
   testGroup
     "Instantiate Specs"
-    [ run "top level" "spec-qm.gcl"
+    [ run "top level 1" "spec-qm-1.gcl"
+    , run "top level 2" "spec-qm-2.gcl"
+    , run "indented 1" "spec-qm-3.gcl"
+    , run "indented 2" "spec-qm-4.gcl"
+    , run "complex 1" "spec-qm-5.gcl"
     ]
   where
     run :: String -> FilePath -> TestTree
     run = runGoldenTest "Server/assets/" $ \sourcePath -> do
       source <- Text.readFile sourcePath
-      let makeRange (offsetA, lineA, colA) (offsetB, lineB, colB) =
-            Range
-              (Pos sourcePath lineA colA offsetA)
-              (Pos sourcePath lineB colB offsetB)
-      --
+
       let testResult = runTest sourcePath source $ do
             program <- parseProgram source
             _ <- sweep program
@@ -54,9 +54,7 @@ instantiateSpec =
 
       -- see if the traces are right
       let traces = StrictText.pack $ show 
-            [ CmdGetFilePath,
-              CmdEditText (makeRange (0, 1, 1) (1, 1, 2)) "[!\n\n!]",
-              CmdGetFilePath
+            [ CmdEditText (makeRange (0, 1, 1) (1, 1, 2)) "[!\n\n!]"
             ]
 
       return $ Text.encodeUtf8 $ Text.fromStrict $ StrictText.pack $ show testResult

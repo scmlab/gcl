@@ -1,0 +1,19 @@
+### Result
+
+Just ()
+
+### Source
+
+[!
+
+!]
+[!
+
+!]
+
+{ True }
+
+### Trace
+
+CmdEditText ./test/Test/Server/assets/spec-qm-2.gcl [0-1] 1:1-2 "[!\n\n!]"
+CmdEditText ./test/Test/Server/assets/spec-qm-2.gcl [7-8] 4:1-2 "[!\n\n!]"

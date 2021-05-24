@@ -1,0 +1,21 @@
+### Result
+
+Just ()
+
+### Source
+
+if True -> 
+    [!
+    
+    !]
+    [!
+    
+    !]
+fi
+
+{ True }
+
+### Trace
+
+CmdEditText ./test/Test/Server/assets/spec-qm-4.gcl [16-17] 2:5-6 "[!\n    \n    !]"
+CmdEditText ./test/Test/Server/assets/spec-qm-4.gcl [35-36] 5:5-6 "[!\n    \n    !]"

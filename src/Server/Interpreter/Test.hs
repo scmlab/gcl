@@ -16,7 +16,6 @@ import Control.Monad.State
 
 data CmdKind
   = CmdEditText Range Text
-  | CmdGetFilePath
   | CmdGetSource
   | CmdPutLastSelection Range
   | CmdGetLastSelection
@@ -43,13 +42,12 @@ interpret filepath p = case runCmdM p of
     let Range start end = range
     source <- get
     let (before, rest) = Text.splitAt (posCoff start) source 
-    let (_, after) = Text.splitAt (posCoff end) rest 
+    let (_, after) = Text.splitAt (posCoff end - posCoff start) rest 
     let newSource = before <> text <> after
     put newSource
     lift $ tell [CmdEditText range text]
     interpret filepath (next newSource)
   Right (Free (GetFilePath next)) -> do
-    lift $ tell [CmdGetFilePath]
     interpret filepath (next filepath)
   Right (Free (GetSource next)) -> do
     lift $ tell [CmdGetSource]
