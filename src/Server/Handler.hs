@@ -105,14 +105,8 @@ handlers =
               case kind of
                 -- Inspect
                 ReqInspect range -> do
-
-                  mute True
                   setLastSelection range
-                  source <- getSource
-                  program <- parseProgram source
-                  typeCheck program
-                  mute False
-                  generateResponseAndDiagnostics program
+                  terminate [] []
 
                 -- Refine
                 ReqRefine range -> do
@@ -154,11 +148,8 @@ handlers =
       -- when the client opened the document
 
       notificationHandler STextDocumentDidChange $ \ntf -> do
-        logText " --> TextDocumentDidChange"
-
         m <- getMute
-        logText $ " --> Mute: " <> Text.pack (show m)
-
+        logText $ " --> TextDocumentDidChange (muted: "<> Text.pack (show m) <> ")"
         unless m $ do 
           let NotificationMessage _ _ (DidChangeTextDocumentParams (VersionedTextDocumentIdentifier uri _) change) = ntf
           logText $ Text.pack $ " --> " <> show change
