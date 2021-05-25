@@ -1,0 +1,35 @@
+Algorithm Computing WP and Proof Obligations
+============================================
+
+An abstract, mutually recursive definition of wp and {_}_{_}.
+Let [: P :] denote signaling a proof obligation.
+
+wp abort Q = False
+wp skip Q = Q
+wp {P} Q = [:P => Q:]; P
+wp (x := e) Q = Q [e/x]
+wp (if {Bi -> Si} fi) Q =
+   (or Bi) && (Bi => wp Si Q)
+wp (do {Bi -> Si} od) Q =
+   (there is a fixed point equation
+    but we won't reach this case, if we
+    insists that every loop has an invariant)
+
+wp ({P}; S) Q = {P} S {Q}
+wp (S;T) Q = wp S (wp T Q)
+
+{P} abort {Q} = False
+{P} skip {Q} = [: P => Q :]
+{P} {R} {Q}  = [: P => R :]; [: R => Q :]
+{P} x:=e {Q} = [: P => Q [e/x] :]
+{P} if {Bi -> Si} fi {Q} =
+  [: P => or Bi :];
+  { P && Bi } Si { Q }
+{P, bnd} do {Bi -> Si} od {Q} =
+  [: P && neg Bi => Q :];
+  { P && Bi } Si { P };
+  [: P && (or Bi) => bnd >= 0 :];
+  { P && Bi && bnd = C } Si { bnd < C }
+
+{P} ({R}; S) {Q} = [: P => R :]; {R} S {Q}
+{P} (S; T) {Q} = {P} S { wp T Q }
