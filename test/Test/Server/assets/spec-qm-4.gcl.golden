@@ -1,6 +1,17 @@
 ### Result
 
-Just ([PO 0 (Constant (Lit (Bol True) NoLoc)) (Disjunct [GuardIf (Lit (Bol True) (Loc (Pos "./test/Test/Server/assets/spec-qm-4.gcl" 1 4 3) (Pos "./test/Test/Server/assets/spec-qm-4.gcl" 1 8 7))) NoLoc]) (AtIf (Loc (Pos "./test/Test/Server/assets/spec-qm-4.gcl" 1 1 0) (Pos "./test/Test/Server/assets/spec-qm-4.gcl" 8 3 52)))],[Specification {specID = 1, specPreCond = Conjunct [Constant (Lit (Bol True) NoLoc),GuardIf (Lit (Bol True) (Loc (Pos "./test/Test/Server/assets/spec-qm-4.gcl" 1 4 3) (Pos "./test/Test/Server/assets/spec-qm-4.gcl" 1 8 7))) NoLoc], specPostCond = Assertion (Lit (Bol True) (Loc (Pos "./test/Test/Server/assets/spec-qm-4.gcl" 10 3 56) (Pos "./test/Test/Server/assets/spec-qm-4.gcl" 10 7 60))) (Loc (Pos "./test/Test/Server/assets/spec-qm-4.gcl" 10 1 54) (Pos "./test/Test/Server/assets/spec-qm-4.gcl" 10 9 62)), specLoc = Loc (Pos "./test/Test/Server/assets/spec-qm-4.gcl" 2 5 16) (Pos "./test/Test/Server/assets/spec-qm-4.gcl" 4 7 30)},Specification {specID = 0, specPreCond = Assertion (Lit (Bol True) (Loc (Pos "./test/Test/Server/assets/spec-qm-4.gcl" 10 3 56) (Pos "./test/Test/Server/assets/spec-qm-4.gcl" 10 7 60))) (Loc (Pos "./test/Test/Server/assets/spec-qm-4.gcl" 10 1 54) (Pos "./test/Test/Server/assets/spec-qm-4.gcl" 10 9 62)), specPostCond = Assertion (Lit (Bol True) (Loc (Pos "./test/Test/Server/assets/spec-qm-4.gcl" 10 3 56) (Pos "./test/Test/Server/assets/spec-qm-4.gcl" 10 7 60))) (Loc (Pos "./test/Test/Server/assets/spec-qm-4.gcl" 10 1 54) (Pos "./test/Test/Server/assets/spec-qm-4.gcl" 10 9 62)), specLoc = Loc (Pos "./test/Test/Server/assets/spec-qm-4.gcl" 5 5 35) (Pos "./test/Test/Server/assets/spec-qm-4.gcl" 7 7 49)}],[],[])
+([ [0] 
+  True
+  True
+  Conditional
+ ], [ [1]
+  True ∧ True
+  True
+
+, [0]
+  True
+  True
+ ], [  ], [  ])
 
 ### Source
 

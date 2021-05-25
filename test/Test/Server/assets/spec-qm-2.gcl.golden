@@ -1,6 +1,13 @@
 ### Result
 
-Just ([],[Specification {specID = 1, specPreCond = Constant (Lit (Bol True) NoLoc), specPostCond = Assertion (Lit (Bol True) (Loc (Pos "./test/Test/Server/assets/spec-qm-2.gcl" 8 3 17) (Pos "./test/Test/Server/assets/spec-qm-2.gcl" 8 7 21))) (Loc (Pos "./test/Test/Server/assets/spec-qm-2.gcl" 8 1 15) (Pos "./test/Test/Server/assets/spec-qm-2.gcl" 8 9 23)), specLoc = Loc (Pos "./test/Test/Server/assets/spec-qm-2.gcl" 1 1 0) (Pos "./test/Test/Server/assets/spec-qm-2.gcl" 3 3 6)},Specification {specID = 0, specPreCond = Assertion (Lit (Bol True) (Loc (Pos "./test/Test/Server/assets/spec-qm-2.gcl" 8 3 17) (Pos "./test/Test/Server/assets/spec-qm-2.gcl" 8 7 21))) (Loc (Pos "./test/Test/Server/assets/spec-qm-2.gcl" 8 1 15) (Pos "./test/Test/Server/assets/spec-qm-2.gcl" 8 9 23)), specPostCond = Assertion (Lit (Bol True) (Loc (Pos "./test/Test/Server/assets/spec-qm-2.gcl" 8 3 17) (Pos "./test/Test/Server/assets/spec-qm-2.gcl" 8 7 21))) (Loc (Pos "./test/Test/Server/assets/spec-qm-2.gcl" 8 1 15) (Pos "./test/Test/Server/assets/spec-qm-2.gcl" 8 9 23)), specLoc = Loc (Pos "./test/Test/Server/assets/spec-qm-2.gcl" 4 1 7) (Pos "./test/Test/Server/assets/spec-qm-2.gcl" 6 3 13)}],[],[])
+([  ], [ [1]
+  True
+  True
+
+, [0]
+  True
+  True
+ ], [  ], [  ])
 
 ### Source
 

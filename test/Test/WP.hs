@@ -18,16 +18,16 @@ import Prelude hiding (Ordering (..))
 tests :: TestTree
 tests = testGroup "WP" [emptyProg, statements, issues]
 
-run :: Text -> TestResult (Maybe ([PO], [Spec], [Expr], [StructWarning]))
+run :: Text -> TestResult ([PO], [Spec], [Expr], [StructWarning])
 run text = runTest "<test>" text $ do 
   program <- parseProgram text
-  Just <$> sweep program
+  Right <$> sweep program
 
-fromPOs :: Text -> [PO] -> TestResult (Maybe ([PO], [Spec], [Expr], [StructWarning]))
-fromPOs source xs = TestResult ((Just (xs, [], [], []), source), [])
+fromPOs :: Text -> [PO] -> TestResult ([PO], [Spec], [Expr], [StructWarning])
+fromPOs source xs = TestResult ((Right (xs, [], [], []), source), [])
 
-fromSpecs :: Text -> [Spec] -> TestResult (Maybe ([PO], [Spec], [Expr], [StructWarning]))
-fromSpecs source specs = TestResult ((Just ([], specs, [], []), source), [])
+fromSpecs :: Text -> [Spec] -> TestResult ([PO], [Spec], [Expr], [StructWarning])
+fromSpecs source specs = TestResult ((Right ([], specs, [], []), source), [])
 
 --------------------------------------------------------------------------------
 

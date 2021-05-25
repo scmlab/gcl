@@ -1,6 +1,9 @@
 ### Result
 
-Just ([],[Specification {specID = 0, specPreCond = Constant (Lit (Bol True) NoLoc), specPostCond = Assertion (Lit (Bol True) (Loc (Pos "./test/Test/Server/assets/spec-qm-1.gcl" 5 3 10) (Pos "./test/Test/Server/assets/spec-qm-1.gcl" 5 7 14))) (Loc (Pos "./test/Test/Server/assets/spec-qm-1.gcl" 5 1 8) (Pos "./test/Test/Server/assets/spec-qm-1.gcl" 5 9 16)), specLoc = Loc (Pos "./test/Test/Server/assets/spec-qm-1.gcl" 1 1 0) (Pos "./test/Test/Server/assets/spec-qm-1.gcl" 3 3 6)}],[],[])
+([  ], [ [0]
+  True
+  True
+ ], [  ], [  ])
 
 ### Source
 

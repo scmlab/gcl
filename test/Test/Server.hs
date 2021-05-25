@@ -10,7 +10,7 @@ import Server.DSL
 import Server.Interpreter.Test
 import Test.Tasty
 import qualified Test.Tasty.Golden as Golden
-import qualified Data.Text as StrictText
+import Pretty (toText)
 
 tests :: TestTree
 tests = testGroup "Server" [instantiateSpec]
@@ -34,12 +34,12 @@ instantiateSpec =
 
       let testResult = runTest sourcePath source $ do
             program <- parseProgram source
-            Just <$> sweep program
+            Right <$> sweep program
 
-      return $ Text.encodeUtf8 $ Text.fromStrict $ StrictText.pack $ show testResult
+      return $ Text.encodeUtf8 $ Text.fromStrict $ toText testResult
 
 runGoldenTest :: FilePath -> (FilePath -> IO ByteString) -> String -> FilePath -> TestTree
 runGoldenTest dir test name path = do
   let goldenPath = "./test/Test/" <> dir <> path <> ".golden"
   let sourcePath = "./test/Test/" <> dir <> path
-  Golden.goldenVsStringDiff name (\ref new -> ["diff", "-u", "--accept", ref, new]) goldenPath (test sourcePath)
+  Golden.goldenVsStringDiff name (\ref new -> ["diff", "-u", ref, new]) goldenPath (test sourcePath)

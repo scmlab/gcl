@@ -1,16 +1,19 @@
 {-# LANGUAGE OverloadedStrings #-}
-module Server.Interpreter.Test (CmdKind(..), TestResult(..), runTest) where
 
+module Server.Interpreter.Test (CmdKind (..), TestResult (..), runTest) where
+
+import Control.Monad.State
 import Control.Monad.Trans.Free
 import Control.Monad.Trans.Writer
+import Data.Loc
 import Data.Loc.Range
 import Data.Text (Text)
+import qualified Data.Text as Text
+import Error (Error)
 import Language.LSP.Types (Diagnostic)
+import Pretty
 import Server.DSL
 import Server.Diagnostic (toDiagnostics)
-import qualified Data.Text as Text
-import Data.Loc
-import Control.Monad.State
 
 data CmdKind
   = CmdEditText Range Text
@@ -24,18 +27,19 @@ data CmdKind
 
 type TestM = StateT Text (Writer [CmdKind])
 
-newtype TestResult a = TestResult ((a, Text), [CmdKind])
-  deriving (Eq)
+newtype TestResult a = TestResult ((Either [Error] a, Text), [CmdKind])
+  deriving (Eq, Show)
 
-instance Show a => Show (TestResult a) where
-  show (TestResult ((value, source), trace)) = "### Result\n\n" <> show value <> "\n\n### Source\n\n" <> Text.unpack source <> "\n\n### Trace\n\n" <> unlines (map show trace)
+instance Pretty a => Pretty (TestResult a) where
+  pretty (TestResult ((value, source), trace)) =
+    "### Result\n\n" <> pretty value <> "\n\n### Source\n\n" <> pretty source <> "\n\n### Trace\n\n" <> pretty (unlines (map show trace))
 
-runTest :: FilePath -> Text -> CmdM (Maybe a) -> TestResult (Maybe a)
+runTest :: FilePath -> Text -> CmdM (Either [Error] a) -> TestResult a
 runTest filepath source program = TestResult $ runWriter (runStateT (interpret filepath program) source)
 
-interpret :: FilePath -> CmdM (Maybe a) -> TestM (Maybe a)
+interpret :: FilePath -> CmdM (Either [Error] a) -> TestM (Either [Error] a)
 interpret filepath p = case runCmdM p of
-  Right (Pure responses) -> return responses
+  Right (Pure result) -> return result
   Right (Free (EditText range text next)) -> do
     let Range start end = range
     source <- get
@@ -78,4 +82,4 @@ interpret filepath p = case runCmdM p of
     -- let responses = [ResDisplay 0 (headerE "Errors" : map renderBlock errors)]
     let diagnostics = errors >>= toDiagnostics
     lift $ tell [CmdSendDiagnostics diagnostics]
-    return Nothing
+    return $ Left errors
