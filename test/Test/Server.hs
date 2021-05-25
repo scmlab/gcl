@@ -4,8 +4,8 @@ module Test.Server (tests) where
 
 import Data.ByteString.Lazy (ByteString)
 import qualified Data.ByteString.Lazy as BSL
-import qualified Data.Text.Lazy as Text
-import qualified Data.Text.Lazy.Encoding as Text
+import qualified Data.Text as Text
+import qualified Data.Text.Encoding as Text
 import Server.DSL
 import Server.Interpreter.Test
 import Test.Tasty
@@ -30,16 +30,17 @@ instantiateSpec =
   where
     run :: String -> FilePath -> TestTree
     run = runGoldenTest "Server/assets/" $ \sourcePath -> do
-      source <- Text.toStrict . Text.decodeUtf8 <$> BSL.readFile sourcePath
+      source <- Text.decodeUtf8 . BSL.toStrict <$> BSL.readFile sourcePath
 
       let testResult = runTest sourcePath source $ do
             program <- parseProgram source
             Right <$> sweep program
 
-      return $ Text.encodeUtf8 $ Text.fromStrict $ toText testResult
+      return $ BSL.fromStrict . Text.encodeUtf8 $ toText testResult
 
 runGoldenTest :: FilePath -> (FilePath -> IO ByteString) -> String -> FilePath -> TestTree
 runGoldenTest dir test name path = do
   let goldenPath = "./test/Test/" <> dir <> path <> ".golden"
   let sourcePath = "./test/Test/" <> dir <> path
   Golden.goldenVsStringDiff name (\ref new -> ["diff", "-u", ref, new]) goldenPath (test sourcePath)
+
