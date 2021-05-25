@@ -62,4 +62,4 @@ runGoldenTest :: FilePath -> (FilePath -> IO ByteString) -> String -> FilePath -
 runGoldenTest dir test name path = do
   let goldenPath = "./test/Test/" <> dir <> path <> ".golden"
   let sourcePath = "./test/Test/" <> dir <> path
-  Golden.goldenVsStringDiff name (\ref new -> ["diff", "-u", ref, new]) goldenPath (test sourcePath)
+  Golden.goldenVsStringDiff name (\ref new -> ["diff", "-u", "--accept", ref, new]) goldenPath (test sourcePath)
