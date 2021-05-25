@@ -69,7 +69,7 @@ tellSpec p q loc = do
 
 
 throwWarning :: StructWarning -> SM ()
-throwWarning warning = do 
+throwWarning warning = do
   lift . lift . lift $ tell [warning]
 
 --------------------------------------------------------------------------------
@@ -83,7 +83,7 @@ struct True pre _ (A.Assert p l) post = do
   obligate (Assertion p l) post (AtAssertion l)
 struct False pre _ (A.Assert _ l) post = do
   obligate pre post (AtAssertion l)
-struct _ _ _ (A.LoopInvariant _ _ l) _ = case fromLoc l of 
+struct _ _ _ (A.LoopInvariant _ _ l) _ = case fromLoc l of
   Nothing -> return ()
   Just range -> throwWarning $ ExcessBound range
 struct _ pre _ (A.Assign xs es l) post = do
@@ -100,7 +100,7 @@ struct False pre _ (A.If gcmds _) post = do
 struct _ inv Nothing (A.Do gcmds l) post = do
   do
     -- warning user about missing "bnd"
-    case fromLoc l of 
+    case fromLoc l of
       Nothing -> return ()
       Just range -> throwWarning (MissingBound range)
     -- base case
@@ -134,7 +134,7 @@ struct True inv (Just bnd) (A.Do gcmds l) post = do
     structStmts True (Conjunct [inv, guardLoop guard]) Nothing body inv
   -- termination
   obligate
-    (Conjunct (inv : map guardLoop guards))
+    (Conjunct [inv, disjunct (map guardLoop guards)])
     (Bound (bnd `A.gte` A.Lit (A.Num 0) NoLoc) NoLoc)
     (AtTermination l)
   -- bound decrementation
@@ -162,7 +162,7 @@ structStmts :: Bool -> Pred -> Maybe Expr -> [Stmt] -> Pred -> SM ()
 structStmts _ pre _ [] post = do
   -- the precondition may be a Constant and have no srcloc
   -- in that case, use the srcloc of postcondition instead
-  case locOf pre of 
+  case locOf pre of
     NoLoc -> obligate pre post (AtAssertion (locOf post))
     others -> obligate pre post (AtAssertion others)
   return ()
