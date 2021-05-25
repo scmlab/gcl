@@ -40,3 +40,6 @@ toString = Text.unpack . toText
 instance {-# OVERLAPPING #-} (Pretty a) => Pretty (Either Error a) where
   pretty (Left a) = "Error" <+> pretty a
   pretty (Right b) = pretty b
+
+instance (Pretty a, Pretty b, Pretty c, Pretty d) => Pretty (a, b, c, d) where
+  pretty (a, b, c, d) = "(" <> pretty a <> ", " <> pretty b <> ", " <> pretty c <> ", " <> pretty d <> ")"

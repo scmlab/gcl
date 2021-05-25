@@ -3,14 +3,14 @@
 {-# LANGUAGE FlexibleContexts #-}
 module Test.Type where
 
-import Data.Loc (Loc(..), Pos(..))
+import Data.Loc (Loc(..))
 import qualified Data.Map as Map
 import Data.Text (Text)
 import Test.Tasty (TestTree, testGroup)
 import Test.Util (goldenFileTest, parseTest)
 import Test.Tasty.HUnit (testCase, (@?=), Assertion)
-import Control.Monad.Except (runExcept, withExcept, liftEither, foldM)
-import GCL.Type (TypeEnv(TypeEnv), TypeError (UnifyFailed, NotInScope), SubstT, emptySubstT, runInfer, lookupEnv, checkProg, runSolver', inferExpr, runSolver, infer, TM, checkStmt, checkType, inferDecl, emptyEnv)
+import Control.Monad.Except
+import GCL.Type
 import Syntax.Concrete.ToAbstract ( ToAbstract(toAbstract) )
 import Syntax.Abstract
     ( Lit(..),
@@ -21,9 +21,8 @@ import Syntax.Abstract
       Endpoint(..) )
 import Syntax.Common ( ArithOp, Name(Name) )
 import Syntax.Parser (runParse, pExpr, pProgram, Parser, pStmt, pType, pDeclaration, pBlockDeclaration)
-import Pretty (toText)
+import Pretty
 import Error (Error(..))
-import Data.Text.Prettyprint.Doc.Internal (layoutCompact, Pretty (pretty))
 
 tests :: TestTree
 tests = testGroup "Type" [exprTests, typeTests, stmtTests, declarationTests, blockDeclarationTests, fileTests]
@@ -250,7 +249,7 @@ fileCheck (filepath, source) = toText result
     result = case runParse pProgram filepath source of
       Left errors -> Left (map SyntacticError errors)
       Right ast -> case runExcept (toAbstract ast) of
-        Left err -> Left [Others "Should dig hole"]
+        Left _ -> Left [Others "Should dig hole"]
         Right prog -> runExcept $ withExcept (pure . TypeError) $ checkProg prog
 
 tint :: Type
@@ -292,25 +291,25 @@ op = Op
 var :: Text -> Expr
 var t = Var (Name t NoLoc) NoLoc
 
-name :: Text -> Name
-name t = Name t NoLoc 
+name' :: Text -> Name
+name' t = Name t NoLoc 
 
-env :: TypeEnv
-env =
+env' :: TypeEnv
+env' =
   TypeEnv $
     Map.fromList
       [
-        (name "A" , tint),
-        (name "B", tint),
-        (name "N", tint),
-        (name "Arr",tarr (Including (litNum 0)) (Excluding (cons "N")) tint),
-        (name "P", tfunc tint tbool),
-        (name "F", tfunc tint tint),
-        (name "Max", tfunc tint (tfunc tint tbool)),
-        (name "i", tint),
-        (name "j", tint),
-        (name "k", tint),
-        (name "b", tbool)
+        (name' "A" , tint),
+        (name' "B", tint),
+        (name' "N", tint),
+        (name' "Arr",tarr (Including (litNum 0)) (Excluding (cons "N")) tint),
+        (name' "P", tfunc tint tbool),
+        (name' "F", tfunc tint tint),
+        (name' "Max", tfunc tint (tfunc tint tbool)),
+        (name' "i", tint),
+        (name' "j", tint),
+        (name' "k", tint),
+        (name' "b", tbool)
       ]
 
 runParser :: ToAbstract a b => Parser a -> Text -> Either (Either [Error] Loc) b
@@ -323,25 +322,25 @@ runParser p t =
 check ::
   (TypeEnv -> a -> TM b) ->
   TypeEnv -> a -> Either Error b
-check check env e =
-  case runExcept (check env e) of
+check f env e =
+  case runExcept (f env e) of
     Left err -> Left . TypeError $ err
     Right x -> Right x
 
 exprCheck :: Text -> Text -> Assertion
 exprCheck t1 t2 =
-  toText (check inferExpr env <$> runParser pExpr t1) @?= t2
+  toText (check inferExpr env' <$> runParser pExpr t1) @?= t2
 
 typeCheck :: Text -> Text -> Assertion
 typeCheck t1 t2 =
-  toText (check checkType env <$> runParser pType t1) @?= t2
+  toText (check checkType env' <$> runParser pType t1) @?= t2
 
 typeCheck' :: Text -> Assertion
 typeCheck' t = typeCheck t "()"
 
 stmtCheck :: Text -> Text -> Assertion
 stmtCheck t1 t2 =
-  toText (check checkStmt env <$> runParser pStmt t1) @?= t2
+  toText (check checkStmt env' <$> runParser pStmt t1) @?= t2
 
 stmtCheck' :: Text -> Assertion
 stmtCheck' t = stmtCheck t "()"

@@ -4,14 +4,8 @@ module Test.WP where
 
 import Data.Loc
 import Data.Text (Text)
-import qualified Data.Text as Text
-import qualified Data.Text.IO as Text
-import Data.Text.Lazy (fromStrict, toStrict)
-import qualified Data.Text.Lazy.Encoding as LazyText
-import Error
 import GCL.WP (StructWarning)
 import Pretty ()
-import qualified Server
 import Server.DSL (parseProgram, sweep)
 import Server.Interpreter.Test 
 import Syntax.Abstract
@@ -24,15 +18,13 @@ import Prelude hiding (Ordering (..))
 tests :: TestTree
 tests = testGroup "WP" [emptyProg, statements, issues]
 
-type Result = ((Maybe ([PO], [Spec], [Expr], [StructWarning]), Text), [CmdKind])
-
 run :: Text -> TestResult (Maybe ([PO], [Spec], [Expr], [StructWarning]))
 run text = runTest "<test>" text $ do 
   program <- parseProgram text
   Just <$> sweep program
 
 fromPOs :: Text -> [PO] -> TestResult (Maybe ([PO], [Spec], [Expr], [StructWarning]))
-fromPOs source pos = TestResult ((Just (pos, [], [], []), source), [])
+fromPOs source xs = TestResult ((Just (xs, [], [], []), source), [])
 
 fromSpecs :: Text -> [Spec] -> TestResult (Maybe ([PO], [Spec], [Expr], [StructWarning]))
 fromSpecs source specs = TestResult ((Just ([], specs, [], []), source), [])

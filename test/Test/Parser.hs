@@ -8,7 +8,7 @@ import Syntax.Parser (Parser, runParse, pProgram, pDeclaration, pType, pExpr, pB
 import Syntax.Parser.Lexer ( scn )
 import Data.Text (Text)
 import Test.Tasty.HUnit (Assertion, testCase, (@?=))
-import Pretty (toString, toText)
+import Pretty (toText)
 
 
 tests :: TestTree

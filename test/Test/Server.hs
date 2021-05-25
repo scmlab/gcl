@@ -3,23 +3,13 @@
 module Test.Server (tests) where
 
 import Data.ByteString.Lazy (ByteString)
-import qualified Data.ByteString.Lazy as BS
-import Data.Loc
-import Data.Loc.Range
 import qualified Data.Text.IO as Text
 import qualified Data.Text.Lazy as Text
 import qualified Data.Text.Lazy.Encoding as Text
-import qualified Data.Text.Prettyprint.Doc as Doc
-import qualified Data.Text.Prettyprint.Doc.Render.Text as Doc
-import Pretty (pretty)
 import Server.DSL
 import Server.Interpreter.Test
-import qualified Server.Interpreter.Test as Server
-import Syntax.Predicate (PO, Spec (Specification))
 import Test.Tasty
-import Test.Tasty.Golden (createDirectoriesAndWriteFile)
 import qualified Test.Tasty.Golden as Golden
-import Test.Tasty.HUnit
 import qualified Data.Text as StrictText
 
 tests :: TestTree
@@ -45,16 +35,6 @@ instantiateSpec =
       let testResult = runTest sourcePath source $ do
             program <- parseProgram source
             Just <$> sweep program
-
-      let makeRange (offsetA, lineA, colA) (offsetB, lineB, colB) =
-            Range
-              (Pos sourcePath lineA colA offsetA)
-              (Pos sourcePath lineB colB offsetB)
-
-      -- see if the traces are right
-      let traces = StrictText.pack $ show 
-            [ CmdEditText (makeRange (0, 1, 1) (1, 1, 2)) "[!\n\n!]"
-            ]
 
       return $ Text.encodeUtf8 $ Text.fromStrict $ StrictText.pack $ show testResult
 
