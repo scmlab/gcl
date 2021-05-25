@@ -3,7 +3,7 @@
 module Test.Server (tests) where
 
 import Data.ByteString.Lazy (ByteString)
-import qualified Data.Text.IO as Text
+import qualified Data.ByteString.Lazy as BSL
 import qualified Data.Text.Lazy as Text
 import qualified Data.Text.Lazy.Encoding as Text
 import Server.DSL
@@ -30,7 +30,7 @@ instantiateSpec =
   where
     run :: String -> FilePath -> TestTree
     run = runGoldenTest "Server/assets/" $ \sourcePath -> do
-      source <- Text.readFile sourcePath
+      source <- Text.toStrict . Text.decodeUtf8 <$> BSL.readFile sourcePath
 
       let testResult = runTest sourcePath source $ do
             program <- parseProgram source
