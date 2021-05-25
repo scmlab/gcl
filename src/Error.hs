@@ -4,15 +4,11 @@ module Error where
 
 import Data.Aeson
 import Data.Loc
--- import Data.ByteString.Lazy (ByteString)
-
--- import Syntax.Abstract (ConvertError)
 import GCL.Type (TypeError)
--- import GCL.Exec.ExecMonad (ExecError)
 import GCL.WP (StructError)
 import GHC.Generics
-import Syntax.Parser.Util ( SyntacticError )
 import Syntax.Common ()
+import Syntax.Parser.Util (SyntacticError)
 
 --------------------------------------------------------------------------------
 

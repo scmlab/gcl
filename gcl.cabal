@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: f8a65acfa6b4cc26b960f91eab2d6e796031bc4d6cab75bbdfba31096a215b35
+-- hash: cdc87b07ff54688cfb76de86873dc711d6a10ecaf30e4df9925d6a6d6e0c7a2a
 
 name:           gcl
 version:        0.1.0.0
@@ -72,7 +72,7 @@ library
       Paths_gcl
   hs-source-dirs:
       src
-  ghc-options: -Wall -fno-warn-orphans
+  ghc-options: -Wall -Werror=incomplete-patterns -fno-warn-orphans
   build-depends:
       aeson
     , base >=4.7 && <5
@@ -102,7 +102,7 @@ executable gcl
       Paths_gcl
   hs-source-dirs:
       app
-  ghc-options: -Wall -threaded -rtsopts -with-rtsopts=-N -fno-warn-orphans
+  ghc-options: -Wall -threaded -rtsopts -with-rtsopts=-N -Werror=incomplete-patterns -fno-warn-orphans
   build-depends:
       aeson
     , base >=4.7 && <5
@@ -188,7 +188,7 @@ test-suite gcl-test
   hs-source-dirs:
       test
       src
-  ghc-options: -Wall -fno-warn-orphans
+  ghc-options: -Wall -Werror=incomplete-patterns -fno-warn-orphans
   build-depends:
       aeson
     , base >=4.7 && <5

@@ -2,10 +2,10 @@ module Syntax.Abstract.Located where
 
 import Data.Loc
 import Data.Text (Text)
-import Syntax.Common.Located()
 import Syntax.Abstract
 import Syntax.Common
-import Prelude hiding (Ordering(..))
+import Syntax.Common.Located ()
+import Prelude hiding (Ordering (..))
 
 instance Located Program where
   locOf (Program _ _ _ _ l) = l
@@ -36,6 +36,7 @@ instance Located Type where
 
 instance Located Expr where
   locOf (Var _ l) = l
+  locOf (Paren x) = locOf x
   locOf (Const _ l) = l
   locOf (Lit _ l) = l
   locOf (Op op) = locOf op
@@ -48,7 +49,7 @@ instance Located Expr where
 
 instance Located Lit where
   locOf _ = NoLoc
-  
+
 -- | Constructors
 unary :: ArithOp -> Expr -> Expr
 unary op x = App (Op op) x (x <--> op)
