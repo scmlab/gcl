@@ -1,5 +1,4 @@
 {-# LANGUAGE OverloadedStrings #-}
-
 module Pretty.Util
   ( renderStrict,
     PrettyPrec (..),
@@ -7,6 +6,9 @@ module Pretty.Util
     DocWithLoc (..),
     toDoc,
     fromDoc,
+    fromRender,
+    fromRenderPrec,
+    fromRenderAndLocated
   )
 where
 
@@ -16,12 +18,40 @@ import Data.Text.Prettyprint.Doc
 import qualified Data.Text.Prettyprint.Doc.Render.Text as Text
 import Prelude hiding (Ordering (..))
 import Data.Loc.Range
+import Render
 
 renderStrict :: Doc ann -> Text
 renderStrict = Text.renderStrict . layoutPretty defaultLayoutOptions
 
 instance Pretty Range where
-  pretty (Range x y) = pretty $ displayPos x <> " " <> displayPos y
+  pretty (Range start end) =
+    if posLine start == posLine end
+      then
+        pretty (posFile start)
+          <> " ["
+          <> pretty (posCoff start)
+          <> "-"
+          <> pretty (posCoff end)
+          <> "] "
+          <> pretty (posLine start)
+          <> ":"
+          <> pretty (posCol start)
+          <> "-"
+          <> pretty (posCol end)
+      else
+        pretty (posFile start)
+          <> " ["
+          <> pretty (posCoff start)
+          <> "-"
+          <> pretty (posCoff end)
+          <> "] "
+          <> pretty (posLine start)
+          <> ":"
+          <> pretty (posCol start)
+          <> "-"
+          <> pretty(posLine end)
+          <> ":"
+          <> pretty (posCol end)
 
 instance Pretty Loc where
   pretty = pretty . displayLoc
@@ -61,7 +91,21 @@ fromDoc (Loc a b) x = DocWithLoc x a b
 toDoc :: DocWithLoc ann -> Doc ann
 -- toDoc (DocWithLoc d a _) = fillGap (Pos (posFile a) 1 0 0) a <> d
 toDoc (DocWithLoc d _ _) = d
-toDoc Empty = mempty 
+toDoc Empty = mempty
+
+-- | If something can be rendered, then make it a Doc
+fromRender :: Render a => a -> Doc ann
+fromRender x = pretty (render x)
+
+-- | If something can be rendered with precedence, then make it a Doc
+fromRenderPrec :: Render a => Int -> a -> Doc ann
+fromRenderPrec n x = pretty (renderPrec n x)
+
+-- | If something can be rendered and located, then make it a DocWithLoc
+fromRenderAndLocated :: (Located a, Render a) => a -> DocWithLoc ann
+fromRenderAndLocated x = case locOf x of
+  NoLoc -> mempty
+  Loc a b -> DocWithLoc (pretty (render x)) a b
 
 -- generates newlines and spaces to fill the gap between to Pos
 fillGap :: Pos -> Pos -> Doc ann
@@ -70,7 +114,7 @@ fillGap this next =
    in if lineDiff == 0
         then -- on the same line, just pad them with spaces
 
-          let colDiff = posCol next - 1 - posCol this
+          let colDiff = posCol next - posCol this
            in mconcat (replicate colDiff space)
         else -- on different lines
           mconcat (replicate lineDiff "\n" ++ replicate (posCol next - 1) space)

@@ -1,28 +1,29 @@
-{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE RoleAnnotations #-}
 {-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE RoleAnnotations #-}
+{-# LANGUAGE UndecidableInstances #-}
+
 module Syntax.Parser.Util where
 
-import Data.Text (Text)
-import Text.Megaparsec (setParserState, MonadParsec(..),  unPos, SourcePos(..), errorOffset, Stream(..), ParseError(..), ParseErrorBundle(..), ShowErrorComponent, PosState(..), State (..), mkPos, Pos)
-import Text.Megaparsec.Error (parseErrorTextPretty)
-import Data.Loc (Loc(..), posCol)
-import qualified Data.Loc as Loc
-import Control.Monad.Trans (MonadTrans, lift)
-import Control.Applicative (Alternative(..))
+import Control.Applicative (Alternative (..))
 import Control.Monad (MonadPlus)
+import Control.Monad.Trans (MonadTrans, lift)
 import Data.Coerce (coerce)
-import Syntax.Concrete (Token(Token))
-
+import Data.Loc (Loc (..), posCol)
+import qualified Data.Loc as Loc
+import Data.Text (Text)
+import Syntax.Concrete (Token (Token))
+import Text.Megaparsec (MonadParsec (..), ParseError (..), ParseErrorBundle (..), Pos, PosState (..), ShowErrorComponent, SourcePos (..), State (..), Stream (..), errorOffset, mkPos, setParserState, unPos)
+import Text.Megaparsec.Error (parseErrorTextPretty)
 
 ------------------------------------------
 -- wrap new type for parser
 ------------------------------------------
 
 type role ParseFunc _ nominal
+
 newtype ParseFunc m a = ParseFunc {parser :: m () -> m a}
 
 (↑) :: (m () -> m a) -> ParseFunc m a
@@ -44,7 +45,6 @@ instance Applicative m => Applicative (ParseFunc m) where
 instance Alternative m => Alternative (ParseFunc m) where
   empty = (↑) (const empty)
   pa <|> pb = (↑) (\sc' -> parser pa sc' <|> parser pb sc')
-
 
 instance Monad m => Monad (ParseFunc m) where
   pa >>= f = (↑) (\sc -> parser pa sc >>= (\a -> parser (f a) sc))
@@ -82,31 +82,32 @@ getTokenColumn :: Syntax.Concrete.Token e -> Text.Megaparsec.Pos
 getTokenColumn (Token s _) = mkPos . posCol $ s
 
 posStateToLoc :: Stream s => PosState s -> Loc
-posStateToLoc PosState {pstateOffset, pstateSourcePos = SourcePos{..}} = 
-    Loc.locOf $ Loc.Pos sourceName (unPos sourceLine) (unPos sourceColumn) pstateOffset 
+posStateToLoc PosState {pstateOffset, pstateSourcePos = SourcePos {..}} =
+  Loc.locOf $ Loc.Pos sourceName (unPos sourceLine) (unPos sourceColumn) pstateOffset
 
 getCurLoc :: (MonadParsec e s m) => m Loc
 getCurLoc = do
-  st@State{stateOffset, statePosState} <- getParserState
+  st@State {stateOffset, statePosState} <- getParserState
   let pst = reachOffsetNoLine stateOffset statePosState
-  setParserState st{statePosState = pst}
+  setParserState st {statePosState = pst}
   return . posStateToLoc $ pst
 
 getEndLoc :: (MonadParsec e s m) => m Loc
 getEndLoc = do
-  st@State{stateOffset, statePosState} <- getParserState
-  let pst= reachOffsetNoLine (stateOffset - 1) statePosState
-  setParserState st{statePosState = pst}
+  st@State {stateOffset, statePosState} <- getParserState
+  let pst = reachOffsetNoLine stateOffset statePosState
+  setParserState st {statePosState = pst}
   return . posStateToLoc $ pst
 
 fromParseErrorBundle :: ShowErrorComponent e => ParseErrorBundle Text e -> [SyntacticError]
-fromParseErrorBundle (ParseErrorBundle errs posState)=
+fromParseErrorBundle (ParseErrorBundle errs posState) =
   snd $ foldr f (posState, []) errs
   where
-    f :: ShowErrorComponent e =>
-      ParseError Text e
-      -> (PosState Text, [SyntacticError])
-      -> (PosState Text, [SyntacticError])
+    f ::
+      ShowErrorComponent e =>
+      ParseError Text e ->
+      (PosState Text, [SyntacticError]) ->
+      (PosState Text, [SyntacticError])
     f err (i, acc) =
-      let n = reachOffsetNoLine (errorOffset err) i in
-        (n, (posStateToLoc n, parseErrorTextPretty err) : acc)
+      let n = reachOffsetNoLine (errorOffset err) i
+       in (n, (posStateToLoc n, parseErrorTextPretty err) : acc)

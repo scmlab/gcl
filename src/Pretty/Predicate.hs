@@ -6,24 +6,14 @@ import Data.Loc (unLoc)
 import Data.Text.Prettyprint.Doc
 import Pretty.Abstract ()
 import Pretty.Util
-import Syntax.Predicate
+import GCL.Predicate
 import Prelude hiding (Ordering (..))
 
 --------------------------------------------------------------------------------
 
 -- | Pred
 instance PrettyPrec Pred where
-  prettyPrec n predicate = case predicate of
-    Constant p -> "Constant" <+> prettyPrec n p
-    GuardIf p _ -> "Guard IF" <+> prettyPrec n p
-    GuardLoop p _ -> "Guard LOOP" <+> prettyPrec n p
-    Assertion p _ -> "Assertion" <+> prettyPrec n p
-    LoopInvariant p b _ ->
-      "LoopInvariant" <+> prettyPrec n p <+> "bnd:" <+> prettyPrec n b
-    Bound p _ -> "Bound" <+> prettyPrec n p
-    Conjunct ps -> "Conjunct" <+> prettyList ps
-    Disjunct ps -> "Disjunct" <+> prettyList ps
-    Negate p -> "Negate" <+> prettyPrec n p
+  prettyPrec = fromRenderPrec
 
 instance Pretty Pred where
   pretty = prettyPrec 0
@@ -72,14 +62,7 @@ instance Pretty GdCmd where
 
 -- | Origin
 instance Pretty Origin where
-  pretty AtAbort {} = "Abort"
-  pretty AtSkip {} = "Skip"
-  pretty AtSpec {} = "Spec"
-  pretty AtAssignment {} = "Assigment"
-  pretty AtAssertion {} = "Assertion"
-  pretty AtIf {} = "Conditional"
-  pretty AtLoop {} = "Loop Invariant"
-  pretty AtTermination {} = "Loop Termination"
+  pretty = fromRender
 
 --------------------------------------------------------------------------------
 

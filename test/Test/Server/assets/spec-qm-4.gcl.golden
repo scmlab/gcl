@@ -1,0 +1,34 @@
+### Result
+
+([ [0] 
+  True
+  True
+  Conditional
+ ], [ [1]
+  True ∧ True
+  True
+
+, [0]
+  True
+  True
+ ], [  ], [  ])
+
+### Source
+
+if True -> 
+    [!
+    
+    !]
+    [!
+    
+    !]
+fi
+
+{ True }
+
+### Trace
+
+CmdLog " ### DigHole ./test/Test/Server/assets/spec-qm-4.gcl [16-17] 2:5-6"
+CmdEditText ./test/Test/Server/assets/spec-qm-4.gcl [16-17] 2:5-6 "[!\n    \n    !]"
+CmdLog " ### DigHole ./test/Test/Server/assets/spec-qm-4.gcl [35-36] 5:5-6"
+CmdEditText ./test/Test/Server/assets/spec-qm-4.gcl [35-36] 5:5-6 "[!\n    \n    !]"

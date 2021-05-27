@@ -4,35 +4,36 @@ module Test.WP where
 
 import Data.Loc
 import Data.Text (Text)
-import qualified Data.Text as Text
-import qualified Data.Text.IO as Text
-import Data.Text.Lazy (fromStrict, toStrict)
-import qualified Data.Text.Lazy.Encoding as LazyText
-import Error
 import GCL.WP (StructWarning)
 import Pretty ()
-import qualified Server
-import qualified Server.CustomMethod as Server
+import Server.DSL (parseProgram, sweep)
+import Server.Interpreter.Test 
 import Syntax.Abstract
-import Syntax.Common
-import Syntax.Predicate
-import Test.Tasty
-import Test.Tasty.HUnit
+    ( Expr(Const, Lit, Chain, Var, App, Op), Lit(Bol, Num) )
+import Syntax.Common ( ArithOp(Mul), ChainOp(EQ), Name(Name) )
+import GCL.Predicate
+    ( PO(..),
+      Origin(AtAssertion, AtSkip, AtAbort, AtAssignment),
+      Pred(Assertion, Constant),
+      Spec(Specification) )
+import GCL.Predicate.Util ( pos )
+import Test.Tasty ( testGroup, TestTree )
+import Test.Tasty.HUnit ( (@?=), testCase )
 import Prelude hiding (Ordering (..))
 
 tests :: TestTree
 tests = testGroup "WP" [emptyProg, statements, issues]
 
-type Result = (Maybe ([PO], [Spec], [Expr], [StructWarning]), [Server.EffKind])
+run :: Text -> TestResult ([PO], [Spec], [Expr], [StructWarning])
+run text = runTest "<test>" text $ do 
+  program <- parseProgram text
+  Right <$> sweep program
 
-run :: Text -> Result
-run text = Server.runTest $ Server.parseProgram text >>= Server.sweep
+fromPOs :: Text -> [PO] -> TestResult ([PO], [Spec], [Expr], [StructWarning])
+fromPOs source xs = TestResult ((Right (xs, [], [], []), source), [])
 
-fromPOs :: [PO] -> Result
-fromPOs pos = (Just (pos, [], [], []), [])
-
-fromSpecs :: [Spec] -> Result
-fromSpecs specs = (Just ([], specs, [], []), [])
+fromSpecs :: Text -> [Spec] -> TestResult ([PO], [Spec], [Expr], [StructWarning])
+fromSpecs source specs = TestResult ((Right ([], specs, [], []), source), [])
 
 --------------------------------------------------------------------------------
 
@@ -43,7 +44,7 @@ emptyProg =
     "empty"
     [ testCase "empty" $ do
         let actual = run ""
-        actual @?= fromPOs []
+        actual @?= fromPOs "" []
     ]
 
 --------------------------------------------------------------------------------
@@ -54,88 +55,92 @@ statements =
   testGroup
     "simple program"
     [ testCase "skip" $ do
-        let actual =
-              run
-                "{ True }   \n\
-                \skip       \n\
-                \{ 0 = 0 }"
+        let source =
+              "{ True }   \n\
+              \skip       \n\
+              \{ 0 = 0 }"
+        let actual = run source
         actual
           @?= fromPOs
+            source
             [ PO
                 0
-                (Assertion (Lit (Bol True) (Loc (pos 1 3 2) (pos 1 6 5))) (Loc (pos 1 1 0) (pos 1 8 7)))
+                (Assertion (Lit (Bol True) (Loc (pos 1 3 2) (pos 1 7 6))) (Loc (pos 1 1 0) (pos 1 9 8)))
                 ( Assertion
                     ( Chain
-                        (Lit (Num 0) (Loc (pos 3 3 26) (pos 3 3 26)))
-                        (EQ (Loc (pos 3 5 28) (pos 3 5 28)))
-                        (Lit (Num 0) (Loc (pos 3 7 30) (pos 3 7 30)))
-                        (Loc (pos 3 3 26) (pos 3 7 30))
+                        (Lit (Num 0) (Loc (pos 3 3 26) (pos 3 4 27)))
+                        (EQ (Loc (pos 3 5 28) (pos 3 6 29)))
+                        (Lit (Num 0) (Loc (pos 3 7 30) (pos 3 8 31)))
+                        (Loc (pos 3 3 26) (pos 3 8 31))
                     )
-                    (Loc (pos 3 1 24) (pos 3 9 32))
+                    (Loc (pos 3 1 24) (pos 3 10 33))
                 )
-                (AtSkip (Loc (pos 2 1 12) (pos 2 4 15)))
+                (AtSkip (Loc (pos 2 1 12) (pos 2 5 16)))
             ],
       testCase "abort" $
         do
-          let actual =
-                run
-                  "{ True }   \n\
-                  \abort      \n\
-                  \{ True }"
+          let source =
+                "{ True }   \n\
+                \abort      \n\
+                \{ True }"
+          let actual = run source
           actual
             @?= fromPOs
+              source
               [ PO
                   0
-                  (Assertion (Lit (Bol True) (Loc (pos 1 3 2) (pos 1 6 5))) (Loc (pos 1 1 0) (pos 1 8 7)))
+                  (Assertion (Lit (Bol True) (Loc (pos 1 3 2) (pos 1 7 6))) (Loc (pos 1 1 0) (pos 1 9 8)))
                   (Constant (Lit (Bol False) NoLoc))
-                  (AtAbort (Loc (pos 2 1 12) (pos 2 5 16)))
+                  (AtAbort (Loc (pos 2 1 12) (pos 2 6 17)))
               ],
       testCase
         "assignment"
         $ do
-          let actual =
-                run
-                  "{ True }   \n\
-                  \x := 1     \n\
-                  \{ 0 = x }"
+          let source =
+                "{ True }   \n\
+                \x := 1     \n\
+                \{ 0 = x }"
+          let actual = run source
           actual
             @?= fromPOs
+              source
               [ PO
                   0
-                  (Assertion (Lit (Bol True) (Loc (pos 1 3 2) (pos 1 6 5))) (Loc (pos 1 1 0) (pos 1 8 7)))
+                  (Assertion (Lit (Bol True) (Loc (pos 1 3 2) (pos 1 7 6))) (Loc (pos 1 1 0) (pos 1 9 8)))
                   ( Assertion
                       ( Chain
-                          (Lit (Num 0) (Loc (pos 3 3 26) (pos 3 3 26)))
-                          (EQ (Loc (pos 3 5 28) (pos 3 5 28)))
-                          (Lit (Num 1) (Loc (pos 2 6 17) (pos 2 6 17)))
-                          (Loc (pos 3 3 26) (pos 3 7 30))
+                          (Lit (Num 0) (Loc (pos 3 3 26) (pos 3 4 27)))
+                          (EQ (Loc (pos 3 5 28) (pos 3 6 29)))
+                          (Lit (Num 1) (Loc (pos 2 6 17) (pos 2 7 18)))
+                          (Loc (pos 3 3 26) (pos 3 8 31))
                       )
-                      (Loc (pos 3 1 24) (pos 3 9 32))
+                      (Loc (pos 3 1 24) (pos 3 10 33))
                   )
-                  (AtAssignment (Loc (pos 2 1 12) (pos 2 6 17)))
+                  (AtAssignment (Loc (pos 2 1 12) (pos 2 7 18)))
               ],
       testCase "spec" $ do
-        let actual =
-              run
-                "{ True }   \n\
-                \[!       \n\
-                \!]       \n\
-                \{ 0 = 0 }"
+        let source =
+              "{ True }   \n\
+              \[!       \n\
+              \!]       \n\
+              \{ 0 = 0 }"
+        let actual = run source
         actual
           @?= fromSpecs
+            source
             [ Specification
                 0
-                (Assertion (Lit (Bol True) (Loc (Pos "<test>" 1 3 2) (Pos "<test>" 1 6 5))) (Loc (Pos "<test>" 1 1 0) (Pos "<test>" 1 8 7)))
+                (Assertion (Lit (Bol True) (Loc (Pos "<test>" 1 3 2) (Pos "<test>" 1 7 6))) (Loc (Pos "<test>" 1 1 0) (Pos "<test>" 1 9 8)))
                 ( Assertion
                     ( Chain
-                        (Lit (Num 0) (Loc (Pos "<test>" 4 3 34) (Pos "<test>" 4 3 34)))
-                        (EQ (Loc (Pos "<test>" 4 5 36) (Pos "<test>" 4 5 36)))
-                        (Lit (Num 0) (Loc (Pos "<test>" 4 7 38) (Pos "<test>" 4 7 38)))
-                        (Loc (Pos "<test>" 4 3 34) (Pos "<test>" 4 7 38))
+                        (Lit (Num 0) (Loc (Pos "<test>" 4 3 34) (Pos "<test>" 4 4 35)))
+                        (EQ (Loc (Pos "<test>" 4 5 36) (Pos "<test>" 4 6 37)))
+                        (Lit (Num 0) (Loc (Pos "<test>" 4 7 38) (Pos "<test>" 4 8 39)))
+                        (Loc (Pos "<test>" 4 3 34) (Pos "<test>" 4 8 39))
                     )
-                    (Loc (Pos "<test>" 4 1 32) (Pos "<test>" 4 9 40))
+                    (Loc (Pos "<test>" 4 1 32) (Pos "<test>" 4 10 41))
                 )
-                (Loc (Pos "<test>" 2 1 12) (Pos "<test>" 3 2 23))
+                (Loc (Pos "<test>" 2 1 12) (Pos "<test>" 3 3 24))
             ]
     ]
 
@@ -193,64 +198,66 @@ issue2 =
   testGroup
     "Issue #2"
     [ testCase "Postcondition only" $ do
-        let actual =
-              run
-                "con A, B : Int\n\
-                \var x, y, z : Int\n\
-                \{ z = A * B }"
+        let source =
+              "con A, B : Int\n\
+              \var x, y, z : Int\n\
+              \{ z = A * B }"
+        let actual = run source
         actual
           @?= fromPOs
+            source
             [ PO
                 0
                 (Constant (Lit (Bol True) NoLoc))
                 ( Assertion
                     ( Chain
-                        (Var (Name "z" (Loc (pos 3 3 35) (pos 3 3 35))) (Loc (pos 3 3 35) (pos 3 3 35)))
-                        (EQ (Loc (pos 3 5 37) (pos 3 5 37)))
+                        (Var (Name "z" (Loc (pos 3 3 35) (pos 3 4 36))) (Loc (pos 3 3 35) (pos 3 4 36)))
+                        (EQ (Loc (pos 3 5 37) (pos 3 6 38)))
                         ( App
                             ( App
-                                (Op (Mul (Loc (pos 3 9 41) (pos 3 9 41))))
-                                (Const (Name "A" (Loc (pos 3 7 39) (pos 3 7 39))) (Loc (pos 3 7 39) (pos 3 7 39)))
-                                (Loc (pos 3 7 39) (pos 3 9 41))
+                                (Op (Mul (Loc (pos 3 9 41) (pos 3 10 42))))
+                                (Const (Name "A" (Loc (pos 3 7 39) (pos 3 8 40))) (Loc (pos 3 7 39) (pos 3 8 40)))
+                                (Loc (pos 3 7 39) (pos 3 10 42))
                             )
-                            (Const (Name "B" (Loc (pos 3 11 43) (pos 3 11 43))) (Loc (pos 3 11 43) (pos 3 11 43)))
-                            (Loc (pos 3 7 39) (pos 3 11 43))
+                            (Const (Name "B" (Loc (pos 3 11 43) (pos 3 12 44))) (Loc (pos 3 11 43) (pos 3 12 44)))
+                            (Loc (pos 3 7 39) (pos 3 12 44))
                         )
-                        (Loc (pos 3 3 35) (pos 3 11 43))
+                        (Loc (pos 3 3 35) (pos 3 12 44))
                     )
-                    (Loc (pos 3 1 33) (pos 3 13 45))
+                    (Loc (pos 3 1 33) (pos 3 14 46))
                 )
-                (AtAssertion (Loc (pos 3 1 33) (pos 3 13 45)))
+                (AtAssertion (Loc (pos 3 1 33) (pos 3 14 46)))
             ],
       testCase "Postcondition + precondition" $ do
-        let actual =
-              run
-                "con A, B : Int\n\
-                \var x, y, z : Int\n\
-                \{ True }\n\
-                \{ z = A * B }"
+        let source =
+              "con A, B : Int\n\
+              \var x, y, z : Int\n\
+              \{ True }\n\
+              \{ z = A * B }"
+        let actual = run source
         actual
           @?= fromPOs
+            source
             [ PO
                 0
-                (Assertion (Lit (Bol True) (Loc (pos 3 3 35) (pos 3 6 38))) (Loc (pos 3 1 33) (pos 3 8 40)))
+                (Assertion (Lit (Bol True) (Loc (pos 3 3 35) (pos 3 7 39))) (Loc (pos 3 1 33) (pos 3 9 41)))
                 ( Assertion
                     ( Chain
-                        (Var (Name "z" (Loc (pos 4 3 44) (pos 4 3 44))) (Loc (pos 4 3 44) (pos 4 3 44)))
-                        (EQ (Loc (pos 4 5 46) (pos 4 5 46)))
+                        (Var (Name "z" (Loc (pos 4 3 44) (pos 4 4 45))) (Loc (pos 4 3 44) (pos 4 4 45)))
+                        (EQ (Loc (pos 4 5 46) (pos 4 6 47)))
                         ( App
                             ( App
-                                (Op (Mul (Loc (pos 4 9 50) (pos 4 9 50))))
-                                (Const (Name "A" (Loc (pos 4 7 48) (pos 4 7 48))) (Loc (pos 4 7 48) (pos 4 7 48)))
-                                (Loc (pos 4 7 48) (pos 4 9 50))
+                                (Op (Mul (Loc (pos 4 9 50) (pos 4 10 51))))
+                                (Const (Name "A" (Loc (pos 4 7 48) (pos 4 8 49))) (Loc (pos 4 7 48) (pos 4 8 49)))
+                                (Loc (pos 4 7 48) (pos 4 10 51))
                             )
-                            (Const (Name "B" (Loc (pos 4 11 52) (pos 4 11 52))) (Loc (pos 4 11 52) (pos 4 11 52)))
-                            (Loc (pos 4 7 48) (pos 4 11 52))
+                            (Const (Name "B" (Loc (pos 4 11 52) (pos 4 12 53))) (Loc (pos 4 11 52) (pos 4 12 53)))
+                            (Loc (pos 4 7 48) (pos 4 12 53))
                         )
-                        (Loc (pos 4 3 44) (pos 4 11 52))
+                        (Loc (pos 4 3 44) (pos 4 12 53))
                     )
-                    (Loc (pos 4 1 42) (pos 4 13 54))
+                    (Loc (pos 4 1 42) (pos 4 14 55))
                 )
-                (AtAssertion (Loc (pos 3 1 33) (pos 3 8 40)))
+                (AtAssertion (Loc (pos 3 1 33) (pos 3 9 41)))
             ]
     ]

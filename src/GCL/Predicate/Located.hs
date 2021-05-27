@@ -1,7 +1,7 @@
 module GCL.Predicate.Located where
 
 import Data.Loc (Located, locOf, Loc (..))
-import GCL.Predicate (Pred (..), Stmt (..), PO (..), Origin (..))
+import GCL.Predicate (Pred (..), Stmt (..), PO (..), Origin (..), Spec (..))
 
 
 instance Located Pred where
@@ -37,3 +37,12 @@ instance Located Origin where
   locOf (AtIf l) = l
   locOf (AtLoop l) = l
   locOf (AtTermination l) = l
+
+instance Located Spec where
+  locOf (Specification _ _ _ l) = l
+
+instance Ord Loc where
+  compare NoLoc NoLoc = EQ
+  compare NoLoc (Loc _ _) = LT
+  compare (Loc _ _) NoLoc = GT
+  compare (Loc x _) (Loc y _) = compare x y

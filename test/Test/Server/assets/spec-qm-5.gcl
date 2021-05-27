@@ -1,0 +1,9 @@
+con N : Int
+con f : array [0..N) of Int
+var n : Int
+
+{ f[n] = 0, bnd: N - n }
+do n ≠ N -> n := n + 1
+            ?
+od 
+{ True } 

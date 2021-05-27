@@ -11,7 +11,6 @@ import Control.Monad.Except
 import qualified Data.Aeson as JSON
 import Data.Loc
 import Data.Loc.Range
-import Data.Text (Text, pack)
 import qualified Data.Text as Text
 import Error
 import Language.LSP.Server
@@ -22,14 +21,13 @@ import Language.LSP.Types hiding
 import qualified Language.LSP.Types as LSP
 import Pretty
 import Render
+import Server.DSL
 import Server.CustomMethod
 import Server.Diagnostic
   ( ToDiagnostics (toDiagnostics),
   )
-import Server.ExportPO ()
-import Server.Monad
-import qualified Syntax.Abstract as A
-import Syntax.Predicate (Spec (..))
+import Server.Interpreter.RealWorld
+import GCL.Predicate (Spec (..))
 
 -- handlers of the LSP server
 handlers :: Handlers ServerM
@@ -100,102 +98,97 @@ handlers =
             logText " --> CustomMethod: CannotDecodeRequest"
             responder $ CannotDecodeRequest $ show msg ++ "\n" ++ show params
           JSON.Success request@(Req filepath kind) -> do
-            logText $ " --> Custom Reqeust: " <> pack (show request)
-            let effEnv = EffEnv filepath (Just responder)
+            logText $ " --> Custom Reqeust: " <> Text.pack (show request)
             -- convert Request to Response
-            case kind of
-              -- Inspect
-              ReqInspect selStart selEnd -> do
-                interpret effEnv $ do
-                  updateLastMouseSelection (selStart, selEnd)
-                  source <- savedSource
-                  program <- parseProgram source
+            interpret filepath (Just responder) $ do
+              case kind of
+                -- Inspect
+                ReqInspect range -> do
+                  setLastSelection range
+                  result <- readCachedResult   
+                  generateResponseAndDiagnosticsFromResult result 
 
-                  -- typeCheck program
-                  -- (pos, _specs, _globalProps, warnings) <- sweep program
-                  -- -- display all POs
-                  -- let diagnostics = concatMap toDiagnostics pos ++ concatMap toDiagnostics warnings
-                  -- -- response with only POs in the vinicity of the cursor
-                  -- let filteredPOs = filterPOs (selStart, selEnd) pos
-                  -- version <- bumpVersion
-
-                  -- let responses = [ResDisplay version (headerE "Proof Obligaitons" : map renderBlock filteredPOs)]
-                  -- terminate responses diagnostics
-
-                  -- parse + type check + sweep
-                  temp program (Just (selStart, selEnd))
-
-              -- Refine
-              ReqRefine selStart selEnd -> do
-                interpret effEnv $ do
-                  updateLastMouseSelection (selStart, selEnd)
-                  source <- latestSource
-                  -- refine (parse + sweep)
-
-                  (spec, content) <- refine source (selStart, selEnd)
-
-                  -- logM "*** SPEC CONTENT ------"
-                  -- logM text
-                  -- logM "************"
+                -- Refine
+                ReqRefine range -> do
+                  mute True
+                  setLastSelection range
+                  source <- getSource
+                  (spec, content) <- refine source range
+                  
 
                   -- remove the Spec
-                  case specLoc spec of
+                  source' <- case specLoc spec of
                     NoLoc -> throwError [Others "NoLoc in ReqRefine"]
-                    Loc start end -> do
-                      source' <- editText (Range start end) (Text.stripStart content)
-                      -- logM $ "*** AFTER REMOVING SPEC\n" <> source'
-                      checkAndSendResponsePrim (Just (selStart, selEnd)) source'
+                    Loc start end -> editText (Range start end) (Text.stripStart content)
 
-              -- Substitute
-              ReqSubstitute index expr subst -> do
-                interpret effEnv $ do
-                  source <- savedSource
-                  program <- parseProgram source
-                  let expr' = substitute program expr subst
-                  terminate [ResSubstitute index expr'] []
+                  program <- parseProgram source'
+                  typeCheck program
+                  mute False
+                  result <- sweep program 
+                  cacheResult (Right result) 
+                  generateResponseAndDiagnosticsFromResult (Right result) 
 
-              -- ExportProofObligations
-              ReqExportProofObligations ->
-                responder $ Res filepath [ResConsoleLog "Export"]
-              ReqDebug -> return $ error "crash!",
+                ReqDebug -> return $ error "crash!",
       -- when the client saved the document, store the text for later use
-      notificationHandler STextDocumentDidSave $ \ntf -> do
-        logText " --> TextDocumentDidSave"
-        let NotificationMessage _ _ (DidSaveTextDocumentParams (TextDocumentIdentifier uri) source') = ntf
-        case source' of
-          Nothing -> pure ()
-          Just source ->
-            case uriToFilePath uri of
-              Nothing -> pure ()
-              Just filepath -> do
-                let effEnv = EffEnv filepath Nothing
-                interpret effEnv $ do
-                  updateSavedSource source
-                  lastSelection <- readLastMouseSelection
-                  checkAndSendResponsePrim lastSelection source,
+      -- notificationHandler STextDocumentDidSave $ \ntf -> do
+      --   logText " --> TextDocumentDidSave"
+      --   let NotificationMessage _ _ (DidSaveTextDocumentParams (TextDocumentIdentifier uri) source') = ntf
+      --   case source' of
+      --     Nothing -> pure ()
+      --     Just source ->
+      --       case uriToFilePath uri of
+      --         Nothing -> pure ()
+      --         Just filepath -> do
+      --           let cmdEnv = CmdEnv filepath Nothing
+      --           interpret cmdEnv $ do
+      --             program <- parseProgram source
+      --             typeCheck program
+      --             generateResponseAndDiagnostics program,
       -- when the client opened the document
+
+      notificationHandler STextDocumentDidChange $ \ntf -> do
+        m <- getMute
+        logText $ " --> TextDocumentDidChange (muted: "<> Text.pack (show m) <> ")"
+        unless m $ do 
+          let NotificationMessage _ _ (DidChangeTextDocumentParams (VersionedTextDocumentIdentifier uri _) change) = ntf
+          logText $ Text.pack $ " --> " <> show change
+          case uriToFilePath uri of
+            Nothing -> pure ()
+            Just filepath -> do
+              interpret filepath Nothing $ do
+                source <- getSource
+                program <- parseProgram source
+                typeCheck program
+                result <- sweep program
+                cacheResult (Right result)
+                generateResponseAndDiagnosticsFromResult (Right result),
+
       notificationHandler STextDocumentDidOpen $ \ntf -> do
         logText " --> TextDocumentDidOpen"
         let NotificationMessage _ _ (DidOpenTextDocumentParams (TextDocumentItem uri _ _ source)) = ntf
         case uriToFilePath uri of
           Nothing -> pure ()
           Just filepath -> do
-            let effEnv = EffEnv filepath Nothing
-            interpret effEnv $ do
-              updateSavedSource source
-              lastSelection <- readLastMouseSelection
-              checkAndSendResponsePrim lastSelection source
+            interpret filepath Nothing $ do
+              program <- parseProgram source
+              typeCheck program
+              result <- sweep program
+              cacheResult (Right result)
+              generateResponseAndDiagnosticsFromResult (Right result)
     ]
 
-temp :: A.Program -> Maybe (Int, Int) -> EffM ()
-temp program lastSelection = do
-  (pos, specs, globalProps, warnings) <- sweep program
+generateResponseAndDiagnosticsFromResult :: Result -> CmdM [ResKind]
+generateResponseAndDiagnosticsFromResult (Left errors) = throwError errors
+generateResponseAndDiagnosticsFromResult (Right (pos, specs, globalProps, warnings)) = do 
+  -- leave only POs & Specs around the mouse selection
+  lastSelection <- getLastSelection
   let overlappedSpecs = case lastSelection of
         Nothing -> specs
-        Just sel -> filterOverlapped sel specs
+        Just sel -> filter (withinRange sel) specs
   let overlappedPOs = case lastSelection of
         Nothing -> pos
-        Just sel -> filterOverlapped sel pos
+        Just sel -> filter (withinRange sel) pos
+  -- render stuff
   let warningsSection = if null warnings then [] else headerE "Warnings" : map renderBlock warnings
   let globalPropsSection = if null globalProps then [] else headerE "Global Properties" : map renderBlock globalProps
   let specsSection = if null overlappedSpecs then [] else headerE "Specs" : map renderBlock overlappedSpecs
@@ -213,12 +206,6 @@ temp program lastSelection = do
 
   let responses = [ResDisplay version blocks, ResUpdateSpecs (map encodeSpec specs)]
   let diagnostics = concatMap toDiagnostics pos ++ concatMap toDiagnostics warnings
+  sendDiagnostics diagnostics
 
-  terminate responses diagnostics
-
--- parse + type check + sweep
-checkAndSendResponsePrim :: Maybe (Int, Int) -> Text -> EffM ()
-checkAndSendResponsePrim lastSelection source = do
-  program <- parseProgram source
-  typeCheck program
-  temp program lastSelection
+  return responses

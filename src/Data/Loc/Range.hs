@@ -7,10 +7,33 @@ module Data.Loc.Range where
 import Data.Aeson (FromJSON (..), ToJSON (..))
 import Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NE
-import Data.Loc
+import Data.Loc hiding (fromLoc)
 import GHC.Generics (Generic)
+import Data.Maybe (mapMaybe)
 
--- | Invariant: the second position should be greater than the first position
+-- | Represents an interval of two source locations
+--
+--  Very much like `Loc`, except that:
+--    1. There's no `NoLoc`
+--    2. Cursors is placed IN-BETWEEN two characters rather than ON a character
+--
+--  For example: to represent the selection of "ABC" in "ABCD" 
+--    (here we use the tip of ">" and "<" to represent a cursor between two characters)
+--
+--    charactor offset    :   0123
+--    charactors          :   ABCD   
+-------------------------------------------------------
+--    Loc       of "ABC"  :   ^^^     Loc   (Pos ... 0) (Pos ... 2)
+--    Range     of "ABC"  :  >   <    Range (Pos ... 0) (Pos ... 3)
+--
+--    Loc       of "AB"   :   ^^      Loc   (Pos ... 0) (Pos ... 1)
+--    Range     of "AB"   :  >  <     Range (Pos ... 0) (Pos ... 2)
+--
+--    Loc       of ""     :  ####### UNREPRESENTABLE ###################
+--    Range     of ""     :  ><       Range (Pos ... 0) (Pos ... 0)
+--
+--  We abuse `Pos` to represent what is actually the left endpoint of that `Pos`
+
 data Range = Range Pos Pos
   deriving (Eq, Generic)
 
@@ -19,7 +42,11 @@ instance Show Range where
     if posLine start == posLine end
       then
         posFile start
-          <> " "
+          <> " ["
+          <> show (posCoff start)
+          <> "-"
+          <> show (posCoff end)
+          <> "] "
           <> show (posLine start)
           <> ":"
           <> show (posCol start)
@@ -27,7 +54,11 @@ instance Show Range where
           <> show (posCol end)
       else
         posFile start
-          <> " "
+          <> " ["
+          <> show (posCoff start)
+          <> "-"
+          <> show (posCoff end)
+          <> "] "
           <> show (posLine start)
           <> ":"
           <> show (posCol start)
@@ -44,13 +75,24 @@ rangeStart (Range a _) = a
 rangeEnd :: Range -> Pos
 rangeEnd (Range _ b) = b
 
+-- | Loc -> Maybe Range
 fromLoc :: Loc -> Maybe Range
 fromLoc NoLoc = Nothing
 fromLoc (Loc x y) = Just (Range x y)
 
--- | Calculates the distance between the two positions
+-- | [Loc] -> [Range]
+fromLocs :: [Loc] -> [Range]
+fromLocs = mapMaybe fromLoc
+
+mergeRangesUnsafe :: [Range] -> Range
+mergeRangesUnsafe xs = foldl (<>) (head xs) xs
+
+mergeRanges :: NonEmpty Range -> Range
+mergeRanges xs = foldl (<>) (NE.head xs) xs
+
+-- | Calculates the length covered by a range
 span :: Range -> Int
-span (Range a b) = posCol b - posCol a + 1
+span (Range a b) = posCol b - posCol a
 
 -- | Compares the starting position
 instance Ord Range where
@@ -118,3 +160,27 @@ instance FromJSON Pos where
 instance FromJSON Range
 
 instance ToJSON Range
+
+--------------------------------------------------------------------------------
+
+-- | Compare the cursor position with something
+--  EQ: the cursor is placed within that thing
+--  LT: the cursor is placed BEFORE (but not touching) that thing
+--  GT: the cursor is placed AFTER (but not touching) that thing
+compareWithPosition :: Located a => Pos -> a -> Ordering
+compareWithPosition pos x = case locOf x of
+  NoLoc -> EQ
+  Loc start end ->
+    if posCoff pos < posCoff start
+      then LT
+      else
+        if posCoff pos > posCoff end
+          then GT
+          else EQ
+
+-- | See if something is within the selection
+withinRange :: Located a => Range -> a -> Bool
+withinRange (Range left right) x =
+  compareWithPosition left x == EQ
+    || compareWithPosition right x == EQ
+    || (compareWithPosition left x == LT && compareWithPosition right x == GT)

@@ -4,9 +4,8 @@ import Control.Concurrent (forkIO, readChan)
 import Control.Monad.Except hiding (guard)
 import qualified Data.Text.IO as Text
 import GHC.IO.IOMode (IOMode (ReadWriteMode))
-import Server.ExportPO ()
 import Server.Handler (handlers)
-import Server.Monad
+import Server.Interpreter.RealWorld
 import Language.LSP.Server
 import qualified Language.LSP.Types as LSP hiding (TextDocumentSyncClientCapabilities (..))
 import Network.Simple.TCP (HostPreference (Host), serve)
@@ -17,7 +16,7 @@ import Network.Socket (socketToHandle)
 -- entry point of the LSP server
 run :: Bool -> IO Int
 run devMode = do
-  env <- initEnv devMode
+  env <- initGlobalEnv  
   if devMode
     then do
       let port = "3000"
@@ -30,14 +29,13 @@ run devMode = do
     else do
       runServer (serverDefn env)
   where
-    printLog :: Env -> IO ()
-    printLog env = do
-      result <- readChan (envChan env)
-      when (envDevMode env) $ do
+    printLog :: GlobalEnv -> IO ()
+    printLog env = forever $ do
+      result <- readChan (globalChan env)
+      when devMode $ do
         Text.putStrLn result
-      printLog env
 
-    serverDefn :: Env -> ServerDefinition ()
+    serverDefn :: GlobalEnv -> ServerDefinition ()
     serverDefn env =
       ServerDefinition
         { defaultConfig = (),

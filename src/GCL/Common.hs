@@ -11,9 +11,7 @@ import Data.Set (Set, (\\))
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Syntax.Abstract (Type(..), Expr(..))
-import Control.Monad.RWS (RWST, MonadState (get), MonadReader (ask, local), evalRWST, MonadWriter (tell))
 import GCL.Predicate (Pred (..))
-import GCL.Predicate.Util (toExpr)
 
 -- Monad for generating fresh variable
 class Monad m => Fresh m where
@@ -78,22 +76,22 @@ instance Free Expr where
     (either (const mempty) fv op <> fv range <> fv term) \\ Set.fromList xs
   fv (Hole _) = mempty -- banacorn: `subs` has been always empty anyway
   -- concat (map freeSubst subs) -- correct?
-  fv (Subst e s) = (fv e \\ (Set.fromList . Map.keys) s) <> fv s
+  fv (Subst e s _) = (fv e \\ (Set.fromList . Map.keys) s) <> fv s
 
 -- class for data that is substitutable
-class Substitutable a where
-  apply :: Subs a -> a -> a
+class Substitutable a b where
+  apply :: Subs a -> b -> b
 
-compose :: Substitutable a => Subs a -> Subs a -> Subs a
+compose :: Substitutable a a => Subs a -> Subs a -> Subs a
 s1 `compose` s2 = s1 <> Map.map (apply s1) s2
 
-instance Substitutable Type where
+instance Substitutable Type Type where
   apply _ t@(TBase _ _) = t
   apply s (TArray i t l) = TArray i (apply s t) l
   apply s (TFunc t1 t2 l) = TFunc (apply s t1) (apply s t2) l
   apply s t@(TVar x _) = Map.findWithDefault t x s
 
-instance Substitutable Expr where
+instance Substitutable Expr Expr where
   apply s (Paren expr) = Paren (apply s expr)
   apply _ lit@(Lit _ _) = lit
   apply s v@(Var n _) = Map.findWithDefault v n s
@@ -115,15 +113,15 @@ instance Substitutable Expr where
                 Right op -> Right (apply s op) in
     let s' = Map.withoutKeys s (Set.fromList xs) in
     Quant op' xs (apply s' rng) (apply s' t) l
-  apply s (Subst expr s') = Subst expr (s `compose` s')
+  apply s (Subst before s' after) = Subst before (s `compose` s') after
 
-instance Substitutable Pred where
-  apply s (Constant e) = Constant (apply (Map.map toExpr s) e)
-  apply s (Bound e l) = Bound (apply (Map.map toExpr s) e) l
-  apply s (Assertion e l) = Assertion (apply (Map.map toExpr s) e) l
-  apply s (LoopInvariant e b l) = LoopInvariant (apply (Map.map toExpr s) e) b l
-  apply s (GuardIf e l) = GuardLoop (apply (Map.map toExpr s) e) l
-  apply s (GuardLoop e l) = GuardLoop (apply (Map.map toExpr s) e) l
+instance Substitutable Expr Pred where
+  apply s (Constant e) = Constant (apply s e)
+  apply s (Bound e l) = Bound (apply s e) l
+  apply s (Assertion e l) = Assertion (apply s e) l
+  apply s (LoopInvariant e b l) = LoopInvariant (apply s e) b l
+  apply s (GuardIf e l) = GuardLoop (apply s e) l
+  apply s (GuardLoop e l) = GuardLoop (apply s e) l
   apply s (Conjunct xs) = Conjunct (map (apply s) xs)
   apply s (Disjunct es) = Disjunct (map (apply s) es)
   apply s (Negate x) = Negate (apply s x)
@@ -132,30 +130,5 @@ instance Substitutable Pred where
 --       | null env = e
 --       | otherwise = Subst e env
 
-type Solver m a = RWST (Env a) [(a, a)] FreshState m
-
-instance Monad m => Fresh (Solver m a) where
-  fresh = get
-
 -- instance Monad m => HasEnv (Solver m a) a where
 --   askEnv = ask
-
-runSolver :: Monad m => Env a -> Solver m a a -> m (a, [(a, a)])
-runSolver env s = evalRWST s env initFreshState
-
-uni :: Monad m => a -> a -> Solver m a ()
-uni x y = tell [(x, y)]
-
-lookupEnv :: Monad m =>
-  Name ->
-  Solver m a a ->
-  (a -> Solver m a a) ->
-  Solver m a a
-lookupEnv n f g = do
-  env <- ask
-  maybe f g (Map.lookup n env)
-
-inEnv :: Monad m => [(Name, a)] -> Solver m a a -> Solver m a a
-inEnv l m = do
-  let scope e = foldl (\e' (x, sc) -> Map.insert x sc e') e l
-  local scope m

@@ -20,15 +20,15 @@ chain op x y = Chain x op y (x <--> y)
 lt, gt, gte, lte, eqq, conj, disj, implies :: Expr -> Expr -> Expr
 lt = (chain . LT) NoLoc
 gt = (chain . GT) NoLoc
-gte = (chain . GTE) NoLoc
-lte = (chain . LTE) NoLoc
+gte = (chain . GTEU) NoLoc
+lte = (chain . LTEU) NoLoc
 eqq = (chain . EQ) NoLoc
-conj = (binary . Conj) NoLoc
-disj = (binary . Disj) NoLoc
-implies = (binary . Implies) NoLoc
+conj = (binary . ConjU) NoLoc
+disj = (binary . DisjU) NoLoc
+implies = (binary . ImpliesU) NoLoc
 
 neg :: Expr -> Expr
-neg = (unary . Neg) NoLoc
+neg = (unary . NegU) NoLoc
 
 true :: Expr
 true = Lit (Bol True) NoLoc
@@ -45,7 +45,7 @@ disjunct [] = false
 disjunct xs = foldl1 disj xs
 
 imply :: Expr -> Expr -> Expr
-imply p q = App (App ((Op . Implies) NoLoc) p (locOf p)) q (locOf q)
+imply p q = App (App ((Op . ImpliesU) NoLoc) p (locOf p)) q (locOf q)
 
 predEq :: Expr -> Expr -> Bool
 predEq = (==)

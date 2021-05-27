@@ -10,6 +10,7 @@ import Render.Class
 import Render.Element
 import Render.Syntax.Common ()
 import Render.Syntax.Abstract ()
+import Data.Foldable (toList)
 
 instance RenderBlock Error where
   renderBlock (SyntacticError (loc, msg)) = blockE (Just "Parse Error") (fromLoc loc) (render msg)
@@ -34,6 +35,12 @@ instance RenderBlock TypeError where
   renderBlock (NotFunction t loc) =
     blockE (Just "Not a function") (fromLoc loc) $
       "The type" <+> render t <+> "is not a function type"
+  renderBlock (NotEnoughExprsInAssigment vars loc) =
+    blockE (Just "Not Enough Expressions") (fromLoc loc) $
+      "Variables" <+> renderManySepByComma (toList vars) <+> "do not have corresponing expressions in the assigment"
+  renderBlock (TooManyExprsInAssigment exprs loc) =
+    blockE (Just "Too Many Expressions") (fromLoc loc) $
+      "Expressions" <+> renderManySepByComma (toList exprs) <+> "do not have corresponing variables in the assigment"
 
 instance RenderBlock StructError where
   renderBlock (MissingAssertion loc) =

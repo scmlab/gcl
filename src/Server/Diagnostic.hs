@@ -11,9 +11,10 @@ import GCL.WP (StructError (..), StructWarning (..))
 import Language.LSP.Types hiding (TextDocumentSyncClientCapabilities (..), Range(..))
 import qualified Language.LSP.Types as LSP
 import Pretty
-import Syntax.Predicate (Origin (..), PO (..))
+import GCL.Predicate (Origin (..), PO (..))
 import Data.Loc.Util (translate)
 import Data.Loc.Range
+import Data.Foldable (toList)
 
 class ToDiagnostics a where
   toDiagnostics :: a -> [Diagnostic]
@@ -46,6 +47,14 @@ instance ToDiagnostics TypeError where
     [ makeError loc "Not a function" $
         docToText $
           "The type" <+> pretty t <+> "is not a function type"
+    ]
+  toDiagnostics (NotEnoughExprsInAssigment names loc) =
+    [ makeError loc "Not Enough Expressions" $
+        docToText $ "Variables" <+> prettyList (toList names) <+> "do not have corresponing expressions in the assigment"
+    ]
+  toDiagnostics (TooManyExprsInAssigment exprs loc) =
+    [ makeError loc "Too Many Expressions" $
+        docToText $ "Expressions" <+> prettyList (toList exprs) <+> "do not have corresponing variables in the assigment"
     ]
 
 instance ToDiagnostics StructWarning where
@@ -91,8 +100,6 @@ makeDiagnostic severity loc title body =
 locToRange :: Loc -> LSP.Range
 locToRange NoLoc = LSP.Range (Position 0 0) (Position 0 0)
 locToRange (Loc start end) = LSP.Range (posToPosition start) (posToPosition (translate 1 end))
-
-
 
 rangeToRange :: Range -> LSP.Range
 rangeToRange (Range start end) = LSP.Range (posToPosition start) (posToPosition (translate 1 end))

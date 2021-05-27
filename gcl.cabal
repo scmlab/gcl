@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 731f06b949f5920eeaee6504a4519809b076d318e0c8a2bbb8bd89f1a8336451
+-- hash: cdc87b07ff54688cfb76de86873dc711d6a10ecaf30e4df9925d6a6d6e0c7a2a
 
 name:           gcl
 version:        0.1.0.0
@@ -31,6 +31,9 @@ library
       GCL.Exec.ExRand
       GCL.Expr
       GCL.Type
+      GCL.Predicate
+      GCL.Predicate.Located
+      GCL.Predicate.Util
       GCL.WP
       Pretty
       Pretty.Abstract
@@ -50,12 +53,13 @@ library
       Server
       Server.CustomMethod
       Server.Diagnostic
-      Server.DiffMap
-      Server.ExportPO
+      Server.DSL
       Server.Handler
-      Server.Monad
+      Server.Interpreter.RealWorld
+      Server.Interpreter.Test
       Syntax.Abstract
       Syntax.Abstract.Located
+      Syntax.Abstract.Operator
       Syntax.Abstract.Util
       Syntax.Common
       Syntax.Common.Located
@@ -68,12 +72,11 @@ library
       Syntax.Parser.Token
       Syntax.Parser.TokenStream
       Syntax.Parser.Util
-      Syntax.Predicate
   other-modules:
       Paths_gcl
   hs-source-dirs:
       src
-  ghc-options: -Wall -fno-warn-orphans
+  ghc-options: -Wall -Werror=incomplete-patterns -fno-warn-orphans
   build-depends:
       aeson
     , base >=4.7 && <5
@@ -103,7 +106,7 @@ executable gcl
       Paths_gcl
   hs-source-dirs:
       app
-  ghc-options: -Wall -threaded -rtsopts -with-rtsopts=-N -fno-warn-orphans
+  ghc-options: -Wall -threaded -rtsopts -with-rtsopts=-N -Werror=incomplete-patterns -fno-warn-orphans
   build-depends:
       aeson
     , base >=4.7 && <5
@@ -133,6 +136,8 @@ test-suite gcl-test
   main-is: Test.hs
   other-modules:
       Test.Parser
+      Test.Server
+      Test.SrcLoc
       Test.Type
       Test.Util
       Test.WP
@@ -146,6 +151,9 @@ test-suite gcl-test
       GCL.Exec.ExRand
       GCL.Expr
       GCL.Type
+      GCL.Predicate
+      GCL.Predicate.Located
+      GCL.Predicate.Util
       GCL.WP
       Pretty
       Pretty.Abstract
@@ -165,11 +173,12 @@ test-suite gcl-test
       Server
       Server.CustomMethod
       Server.Diagnostic
-      Server.DiffMap
-      Server.ExportPO
+      Server.DSL
       Server.Handler
-      Server.Monad
+      Server.Interpreter.RealWorld
+      Server.Interpreter.Test
       Syntax.Abstract
+      Syntax.Abstract.Operator
       Syntax.Abstract.Located
       Syntax.Abstract.Util
       Syntax.Common
@@ -183,11 +192,11 @@ test-suite gcl-test
       Syntax.Parser.Token
       Syntax.Parser.TokenStream
       Syntax.Parser.Util
-      Syntax.Predicate
       Paths_gcl
   hs-source-dirs:
       test
       src
+  ghc-options: -Wall -Werror=incomplete-patterns -fno-warn-orphans
   build-depends:
       aeson
     , base >=4.7 && <5

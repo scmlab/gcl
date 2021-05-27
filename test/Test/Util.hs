@@ -11,7 +11,6 @@ import Test.Tasty.Golden.Advanced (goldenTest)
 import Test.Tasty.Golden (createDirectoriesAndWriteFile)
 import Test.Tasty (TestTree)
 import Prelude hiding (readFile)
-import Error (Error)
 import Pretty ()
 import Syntax.Parser (Parser, runParse)
 import Syntax.Parser.Util (SyntacticError)
@@ -65,9 +64,6 @@ update suffix (filePath, fileName, input) = createDirectoriesAndWriteFile (fileP
 
 removeTrailingWhitespace :: Text -> Text
 removeTrailingWhitespace = Text.unlines . map Text.stripEnd . Text.lines
-
-toString :: Pretty a => a -> Text
-toString = renderStrict . layoutCompact . pretty
 
 parseTest :: Parser a -> Text -> Either [SyntacticError] a
 parseTest parser = runParse parser "<test>"

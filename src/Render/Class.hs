@@ -5,17 +5,18 @@ module Render.Class
   ( Render (..),
     RenderBlock(..), 
     tempHandleLoc,
-    renderLocatedAndPrettified
+    renderManySepByComma
   )
 where
 
 import Render.Element
-import qualified Pretty.Util as Doc
 import qualified Data.Text as Text
 import Data.Text (Text)
-import Data.Loc (Loc, Located (locOf))
-import Pretty
 import Data.Loc.Range (fromLoc)
+import Data.Loc (Loc)
+import Data.Text.Prettyprint.Doc (Doc)
+import qualified Data.Text.Prettyprint.Doc.Render.Text as Text
+import qualified Data.Text.Prettyprint.Doc as Doc
 
 --------------------------------------------------------------------------------
 
@@ -39,11 +40,11 @@ class RenderBlock a where
 
 tempHandleLoc :: Loc -> Inlines -> Inlines 
 tempHandleLoc loc t = case fromLoc loc of 
-  Nothing -> t 
+  Nothing -> t
   Just range -> linkE range t 
 
-renderLocatedAndPrettified :: (Located a, Pretty a) => a -> Inlines 
-renderLocatedAndPrettified x = tempHandleLoc (locOf x) (render $ pretty x) 
+-- renderLocatedAndPrettified :: (Located a, Pretty a) => a -> Inlines 
+-- renderLocatedAndPrettified x = tempHandleLoc (locOf x) (render $ pretty x) 
 
 --------------------------------------------------------------------------------
 
@@ -64,7 +65,12 @@ instance Render Bool where
   render = render . show
 
 instance Render (Doc ann) where
-  render = textE . Doc.renderStrict
+  render = textE . Text.renderStrict . Doc.layoutPretty Doc.defaultLayoutOptions
 
+-- seperated by commas
 -- instance Render a => Render [a] where
---   render xs = "[" <> Inlines $ pure $ Horz (punctuate "," (map render xs)) <> "]"
+--   render = punctuateE "," . map render
+      -- "[" <> Inlines $ pure $ Horz (punctuate "," (map render xs)) <> "]"
+
+renderManySepByComma :: Render a => [a] -> Inlines
+renderManySepByComma = punctuateE "," . map render

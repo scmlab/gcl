@@ -97,7 +97,7 @@ data Expr
   | Lam Name Expr Loc
   | Hole Loc
   | Quant QuantOp' [Name] Expr Expr Loc
-  | Subst Expr Subst -- internal. Location not necessary?
+  | Subst Expr Subst Expr
   deriving (Eq, Show, Generic)
 
 type QuantOp' = Either Op Expr

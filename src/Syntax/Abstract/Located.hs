@@ -35,6 +35,7 @@ instance Located Type where
 instance Located Expr where
   locOf (Paren e) = locOf e
   locOf (Var _ l) = l
+  locOf (Paren x) = locOf x
   locOf (Const _ l) = l
   locOf (Lit _ l) = l
   locOf (Op op) = locOf op
@@ -43,7 +44,7 @@ instance Located Expr where
   locOf (Lam _ _ l) = l
   locOf (Hole l) = l
   locOf (Quant _ _ _ _ l) = l
-  locOf (Subst _ _) = NoLoc
+  locOf (Subst _ _ x) = locOf x
 
 instance Located Lit where
   locOf _ = NoLoc

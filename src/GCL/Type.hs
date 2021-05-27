@@ -6,6 +6,8 @@ module GCL.Type where
 import Control.Monad.Except
 import Control.Monad.RWS hiding (Sum)
 import Data.Aeson (ToJSON)
+import Data.List.NonEmpty (NonEmpty)
+import qualified Data.List.NonEmpty as NE
 import Data.Loc
 import Data.Map (Map)
 import qualified Data.Map as Map
@@ -23,6 +25,9 @@ data TypeError
   | UnifyFailed Type Type Loc
   | RecursiveType Name Type Loc
   | NotFunction Type Loc
+  | -- TODO: move these to scope checking 
+    NotEnoughExprsInAssigment (NonEmpty Name) Loc
+  | TooManyExprsInAssigment (NonEmpty Expr) Loc
   deriving (Show, Eq, Generic)
 
 instance ToJSON TypeError
@@ -32,6 +37,8 @@ instance Located TypeError where
   locOf (UnifyFailed _ _ l) = l
   locOf (RecursiveType _ _ l) = l
   locOf (NotFunction _ l) = l
+  locOf (NotEnoughExprsInAssigment _ l) = l
+  locOf (TooManyExprsInAssigment _ l) = l
 
 ------------------------------------------
 -- type enviornment
@@ -57,7 +64,24 @@ typeWithLoc l (TVar n _) = TVar n l
 -- type inference
 ------------------------------------------
 
-type Infer = Solver TM Type
+type Infer = RWST (Env Type) [(Type, Type)] FreshState TM
+
+instance Fresh Infer where
+  fresh = do
+    i <- get 
+    (put . succ) i 
+    return i
+
+runSolver :: Env Type ->  Infer Type -> TM (Type, [(Type, Type)])
+runSolver env s = evalRWST s env initFreshState
+
+uni :: Type -> Type -> Infer ()
+uni x y = tell [(x, y)]
+
+inEnv :: [(Name, Type)] -> Infer Type -> Infer Type
+inEnv l m = do
+  let scope e = foldl (\e' (x, sc) -> Map.insert x sc e') e l
+  local scope m
 
 infer :: Expr -> Infer Type
 infer (Paren expr) = infer expr
@@ -111,13 +135,13 @@ infer (Quant qop iters rng t l) = do
     Right qop' -> do
       to <- infer qop'
       f tt to
-    where
-      f tt to = do
-        x <- freshVar l
-        uni to (TFunc x (TFunc x x (locOf qop)) (locOf qop))
-        uni tt x
-        return x
-infer (Subst expr sub) = do
+  where
+    f tt to = do
+      x <- freshVar l
+      uni to (TFunc x (TFunc x x (locOf qop)) (locOf qop))
+      uni tt x
+      return x
+infer (Subst expr sub _) = do
   t <- infer expr
   s <- mapM infer sub
   return $ apply s t
@@ -151,9 +175,11 @@ inferDecl env (LetDecl n args expr _) = do
 
 lookupInferEnv :: Name -> Infer Type
 lookupInferEnv n = do
-  lookupEnv n 
+  env <- ask
+  maybe
     (throwError $ NotInScope n (locOf n))
     (return . typeWithLoc (locOf n))
+    (Map.lookup n env)
 
 freshVar :: Loc -> Infer Type
 freshVar l = do
@@ -203,9 +229,19 @@ checkGdCmd env (GdCmd expr stmts _) = do
 checkStmt :: Env Type -> Stmt -> TM ()
 checkStmt _ (Skip _) = return ()
 checkStmt _ (Abort _) = return ()
-checkStmt env (Assign ns es _)            -- NOTE : Not sure if Assign work this way
-  | length ns > length es = throwError $ error "Missing Expression"
-  | length ns < length es = throwError $ error "Duplicated Assignment"
+checkStmt env (Assign ns es loc) -- NOTE : Not sure if Assign work this way
+  | length ns > length es = let extraVars = drop (length es) ns in 
+    throwError $
+      NotEnoughExprsInAssigment
+        (NE.fromList extraVars)
+        -- (locOf $ mergeRangesUnsafe (fromLocs $ map locOf extraVars))
+        loc
+  | length ns < length es = let extraExprs = drop (length ns) es in
+    throwError $
+      TooManyExprsInAssigment
+        (NE.fromList extraExprs)
+        -- (locOf $ mergeRangesUnsafe (fromLocs $ map locOf extraExprs))
+        loc
   | otherwise = forM_ (zip ns es) (checkAssign env)
 checkStmt env (Assert expr _) = do
   checkPredicate env expr
@@ -304,7 +340,6 @@ inferChainOpTypes op = do
     f l = do
       x <- freshVar l
       return (TFunc x (TFunc x (TBase TBool l) l) l)
-
 
 chainOpTypes :: ChainOp -> Type
 chainOpTypes (EQProp l) = TFunc (TBase TBool l) (TFunc (TBase TBool l) (TBase TBool l) l) l
