@@ -5,13 +5,12 @@
 
 module Syntax.Concrete where
 
--- import Syntax.Parser.Lexer (Tok (..))
-
-import Data.Loc (Loc (..), Pos)
+import Data.Loc (Loc (..), Located (locOf), Pos)
+import Data.Loc.Range
 import Data.Text (Text)
 import GHC.Base (Symbol)
 import GHC.Generics (Generic)
-import Syntax.Common ( Name, Op, ChainOp, ArithOp )
+import Syntax.Common (ArithOp, ChainOp, Name, Op)
 import Prelude hiding (Ordering (..))
 
 --------------------------------------------------------------------------------
@@ -20,9 +19,17 @@ import Prelude hiding (Ordering (..))
 data Token (a :: Symbol) = Token Pos Pos
   deriving (Eq, Show)
 
+instance Located (Token a) where
+  locOf (Token l r) = Loc l r
+
+instance Ranged (Token a) where
+  rangeOf (Token l r) = Range l r
+
 -- unicode token wraper
 type TokQuantStarts = Either (Token "<|") (Token "⟨")
+
 type TokQuantEnds = Either (Token "|>") (Token "⟩")
+
 type TokArrows = Either (Token "->") (Token "→")
 
 -- | A non-empty list of stuff seperated by some delimeter
@@ -69,6 +76,7 @@ data GdCmd = GdCmd Expr TokArrows [Stmt] deriving (Eq, Show)
 data Decl = Decl (SepBy "," Name) (Token ":") Type deriving (Eq, Show)
 
 data DeclProp = DeclProp (Token "{") Expr (Token "}") deriving (Eq, Show)
+
 type DeclProp' = Either DeclProp Expr
 
 data DeclBody = DeclBody Name [Name] (Token "=") Expr deriving (Eq, Show)
@@ -76,6 +84,7 @@ data DeclBody = DeclBody Name [Name] (Token "=") Expr deriving (Eq, Show)
 data BlockDecl = BlockDecl Decl (Maybe DeclProp') (Maybe DeclBody) deriving (Eq, Show)
 
 type Declaration' = Either Declaration BlockDeclaration
+
 --------------------------------------------------------------------------------
 
 -- | Endpoint
@@ -121,7 +130,7 @@ data Expr
   | Arr Expr (Token "[") Expr (Token "]")
   | App Expr Expr
   | Quant
-      TokQuantStarts 
+      TokQuantStarts
       QuantOp'
       [Name]
       (Token ":")

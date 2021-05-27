@@ -4,9 +4,6 @@ import Syntax.Concrete
 import Syntax.Common.Located ()
 import Data.Loc (Located (locOf), (<-->))
 
-instance Located (Token a) where
-  locOf (Token l r) = l <--> r
-
 --------------------------------------------------------------------------------
 
 instance Located a => Located (SepBy sep a) where
