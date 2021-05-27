@@ -20,6 +20,7 @@ import Syntax.Parser.Util
 import Text.Megaparsec (MonadParsec (notFollowedBy, tokens, try), Parsec, Stream (tokensToChunk), getOffset, getSourcePos, satisfy, setOffset, (<?>))
 import Text.Megaparsec.Char (alphaNumChar, char, lowerChar, space1, string, upperChar)
 import qualified Text.Megaparsec.Char.Lexer as Lex
+import Data.Bifunctor (second)
 
 type Lexer = Parsec Void Text
 
@@ -43,18 +44,14 @@ skipBlockComment :: Lexer ()
 skipBlockComment = Lex.skipBlockComment tokBlockCommentStart tokBlockCommentEnd
 
 -- wrapper of tokens
-lexeme :: Lexer a -> LexerF (a, Loc)
-lexeme p = (↑) (\sc' -> Lex.lexeme (try sc' <|> sc) . getLoc $ p)
 
-lexeme' :: Lexer a -> LexerF (a, Range)
-lexeme' p = (↑) (\sc' -> Lex.lexeme (try sc' <|> sc) . getRange $ p)
+lexeme :: Lexer a -> LexerF (a, Range)
+lexeme p = (↑) (\sc' -> Lex.lexeme (try sc' <|> sc) . getRange $ p)
 
 symbol :: Text -> LexerF (Token a)
 symbol t = do
-  (_, loc) <- lexeme . string $ t
-  case loc of
-    NoLoc -> error "NoLoc when parsing token"
-    Loc l r -> return $ Token l r
+  (_, Range l r) <- lexeme . string $ t
+  return $ Token l r
 
 ------------------------------------------
 -- lexical token
@@ -326,38 +323,20 @@ lexOps =
 -- literals
 ------------------------------------------
 
-lexUpper :: LexerF (Text, Loc)
+lexUpper :: LexerF (Text, Range)
 lexUpper = lexeme . try . withPredicate notUpperKeywords $ do
   x <- upperChar
   xs <- many . satisfy $ (\c -> isAlphaNum c || c == '_' || c == '\'')
   return $ tokensToChunk (Proxy :: Proxy Text) (x : xs)
 
-lexUpper' :: LexerF (Text, Range)
-lexUpper' = lexeme' . try . withPredicate notUpperKeywords $ do
-  x <- upperChar
-  xs <- many . satisfy $ (\c -> isAlphaNum c || c == '_' || c == '\'')
-  return $ tokensToChunk (Proxy :: Proxy Text) (x : xs)
-
-lexLower :: LexerF (Text, Loc)
+lexLower :: LexerF (Text, Range)
 lexLower = lexeme . try . withPredicate notLowerKeywords $ do
   x <- lowerChar
   xs <- many . satisfy $ (\c -> isAlphaNum c || c == '_' || c == '\'')
   return $ tokensToChunk (Proxy :: Proxy Text) (x : xs)
 
-lexLower' :: LexerF (Text, Range)
-lexLower' = lexeme' . try . withPredicate notLowerKeywords $ do
-  x <- lowerChar
-  xs <- many . satisfy $ (\c -> isAlphaNum c || c == '_' || c == '\'')
-  return $ tokensToChunk (Proxy :: Proxy Text) (x : xs)
-
-lexText :: LexerF (Text, Loc)
+lexText :: LexerF (Text, Range)
 lexText = lexeme . try . withPredicate (\t -> notUpperKeywords t && notLowerKeywords t) $ do
-  x <- satisfy isAlpha
-  xs <- many . satisfy $ (\c -> isAlphaNum c || c == '_' || c == '\'')
-  return $ tokensToChunk (Proxy :: Proxy Text) (x : xs)
-
-lexText' :: LexerF (Text, Range)
-lexText' = lexeme' . try . withPredicate (\t -> notUpperKeywords t && notLowerKeywords t) $ do
   x <- satisfy isAlpha
   xs <- many . satisfy $ (\c -> isAlphaNum c || c == '_' || c == '\'')
   return $ tokensToChunk (Proxy :: Proxy Text) (x : xs)
@@ -369,10 +348,10 @@ lexFalse :: LexerF Lit
 lexFalse = LitBool False . locOf <$> symbol tokFalse
 
 lexInt :: LexerF Lit
-lexInt = uncurry LitInt <$> lexeme Lex.decimal
+lexInt = uncurry LitInt . second locOf <$> lexeme Lex.decimal
 
 lexChar :: LexerF Lit
-lexChar = uncurry LitChar <$> lexeme (char '\'' *> Lex.charLiteral <* char '\'')
+lexChar = uncurry LitChar . second locOf <$> lexeme (char '\'' *> Lex.charLiteral <* char '\'')
 
 lexLits :: LexerF Lit
 lexLits = choice [lexTrue, lexFalse, lexInt, lexChar] <?> "literals"

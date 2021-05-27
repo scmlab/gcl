@@ -22,6 +22,7 @@ import Syntax.Parser.Util
 import Text.Megaparsec (MonadParsec (..), Pos, anySingle, mkPos, parse, tokensToChunk, unPos, (<?>))
 import Text.Megaparsec.Char (eol)
 import qualified Text.Megaparsec.Char.Lexer as Lex
+import Data.Bifunctor (second)
 
 -- The monad binding of ParserF will insert space consumer or indent guard inbetween, 
 -- which sould be convenient for handling linefold indentation. 
@@ -392,13 +393,13 @@ pUnary m = do
 ------------------------------------------
 
 pName :: ParserF Name
-pName = uncurry Name <$> lexText
+pName = uncurry Name . second locOf <$> lexText
 
 upperName :: ParserF Name
-upperName = uncurry Name <$> lexUpper
+upperName = uncurry Name . second locOf <$> lexUpper
 
 lowerName :: ParserF Name
-lowerName = uncurry Name <$> lexLower
+lowerName = uncurry Name . second locOf <$> lexLower
 
 pSepBy ::
   ParserF (Token sep) ->
