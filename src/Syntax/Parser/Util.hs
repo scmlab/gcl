@@ -11,7 +11,7 @@ import Control.Applicative (Alternative (..))
 import Control.Monad (MonadPlus)
 import Control.Monad.Trans (MonadTrans, lift)
 import Data.Coerce (coerce)
-import Data.Loc (Loc (..), posCol)
+import Data.Loc (posCol)
 import qualified Data.Loc as Loc
 import Data.Text (Text)
 import Syntax.Concrete (Token (Token))
@@ -85,23 +85,19 @@ posStateToPos :: Stream s => PosState s -> Loc.Pos
 posStateToPos PosState {pstateOffset, pstateSourcePos = SourcePos {..}} =
   Loc.Pos sourceName (unPos sourceLine) (unPos sourceColumn) pstateOffset
 
-posStateToLoc :: Stream s => PosState s -> Loc
-posStateToLoc PosState {pstateOffset, pstateSourcePos = SourcePos {..}} =
-  Loc.locOf $ Loc.Pos sourceName (unPos sourceLine) (unPos sourceColumn) pstateOffset
-
-getCurLoc :: (MonadParsec e s m) => m Loc
-getCurLoc = do
+getCurPos :: (MonadParsec e s m) => m Loc.Pos
+getCurPos = do
   st@State {stateOffset, statePosState} <- getParserState
   let pst = reachOffsetNoLine stateOffset statePosState
   setParserState st {statePosState = pst}
-  return . posStateToLoc $ pst
+  return . posStateToPos $ pst
 
-getEndLoc :: (MonadParsec e s m) => m Loc
-getEndLoc = do
+getEndPos :: (MonadParsec e s m) => m Loc.Pos
+getEndPos = do
   st@State {stateOffset, statePosState} <- getParserState
   let pst = reachOffsetNoLine stateOffset statePosState
   setParserState st {statePosState = pst}
-  return . posStateToLoc $ pst
+  return . posStateToPos $ pst
 
 fromParseErrorBundle :: ShowErrorComponent e => ParseErrorBundle Text e -> [SyntacticError]
 fromParseErrorBundle (ParseErrorBundle errs posState) =
