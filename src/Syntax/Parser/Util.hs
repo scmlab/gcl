@@ -76,10 +76,14 @@ instance MonadParsec e s m => MonadParsec e s (ParseFunc m) where
 -- combinator helpers
 ------------------------------------------
 
-type SyntacticError = (Loc, String)
+type SyntacticError = (Loc.Pos, String)
 
 getTokenColumn :: Syntax.Concrete.Token e -> Text.Megaparsec.Pos
 getTokenColumn (Token s _) = mkPos . posCol $ s
+
+posStateToPos :: Stream s => PosState s -> Loc.Pos
+posStateToPos PosState {pstateOffset, pstateSourcePos = SourcePos {..}} =
+  Loc.Pos sourceName (unPos sourceLine) (unPos sourceColumn) pstateOffset
 
 posStateToLoc :: Stream s => PosState s -> Loc
 posStateToLoc PosState {pstateOffset, pstateSourcePos = SourcePos {..}} =
@@ -110,4 +114,4 @@ fromParseErrorBundle (ParseErrorBundle errs posState) =
       (PosState Text, [SyntacticError])
     f err (i, acc) =
       let n = reachOffsetNoLine (errorOffset err) i
-       in (n, (posStateToLoc n, parseErrorTextPretty err) : acc)
+       in (n, (posStateToPos n, parseErrorTextPretty err) : acc)

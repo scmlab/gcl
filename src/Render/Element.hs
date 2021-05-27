@@ -59,7 +59,7 @@ instance IsString Block where
 --   show (Header header) = "# " <> header
 
 -- instance Pretty Block where
---   pretty = pretty . show
+--   pretty (Block header range inlines) = pretty header <+> "at" <> pretty
 
 instance ToJSON Block
 

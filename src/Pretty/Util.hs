@@ -107,6 +107,10 @@ fromRenderAndLocated x = case locOf x of
   NoLoc -> mempty
   Loc a b -> DocWithLoc (pretty (render x)) a b
 
+-- -- | If something can be rendered, then make it a Doc
+-- fromRenderBlock :: RenderBlock a => a -> Doc ann
+-- fromRenderBlock x = pretty (renderBlock x)
+
 -- generates newlines and spaces to fill the gap between to Pos
 fillGap :: Pos -> Pos -> Doc ann
 fillGap this next =

@@ -13,7 +13,7 @@ import Render.Syntax.Abstract ()
 import Data.Foldable (toList)
 
 instance RenderBlock Error where
-  renderBlock (SyntacticError (loc, msg)) = blockE (Just "Parse Error") (fromLoc loc) (render msg)
+  renderBlock (SyntacticError (pos, msg)) = blockE (Just "Parse Error") (Just $ Range pos pos) (render msg)
   renderBlock (TypeError e) = renderBlock e
   renderBlock (StructError e) = renderBlock e
   renderBlock (CannotReadFile path) = blockE (Just "Cannot Read File") Nothing $ "\"" <> render path <> "\" does not exist"

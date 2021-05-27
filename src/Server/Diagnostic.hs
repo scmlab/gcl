@@ -24,7 +24,7 @@ instance ToDiagnostics StructError where
   toDiagnostics (MissingPostcondition loc) = [makeError loc "Postcondition Missing" "The last statement of the program should be an assertion"]
 
 instance ToDiagnostics Error where
-  toDiagnostics (SyntacticError (loc, msg)) = [makeError loc "Syntax error" (Text.pack msg)]
+  toDiagnostics (SyntacticError (pos, msg)) = [makeError (Loc pos pos) "Syntax error" (Text.pack msg)]
   toDiagnostics (StructError err) = toDiagnostics err
   toDiagnostics (TypeError err) = toDiagnostics err
   toDiagnostics _ = []
