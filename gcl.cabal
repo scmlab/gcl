@@ -24,12 +24,16 @@ library
       Data.Loc.Range
       Data.Loc.Util
       Error
+      GCL.Common
       GCL.Exec
       GCL.Exec.ExecMonad
       GCL.Exec.ExNondet
       GCL.Exec.ExRand
       GCL.Expr
       GCL.Type
+      GCL.Predicate
+      GCL.Predicate.Located
+      GCL.Predicate.Util
       GCL.WP
       Pretty
       Pretty.Abstract
@@ -55,6 +59,7 @@ library
       Server.Interpreter.Test
       Syntax.Abstract
       Syntax.Abstract.Located
+      Syntax.Abstract.Operator
       Syntax.Abstract.Util
       Syntax.Common
       Syntax.Common.Located
@@ -67,7 +72,6 @@ library
       Syntax.Parser.Token
       Syntax.Parser.TokenStream
       Syntax.Parser.Util
-      Syntax.Predicate
   other-modules:
       Paths_gcl
   hs-source-dirs:
@@ -140,12 +144,16 @@ test-suite gcl-test
       Data.Loc.Range
       Data.Loc.Util
       Error
+      GCL.Common
       GCL.Exec
       GCL.Exec.ExecMonad
       GCL.Exec.ExNondet
       GCL.Exec.ExRand
       GCL.Expr
       GCL.Type
+      GCL.Predicate
+      GCL.Predicate.Located
+      GCL.Predicate.Util
       GCL.WP
       Pretty
       Pretty.Abstract
@@ -170,6 +178,7 @@ test-suite gcl-test
       Server.Interpreter.RealWorld
       Server.Interpreter.Test
       Syntax.Abstract
+      Syntax.Abstract.Operator
       Syntax.Abstract.Located
       Syntax.Abstract.Util
       Syntax.Common
@@ -183,7 +192,6 @@ test-suite gcl-test
       Syntax.Parser.Token
       Syntax.Parser.TokenStream
       Syntax.Parser.Util
-      Syntax.Predicate
       Paths_gcl
   hs-source-dirs:
       test

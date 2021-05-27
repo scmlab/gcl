@@ -11,7 +11,7 @@ import GCL.WP (StructError (..), StructWarning (..))
 import Language.LSP.Types hiding (TextDocumentSyncClientCapabilities (..), Range(..))
 import qualified Language.LSP.Types as LSP
 import Pretty
-import Syntax.Predicate (Origin (..), PO (..))
+import GCL.Predicate (Origin (..), PO (..))
 import Data.Loc.Util (translate)
 import Data.Loc.Range
 import Data.Foldable (toList)

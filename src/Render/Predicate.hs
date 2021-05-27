@@ -6,7 +6,7 @@ import GCL.WP
 import Render.Class
 import Render.Element
 import Render.Syntax.Abstract ()
-import Syntax.Predicate
+import GCL.Predicate
 import Data.Loc.Range (fromLoc)
 import Data.Loc (locOf)
 

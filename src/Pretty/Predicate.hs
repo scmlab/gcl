@@ -6,7 +6,7 @@ import Data.Loc (unLoc)
 import Data.Text.Prettyprint.Doc
 import Pretty.Abstract ()
 import Pretty.Util
-import Syntax.Predicate
+import GCL.Predicate
 import Prelude hiding (Ordering (..))
 
 --------------------------------------------------------------------------------

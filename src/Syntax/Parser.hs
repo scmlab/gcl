@@ -471,15 +471,15 @@ pIndentSepBy p delim = do
 pIndentBlock ::
   ParserF a ->                      -- parser to be indented
   ParserF [a]
-pIndentBlock p = lift $ do
+pIndentBlock p = do
   pos <- Lex.indentLevel
-  p0 <- p'
+  p0 <- lift p'
 
   isEol <- optional . try $ eol
   done <- isJust <$> optional eof
   case (isEol, done) of
     (Just _, False) -> do
-      ps <- indentedItems (posMoveLeft pos 1) pos scn p'
+      ps <- lift $ indentedItems (posMoveLeft pos 1) pos scn p'
       return (p0 : ps)
     _ -> return [p0]                          -- eof or no newline => only one indented element
   where

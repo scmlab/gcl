@@ -21,8 +21,8 @@
   Assigment
 
 , [4] 
-  f   n   =  0 ∧ N   -   n  = _bnd0 ∧ n   ≠   N
-  N   -   (n   +  1)  < _bnd0
+  f   n   =  0 ∧ N   -   n  = ?m_0 ∧ n   ≠   N
+  N   -   (n   +  1)  < ?m_0
   Assigment
  ], [ [0]
   f   n   =  0

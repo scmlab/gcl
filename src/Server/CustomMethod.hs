@@ -9,7 +9,7 @@ import Data.Loc (Loc)
 import Data.Text (Text)
 import GHC.Generics (Generic)
 import Render
-import Syntax.Predicate (Origin, PO, Spec)
+import GCL.Predicate (Origin, PO, Spec)
 import Data.Loc.Range
 
 --------------------------------------------------------------------------------

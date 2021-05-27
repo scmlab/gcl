@@ -21,7 +21,8 @@ import Language.LSP.Types ( Diagnostic )
 import qualified Syntax.Abstract as A
 import Syntax.Concrete.ToAbstract
 import Syntax.Parser (Parser, pProgram, pStmts, runParse)
-import Syntax.Predicate (PO, Spec, specPayload)
+import GCL.Predicate (PO, Spec)
+import GCL.Predicate.Util ( specPayload )
 import Prelude hiding (span)
 import Pretty (toText)
 

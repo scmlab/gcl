@@ -9,10 +9,16 @@ import Pretty ()
 import Server.DSL (parseProgram, sweep)
 import Server.Interpreter.Test 
 import Syntax.Abstract
-import Syntax.Common
-import Syntax.Predicate
-import Test.Tasty
-import Test.Tasty.HUnit
+    ( Expr(Const, Lit, Chain, Var, App, Op), Lit(Bol, Num) )
+import Syntax.Common ( ArithOp(Mul), ChainOp(EQ), Name(Name) )
+import GCL.Predicate
+    ( PO(..),
+      Origin(AtAssertion, AtSkip, AtAbort, AtAssignment),
+      Pred(Assertion, Constant),
+      Spec(Specification) )
+import GCL.Predicate.Util ( pos )
+import Test.Tasty ( testGroup, TestTree )
+import Test.Tasty.HUnit ( (@?=), testCase )
 import Prelude hiding (Ordering (..))
 
 tests :: TestTree

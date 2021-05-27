@@ -27,7 +27,7 @@ import Server.Diagnostic
   ( ToDiagnostics (toDiagnostics),
   )
 import Server.Interpreter.RealWorld
-import Syntax.Predicate (Spec (..))
+import GCL.Predicate (Spec (..))
 
 -- handlers of the LSP server
 handlers :: Handlers ServerM

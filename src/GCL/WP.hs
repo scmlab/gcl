@@ -1,303 +1,211 @@
 {-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE OverloadedStrings #-}
+module GCL.WP where
 
-module GCL.WP (sweep, StructError (..), StructWarning(..)) where
-
-import Control.Monad.Except hiding (guard)
-import Control.Monad.Reader hiding (guard)
-import Control.Monad.State hiding (guard)
-import Control.Monad.Writer hiding (guard)
-import Data.Aeson
-import Data.Loc
-  ( Loc (..),
-    Located (..),
-  )
-import qualified Data.Map as Map
--- import qualified Syntax.Predicate as P
-
-import GCL.Expr (Fresh (freshVar))
-import qualified GCL.Expr as E
-import GHC.Generics
-import Syntax.Common (Name(..))
-import Syntax.Abstract
-  ( Defns,
-    Expr,
-    Stmt,
-  )
+import Control.Monad.RWS (RWST, MonadState (..), MonadWriter (..), evalRWST)
+import Control.Monad.Except (Except, unless,MonadError (throwError), forM, forM_, when, runExcept)
+import GHC.Generics(Generic)
+import Data.Loc (Loc(..), Located (..))
+import Data.Loc.Range ( fromLoc, Range )
+import GCL.Common
+    ( Env, Fresh(freshText, fresh), Substitutable(apply) )
+import GCL.Predicate (PO (..), Pred (..), Origin (..), Spec (Specification))
+import GCL.Predicate.Util ( toExpr, guardIf, disjunct, conjunct, guardLoop )
 import qualified Syntax.Abstract as A
-import qualified Syntax.Abstract.Located as A
+import qualified Syntax.Abstract.Operator as A
 import qualified Syntax.Abstract.Util as A
-import Syntax.Predicate hiding (Stmt)
-import Data.Loc.Range
-
-type SM =
-  ReaderT
-    Defns
-    ( WriterT
-        [PO]
-        ( WriterT
-            [Spec]
-            ( WriterT
-                [StructWarning]
-                (StateT (Int, Int, Int) (Either StructError))
-            )
-        )
-    )
-
-type SMSubst = ReaderT Int SM
-
--- create a proof obligation
-tellObli :: PO -> SM ()
-tellObli obligation = tell [obligation]
-
-obligate :: Pred -> Pred -> Origin -> SM ()
-obligate p q l = unless (A.predEq (toExpr p) (toExpr q)) $ do
-  -- NOTE: this could use some love
-  (i, j, k) <- get
-  put (succ i, j, k)
-  tellObli $ PO i p q l
-
--- inform existence of a spec hole
-
-tellSpec :: Pred -> Pred -> Loc -> SM ()
-tellSpec p q loc = do
-  (i, j, k) <- get
-  put (i, succ j, k)
-  lift . lift $ tell [Specification j p q loc]
+import qualified Data.Map as Map
+import Syntax.Common (Name(Name))
+import Data.Aeson (ToJSON)
 
 
-throwWarning :: StructWarning -> SM ()
-throwWarning warning = do
-  lift . lift . lift $ tell [warning]
+type TM = Except StructError
 
---------------------------------------------------------------------------------
+type WP = RWST (Env A.Expr) ([PO], [Spec], [StructWarning]) (Int, Int, Int) TM
 
--- | Structure, and Weakest-Precondition
-struct :: Bool -> Pred -> Maybe Expr -> Stmt -> Pred -> SM ()
-struct _ pre _ (A.Abort l) _ = obligate pre (Constant A.false) (AtAbort l)
-struct _ pre _ (A.Skip l) post = obligate pre post (AtSkip l)
-struct True pre _ (A.Assert p l) post = do
-  obligate pre (Assertion p l) (AtAssertion l)
-  obligate (Assertion p l) post (AtAssertion l)
-struct False pre _ (A.Assert _ l) post = do
-  obligate pre post (AtAssertion l)
-struct _ _ _ (A.LoopInvariant _ _ l) _ = case fromLoc l of
-  Nothing -> return ()
-  Just range -> throwWarning $ ExcessBound range
-struct _ pre _ (A.Assign xs es l) post = do
-  let denv = assignmentEnv xs es -- E.extendSubstWithDefns (assignmentEnv xs es) ds
-  post' <- runReaderT (subst denv post :: SMSubst Pred) 0
-  obligate pre post' (AtAssignment l)
-struct True pre _ (A.If gcmds l) post = do
-  obligate pre (Disjunct $ map guardIf (A.getGuards gcmds)) (AtIf l)
-  forM_ gcmds $ \(A.GdCmd guard body _) ->
-    structStmts True (Conjunct [pre, guardIf guard]) Nothing body post
-struct False pre _ (A.If gcmds _) post = do
-  forM_ gcmds $ \(A.GdCmd guard body _) ->
-    structStmts False (Conjunct [pre, guardIf guard]) Nothing body post
-struct _ inv Nothing (A.Do gcmds l) post = do
-  do
-    -- warning user about missing "bnd"
-    case fromLoc l of
-      Nothing -> return ()
-      Just range -> throwWarning (MissingBound range)
-    -- base case
-    let guards = A.getGuards gcmds
-    obligate (Conjunct (inv : map (Negate . guardLoop) guards)) post (AtLoop l)
-    -- inductive cases
-    forM_ gcmds $ \(A.GdCmd guard body _) ->
-      structStmts True (Conjunct [inv, guardLoop guard]) Nothing body inv
-    -- termination
-    obligate
-      (Conjunct (inv : map guardLoop guards))
-      post
-      (AtTermination l)
--- Issue: #4
-{- Or if we want to tolerate the user and carry on ---
-do -- warn that bnd is missing
- let gcmds' = map (\(GdCmd x y _) -> (depart x, y)) gcmds
- let guards = map fst gcmds'
- obligate (inv `A.conj` (A.conjunct (map A.neg guards))) post
- --
- forM_ gcmds' $ \(guard, body) -> do
-   structStmts b (inv `A.conj` guard) Nothing body inv
--}
+instance Fresh WP where
+  fresh = do
+    (i, j, k) <- get
+    put (i, j, succ k)
+    return k
 
-struct True inv (Just bnd) (A.Do gcmds l) post = do
-  -- base case
-  let guards = A.getGuards gcmds
-  obligate (Conjunct (inv : map (Negate . guardLoop) guards)) post (AtLoop l)
-  -- inductive cases
-  forM_ gcmds $ \(A.GdCmd guard body _) ->
-    structStmts True (Conjunct [inv, guardLoop guard]) Nothing body inv
-  -- termination
-  obligate
-    (Conjunct [inv, disjunct (map guardLoop guards)])
-    (Bound (bnd `A.gte` A.Lit (A.Num 0) NoLoc) NoLoc)
-    (AtTermination l)
-  -- bound decrementation
-  oldbnd <- freshVar "bnd"
-  forM_ gcmds $ \(A.GdCmd guard body _) ->
-    structStmts
-      False
-      ( Conjunct
-          [ inv,
-            Bound (bnd `A.eqq` A.Var (Name oldbnd NoLoc) NoLoc) NoLoc,
-            guardLoop guard
-          ]
-      )
-      Nothing
-      body
-      (Bound (bnd `A.lt` A.Var (Name oldbnd NoLoc) NoLoc) NoLoc)
-struct False inv _ (A.Do gcmds l) post = do
-  let guards = A.getGuards gcmds
-  obligate (Conjunct (inv : map (Negate . guardLoop) guards)) post (AtLoop l)
-struct b pre _ (A.Spec _ l) post = when b (tellSpec pre post l)
--- banacorn: what to do about this?
-struct _ _ _ (A.Proof _) _ = return ()
+runWP :: WP a -> Env A.Expr -> Either StructError (a, ([PO], [Spec], [StructWarning]))
+runWP p defs = runExcept $ evalRWST p defs (0, 0, 0)
 
-structStmts :: Bool -> Pred -> Maybe Expr -> [Stmt] -> Pred -> SM ()
-structStmts _ pre _ [] post = do
-  -- the precondition may be a Constant and have no srcloc
-  -- in that case, use the srcloc of postcondition instead
-  case locOf pre of
-    NoLoc -> obligate pre post (AtAssertion (locOf post))
-    others -> obligate pre post (AtAssertion others)
-  return ()
-structStmts True pre _ (A.Assert p l : stmts) post = do
-  obligate pre (Assertion p l) (AtAssertion l)
-  structStmts True (Assertion p l) Nothing stmts post
-structStmts False pre _ (A.Assert _ _ : stmts) post = do
-  structStmts False pre Nothing stmts post
-structStmts True pre _ (A.LoopInvariant p bnd l : stmts) post = do
-  let origin = if startsWithDo stmts then AtLoop l else AtAssertion l
-  obligate pre (LoopInvariant p bnd l) origin
-  structStmts True (LoopInvariant p bnd l) (Just bnd) stmts post
-
--- SCM: think about this one later
-structStmts False pre _ (A.LoopInvariant {} : stmts) post = do
-  structStmts False pre Nothing stmts post
-structStmts b pre bnd (stmt : stmts) post = do
-  post' <- wpStmts b stmts post
-  struct b pre bnd stmt post'
-
-startsWithDo :: [Stmt] -> Bool
-startsWithDo (A.Do _ _ : _) = True
-startsWithDo _ = False
+sweep :: A.Program -> Either StructError ([PO], [Spec], [StructWarning])
+sweep (A.Program _ _ ds stmts _) = do
+  snd <$> runWP (structProgram stmts) ds 
 
 data ProgView
   = ProgViewEmpty
-  | ProgViewOkay Pred [Stmt] Pred
-  | ProgViewMissingPrecondition [Stmt] Pred
-  | ProgViewMissingPostcondition Pred [Stmt]
-  | ProgViewMissingBoth [Stmt]
+  | ProgViewOkay Pred [A.Stmt] Pred
+  | ProgViewMissingPrecondition [A.Stmt] Pred
+  | ProgViewMissingPostcondition Pred [A.Stmt]
+  | ProgViewMissingBoth [A.Stmt]
 
-progView :: [Stmt] -> ProgView
+progView :: [A.Stmt] -> ProgView
 progView [] = ProgViewEmpty
 progView [A.Assert pre l] = ProgViewMissingPrecondition [] (Assertion pre l)
 progView stmts = case (head stmts, last stmts) of
   (A.Assert pre l, A.Assert post m) -> ProgViewOkay (Assertion pre l) (init (tail stmts)) (Assertion post m)
   (A.Assert pre l, _) -> ProgViewMissingPostcondition (Assertion pre l) (tail stmts)
   (_, A.Assert post m) -> ProgViewMissingPrecondition (init stmts) (Assertion post m)
-  (_, _) -> ProgViewMissingBoth stmts
+  _ -> ProgViewMissingBoth stmts
 
-structProg :: [Stmt] -> SM ()
-structProg statements = case progView statements of
+structProgram :: [A.Stmt] -> WP ()
+structProgram stmts = case progView stmts of
   ProgViewEmpty -> return ()
-  ProgViewOkay pre stmts post -> structStmts True pre Nothing stmts post
-  -- Missing precondition, insert { True } instead
-  ProgViewMissingPrecondition stmts post -> structStmts True (Constant A.true) Nothing stmts post
-  ProgViewMissingPostcondition _pre stmts -> throwError (MissingPostcondition (locOf (last stmts)))
-  ProgViewMissingBoth stmts -> throwError (MissingPostcondition (locOf (last stmts)))
+  ProgViewOkay pre stmts' post -> structStmts True pre Nothing stmts' post
+  ProgViewMissingPrecondition stmts' post -> structStmts True (Constant A.true) Nothing stmts' post
+  ProgViewMissingPostcondition _ stmts' -> throwError . MissingPostcondition . locOf . last $ stmts'
+  ProgViewMissingBoth stmts' -> throwError . MissingPostcondition . locOf . last $ stmts'
 
-wpStmts :: Bool -> [Stmt] -> Pred -> SM Pred
+structStmts :: Bool -> Pred -> Maybe A.Expr -> [A.Stmt] -> Pred -> WP ()
+structStmts _ pre _ [] post = do
+  case locOf pre of
+    NoLoc -> tellPO pre post (AtAssertion (locOf post))
+    others -> tellPO pre post (AtAssertion others)
+  return ()
+structStmts b pre _ (A.Assert p l : stmts) post = do
+  pre' <- if b
+          then do
+            tellPO pre (Assertion p l) (AtAssertion l)
+            return (Assertion p l)
+          else return pre
+  structStmts b pre' Nothing stmts post
+structStmts True pre _ (A.LoopInvariant p bnd l : stmts) post = do
+  let origin = if startsWithDo stmts then AtLoop l else AtAssertion l
+  tellPO pre (LoopInvariant p bnd l) origin
+  structStmts True (LoopInvariant p bnd l) (Just bnd) stmts post
+  where
+    startsWithDo :: [A.Stmt] -> Bool
+    startsWithDo (A.Do _ _ : _) = True
+    startsWithDo _ = False
+structStmts False pre _ (A.LoopInvariant {} : stmts) post = do
+  structStmts False pre Nothing stmts post
+structStmts b pre bnd (stmt : stmts) post = do
+  post' <- wpStmts b stmts post
+  struct b pre bnd stmt post'
+
+struct :: Bool -> Pred -> Maybe A.Expr -> A.Stmt -> Pred -> WP ()
+struct _ pre _ (A.Abort l) _ = tellPO pre (Constant A.false) (AtAbort l)
+struct _ pre _ (A.Skip l) post = tellPO pre post (AtSkip l)
+struct _ pre _ (A.Assign xs es l) post = do
+  let subst = Map.fromList (zip xs es)
+  let post' = apply subst post
+  tellPO pre post' (AtAssignment l)
+struct True pre _ (A.Assert p l) post = do
+  tellPO pre (Assertion p l) (AtAssertion l)
+  tellPO (Assertion p l) post (AtAssertion l)
+struct False pre _ (A.Assert _ l) post = do
+  tellPO pre post (AtAssertion l)
+struct _ pre _ (A.LoopInvariant p b l) post = do
+  tellPO pre (LoopInvariant p b l) (AtAssertion l)
+  tellPO (LoopInvariant p b l) post (AtAssertion l)
+struct b pre _ (A.If gcmds l) post = do
+  when b $ tellPO pre (disjunctGuards gcmds) (AtIf l)
+  forM_ gcmds $ \(A.GdCmd guard body _) ->
+    structStmts b (Conjunct [pre, guardIf guard]) Nothing body post
+struct True inv (Just bnd) (A.Do gcmds l) post = do
+  let guards = A.getGuards gcmds
+  tellPO (Conjunct (inv : map (Negate . guardLoop) guards)) post (AtLoop l)
+  forM_ gcmds (structGdcmdInduct inv)
+  tellPO
+    (Conjunct (inv : map guardLoop guards))
+    (Bound (bnd `A.gte` A.Lit (A.Num 0) NoLoc) NoLoc)
+    (AtTermination l)
+  forM_ gcmds (structGdcmdBnd inv bnd)
+struct False inv _ (A.Do gcmds l) post = do
+  let guards = A.getGuards gcmds
+  tellPO (Conjunct (inv : map (Negate . guardLoop) guards)) post (AtLoop l)
+struct _ inv Nothing (A.Do gcmds l) post = do
+  case fromLoc l of
+    Nothing -> return ()
+    Just rng -> throwWarning (MissingBound rng)
+  let guards = A.getGuards gcmds
+  tellPO (Conjunct (inv : map (Negate . guardLoop) guards)) post (AtLoop l)
+  forM_ gcmds (structGdcmdInduct inv)
+  tellPO (Conjunct (inv : map guardLoop guards)) post (AtTermination l)
+struct b pre _ (A.Spec _ l) post = when b (tellSpec pre post l)
+struct _ _ _ (A.Proof _) _ = return ()
+
+structGdcmdInduct :: Pred -> A.GdCmd -> WP ()
+structGdcmdInduct inv (A.GdCmd guard body _) =
+  structStmts True (Conjunct [inv, guardLoop guard]) Nothing body inv
+
+structGdcmdBnd :: Pred -> A.Expr -> A.GdCmd -> WP ()
+structGdcmdBnd inv bnd (A.GdCmd guard body _) = do
+  oldbnd <- freshText
+  structStmts
+    False
+    ( Conjunct
+        [ inv,
+          Bound (bnd `A.eqq` A.Var (Name oldbnd NoLoc) NoLoc) NoLoc,
+          guardLoop guard
+        ])
+    Nothing
+    body
+    (Bound (bnd `A.lt` A.Var (Name oldbnd NoLoc) NoLoc) NoLoc)
+
+wpStmts :: Bool -> [A.Stmt] -> Pred -> WP Pred
 wpStmts _ [] post = return post
-wpStmts True (A.Assert pre l : stmts) post =
+wpStmts True (A.Assert pre l : stmts) post = do
   structStmts True (Assertion pre l) Nothing stmts post
-    >> return (Assertion pre l)
-wpStmts False (A.Assert _ _ : stmts) post =
+  return  (Assertion pre l)
+wpStmts False (A.Assert {} : stmts) post =
   wpStmts False stmts post
-wpStmts True (A.LoopInvariant pre bnd l : stmts) post =
-  structStmts True (LoopInvariant pre bnd l) (Just bnd) stmts post
-    >> return (LoopInvariant pre bnd l)
-wpStmts False (A.LoopInvariant {} : stmts) post =
+wpStmts True (A.LoopInvariant p b l : stmts) post = do
+  structStmts True (LoopInvariant p b l) (Just b) stmts post
+  return (LoopInvariant p b l)
+wpStmts False (A.LoopInvariant {} : stmts) post = do
   wpStmts False stmts post
-wpStmts b (stmt : stmts) post = do
+wpStmts b (stmt:stmts) post = do
   post' <- wpStmts b stmts post
   wp b stmt post'
 
-wp :: Bool -> Stmt -> Pred -> SM Pred
-wp _ (A.Abort _) _ = return (Constant A.false)
+wp ::Bool -> A.Stmt -> Pred -> WP Pred
 wp _ (A.Skip _) post = return post
+wp _ (A.Abort _) _ = return (Constant A.false)
+wp _ (A.Assign xs es _) post = do
+  return $ apply subst post
+  where
+    subst = Map.fromList (zip xs es)
 wp _ (A.Assert p l) post = do
-  obligate (Assertion p l) post (AtAssertion l)
+  tellPO (Assertion p l) post (AtAssertion l)
   return (Assertion p l)
 wp _ (A.LoopInvariant p b l) post = do
-  obligate (LoopInvariant p b l) post (AtAssertion l)
+  tellPO (LoopInvariant p b l) post (AtAssertion l)
   return (LoopInvariant p b l)
-wp _ (A.Assign xs es _) post = do
-  let denv = assignmentEnv xs es -- E.extendSubstWithDefns (assignmentEnv xs es) ds
-  runReaderT (subst denv post :: SMSubst Pred) 0
+wp _ (A.Do _ l) _ = throwError $ MissingAssertion l
 wp b (A.If gcmds _) post = do
-  -- forM_ gcmds $ \(A.GdCmd guard body _) ->
-  --   structStmts b (guardIf guard) Nothing body post
-  -- return (Disjunct (map guardIf (A.getGuards gcmds))) -- is this enough?
-  let disGuards = disjunct (map guardIf (A.getGuards gcmds))
   pres <- forM gcmds $ \(A.GdCmd guard body _) ->
-    Constant . (guard `A.imply`) . toExpr
-      <$> wpStmts b body post
-  return (conjunct (disGuards : pres))
-wp _ (A.Do _ l) _ = throwError (MissingAssertion l)
+    Constant . (guard `A.imply`)
+    . toExpr <$> wpStmts b body post
+  return (conjunct (disjunctGuards gcmds : pres))
 wp b (A.Spec _ l) post = do
   when b (tellSpec post post l)
-  return post -- not quite right
-wp _ (A.Proof _) post = do
-  return post -- banacorn: not sure if this is right
+  return post
+wp _ (A.Proof _) post = return post
 
-assignmentEnv :: [Name] -> [Expr] -> A.Subst
-assignmentEnv xs es = Map.fromList (zip xs es)
+disjunctGuards :: [A.GdCmd] -> Pred
+disjunctGuards = disjunct. map guardIf . A.getGuards
 
---------------------------------------------------------------------------------
+tellPO :: Pred -> Pred -> Origin -> WP ()
+tellPO p q l = unless (toExpr p == toExpr q) $ do
+  (i, j, k) <- get
+  put (succ i, j, k)
+  tell ([PO i p q l], [], [])
 
--- | The monad, and other supportive operations
-instance Fresh SM where
-  fresh = do
-    (i, j, k) <- get
-    put (i, j, succ k)
-    return k
+tellSpec :: Pred -> Pred -> Loc -> WP ()
+tellSpec p q l = do
+  (i, j, k) <- get
+  put (i, succ j, k)
+  tell ([], [Specification j p q l], [])
 
-instance E.DefsM SM where
-  askDefns = ask
+throwWarning :: StructWarning -> WP ()
+throwWarning warning = do
+  tell ([], [], [warning])
 
-instance Fresh SMSubst where
-  fresh = do
-    (i, j, k) <- get
-    put (i, j, succ k)
-    return k
-
-instance E.DefsM SMSubst where
-  askDefns = lift ask
-
-instance E.ExpandM SMSubst where
-  ifExpand me mb = do
-    i <- ask
-    if i == 0
-      then mb
-      else local (\n -> n - 1) me
-  doExLevel n = local (const n)
-
-runSM ::
-  SM a ->
-  Defns ->
-  Either StructError (((a, [PO]), [Spec]), [StructWarning])
-runSM p defs = evalStateT (runWriterT . runWriterT . runWriterT $ runReaderT p defs) (0, 0, 0)
-
-sweep :: A.Program -> Either StructError ([PO], [Spec], [StructWarning])
-sweep (A.Program _ _ ds statements _) = do
-  (((_, pos'), specs), warnings) <- runSM (structProg statements) ds
-  return (pos', specs, warnings)
 
 data StructWarning
   = MissingBound Range
@@ -305,8 +213,8 @@ data StructWarning
   deriving (Eq, Show, Generic)
 
 instance Located StructWarning where
-  locOf (MissingBound range) = locOf range
-  locOf (ExcessBound range) = locOf range
+  locOf (MissingBound rng) = locOf rng
+  locOf (ExcessBound rng) = locOf rng
 
 data StructError
   = MissingAssertion Loc
@@ -314,7 +222,7 @@ data StructError
   deriving (Eq, Show, Generic)
 
 instance Located StructError where
-  locOf (MissingAssertion loc) = loc
-  locOf (MissingPostcondition loc) = loc
+  locOf (MissingAssertion l) = l
+  locOf (MissingPostcondition l) = l
 
 instance ToJSON StructError
