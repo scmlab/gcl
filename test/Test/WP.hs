@@ -16,13 +16,15 @@ import GCL.Predicate
       Origin(AtAssertion, AtSkip, AtAbort, AtAssignment),
       Pred(Assertion, Constant),
       Spec(Specification) )
-import GCL.Predicate.Util ( pos )
 import Test.Tasty ( testGroup, TestTree )
 import Test.Tasty.HUnit ( (@?=), testCase )
 import Prelude hiding (Ordering (..))
 
 tests :: TestTree
 tests = testGroup "WP" [emptyProg, statements, issues]
+
+pos :: Int -> Int -> Int -> Pos
+pos = Pos "<test>"
 
 run :: Text -> TestResult ([PO], [Spec], [Expr], [StructWarning])
 run text = runTest "<test>" text $ do 

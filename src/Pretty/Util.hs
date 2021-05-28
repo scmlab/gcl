@@ -56,6 +56,9 @@ instance Pretty Range where
 instance Pretty Loc where
   pretty = pretty . displayLoc
 
+instance Pretty Pos where
+  pretty = pretty . displayPos
+
 
 --------------------------------------------------------------------------------
 

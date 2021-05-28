@@ -4,7 +4,6 @@ module Test.Server (tests) where
 
 import Data.ByteString.Lazy (ByteString)
 import qualified Data.ByteString.Lazy as BSL
-import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
 import Server.DSL
 import Server.Interpreter.Test
