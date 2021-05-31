@@ -69,9 +69,9 @@ instance Render Expr where
 
 handleExpr :: Int -> Expr -> Variadic Expr Inlines
 handleExpr _ (Paren x) = return $ render x
-handleExpr _ (Var x _) = return $ render x
-handleExpr _ (Const x _) = return $ render x
-handleExpr _ (Lit x _) = return $ render x
+handleExpr _ (Var x l) = return $ tempHandleLoc l $ render x
+handleExpr _ (Const x l) = return $ tempHandleLoc l $ render x
+handleExpr _ (Lit x l) = return $ tempHandleLoc l $ render x
 handleExpr n (Op x) = handleOp n x
 handleExpr _ (Chain a op b _) =
   return $
