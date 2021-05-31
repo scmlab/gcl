@@ -1,41 +1,55 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Server.Interpreter.Test (CmdKind (..), TestResult (..), runTest) where
+module Server.Interpreter.Test (Trace (..), TestResult (..), runTest, serializeTestResult) where
 
 import Control.Monad.State
 import Control.Monad.Trans.Free
 import Control.Monad.Trans.Writer
+import qualified Data.ByteString.Lazy as BSL
 import Data.Loc
 import Data.Loc.Range
 import Data.Text (Text)
 import qualified Data.Text as Text
+import qualified Data.Text.Encoding as Text
 import Error (Error)
 import Language.LSP.Types (Diagnostic)
 import Pretty
 import Server.DSL
 import Server.Diagnostic (toDiagnostics)
 
-data CmdKind
-  = CmdEditText Range Text
-  | CmdGetSource
-  | CmdPutLastSelection Range
-  | CmdGetLastSelection
-  | CmdBumpResponseVersion
-  | CmdLog Text
-  | CmdSendDiagnostics [Diagnostic]
-  deriving (Eq, Show)
+--------------------------------------------------------------------------------
 
-type TestM = StateT Text (Writer [CmdKind])
-
-newtype TestResult a = TestResult ((Either [Error] a, Text), [CmdKind])
+data TestResult a = TestResult
+  { testResultValue :: Either [Error] a,
+    testResultSource :: Text,
+    testResultTrace :: [Trace]
+  }
   deriving (Eq, Show)
 
 instance Pretty a => Pretty (TestResult a) where
-  pretty (TestResult ((value, source), trace)) =
+  pretty (TestResult value source trace) =
     "### Result\n\n" <> pretty value <> "\n\n### Source\n\n" <> pretty source <> "\n\n### Trace\n\n" <> pretty (unlines (map show trace))
 
+-- | Serialize TestResult for Golden tests
+serializeTestResult :: Pretty a => TestResult a -> BSL.ByteString
+serializeTestResult = BSL.fromStrict . Text.encodeUtf8 . toText 
+
+--------------------------------------------------------------------------------
+
+data Trace
+  = TraceEditText Range Text
+  | TraceGetSource
+  | TracePutLastSelection Range
+  | TraceGetLastSelection
+  | TraceBumpResponseVersion
+  | TraceLog Text
+  | TraceSendDiagnostics [Diagnostic]
+  deriving (Eq, Show)
+
+type TestM = StateT Text (Writer [Trace])
+
 runTest :: FilePath -> Text -> CmdM (Either [Error] a) -> TestResult a
-runTest filepath source program = TestResult $ runWriter (runStateT (interpret filepath program) source)
+runTest filepath source program = uncurry (uncurry TestResult) $ runWriter (runStateT (interpret filepath program) source)
 
 interpret :: FilePath -> CmdM (Either [Error] a) -> TestM (Either [Error] a)
 interpret filepath p = case runCmdM p of
@@ -47,21 +61,21 @@ interpret filepath p = case runCmdM p of
     let (_, after) = Text.splitAt (posCoff end - posCoff start) rest
     let newSource = before <> text <> after
     put newSource
-    lift $ tell [CmdEditText range text]
+    lift $ tell [TraceEditText range text]
     interpret filepath (next newSource)
   Right (Free (Mute _ next)) -> do
     interpret filepath next
   Right (Free (GetFilePath next)) -> do
     interpret filepath (next filepath)
   Right (Free (GetSource next)) -> do
-    lift $ tell [CmdGetSource]
+    lift $ tell [TraceGetSource]
     source <- get
     interpret filepath (next source)
   Right (Free (GetLastSelection next)) -> do
-    lift $ tell [CmdGetLastSelection]
+    lift $ tell [TraceGetLastSelection]
     interpret filepath (next Nothing)
   Right (Free (PutLastSelection selection next)) -> do
-    lift $ tell [CmdPutLastSelection selection]
+    lift $ tell [TracePutLastSelection selection]
     interpret filepath next
   Right (Free (ReadCachedResult next)) -> do
     lift $ tell []
@@ -70,16 +84,16 @@ interpret filepath p = case runCmdM p of
     lift $ tell []
     interpret filepath next
   Right (Free (BumpResponseVersion next)) -> do
-    lift $ tell [CmdBumpResponseVersion]
+    lift $ tell [TraceBumpResponseVersion]
     interpret filepath (next 0)
   Right (Free (Log text next)) -> do
-    lift $ tell [CmdLog text]
+    lift $ tell [TraceLog text]
     interpret filepath next
   Right (Free (SendDiagnostics diagnostics next)) -> do
-    lift $ tell [CmdSendDiagnostics diagnostics]
+    lift $ tell [TraceSendDiagnostics diagnostics]
     interpret filepath next
   Left errors -> do
     -- let responses = [ResDisplay 0 (headerE "Errors" : map renderBlock errors)]
     let diagnostics = errors >>= toDiagnostics
-    lift $ tell [CmdSendDiagnostics diagnostics]
+    lift $ tell [TraceSendDiagnostics diagnostics]
     return $ Left errors

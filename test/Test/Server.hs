@@ -9,7 +9,6 @@ import Server.DSL
 import Server.Interpreter.Test
 import Test.Tasty
 import qualified Test.Tasty.Golden as Golden
-import Pretty (toText)
 
 tests :: TestTree
 tests = testGroup "Server" [instantiateSpec]
@@ -30,12 +29,9 @@ instantiateSpec =
     run :: String -> FilePath -> TestTree
     run = runGoldenTest "Server/assets/" $ \sourcePath -> do
       source <- Text.decodeUtf8 . BSL.toStrict <$> BSL.readFile sourcePath
-
-      let testResult = runTest sourcePath source $ do
+      return $ serializeTestResult $ runTest sourcePath source $ do
             program <- parseProgram source
             Right <$> sweep program
-
-      return $ BSL.fromStrict . Text.encodeUtf8 $ toText testResult
 
 runGoldenTest :: FilePath -> (FilePath -> IO ByteString) -> String -> FilePath -> TestTree
 runGoldenTest dir test name path = do

@@ -32,10 +32,10 @@ run text = runTest "<test>" text $ do
   Right <$> sweep program
 
 fromPOs :: Text -> [PO] -> TestResult ([PO], [Spec], [Expr], [StructWarning])
-fromPOs source xs = TestResult ((Right (xs, [], [], []), source), [])
+fromPOs source xs = TestResult (Right (xs, [], [], [])) source []
 
 fromSpecs :: Text -> [Spec] -> TestResult ([PO], [Spec], [Expr], [StructWarning])
-fromSpecs source specs = TestResult ((Right ([], specs, [], []), source), [])
+fromSpecs source specs = TestResult (Right ([], specs, [], [])) source []
 
 --------------------------------------------------------------------------------
 
