@@ -1,10 +1,10 @@
 ### Result
 
-([ [0] 
-  True
-  False
-  Abort
- ], [  ], [  ], [  ])
+[ < Abort >
+True
+=>
+False
+at ./test/Test/WP/assets/abort.gcl [9-14] 2:1-6 ]
 
 ### Source
 

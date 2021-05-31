@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -10,6 +11,7 @@ import qualified Data.List.NonEmpty as NE
 import Data.Loc hiding (fromLoc)
 import GHC.Generics (Generic)
 import Data.Maybe (mapMaybe)
+import Data.Text.Prettyprint.Doc (Pretty (pretty))
 
 -- | Represents an interval of two source locations
 --
@@ -184,3 +186,43 @@ withinRange (Range left right) x =
   compareWithPosition left x == EQ
     || compareWithPosition right x == EQ
     || (compareWithPosition left x == LT && compareWithPosition right x == GT)
+
+
+
+--------------------------------------------------------------------------------
+
+instance Pretty Range where
+  pretty (Range start end) =
+    if posLine start == posLine end
+      then
+        pretty (posFile start)
+          <> " ["
+          <> pretty (posCoff start)
+          <> "-"
+          <> pretty (posCoff end)
+          <> "] "
+          <> pretty (posLine start)
+          <> ":"
+          <> pretty (posCol start)
+          <> "-"
+          <> pretty (posCol end)
+      else
+        pretty (posFile start)
+          <> " ["
+          <> pretty (posCoff start)
+          <> "-"
+          <> pretty (posCoff end)
+          <> "] "
+          <> pretty (posLine start)
+          <> ":"
+          <> pretty (posCol start)
+          <> "-"
+          <> pretty(posLine end)
+          <> ":"
+          <> pretty (posCol end)
+
+instance Pretty Loc where
+  pretty = pretty . displayLoc
+
+instance Pretty Pos where
+  pretty = pretty . displayPos

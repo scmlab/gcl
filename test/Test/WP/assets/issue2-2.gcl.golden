@@ -1,0 +1,17 @@
+### Result
+
+[ < Assertion >
+True
+=>
+z   =   A   *   B
+at ./test/Test/WP/assets/issue2-2.gcl [33-41] 3:1-9 ]
+
+### Source
+
+con A, B : Int
+var x, y, z : Int
+{ True }
+{ z = A * B }
+
+### Trace
+

@@ -1,13 +1,13 @@
 ### Result
 
-([ [0] 
-  True
-  True
-  Conditional
- ], [ [0]
-  True ∧ True
-  True
- ], [  ], [  ])
+([ < Conditional >
+True
+=>
+True
+at ./test/Test/Server/assets/spec-qm-3.gcl [0-33] 1:1-5:3 ], [ True ∧ True
+=>
+True
+at ./test/Test/Server/assets/spec-qm-3.gcl [16-30] 2:5-4:7 ], [  ], [  ])
 
 ### Source
 

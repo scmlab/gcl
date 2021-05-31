@@ -68,25 +68,7 @@ instance Pretty Origin where
 
 -- | Obligation & Specification
 instance Pretty PO where
-  pretty (PO i p q os) =
-    lbracket
-      <> pretty i
-      <> rbracket
-      <+> line
-      <> indent 2 (pretty p)
-      <> line
-      <> indent 2 (pretty q)
-      <> line
-      <> indent 2 (pretty os)
-      <> line
+  pretty = fromRenderBlock
 
 instance Pretty Spec where
-  pretty (Specification i p q _) =
-    lbracket
-      <> pretty i
-      <> rbracket
-      <> line
-      <> indent 2 (pretty p)
-      <> line
-      <> indent 2 (pretty q)
-      <> line
+  pretty = fromRenderBlock

@@ -1,0 +1,3 @@
+con A, B : Int
+var x, y, z : Int
+{ z = A * B }
