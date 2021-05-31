@@ -45,5 +45,5 @@ od
 
 ### Trace
 
-CmdLog " ### DigHole ./test/Test/Server/assets/spec-qm-5.gcl [113-114] 7:13-14"
-CmdEditText ./test/Test/Server/assets/spec-qm-5.gcl [113-114] 7:13-14 "[!\n            \n            !]"
+TraceLog " ### DigHole ./test/Test/Server/assets/spec-qm-5.gcl [113-114] 7:13-14"
+TraceEditText ./test/Test/Server/assets/spec-qm-5.gcl [113-114] 7:13-14 "[!\n            \n            !]"

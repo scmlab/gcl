@@ -1,0 +1,16 @@
+### Result
+
+([ [0] 
+  True
+  False
+  Abort
+ ], [  ], [  ], [  ])
+
+### Source
+
+{ True }
+abort
+{ True }
+
+### Trace
+

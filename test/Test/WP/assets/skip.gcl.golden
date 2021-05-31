@@ -1,0 +1,16 @@
+### Result
+
+([ [0] 
+  True
+  0  =  0
+  Skip
+ ], [  ], [  ], [  ])
+
+### Source
+
+{ True }
+skip
+{ 0 = 0 }
+
+### Trace
+

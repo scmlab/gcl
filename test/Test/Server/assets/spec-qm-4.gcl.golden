@@ -28,7 +28,7 @@ fi
 
 ### Trace
 
-CmdLog " ### DigHole ./test/Test/Server/assets/spec-qm-4.gcl [16-17] 2:5-6"
-CmdEditText ./test/Test/Server/assets/spec-qm-4.gcl [16-17] 2:5-6 "[!\n    \n    !]"
-CmdLog " ### DigHole ./test/Test/Server/assets/spec-qm-4.gcl [35-36] 5:5-6"
-CmdEditText ./test/Test/Server/assets/spec-qm-4.gcl [35-36] 5:5-6 "[!\n    \n    !]"
+TraceLog " ### DigHole ./test/Test/Server/assets/spec-qm-4.gcl [16-17] 2:5-6"
+TraceEditText ./test/Test/Server/assets/spec-qm-4.gcl [16-17] 2:5-6 "[!\n    \n    !]"
+TraceLog " ### DigHole ./test/Test/Server/assets/spec-qm-4.gcl [35-36] 5:5-6"
+TraceEditText ./test/Test/Server/assets/spec-qm-4.gcl [35-36] 5:5-6 "[!\n    \n    !]"

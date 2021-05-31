@@ -4,30 +4,35 @@ module Test.WP where
 
 import Data.Loc
 import Data.Text (Text)
+import GCL.Predicate
 import GCL.WP (StructWarning)
 import Pretty ()
 import Server.DSL (parseProgram, sweep)
-import Server.Interpreter.Test 
+import Server.Interpreter.Test
 import Syntax.Abstract
-    ( Expr(Const, Lit, Chain, Var, App, Op), Lit(Bol, Num) )
-import Syntax.Common ( ArithOp(Mul), ChainOp(EQ), Name(Name) )
-import GCL.Predicate
-    ( PO(..),
-      Origin(AtAssertion, AtSkip, AtAbort, AtAssignment),
-      Pred(Assertion, Constant),
-      Spec(Specification) )
-import Test.Tasty ( testGroup, TestTree )
-import Test.Tasty.HUnit ( (@?=), testCase )
+  ( Expr (App, Chain, Const, Lit, Op, Var),
+    Lit (Bol, Num),
+  )
+import Syntax.Common (ArithOp (Mul), ChainOp (EQ), Name (Name))
+import Test.Server (runGoldenTest)
+import Test.Tasty (TestTree, testGroup)
+import Test.Tasty.HUnit (testCase, (@?=))
 import Prelude hiding (Ordering (..))
 
 tests :: TestTree
-tests = testGroup "WP" [emptyProg, statements, issues]
+tests =
+  testGroup
+    "WP"
+    [ emptyProg,
+      statements,
+      issues
+    ]
 
 pos :: Int -> Int -> Int -> Pos
 pos = Pos "<test>"
 
 run :: Text -> TestResult ([PO], [Spec], [Expr], [StructWarning])
-run text = runTest "<test>" text $ do 
+run text = runTest "<test>" text $ do
   program <- parseProgram text
   Right <$> sweep program
 
@@ -51,50 +56,21 @@ emptyProg =
 
 --------------------------------------------------------------------------------
 
+run2 :: String -> FilePath -> TestTree
+run2 = runGoldenTest "WP/assets/" $ \sourcePath source -> do
+  return $
+    serializeTestResult $
+      runTest sourcePath source $ do
+        program <- parseProgram source
+        Right <$> sweep program
+
 -- | Expression
 statements :: TestTree
 statements =
   testGroup
     "simple program"
-    [ testCase "skip" $ do
-        let source =
-              "{ True }   \n\
-              \skip       \n\
-              \{ 0 = 0 }"
-        let actual = run source
-        actual
-          @?= fromPOs
-            source
-            [ PO
-                0
-                (Assertion (Lit (Bol True) (Loc (pos 1 3 2) (pos 1 7 6))) (Loc (pos 1 1 0) (pos 1 9 8)))
-                ( Assertion
-                    ( Chain
-                        (Lit (Num 0) (Loc (pos 3 3 26) (pos 3 4 27)))
-                        (EQ (Loc (pos 3 5 28) (pos 3 6 29)))
-                        (Lit (Num 0) (Loc (pos 3 7 30) (pos 3 8 31)))
-                        (Loc (pos 3 3 26) (pos 3 8 31))
-                    )
-                    (Loc (pos 3 1 24) (pos 3 10 33))
-                )
-                (AtSkip (Loc (pos 2 1 12) (pos 2 5 16)))
-            ],
-      testCase "abort" $
-        do
-          let source =
-                "{ True }   \n\
-                \abort      \n\
-                \{ True }"
-          let actual = run source
-          actual
-            @?= fromPOs
-              source
-              [ PO
-                  0
-                  (Assertion (Lit (Bol True) (Loc (pos 1 3 2) (pos 1 7 6))) (Loc (pos 1 1 0) (pos 1 9 8)))
-                  (Constant (Lit (Bol False) NoLoc))
-                  (AtAbort (Loc (pos 2 1 12) (pos 2 6 17)))
-              ],
+    [ run2 "skip" "skip.gcl",
+      run2 "abort" "abort.gcl",
       testCase
         "assignment"
         $ do

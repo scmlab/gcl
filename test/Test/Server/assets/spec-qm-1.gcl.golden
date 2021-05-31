@@ -15,5 +15,5 @@
 
 ### Trace
 
-CmdLog " ### DigHole ./test/Test/Server/assets/spec-qm-1.gcl [0-1] 1:1-2"
-CmdEditText ./test/Test/Server/assets/spec-qm-1.gcl [0-1] 1:1-2 "[!\n\n!]"
+TraceLog " ### DigHole ./test/Test/Server/assets/spec-qm-1.gcl [0-1] 1:1-2"
+TraceEditText ./test/Test/Server/assets/spec-qm-1.gcl [0-1] 1:1-2 "[!\n\n!]"
