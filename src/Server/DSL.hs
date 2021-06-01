@@ -25,6 +25,7 @@ import GCL.Predicate (PO, Spec)
 import GCL.Predicate.Util ( specPayload )
 import Prelude hiding (span)
 import Pretty (toText)
+import qualified Data.List as List
 
 --------------------------------------------------------------------------------
 
@@ -128,7 +129,7 @@ sweep program@(A.Program _ globalProps _ _ _) =
   case WP.sweep program of
     Left e -> throwError [StructError e]
     Right (pos, specs, warings) -> do
-      return (sortOn locOf pos, sortOn locOf specs, globalProps, warings)
+      return (List.sort pos, sortOn locOf specs, globalProps, warings)
 
 --------------------------------------------------------------------------------
 

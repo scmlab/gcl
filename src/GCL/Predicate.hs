@@ -2,11 +2,12 @@
 
 module GCL.Predicate where
 
-import Data.Loc (Loc(..), L)
+import Data.Loc (Loc(..), L, Located (locOf))
 import Syntax.Abstract (Expr)
 import GHC.Generics (Generic)
 import Data.Aeson (ToJSON)
 import Syntax.Common (Name)
+import Data.Loc.Range (fromLoc, within)
 
 -- | Predicates
 data Pred
@@ -70,10 +71,26 @@ instance Eq Stmt where
 
 --------------------------------------------------------------------------------
 
--- | Obligation
+-- | Proof obligation
 data PO
   = PO Int Pred Pred Origin
   deriving (Eq, Show, Generic)
+
+-- | This ordering would affect how they are presented to the user 
+-- | A PO should be placed in front of another PO when: 
+-- |  1. its range is within another PO 
+-- |  2. its range is ahead of that of another PO 
+instance Ord PO where 
+  compare x y = case fromLoc (locOf x) of 
+    Nothing -> LT 
+    Just a -> case fromLoc (locOf y) of 
+      Nothing -> GT 
+      Just b -> if a `within` b 
+        then LT 
+        else compare a b 
+
+instance Located PO where
+  locOf (PO _ _ _ o) = locOf o
 
 data Origin
   = AtAbort Loc
@@ -86,6 +103,16 @@ data Origin
   | AtTermination Loc
   deriving (Eq, Show, Generic)
 
+instance Located Origin where
+  locOf (AtAbort l) = l
+  locOf (AtSkip l) = l
+  locOf (AtSpec l) = l
+  locOf (AtAssignment l) = l
+  locOf (AtAssertion l) = l
+  locOf (AtIf l) = l
+  locOf (AtLoop l) = l
+  locOf (AtTermination l) = l
+
 data Spec = Specification
   { specID :: Int,
     specPreCond :: Pred,
@@ -93,3 +120,6 @@ data Spec = Specification
     specLoc :: Loc
   }
   deriving (Eq, Show, Generic)
+
+instance Located Spec where
+  locOf (Specification _ _ _ l) = l

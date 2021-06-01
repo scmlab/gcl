@@ -39,6 +39,12 @@ import Data.Text.Prettyprint.Doc (Pretty (pretty))
 data Range = Range Pos Pos
   deriving (Eq, Generic)
 
+-- First by comparing their starting positions and then their ending positions
+instance Ord Range where 
+  compare (Range a b) (Range c d) = case compare a c of 
+    EQ -> compare b d 
+    others -> others 
+
 instance Show Range where
   show (Range start end) =
     if posLine start == posLine end
@@ -96,9 +102,9 @@ mergeRanges xs = foldl (<>) (NE.head xs) xs
 span :: Range -> Int
 span (Range a b) = posCol b - posCol a
 
--- | Compares the starting position
-instance Ord Range where
-  Range a _ `compare` Range b _ = a `compare` b
+-- | See if a Range is within another Range 
+within :: Range -> Range -> Bool
+within (Range a b) (Range c d) = c <= a && b <= d
 
 instance Located Range where
   locOf (Range x y) = Loc x y
@@ -186,8 +192,6 @@ withinRange (Range left right) x =
   compareWithPosition left x == EQ
     || compareWithPosition right x == EQ
     || (compareWithPosition left x == LT && compareWithPosition right x == GT)
-
-
 
 --------------------------------------------------------------------------------
 
