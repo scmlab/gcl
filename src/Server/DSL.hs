@@ -129,11 +129,6 @@ sweep program@(A.Program _ globalProps _ _ _) =
   case WP.sweep program of
     Left e -> throwError [StructError e]
     Right (pos, specs, warings) -> do
-      logM $ "before ===="
-      logM $ Text.pack $ show (length pos) <> " " <> show (map locOf pos)
-      logM $ "after ===="
-      logM $ Text.pack $ show (length pos) <> " " <> show (map locOf $ List.sort pos)
-      logM $ "============"
       return (List.sort pos, sortOn locOf specs, globalProps, warings)
 
 --------------------------------------------------------------------------------

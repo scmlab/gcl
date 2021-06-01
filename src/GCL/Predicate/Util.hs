@@ -1,13 +1,14 @@
 module GCL.Predicate.Util where
 
+import qualified Data.Char as Char
+import Data.Loc (Loc (..), Located (locOf), posCoff, posLine, unLoc)
+import Data.Text (Text)
+import qualified Data.Text as Text
 import GCL.Predicate
 import GCL.Predicate.Located ()
 import Syntax.Abstract (Expr)
 import qualified Syntax.Abstract.Operator as A
-import Data.Loc (Loc (..), Located (locOf), posLine, unLoc, posCoff)
-import Data.Text (Text)
-import qualified Data.Text as Text
-import qualified Data.Char as Char
+import Data.Loc.Range (Range(Range))
 
 toExpr :: Pred -> Expr
 toExpr (Constant e) = e
@@ -54,7 +55,7 @@ precondAtLine i = findNext i . toPredList
     findNext n (p : ps) = case locOf p of
       NoLoc -> Nothing
       Loc start _ -> if n <= posLine start then Just p else findNext n ps
-      
+
 precond :: Stmt -> Pred
 precond (Skip l) = unLoc l
 precond (Abort l) = unLoc l
@@ -65,17 +66,16 @@ precond (Spec l _) = unLoc l
 
 -- | Return lines within a Spec without indentation
 specPayload :: Text -> Spec -> [Text]
-specPayload source spec = case specLoc spec of
-  NoLoc -> mempty
-  Loc start end ->
-    let payload = Text.drop (posCoff start) $ Text.take (posCoff end) source
-     in init $ tail $ Text.lines payload
+specPayload source spec =
+  let Range start end = specRange spec
+      payload = Text.drop (posCoff start) $ Text.take (posCoff end) source
+  in init $ tail $ Text.lines payload
 
 -- | Return lines within a Spec without indentation
 specPayloadWithoutIndentation :: Text -> Spec -> [Text]
-specPayloadWithoutIndentation source spec = 
+specPayloadWithoutIndentation source spec =
   let linesWithIndentation = specPayload source spec
       splittedIndentedLines = map (Text.break (not . Char.isSpace)) linesWithIndentation
       smallestIndentation = minimum $ map (Text.length . fst) splittedIndentedLines
       trimmedLines = map (\(indentation, content) -> Text.drop smallestIndentation indentation <> content) splittedIndentedLines
-  in trimmedLines
+   in trimmedLines

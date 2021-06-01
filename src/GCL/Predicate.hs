@@ -7,7 +7,7 @@ import Syntax.Abstract (Expr)
 import GHC.Generics (Generic)
 import Data.Aeson (ToJSON)
 import Syntax.Common (Name)
-import Data.Loc.Range (fromLoc, within)
+import Data.Loc.Range (fromLoc, within, Range)
 
 -- | Predicates
 data Pred
@@ -122,9 +122,9 @@ data Spec = Specification
   { specID :: Int,
     specPreCond :: Pred,
     specPostCond :: Pred,
-    specLoc :: Loc
+    specRange :: Range
   }
   deriving (Eq, Show, Generic)
 
 instance Located Spec where
-  locOf (Specification _ _ _ l) = l
+  locOf (Specification _ _ _ l) = locOf l

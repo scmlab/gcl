@@ -20,10 +20,9 @@ instance RenderBlock StructWarning where
     ExcessBound range -> blockE (Just "Excess Bound") (Just range) (render x)
 
 instance RenderBlock Spec where
-  renderBlock (Specification _ pre post loc) =
-    proofObligationE
-      Nothing
-      (fromLoc loc)
+  renderBlock (Specification _ pre post range) =
+    specE
+      range
       (render pre)
       (render post)
 

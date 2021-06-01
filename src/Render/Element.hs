@@ -6,6 +6,7 @@ module Render.Element
   ( Block,
     blockE,
     proofObligationE,
+    specE,
     headerE,
     Inlines (..),
     textE,
@@ -40,8 +41,11 @@ data Block
   = -- for ordinary stuff
     -- header + body
     Block (Maybe String) (Maybe Range) Inlines
+  | -- for Specs
+    -- range + precondition + post-condition
+    Spec Range Inlines Inlines
   | -- for Proof Obligations
-    -- header + precondition + post-condition
+    -- header + range + precondition + post-condition
     PO (Maybe String) (Maybe Range) Inlines Inlines
   | -- for headers
     Header String
@@ -56,6 +60,7 @@ instance Pretty Block where
   pretty (Block Nothing (Just range) inlines) = pretty inlines <> "at " <> pretty range
   pretty (Block (Just header) Nothing inlines) = "< " <> pretty header <> " >" <> line <> pretty inlines
   pretty (Block (Just header) (Just range) inlines) = "< " <> pretty header <> " >" <> line <> pretty inlines <> "at " <> pretty range
+  pretty (Spec range pre post) = pretty $ Block Nothing (Just range) (vertE [pre, "=>", post])
   pretty (PO header range pre post) = pretty $ Block header range (vertE [pre, "=>", post])
   pretty (Header header) = "# " <> pretty header
 
@@ -68,6 +73,10 @@ blockE = Block
 -- | Constructor for `PO`
 proofObligationE :: Maybe String -> Maybe Range -> Inlines -> Inlines -> Block
 proofObligationE = PO
+
+-- | Constructor for `Spec`
+specE :: Range -> Inlines -> Inlines -> Block
+specE = Spec
 
 -- | Constructor for `Header`
 headerE :: String -> Block

@@ -126,7 +126,7 @@ struct _ inv Nothing (A.Do gcmds l) post = do
   tellPO (Conjunct (inv : map (Negate . guardLoop) guards)) post (AtLoop l)
   forM_ gcmds (structGdcmdInduct inv)
   tellPO (Conjunct (inv : map guardLoop guards)) post (AtTermination l)
-struct b pre _ (A.Spec _ l) post = when b (tellSpec pre post l)
+struct b pre _ (A.Spec _ range) post = when b (tellSpec pre post range)
 struct _ _ _ (A.Proof _) _ = return ()
 
 structGdcmdInduct :: Pred -> A.GdCmd -> WP ()
@@ -182,8 +182,8 @@ wp b (A.If gcmds _) post = do
     Constant . (guard `A.imply`)
     . toExpr <$> wpStmts b body post
   return (conjunct (disjunctGuards gcmds : pres))
-wp b (A.Spec _ l) post = do
-  when b (tellSpec post post l)
+wp b (A.Spec _ range) post = do
+  when b (tellSpec post post range)
   return post
 wp _ (A.Proof _) post = return post
 
@@ -196,7 +196,7 @@ tellPO p q l = unless (toExpr p == toExpr q) $ do
   put (succ i, j, k)
   tell ([PO i p q l], [], [])
 
-tellSpec :: Pred -> Pred -> Loc -> WP ()
+tellSpec :: Pred -> Pred -> Range -> WP ()
 tellSpec p q l = do
   (i, j, k) <- get
   put (i, succ j, k)
