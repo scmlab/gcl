@@ -104,7 +104,7 @@ span (Range a b) = posCol b - posCol a
 
 -- | See if a Range is within another Range 
 within :: Range -> Range -> Bool
-within (Range a b) (Range c d) = c <= a && b <= d
+within (Range a b) (Range c d) = posCol c <= posCol a && posCol b <= posCol d
 
 instance Located Range where
   locOf (Range x y) = Loc x y

@@ -76,18 +76,8 @@ data PO
   = PO Int Pred Pred Origin
   deriving (Eq, Show, Generic)
 
--- | This ordering would affect how they are presented to the user 
--- | A PO should be placed in front of another PO when: 
--- |  1. its range is within another PO 
--- |  2. its range is ahead of that of another PO 
 instance Ord PO where 
-  compare x y = case fromLoc (locOf x) of 
-    Nothing -> LT 
-    Just a -> case fromLoc (locOf y) of 
-      Nothing -> GT 
-      Just b -> if a `within` b 
-        then LT 
-        else compare a b 
+  compare (PO _ _ _ x) (PO _ _ _ y) = compare x y
 
 instance Located PO where
   locOf (PO _ _ _ o) = locOf o
@@ -102,6 +92,19 @@ data Origin
   | AtLoop Loc
   | AtTermination Loc
   deriving (Eq, Show, Generic)
+
+-- | This ordering would affect how they are presented to the user 
+-- | A PO should be placed in front of another PO when: 
+-- |  1. its range is within another PO 
+-- |  2. its range is ahead of that of another PO 
+instance Ord Origin where 
+  compare x y = case fromLoc (locOf x) of 
+    Nothing -> LT 
+    Just a -> case fromLoc (locOf y) of 
+      Nothing -> GT 
+      Just b -> if a `within` b 
+        then LT
+        else compare a b 
 
 instance Located Origin where
   locOf (AtAbort l) = l
