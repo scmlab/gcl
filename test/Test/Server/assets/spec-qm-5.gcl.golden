@@ -5,16 +5,6 @@ True
 =>
 f   n   =   0
 at ./test/Test/Server/assets/spec-qm-5.gcl [53-77] 5:1-25
-, < Loop Invariant >
-f   n   =   0  ∧ ¬  n   ≠   N
-=>
-True
-at ./test/Test/Server/assets/spec-qm-5.gcl [78-146] 6:1-10:3
-, < Loop Termination >
-f   n   =   0  ∧ n   ≠   N
-=>
-N   -   n  ≥ 0
-at ./test/Test/Server/assets/spec-qm-5.gcl [78-146] 6:1-10:3
 , < Assigment >
 f   n   =   0  ∧ n   ≠   N
 =>
@@ -24,7 +14,17 @@ at ./test/Test/Server/assets/spec-qm-5.gcl [90-100] 6:13-23
 f   n   =   0  ∧ N   -   n  = ?m_0 ∧ n   ≠   N
 =>
 N   -   (n   +   1)  < ?m_0
-at ./test/Test/Server/assets/spec-qm-5.gcl [90-100] 6:13-23 ], [ f   n   =   0
+at ./test/Test/Server/assets/spec-qm-5.gcl [90-100] 6:13-23
+, < Loop Invariant >
+f   n   =   0  ∧ ¬  n   ≠   N
+=>
+True
+at ./test/Test/Server/assets/spec-qm-5.gcl [78-146] 6:1-10:3
+, < Loop Termination >
+f   n   =   0  ∧ n   ≠   N
+=>
+N   -   n  ≥ 0
+at ./test/Test/Server/assets/spec-qm-5.gcl [78-146] 6:1-10:3 ], [ f   n   =   0
 =>
 f   n   =   0
 at ./test/Test/Server/assets/spec-qm-5.gcl [113-143] 7:13-9:15 ], [  ], [  ])
@@ -47,3 +47,8 @@ od
 
 TraceLog " ### DigHole ./test/Test/Server/assets/spec-qm-5.gcl [113-114] 7:13-14"
 TraceEditText ./test/Test/Server/assets/spec-qm-5.gcl [113-114] 7:13-14 "[!\n            \n            !]"
+TraceLog "before ===="
+TraceLog "5 [Loc (Pos \"./test/Test/Server/assets/spec-qm-5.gcl\" 5 1 53) (Pos \"./test/Test/Server/assets/spec-qm-5.gcl\" 5 25 77),Loc (Pos \"./test/Test/Server/assets/spec-qm-5.gcl\" 6 1 78) (Pos \"./test/Test/Server/assets/spec-qm-5.gcl\" 10 3 146),Loc (Pos \"./test/Test/Server/assets/spec-qm-5.gcl\" 6 13 90) (Pos \"./test/Test/Server/assets/spec-qm-5.gcl\" 6 23 100),Loc (Pos \"./test/Test/Server/assets/spec-qm-5.gcl\" 6 1 78) (Pos \"./test/Test/Server/assets/spec-qm-5.gcl\" 10 3 146),Loc (Pos \"./test/Test/Server/assets/spec-qm-5.gcl\" 6 13 90) (Pos \"./test/Test/Server/assets/spec-qm-5.gcl\" 6 23 100)]"
+TraceLog "after ===="
+TraceLog "5 [Loc (Pos \"./test/Test/Server/assets/spec-qm-5.gcl\" 5 1 53) (Pos \"./test/Test/Server/assets/spec-qm-5.gcl\" 5 25 77),Loc (Pos \"./test/Test/Server/assets/spec-qm-5.gcl\" 6 13 90) (Pos \"./test/Test/Server/assets/spec-qm-5.gcl\" 6 23 100),Loc (Pos \"./test/Test/Server/assets/spec-qm-5.gcl\" 6 13 90) (Pos \"./test/Test/Server/assets/spec-qm-5.gcl\" 6 23 100),Loc (Pos \"./test/Test/Server/assets/spec-qm-5.gcl\" 6 1 78) (Pos \"./test/Test/Server/assets/spec-qm-5.gcl\" 10 3 146),Loc (Pos \"./test/Test/Server/assets/spec-qm-5.gcl\" 6 1 78) (Pos \"./test/Test/Server/assets/spec-qm-5.gcl\" 10 3 146)]"
+TraceLog "============"

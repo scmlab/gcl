@@ -14,3 +14,8 @@ x := 1
 
 ### Trace
 
+TraceLog "before ===="
+TraceLog "1 [Loc (Pos \"./test/Test/WP/assets/assignment.gcl\" 2 1 9) (Pos \"./test/Test/WP/assets/assignment.gcl\" 2 7 15)]"
+TraceLog "after ===="
+TraceLog "1 [Loc (Pos \"./test/Test/WP/assets/assignment.gcl\" 2 1 9) (Pos \"./test/Test/WP/assets/assignment.gcl\" 2 7 15)]"
+TraceLog "============"

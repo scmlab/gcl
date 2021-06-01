@@ -14,3 +14,8 @@ var x, y, z : Int
 
 ### Trace
 
+TraceLog "before ===="
+TraceLog "1 [Loc (Pos \"./test/Test/WP/assets/issue2-1.gcl\" 3 1 33) (Pos \"./test/Test/WP/assets/issue2-1.gcl\" 3 14 46)]"
+TraceLog "after ===="
+TraceLog "1 [Loc (Pos \"./test/Test/WP/assets/issue2-1.gcl\" 3 1 33) (Pos \"./test/Test/WP/assets/issue2-1.gcl\" 3 14 46)]"
+TraceLog "============"

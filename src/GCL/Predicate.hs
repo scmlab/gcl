@@ -77,7 +77,7 @@ data PO
   deriving (Eq, Show, Generic)
 
 instance Ord PO where 
-  compare (PO _ _ _ x) (PO _ _ _ y) = compare x y
+  compare (PO _ _ _ x) (PO _ _ _ y) = compare y x
 
 instance Located PO where
   locOf (PO _ _ _ o) = locOf o
@@ -102,9 +102,11 @@ instance Ord Origin where
     Nothing -> LT 
     Just a -> case fromLoc (locOf y) of 
       Nothing -> GT 
-      Just b -> if a `within` b 
+      Just b -> if a `within` b
         then LT
-        else compare a b 
+        else if b `within` a 
+          then GT 
+          else compare a b 
 
 instance Located Origin where
   locOf (AtAbort l) = l

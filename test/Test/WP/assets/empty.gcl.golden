@@ -8,3 +8,8 @@
 
 ### Trace
 
+TraceLog "before ===="
+TraceLog "0 []"
+TraceLog "after ===="
+TraceLog "0 []"
+TraceLog "============"

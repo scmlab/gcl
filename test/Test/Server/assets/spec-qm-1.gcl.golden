@@ -17,3 +17,8 @@ at ./test/Test/Server/assets/spec-qm-1.gcl [0-6] 1:1-3:3 ], [  ], [  ])
 
 TraceLog " ### DigHole ./test/Test/Server/assets/spec-qm-1.gcl [0-1] 1:1-2"
 TraceEditText ./test/Test/Server/assets/spec-qm-1.gcl [0-1] 1:1-2 "[!\n\n!]"
+TraceLog "before ===="
+TraceLog "0 []"
+TraceLog "after ===="
+TraceLog "0 []"
+TraceLog "============"

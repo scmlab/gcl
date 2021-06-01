@@ -6,9 +6,11 @@ import Data.Loc
 import Test.Tasty
 import Test.Tasty.HUnit
 import Data.Loc.Range
+import Data.List (sort)
+import GCL.Predicate (Origin (AtSkip))
 
 tests :: TestTree
-tests = testGroup "Source Location" [compareWithPositionTests, withinTests, withinRangeTests]
+tests = testGroup "Source Location" [compareWithPositionTests, withinTests, withinRangeTests, sortingOriginsTests]
 
 --------------------------------------------------------------------------------
 
@@ -52,6 +54,20 @@ withinTests =
 
 --------------------------------------------------------------------------------
 
+sortingOriginsTests :: TestTree
+sortingOriginsTests =
+  testGroup
+    "sorting Origins"
+    [ testCase "1" $ sort [mk 10 20, mk 20 30, mk 11 19, mk 21 29] @?= [mk 11 19, mk 10 20, mk 21 29, mk 20 30]
+    , testCase "2" $ sort [mk 80 184, mk 80 184, mk 92 102, mk 92 102] @?= [mk 92 102, mk 92 102, mk 80 184, mk 80 184]
+    , testCase "overlapped 1" $ sort [mk 10 20, mk 15 25, mk 20 30] @?= [mk 10 20, mk 15 25, mk 20 30]
+    ]
+    where 
+      mk :: Int -> Int -> Origin 
+      mk a b = AtSkip (Loc (Pos "" 1 (a + 1) a) (Pos "" 1 (b + 1) b))
+
+--------------------------------------------------------------------------------
+
 withinRangeTests :: TestTree
 withinRangeTests =
   testGroup
@@ -69,7 +85,7 @@ withinRangeTests =
     ]
   where
     run :: (Int, Int) -> Item -> Bool
-    run (start, end) item = withinRange (Range (Pos "" 1 1 start) (Pos "" 1 end end)) item
+    run (start, end) item = withinRange (Range (Pos "" 1 1 start) (Pos "" 1 1 end)) item
 
 -- | For testing selection related stuff
 newtype Item = Item {unItem :: Range}
