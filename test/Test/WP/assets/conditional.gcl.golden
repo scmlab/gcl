@@ -2,12 +2,12 @@
 
 [ < Skip >
 True ∧ False
-=>
+⇒
 True
 at ./test/Test/WP/assets/conditional.gcl [12-16] 1:13-17
 , < Conditional >
 True
-=>
+⇒
 False
 at ./test/Test/WP/assets/conditional.gcl [0-20] 1:1-2:3 ]
 
@@ -19,8 +19,3 @@ fi
 
 ### Trace
 
-TraceLog "before ===="
-TraceLog "2 [Loc (Pos \"./test/Test/WP/assets/conditional.gcl\" 1 1 0) (Pos \"./test/Test/WP/assets/conditional.gcl\" 2 3 20),Loc (Pos \"./test/Test/WP/assets/conditional.gcl\" 1 13 12) (Pos \"./test/Test/WP/assets/conditional.gcl\" 1 17 16)]"
-TraceLog "after ===="
-TraceLog "2 [Loc (Pos \"./test/Test/WP/assets/conditional.gcl\" 1 13 12) (Pos \"./test/Test/WP/assets/conditional.gcl\" 1 17 16),Loc (Pos \"./test/Test/WP/assets/conditional.gcl\" 1 1 0) (Pos \"./test/Test/WP/assets/conditional.gcl\" 2 3 20)]"
-TraceLog "============"

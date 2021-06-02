@@ -2,7 +2,7 @@
 
 [ < Skip >
 True
-=>
+⇒
 0   =   0
 at ./test/Test/WP/assets/skip.gcl [9-13] 2:1-5 ]
 
@@ -14,8 +14,3 @@ skip
 
 ### Trace
 
-TraceLog "before ===="
-TraceLog "1 [Loc (Pos \"./test/Test/WP/assets/skip.gcl\" 2 1 9) (Pos \"./test/Test/WP/assets/skip.gcl\" 2 5 13)]"
-TraceLog "after ===="
-TraceLog "1 [Loc (Pos \"./test/Test/WP/assets/skip.gcl\" 2 1 9) (Pos \"./test/Test/WP/assets/skip.gcl\" 2 5 13)]"
-TraceLog "============"

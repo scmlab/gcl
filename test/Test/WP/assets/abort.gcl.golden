@@ -2,7 +2,7 @@
 
 [ < Abort >
 True
-=>
+⇒
 False
 at ./test/Test/WP/assets/abort.gcl [9-14] 2:1-6 ]
 
@@ -14,8 +14,3 @@ abort
 
 ### Trace
 
-TraceLog "before ===="
-TraceLog "1 [Loc (Pos \"./test/Test/WP/assets/abort.gcl\" 2 1 9) (Pos \"./test/Test/WP/assets/abort.gcl\" 2 6 14)]"
-TraceLog "after ===="
-TraceLog "1 [Loc (Pos \"./test/Test/WP/assets/abort.gcl\" 2 1 9) (Pos \"./test/Test/WP/assets/abort.gcl\" 2 6 14)]"
-TraceLog "============"

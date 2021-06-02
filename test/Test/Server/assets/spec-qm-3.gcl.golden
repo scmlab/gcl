@@ -2,7 +2,7 @@
 
 ([ < Conditional >
 True
-=>
+⇒
 True
 at ./test/Test/Server/assets/spec-qm-3.gcl [0-33] 1:1-5:3 ], [ True ∧ True
 =>
@@ -23,8 +23,3 @@ fi
 
 TraceLog " ### DigHole ./test/Test/Server/assets/spec-qm-3.gcl [16-17] 2:5-6"
 TraceEditText ./test/Test/Server/assets/spec-qm-3.gcl [16-17] 2:5-6 "[!\n    \n    !]"
-TraceLog "before ===="
-TraceLog "1 [Loc (Pos \"./test/Test/Server/assets/spec-qm-3.gcl\" 1 1 0) (Pos \"./test/Test/Server/assets/spec-qm-3.gcl\" 5 3 33)]"
-TraceLog "after ===="
-TraceLog "1 [Loc (Pos \"./test/Test/Server/assets/spec-qm-3.gcl\" 1 1 0) (Pos \"./test/Test/Server/assets/spec-qm-3.gcl\" 5 3 33)]"
-TraceLog "============"
