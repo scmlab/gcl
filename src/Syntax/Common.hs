@@ -107,8 +107,8 @@ classifyArithOp (Sub _) = InfixL 7
 classifyArithOp (Mul _) = InfixL 8
 classifyArithOp (Div _) = InfixL 8
 classifyArithOp (Mod _) = InfixL 9
-classifyArithOp (Max _) = InfixL 10
-classifyArithOp (Min _) = InfixL 10
+classifyArithOp (Max _) = Infix 10
+classifyArithOp (Min _) = Infix 10
 
 -- classifyQuantOp :: QuantOp -> Fixity
 -- classifyQuantOp (Sum _) = Prefix 5

@@ -320,7 +320,7 @@ pExprArith = makeExprParser pTerm arithTable <* (↑) (\sc' -> try sc' <|> sc)
 arithTable :: [[Operator ParserF Expr]]
 arithTable =
   [ [Postfix pApp],
-    [InfixL (pBinary lexMax), InfixL (pBinary lexMin)],
+    [InfixN (pBinary lexMax), InfixN (pBinary lexMin)],
     [InfixL (pBinary lexMod)],
     [InfixL (pBinary lexMul), InfixL (pBinary lexDiv)],
     [InfixL (pBinary lexAdd), InfixL (pBinary lexSub)],
