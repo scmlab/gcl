@@ -92,7 +92,7 @@ sendResponses :: FilePath -> Maybe Responder -> [ResKind] -> ServerM ()
 sendResponses filepath responder responses = do
   -- send responses
   case responder of
-    Nothing -> sendNotification (SCustomMethod "guacamole") $ JSON.toJSON $ Res filepath responses
+    Nothing -> sendNotification (SCustomMethod "guabao") $ JSON.toJSON $ Res filepath responses
     Just f -> f $ Res filepath responses
 
 handleErrors :: FilePath -> Maybe Responder -> [Error] -> ServerM ()

@@ -87,7 +87,7 @@ handlers =
             responder $ Right $ InR completionList
           else responder $ Right $ InR $ CompletionList True (List []),
       -- custom methods, not part of LSP
-      requestHandler (SCustomMethod "guacamole") $ \req responderPrim -> do
+      requestHandler (SCustomMethod "guabao") $ \req responderPrim -> do
         let responder = responderPrim . Right . JSON.toJSON
         let RequestMessage _ _ _ params = req
         -- JSON Value => Request => Response
