@@ -5,7 +5,6 @@
 module Server.CustomMethod where
 
 import Data.Aeson (FromJSON, ToJSON)
-import Data.Loc (Loc)
 import Data.Text (Text)
 import GHC.Generics (Generic)
 import Render
@@ -17,7 +16,7 @@ import Data.Loc.Range
 -- | Response
 data ResKind
   = ResDisplay Int [Block]
-  | ResUpdateSpecs [(Int, Text, Text, Loc)]
+  | ResUpdateSpecs [(Int, Text, Text, Range)]
   | ResConsoleLog Text
   deriving (Eq, Generic)
 

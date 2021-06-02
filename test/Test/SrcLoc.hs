@@ -6,9 +6,11 @@ import Data.Loc
 import Test.Tasty
 import Test.Tasty.HUnit
 import Data.Loc.Range
+import Data.List (sort)
+import GCL.Predicate (Origin (AtSkip))
 
 tests :: TestTree
-tests = testGroup "Source Location" [compareWithPositionTests, withinRangeTests]
+tests = testGroup "Source Location" [compareWithPositionTests, withinTests, withinRangeTests, sortingOriginsTests]
 
 --------------------------------------------------------------------------------
 
@@ -32,6 +34,40 @@ compareWithPositionTests =
 
 --------------------------------------------------------------------------------
 
+withinTests :: TestTree
+withinTests =
+  testGroup
+    "within"
+    [ testCase "1" $ run (make 9 20) (make 10 20) @?= False,
+      testCase "2" $ run (make 10 21) (make 10 20) @?= False,
+      testCase "3" $ run (make 10 20) (make 10 20) @?= True,
+      testCase "4" $ run (make 10 20) (make 9 20) @?= True,
+      testCase "5" $ run (make 10 20) (make 10 21) @?= True,
+      testCase "6" $ run (make 0 1) (make 10 20) @?= False,
+      testCase "7" $ run (make 0 15) (make 10 20) @?= False,
+      testCase "8" $ run (make 30 40) (make 10 20) @?= False,
+      testCase "9" $ run (make 15 40) (make 10 20) @?= False
+    ]
+    where 
+      run :: Item -> Item -> Bool
+      run x y = rangeOf x `within` rangeOf y
+
+--------------------------------------------------------------------------------
+
+sortingOriginsTests :: TestTree
+sortingOriginsTests =
+  testGroup
+    "sorting Origins"
+    [ testCase "1" $ sort [mk 10 20, mk 20 30, mk 11 19, mk 21 29] @?= [mk 11 19, mk 10 20, mk 21 29, mk 20 30]
+    , testCase "2" $ sort [mk 80 184, mk 80 184, mk 92 102, mk 92 102] @?= [mk 92 102, mk 92 102, mk 80 184, mk 80 184]
+    , testCase "overlapped 1" $ sort [mk 10 20, mk 15 25, mk 20 30] @?= [mk 10 20, mk 15 25, mk 20 30]
+    ]
+    where 
+      mk :: Int -> Int -> Origin 
+      mk a b = AtSkip (Loc (Pos "" 1 (a + 1) a) (Pos "" 1 (b + 1) b))
+
+--------------------------------------------------------------------------------
+
 withinRangeTests :: TestTree
 withinRangeTests =
   testGroup
@@ -52,16 +88,18 @@ withinRangeTests =
     run (start, end) item = withinRange (Range (Pos "" 1 1 start) (Pos "" 1 1 end)) item
 
 -- | For testing selection related stuff
-newtype Item = Item {unItem :: Loc}
+newtype Item = Item {unItem :: Range}
   deriving (Eq)
 
 instance Show Item where
-  show item = case locOf item of
-    NoLoc -> "Item"
-    Loc start end -> "Item " <> show (posCoff start) <> " " <> show (posCoff end)
+  show item = case rangeOf item of
+    Range start end -> "Item " <> show (posCoff start) <> " " <> show (posCoff end)
 
 make :: Int -> Int -> Item
-make start end = Item (Loc (Pos "" 1 1 start) (Pos "" 1 1 end))
+make start end = Item (Range (Pos "" 1 (start + 1) start) (Pos "" 1 (end + 1) end))
+
+instance Ranged Item where
+  rangeOf = unItem
 
 instance Located Item where
-  locOf = unItem
+  locOf = locOf . unItem

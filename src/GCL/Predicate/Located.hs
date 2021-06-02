@@ -1,7 +1,7 @@
 module GCL.Predicate.Located where
 
 import Data.Loc (Located, locOf, Loc (..))
-import GCL.Predicate (Pred (..), Stmt (..), PO (..), Origin (..), Spec (..))
+import GCL.Predicate (Pred (..), Stmt (..))
 
 
 instance Located Pred where
@@ -23,23 +23,6 @@ instance Located Stmt where
   locOf (If l _) = locOf l
   locOf (Spec l _) = locOf l
 
--- comparing only the constructor and the predicate
-
-instance Located PO where
-  locOf (PO _ _ _ o) = locOf o
-
-instance Located Origin where
-  locOf (AtAbort l) = l
-  locOf (AtSkip l) = l
-  locOf (AtSpec l) = l
-  locOf (AtAssignment l) = l
-  locOf (AtAssertion l) = l
-  locOf (AtIf l) = l
-  locOf (AtLoop l) = l
-  locOf (AtTermination l) = l
-
-instance Located Spec where
-  locOf (Specification _ _ _ l) = l
 
 instance Ord Loc where
   compare NoLoc NoLoc = EQ

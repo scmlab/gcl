@@ -266,46 +266,49 @@ lexHash :: LexerF QuantOp
 lexHash = Hash . locOf <$> symbol tokHash
 
 lexChainOps :: LexerF ChainOp 
-lexChainOps = choice [
-    lexEQProp, 
-    lexEQPropU,
-    lexEQ, 
-    lexNEQ, 
-    lexNEQU, 
-    lexGT, 
-    lexGTE, 
-    lexGTEU,
-    lexLT, 
-    lexLTE, 
-    lexLTEU
-  ]
+lexChainOps = 
+  choice 
+    [ lexEQProp, 
+      lexEQPropU,
+      lexEQ, 
+      lexNEQ, 
+      lexNEQU, 
+      lexGT, 
+      lexGTE, 
+      lexGTEU,
+      lexLT, 
+      lexLTE, 
+      lexLTEU
+    ]
 
 lexArithOps :: LexerF ArithOp 
-lexArithOps = choice [
-    lexImpl, 
-    lexImplU, 
-    lexConj, 
-    lexConjU, 
-    lexDisj, 
-    lexDisjU,
-    lexNeg, 
-    lexNegU, 
-    lexAdd, 
-    lexSub, 
-    lexMul, 
-    lexDiv, 
-    lexMod,
-    lexMax, 
-    lexMin
-  ]
+lexArithOps = 
+  choice 
+    [ lexImpl, 
+      lexImplU, 
+      lexConj, 
+      lexConjU, 
+      lexDisj, 
+      lexDisjU,
+      lexNeg, 
+      lexNegU, 
+      lexAdd, 
+      lexSub, 
+      lexMul, 
+      lexDiv, 
+      lexMod,
+      lexMax, 
+      lexMin
+    ]
 
 lexQuantOps :: LexerF QuantOp 
-lexQuantOps = choice [
-    lexSum, 
-    lexForall, 
-    lexExists, 
-    lexHash
-  ]
+lexQuantOps = 
+  choice 
+    [ lexSum, 
+      lexForall, 
+      lexExists, 
+      lexHash
+    ]
 
 
 lexOps :: LexerF Op

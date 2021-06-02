@@ -9,10 +9,8 @@ module Server.Handler (handlers) where
 
 import Control.Monad.Except
 import qualified Data.Aeson as JSON
-import Data.Loc
 import Data.Loc.Range
 import qualified Data.Text as Text
-import Error
 import Language.LSP.Server
 import Language.LSP.Types hiding
   ( Range,
@@ -89,7 +87,7 @@ handlers =
             responder $ Right $ InR completionList
           else responder $ Right $ InR $ CompletionList True (List []),
       -- custom methods, not part of LSP
-      requestHandler (SCustomMethod "guacamole") $ \req responderPrim -> do
+      requestHandler (SCustomMethod "guabao") $ \req responderPrim -> do
         let responder = responderPrim . Right . JSON.toJSON
         let RequestMessage _ _ _ params = req
         -- JSON Value => Request => Response
@@ -117,9 +115,7 @@ handlers =
                   
 
                   -- remove the Spec
-                  source' <- case specLoc spec of
-                    NoLoc -> throwError [Others "NoLoc in ReqRefine"]
-                    Loc start end -> editText (Range start end) (Text.stripStart content)
+                  source' <- editText (specRange spec) (Text.stripStart content)
 
                   program <- parseProgram source'
                   typeCheck program
@@ -202,7 +198,7 @@ generateResponseAndDiagnosticsFromResult (Right (pos, specs, globalProps, warnin
           ]
 
   version <- bumpVersion
-  let encodeSpec spec = (specID spec, toText $ render (specPreCond spec), toText $ render (specPostCond spec), specLoc spec)
+  let encodeSpec spec = (specID spec, toText $ render (specPreCond spec), toText $ render (specPostCond spec), specRange spec)
 
   let responses = [ResDisplay version blocks, ResUpdateSpecs (map encodeSpec specs)]
   let diagnostics = concatMap toDiagnostics pos ++ concatMap toDiagnostics warnings

@@ -13,6 +13,7 @@ import qualified Syntax.Abstract as A
 import qualified Syntax.Abstract.Operator as A
 import qualified Syntax.ConstExpr as ConstExpr
 import Syntax.Common (Name)
+import Data.Loc.Range (rangeOf)
 
 --------------------------------------------------------------------------------
 
@@ -66,7 +67,7 @@ instance ToAbstract Stmt A.Stmt where
     Do l a r -> A.Do <$> mapM toAbstract (fromSepBy a) <*> pure (l <--> r)
     If l a r -> A.If <$> mapM toAbstract (fromSepBy a) <*> pure (l <--> r)
     SpecQM l -> throwError l
-    Spec l t r -> pure (A.Spec t (l <--> r))
+    Spec l t r -> pure (A.Spec t (rangeOf l <> rangeOf r))
     Proof l r -> pure (A.Proof (l <--> r))
 
 instance ToAbstract GdCmd A.GdCmd where

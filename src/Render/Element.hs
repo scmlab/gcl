@@ -6,6 +6,7 @@ module Render.Element
   ( Block,
     blockE,
     proofObligationE,
+    specE,
     headerE,
     Inlines (..),
     textE,
@@ -40,9 +41,12 @@ data Block
   = -- for ordinary stuff
     -- header + body
     Block (Maybe String) (Maybe Range) Inlines
+  | -- for Specs
+    -- range + precondition + post-condition
+    Spec Range Inlines Inlines
   | -- for Proof Obligations
-    -- header + precondition + post-condition
-    PO (Maybe String) (Maybe Range) Inlines Inlines
+    -- header + range + predicate
+    PO (Maybe String) (Maybe Range) Inlines
   | -- for headers
     Header String
   deriving (Eq, Generic)
@@ -56,7 +60,8 @@ instance Pretty Block where
   pretty (Block Nothing (Just range) inlines) = pretty inlines <> "at " <> pretty range
   pretty (Block (Just header) Nothing inlines) = "< " <> pretty header <> " >" <> line <> pretty inlines
   pretty (Block (Just header) (Just range) inlines) = "< " <> pretty header <> " >" <> line <> pretty inlines <> "at " <> pretty range
-  pretty (PO header range pre post) = pretty $ Block header range (vertE [pre, "=>", post])
+  pretty (Spec range pre post) = pretty $ Block Nothing (Just range) (vertE [pre, "=>", post])
+  pretty (PO header range p) = pretty $ Block header range p
   pretty (Header header) = "# " <> pretty header
 
 instance ToJSON Block
@@ -66,8 +71,12 @@ blockE :: Maybe String -> Maybe Range -> Inlines -> Block
 blockE = Block
 
 -- | Constructor for `PO`
-proofObligationE :: Maybe String -> Maybe Range -> Inlines -> Inlines -> Block
+proofObligationE :: Maybe String -> Maybe Range -> Inlines -> Block
 proofObligationE = PO
+
+-- | Constructor for `Spec`
+specE :: Range -> Inlines -> Inlines -> Block
+specE = Spec
 
 -- | Constructor for `Header`
 headerE :: String -> Block

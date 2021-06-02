@@ -2,13 +2,13 @@
 
 module Render.Predicate where
 
+import Data.Loc (locOf)
+import Data.Loc.Range (fromLoc)
+import GCL.Predicate
 import GCL.WP
 import Render.Class
 import Render.Element
 import Render.Syntax.Abstract ()
-import GCL.Predicate
-import Data.Loc.Range (fromLoc)
-import Data.Loc (locOf)
 
 instance Render StructWarning where
   render (MissingBound _) = "Bound missing at the end of the assertion before the DO construct \" , bnd : ... }\""
@@ -20,10 +20,9 @@ instance RenderBlock StructWarning where
     ExcessBound range -> blockE (Just "Excess Bound") (Just range) (render x)
 
 instance RenderBlock Spec where
-  renderBlock (Specification _ pre post loc) =
-    proofObligationE
-      Nothing
-      (fromLoc loc)
+  renderBlock (Specification _ pre post range) =
+    specE
+      range
       (render pre)
       (render post)
 
@@ -44,8 +43,7 @@ instance RenderBlock PO where
     proofObligationE
       (Just $ show $ render origin)
       (fromLoc (locOf origin))
-      (render pre)
-      (render post)
+      (vertE [render pre, "⇒", render post])
 
 instance Render Origin where
   render AtAbort {} = "Abort"

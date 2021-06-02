@@ -16,7 +16,7 @@ instance Located Stmt where
   locOf (LoopInvariant _ _ l) = l
   locOf (Do _ l) = l
   locOf (If _ l) = l
-  locOf (Spec _ l) = l
+  locOf (Spec _ l) = locOf l
   locOf (Proof l) = l
 
 instance Located Endpoint where

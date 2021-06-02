@@ -2,7 +2,7 @@
 
 ([ < Conditional >
 True
-=>
+⇒
 True
 at ./test/Test/Server/assets/spec-qm-3.gcl [0-33] 1:1-5:3 ], [ True ∧ True
 =>

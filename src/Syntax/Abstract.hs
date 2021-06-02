@@ -9,6 +9,7 @@ import Data.Text (Text)
 import GHC.Generics (Generic)
 import Syntax.Common
 import Prelude hiding (Ordering (..))
+import Data.Loc.Range
 
 --------------------------------------------------------------------------------
 
@@ -46,7 +47,7 @@ data Stmt
   | LoopInvariant Expr Expr Loc
   | Do [GdCmd] Loc
   | If [GdCmd] Loc
-  | Spec Text Loc
+  | Spec Text Range
   | Proof Loc
   deriving (Eq, Show)
 
