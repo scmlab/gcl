@@ -30,7 +30,7 @@ import qualified Data.Sequence as Seq
 import Data.String (IsString (..))
 import Data.Text (Text)
 import qualified Data.Text as Text
-import Data.Text.Prettyprint.Doc (Pretty (..))
+import Data.Text.Prettyprint.Doc (Pretty (..), line)
 import GHC.Generics (Generic)
 
 --------------------------------------------------------------------------------
@@ -51,15 +51,13 @@ data Block
 instance IsString Block where
   fromString s = Block Nothing Nothing (fromString s)
 
--- instance Show Block where
---   show (Block Nothing range body) = show body <> "\nat " <> show range
---   show (Block (Just header) range body) = "## " <> header <> "\n\n" <> show body <> "\nat " <> show range
---   show (PO Nothing range pre post) = show pre <> "\n=>\n" <> show post <> "\nat " <> show range
---   show (PO (Just header) range pre post) = "# " <> header <> "\n\n" <> show pre <> "\n=>\n" <> show post
---   show (Header header) = "# " <> header
-
--- instance Pretty Block where
---   pretty = pretty . show
+instance Pretty Block where
+  pretty (Block Nothing Nothing inlines) = pretty inlines
+  pretty (Block Nothing (Just range) inlines) = pretty inlines <> "at " <> pretty range
+  pretty (Block (Just header) Nothing inlines) = "< " <> pretty header <> " >" <> line <> pretty inlines
+  pretty (Block (Just header) (Just range) inlines) = "< " <> pretty header <> " >" <> line <> pretty inlines <> "at " <> pretty range
+  pretty (PO header range pre post) = pretty $ Block header range (vertE [pre, "=>", post])
+  pretty (Header header) = "# " <> pretty header
 
 instance ToJSON Block
 

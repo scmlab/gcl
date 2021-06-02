@@ -1,0 +1,16 @@
+### Result
+
+[ < Abort >
+True
+=>
+False
+at ./test/Test/WP/assets/abort.gcl [9-14] 2:1-6 ]
+
+### Source
+
+{ True }
+abort
+{ True }
+
+### Trace
+

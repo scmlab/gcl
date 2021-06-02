@@ -1,0 +1,16 @@
+### Result
+
+[ < Assigment >
+True
+=>
+0   =   1
+at ./test/Test/WP/assets/assignment.gcl [9-15] 2:1-7 ]
+
+### Source
+
+{ True }
+x := 1
+{ 0 = x }
+
+### Trace
+

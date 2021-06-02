@@ -35,13 +35,13 @@ instance Render ArithOp where
   render (Mul l) = tempHandleLoc l $ render tokMul
   render (Div l) = tempHandleLoc l $ render tokDiv
   render (Mod l) = tempHandleLoc l $ render tokMod
+  render (Max l) = tempHandleLoc l $ render tokMax
+  render (Min l) = tempHandleLoc l $ render tokMin
 
 instance Render QuantOp where
   render (Sum l) = tempHandleLoc l $ render tokSum
   render (Forall l) = tempHandleLoc l $ render tokForall
   render (Exists l) = tempHandleLoc l $ render tokExists
-  render (Max l) = tempHandleLoc l $ render tokMax
-  render (Min l) = tempHandleLoc l $ render tokMin
   render (Hash l) = tempHandleLoc l $ render tokHash
 
 instance Render Op where

@@ -64,14 +64,14 @@ data ArithOp =
   | Mul Loc
   | Div Loc
   | Mod Loc 
+  | Max Loc
+  | Min Loc
   deriving (Eq, Show, Generic)
 
 data QuantOp = 
     Sum Loc
   | Forall Loc
   | Exists Loc 
-  | Max Loc
-  | Min Loc
   | Hash Loc
   deriving (Eq, Show, Generic)
 
@@ -80,18 +80,18 @@ data Op = ChainOp ChainOp | ArithOp ArithOp | QuantOp QuantOp
   deriving (Show, Eq, Generic)
 
 
-classifyChainOp :: ChainOp -> Fixity
-classifyChainOp (EQProp _) = Infix 10
-classifyChainOp (EQPropU _) = Infix 10
-classifyChainOp (EQ _) = Infix 5
-classifyChainOp (NEQ _) = Infix 6
-classifyChainOp (NEQU _) = Infix 6
-classifyChainOp (LTE _) = Infix 6
-classifyChainOp (LTEU _) = Infix 6
-classifyChainOp (GTE _) = Infix 6
-classifyChainOp (GTEU _) = Infix 6
-classifyChainOp (LT _) = Infix 6
-classifyChainOp (GT _) = Infix 6
+-- classifyChainOp :: ChainOp -> Fixity
+-- classifyChainOp (EQProp _) = Infix 0
+-- classifyChainOp (EQPropU _) = Infix 0
+-- classifyChainOp (EQ _) = Infix 5
+-- classifyChainOp (NEQ _) = Infix 6
+-- classifyChainOp (NEQU _) = Infix 6
+-- classifyChainOp (LTE _) = Infix 6
+-- classifyChainOp (LTEU _) = Infix 6
+-- classifyChainOp (GTE _) = Infix 6
+-- classifyChainOp (GTEU _) = Infix 6
+-- classifyChainOp (LT _) = Infix 6
+-- classifyChainOp (GT _) = Infix 6
 
 classifyArithOp :: ArithOp -> Fixity
 classifyArithOp (Implies _) = InfixR 1
@@ -107,13 +107,13 @@ classifyArithOp (Sub _) = InfixL 7
 classifyArithOp (Mul _) = InfixL 8
 classifyArithOp (Div _) = InfixL 8
 classifyArithOp (Mod _) = InfixL 9
+classifyArithOp (Max _) = InfixL 10
+classifyArithOp (Min _) = InfixL 10
 
 -- classifyQuantOp :: QuantOp -> Fixity
 -- classifyQuantOp (Sum _) = Prefix 5
 -- classifyQuantOp (Exists _) = Prefix 6
 -- classifyQuantOp (Forall _) = Prefix 7
--- classifyQuantOp (Max _) = Prefix 8
--- classifyQuantOp (Min _) = Prefix 8
 -- classifyQuantOp (Hash _) = Prefix 8
 
 -- classify :: Op -> Fixity

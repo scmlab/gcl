@@ -8,6 +8,7 @@ module Pretty.Util
     fromDoc,
     fromRender,
     fromRenderPrec,
+    fromRenderBlock,
     fromRenderAndLocated
   )
 where
@@ -17,44 +18,10 @@ import Data.Text (Text)
 import Data.Text.Prettyprint.Doc
 import qualified Data.Text.Prettyprint.Doc.Render.Text as Text
 import Prelude hiding (Ordering (..))
-import Data.Loc.Range
 import Render
 
 renderStrict :: Doc ann -> Text
 renderStrict = Text.renderStrict . layoutPretty defaultLayoutOptions
-
-instance Pretty Range where
-  pretty (Range start end) =
-    if posLine start == posLine end
-      then
-        pretty (posFile start)
-          <> " ["
-          <> pretty (posCoff start)
-          <> "-"
-          <> pretty (posCoff end)
-          <> "] "
-          <> pretty (posLine start)
-          <> ":"
-          <> pretty (posCol start)
-          <> "-"
-          <> pretty (posCol end)
-      else
-        pretty (posFile start)
-          <> " ["
-          <> pretty (posCoff start)
-          <> "-"
-          <> pretty (posCoff end)
-          <> "] "
-          <> pretty (posLine start)
-          <> ":"
-          <> pretty (posCol start)
-          <> "-"
-          <> pretty(posLine end)
-          <> ":"
-          <> pretty (posCol end)
-
-instance Pretty Loc where
-  pretty = pretty . displayLoc
 
 
 --------------------------------------------------------------------------------
@@ -106,6 +73,10 @@ fromRenderAndLocated :: (Located a, Render a) => a -> DocWithLoc ann
 fromRenderAndLocated x = case locOf x of
   NoLoc -> mempty
   Loc a b -> DocWithLoc (pretty (render x)) a b
+
+-- | If something can be rendered, then make it a Doc
+fromRenderBlock :: RenderBlock a => a -> Doc ann
+fromRenderBlock x = pretty (renderBlock x)
 
 -- generates newlines and spaces to fill the gap between to Pos
 fillGap :: Pos -> Pos -> Doc ann

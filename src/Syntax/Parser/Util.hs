@@ -11,7 +11,7 @@ import Control.Applicative (Alternative (..))
 import Control.Monad (MonadPlus)
 import Control.Monad.Trans (MonadTrans, lift)
 import Data.Coerce (coerce)
-import Data.Loc (Loc (..), posCol)
+import Data.Loc (posCol)
 import qualified Data.Loc as Loc
 import Data.Text (Text)
 import Syntax.Concrete (Token (Token))
@@ -76,28 +76,28 @@ instance MonadParsec e s m => MonadParsec e s (ParseFunc m) where
 -- combinator helpers
 ------------------------------------------
 
-type SyntacticError = (Loc, String)
+type SyntacticError = (Loc.Pos, String)
 
 getTokenColumn :: Syntax.Concrete.Token e -> Text.Megaparsec.Pos
 getTokenColumn (Token s _) = mkPos . posCol $ s
 
-posStateToLoc :: Stream s => PosState s -> Loc
-posStateToLoc PosState {pstateOffset, pstateSourcePos = SourcePos {..}} =
-  Loc.locOf $ Loc.Pos sourceName (unPos sourceLine) (unPos sourceColumn) pstateOffset
+posStateToPos :: Stream s => PosState s -> Loc.Pos
+posStateToPos PosState {pstateOffset, pstateSourcePos = SourcePos {..}} =
+  Loc.Pos sourceName (unPos sourceLine) (unPos sourceColumn) pstateOffset
 
-getCurLoc :: (MonadParsec e s m) => m Loc
-getCurLoc = do
+getCurPos :: (MonadParsec e s m) => m Loc.Pos
+getCurPos = do
   st@State {stateOffset, statePosState} <- getParserState
   let pst = reachOffsetNoLine stateOffset statePosState
   setParserState st {statePosState = pst}
-  return . posStateToLoc $ pst
+  return . posStateToPos $ pst
 
-getEndLoc :: (MonadParsec e s m) => m Loc
-getEndLoc = do
+getEndPos :: (MonadParsec e s m) => m Loc.Pos
+getEndPos = do
   st@State {stateOffset, statePosState} <- getParserState
   let pst = reachOffsetNoLine stateOffset statePosState
   setParserState st {statePosState = pst}
-  return . posStateToLoc $ pst
+  return . posStateToPos $ pst
 
 fromParseErrorBundle :: ShowErrorComponent e => ParseErrorBundle Text e -> [SyntacticError]
 fromParseErrorBundle (ParseErrorBundle errs posState) =
@@ -110,4 +110,4 @@ fromParseErrorBundle (ParseErrorBundle errs posState) =
       (PosState Text, [SyntacticError])
     f err (i, acc) =
       let n = reachOffsetNoLine (errorOffset err) i
-       in (n, (posStateToLoc n, parseErrorTextPretty err) : acc)
+       in (n, (posStateToPos n, parseErrorTextPretty err) : acc)

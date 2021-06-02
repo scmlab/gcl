@@ -1,16 +1,15 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Test.Server (tests) where
+module Test.Server (tests, runGoldenTest) where
 
 import Data.ByteString.Lazy (ByteString)
 import qualified Data.ByteString.Lazy as BSL
-import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
 import Server.DSL
 import Server.Interpreter.Test
 import Test.Tasty
 import qualified Test.Tasty.Golden as Golden
-import Pretty (toText)
+import Data.Text (Text)
 
 tests :: TestTree
 tests = testGroup "Server" [instantiateSpec]
@@ -29,18 +28,16 @@ instantiateSpec =
     ]
   where
     run :: String -> FilePath -> TestTree
-    run = runGoldenTest "Server/assets/" $ \sourcePath -> do
-      source <- Text.decodeUtf8 . BSL.toStrict <$> BSL.readFile sourcePath
-
-      let testResult = runTest sourcePath source $ do
+    run = runGoldenTest "Server/assets/" $ \sourcePath source -> do
+      return $ serializeTestResult $ runTest sourcePath source $ do
             program <- parseProgram source
             Right <$> sweep program
 
-      return $ BSL.fromStrict . Text.encodeUtf8 $ toText testResult
-
-runGoldenTest :: FilePath -> (FilePath -> IO ByteString) -> String -> FilePath -> TestTree
+runGoldenTest :: FilePath -> (FilePath -> Text -> IO ByteString) -> String -> FilePath -> TestTree
 runGoldenTest dir test name path = do
   let goldenPath = "./test/Test/" <> dir <> path <> ".golden"
   let sourcePath = "./test/Test/" <> dir <> path
-  Golden.goldenVsStringDiff name (\ref new -> ["diff", "-u", ref, new]) goldenPath (test sourcePath)
+  Golden.goldenVsStringDiff name (\ref new -> ["diff", "-u", ref, new]) goldenPath $ do
+    source <- Text.decodeUtf8 . BSL.toStrict <$> BSL.readFile sourcePath
+    test sourcePath source 
 

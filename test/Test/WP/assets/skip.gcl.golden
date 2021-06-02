@@ -1,0 +1,16 @@
+### Result
+
+[ < Skip >
+True
+=>
+0   =   0
+at ./test/Test/WP/assets/skip.gcl [9-13] 2:1-5 ]
+
+### Source
+
+{ True }
+skip
+{ 0 = 0 }
+
+### Trace
+

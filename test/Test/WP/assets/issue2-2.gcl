@@ -1,0 +1,4 @@
+con A, B : Int
+var x, y, z : Int
+{ True }
+{ z = A * B }

@@ -53,9 +53,31 @@ exprTests =
         exprCheck "i >= j <= k" "Bool",
       testCase "Chain 5" $
         exprCheck "b = (i < j)" "Bool",
-      testCase "Chain 6" $
+      testCase "Arith 1" $
+        exprCheck "i + j" "Int",
+      testCase "Arith 2" $
+        exprCheck "i - j" "Int",
+      testCase "Arith 3" $
+        exprCheck "i * j" "Int",
+      testCase "Arith 4" $
+        exprCheck "i / j" "Int",
+      testCase "Arith 5" $
+        exprCheck "i % j" "Int",
+      testCase "Arith 6" $
+        exprCheck "p ⇒ q" "Bool",
+      testCase "Arith 7" $
+        exprCheck "p ∧ q" "Bool",
+      testCase "Arith 8" $
+        exprCheck "p ∨ q" "Bool",
+      testCase "Arith 9" $
+        exprCheck "p ¬ q" "Bool",
+      testCase "Arith 10" $
+        exprCheck "i ↑ j" "Int",
+      testCase "Arith 11" $
+        exprCheck "i ↓ j" "Int",
+      testCase "Combined Op 1" $
         exprCheck "i = j ∧ i = k" "Bool",
-      testCase "Chain 7" $
+      testCase "Combined Op 2" $
         exprCheck "i = j ∧ i ≤ k" "Bool",
       -- testCase "Arr App 1" $
       --   exprCheck "Arr" "array [ 0 .. N ) of Int",
@@ -310,7 +332,10 @@ env =
         (name' "i", tint),
         (name' "j", tint),
         (name' "k", tint),
-        (name' "b", tbool)
+        (name' "b", tbool),
+        (name' "p", tbool),
+        (name' "q", tbool),
+        (name' "r", tbool)
       ]
 
 runParser :: ToAbstract a b => Parser a -> Text -> Either (Either [Error] Loc) b

@@ -4,7 +4,7 @@ import GCL.Predicate
 import GCL.Predicate.Located ()
 import Syntax.Abstract (Expr)
 import qualified Syntax.Abstract.Operator as A
-import Data.Loc (Pos(..), Loc (..), Located (locOf), posLine, unLoc, posCoff)
+import Data.Loc (Loc (..), Located (locOf), posLine, unLoc, posCoff)
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Char as Char
@@ -20,38 +20,11 @@ toExpr (Conjunct xs) = A.conjunct (map toExpr xs)
 toExpr (Disjunct xs) = A.disjunct (map toExpr xs)
 toExpr (Negate x) = A.neg (toExpr x)
 
--- | Smart constructors for testing
-pos :: Int -> Int -> Int -> Pos
-pos = Pos "<test>"
-
-assertion :: Expr -> Pred
-assertion x = Assertion x NoLoc
-
-loopInvariant :: Expr -> Text -> Pred
-loopInvariant x b = LoopInvariant x (bnd b) NoLoc
-  where
-    bnd
-      | Text.null b = A.variable
-      | Char.isUpper (Text.head b) = A.constant
-      | otherwise = A.variable
-
 guardIf :: Expr -> Pred
-guardIf x = GuardIf x NoLoc
+guardIf x = GuardIf x (locOf x)
 
 guardLoop :: Expr -> Pred
-guardLoop x = GuardLoop x NoLoc
-
-boundEq :: Expr -> Expr -> Pred
-boundEq x var = Bound (x `A.eqq` var) NoLoc
-
-boundLT :: Expr -> Expr -> Pred
-boundLT x var = Bound (x `A.lt` var) NoLoc
-
-boundGTE :: Expr -> Expr -> Pred
-boundGTE x var = Bound (x `A.gte` var) NoLoc
-
-(===) :: Int -> Int -> Expr
-x === y = A.number x `A.eqq` A.number y
+guardLoop x = GuardLoop x (locOf x)
 
 conjunct :: [Pred] -> Pred
 conjunct [] = Constant A.true

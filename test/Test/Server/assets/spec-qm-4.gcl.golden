@@ -1,17 +1,17 @@
 ### Result
 
-([ [0] 
-  True
-  True
-  Conditional
- ], [ [1]
-  True ∧ True
-  True
-
-, [0]
-  True
-  True
- ], [  ], [  ])
+([ < Conditional >
+True
+=>
+True
+at ./test/Test/Server/assets/spec-qm-4.gcl [0-52] 1:1-8:3 ], [ True ∧ True
+=>
+True
+at ./test/Test/Server/assets/spec-qm-4.gcl [16-30] 2:5-4:7
+, True
+=>
+True
+at ./test/Test/Server/assets/spec-qm-4.gcl [35-49] 5:5-7:7 ], [  ], [  ])
 
 ### Source
 
@@ -28,7 +28,7 @@ fi
 
 ### Trace
 
-CmdLog " ### DigHole ./test/Test/Server/assets/spec-qm-4.gcl [16-17] 2:5-6"
-CmdEditText ./test/Test/Server/assets/spec-qm-4.gcl [16-17] 2:5-6 "[!\n    \n    !]"
-CmdLog " ### DigHole ./test/Test/Server/assets/spec-qm-4.gcl [35-36] 5:5-6"
-CmdEditText ./test/Test/Server/assets/spec-qm-4.gcl [35-36] 5:5-6 "[!\n    \n    !]"
+TraceLog " ### DigHole ./test/Test/Server/assets/spec-qm-4.gcl [16-17] 2:5-6"
+TraceEditText ./test/Test/Server/assets/spec-qm-4.gcl [16-17] 2:5-6 "[!\n    \n    !]"
+TraceLog " ### DigHole ./test/Test/Server/assets/spec-qm-4.gcl [35-36] 5:5-6"
+TraceEditText ./test/Test/Server/assets/spec-qm-4.gcl [35-36] 5:5-6 "[!\n    \n    !]"

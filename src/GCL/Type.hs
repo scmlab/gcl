@@ -368,13 +368,13 @@ arithOpTypes (Sub l) = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TInt l)
 arithOpTypes (Mul l) = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TInt l) l) l
 arithOpTypes (Div l) = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TInt l) l) l
 arithOpTypes (Mod l) = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TInt l) l) l
+arithOpTypes (Max l) = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TInt l) l) l
+arithOpTypes (Min l) = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TInt l) l) l
 
 quantOpTypes :: QuantOp -> Type
 quantOpTypes (Sum l) = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TInt l) l) l
 quantOpTypes (Forall l) = TFunc (TBase TBool l) (TFunc (TBase TBool l) (TBase TBool l) l) l
 quantOpTypes (Exists l) = TFunc (TBase TBool l) (TFunc (TBase TBool l) (TBase TBool l) l) l
-quantOpTypes (Max l) = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TInt l) l) l
-quantOpTypes (Min l) = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TInt l) l) l
 quantOpTypes (Hash l) = TFunc (TBase TBool l) (TBase TInt l) l
 
 opTypes :: Op -> Type

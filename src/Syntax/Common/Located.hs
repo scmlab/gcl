@@ -35,13 +35,13 @@ instance Located ArithOp where
   locOf (Mul l) = l
   locOf (Div l) = l
   locOf (Mod l) = l
+  locOf (Max l) = l
+  locOf (Min l) = l
 
 instance Located QuantOp where
   locOf (Sum l) = l
   locOf (Exists l) = l
   locOf (Forall l) = l
-  locOf (Max l) = l
-  locOf (Min l) = l
   locOf (Hash l) = l
 
 instance Located Op where

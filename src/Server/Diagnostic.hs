@@ -24,7 +24,7 @@ instance ToDiagnostics StructError where
   toDiagnostics (MissingPostcondition loc) = [makeError loc "Postcondition Missing" "The last statement of the program should be an assertion"]
 
 instance ToDiagnostics Error where
-  toDiagnostics (SyntacticError (loc, msg)) = [makeError loc "Syntax error" (Text.pack msg)]
+  toDiagnostics (SyntacticError (pos, msg)) = [makeError (Loc pos pos) "Syntax error" (Text.pack msg)]
   toDiagnostics (StructError err) = toDiagnostics err
   toDiagnostics (TypeError err) = toDiagnostics err
   toDiagnostics _ = []
@@ -67,7 +67,7 @@ instance ToDiagnostics PO where
       -- we only mark the opening tokens ("do" and "if") for loops & conditionals
       first2Char :: Loc -> Loc
       first2Char NoLoc = NoLoc
-      first2Char (Loc start _) = Loc start (translate 1 start)
+      first2Char (Loc start _) = Loc start (translate 2 start)
 
       loc :: Loc
       loc = case origin of
@@ -99,10 +99,10 @@ makeDiagnostic severity loc title body =
 
 locToRange :: Loc -> LSP.Range
 locToRange NoLoc = LSP.Range (Position 0 0) (Position 0 0)
-locToRange (Loc start end) = LSP.Range (posToPosition start) (posToPosition (translate 1 end))
+locToRange (Loc start end) = LSP.Range (posToPosition start) (posToPosition end)
 
 rangeToRange :: Range -> LSP.Range
-rangeToRange (Range start end) = LSP.Range (posToPosition start) (posToPosition (translate 1 end))
+rangeToRange (Range start end) = LSP.Range (posToPosition start) (posToPosition end)
 
 locToLocation :: Loc -> Location
 locToLocation NoLoc = Location (Uri "") (locToRange NoLoc)
