@@ -65,17 +65,17 @@ precond (If l _) = unLoc l
 precond (Spec l _) = unLoc l
 
 -- | Return lines within a Spec without indentation
-specPayload :: Text -> Spec -> [Text]
-specPayload source spec =
-  let Range start end = specRange spec
-      payload = Text.drop (posCoff start) $ Text.take (posCoff end) source
-  in init $ tail $ Text.lines payload
-
--- | Return lines within a Spec without indentation
 specPayloadWithoutIndentation :: Text -> Spec -> [Text]
 specPayloadWithoutIndentation source spec =
-  let linesWithIndentation = specPayload source spec
-      splittedIndentedLines = map (Text.break (not . Char.isSpace)) linesWithIndentation
-      smallestIndentation = minimum $ map (Text.length . fst) splittedIndentedLines
-      trimmedLines = map (\(indentation, content) -> Text.drop smallestIndentation indentation <> content) splittedIndentedLines
-   in trimmedLines
+  let Range start end = specRange spec
+      spansMultipleLines = posLine start /= posLine end
+    in if spansMultipleLines 
+      then 
+        let payload = Text.drop (posCoff start) $ Text.take (posCoff end) source
+            linesWithIndentation = init $ tail $ Text.lines payload
+            splittedIndentedLines = map (Text.break (not . Char.isSpace)) linesWithIndentation
+            smallestIndentation = minimum $ map (Text.length . fst) splittedIndentedLines
+            trimmedLines = map (\(indentation, content) -> Text.drop smallestIndentation indentation <> content) splittedIndentedLines
+        in trimmedLines
+      else 
+        [Text.strip $ Text.take 2 $ Text.drop 2 source]
