@@ -190,6 +190,7 @@ interpret filepath responder p = case runCmdM p of
     sendDiagnostics filepath diagnostics
     interpret filepath responder next
   Left errors -> do
+    setMute False -- unmute on error!
     cacheResult (Left errors)
     logStuff errors
     handleErrors filepath responder errors
