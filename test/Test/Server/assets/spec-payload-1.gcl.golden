@@ -1,0 +1,37 @@
+### Result
+
+[ [ "skip" ]
+, [ "skip" ]
+, [ "skip"
+, "    skip"
+, "abort" ]
+, [ "skip" ]
+, [ "skip" ] ]
+
+### Source
+
+[!
+skip
+!]
+
+[!
+    skip
+!]
+
+
+[!
+    skip
+        skip
+    abort
+!]
+
+
+[!skip!]
+
+
+[!  skip  !]
+
+{ True }
+
+### Trace
+

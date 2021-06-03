@@ -78,4 +78,4 @@ specPayloadWithoutIndentation source spec =
             trimmedLines = map (\(indentation, content) -> Text.drop smallestIndentation indentation <> content) splittedIndentedLines
         in trimmedLines
       else 
-        [Text.strip $ Text.take 2 $ Text.drop 2 source]
+        [Text.strip $ Text.drop (posCoff start + 2) $ Text.take (posCoff end - 2) source]

@@ -1,0 +1,22 @@
+[!
+skip
+!]
+
+[!
+    skip
+!]
+
+
+[!
+    skip
+        skip
+    abort
+!]
+
+
+[!skip!]
+
+
+[!  skip  !]
+
+{ True }

@@ -10,9 +10,10 @@ import Server.Interpreter.Test
 import Test.Tasty
 import qualified Test.Tasty.Golden as Golden
 import Data.Text (Text)
+import GCL.Predicate.Util (specPayloadWithoutIndentation)
 
 tests :: TestTree
-tests = testGroup "Server" [instantiateSpec]
+tests = testGroup "Server" [instantiateSpec, specPayloadWithoutIndentationTests]
 
 --------------------------------------------------------------------------------
 
@@ -32,6 +33,22 @@ instantiateSpec =
       return $ serializeTestResult $ runTest sourcePath source $ do
             program <- parseProgram source
             Right <$> sweep program
+
+
+specPayloadWithoutIndentationTests :: TestTree
+specPayloadWithoutIndentationTests =
+  testGroup
+    "Testing specPayloadWithoutIndentation"
+    [ run "mulitline 1" "spec-payload-1.gcl"
+    ]
+  where
+    run :: String -> FilePath -> TestTree
+    run = runGoldenTest "Server/assets/" $ \sourcePath source -> do
+      return $ serializeTestResult $ runTest sourcePath source $ do
+            program <- parseProgram source
+            (_, specs, _, _) <- sweep program
+            return $ Right $ map (map (\x -> "\"" <> x <> "\"") . specPayloadWithoutIndentation source) specs
+
 
 runGoldenTest :: FilePath -> (FilePath -> Text -> IO ByteString) -> String -> FilePath -> TestTree
 runGoldenTest dir test name path = do
