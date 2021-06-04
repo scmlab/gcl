@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: b7caaed09acf41a9724fdce1d3fc4bc715976c8e2153311fae6b765593e6c00b
+-- hash: 4735cc1a4e00069a561d982ee7c57a7cb8ba1c1ab5ead703c119922986848289
 
 name:           gcl
 version:        0.1.0.0
@@ -56,6 +56,7 @@ library
       Server.DSL
       Server.Handler
       Server.Handler.AutoCompletion
+      Server.Handler.CustomMethod
       Server.Interpreter.RealWorld
       Server.Interpreter.Test
       Syntax.Abstract
@@ -179,6 +180,7 @@ test-suite gcl-test
       Server.DSL
       Server.Handler
       Server.Handler.AutoCompletion
+      Server.Handler.CustomMethod
       Server.Interpreter.RealWorld
       Server.Interpreter.Test
       Syntax.Abstract

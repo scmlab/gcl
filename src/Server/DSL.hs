@@ -21,11 +21,14 @@ import Language.LSP.Types ( Diagnostic )
 import qualified Syntax.Abstract as A
 import Syntax.Concrete.ToAbstract
 import Syntax.Parser (Parser, pProgram, pStmts, runParse)
-import GCL.Predicate (PO, Spec)
+import GCL.Predicate
 import GCL.Predicate.Util ( specPayloadWithoutIndentation )
 import Prelude hiding (span)
 import Pretty (toText)
 import qualified Data.List as List
+import Server.CustomMethod 
+import Render
+import Server.Diagnostic
 
 --------------------------------------------------------------------------------
 
@@ -151,3 +154,48 @@ parseProgram source = do
 
 --------------------------------------------------------------------------------
 
+
+
+generateResponseAndDiagnosticsFromResult :: Result -> CmdM [ResKind]
+generateResponseAndDiagnosticsFromResult (Left errors) = throwError errors
+generateResponseAndDiagnosticsFromResult (Right (pos, specs, globalProps, warnings))
+  = do
+  -- leave only POs & Specs around the mouse selection
+    lastSelection <- getLastSelection
+    let overlappedSpecs = case lastSelection of
+          Nothing  -> specs
+          Just sel -> filter (withinRange sel) specs
+    let overlappedPOs = case lastSelection of
+          Nothing  -> pos
+          Just sel -> filter (withinRange sel) pos
+    -- render stuff
+    let warningsSection = if null warnings
+          then []
+          else headerE "Warnings" : map renderBlock warnings
+    let globalPropsSection = if null globalProps
+          then []
+          else headerE "Global Properties" : map renderBlock globalProps
+    let specsSection = if null overlappedSpecs
+          then []
+          else headerE "Specs" : map renderBlock overlappedSpecs
+    let poSection = if null overlappedPOs
+          then []
+          else headerE "Proof Obligations" : map renderBlock overlappedPOs
+    let blocks = mconcat
+          [warningsSection, specsSection, poSection, globalPropsSection]
+
+    version <- bumpVersion
+    let encodeSpec spec =
+          ( specID spec
+          , toText $ render (specPreCond spec)
+          , toText $ render (specPostCond spec)
+          , specRange spec
+          )
+
+    let responses =
+          [ResDisplay version blocks, ResUpdateSpecs (map encodeSpec specs)]
+    let diagnostics =
+          concatMap toDiagnostics pos ++ concatMap toDiagnostics warnings
+    sendDiagnostics diagnostics
+
+    return responses
