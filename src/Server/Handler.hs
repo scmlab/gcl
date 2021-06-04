@@ -9,6 +9,7 @@ module Server.Handler
 
 -- import qualified Server.CustomMethod as Custom
 
+import           Control.Lens                   ( (^.) )
 import           Control.Monad.Except
 import qualified Data.Aeson                    as JSON
 import           Data.Loc.Range
@@ -25,16 +26,17 @@ import           Server.DSL
 import           Server.Diagnostic              ( ToDiagnostics(toDiagnostics) )
 import           Server.Interpreter.RealWorld
 
+-- import qualified Language.LSP.Types            as J
+import qualified Language.LSP.Types.Lens       as J
 import qualified Server.Handler.AutoCompletion as AutoCompletion
+
 -- handlers of the LSP server
 handlers :: Handlers ServerM
 handlers = mconcat
   [ -- autocompletion
     requestHandler STextDocumentCompletion $ \req responder -> do
-    let RequestMessage _ _ _ params = req
-    let
-      CompletionParams (TextDocumentIdentifier _uri) position _progress _partial completionContext
-        = params
+    let completionContext = req ^. J.params . J.context
+    let position          = req ^. J.params . J.position
     AutoCompletion.handler position completionContext >>= responder . Right
   ,
       -- custom methods, not part of LSP

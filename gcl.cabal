@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: cdc87b07ff54688cfb76de86873dc711d6a10ecaf30e4df9925d6a6d6e0c7a2a
+-- hash: b7caaed09acf41a9724fdce1d3fc4bc715976c8e2153311fae6b765593e6c00b
 
 name:           gcl
 version:        0.1.0.0
@@ -30,10 +30,10 @@ library
       GCL.Exec.ExNondet
       GCL.Exec.ExRand
       GCL.Expr
-      GCL.Type
       GCL.Predicate
       GCL.Predicate.Located
       GCL.Predicate.Util
+      GCL.Type
       GCL.WP
       Pretty
       Pretty.Abstract
@@ -55,6 +55,7 @@ library
       Server.Diagnostic
       Server.DSL
       Server.Handler
+      Server.Handler.AutoCompletion
       Server.Interpreter.RealWorld
       Server.Interpreter.Test
       Syntax.Abstract
@@ -83,6 +84,7 @@ library
     , bytestring
     , containers
     , free
+    , lens
     , lexer-applicative
     , lsp
     , megaparsec >=8.0
@@ -114,6 +116,7 @@ executable gcl
     , containers
     , free
     , gcl
+    , lens
     , lexer-applicative
     , lsp
     , megaparsec >=8.0
@@ -150,10 +153,10 @@ test-suite gcl-test
       GCL.Exec.ExNondet
       GCL.Exec.ExRand
       GCL.Expr
-      GCL.Type
       GCL.Predicate
       GCL.Predicate.Located
       GCL.Predicate.Util
+      GCL.Type
       GCL.WP
       Pretty
       Pretty.Abstract
@@ -175,11 +178,12 @@ test-suite gcl-test
       Server.Diagnostic
       Server.DSL
       Server.Handler
+      Server.Handler.AutoCompletion
       Server.Interpreter.RealWorld
       Server.Interpreter.Test
       Syntax.Abstract
-      Syntax.Abstract.Operator
       Syntax.Abstract.Located
+      Syntax.Abstract.Operator
       Syntax.Abstract.Util
       Syntax.Common
       Syntax.Common.Located
@@ -203,6 +207,7 @@ test-suite gcl-test
     , bytestring
     , containers
     , free
+    , lens
     , lexer-applicative
     , lsp
     , megaparsec >=8.0
