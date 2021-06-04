@@ -22,7 +22,7 @@ import qualified Syntax.Abstract as A
 import Syntax.Concrete.ToAbstract
 import Syntax.Parser (Parser, pProgram, pStmts, runParse)
 import GCL.Predicate (PO, Spec)
-import GCL.Predicate.Util ( specPayload )
+import GCL.Predicate.Util ( specPayloadWithoutIndentation )
 import Prelude hiding (span)
 import Pretty (toText)
 import qualified Data.List as List
@@ -105,7 +105,7 @@ refine source range  = do
     Nothing -> throwError [Others "Please place the cursor in side a Spec to refine it"]
     Just spec -> do
       source' <- getSource
-      let payload = Text.unlines $ specPayload source' spec
+      let payload = Text.unlines $ specPayloadWithoutIndentation source' spec
       -- HACK, `pStmts` will kaput if we feed empty strings into it
       let payloadIsEmpty = Text.null (Text.strip payload)
       if payloadIsEmpty
