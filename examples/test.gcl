@@ -3,11 +3,14 @@ con a : array [0..N) of Int
 con inf : Int
 var r, s, n : Int
 
-let P = True
+let P x = x
 
 r, s, n := 0-inf, 0 - inf, 0
 { r = s ∧ 0 ≤ n, bnd : N -n}
-skip
+if P r = r -> [!
+              
+              !]
+fi
 { True }
 
 {-

@@ -2,13 +2,13 @@
 {-# LANGUAGE FlexibleInstances #-}
 module GCL.WP where
 
-import Control.Monad.RWS (RWST, MonadState (..), MonadWriter (..), evalRWST)
+import Control.Monad.RWS (RWST, MonadState (..), MonadWriter (..), evalRWST, MonadReader (ask))
 import Control.Monad.Except (Except, unless,MonadError (throwError), forM, forM_, when, runExcept)
 import GHC.Generics(Generic)
 import Data.Loc (Loc(..), Located (..))
 import Data.Loc.Range ( fromLoc, Range )
 import GCL.Common
-    ( Env, Fresh(freshText, fresh), Substitutable(apply) )
+    ( Env, Fresh(freshText, fresh), Substitutable(apply), Subs )
 import GCL.Predicate (PO (..), Pred (..), Origin (..), Spec (Specification))
 import GCL.Predicate.Util ( toExpr, guardIf, disjunct, conjunct, guardLoop )
 import qualified Syntax.Abstract as A
@@ -91,8 +91,9 @@ struct :: Bool -> Pred -> Maybe A.Expr -> A.Stmt -> Pred -> WP ()
 struct _ pre _ (A.Abort l) _ = tellPO pre (Constant A.false) (AtAbort l)
 struct _ pre _ (A.Skip l) post = tellPO pre post (AtSkip l)
 struct _ pre _ (A.Assign xs es l) post = do
-  let subst = Map.fromList (zip xs es)
-  let post' = apply subst post
+  env <- Map.map Right <$> ask
+  let subst = Map.fromList . zip xs . map Left $ es
+  let post' = apply (env `Map.union` subst) post
   tellPO pre post' (AtAssignment l)
 struct True pre _ (A.Assert p l) post = do
   tellPO pre (Assertion p l) (AtAssertion l)
@@ -167,9 +168,10 @@ wp ::Bool -> A.Stmt -> Pred -> WP Pred
 wp _ (A.Skip _) post = return post
 wp _ (A.Abort _) _ = return (Constant A.false)
 wp _ (A.Assign xs es _) post = do
-  return $ apply subst post
+  env <- Map.map Right <$> ask
+  return $ apply (env `Map.union` subst) post
   where
-    subst = Map.fromList (zip xs es)
+    subst = Map.fromList . zip xs . map Left $ es
 wp _ (A.Assert p l) post = do
   tellPO (Assertion p l) post (AtAssertion l)
   return (Assertion p l)

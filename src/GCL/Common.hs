@@ -91,18 +91,32 @@ instance Substitutable Type Type where
   apply s (TFunc t1 t2 l) = TFunc (apply s t1) (apply s t2) l
   apply s t@(TVar x _) = Map.findWithDefault t x s
 
-instance Substitutable Expr Expr where
+-- `Subs` is either local bindings or let bindings
+-- local bindings need not to be recorded by constructor `Subst`
+instance Substitutable (Either Expr Expr) Expr where
   apply s (Paren expr) = Paren (apply s expr)
   apply _ lit@(Lit _ _) = lit
-  apply s v@(Var n _) = Map.findWithDefault v n s
-  apply s c@(Const n _) = Map.findWithDefault c n s
+  apply s v@(Var n _) = -- Map.findWithDefault v n s
+    case Map.lookup n s of
+      Just (Left v') -> apply (Map.delete n s) v'
+      Just (Right v') -> do
+        let s' = snd $ Map.mapEither id s
+        Subst v s' (apply (Map.delete n s) v') 
+      Nothing -> v
+  apply s c@(Const n _) = -- Map.findWithDefault c n s
+    case Map.lookup n s of
+      Just (Left c') -> apply (Map.delete n s) c'
+      Just (Right c') -> do
+        let s' = snd $ Map.mapEither id s
+        Subst c s' (apply (Map.delete n s) c')
+      Nothing -> c
   apply _ op@(Op _) = op
   apply s (Chain a op b l) = Chain (apply s a) op (apply s b) l
   apply s (App a b l) = 
     let a' = apply s a in
     let b' = apply s b in
     case a' of
-      Lam x body _ -> apply (Map.singleton x b') body
+      Lam x body _ -> apply (Map.singleton x (Left b' :: Either Expr Expr)) body
       _ -> App a' b' l 
   apply s (Lam x e l) = let s' = Map.filterWithKey (\n _ -> n /= x) s in
       Lam x (apply s' e) l
@@ -113,9 +127,12 @@ instance Substitutable Expr Expr where
                 Right op -> Right (apply s op) in
     let s' = Map.withoutKeys s (Set.fromList xs) in
     Quant op' xs (apply s' rng) (apply s' t) l
-  apply s (Subst before s' after) = Subst before (s `compose` s') after
+  apply s1 (Subst before s2 after) = do
+    let s1' = snd $ Map.mapEither id s1
+    Subst before (s1' `Map.union` s2) (apply s1 after)
+    -- Subst before (s `compose` s') after
 
-instance Substitutable Expr Pred where
+instance Substitutable (Either Expr Expr) Pred where
   apply s (Constant e) = Constant (apply s e)
   apply s (Bound e l) = Bound (apply s e) l
   apply s (Assertion e l) = Assertion (apply s e) l
