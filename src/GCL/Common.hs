@@ -94,32 +94,32 @@ instance Substitutable A.Type A.Type where
   apply s (A.TFunc t1 t2 l) = A.TFunc (apply s t1) (apply s t2) l
   apply s t@(A.TVar x _) = Map.findWithDefault t x s
 
--- instance Substitutable Expr Expr where
---   apply s (Paren expr) = Paren (apply s expr)
---   apply _ lit@(Lit _ _) = lit
---   apply s v@(Var n _) = Map.findWithDefault v n s
---   apply s c@(Const n _) = Map.findWithDefault c n s
---   apply _ o@(Op _) = o
---   apply s (Chain a op b l) = Chain (apply s a) op (apply s b) l
---   apply s (App a b l) =
---     let a' = apply s a in
---     let b' = apply s b in 
---       case a' of
---         Lam x body _ -> apply (Map.singleton x b') body
---         _ -> App a' b' l
---   apply s (Lam x e l) =
---     let s' = Map.withoutKeys s (Set.singleton x) in
---     Lam x (apply s' e) l
---   apply _ h@(Hole _) = h
---   apply s (Quant qop xs rng t l) = 
---     let op' = case qop of
---                 Left op -> Left op
---                 Right op -> Right (apply s op) in
---     let s' = Map.withoutKeys s (Set.fromList xs) in
---     Quant op' xs (apply s' rng) (apply s' t) l
---   -- after should already be applied to subs 
---   apply s1 (Subst before s2 after) = 
---     Subst before (s1 `compose` s2) (apply s1 after)
+instance Substitutable A.Expr A.Expr where
+  apply s (A.Paren expr) = A.Paren (apply s expr)
+  apply _ lit@(A.Lit _ _) = lit
+  apply s v@(A.Var n _) = Map.findWithDefault v n s
+  apply s c@(A.Const n _) = Map.findWithDefault c n s
+  apply _ o@(A.Op _) = o
+  apply s (A.Chain a op b l) = A.Chain (apply s a) op (apply s b) l
+  apply s (A.App a b l) =
+    let a' = apply s a in
+    let b' = apply s b in 
+      case a' of
+        A.Lam x body _ -> apply (Map.singleton x b') body
+        _ -> A.App a' b' l
+  apply s (A.Lam x e l) =
+    let s' = Map.withoutKeys s (Set.singleton x) in
+    A.Lam x (apply s' e) l
+  apply _ h@(A.Hole _) = h
+  apply s (A.Quant qop xs rng t l) = 
+    let op' = case qop of
+                Left op -> Left op
+                Right op -> Right (apply s op) in
+    let s' = Map.withoutKeys s (Set.fromList xs) in
+    A.Quant op' xs (apply s' rng) (apply s' t) l
+  -- after should already be applied to subs 
+  apply s1 (A.Subst before s2 after) = 
+    A.Subst before (s1 `compose` s2) (apply s1 after)
 
 -- Left of Bindings will be rendered,   
 --    including assignment
@@ -140,14 +140,14 @@ instance Substitutable Bindings A.Expr where
   apply s v@(A.Var n _) = 
     case Map.lookup n s of
       Just (Left v') -> do
-        A.Subst v (Map.singleton n v') (apply (Map.delete n s) v')
+        apply (Map.delete n s) v'
       Just (Right v') -> do
         A.Subst v emptySubs (apply (Map.delete n s) v')
       Nothing -> v
   apply s c@(A.Const n _) = 
     case Map.lookup n s of
       Just (Left c') -> do
-        A.Subst c (Map.singleton n c') (apply (Map.delete n s) c')
+        apply (Map.delete n s) c'
       Just (Right c') -> do
         A.Subst c emptySubs (apply (Map.delete n s) c')
       Nothing -> c
@@ -158,13 +158,10 @@ instance Substitutable Bindings A.Expr where
     let b' = apply s b in
     case a' of
       A.Lam x body _ -> 
-        apply (singleBinding x (Right b')) body
+        apply (Map.singleton x b') body
       A.Subst _ s1 (A.Lam x body _) -> do
-        let body' = apply (singleBinding x (Right b')) body
-        let (s', after) = case body' of
-                  A.Subst _ s2 bodyAfter -> (s1 `Map.union` s2, bodyAfter)
-                  _ -> (s1, body')
-        A.Subst (A.App a b l) s' after
+        let body' = apply (Map.singleton x b') body
+        A.Subst (A.App a b l) s1 body'
       _ -> A.App a' b' l 
   apply s (A.Lam x e l) = 
     let s' = Map.withoutKeys s (Set.singleton x) in
