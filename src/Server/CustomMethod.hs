@@ -34,7 +34,6 @@ instance Show ResKind where
 data Response
   = Res FilePath [ResKind]
   | CannotDecodeRequest String
-  | NotLoaded
   deriving (Generic)
 
 instance ToJSON Response
@@ -42,7 +41,6 @@ instance ToJSON Response
 instance Show Response where
   show (Res _path kinds) = show kinds
   show (CannotDecodeRequest s) = "CannotDecodeRequest " <> s
-  show NotLoaded = "NotLoaded"
 
 --------------------------------------------------------------------------------
 
