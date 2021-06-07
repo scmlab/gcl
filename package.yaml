@@ -30,6 +30,7 @@ dependencies:
   - random
   - vector
   - lsp 
+  - lens
   - multiset
   - transformers
 
