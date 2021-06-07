@@ -116,10 +116,12 @@ handleExpr _ (Subst before env after) =
     isLam _ = False
 
 instance Render Subst where
-  render env = "[" <+> exprs <+> "/" <+> vars <+> "]"
-    where
-      vars = punctuateE "," $ map render $ Map.keys env
-      exprs = punctuateE "," $ map render $ Map.elems env
+  render env 
+    | null env = mempty
+    | otherwise = "[" <+> exprs <+> "/" <+> vars <+> "]"
+      where
+        vars = punctuateE "," $ map render $ Map.keys env
+        exprs = punctuateE "," $ map render $ Map.elems env
 
 --------------------------------------------------------------------------------
 
