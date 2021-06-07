@@ -10,6 +10,7 @@ import GHC.Generics (Generic)
 import Render
 import GCL.Predicate (Origin, PO, Spec)
 import Data.Loc.Range
+import Pretty
 
 --------------------------------------------------------------------------------
 
@@ -22,10 +23,13 @@ data ResKind
 
 instance ToJSON ResKind
 
+instance Pretty ResKind where
+  pretty (ResDisplay _ _) = "Display"
+  pretty (ResUpdateSpecs _) = "UpdateSpecs"
+  pretty (ResConsoleLog x) = "ConsoleLog " <> pretty x
+
 instance Show ResKind where
-  show (ResDisplay _ _) = "Display"
-  show (ResUpdateSpecs _) = "UpdateSpecs"
-  show (ResConsoleLog x) = "ConsoleLog " <> show x
+  show = toString 
 
 data Response
   = Res FilePath [ResKind]

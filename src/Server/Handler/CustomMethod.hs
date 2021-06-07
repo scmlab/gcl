@@ -2,11 +2,41 @@
 module Server.Handler.CustomMethod where
 
 import qualified Data.Aeson                    as JSON
+import           Data.Loc.Range
 import qualified Data.Text                     as Text
 import           GCL.Predicate
 import           Server.CustomMethod
 import           Server.DSL
 import           Server.Interpreter.RealWorld
+import Data.Loc (posCol)
+
+handleRefine :: Range -> CmdM [ResKind]
+handleRefine range = do
+    mute True
+    setLastSelection range
+    source               <- getSource
+    (spec, payloadLines) <- refine source range
+
+    -- remove the Spec
+    let
+        indentedPayload = case payloadLines of
+            []  -> ""
+            [x] -> x
+            (x : xs) ->
+                let
+                    indentation = Text.replicate
+                        (posCol (rangeStart (specRange spec)) - 1)
+                        " "
+                in  Text.unlines $ x : map (indentation <>) xs
+    source' <- editText (specRange spec) indentedPayload
+
+
+    program <- parseProgram source'
+    typeCheck program
+    mute False
+    result <- sweep program
+    cacheResult (Right result)
+    generateResponseAndDiagnosticsFromResult (Right result)
 
 -- handler :: JSON.Value -> ServerM Int 
 handler :: JSON.Value -> (Response -> ServerM ()) -> ServerM ()
@@ -26,24 +56,5 @@ handler params responder = do
                         setLastSelection range
                         result <- readCachedResult
                         generateResponseAndDiagnosticsFromResult result
-
-                    -- Refine
-                    ReqRefine range -> do
-                        mute True
-                        setLastSelection range
-                        source          <- getSource
-                        (spec, content) <- refine source range
-
-
-                        -- remove the Spec
-                        source'         <- editText (specRange spec)
-                                                    (Text.stripStart content)
-
-                        program <- parseProgram source'
-                        typeCheck program
-                        mute False
-                        result <- sweep program
-                        cacheResult (Right result)
-                        generateResponseAndDiagnosticsFromResult (Right result)
-
-                    ReqDebug -> return $ error "crash!"
+                    ReqRefine range -> handleRefine range
+                    ReqDebug        -> return $ error "crash!"

@@ -101,7 +101,7 @@ digHole range = do
   editText range holeText
 
 -- | Try to parse a piece of text in a Spec
-refine :: Text -> Range -> CmdM (Spec, Text)
+refine :: Text -> Range -> CmdM (Spec, [Text])
 refine source range  = do
   result <- findPointedSpec
   case result of
@@ -114,7 +114,7 @@ refine source range  = do
       if payloadIsEmpty
         then return ()
         else void $ parse pStmts payload
-      return (spec, payload)
+      return (spec, specPayloadWithoutIndentation source' spec)
   where
     findPointedSpec :: CmdM (Maybe Spec)
     findPointedSpec = do

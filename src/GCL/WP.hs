@@ -8,7 +8,7 @@ import GHC.Generics(Generic)
 import Data.Loc (Loc(..), Located (..))
 import Data.Loc.Range ( fromLoc, Range )
 import GCL.Common
-    ( Env, Fresh(freshText, fresh), Substitutable(apply), Subs )
+    ( Env, Fresh(freshText, fresh), Substitutable(apply) )
 import GCL.Predicate (PO (..), Pred (..), Origin (..), Spec (Specification))
 import GCL.Predicate.Util ( toExpr, guardIf, disjunct, conjunct, guardLoop )
 import qualified Syntax.Abstract as A

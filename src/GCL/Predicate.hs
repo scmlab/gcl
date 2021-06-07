@@ -7,7 +7,7 @@ import Syntax.Abstract (Expr)
 import GHC.Generics (Generic)
 import Data.Aeson (ToJSON)
 import Syntax.Common (Name)
-import Data.Loc.Range (fromLoc, within, Range)
+import Data.Loc.Range (fromLoc, within, Range, Ranged (rangeOf))
 
 -- | Predicates
 data Pred
@@ -128,3 +128,6 @@ data Spec = Specification
 
 instance Located Spec where
   locOf (Specification _ _ _ l) = locOf l
+
+instance Ranged Spec where
+  rangeOf (Specification _ _ _ r) = r
