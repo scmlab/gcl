@@ -15,7 +15,7 @@ import Error (Error)
 import Language.LSP.Types (Diagnostic)
 import Pretty
 import Server.DSL
-import Server.Diagnostic (toDiagnostics)
+import Server.Stab (collect)
 
 --------------------------------------------------------------------------------
 
@@ -94,6 +94,6 @@ interpret filepath p = case runCmdM p of
     interpret filepath next
   Left errors -> do
     -- let responses = [ResDisplay 0 (headerE "Errors" : map renderBlock errors)]
-    let diagnostics = errors >>= toDiagnostics
+    let diagnostics = errors >>= collect
     lift $ tell [TraceSendDiagnostics diagnostics]
     return $ Left errors

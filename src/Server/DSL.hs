@@ -28,7 +28,8 @@ import Pretty (toText)
 import qualified Data.List as List
 import Server.CustomMethod 
 import Render
-import Server.Diagnostic
+import Server.Diagnostic ()
+import Server.Stab (collect)
 
 --------------------------------------------------------------------------------
 
@@ -195,7 +196,7 @@ generateResponseAndDiagnosticsFromResult (Right (pos, specs, globalProps, warnin
     let responses =
           [ResDisplay version blocks, ResUpdateSpecs (map encodeSpec specs)]
     let diagnostics =
-          concatMap toDiagnostics pos ++ concatMap toDiagnostics warnings
+          concatMap collect pos ++ concatMap collect warnings
     sendDiagnostics diagnostics
 
     return responses

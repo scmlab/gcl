@@ -30,11 +30,12 @@ import qualified Language.LSP.VFS as VFS
 import Render
 import Server.CustomMethod
 import Server.DSL (runCmdM, CmdM, Cmd(..), Result)
-import Server.Diagnostic
+import Server.Diagnostic ()
 import qualified Server.DSL as DSL
 import Data.Loc.Range (Range)
 import Pretty (toText)
 import qualified Server.Util as J
+import Server.Stab (collect)
 
 --------------------------------------------------------------------------------
 
@@ -101,7 +102,7 @@ handleErrors filepath responder errors = do
   version <- bumpVersionM
   -- (IdInt version)
   let responses = [ResDisplay version (headerE "Errors" : map renderBlock errors), ResUpdateSpecs []]
-  let diagnostics = errors >>= toDiagnostics
+  let diagnostics = errors >>= collect
   -- send diagnostics
   sendDiagnostics filepath diagnostics
   -- send responses
