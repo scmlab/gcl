@@ -34,6 +34,7 @@ import Server.Diagnostic
 import qualified Server.DSL as DSL
 import Data.Loc.Range (Range)
 import Pretty (toText)
+import qualified Server.Util as J
 
 --------------------------------------------------------------------------------
 
@@ -144,7 +145,7 @@ interpret filepath responder p = case runCmdM p of
   Right (Free (EditText range text next)) -> do
     logText $ " ### EditText " <> toText range <> " " <> text
     -- apply edit
-    let removeSpec = TextEdit (rangeToRange range) text
+    let removeSpec = TextEdit (J.toRange range) text
     let identifier = VersionedTextDocumentIdentifier (filePathToUri filepath) (Just 0)
     let textDocumentEdit = TextDocumentEdit identifier (List [InL removeSpec])
     let change = InL textDocumentEdit
