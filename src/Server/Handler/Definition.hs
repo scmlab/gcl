@@ -8,16 +8,16 @@ module Server.Handler.Definition
   ) where
 
 import           Control.Monad.Reader
-import           Data.Loc                       ( Loc
-                                                , locOf
+import           Data.Loc                       ( locOf
                                                 )
 import           Data.Loc.Range
 import qualified Data.Map                      as Map
 import           Data.Map                       ( Map )
-import           Data.Maybe                     ( maybeToList )
+import           Data.Maybe                     ( mapMaybe
+                                                )
 import           Data.Text                      ( Text )
 import           Error
-import           Language.LSP.Types
+import           Language.LSP.Types      hiding ( Range )
 import           Server.DSL
 import           Server.Interpreter.RealWorld
 import           Server.Stab
@@ -45,14 +45,14 @@ type GotoM = ReaderT Env CmdM
 
 data Env = Env
   { envUri   :: Uri
-  , envDecls :: Map Text (Name, Declaration)
+  , envDecls :: Map Text (Range -> LocationLink)
   }
 
 runGotoM :: Uri -> Program -> GotoM a -> CmdM a
 runGotoM uri (Program decls _ _ _ _) = flip runReaderT (Env uri decls')
  where
-  decls' :: Map Text (Name, Declaration)
-  decls' = Map.fromList (decls >>= map makeEntry . splitDecl)
+  decls' :: Map Text (Range -> LocationLink)
+  decls' = Map.fromList (decls >>= mapMaybe declToLocationLink . splitDecl)
 
   -- split a parallel declaration into many simpler declarations 
   splitDecl :: Declaration -> [(Name, Declaration)]
@@ -60,8 +60,20 @@ runGotoM uri (Program decls _ _ _ _) = flip runReaderT (Env uri decls')
   splitDecl decl@(VarDecl   names _ _ _) = [ (name, decl) | name <- names ]
   splitDecl decl@(LetDecl   name  _ _ _) = [(name, decl)]
 
-  makeEntry :: (Name, Declaration) -> (Text, (Name, Declaration))
-  makeEntry (name, decl) = (nameToText name, (name, decl))
+  declToLocationLink
+    :: (Name, Declaration) -> Maybe (Text, Range -> LocationLink)
+  declToLocationLink (name, decl) = do
+    calleeRange    <- fromLoc (locOf decl)
+    calleeSelRange <- fromLoc (locOf name)
+
+    let text = nameToText name
+    let toLocationLink callerRange = LocationLink
+          (Just $ toRange callerRange)
+          uri
+          (toRange calleeRange)
+          (toRange calleeSelRange)
+
+    return (text, toLocationLink)
 
 instance StabM GotoM Program LocationLink where
   stabM pos (Program decls _ _ stmts _) = do
@@ -98,42 +110,14 @@ instance StabM GotoM Expr LocationLink where
     Quant _ _ c d _ -> (<>) <$> stabM pos c <*> stabM pos d
     _               -> return []
 
-
--- stabDeclarations :: Position -> Name -> Loc -> GotoM [LocationLink]
--- stabDeclarations pos name callerLoc = do
---   uri   <- asks envUri
---   decls <- asks envDecls
---   if pos `stabbed'` name
---     then case Map.lookup (nameToText name) decls of
---       Nothing                   -> return []
---       Just (defnName, defnExpr) -> do
---         let getLink = do
---               callerRange    <- fromLoc callerLoc
---               calleeRange    <- fromLoc (locOf defnExpr)
---               calleeSelRange <- fromLoc (locOf defnName)
---               return $ LocationLink (Just $ toRange callerRange)
---                                     uri
---                                     (toRange calleeRange)
---                                     (toRange calleeSelRange)
---         return $ maybeToList getLink
---     else return []
-
-
 instance StabM GotoM Name LocationLink where
   stabM pos name@(Name text callerLoc) = do
-    uri   <- asks envUri
     decls <- asks envDecls
     if pos `stabbed'` name
       then case Map.lookup text decls of
-        Nothing                   -> return []
-        Just (defnName, defnExpr) -> do
-          let getLink = do
-                callerRange    <- fromLoc callerLoc
-                calleeRange    <- fromLoc (locOf defnExpr)
-                calleeSelRange <- fromLoc (locOf defnName)
-                return $ LocationLink (Just $ toRange callerRange)
-                                      uri
-                                      (toRange calleeRange)
-                                      (toRange calleeSelRange)
-          return $ maybeToList getLink
+        Nothing             -> return []
+        Just toLocationLink -> do
+          case fromLoc callerLoc of
+            Nothing          -> return []
+            Just callerRange -> return [toLocationLink callerRange]
       else return []
