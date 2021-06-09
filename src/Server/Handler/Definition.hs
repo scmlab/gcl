@@ -23,7 +23,7 @@ import           Server.Interpreter.RealWorld
 import           Server.Stab
 import           Server.Util
 import           Syntax.Abstract
-import           Syntax.Common                  ( Name
+import           Syntax.Common                  ( Name(Name)
                                                 , nameToText
                                                 )
 
@@ -77,6 +77,7 @@ instance StabM GotoM Declaration LocationLink where
 
 instance StabM GotoM Stmt LocationLink where
   stabM pos = \case
+    Assign a b _        -> (<>) <$> stabM pos a <*> stabM pos b
     Assert a _          -> stabM pos a
     LoopInvariant a b _ -> (<>) <$> stabM pos a <*> stabM pos b
     Do a _              -> stabM pos a
@@ -88,30 +89,51 @@ instance StabM GotoM GdCmd LocationLink where
 
 instance StabM GotoM Expr LocationLink where
   stabM pos = \case
-    Var   name callerLoc -> stabDeclaration name callerLoc
-    Const name callerLoc -> stabDeclaration name callerLoc
-    Paren a              -> stabM pos a
-    Chain a _ c _        -> (<>) <$> stabM pos a <*> stabM pos c
-    App a b _            -> (<>) <$> stabM pos a <*> stabM pos b
-    Lam _ b _            -> stabM pos b
-    Quant _ _ c d _      -> (<>) <$> stabM pos c <*> stabM pos d
-    _                    -> return []
-   where
-    stabDeclaration :: Name -> Loc -> GotoM [LocationLink]
-    stabDeclaration name callerLoc = do
-      uri   <- asks envUri
-      decls <- asks envDecls
-      if pos `stabbed'` name
-        then case Map.lookup (nameToText name) decls of
-          Nothing                   -> return []
-          Just (defnName, defnExpr) -> do
-            let getLink = do
-                  callerRange    <- fromLoc callerLoc
-                  calleeRange    <- fromLoc (locOf defnExpr)
-                  calleeSelRange <- fromLoc (locOf defnName)
-                  return $ LocationLink (Just $ toRange callerRange)
-                                        uri
-                                        (toRange calleeRange)
-                                        (toRange calleeSelRange)
-            return $ maybeToList getLink
-        else return []
+    Var   a _       -> stabM pos a
+    Const a _       -> stabM pos a
+    Paren a         -> stabM pos a
+    Chain a _ c _   -> (<>) <$> stabM pos a <*> stabM pos c
+    App a b _       -> (<>) <$> stabM pos a <*> stabM pos b
+    Lam _ b _       -> stabM pos b
+    Quant _ _ c d _ -> (<>) <$> stabM pos c <*> stabM pos d
+    _               -> return []
+
+
+-- stabDeclarations :: Position -> Name -> Loc -> GotoM [LocationLink]
+-- stabDeclarations pos name callerLoc = do
+--   uri   <- asks envUri
+--   decls <- asks envDecls
+--   if pos `stabbed'` name
+--     then case Map.lookup (nameToText name) decls of
+--       Nothing                   -> return []
+--       Just (defnName, defnExpr) -> do
+--         let getLink = do
+--               callerRange    <- fromLoc callerLoc
+--               calleeRange    <- fromLoc (locOf defnExpr)
+--               calleeSelRange <- fromLoc (locOf defnName)
+--               return $ LocationLink (Just $ toRange callerRange)
+--                                     uri
+--                                     (toRange calleeRange)
+--                                     (toRange calleeSelRange)
+--         return $ maybeToList getLink
+--     else return []
+
+
+instance StabM GotoM Name LocationLink where
+  stabM pos name@(Name text callerLoc) = do
+    uri   <- asks envUri
+    decls <- asks envDecls
+    if pos `stabbed'` name
+      then case Map.lookup text decls of
+        Nothing                   -> return []
+        Just (defnName, defnExpr) -> do
+          let getLink = do
+                callerRange    <- fromLoc callerLoc
+                calleeRange    <- fromLoc (locOf defnExpr)
+                calleeSelRange <- fromLoc (locOf defnName)
+                return $ LocationLink (Just $ toRange callerRange)
+                                      uri
+                                      (toRange calleeRange)
+                                      (toRange calleeSelRange)
+          return $ maybeToList getLink
+      else return []
