@@ -9,6 +9,7 @@ import Syntax.Parser.Lexer ( scn )
 import Data.Text (Text)
 import Test.Tasty.HUnit (Assertion, testCase, (@?=))
 import Pretty (toText)
+import qualified Data.Text as Text
 
 
 tests :: TestTree
@@ -138,7 +139,7 @@ declaration =
       testCase "constant keyword collision 2" $ run "con Trueu : Int",
       testCase "constant keyword collision 3" $ run "con Intt : Int",
       testCase "constant keyword collision 4" $ run "con Boola : Int",
-      testCase "let binding" $ run "let  X   i  =  N  >   (0)  ",
+      testCase "let binding 1" $ run "let  X   i  =  N  >   (0)  ",
       testCase "block declaration 1" $ runBlock
         "{:\n\
         \   A, B : Int\n\
@@ -167,6 +168,7 @@ declaration =
     ]
   where
     run = parserIso pDeclaration
+    run' = parserShow pDeclaration 
     runBlock = parserIso pBlockDeclaration
 
 --------------------------------------------------------------------------------
@@ -244,6 +246,9 @@ parserGolden name filePath fileName =
 
 runFile :: (FilePath, Text) -> Text
 runFile (filePath, source) = toText $ runParse pProgram filePath source
+
+parserShow :: Show a => Parser a -> Text -> Text -> Assertion
+parserShow parser actual expected = (Text.pack . show . parseTest parser) actual @?= expected
 
 parserCompare :: Pretty a => Parser a -> Text -> Text -> Assertion
 parserCompare parser actual expected = (removeTrailingWhitespace . toText . parseTest parser) actual @?= removeTrailingWhitespace expected

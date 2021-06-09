@@ -54,8 +54,8 @@ compareAndReport
         ++ "\n------------\n"
         ++ "actual ("
         ++ actualPath ++ actualFileName ++ ", "
-        ++ show (Text.length actualRaw) ++ " chars): \n"
-        ++ Text.unpack actualRaw
+        ++ show (Text.length actualRes) ++ " chars): \n"
+        ++ Text.unpack actualRes
 
 update :: String -> (FilePath, FilePath, Text) -> IO ()
 update suffix (filePath, fileName, input) = createDirectoriesAndWriteFile (filePath ++ "golden/" ++ fileName ++ suffix) result

@@ -1,7 +1,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 module GCL.Expr where
 
-import GCL.Common ( Env, FreshState, Substitutable (apply), Subs )
+import GCL.Common ( Env, FreshState, Substitutable (subst), Subs )
 import Syntax.Abstract ( Expr (..) )
 import Control.Monad.Reader (ReaderT, ask)
 import Control.Monad.State (State)
@@ -31,7 +31,7 @@ expand (App a b l) = do
   a' <- expand a
   b' <- expand b
   case a' of
-    Lam x body _ -> return $ apply (Map.singleton x (Left b' :: Either Expr Expr)) body
+    Lam x body _ -> return $ subst (Map.singleton x (Left b' :: Either Expr Expr)) body
     _ -> return $ App a' b' l
 expand (Lam x e l) = return (Lam x e l)
 expand h@(Hole _) = return h
@@ -42,4 +42,4 @@ expand (Quant op xs rng t l) = do
 expand (Subst e s _) = do
   e' <- expand e
   let s' = Map.map Right s :: Subs (Either Expr Expr)
-  return $ apply s' e'
+  return $ subst s' e'

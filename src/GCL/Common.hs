@@ -12,6 +12,8 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Syntax.Abstract as A
 import GCL.Predicate (Pred (..))
+import Control.Monad.RWS (RWST(..))
+import Control.Monad.State (StateT(..))
 
 -- Monad for generating fresh variable
 class Monad m => Fresh m where
@@ -38,14 +40,6 @@ emptySubs = mempty
 
 emptyEnv :: Env a
 emptyEnv = mempty
-
--- Not sure if neccessary
--- class (Monad m) => HasEnv m a where
---   askEnv :: m (Env a)
-
-extend :: Env a -> (Name, a) -> Env a
-extend env (n, x) = Map.insert n x env
-
 
 -- Monad for free variable
 class Free a where
@@ -80,46 +74,47 @@ instance Free A.Expr where
 
 -- class for data that is substitutable
 class Substitutable a b where
-  apply :: Subs a -> b -> b
+  subst :: Subs a -> b -> b
 
 compose :: Substitutable a a => Subs a -> Subs a -> Subs a
-s1 `compose` s2 = s1 <> Map.map (apply s1) s2
+s1 `compose` s2 = s1 <> Map.map (subst s1) s2
 
 instance Substitutable a b => Substitutable a [b] where
-  apply = map . apply
+  subst = map . subst
 
 instance Substitutable A.Type A.Type where
-  apply _ t@(A.TBase _ _) = t
-  apply s (A.TArray i t l) = A.TArray i (apply s t) l
-  apply s (A.TFunc t1 t2 l) = A.TFunc (apply s t1) (apply s t2) l
-  apply s t@(A.TVar x _) = Map.findWithDefault t x s
+  subst _ t@(A.TBase _ _) = t
+  subst s (A.TArray i t l) = A.TArray i (subst s t) l
+  subst s (A.TFunc t1 t2 l) = A.TFunc (subst s t1) (subst s t2) l
+  subst s t@(A.TVar x _) = Map.findWithDefault t x s
 
 instance Substitutable A.Expr A.Expr where
-  apply s (A.Paren expr) = A.Paren (apply s expr)
-  apply _ lit@(A.Lit _ _) = lit
-  apply s v@(A.Var n _) = Map.findWithDefault v n s
-  apply s c@(A.Const n _) = Map.findWithDefault c n s
-  apply _ o@(A.Op _) = o
-  apply s (A.Chain a op b l) = A.Chain (apply s a) op (apply s b) l
-  apply s (A.App a b l) =
-    let a' = apply s a in
-    let b' = apply s b in 
+  subst s (A.Paren expr) = A.Paren (subst s expr)
+  subst _ lit@(A.Lit _ _) = lit
+  subst s v@(A.Var n _) = Map.findWithDefault v n s
+  subst s c@(A.Const n _) = Map.findWithDefault c n s
+  subst _ o@(A.Op _) = o
+  subst s (A.Chain a op b l) = A.Chain (subst s a) op (subst s b) l
+  subst s (A.App a b l) =
+    let a' = subst s a in
+    let b' = subst s b in 
       case a' of
-        A.Lam x body _ -> apply (Map.singleton x b') body
+        A.Lam x body _ -> subst (Map.singleton x b') body
         _ -> A.App a' b' l
-  apply s (A.Lam x e l) =
+  subst s (A.Lam x e l) =
     let s' = Map.withoutKeys s (Set.singleton x) in
-    A.Lam x (apply s' e) l
-  apply _ h@(A.Hole _) = h
-  apply s (A.Quant qop xs rng t l) = 
+    A.Lam x (subst s' e) l
+  subst _ h@(A.Hole _) = h
+  subst s (A.Quant qop xs rng t l) = 
     let op' = case qop of
                 Left op -> Left op
-                Right op -> Right (apply s op) in
+                Right op -> Right (subst s op) in
     let s' = Map.withoutKeys s (Set.fromList xs) in
-    A.Quant op' xs (apply s' rng) (apply s' t) l
+    A.Quant op' xs (subst s' rng) (subst s' t) l
   -- after should already be applied to subs 
-  apply s1 (A.Subst before s2 after) = 
-    A.Subst before (s1 `compose` s2) (apply s1 after)
+  subst s1 (A.Subst before s2 after) = 
+    -- NOTE: use `Map.union` or `compose` ?
+    A.Subst before (s1 `Map.union` s2) (subst s1 after)
 
 -- Left of Bindings will be rendered,   
 --    including assignment
@@ -135,75 +130,83 @@ singleBinding = Map.singleton
 
 -- should make sure `fv Bindings` and `fv Expr` are disjoint before substitution
 instance Substitutable Bindings A.Expr where
-  apply s (A.Paren expr) = A.Paren (apply s expr)
-  apply _ lit@(A.Lit _ _) = lit
-  apply s v@(A.Var n _) = 
+  subst s (A.Paren expr) = A.Paren (subst s expr)
+  subst _ lit@(A.Lit _ _) = lit
+  subst s v@(A.Var n _) = 
     case Map.lookup n s of
       Just (Left v') -> do
-        apply (Map.delete n s) v'
+        subst (Map.delete n s) v'
       Just (Right v') -> do
-        A.Subst v emptySubs (apply (Map.delete n s) v')
+        A.Subst v emptySubs (subst (Map.delete n s) v')
       Nothing -> v
-  apply s c@(A.Const n _) = 
+  subst s c@(A.Const n _) = 
     case Map.lookup n s of
       Just (Left c') -> do
-        apply (Map.delete n s) c'
+        subst (Map.delete n s) c'
       Just (Right c') -> do
-        A.Subst c emptySubs (apply (Map.delete n s) c')
+        A.Subst c emptySubs (subst (Map.delete n s) c')
       Nothing -> c
-  apply _ op@(A.Op _) = op
-  apply s (A.Chain a op b l) = A.Chain (apply s a) op (apply s b) l
-  apply s (A.App a b l) = 
-    let a' = apply s a in
-    let b' = apply s b in
+  subst _ op@(A.Op _) = op
+  subst s (A.Chain a op b l) = A.Chain (subst s a) op (subst s b) l
+  subst s (A.App a b l) = 
+    let a' = subst s a in
+    let b' = subst s b in
     case a' of
       A.Lam x body _ -> 
-        apply (Map.singleton x b') body
+        subst (Map.singleton x b') body
       A.Subst _ s1 (A.Lam x body _) -> do
-        let body' = apply (Map.singleton x b') body
+        let body' = subst (Map.singleton x b') body
         A.Subst (A.App a b l) s1 body'
       _ -> A.App a' b' l 
-  apply s (A.Lam x e l) = 
+  subst s (A.Lam x e l) = 
     let s' = Map.withoutKeys s (Set.singleton x) in
-    A.Lam x (apply s' e) l
-  apply _ (A.Hole l) = A.Hole l
-  apply s (A.Quant qop xs rng t l) = 
+    A.Lam x (subst s' e) l
+  subst _ (A.Hole l) = A.Hole l
+  subst s (A.Quant qop xs rng t l) = 
     let op' = case qop of
                 Left op -> Left op
-                Right op -> Right (apply s op) in
+                Right op -> Right (subst s op) in
     let s' = Map.withoutKeys s (Set.fromList xs) in
-    A.Quant op' xs (apply s' rng) (apply s' t) l
+    A.Quant op' xs (subst s' rng) (subst s' t) l
   -- after should already be applied to subs 
-  apply s1 (A.Subst before s2 after) = do
+  subst s1 (A.Subst before s2 after) = do
     let s1' = fst $ Map.mapEither id s1
-    A.Subst before (s1' `Map.union` s2) (apply s1 after)
-
+    A.Subst before (s1' `Map.union` s2) (subst s1 after)
 
 instance Substitutable Bindings Pred where
-  apply s (Constant e) = Constant (apply s e)
-  apply s (Bound e l) = Bound (apply s e) l
-  apply s (Assertion e l) = Assertion (apply s e) l
-  apply s (LoopInvariant e b l) = LoopInvariant (apply s e) b l
-  apply s (GuardIf e l) = GuardLoop (apply s e) l
-  apply s (GuardLoop e l) = GuardLoop (apply s e) l
-  apply s (Conjunct xs) = Conjunct (apply s xs)
-  apply s (Disjunct es) = Disjunct (apply s es)
-  apply s (Negate x) = Negate (apply s x)
+  subst s (Constant e) = Constant (subst s e)
+  subst s (Bound e l) = Bound (subst s e) l
+  subst s (Assertion e l) = Assertion (subst s e) l
+  subst s (LoopInvariant e b l) = LoopInvariant (subst s e) b l
+  subst s (GuardIf e l) = GuardLoop (subst s e) l
+  subst s (GuardLoop e l) = GuardLoop (subst s e) l
+  subst s (Conjunct xs) = Conjunct (subst s xs)
+  subst s (Disjunct es) = Disjunct (subst s es)
+  subst s (Negate x) = Negate (subst s x)
 
 instance Substitutable Bindings A.Stmt where
-  apply _ st@(A.Skip _) = st
-  apply _ st@(A.Abort _) = st
-  apply s (A.Assign ns es l) = A.Assign ns (apply s es) l
-  apply s (A.Assert e l) = A.Assert (apply s e) l
-  apply s (A.LoopInvariant p bnd l) = A.LoopInvariant (apply s p) (apply s bnd) l
-  apply s (A.Do gds l) = A.Do (apply s gds) l
-  apply s (A.If gds l) = A.If (apply s gds) l
-  apply _ st@(A.Spec _ _) = st
-  apply _ st@(A.Proof _) = st
+  subst _ st@(A.Skip _) = st
+  subst _ st@(A.Abort _) = st
+  subst s (A.Assign ns es l) = A.Assign ns (subst s es) l
+  subst s (A.Assert e l) = A.Assert (subst s e) l
+  subst s (A.LoopInvariant p bnd l) = A.LoopInvariant (subst s p) (subst s bnd) l
+  subst s (A.Do gds l) = A.Do (subst s gds) l
+  subst s (A.If gds l) = A.If (subst s gds) l
+  subst _ st@(A.Spec _ _) = st
+  subst _ st@(A.Proof _) = st
 
 instance Substitutable Bindings A.GdCmd where
-  apply s (A.GdCmd gd stmts l) = A.GdCmd (apply s gd) (apply s stmts) l
+  subst s (A.GdCmd gd stmts l) = A.GdCmd (subst s gd) (subst s stmts) l
 
--- rebindLam :: Fresh m => Expr -> m Expr
--- rebindLam (Lam x e l) = do
---   env <- ask
+
+toStateT :: Monad m => r -> RWST r w s m a -> StateT s m a
+toStateT r m = StateT (\s -> do
+    (a, s', _) <- runRWST m r s
+    return (a, s')
+  )
+
+toEvalStateT :: Monad m => r -> RWST r w s m a -> StateT s m (a, w)
+toEvalStateT r m = StateT (\s -> do
+    (a, s', w) <- runRWST m r s
+    return ((a, w), s')
+  )
