@@ -147,7 +147,6 @@ readCachedResult = do
 interpret :: Show a => FilePath -> (Either [Error] a -> ServerM ()) -> CmdM a -> ServerM ()
 interpret filepath responder p = case runCmdM p of
   Right (Pure responses) -> do
-    logText $ " ### SendResponses " <> toText (show responses)
     -- send responses
     responder (Right responses)
     -- sendResponses filepath responder responses
