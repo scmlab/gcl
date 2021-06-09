@@ -57,4 +57,4 @@ handler params responder = do
     JSON.Success request@(Req filepath kind) -> do
       logText $ " --> Custom Reqeust: " <> Text.pack (show request)
       -- convert Request to Response
-      interpret filepath (responder . Res filepath) (handleCustomMethod kind)
+      interpret filepath (customRequestResponder filepath responder) (handleCustomMethod kind)

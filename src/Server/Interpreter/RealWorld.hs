@@ -8,6 +8,8 @@ module Server.Interpreter.RealWorld
     initGlobalEnv,
     runServerM,
     logText, logStuff,
+    customRequestResponder,
+    notificationResponder,
     interpret,
     getMute
   )
@@ -35,6 +37,7 @@ import Data.Loc.Range (Range)
 import Pretty (toText)
 import qualified Server.Util as J
 import Server.Stab (collect)
+import qualified Data.Aeson as JSON
 
 --------------------------------------------------------------------------------
 
@@ -89,16 +92,28 @@ sendDiagnostics filepath diagnostics = do
   liftIO $ writeIORef ref (succ version)
   publishDiagnostics 100 (toNormalizedUri (filePathToUri filepath)) (Just version) (partitionBySource diagnostics)
 
-handleErrors :: FilePath -> ([ResKind] -> ServerM ()) -> [Error] -> ServerM ()
-handleErrors filepath responder errors = do
+handleErrors :: FilePath -> Either [Error] [ResKind] -> ServerM [ResKind]
+handleErrors filepath (Left errors) = do 
   version <- bumpVersionM
-  -- (IdInt version)
   let responses = [ResDisplay version (headerE "Errors" : map renderBlock errors), ResUpdateSpecs []]
   let diagnostics = errors >>= collect
   -- send diagnostics
   sendDiagnostics filepath diagnostics
+  return responses
+handleErrors _ (Right responses) = return responses
+
+customRequestResponder :: FilePath -> (Response -> ServerM ()) -> Either [Error] [ResKind] -> ServerM ()
+customRequestResponder filepath responder result = do  
+  responses <- handleErrors filepath result 
+  responder (Res filepath responses)
+
+notificationResponder :: FilePath -> Either [Error] [ResKind] -> ServerM ()
+notificationResponder filepath result = do
+  responses <- handleErrors filepath result
   -- send responses
-  responder responses
+  sendNotification (SCustomMethod "guabao") $ JSON.toJSON $ Res filepath responses
+
+--------------------------------------------------------------------------------
 
 bumpVersionM :: ServerM Int
 bumpVersionM = do
@@ -129,12 +144,12 @@ readCachedResult = do
 
 --------------------------------------------------------------------------------
 
-interpret :: FilePath -> ([ResKind] -> ServerM ()) -> CmdM [ResKind] -> ServerM ()
+interpret :: Show a => FilePath -> (Either [Error] a -> ServerM ()) -> CmdM a -> ServerM ()
 interpret filepath responder p = case runCmdM p of
   Right (Pure responses) -> do
     logText $ " ### SendResponses " <> toText (show responses)
     -- send responses
-    responder responses
+    responder (Right responses)
     -- sendResponses filepath responder responses
   Right (Free (EditText range text next)) -> do
     logText $ " ### EditText " <> toText range <> " " <> text
@@ -157,7 +172,7 @@ interpret filepath responder p = case runCmdM p of
   Right (Free (GetSource next)) -> do
     result <- fmap VFS.virtualFileText <$> getVirtualFile (toNormalizedUri (filePathToUri filepath))
     case result of
-      Nothing -> handleErrors filepath responder [CannotReadFile filepath]
+      Nothing -> responder (Left [CannotReadFile filepath])
       Just source -> interpret filepath responder (next source)
   Right (Free (GetLastSelection next)) -> do
     ref <- lift $ asks globalSelectionMap
@@ -188,4 +203,9 @@ interpret filepath responder p = case runCmdM p of
     setMute False -- unmute on error!
     cacheResult (Left errors)
     logStuff errors
-    handleErrors filepath responder errors
+
+    -- responses <- errorsToResponses filepath errors
+    responder (Left errors)
+
+    -- sendNotificationsPrim filepath (Left errors)
+    return ()
