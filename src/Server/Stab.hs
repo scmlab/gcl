@@ -61,6 +61,9 @@ instance (Monad m, StabM m a b) => StabM m (Maybe a) b where
   stabM _   Nothing  = return []
   stabM pos (Just x) = stabM pos x
 
+instance (Monad m, StabM m a b) => StabM m [a] b where
+  stabM pos xs = concat <$> mapM (stabM pos) xs
+
 stabMaybeM :: (Monad m, StabM m a b) => J.Position -> a -> m (Maybe b)
 stabMaybeM pos node = do
   result <- stabM pos node
