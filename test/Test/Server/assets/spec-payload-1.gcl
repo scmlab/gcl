@@ -19,4 +19,9 @@ skip
 
 [!  skip  !]
 
+if True ->  [!
+            ?
+            !]
+fi
+
 { True }

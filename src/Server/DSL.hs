@@ -28,7 +28,8 @@ import Pretty (toText)
 import qualified Data.List as List
 import Server.CustomMethod 
 import Render
-import Server.Diagnostic
+import Server.Diagnostic ()
+import Server.Stab (collect)
 
 --------------------------------------------------------------------------------
 
@@ -101,7 +102,7 @@ digHole range = do
   editText range holeText
 
 -- | Try to parse a piece of text in a Spec
-refine :: Text -> Range -> CmdM (Spec, Text)
+refine :: Text -> Range -> CmdM (Spec, [Text])
 refine source range  = do
   result <- findPointedSpec
   case result of
@@ -114,7 +115,7 @@ refine source range  = do
       if payloadIsEmpty
         then return ()
         else void $ parse pStmts payload
-      return (spec, payload)
+      return (spec, specPayloadWithoutIndentation source' spec)
   where
     findPointedSpec :: CmdM (Maybe Spec)
     findPointedSpec = do
@@ -195,7 +196,7 @@ generateResponseAndDiagnosticsFromResult (Right (pos, specs, globalProps, warnin
     let responses =
           [ResDisplay version blocks, ResUpdateSpecs (map encodeSpec specs)]
     let diagnostics =
-          concatMap toDiagnostics pos ++ concatMap toDiagnostics warnings
+          concatMap collect pos ++ concatMap collect warnings
     sendDiagnostics diagnostics
 
     return responses

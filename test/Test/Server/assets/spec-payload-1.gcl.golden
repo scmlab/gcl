@@ -6,7 +6,8 @@
 , "    skip"
 , "abort" ]
 , [ "skip" ]
-, [ "skip" ] ]
+, [ "skip" ]
+, [ "?" ] ]
 
 ### Source
 
@@ -30,6 +31,11 @@ skip
 
 
 [!  skip  !]
+
+if True ->  [!
+            ?
+            !]
+fi
 
 { True }
 

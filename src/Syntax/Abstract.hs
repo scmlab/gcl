@@ -21,7 +21,7 @@ type TypeVar = Text
 
 --------------------------------------------------------------------------------
 
--- | Program / Declaration / Statement
+-- | Program
 data Program
   = Program
       [Declaration] -- constant and variable declarations
@@ -33,11 +33,21 @@ data Program
 
 type Defns = Map Name Expr 
 
+--------------------------------------------------------------------------------
+
+-- | Declaration
 data Declaration
   = ConstDecl [Name] Type (Maybe Expr) Loc
   | VarDecl [Name] Type (Maybe Expr) Loc
   | LetDecl Name [Name] Expr Loc
   deriving (Eq, Show)
+
+instance Located Declaration where
+  locOf (ConstDecl _ _ _ l) = l
+  locOf (VarDecl _ _ _ l) = l
+  locOf (LetDecl _ _ _ l) = l
+
+--------------------------------------------------------------------------------
 
 data Stmt
   = Skip Loc

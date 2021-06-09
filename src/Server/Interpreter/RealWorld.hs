@@ -8,6 +8,8 @@ module Server.Interpreter.RealWorld
     initGlobalEnv,
     runServerM,
     logText, logStuff,
+    customRequestResponder,
+    notificationResponder,
     interpret,
     getMute
   )
@@ -16,7 +18,6 @@ where
 import Control.Concurrent (Chan, newChan, writeChan)
 import Control.Monad.Reader
 import Control.Monad.Trans.Free
-import qualified Data.Aeson as JSON
 import Data.IORef (IORef, modifyIORef', newIORef, readIORef, writeIORef)
 import Data.Map (Map)
 import qualified Data.Map as Map
@@ -30,10 +31,13 @@ import qualified Language.LSP.VFS as VFS
 import Render
 import Server.CustomMethod
 import Server.DSL (runCmdM, CmdM, Cmd(..), Result)
-import Server.Diagnostic
+import Server.Diagnostic ()
 import qualified Server.DSL as DSL
 import Data.Loc.Range (Range)
 import Pretty (toText)
+import qualified Server.Util as J
+import Server.Stab (collect)
+import qualified Data.Aeson as JSON
 
 --------------------------------------------------------------------------------
 
@@ -62,7 +66,7 @@ type ServerM = LspT () (ReaderT GlobalEnv IO)
 runServerM :: GlobalEnv -> LanguageContextEnv () -> ServerM a -> IO a
 runServerM env ctxEnv program = runReaderT (runLspT ctxEnv program) env
 
-type Responder = Response -> ServerM ()
+
 
 --------------------------------------------------------------------------------
 
@@ -88,23 +92,28 @@ sendDiagnostics filepath diagnostics = do
   liftIO $ writeIORef ref (succ version)
   publishDiagnostics 100 (toNormalizedUri (filePathToUri filepath)) (Just version) (partitionBySource diagnostics)
 
-sendResponses :: FilePath -> Maybe Responder -> [ResKind] -> ServerM ()
-sendResponses filepath responder responses = do
-  -- send responses
-  case responder of
-    Nothing -> sendNotification (SCustomMethod "guabao") $ JSON.toJSON $ Res filepath responses
-    Just f -> f $ Res filepath responses
-
-handleErrors :: FilePath -> Maybe Responder -> [Error] -> ServerM ()
-handleErrors filepath responder errors = do
+handleErrors :: FilePath -> Either [Error] [ResKind] -> ServerM [ResKind]
+handleErrors filepath (Left errors) = do 
   version <- bumpVersionM
-  -- (IdInt version)
   let responses = [ResDisplay version (headerE "Errors" : map renderBlock errors), ResUpdateSpecs []]
-  let diagnostics = errors >>= toDiagnostics
+  let diagnostics = errors >>= collect
   -- send diagnostics
   sendDiagnostics filepath diagnostics
+  return responses
+handleErrors _ (Right responses) = return responses
+
+customRequestResponder :: FilePath -> (Response -> ServerM ()) -> Either [Error] [ResKind] -> ServerM ()
+customRequestResponder filepath responder result = do  
+  responses <- handleErrors filepath result 
+  responder (Res filepath responses)
+
+notificationResponder :: FilePath -> Either [Error] [ResKind] -> ServerM ()
+notificationResponder filepath result = do
+  responses <- handleErrors filepath result
   -- send responses
-  sendResponses filepath responder responses
+  sendNotification (SCustomMethod "guabao") $ JSON.toJSON $ Res filepath responses
+
+--------------------------------------------------------------------------------
 
 bumpVersionM :: ServerM Int
 bumpVersionM = do
@@ -135,16 +144,16 @@ readCachedResult = do
 
 --------------------------------------------------------------------------------
 
-interpret :: FilePath -> Maybe Responder -> CmdM [ResKind] -> ServerM ()
+interpret :: Show a => FilePath -> (Either [Error] a -> ServerM ()) -> CmdM a -> ServerM ()
 interpret filepath responder p = case runCmdM p of
   Right (Pure responses) -> do
-    logText $ " ### SendResponses " <> toText (show responses)
     -- send responses
-    sendResponses filepath responder responses
+    responder (Right responses)
+    -- sendResponses filepath responder responses
   Right (Free (EditText range text next)) -> do
     logText $ " ### EditText " <> toText range <> " " <> text
     -- apply edit
-    let removeSpec = TextEdit (rangeToRange range) text
+    let removeSpec = TextEdit (J.toRange range) text
     let identifier = VersionedTextDocumentIdentifier (filePathToUri filepath) (Just 0)
     let textDocumentEdit = TextDocumentEdit identifier (List [InL removeSpec])
     let change = InL textDocumentEdit
@@ -162,7 +171,7 @@ interpret filepath responder p = case runCmdM p of
   Right (Free (GetSource next)) -> do
     result <- fmap VFS.virtualFileText <$> getVirtualFile (toNormalizedUri (filePathToUri filepath))
     case result of
-      Nothing -> handleErrors filepath responder [CannotReadFile filepath]
+      Nothing -> responder (Left [CannotReadFile filepath])
       Just source -> interpret filepath responder (next source)
   Right (Free (GetLastSelection next)) -> do
     ref <- lift $ asks globalSelectionMap
@@ -193,4 +202,4 @@ interpret filepath responder p = case runCmdM p of
     setMute False -- unmute on error!
     cacheResult (Left errors)
     logStuff errors
-    handleErrors filepath responder errors
+    responder (Left errors)

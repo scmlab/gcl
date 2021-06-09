@@ -1,0 +1,21 @@
+### Result
+
+[ Display
+, UpdateSpecs ]
+
+### Source
+
+skip
+
+{ True }
+
+### Trace
+
+TracePutLastSelection ./test/Test/Server/assets/spec-refine-1.gcl [0-10] 1:1-3:3
+TraceGetSource
+TraceGetSource
+TraceEditText ./test/Test/Server/assets/spec-refine-1.gcl [0-10] 1:1-3:3 "skip"
+TraceGetLastSelection
+TraceBumpResponseVersion
+TraceLog " ### Diagnostic 1"
+TraceSendDiagnostics [Diagnostic {_range = Range {_start = Position {_line = 0, _character = 0}, _end = Position {_line = 0, _character = 4}}, _severity = Just DsWarning, _code = Nothing, _source = Nothing, _message = "Skip", _tags = Nothing, _relatedInformation = Just (List [DiagnosticRelatedInformation {_location = Location {_uri = Uri {getUri = "./test/Test/Server/assets/spec-refine-1.gcl"}, _range = Range {_start = Position {_line = 0, _character = 0}, _end = Position {_line = 0, _character = 4}}}, _message = ""}])}]
