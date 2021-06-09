@@ -20,10 +20,11 @@ import           Language.LSP.Types      hiding ( Range
 import           Server.DSL
 import           Server.Interpreter.RealWorld
 
--- import qualified Language.LSP.Types            as J
+import qualified Language.LSP.Types            as J
 import qualified Language.LSP.Types.Lens       as J
 import qualified Server.Handler.AutoCompletion as AutoCompletion
 import qualified Server.Handler.CustomMethod   as CustomMethod
+import qualified Server.Handler.Definition as Definition
 
 -- handlers of the LSP server
 handlers :: Handlers ServerM
@@ -69,5 +70,11 @@ handlers = mconcat
           typeCheck program
           result <- sweep program
           cacheResult (Right result)
-          generateResponseAndDiagnosticsFromResult (Right result)
+          generateResponseAndDiagnosticsFromResult (Right result),
+      -- Goto Definition
+      requestHandler J.STextDocumentDefinition $ \req responder -> do
+        logText "<-- Goto Definition"
+        let uri = req ^. (J.params . J.textDocument . J.uri)
+        let pos = req ^. (J.params . J.position)
+        Definition.handler uri pos (responder . Right . InR . InR . List)
   ]

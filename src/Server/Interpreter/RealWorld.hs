@@ -203,9 +203,4 @@ interpret filepath responder p = case runCmdM p of
     setMute False -- unmute on error!
     cacheResult (Left errors)
     logStuff errors
-
-    -- responses <- errorsToResponses filepath errors
     responder (Left errors)
-
-    -- sendNotificationsPrim filepath (Left errors)
-    return ()
