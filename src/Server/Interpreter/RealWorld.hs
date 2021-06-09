@@ -16,7 +16,6 @@ where
 import Control.Concurrent (Chan, newChan, writeChan)
 import Control.Monad.Reader
 import Control.Monad.Trans.Free
-import qualified Data.Aeson as JSON
 import Data.IORef (IORef, modifyIORef', newIORef, readIORef, writeIORef)
 import Data.Map (Map)
 import qualified Data.Map as Map
@@ -64,7 +63,7 @@ type ServerM = LspT () (ReaderT GlobalEnv IO)
 runServerM :: GlobalEnv -> LanguageContextEnv () -> ServerM a -> IO a
 runServerM env ctxEnv program = runReaderT (runLspT ctxEnv program) env
 
-type Responder = Response -> ServerM ()
+
 
 --------------------------------------------------------------------------------
 
@@ -90,14 +89,7 @@ sendDiagnostics filepath diagnostics = do
   liftIO $ writeIORef ref (succ version)
   publishDiagnostics 100 (toNormalizedUri (filePathToUri filepath)) (Just version) (partitionBySource diagnostics)
 
-sendResponses :: FilePath -> Maybe Responder -> [ResKind] -> ServerM ()
-sendResponses filepath responder responses = do
-  -- send responses
-  case responder of
-    Nothing -> sendNotification (SCustomMethod "guabao") $ JSON.toJSON $ Res filepath responses
-    Just f -> f $ Res filepath responses
-
-handleErrors :: FilePath -> Maybe Responder -> [Error] -> ServerM ()
+handleErrors :: FilePath -> ([ResKind] -> ServerM ()) -> [Error] -> ServerM ()
 handleErrors filepath responder errors = do
   version <- bumpVersionM
   -- (IdInt version)
@@ -106,7 +98,7 @@ handleErrors filepath responder errors = do
   -- send diagnostics
   sendDiagnostics filepath diagnostics
   -- send responses
-  sendResponses filepath responder responses
+  responder responses
 
 bumpVersionM :: ServerM Int
 bumpVersionM = do
@@ -137,12 +129,13 @@ readCachedResult = do
 
 --------------------------------------------------------------------------------
 
-interpret :: FilePath -> Maybe Responder -> CmdM [ResKind] -> ServerM ()
+interpret :: FilePath -> ([ResKind] -> ServerM ()) -> CmdM [ResKind] -> ServerM ()
 interpret filepath responder p = case runCmdM p of
   Right (Pure responses) -> do
     logText $ " ### SendResponses " <> toText (show responses)
     -- send responses
-    sendResponses filepath responder responses
+    responder responses
+    -- sendResponses filepath responder responses
   Right (Free (EditText range text next)) -> do
     logText $ " ### EditText " <> toText range <> " " <> text
     -- apply edit

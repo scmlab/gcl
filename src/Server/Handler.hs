@@ -24,6 +24,7 @@ import           Server.Interpreter.RealWorld
 import qualified Language.LSP.Types.Lens       as J
 import qualified Server.Handler.AutoCompletion as AutoCompletion
 import qualified Server.Handler.CustomMethod   as CustomMethod
+import Server.CustomMethod (Response(Res))
 
 -- handlers of the LSP server
 handlers :: Handlers ServerM
@@ -49,7 +50,8 @@ handlers = mconcat
       case uriToFilePath uri of
         Nothing       -> pure ()
         Just filepath -> do
-          interpret filepath Nothing $ do
+          let responder = sendNotification (SCustomMethod "guabao") . JSON.toJSON . Res filepath
+          interpret filepath responder $ do
             source  <- getSource
             program <- parseProgram source
             typeCheck program
@@ -64,7 +66,8 @@ handlers = mconcat
     case uriToFilePath uri of
       Nothing       -> pure ()
       Just filepath -> do
-        interpret filepath Nothing $ do
+        let responder = sendNotification (SCustomMethod "guabao") . JSON.toJSON . Res filepath
+        interpret filepath responder $ do
           program <- parseProgram source
           typeCheck program
           result <- sweep program
