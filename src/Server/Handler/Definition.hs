@@ -11,7 +11,9 @@ import           Control.Monad.Reader
 import           Data.Loc                       ( locOf )
 import           Data.Loc.Range
 import qualified Data.Map                      as Map
+import           Data.Map                       ( Map )
 import           Data.Maybe                     ( maybeToList )
+import           Data.Text                      ( Text )
 import           Error
 import           Language.LSP.Types
 import           Server.DSL
@@ -19,9 +21,9 @@ import           Server.Interpreter.RealWorld
 import           Server.Stab
 import           Server.Util
 import           Syntax.Abstract
-import Syntax.Common (Name, nameToText)
-import Data.Text (Text)
-import Data.Map (Map)
+import           Syntax.Common                  ( Name
+                                                , nameToText
+                                                )
 
 ignoreErrors :: Either [Error] [LocationLink] -> [LocationLink]
 ignoreErrors (Left  _errors  ) = []
@@ -33,21 +35,32 @@ handler uri pos responder = do
     Nothing       -> return ()
     Just filepath -> do
       interpret filepath (responder . ignoreErrors) $ do
-        source                          <- getSource
-        program@(Program _ _ defns _ _) <- parseProgram source
-        runGotoM uri defns $ stabM pos program
+        source  <- getSource
+        program <- parseProgram source
+        runGotoM uri program $ stabM pos program
 
 type GotoM = ReaderT Env CmdM
 
 data Env = Env
   { envUri   :: Uri
-  , envDefns :: Map Text (Name, Expr)
+  , envDecls :: Map Text (Name, Declaration)
   }
 
-runGotoM :: Uri -> Defns -> GotoM a -> CmdM a
-runGotoM uri defns = flip runReaderT (Env uri defns')
-  where
-    defns' = Map.mapKeys nameToText $ Map.mapWithKey (,) defns
+runGotoM :: Uri -> Program -> GotoM a -> CmdM a
+runGotoM uri (Program decls _ _ _ _) = flip runReaderT
+                                                (Env uri decls')
+ where
+  decls' :: Map Text (Name, Declaration)
+  decls' = Map.fromList (decls >>= map makeEntry . splitDecl)
+
+  -- split a parallel declaration into many simpler declarations 
+  splitDecl :: Declaration -> [(Name, Declaration)]
+  splitDecl decl@(ConstDecl names _ _ _) = [ (name, decl) | name <- names ]
+  splitDecl decl@(VarDecl   names _ _ _) = [ (name, decl) | name <- names ]
+  splitDecl decl@(LetDecl   name  _ _ _) = [(name, decl)]
+
+  makeEntry :: (Name, Declaration) -> (Text, (Name, Declaration))
+  makeEntry (name, decl) = (nameToText name, (name, decl))
 
 instance StabM GotoM Program LocationLink where
   stabM pos (Program _ _ _ stmts _) = do
@@ -64,15 +77,15 @@ instance StabM GotoM Expr LocationLink where
   stabM pos = \case
     Const name callerLoc -> do
       uri   <- asks envUri
-      defns <- asks envDefns
+      decls <- asks envDecls
 
       if pos `stabbed'` name
-        then case Map.lookup (nameToText name) defns of
-          Nothing   -> return []
+        then case Map.lookup (nameToText name) decls of
+          Nothing                   -> return []
           Just (defnName, defnExpr) -> do
             let getLink = do
-                  callerRange <- fromLoc callerLoc
-                  calleeRange <- fromLoc (locOf defnExpr)
+                  callerRange    <- fromLoc callerLoc
+                  calleeRange    <- fromLoc (locOf defnExpr)
                   calleeSelRange <- fromLoc (locOf defnName)
                   return $ LocationLink (Just $ toRange callerRange)
                                         uri
