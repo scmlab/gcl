@@ -8,7 +8,7 @@ module Server.Handler.Definition
   ) where
 
 import           Control.Monad.Reader
-import           Data.Loc                       ( locOf )
+import           Data.Loc                       ( locOf, Loc )
 import           Data.Loc.Range
 import qualified Data.Map                      as Map
 import           Data.Map                       ( Map )
@@ -63,9 +63,16 @@ runGotoM uri (Program decls _ _ _ _) = flip runReaderT
   makeEntry (name, decl) = (nameToText name, (name, decl))
 
 instance StabM GotoM Program LocationLink where
-  stabM pos (Program _ _ _ stmts _) = do
-    _ <- ask
-    fmap concat (mapM (stabM pos) stmts)
+  stabM pos (Program decls _ _ stmts _) = do
+    decls' <- concat <$> mapM (stabM pos) decls
+    stmts' <- concat <$> mapM (stabM pos) stmts
+    return (decls' <> stmts')
+
+instance StabM GotoM Declaration LocationLink where
+  stabM pos = \case
+    ConstDecl _ _ c _ -> stabM pos c
+    VarDecl _ _ c _ -> stabM pos c
+    LetDecl _ _ c _ -> stabM pos c
 
 instance StabM GotoM Stmt LocationLink where
   stabM pos = \case
@@ -75,32 +82,33 @@ instance StabM GotoM Stmt LocationLink where
 
 instance StabM GotoM Expr LocationLink where
   stabM pos = \case
-    Const name callerLoc -> do
-      uri   <- asks envUri
-      decls <- asks envDecls
-
-      if pos `stabbed'` name
-        then case Map.lookup (nameToText name) decls of
-          Nothing                   -> return []
-          Just (defnName, defnExpr) -> do
-            let getLink = do
-                  callerRange    <- fromLoc callerLoc
-                  calleeRange    <- fromLoc (locOf defnExpr)
-                  calleeSelRange <- fromLoc (locOf defnName)
-                  return $ LocationLink (Just $ toRange callerRange)
-                                        uri
-                                        (toRange calleeRange)
-                                        (toRange calleeSelRange)
-            return $ maybeToList getLink
-        else return []
-
-
+    Var name callerLoc -> stabDeclaration name callerLoc
+    Const name callerLoc -> stabDeclaration name callerLoc
     Paren a         -> stabM pos a
     Chain a _ c _   -> (<>) <$> stabM pos a <*> stabM pos c
     App a b _       -> (<>) <$> stabM pos a <*> stabM pos b
     Lam _ b _       -> stabM pos b
     Quant _ _ c d _ -> (<>) <$> stabM pos c <*> stabM pos d
     _               -> return []
+    where
+      stabDeclaration :: Name -> Loc -> GotoM [LocationLink]
+      stabDeclaration name callerLoc = do
+        uri   <- asks envUri
+        decls <- asks envDecls
+        if pos `stabbed'` name
+          then case Map.lookup (nameToText name) decls of
+            Nothing                   -> return []
+            Just (defnName, defnExpr) -> do
+              let getLink = do
+                    callerRange    <- fromLoc callerLoc
+                    calleeRange    <- fromLoc (locOf defnExpr)
+                    calleeSelRange <- fromLoc (locOf defnName)
+                    return $ LocationLink (Just $ toRange callerRange)
+                                          uri
+                                          (toRange calleeRange)
+                                          (toRange calleeSelRange)
+              return $ maybeToList getLink
+          else return []
 
 -- instance StabM GotoM ProcDefn LocationLink where
 --   stabM pos (ProcDefn _ _ process _) = stabM pos process

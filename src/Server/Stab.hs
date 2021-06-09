@@ -1,4 +1,5 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FlexibleInstances #-}
 module Server.Stab
   ( Stab(..)
   , stabMaybe
@@ -55,6 +56,10 @@ stabbed' position node = case fromLoc (locOf node) of
 -- | Like `Stab` but in some context
 class StabM m a b where
   stabM :: J.Position -> a -> m [b]
+
+instance (Monad m, StabM m a b) => StabM m (Maybe a) b where
+  stabM _   Nothing  = return []
+  stabM pos (Just x) = stabM pos x
 
 stabMaybeM :: (Monad m, StabM m a b) => J.Position -> a -> m (Maybe b)
 stabMaybeM pos node = do
