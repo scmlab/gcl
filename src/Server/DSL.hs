@@ -28,7 +28,7 @@ import Pretty (toText)
 import qualified Data.List as List
 import Server.CustomMethod 
 import Render
-import Server.Diagnostic ()
+import Server.Handler.Diagnostic ()
 import Server.Stab (collect)
 
 --------------------------------------------------------------------------------

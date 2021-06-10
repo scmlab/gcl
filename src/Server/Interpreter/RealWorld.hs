@@ -31,7 +31,7 @@ import qualified Language.LSP.VFS as VFS
 import Render
 import Server.CustomMethod
 import Server.DSL (runCmdM, CmdM, Cmd(..), Result)
-import Server.Diagnostic ()
+import Server.Handler.Diagnostic ()
 import qualified Server.DSL as DSL
 import Data.Loc.Range (Range)
 import Pretty (toText)

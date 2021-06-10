@@ -25,6 +25,7 @@ import qualified Language.LSP.Types.Lens       as J
 import qualified Server.Handler.AutoCompletion as AutoCompletion
 import qualified Server.Handler.CustomMethod   as CustomMethod
 import qualified Server.Handler.Definition     as Definition
+import qualified Server.Handler.Hover          as Hover
 
 -- handlers of the LSP server
 handlers :: Handlers ServerM
@@ -69,11 +70,16 @@ handlers = mconcat
           result <- sweep program
           cacheResult (Right result)
           generateResponseAndDiagnosticsFromResult (Right result)
-  ,
-      -- Goto Definition
+  , -- Goto Definition
     requestHandler J.STextDocumentDefinition $ \req responder -> do
     logText "<-- Goto Definition"
     let uri = req ^. (J.params . J.textDocument . J.uri)
     let pos = req ^. (J.params . J.position)
     Definition.handler uri pos (responder . Right . J.InR . J.InR . J.List)
+  , -- Hover
+    requestHandler J.STextDocumentHover $ \req responder -> do
+    logText "<-- Hover"
+    let uri = req ^. (J.params . J.textDocument . J.uri)
+    let pos = req ^. (J.params . J.position)
+    Hover.handler uri pos (responder . Right)
   ]
