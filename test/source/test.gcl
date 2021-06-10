@@ -8,7 +8,7 @@ let P x = (r = s)
 
 { True }
 r := s
-{ P 1 }
+{ P r }
 
 {-
 

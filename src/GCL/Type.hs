@@ -9,7 +9,6 @@ import Data.Aeson (ToJSON)
 import Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NE
 import Data.Loc
-import Data.Map (Map)
 import qualified Data.Map as Map
 import GHC.Generics (Generic)
 import Syntax.Abstract
@@ -17,8 +16,8 @@ import Syntax.Abstract.Located ()
 import Syntax.Common
 import Prelude hiding (Ordering (..))
 import GCL.Common
+import Control.Monad.State (StateT(..), evalStateT)
 
-type TM = Except TypeError
 
 data TypeError
   = NotInScope Name Loc
@@ -44,10 +43,10 @@ instance Located TypeError where
 -- type enviornment
 ------------------------------------------
 
-extend' :: Env Type -> (Name, Type) -> TM (Env Type)
-extend' env (x, s) =
+extend :: Env Type -> (Name, Type) -> TM (Env Type)
+extend env (x, s) =
   case Map.lookup x env of
-    Nothing -> return $ env `extend` (x, s)
+    Nothing -> return $ Map.insert x s env
     Just t -> throwError $ RecursiveType x t (locOf t)
 
 ------------------------------------------
@@ -64,7 +63,9 @@ typeWithLoc l (TVar n _) = TVar n l
 -- type inference
 ------------------------------------------
 
-type Infer = RWST (Env Type) [(Type, Type)] FreshState TM
+type Infer = RWST (Env Type) [Constraint] FreshState (Except TypeError)
+type TM = StateT FreshState (Except TypeError)
+
 
 instance Fresh Infer where
   fresh = do
@@ -72,11 +73,11 @@ instance Fresh Infer where
     (put . succ) i 
     return i
 
-runSolver :: Env Type ->  Infer Type -> TM (Type, [(Type, Type)])
-runSolver env s = evalRWST s env initFreshState
+runSolver :: Env Type ->  Infer Type -> TM (Type, [Constraint])
+runSolver = toEvalStateT
 
-uni :: Type -> Type -> Infer ()
-uni x y = tell [(x, y)]
+unify :: Type -> Type -> Infer ()
+unify x y = tell [(x, y)]
 
 inEnv :: [(Name, Type)] -> Infer Type -> Infer Type
 inEnv l m = do
@@ -99,21 +100,21 @@ infer (Chain a op b loc) = do
       tl <- infer l
       tr <- infer r
       -- check type of `l op r` is bool
-      uni top (TFunc tl (TFunc tr (TBase TBool (locOf op)) (locOf r)) (l <--> r))
+      unify top (TFunc tl (TFunc tr (TBase TBool (locOf op)) (locOf r)) (l <--> r))
     (Chain _ _ l _, _) -> do
       tl <- infer l
-      uni top (TFunc tl (TFunc tb (TBase TBool (locOf op)) (locOf b)) (l <--> b))
+      unify top (TFunc tl (TFunc tb (TBase TBool (locOf op)) (locOf b)) (l <--> b))
     (_, Chain r _ _ _) -> do
       tr <- infer r
-      uni top (TFunc ta (TFunc tr (TBase TBool (locOf op)) (locOf r)) (a <--> r))
+      unify top (TFunc ta (TFunc tr (TBase TBool (locOf op)) (locOf r)) (a <--> r))
     (_, _) -> do
-      uni top (TFunc ta (TFunc tb (TBase TBool (locOf op)) (locOf b)) (a <--> b))
+      unify top (TFunc ta (TFunc tb (TBase TBool (locOf op)) (locOf b)) (a <--> b))
   return (TBase TBool loc)
 infer (App e1 e2 l) = do
   t1 <- infer e1
   t2 <- infer e2
   v <- freshVar l
-  uni t1 (TFunc t2 v l)
+  unify t1 (TFunc t2 v l)
   return v
 infer (Lam x e l) = do
   v <- freshVar l
@@ -122,56 +123,52 @@ infer (Lam x e l) = do
 infer (Hole l) = freshVar l
 infer (Quant qop iters rng t l) = do
   tr <- inEnv [(n, TBase TInt (locOf n)) | n <- iters] (infer rng)
-  uni tr (TBase TBool (locOf rng))
+  unify tr (TBase TBool (locOf rng))
 
   tt <- inEnv [(n, TBase TInt (locOf n)) | n <- iters] (infer t)
   case qop of
     Left (QuantOp (Hash _)) -> do
-      uni tt (TBase TBool (locOf t))
+      unify tt (TBase TBool (locOf t))
       return (TBase TInt l)
     Left op -> do
       let to = opTypes op
-      f tt to
+      unifyQOp tt to
     Right qop' -> do
       to <- infer qop'
-      f tt to
+      unifyQOp tt to
   where
-    f tt to = do
+    unifyQOp tt to = do
       x <- freshVar l
-      uni to (TFunc x (TFunc x x (locOf qop)) (locOf qop))
-      uni tt x
+      unify to (TFunc x (TFunc x x (locOf qop)) (locOf qop))
+      unify tt x
       return x
 infer (Subst expr sub _) = do
   t <- infer expr
   s <- mapM infer sub
-  return $ apply s t
+  return $ subst s t
 
 inferExpr :: Env Type -> Expr -> TM Type
 inferExpr env e = do
   (t, cs) <- runSolver env (infer e)
   s <- solveConstraints cs
-  return $ apply s t
+  return $ subst s t
+
+inferDecl' :: Env Type -> [Name] -> Type -> Maybe Expr -> TM (Env Type)
+inferDecl' env ns t p = do
+  checkType env t
+  env' <- foldM f env ns
+  forM_ p (checkPredicate env')
+  return env'
+  where
+    f env' n = env' `extend` (n, t)
 
 inferDecl :: Env Type -> Declaration -> TM (Env Type)
-inferDecl env (ConstDecl ns t p _) = do
-  checkType env t
-  env' <- foldM f env ns
-  forM_ p (checkPredicate env')
-  return env'
-  where
-    f env' n = env' `extend'` (n, t)
-inferDecl env (VarDecl ns t p _) = do
-  checkType env t
-  env' <- foldM f env ns
-  forM_ p (checkPredicate env')
-  return env'
-  where
-    f env' n = env' `extend'` (n, t)
+inferDecl env (ConstDecl ns t p _) = inferDecl' env ns t p
+inferDecl env (VarDecl ns t p _) = inferDecl' env ns t p
 inferDecl env (LetDecl n args expr _) = do
+  let expr' = foldr (\a e' -> Lam a e' (a <--> e')) expr args
   s <- inferExpr env expr'
-  env `extend'` (n, s)
-  where
-    expr' = foldr (\a e' -> Lam a e' (locOf e')) expr args
+  env `extend` (n, s)
 
 lookupInferEnv :: Name -> Infer Type
 lookupInferEnv n = do
@@ -253,23 +250,26 @@ checkStmt env (If gdcmds _) = mapM_ (checkGdCmd env) gdcmds
 checkStmt _ (Spec _ _) = return ()
 checkStmt _ (Proof _) = return ()
 
-declsMap :: [Declaration] -> Map Name (Either Type Expr)
-declsMap [] = mempty
-declsMap (ConstDecl ns t _ _ : decls) =
-  foldl (\m n -> Map.insert n (Left t) m) (declsMap decls) ns
-declsMap (VarDecl ns t _ _ : decls) =
-  foldl (\m n -> Map.insert n (Left t) m) (declsMap decls) ns
-declsMap (LetDecl n xs body _ : decls) =
-  Map.insert n (Right expr') (declsMap decls)
-  where
-    expr' = foldr (\x b -> Lam x b (b <--> locOf x)) body xs
+-- declsMap :: [Declaration] -> Map Name (Either Type Expr)
+-- declsMap [] = mempty
+-- declsMap (ConstDecl ns t _ _ : decls) =
+--   foldl (\m n -> Map.insert n (Left t) m) (declsMap decls) ns
+-- declsMap (VarDecl ns t _ _ : decls) =
+--   foldl (\m n -> Map.insert n (Left t) m) (declsMap decls) ns
+-- declsMap (LetDecl n xs body _ : decls) =
+--   Map.insert n (Right expr') (declsMap decls)
+--   where
+--     expr' = foldr (\x b -> Lam x b (b <--> locOf x)) body xs
 
-checkProg :: Program -> TM ()
-checkProg (Program decls exprs defs stmts _) = do
+checkProg' :: Program -> TM ()
+checkProg' (Program decls exprs defs stmts _) = do
   env <- foldM inferDecl emptyEnv decls
   mapM_ (checkExpr env) exprs
   mapM_ (checkAssign env) (Map.toList defs)
   mapM_ (checkStmt env) stmts
+
+checkProg :: Program -> Except TypeError ()
+checkProg prog = evalStateT (checkProg' prog) initFreshState 
 
 ------------------------------------------
 -- unification
@@ -292,14 +292,11 @@ unifies (TArray _ t1 _) (TFunc (TBase TInt _) t2 _) =
   unifies t1 t2
 unifies (TFunc t1 t2 _) (TFunc t3 t4 _) = do
   s1 <- unifies t1 t3
-  s2 <- unifies (apply s1 t2) (apply s1 t4)
+  s2 <- unifies (subst s1 t2) (subst s1 t4)
   return (s2 `compose` s1)
 unifies (TVar x l) t = bind x t l
 unifies t (TVar x _) = bind x t (locOf t)
 unifies t1 t2 = throwError $ UnifyFailed t1 t2 (locOf t1)
-
-solveConstraints' :: [Constraint] -> Either TypeError (Subs Type)
-solveConstraints' cs = runExcept . solveUnifier $ (emptySubs, cs)
 
 solveConstraints :: [Constraint] -> TM (Subs Type)
 solveConstraints cs = solveUnifier (emptySubs, cs)
@@ -308,7 +305,7 @@ solveUnifier :: Unifier -> TM (Subs Type)
 solveUnifier (s, []) = return s
 solveUnifier (s, c : cs) = do
   su <- uncurry unifies c
-  solveUnifier (su `compose` s, map (f (apply su)) cs)
+  solveUnifier (su `compose` s, map (f (subst su)) cs)
   where
     f g (a, b) = (g a, g b)
 

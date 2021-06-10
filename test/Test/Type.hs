@@ -15,9 +15,9 @@ import GCL.Common ( Env, emptyEnv )
 import Syntax.Concrete.ToAbstract ( ToAbstract(toAbstract) )
 import Syntax.Abstract
     ( Lit(..),
-      Expr(Var, Lit, Const, App, Op),
-      Type(TArray, TBase, TFunc),
-      TBase(TBool, TChar, TInt),
+      Expr(..),
+      Type(..),
+      TBase(..),
       Interval(..),
       Endpoint(..) )
 import Syntax.Common ( ArithOp, Name(Name) )
@@ -25,10 +25,10 @@ import Syntax.Parser (runParse, pExpr, pProgram, Parser, pStmt, pType, pDeclarat
 import Pretty ( Pretty(pretty), toText )
 import Error (Error(..))
 import Data.Map (Map)
+import Control.Monad.State (evalStateT)
 
 tests :: TestTree
 tests = testGroup "Type" [exprTests, typeTests, stmtTests, declarationTests, blockDeclarationTests, fileTests]
-
 
 exprTests :: TestTree
 exprTests =
@@ -93,6 +93,10 @@ exprTests =
         exprCheck "P i => P j" "Bool",
       testCase "Func App 4" $
         exprCheck "Max i j" "Bool",
+      testCase "Func App 5" $
+        exprCheck "Q i" "Bool",
+      testCase "Func App 6" $
+        exprCheck "Q b" "Bool",
       -- testCase "Hole" $
       --   exprCheck "_" "TVar",
       testCase "Quant" $
@@ -203,9 +207,9 @@ declarationTests =
     "Check Declaration"
     [
       testCase "const declaration" $
-        declarationCheck "con A : Int" "[ ( A\n, Int ) ]",
+        declarationCheck "con C : Int" "[ ( C\n, Int ) ]",
       testCase "const declaration w/ prop" $
-        declarationCheck "con A : Int { A > 0 }" "[ ( A\n, Int ) ]",
+        declarationCheck "con C : Int { C > 0 }" "[ ( C\n, Int ) ]",
       testCase "var declaration" $
         declarationCheck "var x : Bool" "[ ( x\n, Bool ) ]",
       testCase "var declaration w/ prop" $
@@ -213,7 +217,7 @@ declarationTests =
       testCase "let declaration 1" $
         declarationCheck "let N = 5" "[ ( N\n, Int ) ]",
       testCase "let declaration 2" $
-        declarationCheck "let F i j = i + j" "[ ( F\n, Int → Int → Int ) ]"
+        declarationCheck "let G i j = i + j" "[ ( G\n, Int → Int → Int ) ]"
     ]
 
 blockDeclarationTests :: TestTree
@@ -251,6 +255,18 @@ blockDeclarationTests =
         "[ ( A\n, Int )\n, ( B\n, Int )\n, ( F\n, Int → Int → Int )\n, ( P\n, Char → Bool ) ]"
     ]
 
+programTest :: TestTree
+programTest = 
+  testGroup
+    "Check program"
+    [
+      testCase "program check 1" $
+        programCheck
+          "var i, j : Int\n\
+          \let P x = i = j\n\
+          \{ P 1 }\n\
+          \"
+    ]
 
 fileTests :: TestTree
 fileTests =
@@ -284,6 +300,9 @@ tbool = TBase TBool NoLoc
 
 tchar :: Type
 tchar = TBase TChar NoLoc
+
+tvar :: Text -> Type
+tvar x = TVar (name' x) NoLoc
 
 tarr :: Endpoint -> Endpoint -> Type -> Type
 tarr e1 e2 t = TArray (interval e1 e2) t NoLoc
@@ -327,6 +346,7 @@ env =
         (name' "N", tint),
         (name' "Arr",tarr (Including (litNum 0)) (Excluding (cons "N")) tint),
         (name' "P", tfunc tint tbool),
+        (name' "Q", tfunc (tvar "?m") tbool),
         (name' "F", tfunc tint tint),
         (name' "Max", tfunc tint (tfunc tint tbool)),
         (name' "i", tint),
@@ -349,7 +369,7 @@ check ::
   (Env Type -> a -> TM b) ->
   Env Type -> a -> Either Error b
 check checker env' e =
-  case runExcept (checker env' e) of
+  case runExcept (evalStateT (checker env' e) 0) of
     Left err -> Left . TypeError $ err
     Right x -> Right x
 
@@ -378,6 +398,14 @@ declarationCheck :: Text -> Text -> Assertion
 declarationCheck t1 t2 =
   toText (check inferDecl emptyEnv <$> runParser pDeclaration t1) @?= t2
 
+declarationCheck' :: Text -> Text -> Assertion 
+declarationCheck' t1 t2 =
+  toText (check inferDecl env <$> runParser pDeclaration t1) @?= t2
+
+envCheck :: Text -> Assertion 
+envCheck t =
+  toText env @?= t
+
 blockDeclarationCheck :: Text -> Text -> Assertion
 blockDeclarationCheck t1 t2 =
   -- toString (map (check inferDecl emptyEnv) <$> runParser pBlockDeclaration t1) @?= t2
@@ -391,3 +419,13 @@ blockDeclarationCheck t1 t2 =
           Right env' -> return (check inferDecl env' d)
           ) (Right emptyEnv) ds
   
+programCheck :: Text -> Assertion
+programCheck t1 = 
+  toText wrap @?= "()"
+  where
+    -- wrap :: Either Error ()
+    wrap = do
+      prog <- runParser pProgram t1
+      case runExcept (checkProg prog) of
+        Left err -> Left . Left $ [TypeError err]
+        Right x -> Right x

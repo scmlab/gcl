@@ -10,7 +10,7 @@ import Data.Aeson (ToJSON)
 import Data.Loc (Loc (..), Located (..))
 import Data.Loc.Range (Range, fromLoc)
 import qualified Data.Map as Map
-import GCL.Common (Bindings, Fresh (fresh, freshText), Subs, Substitutable (apply))
+import GCL.Common (Bindings, Fresh (fresh, freshText), Subs, Substitutable (subst))
 import GCL.Predicate (Origin (..), PO (..), Pred (..), Spec (Specification))
 import GCL.Predicate.Util (conjunct, disjunct, guardIf, guardLoop, toExpr)
 import GHC.Generics (Generic)
@@ -43,21 +43,6 @@ data ProgView
   | ProgViewMissingPostcondition Pred [A.Stmt]
   | ProgViewMissingBoth [A.Stmt]
 
--- applyPredAssert :: Env (Either A.Expr A.Expr) -> A.Expr -> Loc -> Pred
--- applyPredAssert env p l = apply env (Assertion p l)
-
--- applyPredAssert' :: A.Expr -> Loc -> WP Pred
--- applyPredAssert' p l = do
---   env <- ask
---   let env' = Map.map Right env :: Env (Either A.Expr A.Expr)
---   return $ apply env' (Assertion p l)
-
--- applyPredLoopInvariant :: A.Expr -> A.Expr -> Loc -> WP Pred
--- applyPredLoopInvariant p bnd l = do
---   env <- ask
---   let env' = Map.map Right env :: Env (Either A.Expr A.Expr)
---   return $ apply env' (LoopInvariant p bnd l)
-
 progView :: [A.Stmt] -> ProgView
 progView [] = ProgViewEmpty
 progView [A.Assert pre l] = do
@@ -76,7 +61,7 @@ structProgram :: [A.Stmt] -> WP ()
 structProgram stmts = do
   env <- Map.map Right <$> ask :: WP (Subs Bindings)
 
-  case progView (apply env stmts) of
+  case progView (subst env stmts) of
     ProgViewEmpty -> return ()
     ProgViewOkay pre stmts' post -> structStmts True pre Nothing stmts' post
     ProgViewMissingPrecondition stmts' post -> structStmts True (Constant A.true) Nothing stmts' post
@@ -117,8 +102,8 @@ struct :: Bool -> Pred -> Maybe A.Expr -> A.Stmt -> Pred -> WP ()
 struct _ pre _ (A.Abort l) _ = tellPO pre (Constant A.false) (AtAbort l)
 struct _ pre _ (A.Skip l) post = tellPO pre post (AtSkip l)
 struct _ pre _ (A.Assign xs es l) post = do
-  let subst = Map.fromList . zip xs . map Left $ es :: Subs Bindings
-  tellPO pre (apply subst post) (AtAssignment l)
+  let sub = Map.fromList . zip xs . map Left $ es :: Subs Bindings
+  tellPO pre (subst sub post) (AtAssignment l)
 struct True pre _ (A.Assert p l) post = do
   tellPO pre (Assertion p l) (AtAssertion l)
   tellPO (Assertion p l) post (AtAssertion l)
@@ -193,10 +178,10 @@ wp :: Bool -> A.Stmt -> Pred -> WP Pred
 wp _ (A.Skip _) post = return post
 wp _ (A.Abort _) _ = return (Constant A.false)
 wp _ (A.Assign xs es _) post = do
-  return $ apply subst post
+  return $ subst sub post
   where
-    subst :: Subs Bindings
-    subst = Map.fromList . zip xs . map Left $ es
+    sub :: Subs Bindings
+    sub = Map.fromList . zip xs . map Left $ es
 wp _ (A.Assert p l) post = do
   tellPO (Assertion p l) post (AtAssertion l)
   return (Assertion p l)
