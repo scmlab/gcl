@@ -46,7 +46,6 @@ handler uri pos responder = do
 -- | A "Scope" is a mapping of names and LocationLinks
 type Scope = Map Text (Range -> LocationLink)
 
-
 -- | See if a name is in the scope
 lookupScope :: Scope -> Name -> Maybe LocationLink
 lookupScope scope name = case Map.lookup (nameToText name) scope of
@@ -115,9 +114,7 @@ runGotoM (Program decls _ _ _ _) = flip runReaderT [declScope]
 
 instance StabM GotoM Program LocationLink where
   stabM pos (Program decls _ _ stmts l) = whenInRange' pos l $ do
-    decls' <- concat <$> mapM (stabM pos) decls
-    stmts' <- concat <$> mapM (stabM pos) stmts
-    return (decls' <> stmts')
+    (<>) <$> stabM pos decls <*> stabM pos stmts
 
 instance StabM GotoM Declaration LocationLink where
   stabM pos x = whenInRange' pos (locOf x) $ case x of 
