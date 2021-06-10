@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 {-# LANGUAGE MultiParamTypeClasses #-}
-module Server.Diagnostic where
+module Server.Handler.Diagnostic where
 
 import           Data.Foldable                  ( toList )
 import           Data.Loc hiding (fromLoc)
