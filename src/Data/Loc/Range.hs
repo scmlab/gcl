@@ -83,6 +83,10 @@ rangeStart (Range a _) = a
 rangeEnd :: Range -> Pos
 rangeEnd (Range _ b) = b
 
+-- | Filepath of the range
+rangeFile :: Range -> FilePath 
+rangeFile (Range a _) = posFile a
+
 -- | Loc -> Maybe Range
 fromLoc :: Loc -> Maybe Range
 fromLoc NoLoc = Nothing

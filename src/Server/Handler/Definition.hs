@@ -8,24 +8,26 @@ module Server.Handler.Definition
   ) where
 
 import           Control.Monad.Reader
-import           Data.Loc                       ( locOf
-                                                )
+import           Data.Loc                       ( locOf )
 import           Data.Loc.Range
 import qualified Data.Map                      as Map
 import           Data.Map                       ( Map )
 import           Data.Maybe                     ( mapMaybe
+                                                , maybeToList
                                                 )
 import           Data.Text                      ( Text )
 import           Error
+import       qualified    Language.LSP.Types as J 
 import           Language.LSP.Types      hiding ( Range )
 import           Server.DSL
 import           Server.Interpreter.RealWorld
 import           Server.Stab
 import           Server.Util
 import           Syntax.Abstract
-import           Syntax.Common                  ( Name(Name)
+import           Syntax.Common                  ( Name
                                                 , nameToText
                                                 )
+import Debug.Trace (traceShow)
 
 ignoreErrors :: Either [Error] [LocationLink] -> [LocationLink]
 ignoreErrors (Left  _errors  ) = []
@@ -41,18 +43,39 @@ handler uri pos responder = do
         program <- parseProgram source
         runGotoM uri program $ stabM pos program
 
-type GotoM = ReaderT Env CmdM
+--------------------------------------------------------------------------------
 
-data Env = Env
-  { envUri   :: Uri
-  , envDecls :: Map Text (Range -> LocationLink)
-  }
+-- | A "Scope" is a mapping of names and LocationLinks
+type Scope = Map Text (Range -> LocationLink)
+
+
+-- | See if a name is in the scope
+lookupScope :: Scope -> Name -> Maybe LocationLink
+lookupScope scope name = case Map.lookup (nameToText name) scope of
+  Nothing             -> Nothing
+  Just toLocationLink -> do
+    case fromLoc (locOf name) of
+      Nothing          -> Nothing
+      Just callerRange -> Just (toLocationLink callerRange)
+
+-- | See if a name is in a series of scopes (from local to global)
+-- | Return the first result (which should be the most local target)
+lookupScopes :: [Scope] -> Name -> Maybe LocationLink
+lookupScopes scopes name = foldl findFirst Nothing scopes
+ where
+  findFirst :: Maybe LocationLink -> Scope -> Maybe LocationLink
+  findFirst (Just found) _     = Just found
+  findFirst Nothing      scope = lookupScope scope name
+
+--------------------------------------------------------------------------------
+
+type GotoM = ReaderT [Scope] CmdM
 
 runGotoM :: Uri -> Program -> GotoM a -> CmdM a
-runGotoM uri (Program decls _ _ _ _) = flip runReaderT (Env uri decls')
+runGotoM uri (Program decls _ _ _ _) = flip runReaderT [declScope]
  where
-  decls' :: Map Text (Range -> LocationLink)
-  decls' = Map.fromList (decls >>= mapMaybe declToLocationLink . splitDecl)
+  declScope :: Map Text (Range -> LocationLink)
+  declScope = Map.fromList (decls >>= mapMaybe declToLocationLink . splitDecl)
 
   -- split a parallel declaration into many simpler declarations 
   splitDecl :: Declaration -> [(Name, Declaration)]
@@ -60,6 +83,7 @@ runGotoM uri (Program decls _ _ _ _) = flip runReaderT (Env uri decls')
   splitDecl decl@(VarDecl   names _ _ _) = [ (name, decl) | name <- names ]
   splitDecl decl@(LetDecl   name  _ _ _) = [(name, decl)]
 
+  -- convert a declaration (and its name) to a LocationLink (that is waiting for the caller's Range)
   declToLocationLink
     :: (Name, Declaration) -> Maybe (Text, Range -> LocationLink)
   declToLocationLink (name, decl) = do
@@ -75,6 +99,7 @@ runGotoM uri (Program decls _ _ _ _) = flip runReaderT (Env uri decls')
 
     return (text, toLocationLink)
 
+
 instance StabM GotoM Program LocationLink where
   stabM pos (Program decls _ _ stmts _) = do
     decls' <- concat <$> mapM (stabM pos) decls
@@ -85,7 +110,26 @@ instance StabM GotoM Declaration LocationLink where
   stabM pos = \case
     ConstDecl _ _ c _ -> stabM pos c
     VarDecl   _ _ c _ -> stabM pos c
-    LetDecl   _ _ c _ -> stabM pos c
+    LetDecl   _ args c _ -> do 
+      -- creates a local scope with arguments 
+      let argsScope = Map.fromList $ mapMaybe argToLocationLink args
+      -- temporarily preppend this local scope to the scope list 
+      local (argsScope :) $ stabM pos c
+      where 
+        argToLocationLink
+          :: Name -> Maybe (Text, Range -> LocationLink)
+        argToLocationLink arg = do
+          targetRange    <- fromLoc (locOf arg)
+          let targetUri = J.filePathToUri (rangeFile targetRange)
+
+          let text = nameToText arg
+          let toLocationLink callerRange = LocationLink
+                (Just $ toRange callerRange)
+                targetUri
+                (toRange targetRange)
+                (toRange targetRange)
+
+          return (text, toLocationLink)
 
 instance StabM GotoM Stmt LocationLink where
   stabM pos = \case
@@ -111,13 +155,9 @@ instance StabM GotoM Expr LocationLink where
     _               -> return []
 
 instance StabM GotoM Name LocationLink where
-  stabM pos name@(Name text callerLoc) = do
-    decls <- asks envDecls
+  stabM pos name = do
     if pos `stabbed'` name
-      then case Map.lookup text decls of
-        Nothing             -> return []
-        Just toLocationLink -> do
-          case fromLoc callerLoc of
-            Nothing          -> return []
-            Just callerRange -> return [toLocationLink callerRange]
+      then do
+        scopes <- ask
+        return $ maybeToList $ lookupScopes scopes name
       else return []
