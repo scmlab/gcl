@@ -132,6 +132,9 @@ instance Semigroup Range where
 class Ranged a where
   rangeOf :: a -> Range
 
+instance Ranged Range where
+  rangeOf x = x
+
 instance Ranged a => Ranged (NonEmpty a) where
   rangeOf xs = rangeOf (NE.head xs) <> rangeOf (NE.last xs)
 

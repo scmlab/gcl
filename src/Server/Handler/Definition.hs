@@ -115,13 +115,13 @@ runGotoM (Program decls _ _ _ _) = flip runReaderT [declScope]
 
 
 instance StabM GotoM Program LocationLink where
-  stabM pos (Program decls _ _ stmts _) = do
+  stabM pos (Program decls _ _ stmts l) = whenInRange' pos l $ do
     decls' <- concat <$> mapM (stabM pos) decls
     stmts' <- concat <$> mapM (stabM pos) stmts
     return (decls' <> stmts')
 
 instance StabM GotoM Declaration LocationLink where
-  stabM pos = \case
+  stabM pos x = whenInRange' pos (locOf x) $ case x of 
     ConstDecl _ _ c _ -> stabM pos c
     VarDecl   _ _ c _ -> stabM pos c
     LetDecl   _ args c _ -> do 
@@ -129,8 +129,9 @@ instance StabM GotoM Declaration LocationLink where
       let argsScope = Map.fromList $ mapMaybe nameToLocationLink args
       -- temporarily preppend this local scope to the scope list 
       local (argsScope :) $ stabM pos c
+      
 instance StabM GotoM Stmt LocationLink where
-  stabM pos = \case
+  stabM pos x = whenInRange' pos (locOf x) $ case x of 
     Assign a b _        -> (<>) <$> stabM pos a <*> stabM pos b
     Assert a _          -> stabM pos a
     LoopInvariant a b _ -> (<>) <$> stabM pos a <*> stabM pos b
@@ -139,10 +140,10 @@ instance StabM GotoM Stmt LocationLink where
     _                   -> return []
 
 instance StabM GotoM GdCmd LocationLink where
-  stabM pos (GdCmd gd stmts _) = (<>) <$> stabM pos gd <*> stabM pos stmts
+  stabM pos (GdCmd gd stmts l) = whenInRange' pos l $ (<>) <$> stabM pos gd <*> stabM pos stmts
 
 instance StabM GotoM Expr LocationLink where
-  stabM pos = \case
+  stabM pos x = whenInRange' pos (locOf x) $ case x of 
     Var   a _       -> stabM pos a
     Const a _       -> stabM pos a
     Paren a         -> stabM pos a

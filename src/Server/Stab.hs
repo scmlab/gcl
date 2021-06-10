@@ -7,10 +7,12 @@ module Server.Stab
   , stabMaybeM
   , stabbed
   , stabbed'
+  , whenInRange
+  , whenInRange'
   , Collect(..)
   ) where
 
-import           Data.Loc                       ( Located(locOf) )
+import           Data.Loc                       ( Located(locOf), Loc )
 import           Data.Loc.Range
 import qualified Language.LSP.Types            as J
 import qualified Server.Util                   as J
@@ -63,6 +65,16 @@ instance (Monad m, StabM m a b) => StabM m (Maybe a) b where
 
 instance (Monad m, StabM m a b) => StabM m [a] b where
   stabM pos xs = concat <$> mapM (stabM pos) xs
+
+whenInRange :: (Monad m) => J.Position -> Range -> m [a] -> m [a]
+whenInRange pos range f = if pos `stabbed` range 
+  then f
+  else return []
+
+whenInRange' :: (Monad m) => J.Position -> Loc -> m [a] -> m [a]
+whenInRange' pos range f = if pos `stabbed'` range 
+  then f
+  else return []
 
 stabMaybeM :: (Monad m, StabM m a b) => J.Position -> a -> m (Maybe b)
 stabMaybeM pos node = do
