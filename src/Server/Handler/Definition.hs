@@ -27,7 +27,6 @@ import           Syntax.Abstract
 import           Syntax.Common                  ( Name
                                                 , nameToText
                                                 )
-import Debug.Trace (traceShow)
 
 ignoreErrors :: Either [Error] [LocationLink] -> [LocationLink]
 ignoreErrors (Left  _errors  ) = []
@@ -41,7 +40,7 @@ handler uri pos responder = do
       interpret filepath (responder . ignoreErrors) $ do
         source  <- getSource
         program <- parseProgram source
-        runGotoM uri program $ stabM pos program
+        runGotoM program $ stabM pos program
 
 --------------------------------------------------------------------------------
 
@@ -71,8 +70,8 @@ lookupScopes scopes name = foldl findFirst Nothing scopes
 
 type GotoM = ReaderT [Scope] CmdM
 
-runGotoM :: Uri -> Program -> GotoM a -> CmdM a
-runGotoM uri (Program decls _ _ _ _) = flip runReaderT [declScope]
+runGotoM :: Program -> GotoM a -> CmdM a
+runGotoM (Program decls _ _ _ _) = flip runReaderT [declScope]
  where
   declScope :: Map Text (Range -> LocationLink)
   declScope = Map.fromList (decls >>= mapMaybe declToLocationLink . splitDecl)
@@ -87,15 +86,16 @@ runGotoM uri (Program decls _ _ _ _) = flip runReaderT [declScope]
   declToLocationLink
     :: (Name, Declaration) -> Maybe (Text, Range -> LocationLink)
   declToLocationLink (name, decl) = do
-    calleeRange    <- fromLoc (locOf decl)
-    calleeSelRange <- fromLoc (locOf name)
+    targetRange    <- fromLoc (locOf decl)
+    targetSelRange <- fromLoc (locOf name)
+    let targetUri = J.filePathToUri (rangeFile targetRange)
 
     let text = nameToText name
     let toLocationLink callerRange = LocationLink
           (Just $ toRange callerRange)
-          uri
-          (toRange calleeRange)
-          (toRange calleeSelRange)
+          targetUri
+          (toRange targetRange)
+          (toRange targetSelRange)
 
     return (text, toLocationLink)
 
