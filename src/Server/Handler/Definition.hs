@@ -13,7 +13,6 @@ import           Data.Loc.Range
 import qualified Data.Map                      as Map
 import           Data.Map                       ( Map )
 import           Data.Maybe                     ( mapMaybe
-                                                , maybeToList
                                                 )
 import           Data.Text                      ( Text )
 import           Error
@@ -45,25 +44,25 @@ handler uri pos responder = do
 --------------------------------------------------------------------------------
 
 -- | A "Scope" is a mapping of names and LocationLinks
-type Scope = Map Text (Range -> LocationLink)
+-- type Scope = Map Text (Range -> LocationLink)
 
--- | See if a name is in the scope
-lookupScope :: Scope -> Name -> Maybe LocationLink
-lookupScope scope name = case Map.lookup (nameToText name) scope of
-  Nothing             -> Nothing
-  Just toLocationLink -> do
-    case fromLoc (locOf name) of
-      Nothing          -> Nothing
-      Just callerRange -> Just (toLocationLink callerRange)
+-- -- | See if a name is in the scope
+-- lookupScope :: Scope -> Name -> Maybe LocationLink
+-- lookupScope scope name = case Map.lookup (nameToText name) scope of
+--   Nothing             -> Nothing
+--   Just toLocationLink -> do
+--     case fromLoc (locOf name) of
+--       Nothing          -> Nothing
+--       Just callerRange -> Just (toLocationLink callerRange)
 
--- | See if a name is in a series of scopes (from local to global)
--- | Return the first result (which should be the most local target)
-lookupScopes :: [Scope] -> Name -> Maybe LocationLink
-lookupScopes scopes name = foldl findFirst Nothing scopes
- where
-  findFirst :: Maybe LocationLink -> Scope -> Maybe LocationLink
-  findFirst (Just found) _     = Just found
-  findFirst Nothing      scope = lookupScope scope name
+-- -- | See if a name is in a series of scopes (from local to global)
+-- -- | Return the first result (which should be the most local target)
+-- lookupScopes :: [Scope] -> Name -> Maybe LocationLink
+-- lookupScopes scopes name = foldl findFirst Nothing scopes
+--  where
+--   findFirst :: Maybe LocationLink -> Scope -> Maybe LocationLink
+--   findFirst (Just found) _     = Just found
+--   findFirst Nothing      scope = lookupScope scope name
 
 nameToLocationLink :: Name -> Maybe (Text, Range -> LocationLink)
 nameToLocationLink arg = do
@@ -79,13 +78,16 @@ nameToLocationLink arg = do
   return (text, toLocationLink)
 --------------------------------------------------------------------------------
 
-type GotoM = ReaderT Position (ReaderT [Scope] CmdM)
+type GotoM = ReaderT Position (ReaderT [Scope (Range -> LocationLink)] CmdM)
 
--- temporarily preppend a local scope to the scope list 
-localScope :: Scope -> GotoM a -> GotoM a
-localScope scope p = do
-  pos <- ask
-  lift $ local (scope :) $ runReaderT p pos
+instance HasPosition GotoM where
+  askPosition = ask
+
+instance HasScopes GotoM (Range -> LocationLink) where
+  askScopes = lift ask
+  localScope scope p = do
+    pos <- ask
+    lift $ local (scope :) $ runReaderT p pos
 
 runGotoM :: Program -> Position -> GotoM a -> CmdM a
 runGotoM (Program decls _ _ _ _) pos f = runReaderT (runReaderT f pos)
@@ -160,6 +162,10 @@ instance StabM GotoM Expr LocationLink where
     _ -> return []
 
 instance StabM GotoM Name LocationLink where
-  stabM name = do
-    scopes <- lift ask
-    return $ maybeToList $ lookupScopes scopes name
+  stabM name = do 
+    result <- lookupScopes (nameToText name)
+    case result of 
+      Nothing             -> return []
+      Just toLocationLink -> case fromLoc (locOf name) of
+        Nothing          -> return []
+        Just callerRange -> return [toLocationLink callerRange]
