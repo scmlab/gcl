@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -16,11 +17,11 @@ import           Data.Maybe                     ( mapMaybe
                                                 )
 import           Data.Text                      ( Text )
 import           Error
-import       qualified    Language.LSP.Types as J 
+import qualified Language.LSP.Types            as J
 import           Language.LSP.Types      hiding ( Range )
 import           Server.DSL
 import           Server.Interpreter.RealWorld
-import           Server.Stab
+import           Server.Stab2
 import           Server.Util
 import           Syntax.Abstract
 import           Syntax.Common                  ( Name
@@ -39,7 +40,7 @@ handler uri pos responder = do
       interpret filepath (responder . ignoreErrors) $ do
         source  <- getSource
         program <- parseProgram source
-        runGotoM program $ stabM pos program
+        runGotoM program pos $ stabM program
 
 --------------------------------------------------------------------------------
 
@@ -64,26 +65,31 @@ lookupScopes scopes name = foldl findFirst Nothing scopes
   findFirst (Just found) _     = Just found
   findFirst Nothing      scope = lookupScope scope name
 
-nameToLocationLink
-  :: Name -> Maybe (Text, Range -> LocationLink)
+nameToLocationLink :: Name -> Maybe (Text, Range -> LocationLink)
 nameToLocationLink arg = do
-  targetRange    <- fromLoc (locOf arg)
+  targetRange <- fromLoc (locOf arg)
   let targetUri = J.filePathToUri (rangeFile targetRange)
 
-  let text = nameToText arg
-  let toLocationLink callerRange = LocationLink
-        (Just $ toRange callerRange)
-        targetUri
-        (toRange targetRange)
-        (toRange targetRange)
+  let text      = nameToText arg
+  let toLocationLink callerRange = LocationLink (Just $ toRange callerRange)
+                                                targetUri
+                                                (toRange targetRange)
+                                                (toRange targetRange)
 
   return (text, toLocationLink)
 --------------------------------------------------------------------------------
 
-type GotoM = ReaderT [Scope] CmdM
+type GotoM = ReaderT Position (ReaderT [Scope] CmdM)
 
-runGotoM :: Program -> GotoM a -> CmdM a
-runGotoM (Program decls _ _ _ _) = flip runReaderT [declScope]
+-- temporarily preppend a local scope to the scope list 
+localScope :: Scope -> GotoM a -> GotoM a
+localScope scope p = do
+  pos <- ask
+  lift $ local (scope :) $ runReaderT p pos
+
+runGotoM :: Program -> Position -> GotoM a -> CmdM a
+runGotoM (Program decls _ _ _ _) pos f = runReaderT (runReaderT f pos)
+                                                    [declScope]
  where
   declScope :: Map Text (Range -> LocationLink)
   declScope = Map.fromList (decls >>= mapMaybe declToLocationLink . splitDecl)
@@ -102,7 +108,7 @@ runGotoM (Program decls _ _ _ _) = flip runReaderT [declScope]
     targetSelRange <- fromLoc (locOf name)
     let targetUri = J.filePathToUri (rangeFile targetRange)
 
-    let text = nameToText name
+    let text      = nameToText name
     let toLocationLink callerRange = LocationLink
           (Just $ toRange callerRange)
           targetUri
@@ -111,52 +117,49 @@ runGotoM (Program decls _ _ _ _) = flip runReaderT [declScope]
 
     return (text, toLocationLink)
 
-
 instance StabM GotoM Program LocationLink where
-  stabM pos (Program decls _ _ stmts l) = whenInRange' pos l $ do
-    (<>) <$> stabM pos decls <*> stabM pos stmts
+  stabM (Program decls _ _ stmts _) =
+    (<>) <$> stabLocated decls <*> stabLocated stmts
 
 instance StabM GotoM Declaration LocationLink where
-  stabM pos x = whenInRange' pos (locOf x) $ case x of 
-    ConstDecl _ _ c _ -> stabM pos c
-    VarDecl   _ _ c _ -> stabM pos c
-    LetDecl   _ args c _ -> do 
+  stabM = \case
+    ConstDecl _ _    c _ -> stabLocated c
+    VarDecl   _ _    c _ -> stabLocated c
+    LetDecl   _ args c _ -> do
       -- creates a local scope for arguments 
       let argsScope = Map.fromList $ mapMaybe nameToLocationLink args
       -- temporarily preppend this local scope to the scope list 
-      local (argsScope :) $ stabM pos c
-      
+
+      localScope argsScope $ stabM c
+
 instance StabM GotoM Stmt LocationLink where
-  stabM pos x = whenInRange' pos (locOf x) $ case x of 
-    Assign a b _        -> (<>) <$> stabM pos a <*> stabM pos b
-    Assert a _          -> stabM pos a
-    LoopInvariant a b _ -> (<>) <$> stabM pos a <*> stabM pos b
-    Do a _              -> stabM pos a
-    If a _              -> stabM pos a
+  stabM = \case
+    Assign a b _        -> (<>) <$> stabLocated a <*> stabLocated b
+    Assert a _          -> stabLocated a
+    LoopInvariant a b _ -> (<>) <$> stabLocated a <*> stabLocated b
+    Do a _              -> stabLocated a
+    If a _              -> stabLocated a
     _                   -> return []
 
 instance StabM GotoM GdCmd LocationLink where
-  stabM pos (GdCmd gd stmts l) = whenInRange' pos l $ (<>) <$> stabM pos gd <*> stabM pos stmts
+  stabM (GdCmd gd stmts _) = (<>) <$> stabLocated gd <*> stabLocated stmts
 
 instance StabM GotoM Expr LocationLink where
-  stabM pos x = whenInRange' pos (locOf x) $ case x of 
-    Var   a _       -> stabM pos a
-    Const a _       -> stabM pos a
-    Paren a         -> stabM pos a
-    Chain a _ c _   -> (<>) <$> stabM pos a <*> stabM pos c
-    App a b _       -> (<>) <$> stabM pos a <*> stabM pos b
-    Lam _ b _       -> stabM pos b
-    Quant _ args c d _ -> do 
+  stabM = \case
+    Var   a _          -> stabLocated a
+    Const a _          -> stabLocated a
+    Paren a            -> stabLocated a
+    Chain a _ c _      -> (<>) <$> stabLocated a <*> stabLocated c
+    App a b _          -> (<>) <$> stabLocated a <*> stabLocated b
+    Lam _ b _          -> stabLocated b
+    Quant _ args c d _ -> do
       -- creates a local scope for arguments 
       let argsScope = Map.fromList $ mapMaybe nameToLocationLink args
       -- temporarily preppend this local scope to the scope list 
-      local (argsScope :) $ (<>) <$> stabM pos c <*> stabM pos d
-    _               -> return []
+      localScope argsScope $ (<>) <$> stabLocated c <*> stabLocated d
+    _ -> return []
 
 instance StabM GotoM Name LocationLink where
-  stabM pos name = do
-    if pos `stabbed'` name
-      then do
-        scopes <- ask
-        return $ maybeToList $ lookupScopes scopes name
-      else return []
+  stabM name = do
+    scopes <- lift ask
+    return $ maybeToList $ lookupScopes scopes name

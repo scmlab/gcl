@@ -63,8 +63,9 @@ data Stmt
 
 data GdCmd = GdCmd Expr [Stmt] Loc deriving (Eq, Show)
 
-
-
+instance Located GdCmd where
+  locOf (GdCmd _ _ l) = l 
+  
 --------------------------------------------------------------------------------
 
 -- | Endpoint
