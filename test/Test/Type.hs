@@ -8,9 +8,9 @@ import Data.Text (Text)
 import Test.Tasty (TestTree, testGroup)
 import Test.Util (goldenFileTest, parseTest)
 import Test.Tasty.HUnit (testCase, (@?=), Assertion)
-import Control.Monad.Except (foldM, runExcept, withExcept)
+import Control.Monad.Except (foldM, runExcept)
 import GCL.Type
-    ( TM, inferExpr, inferDecl, checkType, checkStmt, checkProg )
+    ( TM, inferExpr, inferDecl, checkType, checkStmt, checkProg, runTM )
 import GCL.Common ( Env, emptyEnv )
 import Syntax.Concrete.ToAbstract ( ToAbstract(toAbstract) )
 import Syntax.Abstract
@@ -290,7 +290,9 @@ fileCheck (filepath, source) = toText result
       Left errors -> Left (map SyntacticError errors)
       Right ast -> case runExcept (toAbstract ast) of
         Left _ -> Left [Others "Should dig hole"]
-        Right prog -> runExcept $ withExcept (pure . TypeError) $ checkProg prog
+        Right prog -> case runTM (checkProg prog) of 
+          Left errors -> Left [TypeError errors]
+          Right val -> Right val
 
 tint :: Type
 tint = TBase TInt NoLoc
@@ -426,6 +428,6 @@ programCheck t1 =
     -- wrap :: Either Error ()
     wrap = do
       prog <- runParser pProgram t1
-      case runExcept (checkProg prog) of
+      case runTM (checkProg prog) of
         Left err -> Left . Left $ [TypeError err]
         Right x -> Right x

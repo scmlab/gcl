@@ -27,8 +27,6 @@ import           Language.LSP.Types      hiding ( Range )
 import           Pretty                         ( toText )
 import           Server.DSL
 import           Syntax.Common
-import Debug.Trace (traceShowId, traceShow)
-
 
 ignoreErrors :: Either [Error] (Maybe Hover) -> Maybe Hover
 ignoreErrors (Left  _errors  ) = Nothing
@@ -108,7 +106,7 @@ instance StabM HoverM Declaration HoverResult where
     LetDecl   name args body _ -> do
       name' <- stabM pos name
       args' <- stabM pos (toArgs name args)
-      let argsScope = traceShow (args, args') $ Map.fromList $ zip (map nameToText args) args'
+      let argsScope = Map.fromList $ zip (map nameToText args) args'
       body' <- local (argsScope :) $ stabM pos body
       return $ concat [name', args', body']
 

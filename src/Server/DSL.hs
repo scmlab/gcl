@@ -124,7 +124,7 @@ refine source range  = do
       return $ find (withinRange range) specs
 
 typeCheck :: A.Program -> CmdM ()
-typeCheck p = case runExcept (TypeChecking.checkProg p) of
+typeCheck p = case TypeChecking.runTM (TypeChecking.checkProg p) of
   Left e -> throwError [TypeError e]
   Right v -> return v
 

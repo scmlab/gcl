@@ -261,15 +261,12 @@ checkStmt _ (Proof _) = return ()
 --   where
 --     expr' = foldr (\x b -> Lam x b (b <--> locOf x)) body xs
 
-checkProg' :: Program -> TM ()
-checkProg' (Program decls exprs defs stmts _) = do
+checkProg :: Program -> TM ()
+checkProg (Program decls exprs defs stmts _) = do
   env <- foldM inferDecl emptyEnv decls
   mapM_ (checkExpr env) exprs
   mapM_ (checkAssign env) (Map.toList defs)
   mapM_ (checkStmt env) stmts
-
-checkProg :: Program -> Except TypeError ()
-checkProg prog = evalStateT (checkProg' prog) initFreshState 
 
 runTM :: TM a -> Either TypeError a
 runTM p = runExcept (evalStateT p initFreshState)
