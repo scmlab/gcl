@@ -1,5 +1,6 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleContexts #-}
 module Server.Stab
   ( Stab(..)
   , stabMaybe
@@ -67,12 +68,12 @@ instance (Monad m, StabM m a b) => StabM m [a] b where
   stabM pos xs = concat <$> mapM (stabM pos) xs
 
 whenInRange :: (Monad m) => J.Position -> Range -> m [a] -> m [a]
-whenInRange pos range f = if pos `stabbed` range 
+whenInRange pos range f = if pos `stabbed` range
   then f
   else return []
 
 whenInRange' :: (Monad m) => J.Position -> Loc -> m [a] -> m [a]
-whenInRange' pos range f = if pos `stabbed'` range 
+whenInRange' pos range f = if pos `stabbed'` range
   then f
   else return []
 
