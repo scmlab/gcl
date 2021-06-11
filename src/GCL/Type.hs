@@ -271,6 +271,9 @@ checkProg' (Program decls exprs defs stmts _) = do
 checkProg :: Program -> Except TypeError ()
 checkProg prog = evalStateT (checkProg' prog) initFreshState 
 
+runTM :: TM a -> Either TypeError a
+runTM p = runExcept (evalStateT p initFreshState)
+
 ------------------------------------------
 -- unification
 ------------------------------------------

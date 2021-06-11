@@ -27,6 +27,7 @@ import           Language.LSP.Types      hiding ( Range )
 import           Pretty                         ( toText )
 import           Server.DSL
 import           Syntax.Common
+import Debug.Trace (traceShowId, traceShow)
 
 
 ignoreErrors :: Either [Error] (Maybe Hover) -> Maybe Hover
@@ -47,6 +48,7 @@ data HoverResult = Result
   { resultHover :: Hover
   , resultType  :: Type
   }
+  deriving (Show)
 
 --------------------------------------------------------------------------------
 
@@ -75,7 +77,7 @@ runHoverM :: Program -> HoverM a -> CmdM a
 runHoverM (Program decls _ _ _ _) = flip runReaderT [declScope]
  where
   declScope :: Map Text HoverResult
-  declScope = case runExcept (foldM Type.inferDecl Map.empty decls) of
+  declScope = case Type.runTM (foldM Type.inferDecl Map.empty decls) of
     -- ignore type errors 
     Left  _   -> Map.empty
     Right env -> Map.mapKeys nameToText $ Map.map typeToHoverResult env
@@ -106,7 +108,8 @@ instance StabM HoverM Declaration HoverResult where
     LetDecl   name args body _ -> do
       name' <- stabM pos name
       args' <- stabM pos (toArgs name args)
-      body' <- stabM pos body
+      let argsScope = traceShow (args, args') $ Map.fromList $ zip (map nameToText args) args'
+      body' <- local (argsScope :) $ stabM pos body
       return $ concat [name', args', body']
 
 instance StabM HoverM Expr HoverResult where
@@ -168,7 +171,7 @@ toArgs :: Name -> [Name] -> [Arg]
 toArgs func args = zipWith (Arg func) args [0 ..]
 
 instance StabM HoverM Arg HoverResult where
-  stabM pos (Arg func arg index) = whenInRange' pos (locOf arg) $ do
+  stabM _pos (Arg func _arg index) = do
     scopes <- ask
     case lookupScopes scopes func of
       Nothing -> return []
