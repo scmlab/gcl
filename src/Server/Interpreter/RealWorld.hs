@@ -52,12 +52,12 @@ data GlobalEnv = GlobalEnv
     -- 
     globalMute :: IORef Bool,
 
-    globalCachedResult :: IORef Result
+    globalCachedResult :: IORef (Map FilePath Result) 
   }
 
 -- | Constructs an initial global state
 initGlobalEnv :: IO GlobalEnv
-initGlobalEnv = GlobalEnv <$> newChan <*> newIORef Map.empty <*> newIORef 0 <*> newIORef False <*> newIORef (Right ([], [], [], []))
+initGlobalEnv = GlobalEnv <$> newChan <*> newIORef Map.empty <*> newIORef 0 <*> newIORef False <*> newIORef Map.empty 
 
 --------------------------------------------------------------------------------
 
@@ -132,15 +132,16 @@ setMute b = do
   ref <- lift $ asks globalMute
   liftIO $ writeIORef ref b
 
-cacheResult :: Result -> ServerM ()
-cacheResult result = do
+cacheResult :: FilePath -> Result -> ServerM ()
+cacheResult filepath result = do
   ref <- lift $ asks globalCachedResult
-  liftIO $ writeIORef ref result
+  liftIO $ modifyIORef' ref (Map.insert filepath result)
 
-readCachedResult :: ServerM Result
-readCachedResult = do
+readCachedResult :: FilePath -> ServerM (Maybe Result)
+readCachedResult filepath = do
   ref <- lift $ asks globalCachedResult
-  liftIO $ readIORef ref
+  mapping <- liftIO $ readIORef ref
+  return (Map.lookup filepath mapping)
 
 --------------------------------------------------------------------------------
 
@@ -183,10 +184,10 @@ interpret filepath responder p = case runCmdM p of
     liftIO $ modifyIORef' ref (Map.insert filepath (Just selection))
     interpret filepath responder next
   Right (Free (ReadCachedResult next)) -> do
-    result <- readCachedResult
+    result <- readCachedResult filepath
     interpret filepath responder (next result)
   Right (Free (CacheResult result next)) -> do
-    cacheResult result
+    cacheResult filepath result
     interpret filepath responder next
   Right (Free (BumpResponseVersion next)) -> do
     n <- bumpVersionM
@@ -200,6 +201,6 @@ interpret filepath responder p = case runCmdM p of
     interpret filepath responder next
   Left errors -> do
     setMute False -- unmute on error!
-    cacheResult (Left errors)
+    cacheResult filepath (Left errors)
     logStuff errors
     responder (Left errors)

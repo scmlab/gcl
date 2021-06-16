@@ -46,7 +46,7 @@ data Cmd next
   | BumpResponseVersion (Int -> next)
   | Log Text next
   | CacheResult Result next
-  | ReadCachedResult (Result -> next)
+  | ReadCachedResult (Maybe Result -> next)
   | SendDiagnostics [Diagnostic] next
   deriving (Functor)
 
@@ -76,7 +76,7 @@ getLastSelection = liftF (GetLastSelection id)
 cacheResult :: Result -> CmdM ()
 cacheResult result = liftF (CacheResult result ())
 
-readCachedResult :: CmdM Result
+readCachedResult :: CmdM (Maybe Result)
 readCachedResult = liftF (ReadCachedResult id)
 
 logM :: Text -> CmdM ()

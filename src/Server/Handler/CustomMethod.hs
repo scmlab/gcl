@@ -14,7 +14,9 @@ handleInspect :: Range -> CmdM [ResKind]
 handleInspect range = do
   setLastSelection range
   result <- readCachedResult
-  generateResponseAndDiagnosticsFromResult result
+  case result of 
+    Just v -> generateResponseAndDiagnosticsFromResult v 
+    Nothing -> return []
 
 handleRefine :: Range -> CmdM [ResKind]
 handleRefine range = do

@@ -79,7 +79,7 @@ interpret filepath p = case runCmdM p of
     interpret filepath next
   Right (Free (ReadCachedResult next)) -> do
     lift $ tell []
-    interpret filepath (next (Right ([], [], [], [])))
+    interpret filepath (next Nothing)
   Right (Free (CacheResult _ next)) -> do
     lift $ tell []
     interpret filepath next
