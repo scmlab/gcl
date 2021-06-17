@@ -63,11 +63,82 @@ structProgram stmts = do
 
   case progView (subst env stmts) of
     ProgViewEmpty -> return ()
-    ProgViewOkay pre stmts' post -> structStmts True pre Nothing stmts' post
-    ProgViewMissingPrecondition stmts' post -> structStmts True (Constant A.true) Nothing stmts' post
+    ProgViewOkay pre stmts' post -> structStmts True (pre,Nothing) stmts' post
+    ProgViewMissingPrecondition stmts' post -> structStmts True (Constant A.true, Nothing) stmts' post
     ProgViewMissingPostcondition _ stmts' -> throwError . MissingPostcondition . locOf . last $ stmts'
     ProgViewMissingBoth stmts' -> throwError . MissingPostcondition . locOf . last $ stmts'
 
+
+data SegElm = SAsrt A.Stmt
+            | SSpec A.Stmt
+            | SStmts [A.Stmt]
+
+groupStmts :: [A.Stmt] -> [SegElm]
+groupStmts [] = []
+groupStmts (s@(A.Assert _ _) : stmts) = SAsrt s : groupStmts stmts
+groupStmts (s@(A.LoopInvariant _ _ _) : stmts) = SAsrt s : groupStmts stmts
+groupStmts (s@(A.Spec _ _) : stmts) = SSpec s : groupStmts stmts
+groupStmts (s : stmts) = case groupStmts stmts of
+    [] -> [SStmts [s]]
+    (SStmts ss : segs) -> SStmts (s:ss) : segs
+    (s' : segs) -> SStmts [s] : s' : segs
+
+structStmts :: Bool -> (Pred, Maybe A.Expr) -> [A.Stmt] -> Pred -> WP ()
+structStmts b pre stmts post =
+  structSegs b pre (groupStmts stmts) post
+
+structSegs :: Bool -> (Pred, Maybe A.Expr) -> [SegElm] -> Pred -> WP ()
+structSegs _ (pre, _) [] post = do
+  case locOf pre of
+    NoLoc -> tellPO pre post (AtAssertion (locOf post))
+    others -> tellPO pre post (AtAssertion others)
+  return ()
+structSegs True (pre, _) (SAsrt (A.Assert p l) : segs) post = do
+    let assert = Assertion p l
+    tellPO pre assert (AtAssertion (locOf pre))
+    structSegs True (assert, Nothing) segs post
+structSegs False (pre, bnd) (SAsrt (A.Assert _ _) : segs) post =
+  structSegs False (pre, bnd) segs post
+structSegs True (pre, _) (SAsrt (A.LoopInvariant p bnd l) : segs) post = do
+  let loopInv = LoopInvariant p bnd l
+  tellPO pre loopInv origin
+  structSegs True (loopInv, Just bnd) segs post
+ where startsWithDo :: [SegElm] -> Bool
+       startsWithDo (SStmts (A.Do _ _ : _) : _) = True
+       startsWithDo _ = False
+       origin = if startsWithDo segs then AtLoop l else AtAssertion l
+structSegs False (pre, bnd) (SAsrt (A.LoopInvariant {}) : segs) post =
+  structSegs False (pre, bnd) segs post
+structSegs b (pre, bnd) [SStmts ss] post =
+  structSStmts b (pre,bnd) ss post
+structSegs b (pre, bnd) (SStmts ss : SAsrt (A.Assert p l) : segs) post = do
+  structSStmts b (pre, bnd) ss (Assertion p l)
+  structSegs b (Assertion p l, Nothing) segs post
+structSegs b (pre, bnd) (SStmts ss : SAsrt (A.LoopInvariant p bd l) : segs) post = do
+  structSStmts b (pre, bnd) ss (LoopInvariant p bd l)
+  structSegs b (LoopInvariant p bd l, Just bd) segs post
+structSegs b (pre, bnd) (SStmts ss : SSpec (A.Spec _ range) : segs) post = do
+  post' <- wpSegs b segs post
+  pre'  <- spStmts b (pre, bnd) ss
+  when b (tellSpec pre' post' range)
+structSegs b (pre, _) (SSpec (A.Spec _ range) : segs) post = do
+  post' <- wpSegs b segs post
+  when b (tellSpec pre post' range)
+structSegs _ _ _ _ = error "Missing case in structSegs"
+
+ -- 'simple' version of struct stmts -- there are no assertions,
+ -- invariants, or specs in the list of statements.
+structSStmts :: Bool -> (Pred, Maybe A.Expr) -> [A.Stmt] -> Pred -> WP ()
+structSStmts _ (pre, _) [] post = do
+  case locOf pre of
+    NoLoc -> tellPO pre post (AtAssertion (locOf post))
+    others -> tellPO pre post (AtAssertion others)
+  return ()
+structSStmts b (pre, bnd) (stmt : stmts) post = do
+  post' <- wpStmts b stmts post
+  struct b (pre, bnd) stmt post'
+
+{-
 structStmts :: Bool -> Pred -> Maybe A.Expr -> [A.Stmt] -> Pred -> WP ()
 structStmts _ pre _ [] post = do
   case locOf pre of
@@ -97,26 +168,28 @@ structStmts False pre _ (A.LoopInvariant {} : stmts) post = do
 structStmts b pre bnd (stmt : stmts) post = do
   post' <- wpStmts b stmts post
   struct b pre bnd stmt post'
+-}
 
-struct :: Bool -> Pred -> Maybe A.Expr -> A.Stmt -> Pred -> WP ()
-struct _ pre _ (A.Abort l) _ = tellPO pre (Constant A.false) (AtAbort l)
-struct _ pre _ (A.Skip l) post = tellPO pre post (AtSkip l)
-struct _ pre _ (A.Assign xs es l) post = do
+struct :: Bool -> (Pred, Maybe A.Expr) -> A.Stmt -> Pred -> WP ()
+struct _ (pre, _) (A.Abort l) _ = tellPO pre (Constant A.false) (AtAbort l)
+struct _ (pre, _) (A.Skip l) post = tellPO pre post (AtSkip l)
+struct _ (pre, _) (A.Assign xs es l) post = do
   let sub = Map.fromList . zip xs . map Left $ es :: Subs Bindings
   tellPO pre (subst sub post) (AtAssignment l)
-struct True pre _ (A.Assert p l) post = do
-  tellPO pre (Assertion p l) (AtAssertion l)
-  tellPO (Assertion p l) post (AtAssertion l)
-struct False pre _ (A.Assert _ l) post = do
-  tellPO pre post (AtAssertion l)
-struct _ pre _ (A.LoopInvariant p b l) post = do
-  tellPO pre (LoopInvariant p b l) (AtAssertion l)
-  tellPO (LoopInvariant p b l) post (AtAssertion l)
-struct b pre _ (A.If gcmds l) post = do
+-- SCM: assertions and specs are handled by structSegs.
+-- struct True (pre, _) (A.Assert p l) post = do
+--   tellPO pre (Assertion p l) (AtAssertion l)
+--   tellPO (Assertion p l) post (AtAssertion l)
+-- struct False (pre, _) (A.Assert _ l) post = do
+--   tellPO pre post (AtAssertion l)
+-- struct _ (pre, _) (A.LoopInvariant p b l) post = do
+--   tellPO pre (LoopInvariant p b l) (AtAssertion l)
+--   tellPO (LoopInvariant p b l) post (AtAssertion l)
+struct b (pre, _) (A.If gcmds l) post = do
   when b $ tellPO pre (disjunctGuards gcmds) (AtIf l)
   forM_ gcmds $ \(A.GdCmd guard body _) ->
-    structStmts b (Conjunct [pre, guardIf guard]) Nothing body post
-struct True inv (Just bnd) (A.Do gcmds l) post = do
+    structStmts b (Conjunct [pre, guardIf guard], Nothing) body post
+struct True (inv, Just bnd) (A.Do gcmds l) post = do
   let guards = A.getGuards gcmds
   tellPO (Conjunct (inv : map (Negate . guardLoop) guards)) post (AtLoop l)
   forM_ gcmds (structGdcmdInduct inv)
@@ -125,23 +198,24 @@ struct True inv (Just bnd) (A.Do gcmds l) post = do
     (Bound (bnd `A.gte` A.Lit (A.Num 0) NoLoc) NoLoc)
     (AtTermination l)
   forM_ gcmds (structGdcmdBnd inv bnd)
-struct False inv _ (A.Do gcmds l) post = do
+struct False (inv, _) (A.Do gcmds l) post = do
   let guards = A.getGuards gcmds
   tellPO (Conjunct (inv : map (Negate . guardLoop) guards)) post (AtLoop l)
-struct _ inv Nothing (A.Do gcmds l) post = do
+struct _ (inv, Nothing) (A.Do gcmds l) post = do
   case fromLoc l of
     Nothing -> return ()
     Just rng -> throwWarning (MissingBound rng)
   let guards = A.getGuards gcmds
   tellPO (Conjunct (inv : map (Negate . guardLoop) guards)) post (AtLoop l)
   forM_ gcmds (structGdcmdInduct inv)
-  tellPO (Conjunct (inv : map guardLoop guards)) post (AtTermination l)
-struct b pre _ (A.Spec _ range) post = when b (tellSpec pre post range)
-struct _ _ _ (A.Proof _) _ = return ()
+--  tellPO (Conjunct (inv : map guardLoop guards)) post (AtTermination l)
+-- struct b (pre, _) (A.Spec _ range) post = when b (tellSpec pre post range)
+struct _ _ (A.Proof _) _ = return ()
+struct _ _ _ _ = error "missing case in struct"
 
 structGdcmdInduct :: Pred -> A.GdCmd -> WP ()
 structGdcmdInduct inv (A.GdCmd guard body _) =
-  structStmts True (Conjunct [inv, guardLoop guard]) Nothing body inv
+  structStmts True (Conjunct [inv, guardLoop guard], Nothing) body inv
 
 structGdcmdBnd :: Pred -> A.Expr -> A.GdCmd -> WP ()
 structGdcmdBnd inv bnd (A.GdCmd guard body _) = do
@@ -152,27 +226,47 @@ structGdcmdBnd inv bnd (A.GdCmd guard body _) = do
         [ inv,
           Bound (bnd `A.eqq` A.Var (Name oldbnd NoLoc) NoLoc) NoLoc,
           guardLoop guard
-        ]
-    )
-    Nothing
+        ],
+    Nothing )
     body
     (Bound (bnd `A.lt` A.Var (Name oldbnd NoLoc) NoLoc) NoLoc)
 
+-- weakest precondition
+
+wpSegs :: Bool -> [SegElm] -> Pred -> WP Pred
+wpSegs _ [] post = return post
+wpSegs b (SStmts ss : segs) post = do
+  post' <- wpSegs b segs post
+  wpStmts b ss post'
+wpSegs b (SSpec (A.Spec _ range) : segs) post = do
+  post' <- wpSegs b segs post
+  when b (tellSpec post' post' range)
+  return post'
+wpSegs b (SAsrt (A.Assert p l) : segs) post = do
+  structSegs b (Assertion p l, Nothing) segs post
+  return (Assertion p l)
+wpSegs b (SAsrt (A.LoopInvariant p bd l) : segs) post = do
+  structSegs b (LoopInvariant p bd l, Just bd) segs post
+  return (Assertion p l) -- SCM: erasing bound information?
+wpSegs _ _ _ = error "Missing case in wpSegs"
+
+  -- wpStmts need not deal with assertions and specs
+
 wpStmts :: Bool -> [A.Stmt] -> Pred -> WP Pred
 wpStmts _ [] post = return post
-wpStmts True (A.Assert pre l : stmts) post = do
-  structStmts True (Assertion pre l) Nothing stmts post
-  return (Assertion pre l)
-wpStmts False (A.Assert {} : stmts) post =
-  wpStmts False stmts post
-wpStmts True (A.LoopInvariant p b l : stmts) post = do
-  structStmts True (LoopInvariant p b l) (Just b) stmts post
-  return (LoopInvariant p b l)
-wpStmts False (A.LoopInvariant {} : stmts) post = do
-  wpStmts False stmts post
 wpStmts b (stmt : stmts) post = do
   post' <- wpStmts b stmts post
   wp b stmt post'
+-- wpStmts True (A.Assert pre l : stmts) post = do
+--   structStmts True (Assertion pre l, Nothing) stmts post
+--   return (Assertion pre l)
+-- wpStmts False (A.Assert {} : stmts) post =
+--   wpStmts False stmts post
+-- wpStmts True (A.LoopInvariant p b l : stmts) post = do
+--   structStmts True (LoopInvariant p b l, Just b) stmts post
+--   return (LoopInvariant p b l)
+-- wpStmts False (A.LoopInvariant {} : stmts) post = do
+--   wpStmts False stmts post
 
 wp :: Bool -> A.Stmt -> Pred -> WP Pred
 wp _ (A.Skip _) post = return post
@@ -182,12 +276,12 @@ wp _ (A.Assign xs es _) post = do
   where
     sub :: Subs Bindings
     sub = Map.fromList . zip xs . map Left $ es
-wp _ (A.Assert p l) post = do
-  tellPO (Assertion p l) post (AtAssertion l)
-  return (Assertion p l)
-wp _ (A.LoopInvariant p b l) post = do
-  tellPO (LoopInvariant p b l) post (AtAssertion l)
-  return (LoopInvariant p b l)
+-- wp _ (A.Assert p l) post = do
+--   tellPO (Assertion p l) post (AtAssertion l)
+--   return (Assertion p l)
+-- wp _ (A.LoopInvariant p b l) post = do
+--   tellPO (LoopInvariant p b l) post (AtAssertion l)
+--   return (LoopInvariant p b l)
 wp _ (A.Do _ l) _ = throwError $ MissingAssertion l
 wp b (A.If gcmds _) post = do
   pres <- forM gcmds $ \(A.GdCmd guard body _) ->
@@ -195,13 +289,22 @@ wp b (A.If gcmds _) post = do
       . toExpr
       <$> wpStmts b body post
   return (conjunct (disjunctGuards gcmds : pres))
-wp b (A.Spec _ range) post = do
-  when b (tellSpec post post range)
-  return post
+-- wp b (A.Spec _ range) post = do
+--   when b (tellSpec post post range)
+--   return post
 wp _ (A.Proof _) post = return post
+wp _ _ _ = error "missing case in wp"
 
 disjunctGuards :: [A.GdCmd] -> Pred
 disjunctGuards = disjunct . map guardIf . A.getGuards
+
+-- strongest postcondition
+
+spStmts :: Bool -> (Pred, Maybe A.Expr) -> [A.Stmt] -> WP Pred
+spStmts _ (pre, _) _ = return pre
+  -- SCM: TODO
+
+--
 
 tellPO :: Pred -> Pred -> Origin -> WP ()
 tellPO p q l = unless (toExpr p == toExpr q) $ do
