@@ -135,7 +135,7 @@ structSStmts _ (pre, _) [] post = do
     others -> tellPO pre post (AtAssertion others)
   return ()
 structSStmts b (pre, bnd) (stmt : stmts) post = do
-  post' <- wpStmts b stmts post
+  post' <- wpSStmts b stmts post
   struct b (pre, bnd) stmt post'
 
 {-
@@ -233,11 +233,15 @@ structGdcmdBnd inv bnd (A.GdCmd guard body _) = do
 
 -- weakest precondition
 
+wpStmts :: Bool -> [A.Stmt] -> Pred -> WP Pred
+wpStmts b stmts post =
+  wpSegs b (groupStmts stmts) post
+
 wpSegs :: Bool -> [SegElm] -> Pred -> WP Pred
 wpSegs _ [] post = return post
 wpSegs b (SStmts ss : segs) post = do
   post' <- wpSegs b segs post
-  wpStmts b ss post'
+  wpSStmts b ss post'
 wpSegs b (SSpec (A.Spec _ range) : segs) post = do
   post' <- wpSegs b segs post
   when b (tellSpec post' post' range)
@@ -252,10 +256,10 @@ wpSegs _ _ _ = error "Missing case in wpSegs"
 
   -- wpStmts need not deal with assertions and specs
 
-wpStmts :: Bool -> [A.Stmt] -> Pred -> WP Pred
-wpStmts _ [] post = return post
-wpStmts b (stmt : stmts) post = do
-  post' <- wpStmts b stmts post
+wpSStmts :: Bool -> [A.Stmt] -> Pred -> WP Pred
+wpSStmts _ [] post = return post
+wpSStmts b (stmt : stmts) post = do
+  post' <- wpSStmts b stmts post
   wp b stmt post'
 -- wpStmts True (A.Assert pre l : stmts) post = do
 --   structStmts True (Assertion pre l, Nothing) stmts post
@@ -276,9 +280,11 @@ wp _ (A.Assign xs es _) post = do
   where
     sub :: Subs Bindings
     sub = Map.fromList . zip xs . map Left $ es
+wp _ (A.Assert p l) post = error "wp got assert"
 -- wp _ (A.Assert p l) post = do
 --   tellPO (Assertion p l) post (AtAssertion l)
 --   return (Assertion p l)
+wp _ (A.LoopInvariant p b l) post = error "wp got inv"
 -- wp _ (A.LoopInvariant p b l) post = do
 --   tellPO (LoopInvariant p b l) post (AtAssertion l)
 --   return (LoopInvariant p b l)
@@ -289,6 +295,7 @@ wp b (A.If gcmds _) post = do
       . toExpr
       <$> wpStmts b body post
   return (conjunct (disjunctGuards gcmds : pres))
+wp b (A.Spec _ range) post = error "wp got spec"
 -- wp b (A.Spec _ range) post = do
 --   when b (tellSpec post post range)
 --   return post
@@ -302,7 +309,9 @@ disjunctGuards = disjunct . map guardIf . A.getGuards
 
 spStmts :: Bool -> (Pred, Maybe A.Expr) -> [A.Stmt] -> WP Pred
 spStmts _ (pre, _) _ = return pre
-  -- SCM: TODO
+-- spStmts _ (pre, _) [] = return pre
+-- spStmts b (stmt : stmts) post = do
+--
 
 --
 
