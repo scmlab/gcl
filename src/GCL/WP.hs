@@ -119,7 +119,7 @@ structSegs b (pre, bnd) (SStmts ss : SAsrt (A.LoopInvariant p bd l) : segs) post
   structSegs b (LoopInvariant p bd l, Just bd) segs post
 structSegs b (pre, bnd) (SStmts ss : SSpec (A.Spec _ range) : segs) post = do
   post' <- wpSegs b segs post
-  pre'  <- spStmts b (pre, bnd) ss
+  pre'  <- spSStmts b (pre, bnd) ss
   when b (tellSpec pre' post' range)
 structSegs b (pre, _) (SSpec (A.Spec _ range) : segs) post = do
   post' <- wpSegs b segs post
@@ -273,18 +273,16 @@ wpSStmts b (stmt : stmts) post = do
 --   wpStmts False stmts post
 
 wp :: Bool -> A.Stmt -> Pred -> WP Pred
-wp _ (A.Skip _) post = return post
 wp _ (A.Abort _) _ = return (Constant A.false)
+wp _ (A.Skip _) post = return post
 wp _ (A.Assign xs es _) post = do
   return $ subst sub post
   where
     sub :: Subs Bindings
     sub = Map.fromList . zip xs . map Left $ es
-wp _ (A.Assert p l) post = error "wp got assert"
 -- wp _ (A.Assert p l) post = do
 --   tellPO (Assertion p l) post (AtAssertion l)
 --   return (Assertion p l)
-wp _ (A.LoopInvariant p b l) post = error "wp got inv"
 -- wp _ (A.LoopInvariant p b l) post = do
 --   tellPO (LoopInvariant p b l) post (AtAssertion l)
 --   return (LoopInvariant p b l)
@@ -295,7 +293,6 @@ wp b (A.If gcmds _) post = do
       . toExpr
       <$> wpStmts b body post
   return (conjunct (disjunctGuards gcmds : pres))
-wp b (A.Spec _ range) post = error "wp got spec"
 -- wp b (A.Spec _ range) post = do
 --   when b (tellSpec post post range)
 --   return post
@@ -307,11 +304,32 @@ disjunctGuards = disjunct . map guardIf . A.getGuards
 
 -- strongest postcondition
 
-spStmts :: Bool -> (Pred, Maybe A.Expr) -> [A.Stmt] -> WP Pred
-spStmts _ (pre, _) _ = return pre
--- spStmts _ (pre, _) [] = return pre
--- spStmts b (stmt : stmts) post = do
---
+  -- for now we need only the "simple" version
+spSStmts :: Bool -> (Pred, Maybe A.Expr) -> [A.Stmt] -> WP Pred
+spSStmts _ (pre, _) [] = return pre
+spSStmts b (pre, bnd) (stmt : stmts) = do
+  pre' <- sp b (pre, bnd) stmt
+  spSStmts b (pre', Nothing) stmts
+
+sp :: Bool -> (Pred, Maybe A.Expr) -> A.Stmt -> WP Pred
+sp _ (pre, _) (A.Abort _) = return (Constant A.true)
+sp _ (pre, _) (A.Skip _) = return pre
+sp _ (pre, _) (A.Assign xs es l) = do
+      -- {P} x:=E { (exists x' :: P[x'/x] && x = E[x'/x]) }
+    frNames <- genFrNames xs
+    let frExpr = map (\v -> A.Var v l) frNames
+    let sub = genSub xs frExpr
+    return $ Constant (
+       A.exists frNames (A.conjunct (zipWith (genEq sub) xs es))
+          (subst sub (toExpr pre)))
+  where
+    genFrNames :: [a] -> WP [Name]
+    genFrNames xs = map (\x -> Name x l) <$> mapM (const freshText) xs
+    genSub :: [Name] -> [A.Expr] -> Subs Bindings
+    genSub xs hs = Map.fromList . zip xs . map Left $ hs
+    -- genEq :: Name -> A.Expr -> A.Expr
+    genEq sub x e = (A.Var x NoLoc) `A.eqq` (subst sub e)
+sp _ (pre, _) _ = return pre
 
 --
 
