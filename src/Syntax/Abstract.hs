@@ -103,12 +103,12 @@ data Expr
   | Lit Lit Loc
   | Var Name Loc
   | Const Name Loc
-  | Op ArithOp
-  | Chain Expr ChainOp Expr Loc
+  | Op Op
+  | Chain Expr Op Expr Loc
   | App Expr Expr Loc
   | Lam Name Expr Loc
   | Hole Loc
-  | Quant QuantOp' [Name] Expr Expr Loc
+  | Quant Expr [Name] Expr Expr Loc
   | Subst Expr Subst Expr
   deriving (Eq, Show, Generic)
 

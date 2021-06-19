@@ -67,7 +67,7 @@ instance Free A.Expr where
   fv (A.App e1 e2 _) = fv e1 <> fv e2
   fv (A.Lam x e _) = fv e \\ Set.singleton x
   fv (A.Quant op xs range term _) =
-    (either (const mempty) fv op <> fv range <> fv term) \\ Set.fromList xs
+    (fv op <> fv range <> fv term) \\ Set.fromList xs
   fv (A.Hole _) = mempty -- banacorn: `subs` has been always empty anyway
   -- concat (map freeSubst subs) -- correct?
   fv (A.Subst e s _) = (fv e \\ (Set.fromList . Map.keys) s) <> fv s
@@ -106,11 +106,8 @@ instance Substitutable A.Expr A.Expr where
     A.Lam x (subst s' e) l
   subst _ h@(A.Hole _) = h
   subst s (A.Quant qop xs rng t l) = 
-    let op' = case qop of
-                Left op -> Left op
-                Right op -> Right (subst s op) in
     let s' = Map.withoutKeys s (Set.fromList xs) in
-    A.Quant op' xs (subst s' rng) (subst s' t) l
+    A.Quant (subst s' qop) xs (subst s' rng) (subst s' t) l
   -- after should already be applied to subs 
   subst s1 (A.Subst before s2 after) = 
     -- NOTE: use `Map.union` or `compose` ?
@@ -163,11 +160,8 @@ instance Substitutable Bindings A.Expr where
     A.Lam x (subst s' e) l
   subst _ (A.Hole l) = A.Hole l
   subst s (A.Quant qop xs rng t l) = 
-    let op' = case qop of
-                Left op -> Left op
-                Right op -> Right (subst s op) in
     let s' = Map.withoutKeys s (Set.fromList xs) in
-    A.Quant op' xs (subst s' rng) (subst s' t) l
+    A.Quant (subst s' qop) xs (subst s' rng) (subst s' t) l
   -- after should already be applied to subs 
   subst s1 (A.Subst before s2 after) = do
     let s1' = fst $ Map.mapEither id s1

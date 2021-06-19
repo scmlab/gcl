@@ -9,13 +9,13 @@ import Prelude hiding (Ordering(..))
 
 -- | Constructors
 unary :: ArithOp -> Expr -> Expr
-unary op x = App (Op op) x (x <--> op)
+unary op x = App (Op (ArithOp op)) x (x <--> op)
 
 binary :: ArithOp -> Expr -> Expr -> Expr
-binary op x y = App (App (Op op) x (x <--> op)) y (x <--> y)
+binary op x y = App (App (Op (ArithOp op)) x (x <--> op)) y (x <--> y)
 
 chain :: ChainOp -> Expr -> Expr -> Expr
-chain op x y = Chain x op y (x <--> y)
+chain op x y = Chain x (ChainOp op) y (x <--> y)
 
 lt, gt, gte, lte, eqq, conj, disj, implies :: Expr -> Expr -> Expr
 lt = (chain . LT) NoLoc
@@ -45,7 +45,7 @@ disjunct [] = false
 disjunct xs = foldl1 disj xs
 
 imply :: Expr -> Expr -> Expr
-imply p q = App (App ((Op . ImpliesU) NoLoc) p (locOf p)) q (locOf q)
+imply p q = App (App ((Op . ArithOp . ImpliesU) NoLoc) p (locOf p)) q (locOf q)
 
 predEq :: Expr -> Expr -> Bool
 predEq = (==)

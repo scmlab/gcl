@@ -80,18 +80,18 @@ data Op = ChainOp ChainOp | ArithOp ArithOp | QuantOp QuantOp
   deriving (Show, Eq, Generic)
 
 
--- classifyChainOp :: ChainOp -> Fixity
--- classifyChainOp (EQProp _) = Infix 0
--- classifyChainOp (EQPropU _) = Infix 0
--- classifyChainOp (EQ _) = Infix 5
--- classifyChainOp (NEQ _) = Infix 6
--- classifyChainOp (NEQU _) = Infix 6
--- classifyChainOp (LTE _) = Infix 6
--- classifyChainOp (LTEU _) = Infix 6
--- classifyChainOp (GTE _) = Infix 6
--- classifyChainOp (GTEU _) = Infix 6
--- classifyChainOp (LT _) = Infix 6
--- classifyChainOp (GT _) = Infix 6
+classifyChainOp :: ChainOp -> Fixity
+classifyChainOp (EQProp _) = Infix 0
+classifyChainOp (EQPropU _) = Infix 0
+classifyChainOp (EQ _) = Infix 5
+classifyChainOp (NEQ _) = Infix 6
+classifyChainOp (NEQU _) = Infix 6
+classifyChainOp (LTE _) = Infix 6
+classifyChainOp (LTEU _) = Infix 6
+classifyChainOp (GTE _) = Infix 6
+classifyChainOp (GTEU _) = Infix 6
+classifyChainOp (LT _) = Infix 6
+classifyChainOp (GT _) = Infix 6
 
 classifyArithOp :: ArithOp -> Fixity
 classifyArithOp (Implies _) = InfixR 1
@@ -110,16 +110,16 @@ classifyArithOp (Mod _) = InfixL 9
 classifyArithOp (Max _) = Infix 10
 classifyArithOp (Min _) = Infix 10
 
--- classifyQuantOp :: QuantOp -> Fixity
--- classifyQuantOp (Sum _) = Prefix 5
--- classifyQuantOp (Exists _) = Prefix 6
--- classifyQuantOp (Forall _) = Prefix 7
--- classifyQuantOp (Hash _) = Prefix 8
+classifyQuantOp :: QuantOp -> Fixity
+classifyQuantOp (Sum _) = Prefix 5
+classifyQuantOp (Exists _) = Prefix 6
+classifyQuantOp (Forall _) = Prefix 7
+classifyQuantOp (Hash _) = Prefix 8
 
--- classify :: Op -> Fixity
--- classify (ChainOp op) = classifyChainOp op
--- classify (ArithOp op) = classifyArithOp op
--- classify (QuantOp op) = classifyQuantOp op
+classify :: Op -> Fixity
+classify (ChainOp op) = classifyChainOp op
+classify (ArithOp op) = classifyArithOp op
+classify (QuantOp op) = classifyQuantOp op
 
 instance ToJSON ChainOp
 instance FromJSON ChainOp
