@@ -61,4 +61,4 @@ number n = Lit (Num n) NoLoc
 
 exists :: [Name] -> Expr -> Expr -> Expr
 exists xs ran term =
-  Quant (Left (QuantOp (Exists NoLoc))) xs ran term NoLoc
+  Quant (Op (QuantOp (Exists NoLoc))) xs ran term NoLoc
