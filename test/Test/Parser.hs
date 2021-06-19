@@ -168,7 +168,6 @@ declaration =
     ]
   where
     run = parserIso pDeclaration
-    run' = parserShow pDeclaration 
     runBlock = parserIso pBlockDeclaration
 
 --------------------------------------------------------------------------------

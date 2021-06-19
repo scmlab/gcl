@@ -20,7 +20,7 @@ import Syntax.Abstract
       TBase(..),
       Interval(..),
       Endpoint(..) )
-import Syntax.Common ( ArithOp, Name(Name) )
+import Syntax.Common ( Name(Name), Op )
 import Syntax.Parser (runParse, pExpr, pProgram, Parser, pStmt, pType, pDeclaration, pBlockDeclaration)
 import Pretty ( Pretty(pretty), toText )
 import Error (Error(..))
@@ -330,7 +330,7 @@ cons name = Const (Name name NoLoc) NoLoc
 app :: Expr -> Expr -> Expr
 app e1 e2 = App e1 e2 NoLoc
 
-op :: ArithOp -> Expr
+op :: Op -> Expr
 op = Op
 
 var :: Text -> Expr

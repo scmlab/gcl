@@ -89,10 +89,10 @@ infer (Paren expr) = infer expr
 infer (Lit lit l) = return (litTypes lit l)
 infer (Var x _) = lookupInferEnv x
 infer (Const c _) = lookupInferEnv c
-infer (Op o) = return (arithOpTypes o)
+infer (Op o) = inferOpTypes o
 infer (Chain a op b loc) = do
   ta <- infer a
-  top <- inferChainOpTypes op
+  top <- inferOpTypes op
   tb <- infer b
 
   case (a, b) of
@@ -127,17 +127,11 @@ infer (Quant qop iters rng t l) = do
 
   tt <- inEnv [(n, TBase TInt (locOf n)) | n <- iters] (infer t)
   case qop of
-    Left (QuantOp (Hash _)) -> do
+    Op (QuantOp (Hash _)) -> do
       unify tt (TBase TBool (locOf t))
       return (TBase TInt l)
-    Left op -> do
-      let to = opTypes op
-      unifyQOp tt to
-    Right qop' -> do
-      to <- infer qop'
-      unifyQOp tt to
-  where
-    unifyQOp tt to = do
+    op -> do
+      to <- infer op
       x <- freshVar l
       unify to (TFunc x (TFunc x x (locOf qop)) (locOf qop))
       unify tt x
@@ -326,13 +320,13 @@ litTypes (Bol _) l = TBase TBool l
 litTypes (Chr _) l = TBase TChar l
 
 -- NOTE : EQ, NEQ, NEQU is redundant here
-inferChainOpTypes :: ChainOp -> Infer Type
-inferChainOpTypes op = do
+inferOpTypes :: Op -> Infer Type
+inferOpTypes op = do
   case op of
-    (EQ l) -> f l
-    (NEQ l) -> f l
-    (NEQU l) -> f l
-    _ -> return (chainOpTypes op)
+    ChainOp (EQ l) -> f l
+    ChainOp (NEQ l) -> f l
+    ChainOp (NEQU l) -> f l
+    _ -> return (opTypes op)
   where
     f l = do
       x <- freshVar l

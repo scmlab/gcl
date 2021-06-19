@@ -12,7 +12,7 @@ import Render.Element
 import Render.Syntax.Common ()
 import Syntax.Abstract
 import Syntax.Abstract.Located ()
-import Syntax.Common (ArithOp, Fixity (..), classifyArithOp)
+import Syntax.Common (Fixity (..), Op, classify)
 
 --------------------------------------------------------------------------------
 
@@ -88,17 +88,7 @@ handleExpr n (App p q _) = case handleExpr n p of
       _ -> s <+> t
 handleExpr _ (Lam p q _) = return $ "λ" <+> render p <+> "→" <+> render q
 handleExpr _ (Hole _) = return "{!!}"
-handleExpr _ (Quant (Left op) xs r t _) =
-  return $
-    "⟨"
-      <+> render op
-      <+> horzE (map render xs)
-      <+> ":"
-      <+> render r
-      <+> ":"
-      <+> render t
-      <+> "⟩"
-handleExpr _ (Quant (Right op) xs r t _) =
+handleExpr _ (Quant op xs r t _) =
   return $
     "⟨"
       <+> render op
@@ -125,8 +115,8 @@ instance Render Subst where
 
 --------------------------------------------------------------------------------
 
-handleOp :: Int -> ArithOp -> Variadic Expr Inlines
-handleOp n op = case classifyArithOp op of
+handleOp :: Int -> Op -> Variadic Expr Inlines
+handleOp n op = case classify op of
   Infix m -> do
     p <- var
     q <- var

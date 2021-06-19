@@ -3,6 +3,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE FlexibleContexts #-}
 module Syntax.Concrete.ToAbstract where
 
 import Control.Monad.Except ( Except, forM, throwError )
@@ -12,7 +13,7 @@ import Syntax.Concrete.Located()
 import qualified Syntax.Abstract as A
 import qualified Syntax.Abstract.Operator as A
 import qualified Syntax.ConstExpr as ConstExpr
-import Syntax.Common (Name)
+import Syntax.Common (Name, Op(..))
 import Data.Loc.Range (rangeOf)
 
 --------------------------------------------------------------------------------
@@ -153,17 +154,15 @@ instance ToAbstract Expr A.Expr where
     Lit a -> A.Lit <$> toAbstract a <*> pure (locOf x)
     Var a -> pure $ A.Var a (locOf x)
     Const a -> pure $ A.Const a (locOf x)
-    Op a -> pure $ A.Op a
-    Chain a op b -> A.Chain <$> toAbstract a <*> pure op <*> toAbstract b <*> pure (locOf x)
+    Op a -> pure $ A.Op (ArithOp a)
+    Chain a op b -> A.Chain <$> toAbstract a <*> pure (ChainOp op) <*> toAbstract b <*> pure (locOf x)
     Arr arr _ i _ -> A.App <$> toAbstract arr <*> toAbstract i <*> pure (locOf x)
     App a b -> A.App <$> toAbstract a <*> toAbstract b <*> pure (locOf x)
     Quant _ a b _ c _ d _ -> A.Quant <$> toAbstractQOp a <*> pure b <*> toAbstract c <*> toAbstract d <*> pure (locOf x)
       where
         toAbstractQOp qop = case qop of
-              Left op -> return . Left $ op
-              Right expr -> do
-                expr' <- toAbstract expr
-                return . Right $ expr'
+              Left op -> return (A.Op op)
+              Right expr -> toAbstract expr
 
 -- | Literals (Integer / Boolean / Character)
 instance ToAbstract Lit A.Lit where
