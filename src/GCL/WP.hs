@@ -10,7 +10,7 @@ import Data.Aeson (ToJSON)
 import Data.Loc (Loc (..), Located (..))
 import Data.Loc.Range (Range, fromLoc)
 import qualified Data.Map as Map
-import GCL.Common (Bindings, Fresh (fresh, freshText), Subs, Substitutable (subst))
+import GCL.Common (Fresh (fresh, freshText), Subs, Substitutable (subst))
 import GCL.Predicate (Origin (..), PO (..), Pred (..), Spec (Specification))
 import GCL.Predicate.Util (conjunct, disjunct, guardIf, guardLoop, toExpr)
 import GHC.Generics (Generic)
@@ -59,7 +59,7 @@ progView stmts = do
 
 structProgram :: [A.Stmt] -> WP ()
 structProgram stmts = do
-  env <- Map.map Right <$> ask :: WP (Subs Bindings)
+  env <- Map.map Right <$> ask :: WP (Subs A.Bindings)
 
   case progView (subst env stmts) of
     ProgViewEmpty -> return ()
@@ -102,7 +102,7 @@ struct :: Bool -> Pred -> Maybe A.Expr -> A.Stmt -> Pred -> WP ()
 struct _ pre _ (A.Abort l) _ = tellPO pre (Constant A.false) (AtAbort l)
 struct _ pre _ (A.Skip l) post = tellPO pre post (AtSkip l)
 struct _ pre _ (A.Assign xs es l) post = do
-  let sub = Map.fromList . zip xs . map Left $ es :: Subs Bindings
+  let sub = Map.fromList . zip xs . map Left $ es :: Subs A.Bindings
   tellPO pre (subst sub post) (AtAssignment l)
 struct True pre _ (A.Assert p l) post = do
   tellPO pre (Assertion p l) (AtAssertion l)
@@ -180,7 +180,7 @@ wp _ (A.Abort _) _ = return (Constant A.false)
 wp _ (A.Assign xs es _) post = do
   return $ subst sub post
   where
-    sub :: Subs Bindings
+    sub :: Subs A.Bindings
     sub = Map.fromList . zip xs . map Left $ es
 wp _ (A.Assert p l) post = do
   tellPO (Assertion p l) post (AtAssertion l)

@@ -12,7 +12,8 @@ import Render.Element
 import Render.Syntax.Common ()
 import Syntax.Abstract
 import Syntax.Abstract.Located ()
-import Syntax.Common (ArithOp, Fixity (..), classifyArithOp)
+import Syntax.Common (ArithOp, Fixity (..), classifyArithOp, Name)
+import Data.Map (Map)
 
 --------------------------------------------------------------------------------
 
@@ -116,7 +117,10 @@ handleExpr _ (Subst before env after) =
     isLam _ = False
 
 instance Render Subst where
-  render env 
+  render = render . fst . Map.mapEither id
+
+instance Render (Map Name Expr) where
+  render env
     | null env = mempty
     | otherwise = "[" <+> exprs <+> "/" <+> vars <+> "]"
       where

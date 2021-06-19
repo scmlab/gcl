@@ -41,5 +41,4 @@ expand (Quant op xs rng t l) = do
   return $ Quant op xs rng' t' l
 expand (Subst e s _) = do
   e' <- expand e
-  let s' = Map.map Right s :: Subs (Either Expr Expr)
-  return $ subst s' e'
+  return $ subst s e'

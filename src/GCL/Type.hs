@@ -144,7 +144,7 @@ infer (Quant qop iters rng t l) = do
       return x
 infer (Subst expr sub _) = do
   t <- infer expr
-  s <- mapM infer sub
+  s <- mapM (either infer infer) sub
   return $ subst s t
 
 inferExpr :: Env Type -> Expr -> TM Type
