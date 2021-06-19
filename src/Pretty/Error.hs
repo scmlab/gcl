@@ -41,6 +41,8 @@ instance Pretty TypeError where
     "Recursive type variable: " <+> pretty v <+> "in" <+> pretty a
   pretty (NotFunction a _) =
     "The type" <+> pretty a <+> "is not a function type"
+  pretty (NotArray a _) =
+    "The type" <+> pretty a <+> "is not an array type"
   pretty (NotEnoughExprsInAssigment vars _) =
     "Not Enough Expressions:" <+> "Variables" <+> pretty vars <+> "do not have corresponing expressions in the assigment"
   pretty (TooManyExprsInAssigment exprs _) =

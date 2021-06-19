@@ -56,6 +56,9 @@ constant x = Const (Name x NoLoc) NoLoc
 variable :: Text -> Expr
 variable x = Var (Name x NoLoc) NoLoc
 
+nameVar :: Name -> Expr
+nameVar x = Var x NoLoc
+
 number :: Int -> Expr
 number n = Lit (Num n) NoLoc
 

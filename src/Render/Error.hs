@@ -35,6 +35,9 @@ instance RenderBlock TypeError where
   renderBlock (NotFunction t loc) =
     blockE (Just "Not a function") (fromLoc loc) $
       "The type" <+> render t <+> "is not a function type"
+  renderBlock (NotArray t loc) =
+    blockE (Just "Not an array") (fromLoc loc) $
+      "The type" <+> render t <+> "is not an array type"
   renderBlock (NotEnoughExprsInAssigment vars loc) =
     blockE (Just "Not Enough Expressions") (fromLoc loc) $
       "Variables" <+> renderManySepByComma (toList vars) <+> "do not have corresponing expressions in the assigment"

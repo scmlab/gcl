@@ -71,6 +71,11 @@ instance Free A.Expr where
   fv (A.Hole _) = mempty -- banacorn: `subs` has been always empty anyway
   -- concat (map freeSubst subs) -- correct?
   fv (A.Subst e s _) = (fv e \\ (Set.fromList . Map.keys) s) <> fv s
+  fv (A.ArrUpd e1 e2 e3 _) = fv e1 <> fv e2 <> fv e3
+
+instance Free Bindings where
+  fv (Left expr) = fv expr
+  fv (Right expr) = fv expr
 
 -- class for data that is substitutable
 class Substitutable a b where
@@ -97,7 +102,7 @@ instance Substitutable A.Expr A.Expr where
   subst s (A.Chain a op b l) = A.Chain (subst s a) op (subst s b) l
   subst s (A.App a b l) =
     let a' = subst s a in
-    let b' = subst s b in 
+    let b' = subst s b in
       case a' of
         A.Lam x body _ -> subst (Map.singleton x b') body
         _ -> A.App a' b' l
@@ -105,17 +110,19 @@ instance Substitutable A.Expr A.Expr where
     let s' = Map.withoutKeys s (Set.singleton x) in
     A.Lam x (subst s' e) l
   subst _ h@(A.Hole _) = h
-  subst s (A.Quant qop xs rng t l) = 
+  subst s (A.Quant qop xs rng t l) =
     let s' = Map.withoutKeys s (Set.fromList xs) in
     A.Quant (subst s' qop) xs (subst s' rng) (subst s' t) l
   -- after should already be applied to subs 
-  subst s1 (A.Subst before s2 after) = 
+  subst s1 (A.Subst before s2 after) =
     -- NOTE: use `Map.union` or `compose` ?
     A.Subst before (s1 `Map.union` s2) (subst s1 after)
+  subst s (A.ArrUpd e1 e2 e3 l) =
+    A.ArrUpd (subst s e1) (subst s e2) (subst s e3) l
 
--- Left of Bindings will be rendered,   
+-- Left of Bindings will be rendered,
 --    including assignment
--- Right of Bindings will not be rendered, 
+-- Right of Bindings will not be rendered,
 --    including global let bindings, and lambda bindings
 type Bindings = Either A.Expr A.Expr
 
@@ -129,43 +136,54 @@ singleBinding = Map.singleton
 instance Substitutable Bindings A.Expr where
   subst s (A.Paren expr) = A.Paren (subst s expr)
   subst _ lit@(A.Lit _ _) = lit
-  subst s v@(A.Var n _) = 
+  subst s v@(A.Var n _) =
     case Map.lookup n s of
       Just (Left v') -> do
         subst (Map.delete n s) v'
       Just (Right v') -> do
         A.Subst v emptySubs (subst (Map.delete n s) v')
       Nothing -> v
-  subst s c@(A.Const n _) = 
+  subst s c@(A.Const n _) =
     case Map.lookup n s of
       Just (Left c') -> do
         subst (Map.delete n s) c'
-      Just (Right c') -> do
+      Just (Right c') ->
         A.Subst c emptySubs (subst (Map.delete n s) c')
       Nothing -> c
   subst _ op@(A.Op _) = op
   subst s (A.Chain a op b l) = A.Chain (subst s a) op (subst s b) l
-  subst s (A.App a b l) = 
+  subst s (A.App a b l) =
     let a' = subst s a in
     let b' = subst s b in
     case a' of
-      A.Lam x body _ -> 
+      A.Lam x body _ ->
         subst (Map.singleton x b') body
       A.Subst _ s1 (A.Lam x body _) -> do
         let body' = subst (Map.singleton x b') body
         A.Subst (A.App a b l) s1 body'
-      _ -> A.App a' b' l 
-  subst s (A.Lam x e l) = 
+      _ -> A.App a' b' l
+  subst s (A.Lam x e l) =
     let s' = Map.withoutKeys s (Set.singleton x) in
     A.Lam x (subst s' e) l
   subst _ (A.Hole l) = A.Hole l
-  subst s (A.Quant qop xs rng t l) = 
+  subst s (A.Quant qop xs rng t l) =
     let s' = Map.withoutKeys s (Set.fromList xs) in
     A.Quant (subst s' qop) xs (subst s' rng) (subst s' t) l
   -- after should already be applied to subs 
   subst s1 (A.Subst before s2 after) = do
     let s1' = fst $ Map.mapEither id s1
     A.Subst before (s1' `Map.union` s2) (subst s1 after)
+  subst s (A.ArrUpd e1 e2 e3 l) =
+    A.ArrUpd (subst s e1) (subst s e2) (subst s e3) l
+
+afterMost :: A.Expr -> A.Expr
+afterMost (A.Subst _ _ after) = afterMost after
+afterMost expr = expr
+
+chainAfter :: A.Expr -> Subs A.Expr -> A.Expr -> A.Expr
+chainAfter subE@(A.Subst _ _ after) s2 after' =
+  A.Subst subE s2 (chainAfter after s2 after')
+chainAfter before s after = A.Subst before s after
 
 instance Substitutable Bindings Pred where
   subst s (Constant e) = Constant (subst s e)
@@ -178,10 +196,14 @@ instance Substitutable Bindings Pred where
   subst s (Disjunct es) = Disjunct (subst s es)
   subst s (Negate x) = Negate (subst s x)
 
+-- SCM: I don't think this is well-defined and I wonder whether
+--      we ever need this. Applying a substitution to a statement
+--      is not even syntatically correct in general.
 instance Substitutable Bindings A.Stmt where
   subst _ st@(A.Skip _) = st
   subst _ st@(A.Abort _) = st
   subst s (A.Assign ns es l) = A.Assign ns (subst s es) l
+  subst s (A.AAssign a i e l) = A.AAssign a (subst s i) (subst s e) l
   subst s (A.Assert e l) = A.Assert (subst s e) l
   subst s (A.LoopInvariant p bnd l) = A.LoopInvariant (subst s p) (subst s bnd) l
   subst s (A.Do gds l) = A.Do (subst s gds) l

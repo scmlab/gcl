@@ -24,7 +24,8 @@ data TypeError
   | UnifyFailed Type Type Loc
   | RecursiveType Name Type Loc
   | NotFunction Type Loc
-  | -- TODO: move these to scope checking 
+  | NotArray    Type Loc
+  | -- TODO: move these to scope checking
     NotEnoughExprsInAssigment (NonEmpty Name) Loc
   | TooManyExprsInAssigment (NonEmpty Expr) Loc
   deriving (Show, Eq, Generic)
@@ -36,6 +37,7 @@ instance Located TypeError where
   locOf (UnifyFailed _ _ l) = l
   locOf (RecursiveType _ _ l) = l
   locOf (NotFunction _ l) = l
+  locOf (NotArray _ l) = l
   locOf (NotEnoughExprsInAssigment _ l) = l
   locOf (TooManyExprsInAssigment _ l) = l
 
@@ -69,8 +71,8 @@ type TM = StateT FreshState (Except TypeError)
 
 instance Fresh Infer where
   fresh = do
-    i <- get 
-    (put . succ) i 
+    i <- get
+    (put . succ) i
     return i
 
 runSolver :: Env Type ->  Infer Type -> TM (Type, [Constraint])
@@ -140,6 +142,20 @@ infer (Subst expr sub _) = do
   t <- infer expr
   s <- mapM infer sub
   return $ subst s t
+infer (ArrUpd e1 e2 e3 l) = do
+  t1 <- infer e1
+  let interval = case t1 of
+        TArray itv _ _ -> itv
+        _ -> emptyInterval
+  t2 <- infer e2
+  t3 <- infer e3
+  unify t2 (TBase TInt l)
+  unify t1 (TArray interval t3 l)
+  return t1
+
+emptyInterval :: Interval
+emptyInterval = Interval (Including zero) (Excluding zero) NoLoc
+  where zero = Lit (Num 0) NoLoc
 
 inferExpr :: Env Type -> Expr -> TM Type
 inferExpr env e = do
@@ -221,7 +237,7 @@ checkStmt :: Env Type -> Stmt -> TM ()
 checkStmt _ (Skip _) = return ()
 checkStmt _ (Abort _) = return ()
 checkStmt env (Assign ns es loc) -- NOTE : Not sure if Assign work this way
-  | length ns > length es = let extraVars = drop (length es) ns in 
+  | length ns > length es = let extraVars = drop (length es) ns in
     throwError $
       NotEnoughExprsInAssigment
         (NE.fromList extraVars)
@@ -234,6 +250,13 @@ checkStmt env (Assign ns es loc) -- NOTE : Not sure if Assign work this way
         -- (locOf $ mergeRangesUnsafe (fromLocs $ map locOf extraExprs))
         loc
   | otherwise = forM_ (zip ns es) (checkAssign env)
+checkStmt env (AAssign x i e loc) =
+  case Map.lookup x env of
+    Nothing -> throwError $ NotInScope x (locOf x)
+    Just (TArray _ t _) -> do
+       checkIsType env i (TBase TInt NoLoc)
+       checkIsType env e t
+    Just t -> throwError $ NotArray t (locOf x)
 checkStmt env (Assert expr _) = do
   checkPredicate env expr
 checkStmt env (LoopInvariant e1 e2 _) = do

@@ -31,7 +31,7 @@ data Program
       Loc
   deriving (Eq, Show)
 
-type Defns = Map Name Expr 
+type Defns = Map Name Expr
 
 --------------------------------------------------------------------------------
 
@@ -53,6 +53,7 @@ data Stmt
   = Skip Loc
   | Abort Loc
   | Assign [Name] [Expr] Loc
+  | AAssign Name Expr Expr Loc
   | Assert Expr Loc
   | LoopInvariant Expr Expr Loc
   | Do [GdCmd] Loc
@@ -64,8 +65,8 @@ data Stmt
 data GdCmd = GdCmd Expr [Stmt] Loc deriving (Eq, Show)
 
 instance Located GdCmd where
-  locOf (GdCmd _ _ l) = l 
-  
+  locOf (GdCmd _ _ l) = l
+
 --------------------------------------------------------------------------------
 
 -- | Endpoint
@@ -110,6 +111,7 @@ data Expr
   | Hole Loc
   | Quant Expr [Name] Expr Expr Loc
   | Subst Expr Subst Expr
+  | ArrUpd Expr Expr Expr Loc
   deriving (Eq, Show, Generic)
 
 type QuantOp' = Either Op Expr

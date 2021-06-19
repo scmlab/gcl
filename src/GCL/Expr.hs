@@ -43,3 +43,8 @@ expand (Subst e s _) = do
   e' <- expand e
   let s' = Map.map Right s :: Subs (Either Expr Expr)
   return $ subst s' e'
+expand (ArrUpd e1 e2 e3 l) = do
+  e1' <- expand e1
+  e2' <- expand e2
+  e3' <- expand e3
+  return (ArrUpd e1' e2' e3' l)

@@ -73,6 +73,13 @@ instance Collect TypeError Diagnostic where
       <+> pretty t
       <+> "is not a function type"
 
+  collect (NotArray t loc) =
+    makeError loc "Not an array"
+      $   docToText
+      $   "The type"
+      <+> pretty t
+      <+> "is not an array type"
+
   collect (NotEnoughExprsInAssigment names loc) =
     makeError loc "Not Enough Expressions"
       $   docToText

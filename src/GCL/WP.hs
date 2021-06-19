@@ -69,7 +69,6 @@ structProgram stmts = do
     ProgViewMissingPostcondition _ stmts' -> throwError . MissingPostcondition . locOf . last $ stmts'
     ProgViewMissingBoth stmts' -> throwError . MissingPostcondition . locOf . last $ stmts'
 
-
 data SegElm = SAsrt A.Stmt
             | SSpec A.Stmt
             | SStmts [A.Stmt]
@@ -145,6 +144,9 @@ struct _ (pre, _) (A.Skip l) post = tellPO pre post (AtSkip l)
 struct _ (pre, _) (A.Assign xs es l) post = do
   let sub = Map.fromList . zip xs . map Left $ es :: Subs Bindings
   tellPO pre (subst sub post) (AtAssignment l)
+struct _ (pre, _) (A.AAssign x i e l) post = do
+  let sub = Map.fromList [(x, Left (A.ArrUpd (A.nameVar x) i e l))] :: Subs Bindings
+  tellPO pre (subst sub post) (AtAssignment l)
 struct b (pre, _) (A.If gcmds l) post = do
   when b $ tellPO pre (disjunctGuards gcmds) (AtIf l)
   forM_ gcmds $ \(A.GdCmd guard body _) ->
@@ -184,12 +186,12 @@ structGdcmdBnd inv bnd (A.GdCmd guard body _) = do
     False
     ( Conjunct
         [ inv,
-          Bound (bnd `A.eqq` A.Var (Name oldbnd NoLoc) NoLoc) NoLoc,
+          Bound (bnd `A.eqq` A.variable oldbnd) NoLoc,
           guardLoop guard
         ],
     Nothing )
     body
-    (Bound (bnd `A.lt` A.Var (Name oldbnd NoLoc) NoLoc) NoLoc)
+    (Bound (bnd `A.lt` A.variable oldbnd) NoLoc)
 
 -- weakest precondition
 
@@ -226,10 +228,11 @@ wp :: Bool -> A.Stmt -> Pred -> WP Pred
 wp _ (A.Abort _) _ = return (Constant A.false)
 wp _ (A.Skip _) post = return post
 wp _ (A.Assign xs es _) post = do
+  let sub = Map.fromList . zip xs . map Left $ es :: Subs Bindings
   return $ subst sub post
-  where
-    sub :: Subs Bindings
-    sub = Map.fromList . zip xs . map Left $ es
+wp _ (A.AAssign x i e _) post = do
+  let sub = Map.fromList [(x, Left (A.ArrUpd (A.nameVar x) i e NoLoc))] :: Subs Bindings
+  return $ subst sub post
 wp _ (A.Do _ l) _ = throwError $ MissingAssertion l
 wp b (A.If gcmds _) post = do
   pres <- forM gcmds $ \(A.GdCmd guard body _) ->
@@ -290,20 +293,27 @@ sp :: Bool -> (Pred, Maybe A.Expr) -> A.Stmt -> WP Pred
 sp _ (_, _) (A.Abort _) = return (Constant A.true)
 sp _ (pre, _) (A.Skip _) = return pre
 sp _ (pre, _) (A.Assign xs es l) = do
-      -- {P} x:=E { (exists x' :: P[x'/x] && x = E[x'/x]) }
+      -- {P} x := E { (exists x' :: x = E[x'/x] && P[x'/x]) }
     frNames <- genFrNames xs
-    let frExpr = map (\v -> A.Var v l) frNames
-    let sub = genSub xs frExpr
+    let sub = genSub xs frNames
     return $ Constant (
        A.exists frNames (A.conjunct (zipWith (genEq sub) xs es))
           (subst sub (toExpr pre)))
   where
     genFrNames :: [a] -> WP [Name]
     genFrNames ys = map (\x -> Name x l) <$> mapM (const freshText) ys
-    genSub :: [Name] -> [A.Expr] -> Subs Bindings
-    genSub ys hs = Map.fromList . zip ys . map Left $ hs
+    genSub :: [Name] -> [Name] -> Subs Bindings
+    genSub ys hs = Map.fromList . zip ys . map (Left . A.nameVar) $ hs
     -- genEq :: Name -> A.Expr -> A.Expr
-    genEq sub x e = (A.Var x NoLoc) `A.eqq` (subst sub e)
+    genEq sub x e = A.nameVar x `A.eqq` (subst sub e)
+sp _ (pre, _) (A.AAssign x i e l) = do
+     -- {P} x[I] := E { (exist x' :: x = x'[I[x'/x] -> E[x'/x]] && P[x'/x]) }
+   x' <- freshText
+   let sub = Map.fromList [(x, Left (A.variable x'))] :: Subs Bindings
+   return $ Constant (
+     A.exists [Name x' NoLoc]
+      (A.nameVar x `A.eqq` A.ArrUpd (A.variable x') (subst sub i) (subst sub e) NoLoc)
+      (subst sub (toExpr pre)))
 sp b (pre, _) (A.If gcmds _) = do
   posts <- forM gcmds $ \(A.GdCmd guard body _) ->
     Constant . toExpr <$>

@@ -24,6 +24,8 @@ constExpr bvars (Quant op bvs range body _) =
     && constExpr (bvs ++ bvars) range
     && constExpr (bvs ++ bvars) body
 constExpr _ Subst {} = error "constExpr Subst to be implemented"
+constExpr bvars (ArrUpd e1 e2 e3 _) =
+  constExpr bvars e1 && constExpr bvars e2 && constExpr bvars e3
 
 -- extract assertions from declarations
 pickGlobals :: [Declaration] -> ([Expr], [Expr])

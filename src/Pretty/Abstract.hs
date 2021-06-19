@@ -61,6 +61,8 @@ instance Pretty Stmt where
     hsep (punctuate ", " (map pretty xs))
       <> ":= "
       <> hsep (punctuate ", " (map pretty es))
+  pretty (AAssign x i e _) =
+    pretty x <> "[" <> pretty i <> "]" <> ":=" <> pretty e
   pretty (Assert p _) =
     "{ " <> pretty p <> " }"
   pretty (LoopInvariant p bnd _) =
