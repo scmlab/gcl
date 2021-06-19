@@ -59,6 +59,7 @@ data Stmt
   = Skip Loc
   | Abort Loc
   | Assign (SepBy "," Name) (Token ":=") (SepBy "," Expr)
+  | AAssign Name (Token "[") Expr (Token "]") (Token ":=") Expr
   | Assert (Token "{") Expr (Token "}")
   | LoopInvariant (Token "{") Expr (Token ",") (Token "bnd") (Token ":") Expr (Token "}")
   | Do (Token "do") (SepBy "|" GdCmd) (Token "od")

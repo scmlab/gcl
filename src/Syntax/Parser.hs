@@ -24,21 +24,21 @@ import Text.Megaparsec.Char (eol)
 import qualified Text.Megaparsec.Char.Lexer as Lex
 import Data.Bifunctor (second)
 
--- The monad binding of ParserF will insert space consumer or indent guard inbetween, 
--- which sould be convenient for handling linefold indentation. 
+-- The monad binding of ParserF will insert space consumer or indent guard inbetween,
+-- which sould be convenient for handling linefold indentation.
 
--- Therefore, users are suggested to implement low level parsers, helper functions 
--- under ParserF monad. For the sake of need not bother handling indentation for linefold, 
+-- Therefore, users are suggested to implement low level parsers, helper functions
+-- under ParserF monad. For the sake of need not bother handling indentation for linefold,
 -- which should be left for top level parsers to handle.
 
--- Hence, the Parser monad is only restricted to top level parsers 
+-- Hence, the Parser monad is only restricted to top level parsers
 -- (e.g. pProgram, pDeclaration, pBlockDeclaration, pStmts, pStmt, pExpr, pType ...)
 
 -- In some case, we may want to release the restriction of linefold under the ParserF monad,
 -- which can be achieve by `lift p` (p : Parser a), see `pBlock` for example.
 
--- While we may want to do the opposite way under Parser monad in order to 
--- specify the space consumer that we wanted to use, which can be achive by using the 
+-- While we may want to do the opposite way under Parser monad in order to
+-- specify the space consumer that we wanted to use, which can be achive by using the
 -- downward coercion combinater `(↓) p sc` (p : ParserF a), see `pBlockDeclaration` for example.
 
 type Parser = Lexer
@@ -170,7 +170,8 @@ pStmt' =
       pAbort,
       try pAssert,
       pLoopInvariant,
-      pAssign,
+      try pAssign,
+      pAAssign,
       pDo,
       pIf,
       pSpecQM,
@@ -189,6 +190,9 @@ pAbort = Abort . locOf <$> lexAbort
 pAssign :: ParserF Stmt
 pAssign = Assign <$> pList lowerName <*> lexAssign <*> pList pExpr'
 
+pAAssign :: ParserF Stmt
+pAAssign = AAssign <$> lowerName <*> lexBracketStart <*> pExpr' <*> lexBracketEnd <*> lexAssign <*> pExpr'
+
 pAssert :: ParserF Stmt
 pAssert = Assert <$> lexBraceStart <*> pExpr' <*> lexBraceEnd
 
@@ -204,17 +208,17 @@ pLoopInvariant =
     <*> lexBraceEnd
 
 pDo :: ParserF Stmt
-pDo = 
+pDo =
   Do
   <$> lexDo
-  <*> pIndentSepBy pGdCmd lexGuardBar 
+  <*> pIndentSepBy pGdCmd lexGuardBar
   <*> lexOd
 
 pIf :: ParserF Stmt
 pIf = do
   If
   <$> lexIf
-  <*> pIndentSepBy pGdCmd lexGuardBar 
+  <*> pIndentSepBy pGdCmd lexGuardBar
   <*> lexFi
 
 pGdCmd :: ParserF GdCmd
@@ -299,9 +303,9 @@ pExpr' = makeExprParser pExprArith chainOpTable <* (↑) (\sc' -> try sc' <|> sc
 
 chainOpTable :: [[Operator ParserF Expr]]
 chainOpTable =
-  [ 
+  [
     [InfixL . pChain $ lexEQ],
-    [ 
+    [
       InfixL . pChain . choice $ [lexNEQ, lexNEQU],
       InfixL . pChain $ lexLT,
       InfixL . pChain . choice $ [lexLTE, lexLTEU],
@@ -312,7 +316,7 @@ chainOpTable =
     [InfixL . pBinary . choice $ [lexDisj, lexDisjU]],
     [InfixL . pBinary . choice $ [lexImpl, lexImplU]],
     [InfixL . pChain $ lexEQProp, InfixL . pChain $ lexEQPropU]
-  ] 
+  ]
 
 pExprArith :: ParserF Expr
 pExprArith = makeExprParser pTerm arithTable <* (↑) (\sc' -> try sc' <|> sc)
@@ -427,14 +431,14 @@ pList = pSepBy lexComma
 --      p2
 --  ...
 --    end
--- 
+--
 pBlock ::
   ParserF s ->                      -- start parser
   ParserF a ->                      -- parser inbetween
   ParserF e ->                      -- end parser
   ParserF (s, [a], e)
 pBlock start p end = do
-  ts <- lift start'                        -- release linefold restriction 
+  ts <- lift start'                        -- release linefold restriction
   t <- lift $ manyTill p' (lookAhead end') -- release linefold restriction
   te <- end
   return (ts, t, te)
@@ -459,13 +463,13 @@ pIndentSepBy p delim = do
   try g <|> return (Head x)
   where
     -- make sure parser after delim start at the same position
-    delim' pos = (↓) delim (void $ Lex.indentGuard sc Ord.EQ pos)   
+    delim' pos = (↓) delim (void $ Lex.indentGuard sc Ord.EQ pos)
 
     parseP gdPos delimPos = do
       x <- p
       let g = do
             -- make sure the delim parser start at the same position
-            lift . void $ Lex.indentGuard scn Ord.EQ delimPos         
+            lift . void $ Lex.indentGuard scn Ord.EQ delimPos
             Delim x <$> lift (delim' gdPos) <*> parseP gdPos delimPos
       try g <|> return (Head x)
 
@@ -487,7 +491,7 @@ pIndentBlock p = do
   where
     p' = (↓) p sc                             -- make sure p doesn't parse newline
     posMoveLeft pos i = mkPos (unPos pos - i) -- safe, since pos should be greater than ref,
-                                              -- by the definition of ParserF 
+                                              -- by the definition of ParserF
 
 -- copied from Text.Megaparsec.Char.Lexer
 indentedItems ::

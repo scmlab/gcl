@@ -105,11 +105,11 @@ handleExpr _ (Subst before env after) =
     isLam Lam {} = True
     isLam _ = False
 handleExpr _ (ArrUpd e1 e2 e3 _) =
-  return $ render e1 <+> "[" <+> render e2 <+> "↣" <+> render e3 <+> "]"
+  return $ "(" <+> render e1 <+> ":" <+> render e2 <+> "↣" <+> render e3 <+> ")"
     -- SCM: need to print parenthesis around e1 when necessary.
 
 instance Render Subst where
-  render env 
+  render env
     | null env = mempty
     | otherwise = "[" <+> exprs <+> "/" <+> vars <+> "]"
       where

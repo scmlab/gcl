@@ -63,6 +63,7 @@ instance ToAbstract Stmt A.Stmt where
     Skip l -> pure (A.Skip l)
     Abort l -> pure (A.Abort l)
     Assign a _ b -> A.Assign (fromSepBy a) <$> mapM toAbstract (fromSepBy b) <*> pure (a <--> b)
+    AAssign x _ i _ _ e -> A.AAssign x <$> toAbstract i <*> toAbstract e <*> pure (x <--> e)
     Assert l a r -> A.Assert <$> toAbstract a <*> pure (l <--> r)
     LoopInvariant l a _ _ _ b r -> A.LoopInvariant <$> toAbstract a <*> toAbstract b <*> pure (l <--> r)
     Do l a r -> A.Do <$> mapM toAbstract (fromSepBy a) <*> pure (l <--> r)

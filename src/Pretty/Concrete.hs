@@ -84,7 +84,7 @@ instance PrettyWithLoc (Token "{:") where
 
 instance PrettyWithLoc (Token ":}") where
   prettyWithLoc (Token l r) = DocWithLoc (pretty tokDeclEnd) l r
-  
+
 instance PrettyWithLoc (Token ":") where
   prettyWithLoc (Token l r) = DocWithLoc (pretty tokColon) l r
 
@@ -183,9 +183,9 @@ instance PrettyWithLoc Declaration where
       <> prettyWithLoc decl
       <> prettyWithLoc declprop
   prettyWithLoc (VarDecl v decl) =
-    prettyWithLoc v <> prettyWithLoc decl 
+    prettyWithLoc v <> prettyWithLoc decl
   prettyWithLoc (VarDeclWithProp v decl declprop) =
-    prettyWithLoc v <> prettyWithLoc decl <> prettyWithLoc declprop 
+    prettyWithLoc v <> prettyWithLoc decl <> prettyWithLoc declprop
   prettyWithLoc (LetDecl a declBody) =
     prettyWithLoc a
       <> prettyWithLoc declBody
@@ -194,7 +194,7 @@ instance Pretty BlockDecl where
   pretty = toDoc . prettyWithLoc
 
 instance PrettyWithLoc BlockDecl where
-  prettyWithLoc (BlockDecl decl mDeclProp mDeclBody) = 
+  prettyWithLoc (BlockDecl decl mDeclProp mDeclBody) =
     prettyWithLoc decl
     <> maybe Empty (either prettyWithLoc prettyWithLoc) mDeclProp
     <> maybe Empty prettyWithLoc mDeclBody
@@ -203,7 +203,7 @@ instance Pretty BlockDeclaration where
   pretty = toDoc . prettyWithLoc
 
 instance PrettyWithLoc BlockDeclaration where
-  prettyWithLoc (BlockDeclaration l decls r) = 
+  prettyWithLoc (BlockDeclaration l decls r) =
     prettyWithLoc l
     <> mconcat (map prettyWithLoc decls)
     <> prettyWithLoc r
@@ -229,6 +229,9 @@ instance PrettyWithLoc Stmt where
   prettyWithLoc (Abort l) = fromDoc l "abort"
   prettyWithLoc (Assign xs a es) =
     prettyWithLoc xs <> prettyWithLoc a <> prettyWithLoc es
+  prettyWithLoc (AAssign x l i r a e) =
+    prettyWithLoc x <> prettyWithLoc l <> prettyWithLoc i <>
+     prettyWithLoc r <> prettyWithLoc a <> prettyWithLoc e
   prettyWithLoc (Assert l p r) =
     prettyWithLoc l
       <> prettyWithLoc p
@@ -291,7 +294,7 @@ handleExpr (Chain x op y) =
     prettyWithLoc x
     <> prettyWithLoc op
     <> prettyWithLoc y
-handleExpr (Arr arr l i r) = 
+handleExpr (Arr arr l i r) =
   return $
     prettyWithLoc arr
     <> prettyWithLoc l
