@@ -132,7 +132,7 @@ isEmpty inlines = all elemIsEmpty (Seq.viewl (unInlines inlines))
     elemIsEmpty (Text "" _) = True
     elemIsEmpty (Text _ _) = False
     elemIsEmpty (Link _ xs _) = all elemIsEmpty $ unInlines xs
-    elemIsEmpty (Sbst xs ys _) = all elemIsEmpty $ unInlines xs <> unInlines ys
+    elemIsEmpty (Sbst xs env ys _) = all elemIsEmpty $ unInlines xs <> unInlines env <> unInlines ys
     elemIsEmpty (Horz xs) = all isEmpty xs
     elemIsEmpty (Vert xs) = all isEmpty xs
     elemIsEmpty (Parn _) = False
@@ -156,8 +156,8 @@ linkE :: Range -> Inlines -> Inlines
 linkE range xs = Inlines $ Seq.singleton $ Link range xs []
 
 -- | Text that changes after clicked
-substE :: Inlines -> Inlines -> Inlines
-substE before after = Inlines $ Seq.singleton $ Sbst before after []
+substE :: Inlines -> Inlines -> Inlines -> Inlines
+substE before env after = Inlines $ Seq.singleton $ Sbst before env after []
 
 -- | Note: when there's only 1 Horz inside a Parn, convert it to PrHz
 parensE :: Inlines -> Inlines
@@ -192,7 +192,7 @@ data Inline
   | Text Text ClassNames
   | Link Range Inlines ClassNames
   | -- | For Subst
-    Sbst Inlines Inlines ClassNames
+    Sbst Inlines Inlines Inlines ClassNames
   | -- | Horizontal grouping, wrap when there's no space
     Horz [Inlines]
   | -- | Vertical grouping, each children would end with a newline
@@ -209,7 +209,7 @@ instance Show Inline where
   show (Icon s _) = s
   show (Text s _) = Text.unpack s
   show (Link _ xs _) = show xs
-  show (Sbst xs _ _) = show xs
+  show (Sbst xs env _ _) = show xs <> show env 
   show (Horz xs) = unwords (map show $ toList xs)
   show (Vert xs) = unlines (map show $ toList xs)
   show (Parn x) = "(" <> show x <> ")"

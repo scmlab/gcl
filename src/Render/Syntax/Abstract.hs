@@ -100,7 +100,7 @@ handleExpr _ (Quant op xs r t _) =
       <+> render t
       <+> "⟩"
 handleExpr _ (Subst before env after) =
-  return $ substE (render before <+> render env) (if isLam after then parensE (render after) else render after)
+  return $ substE (render before) (render env) (if isLam after then parensE (render after) else render after)
   where
     isLam :: Expr -> Bool
     isLam Lam {} = True
