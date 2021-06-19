@@ -1,7 +1,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 module GCL.Expr where
 
-import GCL.Common ( Env, FreshState, Substitutable (subst), Subs )
+import GCL.Common ( Env, FreshState, Substitutable (subst) )
 import Syntax.Abstract ( Expr (..) )
 import Control.Monad.Reader (ReaderT, ask)
 import Control.Monad.State (State)

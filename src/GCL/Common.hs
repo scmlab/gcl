@@ -72,7 +72,6 @@ instance Free A.Expr where
   fv (A.Hole _) = mempty -- banacorn: `subs` has been always empty anyway
   -- concat (map freeSubst subs) -- correct?
   fv (A.Subst _ _ after) = fv after
-    -- (fv e \\ (Set.fromList . Map.keys) s) <> fv s
 
 instance Free A.Bindings where
   fv (Left expr) = fv expr
@@ -136,7 +135,8 @@ shrinkSubs expr = Map.filterWithKey (\n _ -> n `Set.member` fv expr)
 
 -- should make sure `fv Bindings` and `fv Expr` are disjoint before substitution
 instance Substitutable A.Bindings A.Expr where
-  subst s expr =
+  subst sub expr =
+    let s = shrinkSubs expr sub in
     if null s
     then expr
     else
