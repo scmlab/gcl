@@ -14,6 +14,7 @@ import qualified Syntax.Abstract as A
 import GCL.Predicate (Pred (..))
 import Control.Monad.RWS (RWST(..))
 import Control.Monad.State (StateT(..))
+import Data.Loc (Loc)
 
 -- Monad for generating fresh variable
 class Monad m => Fresh m where
@@ -70,7 +71,11 @@ instance Free A.Expr where
     (fv op <> fv range <> fv term) \\ Set.fromList xs
   fv (A.Hole _) = mempty -- banacorn: `subs` has been always empty anyway
   -- concat (map freeSubst subs) -- correct?
-  fv (A.Subst e s _) = (fv e \\ (Set.fromList . Map.keys) s) <> fv s
+  fv (A.Subst _ _ after) = fv after
+
+instance Free A.Bindings where
+  fv (Left expr) = fv expr
+  fv (Right expr) = fv expr
 
 -- class for data that is substitutable
 class Substitutable a b where
@@ -97,7 +102,7 @@ instance Substitutable A.Expr A.Expr where
   subst s (A.Chain a op b l) = A.Chain (subst s a) op (subst s b) l
   subst s (A.App a b l) =
     let a' = subst s a in
-    let b' = subst s b in 
+    let b' = subst s b in
       case a' of
         A.Lam x body _ -> subst (Map.singleton x b') body
         _ -> A.App a' b' l
@@ -109,65 +114,109 @@ instance Substitutable A.Expr A.Expr where
     let s' = Map.withoutKeys s (Set.fromList xs) in
     A.Quant (subst s' qop) xs (subst s' rng) (subst s' t) l
   -- after should already be applied to subs 
-  subst s1 (A.Subst before s2 after) = 
-    -- NOTE: use `Map.union` or `compose` ?
-    A.Subst before (s1 `Map.union` s2) (subst s1 after)
+  subst s1 (A.Subst before s2 after) = A.Subst (subst s1 before) s2 (subst s1 after)
 
 -- Left of Bindings will be rendered,   
 --    including assignment
 -- Right of Bindings will not be rendered, 
 --    including global let bindings, and lambda bindings
-type Bindings = Either A.Expr A.Expr
 
-bindToSubs :: Subs Bindings -> Subs A.Expr
+bindToSubs :: Subs A.Bindings -> Subs A.Expr
 bindToSubs = fst . Map.mapEither id
 
-singleBinding :: Name -> Bindings -> Subs Bindings
+singleBinding :: Name -> A.Bindings -> Subs A.Bindings
 singleBinding = Map.singleton
 
--- should make sure `fv Bindings` and `fv Expr` are disjoint before substitution
-instance Substitutable Bindings A.Expr where
-  subst s (A.Paren expr) = A.Paren (subst s expr)
-  subst _ lit@(A.Lit _ _) = lit
-  subst s v@(A.Var n _) = 
-    case Map.lookup n s of
-      Just (Left v') -> do
-        subst (Map.delete n s) v'
-      Just (Right v') -> do
-        A.Subst v emptySubs (subst (Map.delete n s) v')
-      Nothing -> v
-  subst s c@(A.Const n _) = 
-    case Map.lookup n s of
-      Just (Left c') -> do
-        subst (Map.delete n s) c'
-      Just (Right c') -> do
-        A.Subst c emptySubs (subst (Map.delete n s) c')
-      Nothing -> c
-  subst _ op@(A.Op _) = op
-  subst s (A.Chain a op b l) = A.Chain (subst s a) op (subst s b) l
-  subst s (A.App a b l) = 
-    let a' = subst s a in
-    let b' = subst s b in
-    case a' of
-      A.Lam x body _ -> 
-        subst (Map.singleton x b') body
-      A.Subst _ s1 (A.Lam x body _) -> do
-        let body' = subst (Map.singleton x b') body
-        A.Subst (A.App a b l) s1 body'
-      _ -> A.App a' b' l 
-  subst s (A.Lam x e l) = 
-    let s' = Map.withoutKeys s (Set.singleton x) in
-    A.Lam x (subst s' e) l
-  subst _ (A.Hole l) = A.Hole l
-  subst s (A.Quant qop xs rng t l) = 
-    let s' = Map.withoutKeys s (Set.fromList xs) in
-    A.Quant (subst s' qop) xs (subst s' rng) (subst s' t) l
-  -- after should already be applied to subs 
-  subst s1 (A.Subst before s2 after) = do
-    let s1' = fst $ Map.mapEither id s1
-    A.Subst before (s1' `Map.union` s2) (subst s1 after)
+shrinkSubs :: A.Expr -> Subs a -> Subs a
+shrinkSubs expr = Map.filterWithKey (\n _ -> n `Set.member` fv expr)
 
-instance Substitutable Bindings Pred where
+-- should make sure `fv Bindings` and `fv Expr` are disjoint before substitution
+instance Substitutable A.Bindings A.Expr where
+  subst sub expr =
+    let s = shrinkSubs expr sub in
+    if null s
+    then expr
+    else
+    case expr of
+      (A.Paren e) -> A.Paren (subst s e)
+      A.Lit {} -> expr
+      (A.Var n _) ->
+        case Map.lookup n s of
+          Just v ->
+            either (simpleSubs expr s n) (simpleSubs expr s n) v
+          Nothing -> expr
+      (A.Const n _) ->
+        case Map.lookup n s of
+          Just c ->
+            either (simpleSubs expr s n) (simpleSubs expr s n) c
+          Nothing -> expr
+      A.Op {} -> expr
+      (A.Chain a op b l) -> A.Chain (subst s a) op (subst s b) l
+      (A.App a b l) ->
+        let (a', b'a, expr') = substApp s a b l in
+        case a' of
+          A.Lam x body _ ->
+            A.Subst expr' emptySubs (subst (Map.singleton x b'a) body)
+          A.Subst _ _ (A.Lam x body _) ->
+            A.Subst expr' emptySubs (subst (Map.singleton x b'a) body)
+          _ -> expr'
+      (A.Lam x e l) ->
+        let s' = Map.withoutKeys s (Set.singleton x) in
+        let e' = subst s' e in
+        quotSubs expr s (A.Lam x e' l)
+      A.Hole {} -> expr
+      (A.Quant qop xs rng t l) ->
+        let s' = Map.withoutKeys s (Set.fromList xs) in
+        A.Quant (subst s' qop) xs (subst s' rng) (subst s' t) l
+  -- after should already be applied to subs 
+      A.Subst {} -> substSubst s expr
+
+
+-- e1 [s] -> e2
+-- e1 [s] -> e2 [s//(n, e2)]
+simpleSubs :: A.Expr -> Subs A.Bindings -> Name -> A.Expr -> A.Expr
+simpleSubs e1 s n e2 =
+  A.Subst e1 s
+    (quotSubs e2 (Map.delete n s) (subst (Map.delete n s) e2))
+
+quotSubs :: A.Expr -> Subs A.Bindings -> A.Expr -> A.Expr
+quotSubs before s after
+  | before == after = before
+  | otherwise = A.Subst before s after
+
+getSubstAfter :: A.Expr -> A.Expr
+getSubstAfter (A.Subst _ _ after) = after
+getSubstAfter expr = expr
+
+substApp :: Subs A.Bindings -> A.Expr -> A.Expr -> Loc -> (A.Expr, A.Expr, A.Expr)
+substApp s a b l =
+  let a' = subst s a in
+  let b' = subst s b in
+  let b'a = getSubstAfter b' in
+  if a == a' && b == b'
+  then (a', b'a, A.App a b l)
+  else (a', b'a, A.Subst (A.App a b l) s (A.App a' b'a l))
+
+isAllApp :: A.Expr -> Bool
+isAllApp (A.Subst A.App {} _ A.App {}) = True
+isAllApp (A.Subst b@A.Subst {} _ A.App {}) = isAllApp b
+isAllApp _ = False
+
+substSubst :: Subs A.Bindings -> A.Expr -> A.Expr
+substSubst s (A.Subst b@(A.Subst _ _ b2@(A.App b2a b2b l)) s2 a)
+  | isAllApp b && s2 == emptySubs =
+    let (_, _, b2') = substApp s b2a b2b l in
+    let b3 = getSubstAfter b2' in
+    let a' = getSubstAfter (subst s a) in
+    if b2 == b3
+    then A.Subst b emptySubs a'
+    else A.Subst (A.Subst b s b3) emptySubs a'
+substSubst s (A.Subst b s1 a) =
+  let a' = getSubstAfter (subst s a) in
+  A.Subst (A.Subst b s1 a) s a'
+substSubst s expr = subst s expr
+
+instance Substitutable A.Bindings Pred where
   subst s (Constant e) = Constant (subst s e)
   subst s (Bound e l) = Bound (subst s e) l
   subst s (Assertion e l) = Assertion (subst s e) l
@@ -178,7 +227,7 @@ instance Substitutable Bindings Pred where
   subst s (Disjunct es) = Disjunct (subst s es)
   subst s (Negate x) = Negate (subst s x)
 
-instance Substitutable Bindings A.Stmt where
+instance Substitutable A.Bindings A.Stmt where
   subst _ st@(A.Skip _) = st
   subst _ st@(A.Abort _) = st
   subst s (A.Assign ns es l) = A.Assign ns (subst s es) l
@@ -189,9 +238,8 @@ instance Substitutable Bindings A.Stmt where
   subst _ st@(A.Spec _ _) = st
   subst _ st@(A.Proof _) = st
 
-instance Substitutable Bindings A.GdCmd where
+instance Substitutable A.Bindings A.GdCmd where
   subst s (A.GdCmd gd stmts l) = A.GdCmd (subst s gd) (subst s stmts) l
-
 
 toStateT :: Monad m => r -> RWST r w s m a -> StateT s m a
 toStateT r m = StateT (\s -> do

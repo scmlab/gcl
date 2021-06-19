@@ -1,7 +1,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 module GCL.Expr where
 
-import GCL.Common ( Env, FreshState, Substitutable (subst), Subs )
+import GCL.Common ( Env, FreshState, Substitutable (subst) )
 import Syntax.Abstract ( Expr (..) )
 import Control.Monad.Reader (ReaderT, ask)
 import Control.Monad.State (State)
@@ -41,5 +41,4 @@ expand (Quant op xs rng t l) = do
   return $ Quant op xs rng' t' l
 expand (Subst e s _) = do
   e' <- expand e
-  let s' = Map.map Right s :: Subs (Either Expr Expr)
-  return $ subst s' e'
+  return $ subst s e'

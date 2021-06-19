@@ -3,7 +3,7 @@
 [ < Assigment >
 True
 ⇒
-0   =   1
+0   =   x  [  1  /  x  ]
 at ./test/Test/WP/assets/assignment.gcl [9-15] 2:1-7 ]
 
 ### Source

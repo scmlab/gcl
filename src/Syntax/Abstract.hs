@@ -114,7 +114,8 @@ data Expr
 
 type QuantOp' = Either Op Expr
 
-type Subst = Map Name Expr
+type Bindings = Either Expr Expr
+type Subst = Map Name Bindings
 
 instance ToJSON Expr
 
