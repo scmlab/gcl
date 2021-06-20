@@ -33,6 +33,10 @@ instance Collect StructError Diagnostic where
     loc
     "Postcondition Missing"
     "The last statement of the program should be an assertion"
+  collect (MultiDimArrayAsgnNotImp loc) = makeError
+    loc
+    "Assignment to Multi-Dimensional Array"
+    "Not implemented yet"
 
 instance Collect Error Diagnostic where
   collect (SyntacticError (pos, msg)) =

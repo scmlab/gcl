@@ -56,3 +56,8 @@ instance RenderBlock StructError where
       (Just "Missing Postcondition")
       (fromLoc loc)
       "The last statement of the program should be an assertion"
+  renderBlock (MultiDimArrayAsgnNotImp loc) =
+    blockE
+      (Just "Assignment to Multi-Dimensional Array")
+      (fromLoc loc)
+      "Not implemented yet"

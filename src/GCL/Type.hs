@@ -260,13 +260,13 @@ checkStmt env (Assign ns es loc) -- NOTE : Not sure if Assign work this way
         -- (locOf $ mergeRangesUnsafe (fromLocs $ map locOf extraExprs))
         loc
   | otherwise = forM_ (zip ns es) (checkAssign env)
-checkStmt env (AAssign x i e loc) =
-  case Map.lookup x env of
-    Nothing -> throwError $ NotInScope x (locOf x)
-    Just (TArray _ t _) -> do
-       checkIsType env i (TBase TInt NoLoc)
-       checkIsType env e t
-    Just t -> throwError $ NotArray t (locOf x)
+checkStmt env (AAssign x i e _) = do
+  tx <- inferExpr env x
+  case tx of
+   TArray _ t _ -> do
+      checkIsType env i (TBase TInt NoLoc)
+      checkIsType env e t
+   _ -> throwError $ NotArray tx (locOf x)
 checkStmt env (Assert expr _) = do
   checkPredicate env expr
 checkStmt env (LoopInvariant e1 e2 _) = do
@@ -312,8 +312,9 @@ emptyUnifier = (emptySubs, [])
 unifies :: Type -> Type -> TM (Subs Type)
 unifies (TBase t1 _) (TBase t2 _)
   | t1 == t2 = return emptySubs
-unifies (TArray i1 t1 _) (TArray i2 t2 _)
-  | i1 == i2 = unifies t1 t2
+unifies (TArray _ t1 _) (TArray _ t2 _) =
+  unifies t1 t2   {-  | i1 == i2 = unifies t1 t2 -}
+  -- SCM: for now, we do not check the intervals
 -- view array of type `t` as function type of `Int -> t`
 unifies (TArray _ t1 _) (TFunc (TBase TInt _) t2 _) =
   unifies t1 t2

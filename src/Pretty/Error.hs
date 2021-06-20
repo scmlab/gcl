@@ -31,6 +31,7 @@ instance Pretty StructWarning where
 instance Pretty StructError where
   pretty (MissingAssertion loc) = "Missing Assertion" <+> pretty loc
   pretty (MissingPostcondition loc) = "Missing Postcondition" <+> pretty loc
+  pretty (MultiDimArrayAsgnNotImp loc) = "Assignment to Multi-Dimensional Array" <+> pretty loc
 
 instance Pretty TypeError where
   pretty (NotInScope name _) =

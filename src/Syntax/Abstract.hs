@@ -53,7 +53,7 @@ data Stmt
   = Skip Loc
   | Abort Loc
   | Assign [Name] [Expr] Loc
-  | AAssign Name Expr Expr Loc
+  | AAssign Expr Expr Expr Loc
   | Assert Expr Loc
   | LoopInvariant Expr Expr Loc
   | Do [GdCmd] Loc

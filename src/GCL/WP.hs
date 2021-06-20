@@ -144,9 +144,11 @@ struct _ (pre, _) (A.Skip l) post = tellPO pre post (AtSkip l)
 struct _ (pre, _) (A.Assign xs es l) post = do
   let sub = Map.fromList . zip xs . map Left $ es :: Subs Bindings
   tellPO pre (subst sub post) (AtAssignment l)
-struct _ (pre, _) (A.AAssign x i e l) post = do
-  let sub = Map.fromList [(x, Left (A.ArrUpd (A.nameVar x) i e l))] :: Subs Bindings
-  tellPO pre (subst sub post) (AtAssignment l)
+struct _ (pre, _) (A.AAssign (A.Var x _) i e l) post = do
+     let sub = Map.fromList [(x, Left (A.ArrUpd (A.nameVar x) i e l))] :: Subs Bindings
+     tellPO pre (subst sub post) (AtAssignment l)
+struct _ (_, _) (A.AAssign _ _ _ l) _ =
+  throwError (MultiDimArrayAsgnNotImp l)
 struct b (pre, _) (A.If gcmds l) post = do
   when b $ tellPO pre (disjunctGuards gcmds) (AtIf l)
   forM_ gcmds $ \(A.GdCmd guard body _) ->
@@ -230,9 +232,10 @@ wp _ (A.Skip _) post = return post
 wp _ (A.Assign xs es _) post = do
   let sub = Map.fromList . zip xs . map Left $ es :: Subs Bindings
   return $ subst sub post
-wp _ (A.AAssign x i e _) post = do
+wp _ (A.AAssign (A.Var x _) i e _) post = do
   let sub = Map.fromList [(x, Left (A.ArrUpd (A.nameVar x) i e NoLoc))] :: Subs Bindings
   return $ subst sub post
+wp _ (A.AAssign _ _ _ l) _ = throwError (MultiDimArrayAsgnNotImp l)
 wp _ (A.Do _ l) _ = throwError $ MissingAssertion l
 wp b (A.If gcmds _) post = do
   pres <- forM gcmds $ \(A.GdCmd guard body _) ->
@@ -306,7 +309,7 @@ sp _ (pre, _) (A.Assign xs es l) = do
     genSub ys hs = Map.fromList . zip ys . map (Left . A.nameVar) $ hs
     -- genEq :: Name -> A.Expr -> A.Expr
     genEq sub x e = A.nameVar x `A.eqq` (subst sub e)
-sp _ (pre, _) (A.AAssign x i e l) = do
+sp _ (pre, _) (A.AAssign (A.Var x _) i e _) = do
      -- {P} x[I] := E { (exist x' :: x = x'[I[x'/x] -> E[x'/x]] && P[x'/x]) }
    x' <- freshText
    let sub = Map.fromList [(x, Left (A.variable x'))] :: Subs Bindings
@@ -314,6 +317,7 @@ sp _ (pre, _) (A.AAssign x i e l) = do
      A.exists [Name x' NoLoc]
       (A.nameVar x `A.eqq` A.ArrUpd (A.variable x') (subst sub i) (subst sub e) NoLoc)
       (subst sub (toExpr pre)))
+sp _ (_, _) (A.AAssign _ _ _ l) = throwError (MultiDimArrayAsgnNotImp l)
 sp b (pre, _) (A.If gcmds _) = do
   posts <- forM gcmds $ \(A.GdCmd guard body _) ->
     Constant . toExpr <$>
@@ -356,10 +360,14 @@ instance Located StructWarning where
 data StructError
   = MissingAssertion Loc
   | MissingPostcondition Loc
+  | MultiDimArrayAsgnNotImp Loc
+     -- Assignment to multi-dimensional array not implemented.
+     -- SCM: will remove this when we figure out how.
   deriving (Eq, Show, Generic)
 
 instance Located StructError where
   locOf (MissingAssertion l) = l
   locOf (MissingPostcondition l) = l
+  locOf (MultiDimArrayAsgnNotImp l) = l
 
 instance ToJSON StructError
