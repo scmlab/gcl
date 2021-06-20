@@ -142,6 +142,16 @@ infer (Subst expr sub _) = do
   t <- infer expr
   s <- mapM infer sub
   return $ subst s t
+infer (ArrIdx e1 e2 l) = do
+  t1 <- infer e1
+  let interval = case t1 of
+        TArray itv _ _ -> itv
+        _ -> emptyInterval
+  t2 <- infer e2
+  unify t2 (TBase TInt l)
+  v <- freshVar l
+  unify t1 (TArray interval v l)
+  return v
 infer (ArrUpd e1 e2 e3 l) = do
   t1 <- infer e1
   let interval = case t1 of

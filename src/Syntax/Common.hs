@@ -16,8 +16,8 @@ import Data.Loc.Range ()
 data Name = Name Text Loc
   deriving (Show, Generic)
 
--- | Compare regardless of their locations 
-instance Eq Name where 
+-- | Compare regardless of their locations
+instance Eq Name where
   (==) = (==) `on` nameToText
 
 instance Located Name where
@@ -36,7 +36,7 @@ nameToText :: Name -> Text
 nameToText (Name x _) = x
 
 --------------------------------------------------------------------------------
-data ChainOp = 
+data ChainOp =
     EQProp Loc
   | EQPropU Loc
   | EQ Loc
@@ -51,7 +51,8 @@ data ChainOp =
   deriving (Eq, Show, Generic)
 
 data ArithOp =
-   Implies Loc
+     -- logic operators
+    Implies Loc
   | ImpliesU Loc
   | Conj Loc
   | ConjU Loc
@@ -59,19 +60,20 @@ data ArithOp =
   | DisjU Loc
   | Neg Loc
   | NegU Loc
+     -- arithmetics
   | Add Loc
   | Sub Loc
   | Mul Loc
   | Div Loc
-  | Mod Loc 
+  | Mod Loc
   | Max Loc
   | Min Loc
   deriving (Eq, Show, Generic)
 
-data QuantOp = 
+data QuantOp =
     Sum Loc
   | Forall Loc
-  | Exists Loc 
+  | Exists Loc
   | Hash Loc
   deriving (Eq, Show, Generic)
 
@@ -159,10 +161,10 @@ instance FromJSON Loc where
   parseJSON = withObject "Loc" $ \v -> do
     result <- v .:? "tag" :: Parser (Maybe String)
     case result of
-      Just "Loc" -> do 
+      Just "Loc" -> do
         positions <- (v .:? "contents") :: Parser (Maybe (Pos, Pos))
-        case positions of 
-          Just (start, end) -> return $ Loc start end 
+        case positions of
+          Just (start, end) -> return $ Loc start end
           Nothing -> return NoLoc
       _ -> return NoLoc
 
@@ -179,7 +181,7 @@ data Fixity = Infix Int | InfixR Int | InfixL Int | Prefix Int | Postfix Int
 -- type UseUnicodeSymbol = Bool
 
 -- useUnicodeSymbol :: UseUnicodeSymbol
--- useUnicodeSymbol = True 
+-- useUnicodeSymbol = True
 
 -- usePlainSymbol :: UseUnicodeSymbol
 -- usePlainSymbol = False

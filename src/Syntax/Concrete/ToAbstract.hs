@@ -157,7 +157,7 @@ instance ToAbstract Expr A.Expr where
     Const a -> pure $ A.Const a (locOf x)
     Op a -> pure $ A.Op (ArithOp a)
     Chain a op b -> A.Chain <$> toAbstract a <*> pure (ChainOp op) <*> toAbstract b <*> pure (locOf x)
-    Arr arr _ i _ -> A.App <$> toAbstract arr <*> toAbstract i <*> pure (locOf x)
+    Arr arr _ i _ -> A.ArrIdx <$> toAbstract arr <*> toAbstract i <*> pure (locOf x)
     App a b -> A.App <$> toAbstract a <*> toAbstract b <*> pure (locOf x)
     Quant _ a b _ c _ d _ -> A.Quant <$> toAbstractQOp a <*> pure b <*> toAbstract c <*> toAbstract d <*> pure (locOf x)
       where

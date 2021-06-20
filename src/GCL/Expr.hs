@@ -37,12 +37,16 @@ expand (Lam x e l) = return (Lam x e l)
 expand h@(Hole _) = return h
 expand (Quant op xs rng t l) = do
   rng' <- expand rng
-  t' <- expand t 
+  t' <- expand t
   return $ Quant op xs rng' t' l
 expand (Subst e s _) = do
   e' <- expand e
   let s' = Map.map Right s :: Subs (Either Expr Expr)
   return $ subst s' e'
+expand (ArrIdx e1 e2 l) = do
+  e1' <- expand e1
+  e2' <- expand e2
+  return (ArrIdx e1' e2' l)
 expand (ArrUpd e1 e2 e3 l) = do
   e1' <- expand e1
   e2' <- expand e2

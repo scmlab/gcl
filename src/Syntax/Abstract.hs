@@ -111,6 +111,7 @@ data Expr
   | Hole Loc
   | Quant Expr [Name] Expr Expr Loc
   | Subst Expr Subst Expr
+  | ArrIdx Expr Expr Loc
   | ArrUpd Expr Expr Expr Loc
   deriving (Eq, Show, Generic)
 

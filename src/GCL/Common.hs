@@ -71,6 +71,7 @@ instance Free A.Expr where
   fv (A.Hole _) = mempty -- banacorn: `subs` has been always empty anyway
   -- concat (map freeSubst subs) -- correct?
   fv (A.Subst e s _) = (fv e \\ (Set.fromList . Map.keys) s) <> fv s
+  fv (A.ArrIdx e1 e2 _) = fv e1 <> fv e2
   fv (A.ArrUpd e1 e2 e3 _) = fv e1 <> fv e2 <> fv e3
 
 instance Free Bindings where
@@ -113,10 +114,12 @@ instance Substitutable A.Expr A.Expr where
   subst s (A.Quant qop xs rng t l) =
     let s' = Map.withoutKeys s (Set.fromList xs) in
     A.Quant (subst s' qop) xs (subst s' rng) (subst s' t) l
-  -- after should already be applied to subs 
+  -- after should already be applied to subs
   subst s1 (A.Subst before s2 after) =
     -- NOTE: use `Map.union` or `compose` ?
     A.Subst before (s1 `Map.union` s2) (subst s1 after)
+  subst s (A.ArrIdx e1 e2 l) =
+    A.ArrIdx (subst s e1) (subst s e2) l  
   subst s (A.ArrUpd e1 e2 e3 l) =
     A.ArrUpd (subst s e1) (subst s e2) (subst s e3) l
 
@@ -169,10 +172,12 @@ instance Substitutable Bindings A.Expr where
   subst s (A.Quant qop xs rng t l) =
     let s' = Map.withoutKeys s (Set.fromList xs) in
     A.Quant (subst s' qop) xs (subst s' rng) (subst s' t) l
-  -- after should already be applied to subs 
+  -- after should already be applied to subs
   subst s1 (A.Subst before s2 after) = do
     let s1' = fst $ Map.mapEither id s1
     A.Subst before (s1' `Map.union` s2) (subst s1 after)
+  subst s (A.ArrIdx e1 e2 l) =
+      A.ArrIdx (subst s e1) (subst s e2) l
   subst s (A.ArrUpd e1 e2 e3 l) =
     A.ArrUpd (subst s e1) (subst s e2) (subst s e3) l
 
