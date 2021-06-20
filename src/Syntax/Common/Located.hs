@@ -37,6 +37,9 @@ instance Located ArithOp where
   locOf (Mod l) = l
   locOf (Max l) = l
   locOf (Min l) = l
+  locOf (PointsTo l) = l
+  locOf (SConj l) = l
+  locOf (SImp l) = l
 
 instance Located QuantOp where
   locOf (Sum l) = l

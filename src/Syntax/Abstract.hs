@@ -53,13 +53,18 @@ data Stmt
   = Skip Loc
   | Abort Loc
   | Assign [Name] [Expr] Loc
-  | AAssign Expr Expr Expr Loc
+  | AAssign Expr Expr Expr Loc -- a[i] := e
   | Assert Expr Loc
   | LoopInvariant Expr Expr Loc
   | Do [GdCmd] Loc
   | If [GdCmd] Loc
   | Spec Text Range
   | Proof Loc
+    -- pointer operations
+  | Alloc   Name [Expr] Loc  -- p := new (e1,e2,..,en)
+  | HLookup Name Expr Loc    -- x := e*
+  | HMutate Expr Expr Loc    -- e1* := e2
+  | Dispose Expr Loc         -- free e
   deriving (Eq, Show)
 
 data GdCmd = GdCmd Expr [Stmt] Loc deriving (Eq, Show)
@@ -127,6 +132,7 @@ instance FromJSON Expr
 
 -- | Literals
 data Lit = Num Int | Bol Bool | Chr Char
+         | Emp --- predicate for empty heap. Not sure it belongs here.
   deriving (Show, Eq, Generic)
 
 

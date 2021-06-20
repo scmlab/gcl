@@ -119,7 +119,7 @@ instance Substitutable A.Expr A.Expr where
     -- NOTE: use `Map.union` or `compose` ?
     A.Subst before (s1 `Map.union` s2) (subst s1 after)
   subst s (A.ArrIdx e1 e2 l) =
-    A.ArrIdx (subst s e1) (subst s e2) l  
+    A.ArrIdx (subst s e1) (subst s e2) l
   subst s (A.ArrUpd e1 e2 e3 l) =
     A.ArrUpd (subst s e1) (subst s e2) (subst s e3) l
 
@@ -215,6 +215,10 @@ instance Substitutable Bindings A.Stmt where
   subst s (A.If gds l) = A.If (subst s gds) l
   subst _ st@(A.Spec _ _) = st
   subst _ st@(A.Proof _) = st
+  subst s (A.Alloc x es l) = A.Alloc x (map (subst s) es) l
+  subst s (A.HLookup x e l) = A.HLookup x (subst s e) l
+  subst s (A.HMutate e1 e2 l) = A.HMutate (subst s e1) (subst s e2) l
+  subst s (A.Dispose e l) = A.Dispose (subst s e) l
 
 instance Substitutable Bindings A.GdCmd where
   subst s (A.GdCmd gd stmts l) = A.GdCmd (subst s gd) (subst s stmts) l

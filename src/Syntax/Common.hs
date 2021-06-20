@@ -68,6 +68,10 @@ data ArithOp =
   | Mod Loc
   | Max Loc
   | Min Loc
+    -- pointers and sep. logic
+  | PointsTo Loc  -- a |-> v
+  | SConj Loc
+  | SImp Loc
   deriving (Eq, Show, Generic)
 
 data QuantOp =
@@ -111,6 +115,9 @@ classifyArithOp (Div _) = InfixL 8
 classifyArithOp (Mod _) = InfixL 9
 classifyArithOp (Max _) = Infix 10
 classifyArithOp (Min _) = Infix 10
+classifyArithOp (PointsTo _) = Infix 4
+classifyArithOp (SConj _) = InfixL 3
+classifyArithOp (SImp _) = Infix 1
 
 classifyQuantOp :: QuantOp -> Fixity
 classifyQuantOp (Sum _) = Prefix 5

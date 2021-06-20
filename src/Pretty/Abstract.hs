@@ -79,6 +79,14 @@ instance Pretty Stmt where
       <> "fi"
   pretty (Spec content _) = "[!" <> pretty content <> "!]"
   pretty (Proof _) = "{-  -}"
+  pretty (Alloc x es _) =
+     pretty x <+> ":=" <+> "new (" <+>
+        hsep (punctuate ", " (map pretty es)) <+> ")"
+  pretty (HLookup x e _) =
+     pretty x <+> ":=" <+> pretty e <> "*"
+  pretty (HMutate e1 e2 _) =
+     pretty e1 <> "*" <+> ":=" <+> pretty e2
+  pretty (Dispose e _) = "free" <+> pretty e
 
 instance Pretty GdCmd where
   pretty (GdCmd guard body _) =

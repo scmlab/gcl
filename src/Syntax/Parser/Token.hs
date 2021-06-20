@@ -5,7 +5,7 @@ module Syntax.Parser.Token where
 import Data.Text (Text)
 
 ------------------------------------------
--- tokens 
+-- tokens
 ------------------------------------------
 
 tokLineComment :: Text
@@ -63,7 +63,7 @@ tokGuardBar :: Text
 tokGuardBar = "|"
 
 tokArrow :: Text
-tokArrow = "->" 
+tokArrow = "->"
 
 tokArrowU :: Text
 tokArrowU = "→"
@@ -112,10 +112,10 @@ tokBraceEnd :: Text
 tokBraceEnd = "}"
 
 tokQuantStarts :: Text
-tokQuantStarts = "<|" 
+tokQuantStarts = "<|"
 
 tokQuantEnds :: Text
-tokQuantEnds = "|>" 
+tokQuantEnds = "|>"
 
 tokQuantStartU :: Text
 tokQuantStartU = "⟨"
@@ -153,7 +153,7 @@ tokEQ :: Text
 tokEQ = "="
 
 tokNEQ :: Text
-tokNEQ = "/=" 
+tokNEQ = "/="
 
 tokNEQU :: Text
 tokNEQU = "≠"
@@ -162,7 +162,7 @@ tokGT :: Text
 tokGT = ">"
 
 tokGTE :: Text
-tokGTE = ">=" 
+tokGTE = ">="
 
 tokGTEU :: Text
 tokGTEU = "≥"
@@ -177,25 +177,25 @@ tokLTEU :: Text
 tokLTEU = "≤"
 
 tokImpl :: Text
-tokImpl = "=>" 
+tokImpl = "=>"
 
 tokImplU :: Text
 tokImplU = "⇒"
 
 tokConj :: Text
-tokConj = "&&" 
+tokConj = "&&"
 
 tokConjU :: Text
 tokConjU = "∧"
 
 tokDisj :: Text
-tokDisj = "||" 
+tokDisj = "||"
 
 tokDisjU :: Text
 tokDisjU = "∨"
 
 tokNeg :: Text
-tokNeg = "~" 
+tokNeg = "~"
 
 tokNegU :: Text
 tokNegU =  "¬"
@@ -218,11 +218,23 @@ tokMod = "%"
 tokSum :: Text
 tokSum = "Σ"
 
-tokMax :: Text 
+tokMax :: Text
 tokMax = "↑"
 
 tokMin :: Text
 tokMin = "↓"
+
+tokValAt :: Text
+tokValAt = "*"
+
+tokPointsTo :: Text
+tokPointsTo = "↦"
+
+tokSConj :: Text
+tokSConj = "٭"
+
+tokSImp :: Text
+tokSImp = "-٭"
 
 tokForall :: Text
 tokForall = "∀"
