@@ -253,8 +253,14 @@ lexMax = Max . locOf <$> symbol tokMax
 lexMin :: LexerF ArithOp  
 lexMin = Min . locOf <$> symbol tokMin
 
+lexExp :: LexerF ArithOp  
+lexExp = Exp . locOf <$> symbol tokExp
+
 lexSum :: LexerF QuantOp
 lexSum = Sum . locOf <$> symbol tokSum
+
+lexPi :: LexerF QuantOp
+lexPi = Pi . locOf <$> symbol tokPi
 
 lexForall :: LexerF QuantOp
 lexForall = Forall . locOf <$> symbol tokForall
@@ -298,13 +304,15 @@ lexArithOps =
       lexDiv, 
       lexMod,
       lexMax, 
-      lexMin
+      lexMin,
+      lexExp
     ]
 
 lexQuantOps :: LexerF QuantOp 
 lexQuantOps = 
   choice 
     [ lexSum, 
+      lexPi,
       lexForall, 
       lexExists, 
       lexHash
