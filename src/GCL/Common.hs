@@ -113,7 +113,6 @@ instance Substitutable A.Expr A.Expr where
   subst s (A.Quant qop xs rng t l) = 
     let s' = Map.withoutKeys s (Set.fromList xs) in
     A.Quant (subst s' qop) xs (subst s' rng) (subst s' t) l
-  -- after should already be applied to subs 
   subst s1 (A.Subst before s2 after) = A.Subst (subst s1 before) s2 (subst s1 after)
 
 -- Left of Bindings will be rendered,   
@@ -163,24 +162,33 @@ instance Substitutable A.Bindings A.Expr where
       (A.Lam x e l) ->
         let s' = Map.withoutKeys s (Set.singleton x) in
         let e' = subst s' e in
-        quotSubs expr s (A.Lam x e' l)
+        reduceSubs expr s (A.Lam x e' l)
       A.Hole {} -> expr
       (A.Quant qop xs rng t l) ->
         let s' = Map.withoutKeys s (Set.fromList xs) in
         A.Quant (subst s' qop) xs (subst s' rng) (subst s' t) l
   -- after should already be applied to subs 
-      A.Subst {} -> substSubst s expr
-
+      A.Subst b s' a ->
+        let a' = getSubstAfter (subst s a) in
+        case b of
+          A.Subst _ _ b2@(A.App b2a b2b l) 
+            | isAllApp b && s' == emptySubs ->
+              let (_, _, b2') = substApp s b2a b2b l in
+              let b3 = getSubstAfter b2' in
+              if b2 == b3
+              then A.Subst b s' a'
+              else A.Subst (A.Subst b s b3) s' a'
+          _ -> A.Subst (A.Subst b s' a) s a'
 
 -- e1 [s] -> e2
 -- e1 [s] -> e2 [s//(n, e2)]
 simpleSubs :: A.Expr -> Subs A.Bindings -> Name -> A.Expr -> A.Expr
 simpleSubs e1 s n e2 =
   A.Subst e1 s
-    (quotSubs e2 (Map.delete n s) (subst (Map.delete n s) e2))
+    (reduceSubs e2 (Map.delete n s) (subst (Map.delete n s) e2))
 
-quotSubs :: A.Expr -> Subs A.Bindings -> A.Expr -> A.Expr
-quotSubs before s after
+reduceSubs :: A.Expr -> Subs A.Bindings -> A.Expr -> A.Expr
+reduceSubs before s after
   | before == after = before
   | otherwise = A.Subst before s after
 
@@ -202,19 +210,9 @@ isAllApp (A.Subst A.App {} _ A.App {}) = True
 isAllApp (A.Subst b@A.Subst {} _ A.App {}) = isAllApp b
 isAllApp _ = False
 
-substSubst :: Subs A.Bindings -> A.Expr -> A.Expr
-substSubst s (A.Subst b@(A.Subst _ _ b2@(A.App b2a b2b l)) s2 a)
-  | isAllApp b && s2 == emptySubs =
-    let (_, _, b2') = substApp s b2a b2b l in
-    let b3 = getSubstAfter b2' in
-    let a' = getSubstAfter (subst s a) in
-    if b2 == b3
-    then A.Subst b emptySubs a'
-    else A.Subst (A.Subst b s b3) emptySubs a'
-substSubst s (A.Subst b s1 a) =
-  let a' = getSubstAfter (subst s a) in
-  A.Subst (A.Subst b s1 a) s a'
-substSubst s expr = subst s expr
+alphaRename :: Fresh m => Subs A.Bindings -> A.Expr -> m A.Expr
+alphaRename s (A.Lam x body _) = _
+alphaRename _ expr = return expr
 
 instance Substitutable A.Bindings Pred where
   subst s (Constant e) = Constant (subst s e)
