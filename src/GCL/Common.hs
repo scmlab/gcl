@@ -6,7 +6,7 @@ import Data.Text(Text)
 import qualified Data.Text as Text
 import Control.Monad (liftM2)
 import Data.Map (Map)
-import Syntax.Common (Name)
+import Syntax.Common (Name(..), nameToText)
 import Data.Set (Set, (\\))
 import qualified Data.Map as Map
 import qualified Data.Set as Set
@@ -14,16 +14,20 @@ import qualified Syntax.Abstract as A
 import GCL.Predicate (Pred (..))
 import Control.Monad.RWS (RWST(..))
 import Control.Monad.State (StateT(..))
-import Data.Loc (Loc)
+import Data.Loc (Loc, Located (..))
 
 -- Monad for generating fresh variable
 class Monad m => Fresh m where
   fresh :: m Int
   freshText :: m Text
+  freshWithLabel :: Text -> m Text
   freshTexts :: Int -> m [Text]
 
   freshText =
     (\i -> Text.pack ("?m_" ++ show i)) <$> fresh
+
+  freshWithLabel l =
+    (\i -> Text.pack ("?" ++ Text.unpack l ++ "_" ++ show i)) <$> fresh
 
   freshTexts 0 = return []
   freshTexts n = liftM2 (:) freshText (freshTexts (n - 1))
@@ -105,12 +109,13 @@ instance Substitutable A.Expr A.Expr where
     let b' = subst s b in
       case a' of
         A.Lam x body _ -> subst (Map.singleton x b') body
+        A.Subst _ _ (A.Lam x body _) -> subst (Map.singleton x b') body
         _ -> A.App a' b' l
   subst s (A.Lam x e l) =
     let s' = Map.withoutKeys s (Set.singleton x) in
     A.Lam x (subst s' e) l
   subst _ h@(A.Hole _) = h
-  subst s (A.Quant qop xs rng t l) = 
+  subst s (A.Quant qop xs rng t l) =
     let s' = Map.withoutKeys s (Set.fromList xs) in
     A.Quant (subst s' qop) xs (subst s' rng) (subst s' t) l
   subst s1 (A.Subst before s2 after) = A.Subst (subst s1 before) s2 (subst s1 after)
@@ -157,7 +162,7 @@ instance Substitutable A.Bindings A.Expr where
           A.Lam x body _ ->
             A.Subst expr' emptySubs (subst (Map.singleton x b'a) body)
           A.Subst _ _ (A.Lam x body _) ->
-            A.Subst expr' emptySubs (subst (Map.singleton x b'a) body)
+            A.Subst expr emptySubs (subst (Map.singleton x b'a) body)
           _ -> expr'
       (A.Lam x e l) ->
         let s' = Map.withoutKeys s (Set.singleton x) in
@@ -167,11 +172,10 @@ instance Substitutable A.Bindings A.Expr where
       (A.Quant qop xs rng t l) ->
         let s' = Map.withoutKeys s (Set.fromList xs) in
         A.Quant (subst s' qop) xs (subst s' rng) (subst s' t) l
-  -- after should already be applied to subs 
       A.Subst b s' a ->
         let a' = getSubstAfter (subst s a) in
         case b of
-          A.Subst _ _ b2@(A.App b2a b2b l) 
+          A.Subst _ _ b2@(A.App b2a b2b l)
             | isAllApp b && s' == emptySubs ->
               let (_, _, b2') = substApp s b2a b2b l in
               let b3 = getSubstAfter b2' in
@@ -210,8 +214,15 @@ isAllApp (A.Subst A.App {} _ A.App {}) = True
 isAllApp (A.Subst b@A.Subst {} _ A.App {}) = isAllApp b
 isAllApp _ = False
 
-alphaRename :: Fresh m => Subs A.Bindings -> A.Expr -> m A.Expr
-alphaRename s (A.Lam x body _) = _
+alphaRename :: Fresh m => Set Name -> A.Expr -> m A.Expr
+alphaRename s (A.Lam x body l) =
+  if x `Set.member` s
+  then do
+    tx <- freshWithLabel (Text.pack "m" <> nameToText x)
+    let x' = Name tx (locOf x)
+    let vx' = A.Var x' (locOf x)
+    A.Lam x' <$> alphaRename s (subst (Map.singleton x vx') body) <*> pure l
+  else A.Lam x <$> alphaRename s body <*> pure l
 alphaRename _ expr = return expr
 
 instance Substitutable A.Bindings Pred where
