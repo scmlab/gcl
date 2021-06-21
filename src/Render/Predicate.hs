@@ -16,8 +16,8 @@ instance Render StructWarning where
 
 instance RenderBlock StructWarning where
   renderBlock x = case x of
-    MissingBound range -> blockE (Just "Bound Missing") (Just range) (render x)
-    ExcessBound range -> blockE (Just "Excess Bound") (Just range) (render x)
+    MissingBound range -> Block (Just "Bound Missing") (Just range) Yellow (render x)
+    ExcessBound range -> Block (Just "Excess Bound") (Just range) Yellow (render x)
 
 instance RenderBlock Spec where
   renderBlock (Specification _ pre post range) =

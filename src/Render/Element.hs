@@ -3,43 +3,55 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Render.Element
-  ( Block,
-    blockE,
-    proofObligationE,
-    specE,
-    Inlines (..),
-    textE,
-    linkE,
-    substE,
-    parensE,
-    iconE,
-    horzE,
-    vertE,
+  ( Block(Block)
+  , Deco(..)
+  , proofObligationE
+  , specE
+  , Inlines(..)
+  , textE
+  , linkE
+  , substE
+  , parensE
+  , iconE
+  , horzE
+  , vertE
+  ,
     -- combinators
-    (<+>),
-    punctuateAfterE,
-    punctuateE,
-  )
-where
+    (<+>)
+  , punctuateAfterE
+  , punctuateE
+  ) where
 
-import Data.Aeson (ToJSON (toJSON))
-import Data.Foldable (toList)
-import Data.Loc.Range
-import Data.Sequence (Seq (..))
-import qualified Data.Sequence as Seq
-import Data.String (IsString (..))
-import Data.Text (Text)
-import qualified Data.Text as Text
-import Data.Text.Prettyprint.Doc (Pretty (..), line)
-import GHC.Generics (Generic)
+import           Data.Aeson                     ( ToJSON(toJSON) )
+import           Data.Foldable                  ( toList )
+import           Data.Loc.Range
+import           Data.Sequence                  ( Seq(..) )
+import qualified Data.Sequence                 as Seq
+import           Data.String                    ( IsString(..) )
+import           Data.Text                      ( Text )
+import qualified Data.Text                     as Text
+import           Data.Text.Prettyprint.Doc      ( Pretty(..)
+                                                , line
+                                                )
+import           GHC.Generics                   ( Generic )
 
 --------------------------------------------------------------------------------
+
+-- | For decorating a block 
+data Deco = Plain | Red | Yellow | Blue | Green
+  deriving (Eq, Generic)
+instance ToJSON Deco
 
 -- | Block elements
 data Block
   = -- for ordinary stuff
-    -- header + body
-    Block (Maybe String) (Maybe Range) Inlines
+  Block (Maybe String) (Maybe Range) Deco Inlines
+    -- Block {
+    --   blkHeader :: Maybe String,
+    --   blkRange :: Maybe Range,
+    --   blkDeco :: Deco,
+    --   blkBody :: Inlines
+    -- }
   | -- for Specs
     -- range + precondition + post-condition
     Spec Range Inlines Inlines
@@ -50,21 +62,27 @@ data Block
 
 -- Represent Block with String literals
 instance IsString Block where
-  fromString s = Block Nothing Nothing (fromString s)
+  fromString s = Block Nothing Nothing Plain (fromString s)
 
 instance Pretty Block where
-  pretty (Block Nothing Nothing inlines) = pretty inlines
-  pretty (Block Nothing (Just range) inlines) = pretty inlines <> "at " <> pretty range
-  pretty (Block (Just header) Nothing inlines) = "< " <> pretty header <> " >" <> line <> pretty inlines
-  pretty (Block (Just header) (Just range) inlines) = "< " <> pretty header <> " >" <> line <> pretty inlines <> "at " <> pretty range
-  pretty (Spec range pre post) = pretty $ Block Nothing (Just range) (vertE [pre, "=>", post])
-  pretty (PO header range p) = pretty $ Block header range p
+  pretty (Block Nothing Nothing _ inlines) = pretty inlines
+  pretty (Block Nothing (Just range) _ inlines) =
+    pretty inlines <> "at " <> pretty range
+  pretty (Block (Just header) Nothing _ inlines) =
+    "< " <> pretty header <> " >" <> line <> pretty inlines
+  pretty (Block (Just header) (Just range) _ inlines) =
+    "< "
+      <> pretty header
+      <> " >"
+      <> line
+      <> pretty inlines
+      <> "at "
+      <> pretty range
+  pretty (Spec range pre post) =
+    pretty $ Block Nothing (Just range) Plain (vertE [pre, "=>", post])
+  pretty (PO header range p) = pretty $ Block header range Plain p
 
 instance ToJSON Block
-
--- | Constructor for `Block`
-blockE :: Maybe String -> Maybe Range -> Inlines -> Block
-blockE = Block
 
 -- | Constructor for `PO`
 proofObligationE :: Maybe String -> Maybe Range -> Inlines -> Block
@@ -87,21 +105,21 @@ instance IsString Inlines where
 -- | You can join two Inlines using `(<>)`
 instance Semigroup Inlines where
   Inlines as <> Inlines bs = Inlines (merge as bs)
-    where
-      merge :: Seq Inline -> Seq Inline -> Seq Inline
-      merge Empty ys = ys
-      merge (xs :|> x) ys = merge xs (cons x ys)
+   where
+    merge :: Seq Inline -> Seq Inline -> Seq Inline
+    merge Empty      ys = ys
+    merge (xs :|> x) ys = merge xs (cons x ys)
 
-      cons :: Inline -> Seq Inline -> Seq Inline
-      cons (Text s c) (Text t d :<| xs)
-        -- merge 2 adjacent Text if they have the same classnames
-        | c == d = Text (s <> t) c :<| xs
-        | otherwise = Text s c :<| Text t d :<| xs
-      cons (Text s c) (Horz [] :<| xs) = cons (Text s c) xs
-      cons (Text s c) (Horz (Inlines t : ts) :<| xs) =
-        -- merge Text with Horz when possible
-        Horz (Inlines (cons (Text s c) t) : ts) :<| xs
-      cons x xs = x :<| xs
+    cons :: Inline -> Seq Inline -> Seq Inline
+    cons (Text s c) (Text t d :<| xs) |
+      -- merge 2 adjacent Text if they have the same classnames
+                                        c == d    = Text (s <> t) c :<| xs
+                                      | otherwise = Text s c :<| Text t d :<| xs
+    cons (Text s c) (Horz [] :<| xs) = cons (Text s c) xs
+    cons (Text s c) (Horz (Inlines t : ts) :<| xs) =
+      -- merge Text with Horz when possible
+      Horz (Inlines (cons (Text s c) t) : ts) :<| xs
+    cons x xs = x :<| xs
 
 instance Monoid Inlines where
   mempty = Inlines mempty
@@ -118,26 +136,26 @@ instance Pretty Inlines where
 -- | To see if the rendered text is "empty"
 isEmpty :: Inlines -> Bool
 isEmpty inlines = all elemIsEmpty (Seq.viewl (unInlines inlines))
-  where
-    elemIsEmpty :: Inline -> Bool
-    elemIsEmpty (Icon _ _) = False
-    elemIsEmpty (Text "" _) = True
-    elemIsEmpty (Text _ _) = False
-    elemIsEmpty (Link _ xs _) = all elemIsEmpty $ unInlines xs
-    elemIsEmpty (Sbst xs env ys _) = all elemIsEmpty $ unInlines xs <> unInlines env <> unInlines ys
-    elemIsEmpty (Horz xs) = all isEmpty xs
-    elemIsEmpty (Vert xs) = all isEmpty xs
-    elemIsEmpty (Parn _) = False
-    elemIsEmpty (PrHz _) = False
+ where
+  elemIsEmpty :: Inline -> Bool
+  elemIsEmpty (Icon _  _  ) = False
+  elemIsEmpty (Text "" _  ) = True
+  elemIsEmpty (Text _  _  ) = False
+  elemIsEmpty (Link _ xs _) = all elemIsEmpty $ unInlines xs
+  elemIsEmpty (Sbst xs env ys _) =
+    all elemIsEmpty $ unInlines xs <> unInlines env <> unInlines ys
+  elemIsEmpty (Horz xs) = all isEmpty xs
+  elemIsEmpty (Vert xs) = all isEmpty xs
+  elemIsEmpty (Parn _ ) = False
+  elemIsEmpty (PrHz _ ) = False
 
 infixr 6 <+>
 
 -- | Like `<>` but with a space in between
 (<+>) :: Inlines -> Inlines -> Inlines
-x <+> y
-  | isEmpty x = y
-  | isEmpty y = x
-  | otherwise = x <> " " <> y
+x <+> y | isEmpty x = y
+        | isEmpty y = x
+        | otherwise = x <> " " <> y
 
 -- |
 textE :: Text -> Inlines
@@ -154,7 +172,7 @@ substE before env after = Inlines $ Seq.singleton $ Sbst before env after []
 -- | Note: when there's only 1 Horz inside a Parn, convert it to PrHz
 parensE :: Inlines -> Inlines
 parensE (Inlines (Horz xs :<| Empty)) = Inlines $ Seq.singleton $ PrHz xs
-parensE others = Inlines $ Seq.singleton $ Parn others
+parensE others                        = Inlines $ Seq.singleton $ Parn others
 
 iconE :: String -> Inlines
 iconE s = Inlines $ Seq.singleton $ Icon s []
@@ -169,7 +187,8 @@ vertE = Inlines . pure . Vert
 
 punctuateAfterE :: Inlines -> [Inlines] -> [Inlines]
 punctuateAfterE _ [] = []
-punctuateAfterE delim xs = zipWith (<>) xs (replicate (length xs - 1) delim ++ [mempty])
+punctuateAfterE delim xs =
+  zipWith (<>) xs (replicate (length xs - 1) delim ++ [mempty])
 
 punctuateE :: Inlines -> [Inlines] -> Inlines
 punctuateE delim = horzE . punctuateAfterE delim
@@ -179,7 +198,7 @@ punctuateE delim = horzE . punctuateAfterE delim
 type ClassNames = [String]
 
 -- | Internal type, to be converted to JSON values
-data Inline 
+data Inline
   = Icon String ClassNames
   | Text Text ClassNames
   | Link Range Inlines ClassNames
@@ -198,14 +217,14 @@ data Inline
 instance ToJSON Inline
 
 instance Show Inline where
-  show (Icon s _) = s
-  show (Text s _) = Text.unpack s
-  show (Link _ xs _) = show xs
-  show (Sbst xs env _ _) = show xs <> show env 
-  show (Horz xs) = unwords (map show $ toList xs)
-  show (Vert xs) = unlines (map show $ toList xs)
-  show (Parn x) = "(" <> show x <> ")"
-  show (PrHz xs) = "(" <> unwords (map show $ toList xs) <> ")"
+  show (Icon s _       ) = s
+  show (Text s _       ) = Text.unpack s
+  show (Link _ xs _    ) = show xs
+  show (Sbst xs env _ _) = show xs <> show env
+  show (Horz xs        ) = unwords (map show $ toList xs)
+  show (Vert xs        ) = unlines (map show $ toList xs)
+  show (Parn x         ) = "(" <> show x <> ")"
+  show (PrHz xs        ) = "(" <> unwords (map show $ toList xs) <> ")"
 
 instance Pretty Inline where
   pretty = pretty . show

@@ -180,7 +180,7 @@ generateResponseAndDiagnosticsFromResult (Right (pos, specs, globalProps, warnin
     let globalPropsSection = if null globalProps
           then []
           else map
-            (\expr -> blockE (Just "Property") (fromLoc (locOf expr)) (render expr))
+            (\expr -> Block (Just "Property") (fromLoc (locOf expr)) Plain (render expr))
             globalProps
     let specsSection =
           if null overlappedSpecs then [] else map renderBlock overlappedSpecs
