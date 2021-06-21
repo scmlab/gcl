@@ -3,8 +3,6 @@
 
 module Render.Syntax.Abstract where
 
-import Data.Loc (locOf)
-import Data.Loc.Range
 import qualified Data.Map as Map
 import Pretty.Variadic (Variadic (..), var)
 import Render.Class
@@ -60,8 +58,8 @@ instance Render Lit where
 --------------------------------------------------------------------------------
 
 -- | Expr
-instance RenderBlock Expr where
-  renderBlock expr = blockE Nothing (fromLoc (locOf expr)) (render expr)
+-- instance RenderBlock Expr where
+--   renderBlock expr = blockE Nothing (fromLoc (locOf expr)) (render expr)
 
 instance Render Expr where
   renderPrec n expr = case handleExpr n expr of

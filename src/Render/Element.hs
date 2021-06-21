@@ -7,7 +7,6 @@ module Render.Element
     blockE,
     proofObligationE,
     specE,
-    headerE,
     Inlines (..),
     textE,
     linkE,
@@ -47,8 +46,6 @@ data Block
   | -- for Proof Obligations
     -- header + range + predicate
     PO (Maybe String) (Maybe Range) Inlines
-  | -- for headers
-    Header String
   deriving (Eq, Generic)
 
 -- Represent Block with String literals
@@ -62,7 +59,6 @@ instance Pretty Block where
   pretty (Block (Just header) (Just range) inlines) = "< " <> pretty header <> " >" <> line <> pretty inlines <> "at " <> pretty range
   pretty (Spec range pre post) = pretty $ Block Nothing (Just range) (vertE [pre, "=>", post])
   pretty (PO header range p) = pretty $ Block header range p
-  pretty (Header header) = "# " <> pretty header
 
 instance ToJSON Block
 
@@ -77,10 +73,6 @@ proofObligationE = PO
 -- | Constructor for `Spec`
 specE :: Range -> Inlines -> Inlines -> Block
 specE = Spec
-
--- | Constructor for `Header`
-headerE :: String -> Block
-headerE = Header
 
 --------------------------------------------------------------------------------
 
