@@ -41,6 +41,12 @@ instance RenderBlock TypeError where
   renderBlock (TooManyExprsInAssigment exprs loc) =
     Block (Just "Too Many Expressions") (fromLoc loc) Red $
       "Expressions" <+> renderManySepByComma (toList exprs) <+> "do not have corresponing variables in the assigment"
+  renderBlock (AssignToConst n loc) =
+    Block (Just "Assginment to Constant Declaration") (fromLoc loc) Red $
+      "Declaration" <+> render n <+> "is a constant, not a variable"
+  renderBlock (AssignToLet n loc) = 
+    Block (Just "Assginment to Let Declaration") (fromLoc loc) Red $
+      "Declaration" <+> render n <+> "is a let binding, not a variable"
 
 instance RenderBlock StructError where
   renderBlock (MissingAssertion loc) =

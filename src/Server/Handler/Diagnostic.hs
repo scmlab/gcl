@@ -86,7 +86,18 @@ instance Collect TypeError Diagnostic where
       $   "Expressions"
       <+> prettyList (toList exprs)
       <+> "do not have corresponing variables in the assigment"
-
+  collect (AssignToConst n loc) = 
+    makeError loc "Assginment to Constant Declaration"
+      $ docToText
+      $ "Declaration"
+      <+> pretty n
+      <+> "is a constant, not a variable"
+  collect (AssignToLet n loc) = 
+    makeError loc "Assginment to Let Declaration"
+      $ docToText
+      $ "Declaration"
+      <+> pretty n
+      <+> "is a let binding, not a variable"
 
 instance Collect StructWarning Diagnostic where
   collect (MissingBound range) = makeWarning

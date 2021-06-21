@@ -18,7 +18,6 @@ import Prelude hiding (Ordering (..))
 import GCL.Common
 import Control.Monad.State (StateT(..), evalStateT)
 
-
 data TypeError
   = NotInScope Name Loc
   | UnifyFailed Type Type Loc
@@ -27,6 +26,8 @@ data TypeError
   | -- TODO: move these to scope checking 
     NotEnoughExprsInAssigment (NonEmpty Name) Loc
   | TooManyExprsInAssigment (NonEmpty Expr) Loc
+  | AssignToConst Name Loc
+  | AssignToLet Name Loc
   deriving (Show, Eq, Generic)
 
 instance ToJSON TypeError
@@ -38,6 +39,8 @@ instance Located TypeError where
   locOf (NotFunction _ l) = l
   locOf (NotEnoughExprsInAssigment _ l) = l
   locOf (TooManyExprsInAssigment _ l) = l
+  locOf (AssignToConst _ l) = l
+  locOf (AssignToLet _ l) = l
 
 ------------------------------------------
 -- type enviornment
@@ -69,8 +72,8 @@ type TM = StateT FreshState (Except TypeError)
 
 instance Fresh Infer where
   fresh = do
-    i <- get 
-    (put . succ) i 
+    i <- get
+    (put . succ) i
     return i
 
 runSolver :: Env Type ->  Infer Type -> TM (Type, [Constraint])
@@ -221,7 +224,7 @@ checkStmt :: Env Type -> Stmt -> TM ()
 checkStmt _ (Skip _) = return ()
 checkStmt _ (Abort _) = return ()
 checkStmt env (Assign ns es loc) -- NOTE : Not sure if Assign work this way
-  | length ns > length es = let extraVars = drop (length es) ns in 
+  | length ns > length es = let extraVars = drop (length es) ns in
     throwError $
       NotEnoughExprsInAssigment
         (NE.fromList extraVars)
@@ -255,8 +258,27 @@ checkStmt _ (Proof _) = return ()
 --   where
 --     expr' = foldr (\x b -> Lam x b (b <--> locOf x)) body xs
 
+-- NOTE : should this be check here?
+checkIsVarAssign :: [Declaration] -> Stmt -> TM ()
+checkIsVarAssign declarations (Assign ns _ _) =
+  let (_, cs, ls) = splitDecls declarations in
+  forM_ ns (\n ->
+    if n `elem` cs
+    then throwError $ AssignToConst n (locOf n)
+    else when (n `elem` ls) $ throwError $ AssignToLet n (locOf n)
+  )
+  where
+    splitDecls [] = ([], [], [])
+    splitDecls (d : ds) = let (vs, cs, ls) = splitDecls ds in
+      case d of
+        VarDecl n _ _ _ -> (n ++ vs, cs, ls)
+        ConstDecl n _ _ _ -> (vs, n ++ cs, ls)
+        LetDecl n _ _ _ -> (vs, cs, n : ls)
+checkIsVarAssign _ _ = return ()
+
 checkProg :: Program -> TM ()
 checkProg (Program decls exprs defs stmts _) = do
+  mapM_ (checkIsVarAssign decls) stmts
   env <- foldM inferDecl emptyEnv decls
   mapM_ (checkExpr env) exprs
   mapM_ (checkAssign env) (Map.toList defs)
