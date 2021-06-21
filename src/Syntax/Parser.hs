@@ -157,7 +157,9 @@ pBlockDecl = do
 ------------------------------------------
 
 pStmts :: Parser [Stmt]
-pStmts = many (pStmt <* scn) <?> "statements"
+pStmts = (↓) (pIndentBlock (lift pStmt)) scn <|> return []
+-- pStmts = many (pStmt <* scn)
+
 
 -- NOTE :: this function doesn't consume newline after finish parsing the statement
 pStmt :: Parser Stmt
@@ -481,12 +483,12 @@ pIndentBlock p = do
   done <- isJust <$> optional eof
   case (isEol, done) of
     (Just _, False) -> do
-      ps <- lift $ indentedItems (posMoveLeft pos 1) pos scn p'
+      ps <- lift $ indentedItems pos pos scn p'
       return (p0 : ps)
     _ -> return [p0]                          -- eof or no newline => only one indented element
   where
     p' = (↓) p sc                             -- make sure p doesn't parse newline
-    posMoveLeft pos i = mkPos (unPos pos - i) -- safe, since pos should be greater than ref,
+    -- posMoveLeft pos i = mkPos (unPos pos - i) -- safe, since pos should be greater than ref,
                                               -- by the definition of ParserF 
 
 -- copied from Text.Megaparsec.Char.Lexer
@@ -507,6 +509,8 @@ indentedItems ref lvl sc' p = go
         then return []
         else
           if
-              | pos <= ref -> return []
+              | pos < lvl -> return []
               | pos == lvl -> (:) <$> p <*> go
               | otherwise -> Lex.incorrectIndent Ord.EQ lvl pos
+
+              --   | pos <= ref -> return []
