@@ -6,7 +6,7 @@ import Data.List (partition)
 import qualified Data.Map as Map
 import Data.Maybe (mapMaybe)
 import Syntax.Abstract
-import Syntax.Abstract.Util ( extractAssertion, extractLetBinding )
+import Syntax.Abstract.Util ( extractAssertion, extractLetBinding, extractDeclaration )
 import Syntax.Common
 
 constExpr :: [Name] -> Expr -> Bool
@@ -32,3 +32,6 @@ pickGlobals = partition (constExpr []) . mapMaybe extractAssertion
 -- extract let bindings in declarations
 pickLetBindings :: [Declaration] -> Defns
 pickLetBindings = Map.fromList . mapMaybe extractLetBinding
+
+pickDeclarations :: [Declaration] -> [Declaration]
+pickDeclarations = mapMaybe extractDeclaration

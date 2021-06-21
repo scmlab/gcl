@@ -10,14 +10,16 @@ import Data.Aeson (ToJSON)
 import Data.Loc (Loc (..), Located (..))
 import Data.Loc.Range (Range, fromLoc)
 import qualified Data.Map as Map
-import GCL.Common (Fresh (fresh, freshText), Subs, Substitutable (subst))
+import GCL.Common (Fresh (fresh, freshText), Subs, Substitutable (subst), alphaRename)
 import GCL.Predicate (Origin (..), PO (..), Pred (..), Spec (Specification))
 import GCL.Predicate.Util (conjunct, disjunct, guardIf, guardLoop, toExpr)
 import GHC.Generics (Generic)
 import qualified Syntax.Abstract as A
 import qualified Syntax.Abstract.Operator as A
 import qualified Syntax.Abstract.Util as A
+import qualified Syntax.ConstExpr as A
 import Syntax.Common (Name (Name))
+import qualified Data.Set as Set
 
 type TM = Except StructError
 
@@ -33,8 +35,8 @@ runWP :: WP a -> Subs A.Expr -> Either StructError (a, ([PO], [Spec], [StructWar
 runWP p defs = runExcept $ evalRWST p defs (0, 0, 0)
 
 sweep :: A.Program -> Either StructError ([PO], [Spec], [StructWarning])
-sweep (A.Program _ _ ds stmts _) = do
-  snd <$> runWP (structProgram stmts) ds
+sweep (A.Program decls _ ds stmts _) = do
+  snd <$> runWP (structProgram decls stmts) ds
 
 data ProgView
   = ProgViewEmpty
@@ -57,9 +59,18 @@ progView stmts = do
       ProgViewMissingPrecondition (init stmts) (Assertion post m)
     _ -> ProgViewMissingBoth stmts
 
-structProgram :: [A.Stmt] -> WP ()
-structProgram stmts = do
-  env <- Map.map Right <$> ask :: WP (Subs A.Bindings)
+alphaRenameDefns :: [A.Declaration] -> A.Defns -> WP A.Defns
+alphaRenameDefns decls dfns = do
+  let ns = Set.fromList $ Map.keys dfns ++ concatMap extractNames (A.pickDeclarations decls)
+  mapM (alphaRename ns) dfns
+  where
+    extractNames (A.ConstDecl ns _ _ _) = ns
+    extractNames (A.VarDecl ns _ _ _) = ns
+    extractNames (A.LetDecl n _ _ _) = [n]
+
+structProgram :: [A.Declaration] -> [A.Stmt] -> WP ()
+structProgram decls stmts = do
+  env <- Map.map Right <$> (ask >>= alphaRenameDefns decls):: WP (Subs A.Bindings)
 
   case progView (subst env stmts) of
     ProgViewEmpty -> return ()

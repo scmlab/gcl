@@ -26,14 +26,15 @@ class ToAbstract a b | a -> b where
 
 -- | Program / Declaration / Statement
 instance ToAbstract Program A.Program where
-  toAbstract (Program decls' stmts') = do
+  toAbstract prog@(Program decls' stmts') = do
     decls <- concat <$> forM decls' toAbstract
+    -- let declarations = ConstExpr.pickDeclarations decls
     let letBindings = ConstExpr.pickLetBindings decls
     let (globProps, assertions) = ConstExpr.pickGlobals decls
     let pre = [A.Assert (A.conjunct assertions) NoLoc | not (null assertions)]
     stmts <- mapM toAbstract stmts'
 
-    return $ A.Program decls globProps letBindings (pre ++ stmts) (decls' <--> stmts)
+    return $ A.Program decls globProps letBindings (pre ++ stmts) (locOf prog)
 
 instance ToAbstract Declaration A.Declaration where
   toAbstract declaration = case declaration of
