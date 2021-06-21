@@ -17,7 +17,7 @@ binary op x y = App (App (Op (ArithOp op)) x (x <--> op)) y (x <--> y)
 chain :: ChainOp -> Expr -> Expr -> Expr
 chain op x y = Chain x (ChainOp op) y (x <--> y)
 
-lt, gt, gte, lte, eqq, conj, disj, implies :: Expr -> Expr -> Expr
+lt, gt, gte, lte, eqq, conj, disj, implies, add :: Expr -> Expr -> Expr
 lt = (chain . LT) NoLoc
 gt = (chain . GT) NoLoc
 gte = (chain . GTEU) NoLoc
@@ -26,6 +26,7 @@ eqq = (chain . EQ) NoLoc
 conj = (binary . ConjU) NoLoc
 disj = (binary . DisjU) NoLoc
 implies = (binary . ImpliesU) NoLoc
+add = (binary . Add) NoLoc
 
 neg :: Expr -> Expr
 neg = (unary . NegU) NoLoc
@@ -64,4 +65,17 @@ number n = Lit (Num n) NoLoc
 
 exists :: [Name] -> Expr -> Expr -> Expr
 exists xs ran term =
-  Quant (Op (QuantOp (Exists NoLoc))) xs ran term NoLoc
+  Quant (Op (ArithOp (DisjU NoLoc))) xs ran term NoLoc
+
+forAll :: [Name] -> Expr -> Expr -> Expr
+forAll xs ran term =
+  Quant (Op (ArithOp (ConjU NoLoc))) xs ran term NoLoc
+
+pointsTo, sConj, sImp :: Expr -> Expr -> Expr
+pointsTo = (binary . PointsTo) NoLoc
+sConj = (binary . SConj) NoLoc
+sImp = (binary . SImp) NoLoc
+
+sconjunct :: [Expr] -> Expr
+sconjunct [] = true
+sconjunct xs = foldl1 sConj xs

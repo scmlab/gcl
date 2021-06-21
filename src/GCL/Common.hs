@@ -4,9 +4,10 @@ module GCL.Common where
 
 import Data.Text(Text)
 import qualified Data.Text as Text
+import Data.Loc (Loc (..))
 import Control.Monad (liftM2)
 import Data.Map (Map)
-import Syntax.Common (Name)
+import Syntax.Common (Name(..))
 import Data.Set (Set, (\\))
 import qualified Data.Map as Map
 import qualified Data.Set as Set
@@ -20,12 +21,15 @@ class Monad m => Fresh m where
   fresh :: m Int
   freshText :: m Text
   freshTexts :: Int -> m [Text]
+  freshName :: m Name
 
   freshText =
     (\i -> Text.pack ("?m_" ++ show i)) <$> fresh
 
   freshTexts 0 = return []
   freshTexts n = liftM2 (:) freshText (freshTexts (n - 1))
+
+  freshName = (\v -> Name v NoLoc) <$> freshText
 
 type FreshState = Int
 

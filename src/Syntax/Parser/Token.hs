@@ -224,9 +224,6 @@ tokMax = "↑"
 tokMin :: Text
 tokMin = "↓"
 
-tokValAt :: Text
-tokValAt = "*"
-
 tokPointsTo :: Text
 tokPointsTo = "↦"
 

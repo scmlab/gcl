@@ -52,8 +52,8 @@ instance Located Declaration where
 data Stmt
   = Skip Loc
   | Abort Loc
-  | Assign [Name] [Expr] Loc
-  | AAssign Expr Expr Expr Loc -- a[i] := e
+  | Assign [Name] [Expr] Loc   -- xs := es
+  | AAssign Expr Expr Expr Loc -- e1[i] := e2
   | Assert Expr Loc
   | LoopInvariant Expr Expr Loc
   | Do [GdCmd] Loc
@@ -61,10 +61,10 @@ data Stmt
   | Spec Text Range
   | Proof Loc
     -- pointer operations
-  | Alloc   Name [Expr] Loc  -- p := new (e1,e2,..,en)
-  | HLookup Name Expr Loc    -- x := e*
-  | HMutate Expr Expr Loc    -- e1* := e2
-  | Dispose Expr Loc         -- free e
+  | Alloc   Name [Expr] Loc    --  p := new (e1,e2,..,en)
+  | HLookup Name Expr Loc      --  x := *e
+  | HMutate Expr Expr Loc      --  *e1 := e2
+  | Dispose Expr Loc           --  free e
   deriving (Eq, Show)
 
 data GdCmd = GdCmd Expr [Stmt] Loc deriving (Eq, Show)
