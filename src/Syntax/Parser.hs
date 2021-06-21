@@ -5,7 +5,7 @@
 
 module Syntax.Parser where
 
-import Control.Applicative.Combinators (choice, eitherP, many, optional, sepBy1, (<|>), manyTill)
+import Control.Applicative.Combinators (choice, eitherP, many, optional, sepBy1, (<|>), manyTill, some)
 import Control.Monad (void)
 import Control.Monad.Combinators.Expr (Operator (..), makeExprParser)
 import Control.Monad.Trans (lift)
@@ -331,19 +331,30 @@ arithTable =
     [Prefix . pUnary . choice $ [lexNeg, lexNegU]]
   ]
 
-pTerm :: ParserF Expr
-pTerm = choice [try pArray, pTerm']
+-- pTerm :: ParserF Expr
+-- pTerm = choice [try pArray, pTerm']
 
 -- To avoid stuck at parsing terms other than array
-pTerm' :: ParserF Expr
-pTerm' = choice [pParen, pVar, pConst, pLit, pQuant] <?> "term"
+pTerm :: ParserF Expr
+pTerm = choice [pLit, try pArray, pParen, pVar, pConst, pQuant] <?> "term"
 
 pParen :: ParserF Expr
 pParen = Paren <$> lexParenStart <*> pExpr' <*> lexParenEnd
 
--- Allow A[A[i]]
+-- Allow A[A[i]], A[i1][i2]...[in]
 pArray :: ParserF Expr
-pArray = Arr <$> pTerm' <*> lexBracketStart <*> pTerm <*> lexBracketEnd
+pArray = do
+  arr <- choice [pParen, pVar, pConst]
+  is <- some $ do
+    bs <- lexBracketStart 
+    i <- pExprArith
+    be <- lexBracketEnd 
+    return (bs, i, be)
+  return $ pArrayHelper arr is
+  where
+    pArrayHelper :: Expr -> [(Token "[", Expr, Token "]")] -> Expr
+    pArrayHelper a [] = a
+    pArrayHelper a ((bs, i, be):is) = pArrayHelper (Arr a bs i be) is
 
 pLit :: ParserF Expr
 pLit = Lit <$> lexLits
