@@ -68,7 +68,7 @@ instance Pretty Origin where
 
 -- | Obligation & Specification
 instance Pretty PO where
-  pretty = fromRenderBlock
+  pretty = fromRenderSection
 
 instance Pretty Spec where
-  pretty = fromRenderBlock
+  pretty = fromRenderSection

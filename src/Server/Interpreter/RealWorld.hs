@@ -95,7 +95,7 @@ sendDiagnostics filepath diagnostics = do
 handleErrors :: FilePath -> Either [Error] [ResKind] -> ServerM [ResKind]
 handleErrors filepath (Left errors) = do 
   version <- bumpVersionM
-  let responses = [ResDisplay version (map renderBlock errors), ResUpdateSpecs []]
+  let responses = [ResDisplay version (map renderSection errors), ResUpdateSpecs []]
   let diagnostics = errors >>= collect
   -- send diagnostics
   sendDiagnostics filepath diagnostics
