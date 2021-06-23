@@ -43,6 +43,7 @@ instance Located Stmt where
   locOf (Skip l) = l
   locOf (Abort l) = l
   locOf (Assign l _ r) = l <--> r
+  locOf (AAssign l _ _ _ _ r) = l <--> r
   locOf (Assert l _ r) = l <--> r
   locOf (LoopInvariant l _ _ _ _ _ r) = l <--> r
   locOf (Do l _ r) = l <--> r
