@@ -31,7 +31,7 @@ import           Server.CustomMethod
 import           Server.Handler.Diagnostic      ( )
 import           Server.Stab                    ( collect )
 import qualified Syntax.Abstract               as A
-import           Syntax.Concrete.ToAbstract
+import Syntax.Concrete.ToAbstract ( ToAbstract(toAbstract) )
 import           Syntax.Parser                  ( Parser
                                                 , pProgram
                                                 , pStmts

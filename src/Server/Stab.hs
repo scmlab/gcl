@@ -2,35 +2,85 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FlexibleContexts #-}
 module Server.Stab
-  ( Stab(..)
-  , stabMaybe
-  , StabM(..)
-  , stabMaybeM
-  , stabbed
-  , stabbed'
-  , whenInRange
-  , whenInRange'
+  ( StabM(..)
+  , stabRanged
+  , stabLocated
+  , HasPosition(..)
+  , Scope
+  , HasScopes(..)
+  , lookupScopes
   , Collect(..)
   ) where
 
-import           Data.Loc                       ( Located(locOf), Loc )
+import           Data.Loc                       ( Located(locOf) )
 import           Data.Loc.Range
+import           Data.Map                       ( Map )
+import qualified Data.Map                      as Map
+import           Data.Text                      ( Text )
 import qualified Language.LSP.Types            as J
 import qualified Server.Util                   as J
 
 --------------------------------------------------------------------------------
 
--- | O(n), should improve the time complexity with some segment tree
-class Stab a b where
-  stab :: J.Position -> a -> [b]
+-- | Like `Stab` but in some context
+class StabM m a b where
+  stabM :: (Monad m, HasPosition m, StabM m a b) => a -> m [b]
 
-stabMaybe :: Stab a b => J.Position -> a -> Maybe b
-stabMaybe pos node = case stab pos node of
-  []      -> Nothing
-  (x : _) -> Just x
+stabRanged :: (Monad m, Ranged a, HasPosition m, StabM m a b) => a -> m [b]
+stabRanged node = do
+  pos <- askPosition
+  if pos `stabbedRanged` rangeOf node then stabM node else return []
 
-stabbed :: Ranged a => J.Position -> a -> Bool
-stabbed position node =
+stabLocated :: (Monad m, Located a, HasPosition m, StabM m a b) => a -> m [b]
+stabLocated node = do
+  pos <- askPosition
+  if pos `stabbedLocated` locOf node then stabM node else return []
+
+instance (Monad m, StabM m a b) => StabM m (Maybe a) b where
+  stabM Nothing  = return []
+  stabM (Just x) = stabM x
+
+instance (Monad m, StabM m a b) => StabM m [a] b where
+  stabM xs = concat <$> mapM stabM xs
+
+
+--------------------------------------------------------------------------------
+-- HasPosition
+
+class HasPosition m where
+  askPosition :: m J.Position
+
+--------------------------------------------------------------------------------
+-- HasScopes
+
+class HasScopes m a where
+  askScopes :: m [Scope a]
+  -- temporarily preppend a local scope to the scope list 
+  localScope :: Scope a -> m b -> m b
+
+lookupScopes :: (HasScopes m a, Monad m) => Text -> m (Maybe a)
+lookupScopes name = do
+  scopes <- askScopes
+  return $ lookupScopesPrim scopes name
+
+-- | A "Scope" is a mapping of names and LocationLinks
+type Scope a = Map Text a
+
+-- | See if a name is in a series of scopes (from local to global)
+-- | Return the first result (which should be the most local target)
+lookupScopesPrim :: [Scope a] -> Text -> Maybe a
+lookupScopesPrim scopes name = foldl findFirst Nothing scopes
+ where
+  findFirst :: Maybe a -> Scope a -> Maybe a
+  findFirst (Just found) _     = Just found
+  findFirst Nothing      scope = Map.lookup name scope
+
+
+--------------------------------------------------------------------------------
+-- helper functions 
+
+stabbedRanged :: Ranged a => J.Position -> a -> Bool
+stabbedRanged position node =
   let Range start end = rangeOf node
   in  J.toPos start `cmp` position /= GT && position `cmp` J.toPos end /= GT
  where
@@ -41,8 +91,8 @@ stabbed position node =
       EQ -> colA `compare` colB
       GT -> GT
 
-stabbed' :: Located a => J.Position -> a -> Bool
-stabbed' position node = case fromLoc (locOf node) of
+stabbedLocated :: Located a => J.Position -> a -> Bool
+stabbedLocated position node = case fromLoc (locOf node) of
   Nothing -> False
   Just (Range start end) ->
     J.toPos start `cmp` position /= GT && position `cmp` J.toPos end /= GT
@@ -53,36 +103,6 @@ stabbed' position node = case fromLoc (locOf node) of
       LT -> LT
       EQ -> colA `compare` colB
       GT -> GT
-
---------------------------------------------------------------------------------
-
--- | Like `Stab` but in some context
-class StabM m a b where
-  stabM :: J.Position -> a -> m [b]
-
-instance (Monad m, StabM m a b) => StabM m (Maybe a) b where
-  stabM _   Nothing  = return []
-  stabM pos (Just x) = stabM pos x
-
-instance (Monad m, StabM m a b) => StabM m [a] b where
-  stabM pos xs = concat <$> mapM (stabM pos) xs
-
-whenInRange :: (Monad m) => J.Position -> Range -> m [a] -> m [a]
-whenInRange pos range f = if pos `stabbed` range
-  then f
-  else return []
-
-whenInRange' :: (Monad m) => J.Position -> Loc -> m [a] -> m [a]
-whenInRange' pos range f = if pos `stabbed'` range
-  then f
-  else return []
-
-stabMaybeM :: (Monad m, StabM m a b) => J.Position -> a -> m (Maybe b)
-stabMaybeM pos node = do
-  result <- stabM pos node
-  case result of
-    []      -> return Nothing
-    (x : _) -> return (Just x)
 
 --------------------------------------------------------------------------------
 
