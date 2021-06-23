@@ -110,12 +110,9 @@ handleExpr _ (ArrUpd e1 e2 e3 _) =
     -- SCM: need to print parenthesis around e1 when necessary.
 
 instance Render Subst where
-<<<<<<< HEAD
-=======
   render = render . fst . Map.mapEither id
 
 instance Render (Map Name Expr) where
->>>>>>> master
   render env
     | null env = mempty
     | otherwise = "[" <+> exprs <+> "/" <+> vars <+> "]"

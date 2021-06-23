@@ -153,10 +153,10 @@ struct :: Bool -> (Pred, Maybe A.Expr) -> A.Stmt -> Pred -> WP ()
 struct _ (pre, _) (A.Abort l) _ = tellPO pre (Constant A.false) (AtAbort l)
 struct _ (pre, _) (A.Skip l) post = tellPO pre post (AtSkip l)
 struct _ (pre, _) (A.Assign xs es l) post = do
-  let sub = Map.fromList . zip xs . map Left $ es :: Subs Bindings
+  let sub = Map.fromList . zip xs . map Left $ es :: Subs A.Bindings
   tellPO pre (subst sub post) (AtAssignment l)
 struct _ (pre, _) (A.AAssign (A.Var x _) i e l) post = do
-     let sub = Map.fromList [(x, Left (A.ArrUpd (A.nameVar x) i e l))] :: Subs Bindings
+     let sub = Map.fromList [(x, Left (A.ArrUpd (A.nameVar x) i e l))] :: Subs A.Bindings
      tellPO pre (subst sub post) (AtAssignment l)
 struct _ (_, _) (A.AAssign _ _ _ l) _ =
   throwError (MultiDimArrayAsgnNotImp l)
@@ -241,24 +241,12 @@ wp :: Bool -> A.Stmt -> Pred -> WP Pred
 wp _ (A.Abort _) _ = return (Constant A.false)
 wp _ (A.Skip _) post = return post
 wp _ (A.Assign xs es _) post = do
-  let sub = Map.fromList . zip xs . map Left $ es :: Subs Bindings
+  let sub = Map.fromList . zip xs . map Left $ es :: Subs A.Bindings
   return $ subst sub post
-<<<<<<< HEAD
 wp _ (A.AAssign (A.Var x _) i e _) post = do
-  let sub = Map.fromList [(x, Left (A.ArrUpd (A.nameVar x) i e NoLoc))] :: Subs Bindings
+  let sub = Map.fromList [(x, Left (A.ArrUpd (A.nameVar x) i e NoLoc))] :: Subs A.Bindings
   return $ subst sub post
 wp _ (A.AAssign _ _ _ l) _ = throwError (MultiDimArrayAsgnNotImp l)
-=======
-  where
-    sub :: Subs A.Bindings
-    sub = Map.fromList . zip xs . map Left $ es
-wp _ (A.Assert p l) post = do
-  tellPO (Assertion p l) post (AtAssertion l)
-  return (Assertion p l)
-wp _ (A.LoopInvariant p b l) post = do
-  tellPO (LoopInvariant p b l) post (AtAssertion l)
-  return (LoopInvariant p b l)
->>>>>>> master
 wp _ (A.Do _ l) _ = throwError $ MissingAssertion l
 wp b (A.If gcmds _) post = do
   pres <- forM gcmds $ \(A.GdCmd guard body _) ->
@@ -328,14 +316,14 @@ sp _ (pre, _) (A.Assign xs es l) = do
   where
     genFrNames :: [a] -> WP [Name]
     genFrNames ys = map (\x -> Name x l) <$> mapM (const freshText) ys
-    genSub :: [Name] -> [Name] -> Subs Bindings
+    genSub :: [Name] -> [Name] -> Subs A.Bindings
     genSub ys hs = Map.fromList . zip ys . map (Left . A.nameVar) $ hs
     -- genEq :: Name -> A.Expr -> A.Expr
     genEq sub x e = A.nameVar x `A.eqq` (subst sub e)
 sp _ (pre, _) (A.AAssign (A.Var x _) i e _) = do
      -- {P} x[I] := E { (exist x' :: x = x'[I[x'/x] -> E[x'/x]] && P[x'/x]) }
    x' <- freshText
-   let sub = Map.fromList [(x, Left (A.variable x'))] :: Subs Bindings
+   let sub = Map.fromList [(x, Left (A.variable x'))] :: Subs A.Bindings
    return $ Constant (
      A.exists [Name x' NoLoc]
       (A.nameVar x `A.eqq` A.ArrUpd (A.variable x') (subst sub i) (subst sub e) NoLoc)

@@ -79,7 +79,7 @@ instance Free A.Expr where
   fv (A.ArrIdx e1 e2 _) = fv e1 <> fv e2
   fv (A.ArrUpd e1 e2 e3 _) = fv e1 <> fv e2 <> fv e3
 
-instance Free Bindings where
+instance Free A.Bindings where
   fv (Left expr) = fv expr
   fv (Right expr) = fv expr
 
@@ -116,7 +116,6 @@ instance Substitutable A.Expr A.Expr where
   subst s (A.Lam x e l) =
     let s' = Map.withoutKeys s (Set.singleton x) in
     A.Lam x (subst s' e) l
-  -
   subst _ h@A.Hole {} = h
   subst s (A.Quant qop xs rng t l) =
     let s' = Map.withoutKeys s (Set.fromList xs) in
