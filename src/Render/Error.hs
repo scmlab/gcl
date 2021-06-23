@@ -47,6 +47,11 @@ instance RenderSection TypeError where
     [ Header "Not a function" (fromLoc loc)
     , Paragraph $ "The type" <+> render t <+> "is not a function type"
     ]
+  renderSection (NotArray t loc) = Section
+    Red
+    [ Header "Not an array" (fromLoc loc)
+    , Paragraph $ "The type" <+> render t <+> "is not an array"
+    ]
   renderSection (NotEnoughExprsInAssigment vars loc) = Section
     Red
     [ Header "Not Enough Expressions" (fromLoc loc)
@@ -68,7 +73,6 @@ instance RenderSection TypeError where
     [ Header "Assginment to Constant Declaration" (fromLoc loc)
     , Paragraph $ "Declaration" <+> render n <+> "is a constant, not a variable"
     ]
-
   renderSection (AssignToLet n loc) = Section
     Red
     [ Header "Assginment to Let Declaration" (fromLoc loc)
@@ -88,4 +92,9 @@ instance RenderSection StructError where
     Red
     [ Header "Missing Postcondition" (fromLoc loc)
     , Paragraph "The last statement of the program should be an assertion"
+    ]
+  renderSection (MultiDimArrayAsgnNotImp loc) = Section
+    Red
+    [ Header "Assignment to Multi-Dimensional Array" (fromLoc loc)
+    , Paragraph "Not implemented yet"
     ]

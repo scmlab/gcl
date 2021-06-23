@@ -30,7 +30,7 @@ data Program
       Loc
   deriving (Eq, Show)
 
-type Defns = Map Name Expr 
+type Defns = Map Name Expr
 
 --------------------------------------------------------------------------------
 
@@ -47,6 +47,7 @@ data Stmt
   = Skip Loc
   | Abort Loc
   | Assign [Name] [Expr] Loc
+  | AAssign Expr Expr Expr Loc
   | Assert Expr Loc
   | LoopInvariant Expr Expr Loc
   | Do [GdCmd] Loc
@@ -92,6 +93,8 @@ data Expr
   | Hole Loc
   | Quant Expr [Name] Expr Expr Loc
   | Subst Expr Subst Expr
+  | ArrIdx Expr Expr Loc
+  | ArrUpd Expr Expr Expr Loc
   deriving (Eq, Show, Generic)
 
 type QuantOp' = Either Op Expr

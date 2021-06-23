@@ -77,6 +77,8 @@ instance Free A.Expr where
   fv (A.Hole _) = mempty -- banacorn: `subs` has been always empty anyway
   -- concat (map freeSubst subs) -- correct?
   fv (A.Subst _ _ after) = fv after
+  fv (A.ArrIdx e1 e2 _) = fv e1 <> fv e2
+  fv (A.ArrUpd e1 e2 e3 _) = fv e1 <> fv e2 <> fv e3
 
 instance Free A.Bindings where
   fv = fv . A.bindingsToExpr
@@ -119,7 +121,11 @@ instance Substitutable A.Expr A.Expr where
     let s' = Map.withoutKeys s (Set.fromList xs) in
     A.Quant (subst s' qop) xs (subst s' rng) (subst s' t) l
   subst s1 (A.Subst before s2 after) = A.Subst (subst s1 before) s2 (subst s1 after)
-
+  subst s (A.ArrIdx e1 e2 l) =
+    A.ArrIdx (subst s e1) (subst s e2) l
+  subst s (A.ArrUpd e1 e2 e3 l) =
+    A.ArrUpd (subst s e1) (subst s e2) (subst s e3) l
+    
 singleBinding :: Name -> A.Bindings -> Subs A.Bindings
 singleBinding = Map.singleton
 
@@ -175,6 +181,11 @@ instance Substitutable A.Bindings A.Expr where
               then A.Subst b s' a'
               else A.Subst (A.Subst b s b3) s' a'
           _ -> A.Subst (A.Subst b s' a) s a'
+      A.ArrIdx e1 e2 l ->
+        A.ArrIdx (subst s e1) (subst s e2) l
+      A.ArrUpd e1 e2 e3 l ->
+        A.ArrUpd (subst s e1) (subst s e2) (subst s e3) l
+
 
 -- e1 [s] -> e2
 -- e1 [s] -> e2 [s//(n, e2)]
@@ -237,10 +248,14 @@ instance Substitutable A.Bindings Pred where
   subst s (Disjunct es) = Disjunct (subst s es)
   subst s (Negate x) = Negate (subst s x)
 
+  -- SCM: I don't think this is well-defined and I wonder whether
+  --      we ever need this. Applying a substitution to a statement
+  --      is not even syntatically correct in general.
 instance Substitutable A.Bindings A.Stmt where
   subst _ st@(A.Skip _) = st
   subst _ st@(A.Abort _) = st
   subst s (A.Assign ns es l) = A.Assign ns (subst s es) l
+  subst s (A.AAssign a i e l) = A.AAssign a (subst s i) (subst s e) l
   subst s (A.Assert e l) = A.Assert (subst s e) l
   subst s (A.LoopInvariant p bnd l) = A.LoopInvariant (subst s p) (subst s bnd) l
   subst s (A.Do gds l) = A.Do (subst s gds) l

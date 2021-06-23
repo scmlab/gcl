@@ -23,6 +23,7 @@ data TypeError
   | UnifyFailed Type Type Loc
   | RecursiveType Name Type Loc
   | NotFunction Type Loc
+  | NotArray    Type Loc
   | NotEnoughExprsInAssigment (NonEmpty Name) Loc
   | TooManyExprsInAssigment (NonEmpty Expr) Loc
   | AssignToConst Name Loc
@@ -36,6 +37,7 @@ instance Located TypeError where
   locOf (UnifyFailed _ _ l) = l
   locOf (RecursiveType _ _ l) = l
   locOf (NotFunction _ l) = l
+  locOf (NotArray _ l) = l
   locOf (NotEnoughExprsInAssigment _ l) = l
   locOf (TooManyExprsInAssigment _ l) = l
   locOf (AssignToConst _ l) = l
@@ -142,6 +144,30 @@ infer (Subst expr sub _) = do
   t <- infer expr
   s <- mapM infer (Map.map bindingsToExpr sub)
   return $ subst s t
+infer (ArrIdx e1 e2 l) = do
+  t1 <- infer e1
+  let interval = case t1 of
+        TArray itv _ _ -> itv
+        _ -> emptyInterval
+  t2 <- infer e2
+  unify t2 (TBase TInt l)
+  v <- freshVar l
+  unify t1 (TArray interval v l)
+  return v
+infer (ArrUpd e1 e2 e3 l) = do
+  t1 <- infer e1
+  let interval = case t1 of
+        TArray itv _ _ -> itv
+        _ -> emptyInterval
+  t2 <- infer e2
+  t3 <- infer e3
+  unify t2 (TBase TInt l)
+  unify t1 (TArray interval t3 l)
+  return t1
+
+emptyInterval :: Interval
+emptyInterval = Interval (Including zero) (Excluding zero) NoLoc
+  where zero = Lit (Num 0) NoLoc
 
 inferExpr :: Env Type -> Expr -> TM Type
 inferExpr env e = do
@@ -236,6 +262,13 @@ checkStmt env (Assign ns es loc) -- NOTE : Not sure if Assign work this way
         -- (locOf $ mergeRangesUnsafe (fromLocs $ map locOf extraExprs))
         loc
   | otherwise = forM_ (zip ns es) (checkAssign env)
+checkStmt env (AAssign x i e _) = do
+  tx <- inferExpr env x
+  case tx of
+   TArray _ t _ -> do
+      checkIsType env i (TBase TInt NoLoc)
+      checkIsType env e t
+   _ -> throwError $ NotArray tx (locOf x)
 checkStmt env (Assert expr _) = do
   checkPredicate env expr
 checkStmt env (LoopInvariant e1 e2 _) = do
@@ -300,8 +333,9 @@ emptyUnifier = (emptySubs, [])
 unifies :: Type -> Type -> TM (Subs Type)
 unifies (TBase t1 _) (TBase t2 _)
   | t1 == t2 = return emptySubs
-unifies (TArray i1 t1 _) (TArray i2 t2 _)
-  | i1 == i2 = unifies t1 t2
+unifies (TArray _ t1 _) (TArray _ t2 _) =
+  unifies t1 t2   {-  | i1 == i2 = unifies t1 t2 -}
+  -- SCM: for now, we do not check the intervals
 -- view array of type `t` as function type of `Int -> t`
 unifies (TArray _ t1 _) (TFunc (TBase TInt _) t2 _) =
   unifies t1 t2
@@ -356,9 +390,9 @@ inferOpTypes op = do
 chainOpTypes :: ChainOp -> Type
 chainOpTypes (EQProp l) = TFunc (TBase TBool l) (TFunc (TBase TBool l) (TBase TBool l) l) l
 chainOpTypes (EQPropU l) = TFunc (TBase TBool l) (TFunc (TBase TBool l) (TBase TBool l) l) l
-chainOpTypes (EQ l) = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TBool l) l) l          -- Don't care 
-chainOpTypes (NEQ l) = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TBool l) l) l         -- Don't care 
-chainOpTypes (NEQU l) = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TBool l) l) l        -- Don't care 
+chainOpTypes (EQ l) = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TBool l) l) l          -- Don't care
+chainOpTypes (NEQ l) = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TBool l) l) l         -- Don't care
+chainOpTypes (NEQU l) = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TBool l) l) l        -- Don't care
 chainOpTypes (LTE l) = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TBool l) l) l
 chainOpTypes (LTEU l) = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TBool l) l) l
 chainOpTypes (GTE l) = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TBool l) l) l
