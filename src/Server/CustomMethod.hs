@@ -16,7 +16,7 @@ import Pretty
 
 -- | Response
 data ResKind
-  = ResDisplay Int [Block]
+  = ResDisplay Int [Section]
   | ResUpdateSpecs [(Int, Text, Text, Range)]
   | ResConsoleLog Text
   deriving (Eq, Generic)

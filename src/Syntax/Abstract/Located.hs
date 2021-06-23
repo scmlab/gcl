@@ -8,6 +8,11 @@ import Prelude hiding (Ordering(..))
 instance Located Program where
   locOf (Program _ _ _ _ l) = l
 
+instance Located Declaration where
+  locOf (ConstDecl _ _ _ l) = l
+  locOf (VarDecl _ _ _ l) = l
+  locOf (LetDecl _ _ _ l) = l
+
 instance Located Stmt where
   locOf (Skip l) = l
   locOf (Abort l) = l
@@ -20,6 +25,9 @@ instance Located Stmt where
   locOf (Spec _ l) = locOf l
   locOf (Proof l) = l
 
+instance Located GdCmd where
+  locOf (GdCmd _ _ l) = l 
+  
 instance Located Endpoint where
   locOf (Including e) = locOf e
   locOf (Excluding e) = locOf e
@@ -34,7 +42,7 @@ instance Located Type where
   locOf (TVar _ l) = l
 
 instance Located Expr where
-  locOf (Paren e) = locOf e
+  locOf (Paren _ l) = l
   locOf (Var _ l) = l
   locOf (Const _ l) = l
   locOf (Lit _ l) = l

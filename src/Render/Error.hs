@@ -2,62 +2,95 @@
 
 module Render.Error where
 
-import Data.Loc.Range
-import Error
-import GCL.Type (TypeError (..))
-import GCL.WP (StructError (..))
-import Render.Class
-import Render.Element
-import Render.Syntax.Common ()
-import Render.Syntax.Abstract ()
-import Data.Foldable (toList)
+import           Data.Foldable                  ( toList )
+import           Data.Loc.Range
+import           Error
+import           GCL.Type                       ( TypeError(..) )
+import           GCL.WP                         ( StructError(..) )
+import           Render.Class
+import           Render.Element
+import           Render.Syntax.Abstract         ( )
+import           Render.Syntax.Common           ( )
 
-instance RenderBlock Error where
-  renderBlock (SyntacticError (pos, msg)) = blockE (Just "Parse Error") (Just $ Range pos pos) (render msg)
-  renderBlock (TypeError e) = renderBlock e
-  renderBlock (StructError e) = renderBlock e
-  renderBlock (CannotReadFile path) = blockE (Just "Cannot Read File") Nothing $ "\"" <> render path <> "\" does not exist"
-  renderBlock (Others msg) = blockE (Just "Server Internal Error") Nothing $ render msg
+instance RenderSection Error where
+  renderSection (SyntacticError (pos, msg)) = Section
+    Red
+    [Header "Parse Error" (Just $ Range pos pos), Paragraph $ render msg]
+  renderSection (TypeError      e   ) = renderSection e
+  renderSection (StructError    e   ) = renderSection e
+  renderSection (CannotReadFile path) = Section
+    Red
+    [ Header "Cannot Read File" Nothing
+    , Paragraph $ "\"" <> render path <> "\" does not exist"
+    ]
+  renderSection (Others msg) =
+    Section Red [Header "Server Internal Error" Nothing, Paragraph $ render msg]
 
-instance RenderBlock TypeError where
-  renderBlock (NotInScope name loc) =
-    blockE (Just "Not In Scope") (fromLoc loc) $
-      render name <+> "is not in scope"
-  renderBlock (UnifyFailed s t loc) =
-    blockE (Just "Cannot unify types") (fromLoc loc) $
-      "Cannot unify: " <> render s
-        <> "\nwith        :" <+> render t
-  renderBlock (RecursiveType name t loc) =
-    blockE (Just "Recursive type variable") (fromLoc loc) $
-      render name
-        <+> "is recursive in"
-        <+> render t
-  renderBlock (NotFunction t loc) =
-    blockE (Just "Not a function") (fromLoc loc) $
-      "The type" <+> render t <+> "is not a function type"
-  renderBlock (NotArray t loc) =
-    blockE (Just "Not an array") (fromLoc loc) $
-      "The type" <+> render t <+> "is not an array type"
-  renderBlock (NotEnoughExprsInAssigment vars loc) =
-    blockE (Just "Not Enough Expressions") (fromLoc loc) $
-      "Variables" <+> renderManySepByComma (toList vars) <+> "do not have corresponing expressions in the assigment"
-  renderBlock (TooManyExprsInAssigment exprs loc) =
-    blockE (Just "Too Many Expressions") (fromLoc loc) $
-      "Expressions" <+> renderManySepByComma (toList exprs) <+> "do not have corresponing variables in the assigment"
+instance RenderSection TypeError where
+  renderSection (NotInScope name loc) = Section
+    Red
+    [ Header "Not In Scope" (fromLoc loc)
+    , Paragraph $ render name <+> "is not in scope"
+    ]
+  renderSection (UnifyFailed s t loc) = Section
+    Red
+    [ Header "Cannot unify types" (fromLoc loc)
+    , Paragraph $ "Cannot unify: " <> render s <> "\nwith        :" <+> render t
+    ]
+  renderSection (RecursiveType name t loc) = Section
+    Red
+    [ Header "Recursive type variable" (fromLoc loc)
+    , Paragraph $ render name <+> "is recursive in" <+> render t
+    ]
+  renderSection (NotFunction t loc) = Section
+    Red
+    [ Header "Not a function" (fromLoc loc)
+    , Paragraph $ "The type" <+> render t <+> "is not a function type"
+    ]
+  renderSection (NotEnoughExprsInAssigment vars loc) = Section
+    Red
+    [ Header "Not Enough Expressions" (fromLoc loc)
+    , Paragraph
+    $   "Variables"
+    <+> renderManySepByComma (toList vars)
+    <+> "do not have corresponing expressions in the assigment"
+    ]
+  renderSection (TooManyExprsInAssigment exprs loc) = Section
+    Red
+    [ Header "Too Many Expressions" (fromLoc loc)
+    , Paragraph
+    $   "Expressions"
+    <+> renderManySepByComma (toList exprs)
+    <+> "do not have corresponing variables in the assigment"
+    ]
+  renderSection (AssignToConst n loc) = Section
+    Red
+    [ Header "Assginment to Constant Declaration" (fromLoc loc)
+    , Paragraph $ "Declaration" <+> render n <+> "is a constant, not a variable"
+    ]
 
-instance RenderBlock StructError where
-  renderBlock (MissingAssertion loc) =
-    blockE
-      (Just "Missing Loop Invariant")
-      (fromLoc loc)
-      "There should be a loop invariant before the DO construct"
-  renderBlock (MissingPostcondition loc) =
-    blockE
-      (Just "Missing Postcondition")
-      (fromLoc loc)
-      "The last statement of the program should be an assertion"
+  renderSection (AssignToLet n loc) = Section
+    Red
+    [ Header "Assginment to Let Declaration" (fromLoc loc)
+    , Paragraph
+    $   "Declaration"
+    <+> render n
+    <+> "is a let binding, not a variable"
+    ]
+
+instance RenderSection StructError where
+  renderSection (MissingAssertion loc) = Section
+    Red
+    [ Header "Missing Loop Invariant" (fromLoc loc)
+    , Paragraph "There should be a loop invariant before the DO construct"
+    ]
+  renderSection (MissingPostcondition loc) = Section
+    Red
+    [ Header "Missing Postcondition" (fromLoc loc)
+    , Paragraph "The last statement of the program should be an assertion"
+    ]
   renderBlock (MultiDimArrayAsgnNotImp loc) =
-    blockE
-      (Just "Assignment to Multi-Dimensional Array")
-      (fromLoc loc)
-      "Not implemented yet"
+    Red
+    [ Header "Assignment to Multi-Dimensional Array" (fromLoc loc)
+    , Paragraph "Not implemented yet"
+    ]

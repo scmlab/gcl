@@ -51,3 +51,13 @@ instance Pretty TypeError where
       <+> "Expressions"
       <+> pretty exprs
       <+> "do not have corresponing variables in the assigment"
+  pretty (AssignToConst n _) =
+    "Assginment to Constant Declaration"
+      <+> "Declaration"
+      <+> pretty n
+      <+> "is a constant, not a variable"
+  pretty (AssignToLet n _) =
+    "Assginment to Let Declaration"
+      <+> "Declaration"
+      <+> pretty n
+      <+> "is a let binding, not a variable"

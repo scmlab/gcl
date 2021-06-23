@@ -68,10 +68,12 @@ data ArithOp =
   | Mod Loc
   | Max Loc
   | Min Loc
+  | Exp Loc
   deriving (Eq, Show, Generic)
 
 data QuantOp =
     Sum Loc
+  | Pi Loc
   | Forall Loc
   | Exists Loc
   | Hash Loc
@@ -86,14 +88,14 @@ classifyChainOp :: ChainOp -> Fixity
 classifyChainOp (EQProp _) = Infix 0
 classifyChainOp (EQPropU _) = Infix 0
 classifyChainOp (EQ _) = Infix 5
-classifyChainOp (NEQ _) = Infix 6
-classifyChainOp (NEQU _) = Infix 6
-classifyChainOp (LTE _) = Infix 6
-classifyChainOp (LTEU _) = Infix 6
-classifyChainOp (GTE _) = Infix 6
-classifyChainOp (GTEU _) = Infix 6
-classifyChainOp (LT _) = Infix 6
-classifyChainOp (GT _) = Infix 6
+classifyChainOp (NEQ _) = Infix 4
+classifyChainOp (NEQU _) = Infix 4
+classifyChainOp (LTE _) = Infix 4
+classifyChainOp (LTEU _) = Infix 4
+classifyChainOp (GTE _) = Infix 4
+classifyChainOp (GTEU _) = Infix 4
+classifyChainOp (LT _) = Infix 4
+classifyChainOp (GT _) = Infix 4
 
 classifyArithOp :: ArithOp -> Fixity
 classifyArithOp (Implies _) = InfixR 1
@@ -102,8 +104,8 @@ classifyArithOp (Disj _) = InfixL 2
 classifyArithOp (DisjU _) = InfixL 2
 classifyArithOp (Conj _) = InfixL 3
 classifyArithOp (ConjU _) = InfixL 3
-classifyArithOp (Neg _) = Prefix 4
-classifyArithOp (NegU _) = Prefix 4
+classifyArithOp (Neg _) = Prefix 6
+classifyArithOp (NegU _) = Prefix 6
 classifyArithOp (Add _) = InfixL 7
 classifyArithOp (Sub _) = InfixL 7
 classifyArithOp (Mul _) = InfixL 8
@@ -111,12 +113,14 @@ classifyArithOp (Div _) = InfixL 8
 classifyArithOp (Mod _) = InfixL 9
 classifyArithOp (Max _) = Infix 10
 classifyArithOp (Min _) = Infix 10
+classifyArithOp (Exp _) = Infix 11
 
 classifyQuantOp :: QuantOp -> Fixity
-classifyQuantOp (Sum _) = Prefix 5
-classifyQuantOp (Exists _) = Prefix 6
-classifyQuantOp (Forall _) = Prefix 7
-classifyQuantOp (Hash _) = Prefix 8
+classifyQuantOp (Sum _) = Prefix (-1)
+classifyQuantOp (Pi _) = Prefix (-1)
+classifyQuantOp (Exists _) = Prefix (-1)
+classifyQuantOp (Forall _) = Prefix (-1)
+classifyQuantOp (Hash _) = Prefix (-1)
 
 classify :: Op -> Fixity
 classify (ChainOp op) = classifyChainOp op

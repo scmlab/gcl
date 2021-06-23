@@ -11,6 +11,11 @@ extractAssertion (ConstDecl _ _ e _) = e
 extractAssertion (VarDecl _ _ e _) = e
 extractAssertion LetDecl {} = Nothing
 
+extractDeclaration :: Declaration -> Maybe Declaration 
+extractDeclaration d@ConstDecl {} = Just d
+extractDeclaration d@VarDecl {} = Just d
+extractDeclaration _ = Nothing
+
 extractLetBinding :: Declaration -> Maybe (Name, Expr)
 extractLetBinding ConstDecl {} = Nothing
 extractLetBinding VarDecl {} = Nothing
