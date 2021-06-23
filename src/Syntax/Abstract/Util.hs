@@ -1,7 +1,7 @@
 module Syntax.Abstract.Util where
 
 import Syntax.Abstract
-    ( Expr(Lam), GdCmd(..), Stmt, Declaration(..) )
+    ( Expr(Lam), GdCmd(..), Stmt, Declaration(..), Bindings (..) )
 import Syntax.Common (Name)
 import Data.Loc ((<-->))
 
@@ -31,3 +31,13 @@ wrapLam [] body = body
 wrapLam (x : xs) body = 
   let b = wrapLam xs body in
   Lam x b (x <--> b)
+
+bindingsToExpr :: Bindings -> Expr
+bindingsToExpr (AssignBinding e) = e
+bindingsToExpr (LetBinding e) = e
+bindingsToExpr (BetaBinding e) = e
+bindingsToExpr (AlphaBinding e) = e
+
+assignBindingToExpr :: Bindings -> Maybe Expr
+assignBindingToExpr (AssignBinding e) = Just e
+assignBindingToExpr _ = Nothing

@@ -9,6 +9,7 @@ import Render.Class
 import Render.Element
 import Render.Syntax.Common ()
 import Syntax.Abstract
+import Syntax.Abstract.Util ( assignBindingToExpr )
 import Syntax.Common (Fixity (..), Op, classify, Name)
 import Data.Map (Map)
 
@@ -104,7 +105,7 @@ handleExpr _ (Subst before env after) =
     isLam _ = False
 
 instance Render Subst where
-  render = render . fst . Map.mapEither id
+  render = render . Map.mapMaybe assignBindingToExpr
 
 instance Render (Map Name Expr) where
   render env

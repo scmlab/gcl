@@ -96,7 +96,13 @@ data Expr
 
 type QuantOp' = Either Op Expr
 
-type Bindings = Either Expr Expr
+data Bindings = 
+  AssignBinding Expr 
+  | LetBinding Expr 
+  | BetaBinding Expr 
+  | AlphaBinding Expr
+  deriving (Eq, Show, Generic)
+
 type Subst = Map Name Bindings
 
 ----------------------------------------------------------------

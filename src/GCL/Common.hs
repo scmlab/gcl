@@ -11,6 +11,7 @@ import Data.Set (Set, (\\))
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Syntax.Abstract as A
+import qualified Syntax.Abstract.Util as A
 import GCL.Predicate (Pred (..))
 import Control.Monad.RWS (RWST(..))
 import Control.Monad.State (StateT(..))
@@ -78,8 +79,7 @@ instance Free A.Expr where
   fv (A.Subst _ _ after) = fv after
 
 instance Free A.Bindings where
-  fv (Left expr) = fv expr
-  fv (Right expr) = fv expr
+  fv = fv . A.bindingsToExpr
 
 -- class for data that is substitutable
 class Substitutable a b where
@@ -120,14 +120,6 @@ instance Substitutable A.Expr A.Expr where
     A.Quant (subst s' qop) xs (subst s' rng) (subst s' t) l
   subst s1 (A.Subst before s2 after) = A.Subst (subst s1 before) s2 (subst s1 after)
 
--- Left of Bindings will be rendered,   
---    including assignment
--- Right of Bindings will not be rendered, 
---    including global let bindings, and lambda bindings
-
-bindToSubs :: Subs A.Bindings -> Subs A.Expr
-bindToSubs = fst . Map.mapEither id
-
 singleBinding :: Name -> A.Bindings -> Subs A.Bindings
 singleBinding = Map.singleton
 
@@ -146,13 +138,11 @@ instance Substitutable A.Bindings A.Expr where
       A.Lit {} -> expr
       (A.Var n _) ->
         case Map.lookup n s of
-          Just v ->
-            either (simpleSubs expr s n) (simpleSubs expr s n) v
+          Just v -> simpleSubs expr s n (A.bindingsToExpr v)
           Nothing -> expr
       (A.Const n _) ->
         case Map.lookup n s of
-          Just c ->
-            either (simpleSubs expr s n) (simpleSubs expr s n) c
+          Just c -> simpleSubs expr s n (A.bindingsToExpr c)
           Nothing -> expr
       A.Op {} -> expr
       (A.Chain a op b l) -> A.Chain (subst s a) op (subst s b) l
@@ -160,9 +150,11 @@ instance Substitutable A.Bindings A.Expr where
         let (a', b'a, expr') = substApp s a b l in
         case a' of
           A.Lam x body _ ->
-            A.Subst expr' emptySubs (subst (Map.singleton x b'a) body)
+            let s' = Map.singleton x (A.BetaBinding b'a) in
+            A.Subst expr' s' (subst s' body)
           A.Subst _ _ (A.Lam x body _) ->
-            A.Subst expr emptySubs (subst (Map.singleton x b'a) body)
+            let s' = Map.singleton x (A.BetaBinding b'a) in
+            A.Subst expr s' (subst s' body)
           _ -> expr'
       (A.Lam x e l) ->
         let s' = Map.withoutKeys s (Set.singleton x) in
@@ -215,30 +207,24 @@ isAllApp (A.Subst b@A.Subst {} _ A.App {}) = isAllApp b
 isAllApp _ = False
 
 alphaRename :: Fresh m => Set Name -> A.Expr -> m A.Expr
-alphaRename s expr = 
+alphaRename s expr =
   case expr of
     A.Lam x body l -> do
       x' <- capture x
-      let vx' = A.Var x' (locOf x)
+      let vx' = A.AlphaBinding (A.Var x' (locOf x))
       A.Lam x' <$> alphaRename s (subst (Map.singleton x vx') body) <*> pure l
     A.Quant op ns rng t l -> do
       ns' <- mapM capture ns
-      let mns' = Map.fromList . zip ns . map (\x -> A.Var x (locOf x)) $ ns'
+      let mns' = Map.fromList . zip ns . map (\x -> A.AlphaBinding $ A.Var x (locOf x)) $ ns'
       return $ A.Quant op ns' (subst mns' rng) (subst mns' t) l
     _ -> return expr
   where
-    capture x = do
-      tx <- freshWithLabel (Text.pack "m" <> nameToText x)
-      return $ Name tx (locOf x)
--- alphaRename s (A.Lam x body l) =
---   if x `Set.member` s
---   then do
---     tx <- freshWithLabel (Text.pack "m" <> nameToText x)
---     let x' = Name tx (locOf x)
---     let vx' = A.Var x' (locOf x)
---     A.Lam x' <$> alphaRename s (subst (Map.singleton x vx') body) <*> pure l
---   else A.Lam x <$> alphaRename s body <*> pure l
--- alphaRename _ expr = return expr
+    capture x =
+      if x `Set.member` s
+      then do
+        tx <- freshWithLabel (Text.pack "m" <> nameToText x)
+        return $ Name tx (locOf x)
+      else return x
 
 instance Substitutable A.Bindings Pred where
   subst s (Constant e) = Constant (subst s e)

@@ -16,6 +16,7 @@ import Syntax.Common
 import Prelude hiding (Ordering (..))
 import GCL.Common
 import Control.Monad.State (StateT(..), evalStateT)
+import Syntax.Abstract.Util (bindingsToExpr)
 
 data TypeError
   = NotInScope Name Loc
@@ -139,7 +140,7 @@ infer (Quant qop iters rng t l) = do
       return x
 infer (Subst expr sub _) = do
   t <- infer expr
-  s <- mapM (either infer infer) sub
+  s <- mapM infer (Map.map bindingsToExpr sub)
   return $ subst s t
 
 inferExpr :: Env Type -> Expr -> TM Type
