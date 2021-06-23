@@ -211,11 +211,11 @@ alphaRename s expr =
   case expr of
     A.Lam x body l -> do
       x' <- capture x
-      let vx' = A.AlphaBinding (A.Var x' (locOf x))
+      let vx' = A.Var x' (locOf x)
       A.Lam x' <$> alphaRename s (subst (Map.singleton x vx') body) <*> pure l
     A.Quant op ns rng t l -> do
       ns' <- mapM capture ns
-      let mns' = Map.fromList . zip ns . map (\x -> A.AlphaBinding $ A.Var x (locOf x)) $ ns'
+      let mns' = Map.fromList . zip ns . map (\x -> A.Var x (locOf x)) $ ns'
       return $ A.Quant op ns' (subst mns' rng) (subst mns' t) l
     _ -> return expr
   where
