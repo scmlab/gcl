@@ -10,7 +10,7 @@ import Syntax.Abstract.Util ( extractAssertion, extractLetBinding, extractDeclar
 import Syntax.Common
 
 constExpr :: [Name] -> Expr -> Bool
-constExpr ns (Paren expr) = constExpr ns expr
+constExpr ns (Paren expr _) = constExpr ns expr
 constExpr _ (Lit _ _) = True
 constExpr bvars (Var v _) = v `elem` bvars
 constExpr _ (Const _ _) = True

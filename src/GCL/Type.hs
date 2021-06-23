@@ -88,7 +88,7 @@ inEnv l m = do
   local scope m
 
 infer :: Expr -> Infer Type
-infer (Paren expr) = infer expr
+infer (Paren expr _) = infer expr
 infer (Lit lit l) = return (litTypes lit l)
 infer (Var x _) = lookupInferEnv x
 infer (Const c _) = lookupInferEnv c

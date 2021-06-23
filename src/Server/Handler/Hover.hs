@@ -112,7 +112,7 @@ instance StabM HoverM Declaration HoverResult where
 
 instance StabM HoverM Expr HoverResult where
   stabM pos x = whenInRange' pos (locOf x) $ case x of
-    Paren a        -> stabM pos a
+    Paren a _      -> stabM pos a
     Var   a _      -> stabM pos a
     Const a _      -> stabM pos a
     Op op          -> stabM pos op

@@ -10,7 +10,7 @@ import qualified Data.Map as Map
 type Expand = ReaderT (Env Expr) (State FreshState)
 
 expand :: Expr -> Expand Expr
-expand (Paren expr) = Paren <$> expand expr
+expand (Paren expr l) = Paren <$> expand expr <*> pure l
 expand lit@(Lit _ _) = return lit
 expand c@(Const n _) = do
   env <- ask
