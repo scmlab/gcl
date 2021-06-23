@@ -12,7 +12,6 @@ import Data.Loc
 import qualified Data.Map as Map
 import GHC.Generics (Generic)
 import Syntax.Abstract
-import Syntax.Abstract.Located ()
 import Syntax.Common
 import Prelude hiding (Ordering (..))
 import GCL.Common

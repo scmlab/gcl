@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 069304e9277da6f6e998aa5fa4bffe2a8943887f0c9918eb14c0120be8872ed8
+-- hash: dbf56d87ffd8145d63cc9cbf344030fea2857bce21efb0606996ef9753c50d14
 
 name:           gcl
 version:        0.1.0.0
@@ -65,8 +65,10 @@ library
       Server.Stab2
       Server.Util
       Syntax.Abstract
-      Syntax.Abstract.Located
+      Syntax.Abstract.Instances.Json
+      Syntax.Abstract.Instances.Located
       Syntax.Abstract.Operator
+      Syntax.Abstract.Types
       Syntax.Abstract.Util
       Syntax.Common
       Syntax.Common.Located
@@ -194,8 +196,10 @@ test-suite gcl-test
       Server.Stab2
       Server.Util
       Syntax.Abstract
-      Syntax.Abstract.Located
+      Syntax.Abstract.Instances.Json
+      Syntax.Abstract.Instances.Located
       Syntax.Abstract.Operator
+      Syntax.Abstract.Types
       Syntax.Abstract.Util
       Syntax.Common
       Syntax.Common.Located

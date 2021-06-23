@@ -9,7 +9,6 @@ import Render.Class
 import Render.Element
 import Render.Syntax.Common ()
 import Syntax.Abstract
-import Syntax.Abstract.Located ()
 import Syntax.Common (Fixity (..), Op, classify, Name)
 import Data.Map (Map)
 
