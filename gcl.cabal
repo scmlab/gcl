@@ -64,14 +64,19 @@ library
       Server.Stab
       Server.Util
       Syntax.Abstract
-      Syntax.Abstract.Located
+      Syntax.Abstract.Instances.Json
+      Syntax.Abstract.Instances.Located
       Syntax.Abstract.Operator
+      Syntax.Abstract.Types
       Syntax.Abstract.Util
       Syntax.Common
-      Syntax.Common.Located
+      Syntax.Common.Instances.Json
+      Syntax.Common.Instances.Located
+      Syntax.Common.Types
       Syntax.Concrete
-      Syntax.Concrete.Located
-      Syntax.Concrete.ToAbstract
+      Syntax.Concrete.Instances.Located
+      Syntax.Concrete.Instances.ToAbstract
+      Syntax.Concrete.Types
       Syntax.ConstExpr
       Syntax.Parser
       Syntax.Parser.Lexer
@@ -192,14 +197,19 @@ test-suite gcl-test
       Server.Stab
       Server.Util
       Syntax.Abstract
-      Syntax.Abstract.Located
+      Syntax.Abstract.Instances.Json
+      Syntax.Abstract.Instances.Located
       Syntax.Abstract.Operator
+      Syntax.Abstract.Types
       Syntax.Abstract.Util
       Syntax.Common
-      Syntax.Common.Located
+      Syntax.Common.Instances.Json
+      Syntax.Common.Instances.Located
+      Syntax.Common.Types
       Syntax.Concrete
-      Syntax.Concrete.Located
-      Syntax.Concrete.ToAbstract
+      Syntax.Concrete.Instances.Located
+      Syntax.Concrete.Instances.ToAbstract
+      Syntax.Concrete.Types
       Syntax.ConstExpr
       Syntax.Parser
       Syntax.Parser.Lexer

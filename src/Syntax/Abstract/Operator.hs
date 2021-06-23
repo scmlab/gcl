@@ -1,7 +1,6 @@
 module Syntax.Abstract.Operator where
 
 import Syntax.Abstract (Expr (..),Lit (..))
-import Syntax.Abstract.Located()
 import Syntax.Common
 import Data.Text (Text)
 import Data.Loc (Loc(..), (<-->), locOf)

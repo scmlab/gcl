@@ -2,7 +2,6 @@ module Syntax.Abstract.Util where
 
 import Syntax.Abstract
     ( Expr(Lam), GdCmd(..), Stmt, Declaration(..) )
-import Syntax.Abstract.Located()
 import Syntax.Common (Name)
 import Data.Loc ((<-->))
 

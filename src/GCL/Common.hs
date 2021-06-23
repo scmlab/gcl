@@ -226,15 +226,30 @@ isAllApp (A.Subst b@A.Subst {} _ A.App {}) = isAllApp b
 isAllApp _ = False
 
 alphaRename :: Fresh m => Set Name -> A.Expr -> m A.Expr
-alphaRename s (A.Lam x body l) =
-  if x `Set.member` s
-  then do
-    tx <- freshWithLabel (Text.pack "m" <> nameToText x)
-    let x' = Name tx (locOf x)
-    let vx' = A.Var x' (locOf x)
-    A.Lam x' <$> alphaRename s (subst (Map.singleton x vx') body) <*> pure l
-  else A.Lam x <$> alphaRename s body <*> pure l
-alphaRename _ expr = return expr
+alphaRename s expr = 
+  case expr of
+    A.Lam x body l -> do
+      x' <- capture x
+      let vx' = A.Var x' (locOf x)
+      A.Lam x' <$> alphaRename s (subst (Map.singleton x vx') body) <*> pure l
+    A.Quant op ns rng t l -> do
+      ns' <- mapM capture ns
+      let mns' = Map.fromList . zip ns . map (\x -> A.Var x (locOf x)) $ ns'
+      return $ A.Quant op ns' (subst mns' rng) (subst mns' t) l
+    _ -> return expr
+  where
+    capture x = do
+      tx <- freshWithLabel (Text.pack "m" <> nameToText x)
+      return $ Name tx (locOf x)
+-- alphaRename s (A.Lam x body l) =
+--   if x `Set.member` s
+--   then do
+--     tx <- freshWithLabel (Text.pack "m" <> nameToText x)
+--     let x' = Name tx (locOf x)
+--     let vx' = A.Var x' (locOf x)
+--     A.Lam x' <$> alphaRename s (subst (Map.singleton x vx') body) <*> pure l
+--   else A.Lam x <$> alphaRename s body <*> pure l
+-- alphaRename _ expr = return expr
 
 instance Substitutable A.Bindings Pred where
   subst s (Constant e) = Constant (subst s e)
