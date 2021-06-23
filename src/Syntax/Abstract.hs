@@ -42,11 +42,6 @@ data Declaration
   | LetDecl Name [Name] Expr Loc
   deriving (Eq, Show)
 
-instance Located Declaration where
-  locOf (ConstDecl _ _ _ l) = l
-  locOf (VarDecl _ _ _ l) = l
-  locOf (LetDecl _ _ _ l) = l
-
 --------------------------------------------------------------------------------
 
 data Stmt
@@ -63,9 +58,6 @@ data Stmt
 
 data GdCmd = GdCmd Expr [Stmt] Loc deriving (Eq, Show)
 
-instance Located GdCmd where
-  locOf (GdCmd _ _ l) = l 
-  
 --------------------------------------------------------------------------------
 
 -- | Endpoint
@@ -99,7 +91,7 @@ instance ToJSON Type
 
 -- | Expressions
 data Expr
-  = Paren Expr
+  = Paren Expr Loc
   | Lit Lit Loc
   | Var Name Loc
   | Const Name Loc

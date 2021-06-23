@@ -124,7 +124,7 @@ instance StabM HoverM Declaration HoverResult where
 
 instance StabM HoverM Expr HoverResult where
   stabM = \case
-    Paren a        -> stabLocated a
+    Paren a _      -> stabLocated a
     Var   a _      -> stabLocated a
     Const a _      -> stabLocated a
     Op op          -> stabLocated op

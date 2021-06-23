@@ -63,7 +63,7 @@ instance Free A.Type where
   fv (A.TVar x _) = Set.singleton x
 
 instance Free A.Expr where
-  fv (A.Paren expr) = fv expr
+  fv (A.Paren expr _) = fv expr
   fv (A.Var x _) = Set.singleton x
   fv (A.Const x _) = Set.singleton x
   fv (A.Op _) = mempty
@@ -98,11 +98,11 @@ instance Substitutable A.Type A.Type where
   subst s t@(A.TVar x _) = Map.findWithDefault t x s
 
 instance Substitutable A.Expr A.Expr where
-  subst s (A.Paren expr) = A.Paren (subst s expr)
-  subst _ lit@(A.Lit _ _) = lit
+  subst s (A.Paren expr l) = A.Paren (subst s expr) l
+  subst _ lit@A.Lit {} = lit
   subst s v@(A.Var n _) = Map.findWithDefault v n s
   subst s c@(A.Const n _) = Map.findWithDefault c n s
-  subst _ o@(A.Op _) = o
+  subst _ o@A.Op {} = o
   subst s (A.Chain a op b l) = A.Chain (subst s a) op (subst s b) l
   subst s (A.App a b l) =
     let a' = subst s a in
@@ -114,7 +114,7 @@ instance Substitutable A.Expr A.Expr where
   subst s (A.Lam x e l) =
     let s' = Map.withoutKeys s (Set.singleton x) in
     A.Lam x (subst s' e) l
-  subst _ h@(A.Hole _) = h
+  subst _ h@A.Hole {} = h
   subst s (A.Quant qop xs rng t l) =
     let s' = Map.withoutKeys s (Set.fromList xs) in
     A.Quant (subst s' qop) xs (subst s' rng) (subst s' t) l
@@ -142,7 +142,7 @@ instance Substitutable A.Bindings A.Expr where
     then expr
     else
     case expr of
-      (A.Paren e) -> A.Paren (subst s e)
+      (A.Paren e l) -> A.Paren (subst s e) l
       A.Lit {} -> expr
       (A.Var n _) ->
         case Map.lookup n s of

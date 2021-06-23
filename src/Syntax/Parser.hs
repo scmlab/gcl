@@ -19,7 +19,7 @@ import Syntax.Concrete (BlockDecl (..), BlockDeclaration (..), Decl (..), DeclPr
 import Syntax.Concrete.Located ()
 import Syntax.Parser.Lexer
 import Syntax.Parser.Util
-import Text.Megaparsec (MonadParsec (..), Pos, anySingle, mkPos, parse, tokensToChunk, unPos, (<?>))
+import Text.Megaparsec (MonadParsec (..), Pos, anySingle, parse, tokensToChunk, (<?>))
 import Text.Megaparsec.Char (eol)
 import qualified Text.Megaparsec.Char.Lexer as Lex
 import Data.Bifunctor (second)
@@ -157,7 +157,9 @@ pBlockDecl = do
 ------------------------------------------
 
 pStmts :: Parser [Stmt]
-pStmts = many (pStmt <* scn) <?> "statements"
+pStmts = (↓) (pIndentBlock (lift pStmt)) scn <|> return []
+-- pStmts = many (pStmt <* scn)
+
 
 -- NOTE :: this function doesn't consume newline after finish parsing the statement
 pStmt :: Parser Stmt
@@ -320,6 +322,7 @@ pExprArith = makeExprParser pTerm arithTable <* (↑) (\sc' -> try sc' <|> sc)
 arithTable :: [[Operator ParserF Expr]]
 arithTable =
   [ [Postfix pApp],
+    [InfixN (pBinary lexExp)],
     [InfixN (pBinary lexMax), InfixN (pBinary lexMin)],
     [InfixL (pBinary lexMod)],
     [InfixL (pBinary lexMul), InfixL (pBinary lexDiv)],
@@ -481,23 +484,22 @@ pIndentBlock p = do
   done <- isJust <$> optional eof
   case (isEol, done) of
     (Just _, False) -> do
-      ps <- lift $ indentedItems (posMoveLeft pos 1) pos scn p'
+      ps <- lift $ indentedItems pos scn p'
       return (p0 : ps)
     _ -> return [p0]                          -- eof or no newline => only one indented element
   where
     p' = (↓) p sc                             -- make sure p doesn't parse newline
-    posMoveLeft pos i = mkPos (unPos pos - i) -- safe, since pos should be greater than ref,
+    -- posMoveLeft pos i = mkPos (unPos pos - i) -- safe, since pos should be greater than ref,
                                               -- by the definition of ParserF 
 
 -- copied from Text.Megaparsec.Char.Lexer
 indentedItems ::
   (MonadParsec e s m) =>
   Pos ->
-  Pos ->
   m () ->
   m b ->
   m [b]
-indentedItems ref lvl sc' p = go
+indentedItems lvl sc' p = go
   where
     go = do
       sc'
@@ -507,6 +509,8 @@ indentedItems ref lvl sc' p = go
         then return []
         else
           if
-              | pos <= ref -> return []
+              | pos < lvl -> return []
               | pos == lvl -> (:) <$> p <*> go
               | otherwise -> Lex.incorrectIndent Ord.EQ lvl pos
+
+              --   | pos <= ref -> return []

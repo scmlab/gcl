@@ -63,6 +63,20 @@ instance RenderSection TypeError where
     <+> renderManySepByComma (toList exprs)
     <+> "do not have corresponing variables in the assigment"
     ]
+  renderSection (AssignToConst n loc) = Section
+    Red
+    [ Header "Assginment to Constant Declaration" (fromLoc loc)
+    , Paragraph $ "Declaration" <+> render n <+> "is a constant, not a variable"
+    ]
+
+  renderSection (AssignToLet n loc) = Section
+    Red
+    [ Header "Assginment to Let Declaration" (fromLoc loc)
+    , Paragraph
+    $   "Declaration"
+    <+> render n
+    <+> "is a let binding, not a variable"
+    ]
 
 instance RenderSection StructError where
   renderSection (MissingAssertion loc) = Section
