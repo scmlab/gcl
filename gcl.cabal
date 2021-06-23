@@ -70,7 +70,9 @@ library
       Syntax.Abstract.Types
       Syntax.Abstract.Util
       Syntax.Common
-      Syntax.Common.Located
+      Syntax.Common.Instances.Json
+      Syntax.Common.Instances.Located
+      Syntax.Common.Types
       Syntax.Concrete
       Syntax.Concrete.Instances.Located
       Syntax.Concrete.Instances.ToAbstract
@@ -201,7 +203,9 @@ test-suite gcl-test
       Syntax.Abstract.Types
       Syntax.Abstract.Util
       Syntax.Common
-      Syntax.Common.Located
+      Syntax.Common.Instances.Json
+      Syntax.Common.Instances.Located
+      Syntax.Common.Types
       Syntax.Concrete
       Syntax.Concrete.Instances.Located
       Syntax.Concrete.Instances.ToAbstract

@@ -1,7 +1,7 @@
 module Syntax.Abstract.Instances.Located where
 
 import Data.Loc
-import Syntax.Common.Located()
+import Syntax.Common()
 import Syntax.Abstract.Types
 import Prelude hiding (Ordering(..))
 
