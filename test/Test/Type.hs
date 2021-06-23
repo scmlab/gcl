@@ -12,7 +12,7 @@ import Control.Monad.Except (foldM, runExcept)
 import GCL.Type
     ( TM, inferExpr, inferDecl, checkType, checkStmt, checkProg, runTM )
 import GCL.Common ( Env, emptyEnv )
-import Syntax.Concrete.ToAbstract ( ToAbstract(toAbstract) )
+import Syntax.Concrete ( ToAbstract(toAbstract) )
 import Syntax.Abstract
     ( Lit(..),
       Expr(..),

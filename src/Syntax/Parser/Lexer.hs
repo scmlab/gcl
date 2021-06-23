@@ -14,7 +14,6 @@ import Data.Text (Text)
 import Data.Void (Void)
 import Syntax.Common
 import Syntax.Concrete (Lit (..), Token (..))
-import Syntax.Concrete.Located ()
 import Syntax.Parser.Token
 import Syntax.Parser.Util
 import Text.Megaparsec (MonadParsec (notFollowedBy, tokens, try), Parsec, Stream (tokensToChunk), getOffset, getSourcePos, satisfy, setOffset, (<?>))

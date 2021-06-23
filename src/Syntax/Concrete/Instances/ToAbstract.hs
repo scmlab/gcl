@@ -4,12 +4,12 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE FlexibleContexts #-}
-module Syntax.Concrete.ToAbstract where
+module Syntax.Concrete.Instances.ToAbstract where
 
 import Control.Monad.Except ( Except, forM, throwError )
 import Data.Loc (Loc (..), (<-->), Located (locOf))
-import Syntax.Concrete
-import Syntax.Concrete.Located()
+import Syntax.Concrete.Types
+import Syntax.Concrete.Instances.Located()
 import qualified Syntax.Abstract as A
 import qualified Syntax.Abstract.Operator as A
 import qualified Syntax.ConstExpr as ConstExpr
