@@ -1,10 +1,10 @@
 ### Result
 
-[ < Assertion >
-True
+[ Assertion at ./test/Test/WP/assets/issue2-2.gcl [33-41] 3:1-9
+`True
 ⇒
 z   =   A   *   B
-at ./test/Test/WP/assets/issue2-2.gcl [33-41] 3:1-9 ]
+` ]
 
 ### Source
 

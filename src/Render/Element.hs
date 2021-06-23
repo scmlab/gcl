@@ -3,10 +3,11 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Render.Element
-  ( Block(Block)
+  ( Section(..)
+  , Block(..)
   , Deco(..)
-  , proofObligationE
-  , specE
+  -- , proofObligationE
+  -- , specE
   , Inlines(..)
   , textE
   , linkE
@@ -30,9 +31,8 @@ import qualified Data.Sequence                 as Seq
 import           Data.String                    ( IsString(..) )
 import           Data.Text                      ( Text )
 import qualified Data.Text                     as Text
-import           Data.Text.Prettyprint.Doc      ( Pretty(..)
-                                                , line
-                                                )
+import           Data.Text.Prettyprint.Doc      ( Pretty(..) )
+import qualified Data.Text.Prettyprint.Doc     as Pretty
 import           GHC.Generics                   ( Generic )
 
 --------------------------------------------------------------------------------
@@ -42,55 +42,45 @@ data Deco = Plain | Red | Yellow | Blue | Green
   deriving (Eq, Generic)
 instance ToJSON Deco
 
+-- | Section
+data Section = Section
+  { sectionDeco   :: Deco
+  , sectionBlocks :: [Block]
+  }
+  deriving (Eq, Generic)
+instance ToJSON Section
+
+instance Pretty Section where
+  pretty (Section _ blocks) = Pretty.vsep (map pretty blocks)
+
+--------------------------------------------------------------------------------
+
 -- | Block elements
 data Block
-  = -- for ordinary stuff
-  Block (Maybe String) (Maybe Range) Deco Inlines
-    -- Block {
-    --   blkHeader :: Maybe String,
-    --   blkRange :: Maybe Range,
-    --   blkDeco :: Deco,
-    --   blkBody :: Inlines
-    -- }
-  | -- for Specs
-    -- range + precondition + post-condition
-    Spec Range Inlines Inlines
-  | -- for Proof Obligations
-    -- header + range + predicate
-    PO (Maybe String) (Maybe Range) Inlines
+  = Header Text (Maybe Range)
+  | Paragraph Inlines
+  | Code Inlines
   deriving (Eq, Generic)
 
 -- Represent Block with String literals
 instance IsString Block where
-  fromString s = Block Nothing Nothing Plain (fromString s)
+  fromString s = Paragraph (fromString s)
 
 instance Pretty Block where
-  pretty (Block Nothing Nothing _ inlines) = pretty inlines
-  pretty (Block Nothing (Just range) _ inlines) =
-    pretty inlines <> "at " <> pretty range
-  pretty (Block (Just header) Nothing _ inlines) =
-    "< " <> pretty header <> " >" <> line <> pretty inlines
-  pretty (Block (Just header) (Just range) _ inlines) =
-    "< "
-      <> pretty header
-      <> " >"
-      <> line
-      <> pretty inlines
-      <> "at "
-      <> pretty range
-  pretty (Spec range pre post) =
-    pretty $ Block Nothing (Just range) Plain (vertE [pre, "=>", post])
-  pretty (PO header range p) = pretty $ Block header range Plain p
+  pretty (Header header Nothing     ) = pretty header
+  pretty (Header header (Just range)) = pretty header <> " at " <> pretty range
+  pretty (Paragraph inlines         ) = pretty inlines
+  pretty (Code      inlines         ) = "`" <> pretty inlines <> "`"
 
 instance ToJSON Block
 
--- | Constructor for `PO`
-proofObligationE :: Maybe String -> Maybe Range -> Inlines -> Block
-proofObligationE = PO
+-- -- | Constructor for `PO`
+-- proofObligationE :: Maybe String -> Maybe Range -> Inlines -> Block
+-- proofObligationE = PO
 
--- | Constructor for `Spec`
-specE :: Range -> Inlines -> Inlines -> Block
-specE = Spec
+-- -- | Constructor for `Spec`
+-- specE :: Range -> Inlines -> Inlines -> Block
+-- specE = Spec
 
 --------------------------------------------------------------------------------
 

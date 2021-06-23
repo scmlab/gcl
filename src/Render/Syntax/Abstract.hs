@@ -57,8 +57,8 @@ instance Render Lit where
 --------------------------------------------------------------------------------
 
 -- | Expr
--- instance RenderBlock Expr where
---   renderBlock expr = Block Nothing (fromLoc (locOf expr)) (render expr)
+-- instance RenderSection Expr where
+--   renderSection expr = Block Nothing (fromLoc (locOf expr)) (render expr)
 
 instance Render Expr where
   renderPrec n expr = case handleExpr n expr of

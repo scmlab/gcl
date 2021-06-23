@@ -4,42 +4,39 @@
 
 module Server.DSL where
 
-import Control.Monad.Cont
-import Control.Monad.Except
-import Control.Monad.Trans.Free
-import Control.Monad.Writer
-import Data.List
-  ( find,
-    sortOn,
-  )
-import qualified Data.List as List
-import Data.Loc hiding (fromLoc)
-import Data.Loc.Range
-import Data.Text (Text)
-import qualified Data.Text as Text
-import Error
-import GCL.Predicate
-import GCL.Predicate.Util
-  ( specPayloadWithoutIndentation,
-  )
-import qualified GCL.Type as TypeChecking
-import GCL.WP (StructWarning)
-import qualified GCL.WP as WP
-import Language.LSP.Types (Diagnostic)
-import Pretty (toText)
-import Render
-import Server.CustomMethod
-import Server.Handler.Diagnostic ()
-import Server.Stab (collect)
-import qualified Syntax.Abstract as A
-import Syntax.Concrete (ToAbstract (toAbstract))
-import Syntax.Parser
-  ( Parser,
-    pProgram,
-    pStmts,
-    runParse,
-  )
-import Prelude hiding (span)
+import           Control.Monad.Cont
+import           Control.Monad.Except
+import           Control.Monad.Trans.Free
+import           Control.Monad.Writer
+import           Data.List                      ( find
+                                                , sortOn
+                                                )
+import qualified Data.List                     as List
+import           Data.Loc                hiding ( fromLoc )
+import           Data.Loc.Range
+import           Data.Text                      ( Text )
+import qualified Data.Text                     as Text
+import           Error
+import           GCL.Predicate
+import           GCL.Predicate.Util             ( specPayloadWithoutIndentation
+                                                )
+import qualified GCL.Type                      as TypeChecking
+import           GCL.WP                         ( StructWarning )
+import qualified GCL.WP                        as WP
+import           Language.LSP.Types             ( Diagnostic )
+import           Prelude                 hiding ( span )
+import           Pretty                         ( toText )
+import           Render
+import           Server.CustomMethod
+import           Server.Handler.Diagnostic      ( )
+import           Server.Stab                    ( collect )
+import qualified Syntax.Abstract               as A
+import Syntax.Concrete ( ToAbstract(toAbstract) )
+import           Syntax.Parser                  ( Parser
+                                                , pProgram
+                                                , pStmts
+                                                , runParse
+                                                )
 
 --------------------------------------------------------------------------------
 
@@ -176,21 +173,22 @@ generateResponseAndDiagnosticsFromResult (Right (pos, specs, globalProps, warnin
           Nothing -> pos
           Just sel -> filter (withinRange sel) pos
     -- render stuff
-    let warningsSection =
-          if null warnings then [] else map renderBlock warnings
-    let globalPropsSection =
-          if null globalProps
-            then []
-            else
-              map
-                (\expr -> Block (Just "Property") (fromLoc (locOf expr)) Plain (render expr))
-                globalProps
-    let specsSection =
-          if null overlappedSpecs then [] else map renderBlock overlappedSpecs
-    let poSection =
-          if null overlappedPOs then [] else map renderBlock overlappedPOs
-    let blocks =
-          mconcat [warningsSection, specsSection, poSection, globalPropsSection]
+    let warningsSections =
+          if null warnings then [] else map renderSection warnings
+    let globalPropsSections = if null globalProps
+          then []
+          else map
+            (\expr -> Section
+              Plain
+              [Header "Property" (fromLoc (locOf expr)), Code (render expr)]
+            )
+            globalProps
+    let specsSections =
+          if null overlappedSpecs then [] else map renderSection overlappedSpecs
+    let poSections =
+          if null overlappedPOs then [] else map renderSection overlappedPOs
+    let sections =
+          mconcat [warningsSections, specsSections, poSections, globalPropsSections]
 
     version <- bumpVersion
     let encodeSpec spec =
@@ -201,7 +199,7 @@ generateResponseAndDiagnosticsFromResult (Right (pos, specs, globalProps, warnin
           )
 
     let responses =
-          [ResDisplay version blocks, ResUpdateSpecs (map encodeSpec specs)]
+          [ResDisplay version sections, ResUpdateSpecs (map encodeSpec specs)]
     let diagnostics = concatMap collect pos ++ concatMap collect warnings
     sendDiagnostics diagnostics
 

@@ -22,8 +22,7 @@ data TypeError
   | UnifyFailed Type Type Loc
   | RecursiveType Name Type Loc
   | NotFunction Type Loc
-  | -- TODO: move these to scope checking 
-    NotEnoughExprsInAssigment (NonEmpty Name) Loc
+  | NotEnoughExprsInAssigment (NonEmpty Name) Loc
   | TooManyExprsInAssigment (NonEmpty Expr) Loc
   | AssignToConst Name Loc
   | AssignToLet Name Loc

@@ -93,7 +93,7 @@ interpret filepath p = case runCmdM p of
     lift $ tell [TraceSendDiagnostics diagnostics]
     interpret filepath next
   Left errors -> do
-    -- let responses = [ResDisplay 0 (headerE "Errors" : map renderBlock errors)]
+    -- let responses = [ResDisplay 0 (headerE "Errors" : map renderSection errors)]
     let diagnostics = errors >>= collect
     lift $ tell [TraceSendDiagnostics diagnostics]
     return $ Left errors
