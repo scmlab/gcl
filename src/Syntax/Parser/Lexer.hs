@@ -14,7 +14,6 @@ import Data.Text (Text)
 import Data.Void (Void)
 import Syntax.Common
 import Syntax.Concrete (Lit (..), Token (..))
-import Syntax.Concrete.Located ()
 import Syntax.Parser.Token
 import Syntax.Parser.Util
 import Text.Megaparsec (MonadParsec (notFollowedBy, tokens, try), Parsec, Stream (tokensToChunk), getOffset, getSourcePos, satisfy, setOffset, (<?>))
@@ -253,8 +252,14 @@ lexMax = Max . locOf <$> symbol tokMax
 lexMin :: LexerF ArithOp  
 lexMin = Min . locOf <$> symbol tokMin
 
+lexExp :: LexerF ArithOp  
+lexExp = Exp . locOf <$> symbol tokExp
+
 lexSum :: LexerF QuantOp
 lexSum = Sum . locOf <$> symbol tokSum
+
+lexPi :: LexerF QuantOp
+lexPi = Pi . locOf <$> symbol tokPi
 
 lexForall :: LexerF QuantOp
 lexForall = Forall . locOf <$> symbol tokForall
@@ -298,13 +303,15 @@ lexArithOps =
       lexDiv, 
       lexMod,
       lexMax, 
-      lexMin
+      lexMin,
+      lexExp
     ]
 
 lexQuantOps :: LexerF QuantOp 
 lexQuantOps = 
   choice 
     [ lexSum, 
+      lexPi,
       lexForall, 
       lexExists, 
       lexHash

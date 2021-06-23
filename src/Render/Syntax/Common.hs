@@ -37,12 +37,14 @@ instance Render ArithOp where
   render (Mod l) = tempHandleLoc l $ render tokMod
   render (Max l) = tempHandleLoc l $ render tokMax
   render (Min l) = tempHandleLoc l $ render tokMin
+  render (Exp l) = tempHandleLoc l $ render tokExp
   render (PointsTo l) = tempHandleLoc l $ render tokPointsTo
   render (SConj l) = tempHandleLoc l $ render tokSConj
   render (SImp l) = tempHandleLoc l $ render tokSImp
 
 instance Render QuantOp where
   render (Sum l) = tempHandleLoc l $ render tokSum
+  render (Pi l) = tempHandleLoc l $ render tokPi
   render (Forall l) = tempHandleLoc l $ render tokForall
   render (Exists l) = tempHandleLoc l $ render tokExists
   render (Hash l) = tempHandleLoc l $ render tokHash

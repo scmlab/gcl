@@ -4,32 +4,39 @@
 
 module Server.DSL where
 
-import Control.Monad.Cont
-import Control.Monad.Except
-import Control.Monad.Trans.Free
-import Control.Monad.Writer
-import Data.List (find, sortOn)
-import Data.Loc
-import Data.Loc.Range
-import Data.Text (Text)
-import qualified Data.Text as Text
-import Error
-import qualified GCL.Type as TypeChecking
-import GCL.WP (StructWarning)
-import qualified GCL.WP as WP
-import Language.LSP.Types ( Diagnostic )
-import qualified Syntax.Abstract as A
-import Syntax.Concrete.ToAbstract
-import Syntax.Parser (Parser, pProgram, pStmts, runParse)
-import GCL.Predicate
-import GCL.Predicate.Util ( specPayloadWithoutIndentation )
-import Prelude hiding (span)
-import Pretty (toText)
-import qualified Data.List as List
-import Server.CustomMethod 
-import Render
-import Server.Handler.Diagnostic ()
-import Server.Stab (collect)
+import           Control.Monad.Cont
+import           Control.Monad.Except
+import           Control.Monad.Trans.Free
+import           Control.Monad.Writer
+import           Data.List                      ( find
+                                                , sortOn
+                                                )
+import qualified Data.List                     as List
+import           Data.Loc                hiding ( fromLoc )
+import           Data.Loc.Range
+import           Data.Text                      ( Text )
+import qualified Data.Text                     as Text
+import           Error
+import           GCL.Predicate
+import           GCL.Predicate.Util             ( specPayloadWithoutIndentation
+                                                )
+import qualified GCL.Type                      as TypeChecking
+import           GCL.WP                         ( StructWarning )
+import qualified GCL.WP                        as WP
+import           Language.LSP.Types             ( Diagnostic )
+import           Prelude                 hiding ( span )
+import           Pretty                         ( toText )
+import           Render
+import           Server.CustomMethod
+import           Server.Handler.Diagnostic      ( )
+import           Server.Stab                    ( collect )
+import qualified Syntax.Abstract               as A
+import Syntax.Concrete ( ToAbstract(toAbstract) )
+import           Syntax.Parser                  ( Parser
+                                                , pProgram
+                                                , pStmts
+                                                , runParse
+                                                )
 
 --------------------------------------------------------------------------------
 
@@ -103,18 +110,17 @@ digHole range = do
 
 -- | Try to parse a piece of text in a Spec
 refine :: Text -> Range -> CmdM (Spec, [Text])
-refine source range  = do
+refine source range = do
   result <- findPointedSpec
   case result of
-    Nothing -> throwError [Others "Please place the cursor in side a Spec to refine it"]
+    Nothing ->
+      throwError [Others "Please place the cursor in side a Spec to refine it"]
     Just spec -> do
       source' <- getSource
       let payload = Text.unlines $ specPayloadWithoutIndentation source' spec
       -- HACK, `pStmts` will kaput if we feed empty strings into it
       let payloadIsEmpty = Text.null (Text.strip payload)
-      if payloadIsEmpty
-        then return ()
-        else void $ parse pStmts payload
+      if payloadIsEmpty then return () else void $ parse pStmts payload
       return (spec, specPayloadWithoutIndentation source' spec)
   where
     findPointedSpec :: CmdM (Maybe Spec)
@@ -129,11 +135,10 @@ typeCheck p = case TypeChecking.runTM (TypeChecking.checkProg p) of
   Right v -> return v
 
 sweep :: A.Program -> CmdM ([PO], [Spec], [A.Expr], [StructWarning])
-sweep program@(A.Program _ globalProps _ _ _) =
-  case WP.sweep program of
-    Left e -> throwError [StructError e]
-    Right (pos, specs, warings) -> do
-      return (List.sort pos, sortOn locOf specs, globalProps, warings)
+sweep program@(A.Program _ globalProps _ _ _) = case WP.sweep program of
+  Left e -> throwError [StructError e]
+  Right (pos, specs, warings) -> do
+    return (List.sort pos, sortOn locOf specs, globalProps, warings)
 
 --------------------------------------------------------------------------------
 
@@ -155,48 +160,47 @@ parseProgram source = do
 
 --------------------------------------------------------------------------------
 
-
-
 generateResponseAndDiagnosticsFromResult :: Result -> CmdM [ResKind]
 generateResponseAndDiagnosticsFromResult (Left errors) = throwError errors
-generateResponseAndDiagnosticsFromResult (Right (pos, specs, globalProps, warnings))
-  = do
-  -- leave only POs & Specs around the mouse selection
+generateResponseAndDiagnosticsFromResult (Right (pos, specs, globalProps, warnings)) =
+  do
+    -- leave only POs & Specs around the mouse selection
     lastSelection <- getLastSelection
     let overlappedSpecs = case lastSelection of
-          Nothing  -> specs
+          Nothing -> specs
           Just sel -> filter (withinRange sel) specs
     let overlappedPOs = case lastSelection of
-          Nothing  -> pos
+          Nothing -> pos
           Just sel -> filter (withinRange sel) pos
     -- render stuff
-    let warningsSection = if null warnings
+    let warningsSections =
+          if null warnings then [] else map renderSection warnings
+    let globalPropsSections = if null globalProps
           then []
-          else headerE "Warnings" : map renderBlock warnings
-    let globalPropsSection = if null globalProps
-          then []
-          else headerE "Global Properties" : map renderBlock globalProps
-    let specsSection = if null overlappedSpecs
-          then []
-          else headerE "Specs" : map renderBlock overlappedSpecs
-    let poSection = if null overlappedPOs
-          then []
-          else headerE "Proof Obligations" : map renderBlock overlappedPOs
-    let blocks = mconcat
-          [warningsSection, specsSection, poSection, globalPropsSection]
+          else map
+            (\expr -> Section
+              Plain
+              [Header "Property" (fromLoc (locOf expr)), Code (render expr)]
+            )
+            globalProps
+    let specsSections =
+          if null overlappedSpecs then [] else map renderSection overlappedSpecs
+    let poSections =
+          if null overlappedPOs then [] else map renderSection overlappedPOs
+    let sections =
+          mconcat [warningsSections, specsSections, poSections, globalPropsSections]
 
     version <- bumpVersion
     let encodeSpec spec =
-          ( specID spec
-          , toText $ render (specPreCond spec)
-          , toText $ render (specPostCond spec)
-          , specRange spec
+          ( specID spec,
+            toText $ render (specPreCond spec),
+            toText $ render (specPostCond spec),
+            specRange spec
           )
 
     let responses =
-          [ResDisplay version blocks, ResUpdateSpecs (map encodeSpec specs)]
-    let diagnostics =
-          concatMap collect pos ++ concatMap collect warnings
+          [ResDisplay version sections, ResUpdateSpecs (map encodeSpec specs)]
+    let diagnostics = concatMap collect pos ++ concatMap collect warnings
     sendDiagnostics diagnostics
 
     return responses

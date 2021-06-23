@@ -3,7 +3,7 @@
 
 module Render.Class
   ( Render (..),
-    RenderBlock(..), 
+    RenderSection(..), 
     tempHandleLoc,
     renderManySepByComma
   )
@@ -28,13 +28,13 @@ class Render a where
   render = renderPrec 0
   renderPrec = const render
 
--- | Typeclass for rendering Block Elements
-class RenderBlock a where
-  renderBlock :: a -> Block
-  renderBlockPrec :: Int -> a -> Block
+-- | Typeclass for rendering Sections
+class RenderSection a where
+  renderSection :: a -> Section
+  renderSectionPrec :: Int -> a -> Section
 
-  renderBlock = renderBlockPrec 0
-  renderBlockPrec = const renderBlock
+  renderSection = renderSectionPrec 0
+  renderSectionPrec = const renderSection
 
 --------------------------------------------------------------------------------
 

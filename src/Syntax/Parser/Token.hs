@@ -215,9 +215,6 @@ tokDiv = "/"
 tokMod :: Text
 tokMod = "%"
 
-tokSum :: Text
-tokSum = "Σ"
-
 tokMax :: Text
 tokMax = "↑"
 
@@ -232,6 +229,15 @@ tokSConj = "٭"
 
 tokSImp :: Text
 tokSImp = "-٭"
+
+tokExp :: Text
+tokExp = "^"
+
+tokSum :: Text
+tokSum = "Σ"
+
+tokPi :: Text
+tokPi = "∏"
 
 tokForall :: Text
 tokForall = "∀"

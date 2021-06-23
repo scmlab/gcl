@@ -8,7 +8,7 @@ module Pretty.Util
     fromDoc,
     fromRender,
     fromRenderPrec,
-    fromRenderBlock,
+    fromRenderSection,
     fromRenderAndLocated
   )
 where
@@ -75,8 +75,8 @@ fromRenderAndLocated x = case locOf x of
   Loc a b -> DocWithLoc (pretty (render x)) a b
 
 -- | If something can be rendered, then make it a Doc
-fromRenderBlock :: RenderBlock a => a -> Doc ann
-fromRenderBlock x = pretty (renderBlock x)
+fromRenderSection :: RenderSection a => a -> Doc ann
+fromRenderSection x = pretty (renderSection x)
 
 -- generates newlines and spaces to fill the gap between to Pos
 fillGap :: Pos -> Pos -> Doc ann

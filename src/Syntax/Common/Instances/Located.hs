@@ -1,12 +1,15 @@
-module Syntax.Common.Located where
+module Syntax.Common.Instances.Located where
 
 import Data.Loc
-import Syntax.Common
+import Syntax.Common.Types
 import Prelude hiding (Ordering (..))
 
 instance (Located a, Located b) => Located(Either a b) where
   locOf (Left a) = locOf a
   locOf (Right b) = locOf b
+
+instance Located Name where
+  locOf (Name _ l) = l
 
 instance Located ChainOp where
   locOf (EQProp l) = l
@@ -37,12 +40,14 @@ instance Located ArithOp where
   locOf (Mod l) = l
   locOf (Max l) = l
   locOf (Min l) = l
+  locOf (Exp l) = l
   locOf (PointsTo l) = l
   locOf (SConj l) = l
   locOf (SImp l) = l
 
 instance Located QuantOp where
   locOf (Sum l) = l
+  locOf (Pi l) = l
   locOf (Exists l) = l
   locOf (Forall l) = l
   locOf (Hash l) = l

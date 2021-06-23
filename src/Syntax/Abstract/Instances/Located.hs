@@ -1,12 +1,17 @@
-module Syntax.Abstract.Located where
+module Syntax.Abstract.Instances.Located where
 
 import Data.Loc
-import Syntax.Common.Located()
-import Syntax.Abstract
+import Syntax.Common()
+import Syntax.Abstract.Types
 import Prelude hiding (Ordering(..))
 
 instance Located Program where
   locOf (Program _ _ _ _ l) = l
+
+instance Located Declaration where
+  locOf (ConstDecl _ _ _ l) = l
+  locOf (VarDecl _ _ _ l) = l
+  locOf (LetDecl _ _ _ l) = l
 
 instance Located Stmt where
   locOf (Skip l) = l
@@ -24,6 +29,9 @@ instance Located Stmt where
   locOf (HMutate _ _ l) = l
   locOf (Dispose _ l) = l
 
+instance Located GdCmd where
+  locOf (GdCmd _ _ l) = l 
+  
 instance Located Endpoint where
   locOf (Including e) = locOf e
   locOf (Excluding e) = locOf e
@@ -38,7 +46,7 @@ instance Located Type where
   locOf (TVar _ l) = l
 
 instance Located Expr where
-  locOf (Paren e) = locOf e
+  locOf (Paren _ l) = l
   locOf (Var _ l) = l
   locOf (Const _ l) = l
   locOf (Lit _ l) = l

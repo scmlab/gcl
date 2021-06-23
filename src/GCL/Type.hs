@@ -12,12 +12,11 @@ import Data.Loc
 import qualified Data.Map as Map
 import GHC.Generics (Generic)
 import Syntax.Abstract
-import Syntax.Abstract.Located ()
 import Syntax.Common
 import Prelude hiding (Ordering (..))
 import GCL.Common
 import Control.Monad.State (StateT(..), evalStateT)
-
+import Syntax.Abstract.Util (bindingsToExpr)
 
 data TypeError
   = NotInScope Name Loc
@@ -25,9 +24,10 @@ data TypeError
   | RecursiveType Name Type Loc
   | NotFunction Type Loc
   | NotArray    Type Loc
-  | -- TODO: move these to scope checking
-    NotEnoughExprsInAssigment (NonEmpty Name) Loc
+  | NotEnoughExprsInAssigment (NonEmpty Name) Loc
   | TooManyExprsInAssigment (NonEmpty Expr) Loc
+  | AssignToConst Name Loc
+  | AssignToLet Name Loc
   deriving (Show, Eq, Generic)
 
 instance ToJSON TypeError
@@ -40,6 +40,8 @@ instance Located TypeError where
   locOf (NotArray _ l) = l
   locOf (NotEnoughExprsInAssigment _ l) = l
   locOf (TooManyExprsInAssigment _ l) = l
+  locOf (AssignToConst _ l) = l
+  locOf (AssignToLet _ l) = l
 
 ------------------------------------------
 -- type enviornment
@@ -87,7 +89,7 @@ inEnv l m = do
   local scope m
 
 infer :: Expr -> Infer Type
-infer (Paren expr) = infer expr
+infer (Paren expr _) = infer expr
 infer (Lit lit l) = return (litTypes lit l)
 infer (Var x _) = lookupInferEnv x
 infer (Const c _) = lookupInferEnv c
@@ -140,7 +142,7 @@ infer (Quant qop iters rng t l) = do
       return x
 infer (Subst expr sub _) = do
   t <- infer expr
-  s <- mapM infer sub
+  s <- mapM infer (Map.map bindingsToExpr sub)
   return $ subst s t
 infer (ArrIdx e1 e2 l) = do
   t1 <- infer e1
@@ -305,8 +307,27 @@ checkStmt env (Dispose e _) =
 --   where
 --     expr' = foldr (\x b -> Lam x b (b <--> locOf x)) body xs
 
+-- NOTE : should this be check here?
+checkIsVarAssign :: [Declaration] -> Stmt -> TM ()
+checkIsVarAssign declarations (Assign ns _ _) =
+  let (_, cs, ls) = splitDecls declarations in
+  forM_ ns (\n ->
+    if n `elem` cs
+    then throwError $ AssignToConst n (locOf n)
+    else when (n `elem` ls) $ throwError $ AssignToLet n (locOf n)
+  )
+  where
+    splitDecls [] = ([], [], [])
+    splitDecls (d : ds) = let (vs, cs, ls) = splitDecls ds in
+      case d of
+        VarDecl n _ _ _ -> (n ++ vs, cs, ls)
+        ConstDecl n _ _ _ -> (vs, n ++ cs, ls)
+        LetDecl n _ _ _ -> (vs, cs, n : ls)
+checkIsVarAssign _ _ = return ()
+
 checkProg :: Program -> TM ()
 checkProg (Program decls exprs defs stmts _) = do
+  mapM_ (checkIsVarAssign decls) stmts
   env <- foldM inferDecl emptyEnv decls
   mapM_ (checkExpr env) exprs
   mapM_ (checkAssign env) (Map.toList defs)
@@ -421,15 +442,17 @@ arithOpTypes (Div l) = tInt .-> tInt .-> tInt $ l
 arithOpTypes (Mod l) = tInt .-> tInt .-> tInt $ l
 arithOpTypes (Max l) = tInt .-> tInt .-> tInt $ l
 arithOpTypes (Min l) = tInt .-> tInt .-> tInt $ l
+arithOpTypes (Exp l) = tInt .-> tInt .-> tInt $ l
 arithOpTypes (PointsTo l) = tInt .-> tInt .-> tInt $ l
 arithOpTypes (SConj l)    = tBool .-> tBool .-> tBool $ l
 arithOpTypes (SImp l)     = tBool .-> tBool .-> tBool $ l
 
 quantOpTypes :: QuantOp -> Type
-quantOpTypes (Sum l)    = tInt .-> tInt .-> tInt $ l
-quantOpTypes (Forall l) = tBool .-> tBool .-> tBool $ l
-quantOpTypes (Exists l) = tBool .-> tBool .-> tBool $ l
-quantOpTypes (Hash l)   = tBool .-> tInt $ l
+quantOpTypes (Sum l) = arithOpTypes (Add l)
+quantOpTypes (Pi l) = arithOpTypes (Mul l)
+quantOpTypes (Forall l) = arithOpTypes (Conj l)
+quantOpTypes (Exists l) = arithOpTypes (Disj l)
+quantOpTypes (Hash l) = tBool .-> tInt $ l
 
 opTypes :: Op -> Type
 opTypes (ChainOp op) = chainOpTypes op

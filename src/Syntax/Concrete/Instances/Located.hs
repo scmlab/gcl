@@ -1,7 +1,7 @@
-module Syntax.Concrete.Located where
+module Syntax.Concrete.Instances.Located where
 
-import Syntax.Concrete
-import Syntax.Common.Located ()
+import Syntax.Concrete.Types
+import Syntax.Common ()
 import Data.Loc (Located (locOf), (<-->))
 
 --------------------------------------------------------------------------------

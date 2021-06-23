@@ -1,8 +1,8 @@
 {-# LANGUAGE FlexibleInstances #-}
 module GCL.Expr where
 
-import GCL.Common ( Env, FreshState, Substitutable (subst), Subs )
-import Syntax.Abstract ( Expr (..) )
+import GCL.Common ( Env, FreshState, Substitutable (subst) )
+import Syntax.Abstract ( Expr (..), Bindings(BetaBinding) )
 import Control.Monad.Reader (ReaderT, ask)
 import Control.Monad.State (State)
 import qualified Data.Map as Map
@@ -10,7 +10,7 @@ import qualified Data.Map as Map
 type Expand = ReaderT (Env Expr) (State FreshState)
 
 expand :: Expr -> Expand Expr
-expand (Paren expr) = Paren <$> expand expr
+expand (Paren expr l) = Paren <$> expand expr <*> pure l
 expand lit@(Lit _ _) = return lit
 expand c@(Const n _) = do
   env <- ask
@@ -31,7 +31,7 @@ expand (App a b l) = do
   a' <- expand a
   b' <- expand b
   case a' of
-    Lam x body _ -> return $ subst (Map.singleton x (Left b' :: Either Expr Expr)) body
+    Lam x body _ -> return $ subst (Map.singleton x (BetaBinding b')) body
     _ -> return $ App a' b' l
 expand (Lam x e l) = return (Lam x e l)
 expand h@(Hole _) = return h
@@ -41,8 +41,7 @@ expand (Quant op xs rng t l) = do
   return $ Quant op xs rng' t' l
 expand (Subst e s _) = do
   e' <- expand e
-  let s' = Map.map Right s :: Subs (Either Expr Expr)
-  return $ subst s' e'
+  return $ subst s e'
 expand (ArrIdx e1 e2 l) = do
   e1' <- expand e1
   e2' <- expand e2

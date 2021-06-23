@@ -4,6 +4,7 @@
 
 
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE LambdaCase #-}
 module Server.Handler.Hover
   ( handler
   ) where
@@ -15,7 +16,6 @@ import           Syntax.Abstract
 
 import           Control.Monad.Except
 import           Control.Monad.Reader
-import           Data.Loc                       ( locOf )
 import           Data.Map                       ( Map )
 import qualified Data.Map                      as Map
 import           Data.Maybe                     ( listToMaybe
@@ -39,40 +39,50 @@ handler uri pos responder = case uriToFilePath uri of
     interpret filepath (responder . ignoreErrors) $ do
       source       <- getSource
       program      <- parseProgram source
-      hoverResults <- runHoverM program $ stabM pos program
+      hoverResults <- runHoverM program pos $ stabM program
       return $ listToMaybe $ map resultHover hoverResults
 
 data HoverResult = Result
   { resultHover :: Hover
   , resultType  :: Type
   }
-  deriving (Show)
+  deriving Show
 
 --------------------------------------------------------------------------------
 
--- | A "Scope" is a mapping of names and HoverResults
-type Scope = Map Text HoverResult
+-- -- | A "Scope" is a mapping of names and HoverResults
+-- type Scope = Map Text HoverResult
 
--- | See if a name is in the scope
-lookupScope :: Scope -> Name -> Maybe HoverResult
-lookupScope scope name = Map.lookup (nameToText name) scope
+-- -- | See if a name is in the scope
+-- lookupScope :: Scope -> Name -> Maybe HoverResult
+-- lookupScope scope name = Map.lookup (nameToText name) scope
 
--- | See if a name is in a series of scopes (from local to global)
--- | Return the first result (which should be the most local target)
-lookupScopes :: [Scope] -> Name -> Maybe HoverResult
-lookupScopes scopes name = foldl findFirst Nothing scopes
- where
-  findFirst :: Maybe HoverResult -> Scope -> Maybe HoverResult
-  findFirst (Just found) _     = Just found
-  findFirst Nothing      scope = lookupScope scope name
+-- -- | See if a name is in a series of scopes (from local to global)
+-- -- | Return the first result (which should be the most local target)
+-- lookupScopes :: [Scope] -> Name -> Maybe HoverResult
+-- lookupScopes scopes name = foldl findFirst Nothing scopes
+--  where
+--   findFirst :: Maybe HoverResult -> Scope -> Maybe HoverResult
+--   findFirst (Just found) _     = Just found
+--   findFirst Nothing      scope = lookupScope scope name
 
 
 --------------------------------------------------------------------------------
 
-type HoverM = ReaderT [Scope] CmdM
+type HoverM = ReaderT Position (ReaderT [Scope HoverResult] CmdM)
 
-runHoverM :: Program -> HoverM a -> CmdM a
-runHoverM (Program decls _ _ _ _) = flip runReaderT [declScope]
+instance HasPosition HoverM where
+  askPosition = ask
+
+instance HasScopes HoverM HoverResult where
+  askScopes = lift ask
+  localScope scope p = do
+    pos <- ask
+    lift $ local (scope :) $ runReaderT p pos
+
+runHoverM :: Program -> Position -> HoverM a -> CmdM a
+runHoverM (Program decls _ _ _ _) pos f = runReaderT (runReaderT f pos)
+                                                     [declScope]
  where
   declScope :: Map Text HoverResult
   declScope = case Type.runTM (foldM Type.inferDecl Map.empty decls) of
@@ -87,74 +97,73 @@ typeToHoverResult t = Result { resultHover = hover, resultType = t }
   content = HoverContents $ markedUpContent "gcl" (toText t)
 
 instance StabM HoverM Stmt HoverResult where
-  stabM pos x = whenInRange' pos (locOf x) $ case x of
-    Assign a b _        -> (<>) <$> stabM pos a <*> stabM pos b
-    Assert a _          -> stabM pos a
-    LoopInvariant a b _ -> (<>) <$> stabM pos a <*> stabM pos b
-    Do a _              -> stabM pos a
-    If a _              -> stabM pos a
+  stabM = \case
+    Assign a b _        -> (<>) <$> stabLocated a <*> stabLocated b
+    Assert a _          -> stabLocated a
+    LoopInvariant a b _ -> (<>) <$> stabLocated a <*> stabLocated b
+    Do a _              -> stabLocated a
+    If a _              -> stabLocated a
     _                   -> return []
 
 instance StabM HoverM GdCmd HoverResult where
-  stabM pos (GdCmd gd stmts l) =
-    whenInRange' pos l $ (<>) <$> stabM pos gd <*> stabM pos stmts
+  stabM (GdCmd gd stmts _) = (<>) <$> stabLocated gd <*> stabLocated stmts
 
 instance StabM HoverM Declaration HoverResult where
-  stabM pos x = whenInRange' pos (locOf x) $ case x of
-    ConstDecl a    _    c    _ -> (<>) <$> stabM pos a <*> stabM pos c
-    VarDecl   a    _    c    _ -> (<>) <$> stabM pos a <*> stabM pos c
+  stabM = \case
+    ConstDecl a    _    c    _ -> (<>) <$> stabLocated a <*> stabLocated c
+    VarDecl   a    _    c    _ -> (<>) <$> stabLocated a <*> stabLocated c
     LetDecl   name args body _ -> do
-      name' <- stabM pos name
-      args' <- stabM pos (toArgs name args)
+      name' <- stabLocated name
+      -- creates a local scope for arguments 
+      args' <- stabM (toArgs name args)
       let argsScope = Map.fromList $ zip (map nameToText args) args'
-      body' <- local (argsScope :) $ stabM pos body
+      -- temporarily preppend this local scope to the scope list 
+      body' <- localScope argsScope $ stabLocated body
+
       return $ concat [name', args', body']
 
 instance StabM HoverM Expr HoverResult where
-  stabM pos x = whenInRange' pos (locOf x) $ case x of
-    Paren a        -> stabM pos a
-    Var   a _      -> stabM pos a
-    Const a _      -> stabM pos a
-    Op op          -> stabM pos op
+  stabM = \case
+    Paren a _      -> stabLocated a
+    Var   a _      -> stabLocated a
+    Const a _      -> stabLocated a
+    Op op          -> stabLocated op
     Chain a op c _ -> do
-      concat <$> sequence [stabM pos a, stabM pos op, stabM pos c]
-    App a b _ -> (<>) <$> stabM pos a <*> stabM pos b
-    Lam _ b _ -> stabM pos b
+      concat <$> sequence [stabLocated a, stabLocated op, stabLocated c]
+    App a b _ -> (<>) <$> stabLocated a <*> stabLocated b
+    Lam _ b _ -> stabLocated b
     Quant op _ c d _ ->
-      concat <$> sequence [stabM pos op, stabM pos c, stabM pos d]
+      concat <$> sequence [stabLocated op, stabLocated c, stabLocated d]
     _ -> return []
 
 instance StabM HoverM Op HoverResult where
-  stabM pos (ChainOp op) = stabM pos op
-  stabM pos (ArithOp op) = stabM pos op
-  stabM pos (QuantOp op) = stabM pos op
+  stabM (ChainOp op) = stabLocated op
+  stabM (ArithOp op) = stabLocated op
+  stabM (QuantOp op) = stabLocated op
 
 instance StabM HoverM ArithOp HoverResult where
-  stabM pos op = whenInRange' pos (locOf op)
-    $ return [typeToHoverResult (Type.arithOpTypes op)]
+  stabM op = return [typeToHoverResult (Type.arithOpTypes op)]
 
 instance StabM HoverM ChainOp HoverResult where
-  stabM pos op = whenInRange' pos (locOf op)
-    $ return [typeToHoverResult (Type.chainOpTypes op)]
+  stabM op = return [typeToHoverResult (Type.chainOpTypes op)]
 
 instance StabM HoverM QuantOp HoverResult where
-  stabM pos op = whenInRange' pos (locOf op)
-    $ return [typeToHoverResult (Type.quantOpTypes op)]
+  stabM op = return [typeToHoverResult (Type.quantOpTypes op)]
 
 instance StabM HoverM QuantOp' HoverResult where
-  stabM pos (Left  op  ) = stabM pos op
-  stabM pos (Right expr) = stabM pos expr
+  stabM (Left  op  ) = stabLocated op
+  stabM (Right expr) = stabLocated expr
 
 instance StabM HoverM Name HoverResult where
-  stabM pos name = if pos `stabbed'` name
-    then do
-      scopes <- ask
-      return $ maybeToList $ lookupScopes scopes name
-    else return []
+  stabM name = do
+    result <- lookupScopes (nameToText name)
+    case result of
+      Nothing          -> return []
+      Just hoverResult -> return [hoverResult]
 
 instance StabM HoverM Program HoverResult where
-  stabM pos (Program decls _ _ stmts l) =
-    whenInRange' pos l $ (<>) <$> stabM pos decls <*> stabM pos stmts
+  stabM (Program decls _ _ stmts _) =
+    (<>) <$> stabLocated decls <*> stabLocated stmts
 
 
 --------------------------------------------------------------------------------
@@ -169,12 +178,18 @@ toArgs :: Name -> [Name] -> [Arg]
 toArgs func args = zipWith (Arg func) args [0 ..]
 
 instance StabM HoverM Arg HoverResult where
-  stabM _pos (Arg func _arg index) = do
-    scopes <- ask
-    case lookupScopes scopes func of
+  stabM (Arg func _arg index) = do
+    result <- lookupScopes (nameToText func)
+    case result of
       Nothing -> return []
       Just (Result _ t) ->
         return $ map typeToHoverResult $ maybeToList $ locateArgType t index
+
+    -- scopes <- askScopes
+    -- case lookupScopes scopes func of
+    --   Nothing -> return []
+    --   Just (Result _ t) ->
+    --     return $ map typeToHoverResult $ maybeToList $ locateArgType t index
 
    where
       -- given the type of a function and the index of one of its argument

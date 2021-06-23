@@ -1,8 +1,7 @@
 module Syntax.Abstract.Util where
 
 import Syntax.Abstract
-    ( Expr(Lam), GdCmd(..), Stmt, Declaration(..) )
-import Syntax.Abstract.Located()
+    ( Expr(Lam), GdCmd(..), Stmt, Declaration(..), Bindings (..) )
 import Syntax.Common (Name)
 import Data.Loc ((<-->))
 
@@ -10,6 +9,11 @@ extractAssertion :: Declaration -> Maybe Expr
 extractAssertion (ConstDecl _ _ e _) = e
 extractAssertion (VarDecl _ _ e _) = e
 extractAssertion LetDecl {} = Nothing
+
+extractDeclaration :: Declaration -> Maybe Declaration 
+extractDeclaration d@ConstDecl {} = Just d
+extractDeclaration d@VarDecl {} = Just d
+extractDeclaration _ = Nothing
 
 extractLetBinding :: Declaration -> Maybe (Name, Expr)
 extractLetBinding ConstDecl {} = Nothing
@@ -27,3 +31,13 @@ wrapLam [] body = body
 wrapLam (x : xs) body = 
   let b = wrapLam xs body in
   Lam x b (x <--> b)
+
+bindingsToExpr :: Bindings -> Expr
+bindingsToExpr (AssignBinding e) = e
+bindingsToExpr (LetBinding e) = e
+bindingsToExpr (BetaBinding e) = e
+bindingsToExpr (AlphaBinding e) = e
+
+assignBindingToExpr :: Bindings -> Maybe Expr
+assignBindingToExpr (AssignBinding e) = Just e
+assignBindingToExpr _ = Nothing

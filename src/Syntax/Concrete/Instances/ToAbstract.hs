@@ -4,12 +4,12 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE FlexibleContexts #-}
-module Syntax.Concrete.ToAbstract where
+module Syntax.Concrete.Instances.ToAbstract where
 
 import Control.Monad.Except ( Except, forM, throwError )
 import Data.Loc (Loc (..), (<-->), Located (locOf))
-import Syntax.Concrete
-import Syntax.Concrete.Located()
+import Syntax.Concrete.Types
+import Syntax.Concrete.Instances.Located()
 import qualified Syntax.Abstract as A
 import qualified Syntax.Abstract.Operator as A
 import qualified Syntax.ConstExpr as ConstExpr
@@ -26,14 +26,15 @@ class ToAbstract a b | a -> b where
 
 -- | Program / Declaration / Statement
 instance ToAbstract Program A.Program where
-  toAbstract (Program decls' stmts') = do
+  toAbstract prog@(Program decls' stmts') = do
     decls <- concat <$> forM decls' toAbstract
+    -- let declarations = ConstExpr.pickDeclarations decls
     let letBindings = ConstExpr.pickLetBindings decls
     let (globProps, assertions) = ConstExpr.pickGlobals decls
     let pre = [A.Assert (A.conjunct assertions) NoLoc | not (null assertions)]
     stmts <- mapM toAbstract stmts'
 
-    return $ A.Program decls globProps letBindings (pre ++ stmts) (decls' <--> stmts)
+    return $ A.Program decls globProps letBindings (pre ++ stmts) (locOf prog)
 
 instance ToAbstract Declaration A.Declaration where
   toAbstract declaration = case declaration of
@@ -151,7 +152,7 @@ instance ToAbstract Type A.Type where
 -- | Expressions
 instance ToAbstract Expr A.Expr where
   toAbstract x = case x of
-    Paren _ a _ -> A.Paren <$> toAbstract a
+    Paren _ a _ -> A.Paren <$> toAbstract a <*> pure (locOf x)
     Lit a -> A.Lit <$> toAbstract a <*> pure (locOf x)
     Var a -> pure $ A.Var a (locOf x)
     Const a -> pure $ A.Const a (locOf x)

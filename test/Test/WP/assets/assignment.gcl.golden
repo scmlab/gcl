@@ -1,10 +1,10 @@
 ### Result
 
-[ < Assigment >
-True
+[ Assigment at ./test/Test/WP/assets/assignment.gcl [9-15] 2:1-7
+`True
 ⇒
-0   =   1
-at ./test/Test/WP/assets/assignment.gcl [9-15] 2:1-7 ]
+0   =   x[  1  /  x  ]
+` ]
 
 ### Source
 

@@ -15,7 +15,6 @@ import Pretty.Variadic
 import Pretty.Common ()
 import Syntax.Common
 import Syntax.Concrete
-import Syntax.Concrete.Located ()
 import Prelude hiding (Ordering (..))
 import Syntax.Parser.Token
 

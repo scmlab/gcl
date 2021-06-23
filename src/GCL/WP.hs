@@ -11,14 +11,16 @@ import Data.Aeson (ToJSON)
 import Data.Loc (Loc (..), Located (..))
 import Data.Loc.Range (Range, fromLoc)
 import qualified Data.Map as Map
-import GCL.Common (Bindings, Fresh (fresh, freshText, freshName), Subs, Substitutable (subst))
+import GCL.Common (Fresh (fresh, freshText, freshName), Subs, Substitutable (subst), alphaRename)
 import GCL.Predicate (Origin (..), PO (..), Pred (..), Spec (Specification))
 import GCL.Predicate.Util (conjunct, disjunct, guardIf, guardLoop, toExpr)
 import GHC.Generics (Generic)
 import qualified Syntax.Abstract as A
 import qualified Syntax.Abstract.Operator as A
 import qualified Syntax.Abstract.Util as A
+import qualified Syntax.ConstExpr as A
 import Syntax.Common (Name (Name))
+import qualified Data.Set as Set
 
 type TM = Except StructError
 
@@ -34,8 +36,8 @@ runWP :: WP a -> Subs A.Expr -> Either StructError (a, ([PO], [Spec], [StructWar
 runWP p defs = runExcept $ evalRWST p defs (0, 0, 0)
 
 sweep :: A.Program -> Either StructError ([PO], [Spec], [StructWarning])
-sweep (A.Program _ _ ds stmts _) = do
-  snd <$> runWP (structProgram stmts) ds
+sweep (A.Program decls _ ds stmts _) = do
+  snd <$> runWP (structProgram decls stmts) ds
 
 data ProgView
   = ProgViewEmpty
@@ -58,9 +60,18 @@ progView stmts = do
       ProgViewMissingPrecondition (init stmts) (Assertion post m)
     _ -> ProgViewMissingBoth stmts
 
-structProgram :: [A.Stmt] -> WP ()
-structProgram stmts = do
-  env <- Map.map Right <$> ask :: WP (Subs Bindings)
+alphaRenameDefns :: [A.Declaration] -> A.Defns -> WP A.Defns
+alphaRenameDefns decls dfns = do
+  let ns = Set.fromList $ Map.keys dfns ++ concatMap extractNames (A.pickDeclarations decls)
+  mapM (alphaRename ns) dfns
+  where
+    extractNames (A.ConstDecl ns _ _ _) = ns
+    extractNames (A.VarDecl ns _ _ _) = ns
+    extractNames (A.LetDecl n _ _ _) = [n]
+
+structProgram :: [A.Declaration] -> [A.Stmt] -> WP ()
+structProgram decls stmts = do
+  env <- Map.map A.LetBinding <$> (ask >>= alphaRenameDefns decls):: WP (Subs A.Bindings)
 
   case progView (subst env stmts) of
     ProgViewEmpty -> return ()
@@ -228,10 +239,10 @@ wp :: Bool -> A.Stmt -> Pred -> WP Pred
 wp _ (A.Abort _) _ = return (Constant A.false)
 wp _ (A.Skip _) post = return post
 wp _ (A.Assign xs es _) post = do
-  let sub = Map.fromList . zip xs . map Left $ es :: Subs Bindings
+  let sub = Map.fromList . zip xs . map A.AssignBinding $ es
   return $ subst sub post
 wp _ (A.AAssign (A.Var x _) i e _) post = do
-  let sub = Map.fromList [(x, Left (A.ArrUpd (A.nameVar x) i e NoLoc))] :: Subs Bindings
+  let sub = Map.fromList [(x, A.AssignBinding (A.ArrUpd (A.nameVar x) i e NoLoc))]
   return $ subst sub post
 wp _ (A.AAssign _ _ _ l) _ = throwError (MultiDimArrayAsgnNotImp l)
 wp _ (A.Do _ l) _ = throwError $ MissingAssertion l
@@ -248,7 +259,7 @@ wp _ (A.Alloc x (e:es) _) post = do -- non-empty
    return $ Constant
      (A.forAll [x'] A.true
         (newallocs x' `A.sImp` subst (sub x') (toExpr post)))
-  where sub x' = Map.fromList [(x, Left (A.nameVar x'))] :: Subs Bindings
+  where sub x' = Map.fromList [(x, A.AssignBinding (A.nameVar x'))]
         newallocs x' = A.sconjunct (
           (A.nameVar x' `A.pointsTo` e) :
            zipWith (\i e -> (A.nameVar x' `A.add` A.number i) `A.pointsTo` e)
@@ -260,7 +271,7 @@ wp _ (A.HLookup x e _) post = do
     (A.exists [v] A.true
        (entry v `A.sConj` (entry v `A.sImp` subst (sub v) (toExpr post) ))
       )
-  where sub v = Map.fromList [(x, Left (A.nameVar v))] :: Subs Bindings
+  where sub v = Map.fromList [(x, A.AssignBinding (A.nameVar v))]
         entry v = e `A.pointsTo` A.nameVar v
 wp _ (A.HMutate e1 e2 _) post = do
     {- wp (e1* := e2) P = (e1->_) * ((e1->e2) -* P) -}
@@ -337,14 +348,14 @@ sp _ (pre, _) (A.Assign xs es l) = do
   where
     genFrNames :: [a] -> WP [Name]
     genFrNames ys = map (\x -> Name x l) <$> mapM (const freshText) ys
-    genSub :: [Name] -> [Name] -> Subs Bindings
-    genSub ys hs = Map.fromList . zip ys . map (Left . A.nameVar) $ hs
+    -- genSub :: [Name] -> [Name] -> Subs A.Bindings
+    genSub ys hs = Map.fromList . zip ys . map (A.AssignBinding . A.nameVar) $ hs
     -- genEq :: Name -> A.Expr -> A.Expr
     genEq sub x e = A.nameVar x `A.eqq` (subst sub e)
 sp _ (pre, _) (A.AAssign (A.Var x _) i e _) = do
      -- {P} x[I] := E { (exist x' :: x = x'[I[x'/x] -> E[x'/x]] && P[x'/x]) }
    x' <- freshText
-   let sub = Map.fromList [(x, Left (A.variable x'))] :: Subs Bindings
+   let sub = Map.fromList [(x, A.AssignBinding (A.variable x'))]
    return $ Constant (
      A.exists [Name x' NoLoc]
       (A.nameVar x `A.eqq` A.ArrUpd (A.variable x') (subst sub i) (subst sub e) NoLoc)

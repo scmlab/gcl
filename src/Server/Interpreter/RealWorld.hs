@@ -72,9 +72,7 @@ runServerM env ctxEnv program = runReaderT (runLspT ctxEnv program) env
 
 -- | Logging instances of Show
 logStuff :: Show a => a -> ServerM ()
-logStuff x = do
-  chan <- lift $ asks globalChan
-  liftIO $ writeChan chan (Text.pack (show x))
+logStuff = logText . Text.pack . show
 
 -- | Logging Text
 logText :: Text -> ServerM ()
@@ -87,15 +85,13 @@ logText s = do
 sendDiagnostics :: FilePath -> [Diagnostic] -> ServerM ()
 sendDiagnostics filepath diagnostics = do
   -- send diagnostics
-  ref <- lift $ asks globalCounter
-  version <- liftIO $ readIORef ref
-  liftIO $ writeIORef ref (succ version)
+  version <- bumpVersionM
   publishDiagnostics 100 (toNormalizedUri (filePathToUri filepath)) (Just version) (partitionBySource diagnostics)
 
 handleErrors :: FilePath -> Either [Error] [ResKind] -> ServerM [ResKind]
 handleErrors filepath (Left errors) = do 
   version <- bumpVersionM
-  let responses = [ResDisplay version (headerE "Errors" : map renderBlock errors), ResUpdateSpecs []]
+  let responses = [ResDisplay version (map renderSection errors), ResUpdateSpecs []]
   let diagnostics = errors >>= collect
   -- send diagnostics
   sendDiagnostics filepath diagnostics

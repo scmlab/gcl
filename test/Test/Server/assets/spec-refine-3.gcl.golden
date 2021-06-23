@@ -1,7 +1,8 @@
 ### Result
 
-[ Display
-, UpdateSpecs ]
+[ Syntactic Error ./test/Test/Server/assets/spec-refine-3.gcl:2:1 unexpected 'a'
+expecting end of input
+ ]
 
 ### Source
 
@@ -17,7 +18,4 @@ TracePutLastSelection ./test/Test/Server/assets/spec-refine-3.gcl [0-20] 1:1-4:3
 TraceGetSource
 TraceGetSource
 TraceEditText ./test/Test/Server/assets/spec-refine-3.gcl [0-20] 1:1-4:3 "    skip\nabort\n"
-TraceGetLastSelection
-TraceBumpResponseVersion
-TraceLog " ### Diagnostic 1"
-TraceSendDiagnostics [Diagnostic {_range = Range {_start = Position {_line = 0, _character = 4}, _end = Position {_line = 0, _character = 8}}, _severity = Just DsWarning, _code = Nothing, _source = Nothing, _message = "Skip", _tags = Nothing, _relatedInformation = Just (List [DiagnosticRelatedInformation {_location = Location {_uri = Uri {getUri = "./test/Test/Server/assets/spec-refine-3.gcl"}, _range = Range {_start = Position {_line = 0, _character = 4}, _end = Position {_line = 0, _character = 8}}}, _message = ""}])}]
+TraceSendDiagnostics [Diagnostic {_range = Range {_start = Position {_line = 1, _character = 0}, _end = Position {_line = 1, _character = 0}}, _severity = Just DsError, _code = Nothing, _source = Nothing, _message = "Syntax error", _tags = Nothing, _relatedInformation = Just (List [DiagnosticRelatedInformation {_location = Location {_uri = Uri {getUri = "./test/Test/Server/assets/spec-refine-3.gcl"}, _range = Range {_start = Position {_line = 1, _character = 0}, _end = Position {_line = 1, _character = 0}}}, _message = "unexpected 'a'\nexpecting end of input\n"}])}]

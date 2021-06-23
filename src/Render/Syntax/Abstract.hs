@@ -3,16 +3,15 @@
 
 module Render.Syntax.Abstract where
 
-import Data.Loc (locOf)
-import Data.Loc.Range
 import qualified Data.Map as Map
 import Pretty.Variadic (Variadic (..), var)
 import Render.Class
 import Render.Element
 import Render.Syntax.Common ()
 import Syntax.Abstract
-import Syntax.Abstract.Located ()
-import Syntax.Common (Fixity (..), Op, classify)
+import Syntax.Abstract.Util ( assignBindingToExpr )
+import Syntax.Common (Fixity (..), Op, classify, Name)
+import Data.Map (Map)
 
 --------------------------------------------------------------------------------
 
@@ -60,8 +59,8 @@ instance Render Lit where
 --------------------------------------------------------------------------------
 
 -- | Expr
-instance RenderBlock Expr where
-  renderBlock expr = blockE Nothing (fromLoc (locOf expr)) (render expr)
+-- instance RenderSection Expr where
+--   renderSection expr = Block Nothing (fromLoc (locOf expr)) (render expr)
 
 instance Render Expr where
   renderPrec n expr = case handleExpr n expr of
@@ -69,7 +68,7 @@ instance Render Expr where
     Complete s -> s
 
 handleExpr :: Int -> Expr -> Variadic Expr Inlines
-handleExpr _ (Paren x) = return $ render x
+handleExpr _ (Paren x l) = return $ tempHandleLoc l $ render x
 handleExpr _ (Var x l) = return $ tempHandleLoc l $ render x
 handleExpr _ (Const x l) = return $ tempHandleLoc l $ render x
 handleExpr _ (Lit x l) = return $ tempHandleLoc l $ render x
@@ -112,6 +111,9 @@ handleExpr _ (ArrUpd e1 e2 e3 _) =
     -- SCM: need to print parenthesis around e1 when necessary.
 
 instance Render Subst where
+  render = render . Map.mapMaybe assignBindingToExpr
+
+instance Render (Map Name Expr) where
   render env
     | null env = mempty
     | otherwise = "[" <+> exprs <+> "/" <+> vars <+> "]"
