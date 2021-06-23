@@ -1,10 +1,10 @@
 ### Result
 
-[ < Skip >
-True
+[ Skip at ./test/Test/WP/assets/skip.gcl [9-13] 2:1-5
+`True
 ⇒
 0   =   0
-at ./test/Test/WP/assets/skip.gcl [9-13] 2:1-5 ]
+` ]
 
 ### Source
 

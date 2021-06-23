@@ -68,7 +68,7 @@ instance IsString Block where
 
 instance Pretty Block where
   pretty (Header header Nothing     ) = pretty header
-  pretty (Header header (Just range)) = pretty header <> "at " <> pretty range
+  pretty (Header header (Just range)) = pretty header <> " at " <> pretty range
   pretty (Paragraph inlines         ) = pretty inlines
   pretty (Code      inlines         ) = "`" <> pretty inlines <> "`"
 

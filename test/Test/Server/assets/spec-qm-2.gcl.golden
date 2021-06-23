@@ -1,13 +1,13 @@
 ### Result
 
-([  ], [ True
-=>
-True
-at ./test/Test/Server/assets/spec-qm-2.gcl [0-6] 1:1-3:3
-, True
-=>
-True
-at ./test/Test/Server/assets/spec-qm-2.gcl [7-13] 4:1-6:3 ], [  ], [  ])
+([  ], [ Precondition at ./test/Test/Server/assets/spec-qm-2.gcl [0-6] 1:1-3:3
+`True`
+Precondition
+`True`
+, Precondition at ./test/Test/Server/assets/spec-qm-2.gcl [7-13] 4:1-6:3
+`True`
+Precondition
+`True` ], [  ], [  ])
 
 ### Source
 
