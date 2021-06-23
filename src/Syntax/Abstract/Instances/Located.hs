@@ -24,6 +24,10 @@ instance Located Stmt where
   locOf (If _ l) = l
   locOf (Spec _ l) = locOf l
   locOf (Proof l) = l
+  locOf (Alloc _ _ l) = l
+  locOf (HLookup _ _ l) = l
+  locOf (HMutate _ _ l) = l
+  locOf (Dispose _ l) = l
 
 instance Located GdCmd where
   locOf (GdCmd _ _ l) = l 

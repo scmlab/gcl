@@ -4,6 +4,7 @@ module GCL.Common where
 
 import Data.Text(Text)
 import qualified Data.Text as Text
+import Data.Loc (Loc (..))
 import Control.Monad (liftM2)
 import Data.Map (Map)
 import Syntax.Common (Name(..), nameToText)
@@ -23,6 +24,7 @@ class Monad m => Fresh m where
   freshText :: m Text
   freshWithLabel :: Text -> m Text
   freshTexts :: Int -> m [Text]
+  freshName :: m Name
 
   freshText =
     (\i -> Text.pack ("?m_" ++ show i)) <$> fresh
@@ -32,6 +34,8 @@ class Monad m => Fresh m where
 
   freshTexts 0 = return []
   freshTexts n = liftM2 (:) freshText (freshTexts (n - 1))
+
+  freshName = (\v -> Name v NoLoc) <$> freshText
 
 type FreshState = Int
 
@@ -125,7 +129,7 @@ instance Substitutable A.Expr A.Expr where
     A.ArrIdx (subst s e1) (subst s e2) l
   subst s (A.ArrUpd e1 e2 e3 l) =
     A.ArrUpd (subst s e1) (subst s e2) (subst s e3) l
-    
+
 singleBinding :: Name -> A.Bindings -> Subs A.Bindings
 singleBinding = Map.singleton
 
@@ -262,6 +266,10 @@ instance Substitutable A.Bindings A.Stmt where
   subst s (A.If gds l) = A.If (subst s gds) l
   subst _ st@(A.Spec _ _) = st
   subst _ st@(A.Proof _) = st
+  subst s (A.Alloc x es l) = A.Alloc x (map (subst s) es) l
+  subst s (A.HLookup x e l) = A.HLookup x (subst s e) l
+  subst s (A.HMutate e1 e2 l) = A.HMutate (subst s e1) (subst s e2) l
+  subst s (A.Dispose e l) = A.Dispose (subst s e) l
 
 instance Substitutable A.Bindings A.GdCmd where
   subst s (A.GdCmd gd stmts l) = A.GdCmd (subst s gd) (subst s stmts) l

@@ -266,7 +266,7 @@ checkStmt env (AAssign x i e _) = do
   tx <- inferExpr env x
   case tx of
    TArray _ t _ -> do
-      checkIsType env i (TBase TInt NoLoc)
+      checkIsType env i (tInt NoLoc)
       checkIsType env e t
    _ -> throwError $ NotArray tx (locOf x)
 checkStmt env (Assert expr _) = do
@@ -278,6 +278,23 @@ checkStmt env (Do gdcmds _) = mapM_ (checkGdCmd env) gdcmds
 checkStmt env (If gdcmds _) = mapM_ (checkGdCmd env) gdcmds
 checkStmt _ (Spec _ _) = return ()
 checkStmt _ (Proof _) = return ()
+checkStmt env (Alloc x es l) =
+  case Map.lookup x env of
+    Nothing -> throwError $ NotInScope x (locOf x)
+    Just (TBase TInt _) ->
+      mapM_ (\e -> checkIsType env e (tInt NoLoc)) es
+    Just t -> throwError (UnifyFailed t (tInt NoLoc) l)
+checkStmt env (HLookup x e l) =
+  case Map.lookup x env of
+    Nothing -> throwError $ NotInScope x (locOf x)
+    Just (TBase TInt _) ->
+      checkIsType env e (tInt NoLoc)
+    Just t -> throwError (UnifyFailed t (tInt NoLoc) l)
+checkStmt env (HMutate e1 e2 _) = do
+  checkIsType env e1 (tInt NoLoc)
+  checkIsType env e2 (tInt NoLoc)
+checkStmt env (Dispose e _) =
+  checkIsType env e (tInt NoLoc)
 
 -- declsMap :: [Declaration] -> Map Name (Either Type Expr)
 -- declsMap [] = mempty
@@ -373,6 +390,7 @@ litTypes :: Lit -> Loc -> Type
 litTypes (Num _) l = TBase TInt l
 litTypes (Bol _) l = TBase TBool l
 litTypes (Chr _) l = TBase TChar l
+litTypes Emp     l = TBase TBool l
 
 -- NOTE : EQ, NEQ, NEQU is redundant here
 inferOpTypes :: Op -> Infer Type
@@ -387,43 +405,54 @@ inferOpTypes op = do
       x <- freshVar l
       return (TFunc x (TFunc x (TBase TBool l) l) l)
 
+tBool, tInt :: Loc -> Type
+tBool = TBase TBool
+tInt = TBase TInt
+
+(.->) :: (Loc -> Type) -> (Loc -> Type) -> (Loc -> Type)
+(t1 .-> t2) l = TFunc (t1 l) (t2 l) l
+infixr 1 .->
+
 chainOpTypes :: ChainOp -> Type
-chainOpTypes (EQProp l) = TFunc (TBase TBool l) (TFunc (TBase TBool l) (TBase TBool l) l) l
-chainOpTypes (EQPropU l) = TFunc (TBase TBool l) (TFunc (TBase TBool l) (TBase TBool l) l) l
-chainOpTypes (EQ l) = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TBool l) l) l          -- Don't care
-chainOpTypes (NEQ l) = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TBool l) l) l         -- Don't care
-chainOpTypes (NEQU l) = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TBool l) l) l        -- Don't care
-chainOpTypes (LTE l) = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TBool l) l) l
-chainOpTypes (LTEU l) = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TBool l) l) l
-chainOpTypes (GTE l) = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TBool l) l) l
-chainOpTypes (GTEU l) = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TBool l) l) l
-chainOpTypes (LT l) = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TBool l) l) l
-chainOpTypes (GT l) = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TBool l) l) l
+chainOpTypes (EQProp l)  = tBool .-> tBool .-> tBool $ l
+chainOpTypes (EQPropU l) = tBool .-> tBool .-> tBool $ l
+chainOpTypes (EQ l)      = tInt .-> tInt .-> tBool $ l
+chainOpTypes (NEQ l)     = tInt .-> tInt .-> tBool $ l
+chainOpTypes (NEQU l)    = tInt .-> tInt .-> tBool $ l
+chainOpTypes (LTE l)     = tInt .-> tInt .-> tBool $ l
+chainOpTypes (LTEU l)    = tInt .-> tInt .-> tBool $ l
+chainOpTypes (GTE l)     = tInt .-> tInt .-> tBool $ l
+chainOpTypes (GTEU l)    = tInt .-> tInt .-> tBool $ l
+chainOpTypes (LT l)      = tInt .-> tInt .-> tBool $ l
+chainOpTypes (GT l)      = tInt .-> tInt .-> tBool $ l
 
 arithOpTypes :: ArithOp -> Type
-arithOpTypes (Implies l) = TFunc (TBase TBool l) (TFunc (TBase TBool l) (TBase TBool l) l) l
-arithOpTypes (ImpliesU l) = TFunc (TBase TBool l) (TFunc (TBase TBool l) (TBase TBool l) l) l
-arithOpTypes (Conj l) = TFunc (TBase TBool l) (TFunc (TBase TBool l) (TBase TBool l) l) l
-arithOpTypes (ConjU l) = TFunc (TBase TBool l) (TFunc (TBase TBool l) (TBase TBool l) l) l
-arithOpTypes (Disj l) = TFunc (TBase TBool l) (TFunc (TBase TBool l) (TBase TBool l) l) l
-arithOpTypes (DisjU l) = TFunc (TBase TBool l) (TFunc (TBase TBool l) (TBase TBool l) l) l
-arithOpTypes (Neg l) = TFunc (TBase TBool l) (TBase TBool l) l
-arithOpTypes (NegU l) = TFunc (TBase TBool l) (TBase TBool l) l
-arithOpTypes (Add l) = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TInt l) l) l
-arithOpTypes (Sub l) = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TInt l) l) l
-arithOpTypes (Mul l) = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TInt l) l) l
-arithOpTypes (Div l) = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TInt l) l) l
-arithOpTypes (Mod l) = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TInt l) l) l
-arithOpTypes (Max l) = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TInt l) l) l
-arithOpTypes (Min l) = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TInt l) l) l
-arithOpTypes (Exp l) = TFunc (TBase TInt l) (TFunc (TBase TInt l) (TBase TInt l) l) l
+arithOpTypes (Implies l)  = tBool .-> tBool .-> tBool $ l
+arithOpTypes (ImpliesU l) = tBool .-> tBool .-> tBool $ l
+arithOpTypes (Conj l)     = tBool .-> tBool .-> tBool $ l
+arithOpTypes (ConjU l)    = tBool .-> tBool .-> tBool $ l
+arithOpTypes (Disj l)     = tBool .-> tBool .-> tBool $ l
+arithOpTypes (DisjU l)    = tBool .-> tBool .-> tBool $ l
+arithOpTypes (Neg l)      = tBool .-> tBool $ l
+arithOpTypes (NegU l)     = tBool .-> tBool $ l
+arithOpTypes (Add l) = tInt .-> tInt .-> tInt $ l
+arithOpTypes (Sub l) = tInt .-> tInt .-> tInt $ l
+arithOpTypes (Mul l) = tInt .-> tInt .-> tInt $ l
+arithOpTypes (Div l) = tInt .-> tInt .-> tInt $ l
+arithOpTypes (Mod l) = tInt .-> tInt .-> tInt $ l
+arithOpTypes (Max l) = tInt .-> tInt .-> tInt $ l
+arithOpTypes (Min l) = tInt .-> tInt .-> tInt $ l
+arithOpTypes (Exp l) = tInt .-> tInt .-> tInt $ l
+arithOpTypes (PointsTo l) = tInt .-> tInt .-> tInt $ l
+arithOpTypes (SConj l)    = tBool .-> tBool .-> tBool $ l
+arithOpTypes (SImp l)     = tBool .-> tBool .-> tBool $ l
 
 quantOpTypes :: QuantOp -> Type
 quantOpTypes (Sum l) = arithOpTypes (Add l)
 quantOpTypes (Pi l) = arithOpTypes (Mul l)
 quantOpTypes (Forall l) = arithOpTypes (Conj l)
 quantOpTypes (Exists l) = arithOpTypes (Disj l)
-quantOpTypes (Hash l) = TFunc (TBase TBool l) (TBase TInt l) l
+quantOpTypes (Hash l) = tBool .-> tInt $ l
 
 opTypes :: Op -> Type
 opTypes (ChainOp op) = chainOpTypes op

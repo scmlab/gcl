@@ -11,7 +11,7 @@ import Data.Aeson (ToJSON)
 import Data.Loc (Loc (..), Located (..))
 import Data.Loc.Range (Range, fromLoc)
 import qualified Data.Map as Map
-import GCL.Common (Fresh (fresh, freshText), Subs, Substitutable (subst), alphaRename)
+import GCL.Common (Fresh (fresh, freshText, freshName), Subs, Substitutable (subst), alphaRename)
 import GCL.Predicate (Origin (..), PO (..), Pred (..), Spec (Specification))
 import GCL.Predicate.Util (conjunct, disjunct, guardIf, guardLoop, toExpr)
 import GHC.Generics (Generic)
@@ -150,16 +150,14 @@ structSStmts b (pre, bnd) (stmt : stmts) post = do
   struct b (pre, bnd) stmt post'
 
 struct :: Bool -> (Pred, Maybe A.Expr) -> A.Stmt -> Pred -> WP ()
-struct _ (pre, _) (A.Abort l) _ = tellPO pre (Constant A.false) (AtAbort l)
-struct _ (pre, _) (A.Skip l) post = tellPO pre post (AtSkip l)
-struct _ (pre, _) (A.Assign xs es l) post = do
-  let sub = Map.fromList . zip xs . map A.AssignBinding $ es
-  tellPO pre (subst sub post) (AtAssignment l)
-struct _ (pre, _) (A.AAssign (A.Var x _) i e l) post = do
-     let sub = Map.fromList [(x, A.AssignBinding (A.ArrUpd (A.nameVar x) i e l))]
-     tellPO pre (subst sub post) (AtAssignment l)
-struct _ (_, _) (A.AAssign _ _ _ l) _ =
-  throwError (MultiDimArrayAsgnNotImp l)
+struct b (pre, _) s@(A.Abort l) post =
+  tellPO' (AtAbort l) pre =<< wp b s post
+struct b (pre, _) s@(A.Skip l) post =
+  tellPO' (AtSkip l) pre =<< wp b s post
+struct b (pre, _) s@(A.Assign _ _ l) post = do
+  tellPO' (AtAssignment l) pre =<< wp b s post
+struct b (pre, _) s@(A.AAssign _ _ _ l) post = do
+  tellPO' (AtAssignment l) pre =<< wp b s post
 struct b (pre, _) (A.If gcmds l) post = do
   when b $ tellPO pre (disjunctGuards gcmds) (AtIf l)
   forM_ gcmds $ \(A.GdCmd guard body _) ->
@@ -194,17 +192,17 @@ structGdcmdInduct inv (A.GdCmd guard body _) =
 
 structGdcmdBnd :: Pred -> A.Expr -> A.GdCmd -> WP ()
 structGdcmdBnd inv bnd (A.GdCmd guard body _) = do
-  oldbnd <- freshText
+  oldbnd <- freshVar
   structStmts
     False
     ( Conjunct
         [ inv,
-          Bound (bnd `A.eqq` A.variable oldbnd) NoLoc,
+          Bound (bnd `A.eqq` oldbnd) NoLoc,
           guardLoop guard
         ],
     Nothing )
     body
-    (Bound (bnd `A.lt` A.variable oldbnd) NoLoc)
+    (Bound (bnd `A.lt` oldbnd) NoLoc)
 
 -- weakest precondition
 
@@ -255,7 +253,41 @@ wp b (A.If gcmds _) post = do
       <$> wpStmts b body post
   return (conjunct (disjunctGuards gcmds : pres))
 wp _ (A.Proof _) post = return post
+wp _ (A.Alloc x (e:es) _) post = do -- non-empty
+    {- wp (x := es) P = (forall x', (x' -> es) -* P[x'/x])-}
+   x' <- freshName
+   return $ Constant
+     (A.forAll [x'] A.true
+        (newallocs x' `A.sImp` subst (sub x') (toExpr post)))
+  where sub x' = Map.fromList [(x, A.AssignBinding (A.nameVar x'))]
+        newallocs x' = A.sconjunct (
+          (A.nameVar x' `A.pointsTo` e) :
+           zipWith (\i e -> (A.nameVar x' `A.add` A.number i) `A.pointsTo` e)
+               [1..] es)
+wp _ (A.HLookup x e _) post = do
+    {- wp (x := *e) P = (exists v . (e->v) * ((e->v) -* P[v/x])) -}
+   v <- freshName
+   return $ Constant
+    (A.exists [v] A.true
+       (entry v `A.sConj` (entry v `A.sImp` subst (sub v) (toExpr post) ))
+      )
+  where sub v = Map.fromList [(x, A.AssignBinding (A.nameVar v))]
+        entry v = e `A.pointsTo` A.nameVar v
+wp _ (A.HMutate e1 e2 _) post = do
+    {- wp (e1* := e2) P = (e1->_) * ((e1->e2) -* P) -}
+   e1_allocated <- allocated e1
+   return $ Constant (e1_allocated `A.sConj`
+                       ((e1 `A.pointsTo` e2) `A.sImp` toExpr post))
+wp _ (A.Dispose e _) post = do
+    {- wp (dispose e) P = (e -> _) * P -}
+  e_allocated <- allocated e
+  return $ Constant (e_allocated `A.sConj` toExpr post)
 wp _ _ _ = error "missing case in wp"
+
+allocated :: Fresh m => A.Expr -> m A.Expr
+allocated e = do v <- freshName
+                 return (A.exists [v] (A.true) (e `A.pointsTo` A.nameVar v))
+  -- allocated e = e -> _
 
 disjunctGuards :: [A.GdCmd] -> Pred
 disjunctGuards = disjunct . map guardIf . A.getGuards
@@ -349,6 +381,12 @@ tellPO p q l = unless (toExpr p == toExpr q) $ do
   put (succ i, j, k)
   tell ([PO i p q l], [], [])
 
+  -- SCM: swapping the order of arguments, which
+  --      can be convenient in ceratin occassions.
+
+tellPO' :: Origin -> Pred -> Pred -> WP ()
+tellPO' l p q = tellPO p q l
+
 tellSpec :: Pred -> Pred -> Range -> WP ()
 tellSpec p q l = do
   (i, j, k) <- get
@@ -358,6 +396,9 @@ tellSpec p q l = do
 throwWarning :: StructWarning -> WP ()
 throwWarning warning = do
   tell ([], [], [warning])
+
+freshVar :: Fresh m => m A.Expr
+freshVar = (\v -> A.Var (Name v NoLoc) NoLoc) <$> freshText
 
 data StructWarning
   = MissingBound Range

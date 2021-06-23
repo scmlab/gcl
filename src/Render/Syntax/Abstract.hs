@@ -54,6 +54,7 @@ instance Render Lit where
   render (Num i) = render (show i)
   render (Bol b) = render (show b)
   render (Chr c) = render (show c)
+  render Emp     = "emp"
 
 --------------------------------------------------------------------------------
 
