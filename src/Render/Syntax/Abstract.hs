@@ -104,6 +104,7 @@ handleExpr _ (Quant op xs r t _) =
         renderOp (Op (ArithOp (DisjU _))) = "∃"
         renderOp (Op (ArithOp (Add _)))   = "Σ"
         renderOp (Op (ArithOp (Mul _)))   = "Π"
+        renderOp (Op op) = render op
         renderOp op = render op
 handleExpr _ (Subst before env after) =
   return $ substE (render before) (render env) (if isLam after then parensE (render after) else render after)
