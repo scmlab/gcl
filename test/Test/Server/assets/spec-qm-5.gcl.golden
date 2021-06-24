@@ -3,31 +3,21 @@
 ([ Loop Invariant at ./test/Test/Server/assets/spec-qm-5.gcl [53-77] 5:1-25
 `True
 ⇒
-f   n   =   0
-`
-, Assigment at ./test/Test/Server/assets/spec-qm-5.gcl [90-100] 6:13-23
-`f   n   =   0  ∧ n   ≠   N
-⇒
-f   n[  n   +   1  /  n  ]   =   0
-`
-, Assigment at ./test/Test/Server/assets/spec-qm-5.gcl [90-100] 6:13-23
-`f   n   =   0  ∧ N   -   n  = ?m_0 ∧ n   ≠   N
-⇒
-N   -   n[  n   +   1  /  n  ]  < ?m_0
+f [ n ]  =   0
 `
 , Loop Invariant at ./test/Test/Server/assets/spec-qm-5.gcl [78-146] 6:1-10:3
-`f   n   =   0  ∧ ¬  n   ≠   N
+`f [ n ]  =   0  ∧ ¬  n   ≠   N
 ⇒
 True
 `
 , Loop Termination at ./test/Test/Server/assets/spec-qm-5.gcl [78-146] 6:1-10:3
-`f   n   =   0  ∧ n   ≠   N
+`f [ n ]  =   0  ∧ n   ≠   N
 ⇒
 N   -   n  ≥ 0
 ` ], [ Precondition at ./test/Test/Server/assets/spec-qm-5.gcl [113-143] 7:13-9:15
-`f   n   =   0`
+`⟨  ?m_0  :  n  =  n   +   1[  ?m_0  /  n  ]  :  f [ n ]  =   0  ∧  n   ≠   N[  ?m_0  /  n  ]  ⟩`
 Precondition
-`f   n   =   0` ], [  ], [  ])
+`f [ n ]  =   0` ], [  ], [  ])
 
 ### Source
 
