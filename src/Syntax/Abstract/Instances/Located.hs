@@ -57,6 +57,7 @@ instance Located Expr where
   locOf (Hole l) = l
   locOf (Quant _ _ _ _ l) = l
   locOf (Subst es _ _) = locOf es
+  locOf (Subst2 es _ _ _) = locOf es
   locOf (ArrIdx _ _ l) = l
   locOf (ArrUpd _ _ _ l) = l
 

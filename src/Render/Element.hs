@@ -12,6 +12,7 @@ module Render.Element
   , textE
   , linkE
   , substE
+  , subst2E
   , parensE
   , iconE
   , horzE
@@ -34,6 +35,8 @@ import qualified Data.Text                     as Text
 import           Data.Text.Prettyprint.Doc      ( Pretty(..) )
 import qualified Data.Text.Prettyprint.Doc     as Pretty
 import           GHC.Generics                   ( Generic )
+import Syntax.Abstract.Types (RewriteReason)
+import Syntax.Abstract.Instances.Json ()
 
 --------------------------------------------------------------------------------
 
@@ -134,6 +137,8 @@ isEmpty inlines = all elemIsEmpty (Seq.viewl (unInlines inlines))
   elemIsEmpty (Link _ xs _) = all elemIsEmpty $ unInlines xs
   elemIsEmpty (Sbst xs env ys _) =
     all elemIsEmpty $ unInlines xs <> unInlines env <> unInlines ys
+  elemIsEmpty (Sbst2 _ xs env ys _) =
+    all elemIsEmpty $ unInlines xs <> unInlines env <> unInlines ys
   elemIsEmpty (Horz xs) = all isEmpty xs
   elemIsEmpty (Vert xs) = all isEmpty xs
   elemIsEmpty (Parn _ ) = False
@@ -158,6 +163,10 @@ linkE range xs = Inlines $ Seq.singleton $ Link range xs []
 -- | Text that changes after clicked
 substE :: Inlines -> Inlines -> Inlines -> Inlines
 substE before env after = Inlines $ Seq.singleton $ Sbst before env after []
+
+-- | Text that changes after clicked
+subst2E :: RewriteReason -> Inlines -> Inlines -> Inlines -> Inlines
+subst2E reason before env after = Inlines $ Seq.singleton $ Sbst2 reason before env after []
 
 -- | Note: when there's only 1 Horz inside a Parn, convert it to PrHz
 parensE :: Inlines -> Inlines
@@ -193,7 +202,9 @@ data Inline
   | Text Text ClassNames
   | Link Range Inlines ClassNames
   | -- | For Subst
-    Sbst Inlines Inlines Inlines ClassNames
+    Sbst  Inlines Inlines Inlines ClassNames
+  | -- | For Subst
+    Sbst2 RewriteReason Inlines Inlines Inlines ClassNames
   | -- | Horizontal grouping, wrap when there's no space
     Horz [Inlines]
   | -- | Vertical grouping, each children would end with a newline
@@ -211,6 +222,7 @@ instance Show Inline where
   show (Text s _       ) = Text.unpack s
   show (Link _ xs _    ) = show xs
   show (Sbst xs env _ _) = show xs <> show env
+  show (Sbst2 _ xs env _ _) = show xs <> show env
   show (Horz xs        ) = unwords (map show $ toList xs)
   show (Vert xs        ) = unlines (map show $ toList xs)
   show (Parn x         ) = "(" <> show x <> ")"

@@ -11,7 +11,7 @@ import Data.Aeson (ToJSON)
 import Data.Loc (Loc (..), Located (..))
 import Data.Loc.Range (Range, fromLoc)
 import qualified Data.Map as Map
-import GCL.Common (Fresh (fresh, freshText, freshName), Subs, Substitutable (subst), alphaRename)
+import GCL.Common (Fresh (fresh, freshText, freshName), Subs, Substitutable (subst, substWithReason), alphaRename)
 import GCL.Predicate (Origin (..), PO (..), Pred (..), Spec (Specification))
 import GCL.Predicate.Util (conjunct, disjunct, guardIf, guardLoop, toExpr)
 import GHC.Generics (Generic)
@@ -240,7 +240,7 @@ wp _ (A.Abort _) _ = return (Constant A.false)
 wp _ (A.Skip _) post = return post
 wp _ (A.Assign xs es _) post = do
   let sub = Map.fromList . zip xs . map A.AssignBinding $ es
-  return $ subst sub post
+  return $ substWithReason A.RRAssignment sub post
 wp _ (A.AAssign (A.Var x _) i e _) post = do
   let sub = Map.fromList [(x, A.AssignBinding (A.ArrUpd (A.nameVar x) i e NoLoc))]
   return $ subst sub post

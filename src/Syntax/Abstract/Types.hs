@@ -99,6 +99,7 @@ data Expr
   | Hole Loc
   | Quant Expr [Name] Expr Expr Loc
   | Subst Expr Subst Expr
+  | Subst2 Expr Subst Expr RewriteReason
   | ArrIdx Expr Expr Loc
   | ArrUpd Expr Expr Expr Loc
   deriving (Eq, Show, Generic)
@@ -121,3 +122,9 @@ data Lit = Num Int | Bol Bool | Chr Char | Emp
   deriving (Show, Eq, Generic)
 
 ----------------------------------------------------------------
+
+-- | Reason of Rewriting 
+data RewriteReason = 
+    RRAssignment 
+    deriving (Eq, Show, Generic)
+

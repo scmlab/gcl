@@ -34,7 +34,7 @@ class Monad m => Fresh m where
   freshTexts 0 = return []
   freshTexts n = liftM2 (:) freshText (freshTexts (n - 1))
 
-  freshName = (\v -> Name v NoLoc) <$> freshText
+  freshName = (`Name` NoLoc) <$> freshText
 
 type FreshState = Int
 
@@ -77,9 +77,10 @@ instance Free A.Expr where
   fv (A.Lam x e _) = fv e \\ Set.singleton x
   fv (A.Quant op xs range term _) =
     (fv op <> fv range <> fv term) \\ Set.fromList xs
-  fv (A.Hole _) = mempty -- banacorn: `subs` has been always empty anyway
+  fv (A.Hole _) = mempty -- banacorn: `subs` has always been empty anyway
   -- concat (map freeSubst subs) -- correct?
   fv (A.Subst _ _ after) = fv after
+  fv (A.Subst2 _ _ after _) = fv after
   fv (A.ArrIdx e1 e2 _) = fv e1 <> fv e2
   fv (A.ArrUpd e1 e2 e3 _) = fv e1 <> fv e2 <> fv e3
 
@@ -89,6 +90,9 @@ instance Free A.Bindings where
 -- class for data that is substitutable
 class Substitutable a b where
   subst :: Subs a -> b -> b
+
+  substWithReason :: A.RewriteReason -> Subs a -> b -> b
+  substWithReason = const subst
 
 compose :: Substitutable a a => Subs a -> Subs a -> Subs a
 s1 `compose` s2 = s1 <> Map.map (subst s1) s2
@@ -124,6 +128,7 @@ instance Substitutable A.Expr A.Expr where
     let s' = Map.withoutKeys s (Set.fromList xs) in
     A.Quant (subst s' qop) xs (subst s' rng) (subst s' t) l
   subst s1 (A.Subst before s2 after) = A.Subst (subst s1 before) s2 (subst s1 after)
+  subst s1 (A.Subst2 before s2 after reason) = A.Subst2 (subst s1 before) s2 (subst s1 after) reason
   subst s (A.ArrIdx e1 e2 l) =
     A.ArrIdx (subst s e1) (subst s e2) l
   subst s (A.ArrUpd e1 e2 e3 l) =
@@ -184,10 +189,63 @@ instance Substitutable A.Bindings A.Expr where
               then A.Subst b s' a'
               else A.Subst (A.Subst b s b3) s' a'
           _ -> A.Subst (A.Subst b s' a) s a'
+      A.Subst2 a b c d -> A.Subst2 a b c d
       A.ArrIdx e1 e2 l ->
         A.ArrIdx (subst s e1) (subst s e2) l
       A.ArrUpd e1 e2 e3 l ->
         A.ArrUpd (subst s e1) (subst s e2) (subst s e3) l
+
+  substWithReason reason sub expr =
+    let s = shrinkSubs expr sub in
+    if null s
+      then expr
+      else case expr of
+        (A.Paren e l) -> A.Paren (subst s e) l
+        A.Lit {} -> expr
+        (A.Var n _) ->
+          case Map.lookup n s of
+            Just v -> simpleSubs expr s n (A.bindingsToExpr v)
+            Nothing -> expr
+        (A.Const n _) ->
+          case Map.lookup n s of
+            Just c -> simpleSubs expr s n (A.bindingsToExpr c)
+            Nothing -> expr
+        A.Op {} -> expr
+        (A.Chain a op b l) -> A.Chain (subst s a) op (subst s b) l
+        (A.App a b l) ->
+          let (a', b'a, expr') = substApp s a b l in
+          case a' of
+            A.Lam x body _ ->
+              let s' = Map.singleton x (A.BetaBinding b'a) in
+              A.Subst2 expr' s' (subst s' body) reason
+            A.Subst _ _ (A.Lam x body _) ->
+              let s' = Map.singleton x (A.BetaBinding b'a) in
+              A.Subst2 expr s' (subst s' body) reason
+            _ -> expr'
+        (A.Lam x e l) ->
+          let s' = Map.withoutKeys s (Set.singleton x) in
+          let e' = subst s' e in
+          reduceSubs expr s (A.Lam x e' l)
+        A.Hole {} -> expr
+        (A.Quant qop xs rng t l) ->
+          let s' = Map.withoutKeys s (Set.fromList xs) in
+          A.Quant (subst s' qop) xs (subst s' rng) (subst s' t) l
+        A.Subst b s' a ->
+          let a' = getSubstAfter (subst s a) in
+          case b of
+            A.Subst _ _ b2@(A.App b2a b2b l)
+              | isAllApp b && s' == emptySubs ->
+                let (_, _, b2') = substApp s b2a b2b l in
+                let b3 = getSubstAfter b2' in
+                if b2 == b3
+                then A.Subst b s' a'
+                else A.Subst (A.Subst b s b3) s' a'
+            _ -> A.Subst (A.Subst b s' a) s a'
+        A.Subst2 a b c d -> A.Subst2 a b c d
+        A.ArrIdx e1 e2 l ->
+          A.ArrIdx (subst s e1) (subst s e2) l
+        A.ArrUpd e1 e2 e3 l ->
+          A.ArrUpd (subst s e1) (subst s e2) (subst s e3) l
 
 
 -- e1 [s] -> e2

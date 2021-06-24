@@ -144,6 +144,10 @@ infer (Subst expr sub _) = do
   t <- infer expr
   s <- mapM infer (Map.map bindingsToExpr sub)
   return $ subst s t
+infer (Subst2 expr sub _ _) = do
+  t <- infer expr
+  s <- mapM infer (Map.map bindingsToExpr sub)
+  return $ subst s t
 infer (ArrIdx e1 e2 l) = do
   t1 <- infer e1
   let interval = case t1 of
