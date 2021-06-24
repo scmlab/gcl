@@ -10,20 +10,18 @@ import Data.Aeson (ToJSON)
 import Data.Loc (Loc (..), Located (..))
 import Data.Loc.Range (Range, fromLoc)
 import qualified Data.Map as Map
-import GCL.Common (Fresh (fresh, freshText), Subs, Substitutable (subst), alphaRename)
+import GCL.Common (Fresh (fresh, freshText), Subs, Substitutable (subst), alphaRename, AlphaRename)
 import GCL.Predicate (Origin (..), PO (..), Pred (..), Spec (Specification))
 import GCL.Predicate.Util (conjunct, disjunct, guardIf, guardLoop, toExpr)
 import GHC.Generics (Generic)
 import qualified Syntax.Abstract as A
 import qualified Syntax.Abstract.Operator as A
 import qualified Syntax.Abstract.Util as A
-import qualified Syntax.ConstExpr as A
 import Syntax.Common (Name (Name))
-import qualified Data.Set as Set
 
 type TM = Except StructError
 
-type WP = RWST (Subs A.Expr) ([PO], [Spec], [StructWarning]) (Int, Int, Int) TM
+type WP = RWST (Subs (Maybe A.Bindings)) ([PO], [Spec], [StructWarning]) (Int, Int, Int) TM
 
 instance Fresh WP where
   fresh = do
@@ -31,12 +29,14 @@ instance Fresh WP where
     put (i, j, succ k)
     return k
 
-runWP :: WP a -> Subs A.Expr -> Either StructError (a, ([PO], [Spec], [StructWarning]))
+runWP :: WP a -> Subs (Maybe A.Bindings) -> Either StructError (a, ([PO], [Spec], [StructWarning]))
 runWP p defs = runExcept $ evalRWST p defs (0, 0, 0)
 
 sweep :: A.Program -> Either StructError ([PO], [Spec], [StructWarning])
-sweep (A.Program decls _ ds stmts _) = do
-  snd <$> runWP (structProgram decls stmts) ds
+sweep (A.Program decls _ _ stmts _) = do
+  snd <$> runWP (structProgram stmts) decls'
+  where
+    decls' = Map.map (A.LetBinding <$>) (A.extractDeclarations decls)
 
 data ProgView
   = ProgViewEmpty
@@ -59,25 +59,23 @@ progView stmts = do
       ProgViewMissingPrecondition (init stmts) (Assertion post m)
     _ -> ProgViewMissingBoth stmts
 
-alphaRenameDefns :: [A.Declaration] -> A.Defns -> WP A.Defns
-alphaRenameDefns decls dfns = do
-  let ns = Set.fromList $ Map.keys dfns ++ concatMap extractNames (A.pickDeclarations decls)
-  mapM (alphaRename ns) dfns
-  where
-    extractNames (A.ConstDecl ns _ _ _) = ns
-    extractNames (A.VarDecl ns _ _ _) = ns
-    extractNames (A.LetDecl n _ _ _) = [n]
+alphaSubst :: (Substitutable A.Bindings b, AlphaRename WP b) => b -> WP b
+alphaSubst e = do
+  env <- ask
+  let ns = Map.keys env
+  env' <- alphaRename ns env
+  subst env' <$> alphaRename ns e
 
-structProgram :: [A.Declaration] -> [A.Stmt] -> WP ()
-structProgram decls stmts = do
-  env <- Map.map A.LetBinding <$> (ask >>= alphaRenameDefns decls):: WP (Subs A.Bindings)
-
-  case progView (subst env stmts) of
+structProgram :: [A.Stmt] -> WP ()
+structProgram stmts = do
+  case progView stmts of
     ProgViewEmpty -> return ()
-    ProgViewOkay pre stmts' post -> structStmts True pre Nothing stmts' post
-    ProgViewMissingPrecondition stmts' post -> structStmts True (Constant A.true) Nothing stmts' post
-    ProgViewMissingPostcondition _ stmts' -> throwError . MissingPostcondition . locOf . last $ stmts'
-    ProgViewMissingBoth stmts' -> throwError . MissingPostcondition . locOf . last $ stmts'
+    ProgViewOkay pre ss post -> do
+      structStmts True pre Nothing ss post
+    ProgViewMissingPrecondition ss post -> do
+      structStmts True (Constant A.true) Nothing ss post
+    ProgViewMissingPostcondition _ ss -> throwError . MissingPostcondition . locOf . last $ ss
+    ProgViewMissingBoth ss -> throwError . MissingPostcondition . locOf . last $ ss
 
 structStmts :: Bool -> Pred -> Maybe A.Expr -> [A.Stmt] -> Pred -> WP ()
 structStmts _ pre _ [] post = do
@@ -214,9 +212,11 @@ disjunctGuards = disjunct . map guardIf . A.getGuards
 
 tellPO :: Pred -> Pred -> Origin -> WP ()
 tellPO p q l = unless (toExpr p == toExpr q) $ do
+  p' <- alphaSubst p
+  q' <- alphaSubst q
   (i, j, k) <- get
   put (succ i, j, k)
-  tell ([PO i p q l], [], [])
+  tell ([PO i p' q' l], [], [])
 
 tellSpec :: Pred -> Pred -> Range -> WP ()
 tellSpec p q l = do
