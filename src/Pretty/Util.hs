@@ -1,6 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Pretty.Util
-  ( renderStrict,
+  ( 
+    docToText, toText,
+    docToString, toString,
     PrettyPrec (..),
     PrettyWithLoc (..),
     DocWithLoc (..),
@@ -19,9 +21,19 @@ import Data.Text.Prettyprint.Doc
 import qualified Data.Text.Prettyprint.Doc.Render.Text as Text
 import Prelude hiding (Ordering (..))
 import Render
+import qualified Data.Text as Text
 
-renderStrict :: Doc ann -> Text
-renderStrict = Text.renderStrict . layoutPretty defaultLayoutOptions
+docToText :: Doc ann -> Text
+docToText = Text.renderStrict . layoutCompact
+
+toText :: Pretty a => a -> Text
+toText = docToText . pretty
+
+docToString :: Doc ann -> String
+docToString = Text.unpack . docToText
+
+toString :: Pretty a => a -> String
+toString = Text.unpack . toText
 
 
 --------------------------------------------------------------------------------

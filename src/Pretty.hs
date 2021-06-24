@@ -4,35 +4,18 @@
 
 module Pretty
   ( module Data.Text.Prettyprint.Doc,
-    toText,
-    docToText,
-    toString,
-    docToString
+    module Pretty.Util 
   )
 where
 
-import Data.Text (Text)
-import qualified Data.Text as Text
 import Data.Text.Prettyprint.Doc
-import Data.Text.Prettyprint.Doc.Render.Text (renderStrict)
 import Error (Error)
 import Pretty.Abstract ()
 import Pretty.Concrete ()
 import Pretty.Error ()
+import Pretty.Util
 import Pretty.Predicate ()
 import Prelude hiding (Ordering (..))
-
-docToText :: Doc ann -> Text
-docToText = renderStrict . layoutCompact
-
-toText :: Pretty a => a -> Text
-toText = docToText . pretty
-
-docToString :: Doc ann -> String
-docToString = Text.unpack . docToText
-
-toString :: Pretty a => a -> String
-toString = Text.unpack . toText
 
 --------------------------------------------------------------------------------
 

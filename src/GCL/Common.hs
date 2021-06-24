@@ -4,7 +4,7 @@ module GCL.Common where
 
 import Data.Text(Text)
 import qualified Data.Text as Text
-import Data.Loc (Loc (..))
+import Data.Loc ( Loc(..), Located(..) )
 import Control.Monad (liftM2)
 import Data.Map (Map)
 import Syntax.Common (Name(..), nameToText)
@@ -16,7 +16,6 @@ import qualified Syntax.Abstract.Util as A
 import GCL.Predicate (Pred (..))
 import Control.Monad.RWS (RWST(..))
 import Control.Monad.State (StateT(..))
-import Data.Loc (Loc, Located (..))
 
 -- Monad for generating fresh variable
 class Monad m => Fresh m where
