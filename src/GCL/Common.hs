@@ -218,20 +218,6 @@ instance Substitutable A.Bindings Pred where
   subst s (Disjunct es) = Disjunct (subst s es)
   subst s (Negate x) = Negate (subst s x)
 
--- instance Substitutable A.Bindings A.Stmt where
---   subst _ st@(A.Skip _) = st
---   subst _ st@(A.Abort _) = st
---   subst s (A.Assign ns es l) = A.Assign ns (subst s es) l
---   subst s (A.Assert e l) = A.Assert (subst s e) l
---   subst s (A.LoopInvariant p bnd l) = A.LoopInvariant (subst s p) (subst s bnd) l
---   subst s (A.Do gds l) = A.Do (subst s gds) l
---   subst s (A.If gds l) = A.If (subst s gds) l
---   subst _ st@(A.Spec _ _) = st
---   subst _ st@(A.Proof _) = st
-
--- instance Substitutable A.Bindings A.GdCmd where
---   subst s (A.GdCmd gd stmts l) = A.GdCmd (subst s gd) (subst s stmts) l
-
 class Fresh m => AlphaRename m a where
   alphaRename :: [Name] -> a -> m a
 
@@ -244,23 +230,24 @@ instance (Fresh m, AlphaRename m a) => AlphaRename m (Maybe a) where
 instance Fresh m => AlphaRename m A.Expr where
   alphaRename s expr =
     case expr of
-      A.Paren e l -> A.Paren <$> alphaRename s e <*> pure l
-      A.Lit {} -> return expr
-      A.Var {} -> return expr
-      A.Const {} -> return expr
-      A.Op {} -> return expr
-      A.Chain a op b l -> A.Chain <$> alphaRename s a <*> pure op <*> alphaRename s b <*> pure l
-      A.App a b l -> A.App <$> alphaRename s a <*> alphaRename s b <*> pure l
+      -- A.Paren e l -> A.Paren <$> alphaRename s e <*> pure l
+      -- A.Lit {} -> return expr
+      -- A.Var {} -> return expr
+      -- A.Const {} -> return expr
+      -- A.Op {} -> return expr
+      -- A.Chain a op b l -> A.Chain <$> alphaRename s a <*> pure op <*> alphaRename s b <*> pure l
+      -- A.App a b l -> A.App <$> alphaRename s a <*> alphaRename s b <*> pure l
       A.Lam x body l -> do
         x' <- capture x
         let vx' = A.Var x' (locOf x)
         A.Lam x' <$> alphaRename s (subst (Map.singleton x vx') body) <*> pure l
-      A.Hole {} -> return expr
+      -- A.Hole {} -> return expr
       A.Quant op ns rng t l -> do
         ns' <- mapM capture ns
         let mns' = Map.fromList . zip ns . map (\x -> A.Var x (locOf x)) $ ns'
         return $ A.Quant op ns' (subst mns' rng) (subst mns' t) l
-      A.Subst b s' a -> A.Subst <$> alphaRename s b <*> pure s' <*> alphaRename s a
+      -- A.Subst {} -> return expr
+      _ -> return expr
     where
       capture x = do
         if x `elem` s
