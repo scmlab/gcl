@@ -148,10 +148,12 @@ instance Substitutable A.Bindings A.Expr where
       A.Lit {} -> expr
       (A.Var n _) ->
         case Map.lookup n s of
+          Just (A.BetaBinding v) -> v
           Just v -> simpleSubs expr s n (A.bindingsToExpr v)
           Nothing -> expr
       (A.Const n _) ->
         case Map.lookup n s of
+          Just (A.BetaBinding c) -> c
           Just c -> simpleSubs expr s n (A.bindingsToExpr c)
           Nothing -> expr
       A.Op {} -> expr
