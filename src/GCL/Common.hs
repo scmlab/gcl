@@ -5,7 +5,7 @@ module GCL.Common where
 
 import Data.Text(Text)
 import qualified Data.Text as Text
-import Data.Loc (Loc (..))
+import Data.Loc ( Loc(..), Loc, Located(..) )
 import Control.Monad (liftM2)
 import Data.Map (Map)
 import Syntax.Common (Name(..), nameToText)
@@ -17,7 +17,6 @@ import qualified Syntax.Abstract.Util as A
 import GCL.Predicate (Pred (..))
 import Control.Monad.RWS (RWST(..))
 import Control.Monad.State (StateT(..))
-import Data.Loc (Loc, Located (..))
 
 -- Monad for generating fresh variable
 class Monad m => Fresh m where
@@ -25,7 +24,7 @@ class Monad m => Fresh m where
   freshText :: m Text
   freshWithLabel :: Text -> m Text
   freshTexts :: Int -> m [Text]
-  freshName :: m Name
+  -- freshName :: m Name
 
   freshText =
     (\i -> Text.pack ("?m_" ++ show i)) <$> fresh
@@ -36,7 +35,12 @@ class Monad m => Fresh m where
   freshTexts 0 = return []
   freshTexts n = liftM2 (:) freshText (freshTexts (n - 1))
 
-  freshName = (\v -> Name v NoLoc) <$> freshText
+
+freshName :: Fresh m => Loc -> m Name
+freshName l = Name <$> freshText <*> pure l
+
+freshName' :: Fresh m => m Name
+freshName' = freshName NoLoc
 
 type FreshState = Int
 

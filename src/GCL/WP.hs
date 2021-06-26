@@ -11,7 +11,7 @@ import Data.Aeson (ToJSON)
 import Data.Loc (Loc (..), Located (..))
 import Data.Loc.Range (Range, fromLoc)
 import qualified Data.Map as Map
-import GCL.Common (Fresh (..), Subs, Substitutable (..), AlphaRename (..), emptySubs)
+import GCL.Common (Fresh (..), Subs, Substitutable (..), AlphaRename (..), emptySubs, freshName')
 import GCL.Predicate (Origin (..), PO (..), Pred (..), Spec (Specification))
 import GCL.Predicate.Util (conjunct, disjunct, guardIf, guardLoop, toExpr)
 import GHC.Generics (Generic)
@@ -66,6 +66,7 @@ alphaSubst sub e = do
   let ns = Map.keys env
   env' <- alphaRename ns env
   subst sub . subst env' <$> alphaRename ns e
+  -- return . subst sub . subst env $ e
 
 
 structProgram :: [A.Stmt] -> WP ()
@@ -92,7 +93,7 @@ groupStmts (s : stmts) = case groupStmts stmts of
     (s' : segs) -> SStmts [s] : s' : segs
 
 structStmts :: Bool -> (Pred, Maybe A.Expr) -> [A.Stmt] -> Pred -> WP ()
-structStmts b pre stmts = structSegs b pre (groupStmts stmts)
+structStmts b pre = structSegs b pre . groupStmts
 
 structSegs :: Bool -> (Pred, Maybe A.Expr) -> [SegElm] -> Pred -> WP ()
 structSegs _ (pre, _) [] post = do
@@ -256,7 +257,7 @@ wp b (A.If gcmds _) post = do
 wp _ (A.Proof _) post = return post
 wp _ (A.Alloc x (e:es) _) post = do -- non-empty
     {- wp (x := es) P = (forall x', (x' -> es) -* P[x'/x])-}
-   x' <- freshName
+   x' <- freshName'
    post' <- alphaSubst (sub x') (toExpr post)
    return $ Constant
      (A.forAll [x'] A.true
@@ -268,7 +269,7 @@ wp _ (A.Alloc x (e:es) _) post = do -- non-empty
                [1..] es)
 wp _ (A.HLookup x e _) post = do
     {- wp (x := *e) P = (exists v . (e->v) * ((e->v) -* P[v/x])) -}
-   v <- freshName
+   v <- freshName'
    post' <- alphaSubst (sub v) (toExpr post)
    return $ Constant
     (A.exists [v] A.true
@@ -287,7 +288,7 @@ wp _ (A.Dispose e _) post = do
 wp _ _ _ = error "missing case in wp"
 
 allocated :: Fresh m => A.Expr -> m A.Expr
-allocated e = do v <- freshName
+allocated e = do v <- freshName'
                  return (A.exists [v] A.true (e `A.pointsTo` A.nameVar v))
   -- allocated e = e -> _
 

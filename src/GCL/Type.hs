@@ -202,8 +202,7 @@ lookupInferEnv n = do
 
 freshVar :: Loc -> Infer Type
 freshVar l = do
-  t <- freshText
-  return (TVar (Name t l) l)
+  TVar <$> freshName l <*> pure l
 
 ------------------------------------------
 -- type check
