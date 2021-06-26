@@ -255,19 +255,19 @@ lexMin = Min . locOf <$> symbol tokMin
 lexExp :: LexerF ArithOp  
 lexExp = Exp . locOf <$> symbol tokExp
 
-lexSum :: LexerF QuantOp
-lexSum = Sum . locOf <$> symbol tokSum
+lexSum :: LexerF ArithOp 
+lexSum = Add . locOf <$> symbol tokSum
 
-lexPi :: LexerF QuantOp
-lexPi = Pi . locOf <$> symbol tokPi
+lexPi :: LexerF ArithOp
+lexPi = Mul . locOf <$> symbol tokPi
 
-lexForall :: LexerF QuantOp
-lexForall = Forall . locOf <$> symbol tokForall
+lexForall :: LexerF ArithOp
+lexForall = Conj . locOf <$> symbol tokForall
 
-lexExists :: LexerF QuantOp
-lexExists = Exists . locOf <$> symbol tokExists
+lexExists :: LexerF ArithOp
+lexExists = Disj . locOf <$> symbol tokExists
 
-lexHash :: LexerF QuantOp 
+lexHash :: LexerF ArithOp 
 lexHash = Hash . locOf <$> symbol tokHash
 
 lexChainOps :: LexerF ChainOp 
@@ -304,26 +304,20 @@ lexArithOps =
       lexMod,
       lexMax, 
       lexMin,
-      lexExp
-    ]
-
-lexQuantOps :: LexerF QuantOp 
-lexQuantOps = 
-  choice 
-    [ lexSum, 
+      lexExp,
+      lexSum, 
       lexPi,
       lexForall, 
       lexExists, 
       lexHash
+     
     ]
-
 
 lexOps :: LexerF Op
 lexOps =
   choice
     [ ChainOp <$> lexChainOps,
-      ArithOp <$> lexArithOps,
-      QuantOp <$> lexQuantOps
+      ArithOp <$> lexArithOps
     ]
     <?> "operators"
 

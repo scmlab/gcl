@@ -131,7 +131,7 @@ infer (Quant qop iters rng t l) = do
 
   tt <- inEnv [(n, TBase TInt (locOf n)) | n <- iters] (infer t)
   case qop of
-    Op (QuantOp (Hash _)) -> do
+    Op (ArithOp (Hash _)) -> do
       unify tt (TBase TBool (locOf t))
       return (TBase TInt l)
     op -> do
@@ -442,18 +442,12 @@ arithOpTypes (Mod l) = tInt .-> tInt .-> tInt $ l
 arithOpTypes (Max l) = tInt .-> tInt .-> tInt $ l
 arithOpTypes (Min l) = tInt .-> tInt .-> tInt $ l
 arithOpTypes (Exp l) = tInt .-> tInt .-> tInt $ l
+arithOpTypes (Hash l) = tBool .-> tInt $ l
 arithOpTypes (PointsTo l) = tInt .-> tInt .-> tInt $ l
 arithOpTypes (SConj l)    = tBool .-> tBool .-> tBool $ l
 arithOpTypes (SImp l)     = tBool .-> tBool .-> tBool $ l
 
-quantOpTypes :: QuantOp -> Type
-quantOpTypes (Sum l) = arithOpTypes (Add l)
-quantOpTypes (Pi l) = arithOpTypes (Mul l)
-quantOpTypes (Forall l) = arithOpTypes (Conj l)
-quantOpTypes (Exists l) = arithOpTypes (Disj l)
-quantOpTypes (Hash l) = tBool .-> tInt $ l
 
 opTypes :: Op -> Type
 opTypes (ChainOp op) = chainOpTypes op
 opTypes (ArithOp op) = arithOpTypes op
-opTypes (QuantOp op) = quantOpTypes op

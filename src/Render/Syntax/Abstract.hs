@@ -91,21 +91,21 @@ handleExpr _ (Hole _) = return "{!!}"
 handleExpr _ (Quant op xs r t _) =
   return $
     "⟨"
-      <+> renderOp op
+      <+> renderQOp op
       <+> horzE (map render xs)
       <+> ":"
       <+> render r
       <+> ":"
       <+> render t
       <+> "⟩"
-  where renderOp (Op (ArithOp (Conj _)))  = "∀"
-        renderOp (Op (ArithOp (ConjU _))) = "∀"
-        renderOp (Op (ArithOp (Disj _)))  = "∃"
-        renderOp (Op (ArithOp (DisjU _))) = "∃"
-        renderOp (Op (ArithOp (Add _)))   = "Σ"
-        renderOp (Op (ArithOp (Mul _)))   = "Π"
-        renderOp (Op op) = render op
-        renderOp op = render op
+  where renderQOp (Op (ArithOp (Conj _)))  = "∀"
+        renderQOp (Op (ArithOp (ConjU _))) = "∀"
+        renderQOp (Op (ArithOp (Disj _)))  = "∃"
+        renderQOp (Op (ArithOp (DisjU _))) = "∃"
+        renderQOp (Op (ArithOp (Add _)))   = "Σ"
+        renderQOp (Op (ArithOp (Mul _)))   = "Π"
+        renderQOp (Op op') = render op'
+        renderQOp op' = render op'
 handleExpr _ (Subst before env after) =
   return $ substE (render before) (render env) (if isLam after then parensE (render after) else render after)
   where

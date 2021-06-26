@@ -139,16 +139,12 @@ instance StabM HoverM Expr HoverResult where
 instance StabM HoverM Op HoverResult where
   stabM (ChainOp op) = stabLocated op
   stabM (ArithOp op) = stabLocated op
-  stabM (QuantOp op) = stabLocated op
 
 instance StabM HoverM ArithOp HoverResult where
   stabM op = return [typeToHoverResult (Type.arithOpTypes op)]
 
 instance StabM HoverM ChainOp HoverResult where
   stabM op = return [typeToHoverResult (Type.chainOpTypes op)]
-
-instance StabM HoverM QuantOp HoverResult where
-  stabM op = return [typeToHoverResult (Type.quantOpTypes op)]
 
 instance StabM HoverM QuantOp' HoverResult where
   stabM (Left  op  ) = stabLocated op

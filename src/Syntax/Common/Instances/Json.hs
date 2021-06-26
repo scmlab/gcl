@@ -19,9 +19,6 @@ instance FromJSON ChainOp
 instance ToJSON ArithOp
 instance FromJSON ArithOp
 
-instance ToJSON QuantOp
-instance FromJSON QuantOp
-
 instance ToJSON Op
 instance FromJSON Op
 
