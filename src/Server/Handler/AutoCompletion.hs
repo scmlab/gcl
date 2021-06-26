@@ -101,6 +101,26 @@ handler position completionContext = do
                                "↑"
                                "\"↑\" Upwards Arrow"
                                "The Unicode variant of \"max\""
+                    , makeItem "sum"
+                               (Just CiValue)
+                               "Σ"
+                               "\"Σ\" Sum"
+                               "The Unicode variant of \"sum\""
+                    , makeItem "pi"
+                               (Just CiValue)
+                               "∏"
+                               "\"∏\" Pi"
+                               "The Unicode variant of \"pi\""
+                    , makeItem "forall"
+                               (Just CiValue)
+                               "∀"
+                               "\"∀\" Forall"
+                               "The Unicode variant of \"forall\""
+                    , makeItem "exitsts"
+                               (Just CiValue)
+                               "∃"
+                               "\"∃\" Exists"
+                               "The Unicode variant of \"exists\""
                     ]
 
             let isComplete     = True
