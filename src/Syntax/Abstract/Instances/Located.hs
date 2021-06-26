@@ -17,12 +17,17 @@ instance Located Stmt where
   locOf (Skip l) = l
   locOf (Abort l) = l
   locOf (Assign _ _ l) = l
+  locOf (AAssign _ _ _ l) = l
   locOf (Assert _ l) = l
   locOf (LoopInvariant _ _ l) = l
   locOf (Do _ l) = l
   locOf (If _ l) = l
   locOf (Spec _ l) = locOf l
   locOf (Proof l) = l
+  locOf (Alloc _ _ l) = l
+  locOf (HLookup _ _ l) = l
+  locOf (HMutate _ _ l) = l
+  locOf (Dispose _ l) = l
 
 instance Located GdCmd where
   locOf (GdCmd _ _ l) = l 
@@ -51,8 +56,9 @@ instance Located Expr where
   locOf (Lam _ _ l) = l
   locOf (Hole l) = l
   locOf (Quant _ _ _ _ l) = l
-  locOf (Subst _ _ x) = locOf x
+  locOf (Subst es _ _) = locOf es
+  locOf (ArrIdx _ _ l) = l
+  locOf (ArrUpd _ _ _ l) = l
 
 instance Located Lit where
   locOf _ = NoLoc
-  

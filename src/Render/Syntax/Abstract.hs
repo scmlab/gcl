@@ -10,7 +10,7 @@ import Render.Element
 import Render.Syntax.Common ()
 import Syntax.Abstract
 import Syntax.Abstract.Util ( assignBindingToExpr )
-import Syntax.Common (Fixity (..), Op, classify, Name)
+import Syntax.Common (Fixity (..), Op(..), ArithOp(..), classify, Name)
 import Data.Map (Map)
 
 --------------------------------------------------------------------------------
@@ -54,6 +54,7 @@ instance Render Lit where
   render (Num i) = render (show i)
   render (Bol b) = render (show b)
   render (Chr c) = render (show c)
+  render Emp     = "emp"
 
 --------------------------------------------------------------------------------
 
@@ -90,19 +91,32 @@ handleExpr _ (Hole _) = return "{!!}"
 handleExpr _ (Quant op xs r t _) =
   return $
     "⟨"
-      <+> render op
+      <+> renderOp op
       <+> horzE (map render xs)
       <+> ":"
       <+> render r
       <+> ":"
       <+> render t
       <+> "⟩"
+  where renderOp (Op (ArithOp (Conj _)))  = "∀"
+        renderOp (Op (ArithOp (ConjU _))) = "∀"
+        renderOp (Op (ArithOp (Disj _)))  = "∃"
+        renderOp (Op (ArithOp (DisjU _))) = "∃"
+        renderOp (Op (ArithOp (Add _)))   = "Σ"
+        renderOp (Op (ArithOp (Mul _)))   = "Π"
+        renderOp (Op op) = render op
+        renderOp op = render op
 handleExpr _ (Subst before env after) =
   return $ substE (render before) (render env) (if isLam after then parensE (render after) else render after)
   where
     isLam :: Expr -> Bool
     isLam Lam {} = True
     isLam _ = False
+handleExpr _ (ArrIdx e1 e2 _) =
+  return $ render e1 <> "[" <> render e2 <> "]"
+handleExpr _ (ArrUpd e1 e2 e3 _) =
+  return $ "(" <+> render e1 <+> ":" <+> render e2 <+> "↣" <+> render e3 <+> ")"
+    -- SCM: need to print parenthesis around e1 when necessary.
 
 instance Render Subst where
   render = render . Map.mapMaybe assignBindingToExpr

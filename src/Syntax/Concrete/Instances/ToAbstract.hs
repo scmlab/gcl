@@ -64,6 +64,7 @@ instance ToAbstract Stmt A.Stmt where
     Skip l -> pure (A.Skip l)
     Abort l -> pure (A.Abort l)
     Assign a _ b -> A.Assign (fromSepBy a) <$> mapM toAbstract (fromSepBy b) <*> pure (a <--> b)
+    AAssign x _ i _ _ e -> A.AAssign (A.Var x (locOf x)) <$> toAbstract i <*> toAbstract e <*> pure (x <--> e)
     Assert l a r -> A.Assert <$> toAbstract a <*> pure (l <--> r)
     LoopInvariant l a _ _ _ b r -> A.LoopInvariant <$> toAbstract a <*> toAbstract b <*> pure (l <--> r)
     Do l a r -> A.Do <$> mapM toAbstract (fromSepBy a) <*> pure (l <--> r)
@@ -157,7 +158,7 @@ instance ToAbstract Expr A.Expr where
     Const a -> pure $ A.Const a (locOf x)
     Op a -> pure $ A.Op (ArithOp a)
     Chain a op b -> A.Chain <$> toAbstract a <*> pure (ChainOp op) <*> toAbstract b <*> pure (locOf x)
-    Arr arr _ i _ -> A.App <$> toAbstract arr <*> toAbstract i <*> pure (locOf x)
+    Arr arr _ i _ -> A.ArrIdx <$> toAbstract arr <*> toAbstract i <*> pure (locOf x)
     App a b -> A.App <$> toAbstract a <*> toAbstract b <*> pure (locOf x)
     Quant _ a b _ c _ d _ -> A.Quant <$> toAbstractQOp a <*> pure b <*> toAbstract c <*> toAbstract d <*> pure (locOf x)
       where

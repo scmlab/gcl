@@ -6,11 +6,12 @@ module GCL.WP where
 
 import Control.Monad.Except (Except, MonadError (throwError), forM, forM_, runExcept, unless, when)
 import Control.Monad.RWS (MonadReader (ask), MonadState (..), MonadWriter (..), RWST, evalRWST)
+import Control.Arrow(first)
 import Data.Aeson (ToJSON)
 import Data.Loc (Loc (..), Located (..))
 import Data.Loc.Range (Range, fromLoc)
 import qualified Data.Map as Map
-import GCL.Common (Fresh (fresh, freshText), Subs, Substitutable (..), AlphaRename (..), emptySubs)
+import GCL.Common (Fresh (..), Subs, Substitutable (..), AlphaRename (..), emptySubs)
 import GCL.Predicate (Origin (..), PO (..), Pred (..), Spec (Specification))
 import GCL.Predicate.Util (conjunct, disjunct, guardIf, guardLoop, toExpr)
 import GHC.Generics (Generic)
@@ -65,137 +66,186 @@ alphaSubst sub e = do
   let ns = Map.keys env
   env' <- alphaRename ns env
   subst sub . subst env' <$> alphaRename ns e
-  
+
 
 structProgram :: [A.Stmt] -> WP ()
 structProgram stmts = do
   case progView stmts of
     ProgViewEmpty -> return ()
-    ProgViewOkay pre ss post -> do
-      structStmts True pre Nothing ss post
-    ProgViewMissingPrecondition ss post -> do
-      structStmts True (Constant A.true) Nothing ss post
-    ProgViewMissingPostcondition _ ss -> throwError . MissingPostcondition . locOf . last $ ss
-    ProgViewMissingBoth ss -> throwError . MissingPostcondition . locOf . last $ ss
+    ProgViewOkay pre stmts' post -> structStmts True (pre,Nothing) stmts' post
+    ProgViewMissingPrecondition stmts' post -> structStmts True (Constant A.true, Nothing) stmts' post
+    ProgViewMissingPostcondition _ stmts' -> throwError . MissingPostcondition . locOf . last $ stmts'
+    ProgViewMissingBoth stmts' -> throwError . MissingPostcondition . locOf . last $ stmts'
 
-structStmts :: Bool -> Pred -> Maybe A.Expr -> [A.Stmt] -> Pred -> WP ()
-structStmts _ pre _ [] post = do
+data SegElm = SAsrt A.Stmt
+            | SSpec A.Stmt
+            | SStmts [A.Stmt]
+
+groupStmts :: [A.Stmt] -> [SegElm]
+groupStmts [] = []
+groupStmts (s@(A.Assert _ _) : stmts) = SAsrt s : groupStmts stmts
+groupStmts (s@A.LoopInvariant {} : stmts) = SAsrt s : groupStmts stmts
+groupStmts (s@(A.Spec _ _) : stmts) = SSpec s : groupStmts stmts
+groupStmts (s : stmts) = case groupStmts stmts of
+    [] -> [SStmts [s]]
+    (SStmts ss : segs) -> SStmts (s:ss) : segs
+    (s' : segs) -> SStmts [s] : s' : segs
+
+structStmts :: Bool -> (Pred, Maybe A.Expr) -> [A.Stmt] -> Pred -> WP ()
+structStmts b pre stmts = structSegs b pre (groupStmts stmts)
+
+structSegs :: Bool -> (Pred, Maybe A.Expr) -> [SegElm] -> Pred -> WP ()
+structSegs _ (pre, _) [] post = do
   case locOf pre of
-    NoLoc -> tellPO (emptySubs, pre) (emptySubs, post) (AtAssertion (locOf post))
-    others -> tellPO (emptySubs, pre) (emptySubs, post) (AtAssertion others)
+    NoLoc -> tellPO pre post (AtAssertion (locOf post))
+    others -> tellPO pre post (AtAssertion others)
   return ()
-structStmts b pre _ (A.Assert p l : stmts) post = do
-  pre' <-
-    if b
-      then do
-        let assert = Assertion p l
-        tellPO (emptySubs, pre) (emptySubs, assert) (AtAssertion l)
-        return assert
-      else return pre
-  structStmts b pre' Nothing stmts post
-structStmts True pre _ (A.LoopInvariant p bnd l : stmts) post = do
-  let origin = if startsWithDo stmts then AtLoop l else AtAssertion l
+structSegs True (pre, _) (SAsrt (A.Assert p l) : segs) post = do
+    let assert = Assertion p l
+    tellPO pre assert (AtAssertion (locOf pre))
+    structSegs True (assert, Nothing) segs post
+structSegs False (pre, bnd) (SAsrt (A.Assert _ _) : segs) post =
+  structSegs False (pre, bnd) segs post
+structSegs True (pre, _) (SAsrt (A.LoopInvariant p bnd l) : segs) post = do
   let loopInv = LoopInvariant p bnd l
-  tellPO (emptySubs, pre) (emptySubs, loopInv) origin
-  structStmts True loopInv (Just bnd) stmts post
-  where
-    startsWithDo :: [A.Stmt] -> Bool
-    startsWithDo (A.Do _ _ : _) = True
-    startsWithDo _ = False
-structStmts False pre _ (A.LoopInvariant {} : stmts) post = do
-  structStmts False pre Nothing stmts post
-structStmts b pre bnd (stmt : stmts) post = do
-  post' <- wpStmts b stmts post
-  struct b pre bnd stmt post'
+  tellPO pre loopInv origin
+  structSegs True (loopInv, Just bnd) segs post
+ where startsWithDo :: [SegElm] -> Bool
+       startsWithDo (SStmts (A.Do _ _ : _) : _) = True
+       startsWithDo _ = False
+       origin = if startsWithDo segs then AtLoop l else AtAssertion l
+structSegs False (pre, bnd) (SAsrt A.LoopInvariant {} : segs) post =
+  structSegs False (pre, bnd) segs post
+structSegs b (pre, bnd) [SStmts ss] post =
+  structSStmts b (pre,bnd) ss post
+structSegs b (pre, bnd) (SStmts ss : SAsrt (A.Assert p l) : segs) post = do
+  structSStmts b (pre, bnd) ss (Assertion p l)
+  structSegs b (Assertion p l, Nothing) segs post
+structSegs b (pre, bnd) (SStmts ss : SAsrt (A.LoopInvariant p bd l) : segs) post = do
+  structSStmts b (pre, bnd) ss (LoopInvariant p bd l)
+  structSegs b (LoopInvariant p bd l, Just bd) segs post
+structSegs b (pre, bnd) (SStmts ss : SSpec (A.Spec _ range) : segs) post = do
+  post' <- wpSegs b segs post
+  pre'  <- spSStmts b (pre, bnd) ss
+  when b (tellSpec pre' post' range)
+structSegs b (pre, _) (SSpec (A.Spec _ range) : segs) post = do
+  post' <- wpSegs b segs post
+  when b (tellSpec pre post' range)
+structSegs _ _ _ _ = error "Missing case in structSegs"
 
-struct :: Bool -> Pred -> Maybe A.Expr -> A.Stmt -> Pred -> WP ()
-struct _ pre _ (A.Abort l) _ = tellPO (emptySubs, pre) (emptySubs, Constant A.false) (AtAbort l)
-struct _ pre _ (A.Skip l) post = tellPO (emptySubs, pre) (emptySubs, post) (AtSkip l)
-struct _ pre _ (A.Assign xs es l) post = do
-  let sub = Map.fromList . zip xs . map A.AssignBinding $ es
-  tellPO (emptySubs, pre) (sub, post) (AtAssignment l)
-struct True pre _ (A.Assert p l) post = do
-  tellPO (emptySubs, pre) (emptySubs, Assertion p l) (AtAssertion l)
-  tellPO (emptySubs, Assertion p l) (emptySubs, post) (AtAssertion l)
-struct False pre _ (A.Assert _ l) post = do
-  tellPO (emptySubs, pre) (emptySubs, post) (AtAssertion l)
-struct _ pre _ (A.LoopInvariant p b l) post = do
-  tellPO (emptySubs, pre) (emptySubs, LoopInvariant p b l) (AtAssertion l)
-  tellPO (emptySubs, LoopInvariant p b l) (emptySubs, post) (AtAssertion l)
-struct b pre _ (A.If gcmds l) post = do
-  when b $ tellPO (emptySubs, pre) (emptySubs, disjunctGuards gcmds) (AtIf l)
+ -- 'simple' version of struct stmts -- there are no assertions,
+ -- invariants, or specs in the list of statements.
+structSStmts :: Bool -> (Pred, Maybe A.Expr) -> [A.Stmt] -> Pred -> WP ()
+structSStmts _ (pre, _) [] post = do
+  case locOf pre of
+    NoLoc -> tellPO pre post (AtAssertion (locOf post))
+    others -> tellPO pre post (AtAssertion others)
+  return ()
+structSStmts b (pre, bnd) (stmt : stmts) post = do
+  post' <- wpSStmts b stmts post
+  struct b (pre, bnd) stmt post'
+
+struct :: Bool -> (Pred, Maybe A.Expr) -> A.Stmt -> Pred -> WP ()
+struct b (pre, _) s@(A.Abort l) post =
+  tellPO' (AtAbort l) pre =<< wp b s post
+struct b (pre, _) s@(A.Skip l) post =
+  tellPO' (AtSkip l) pre =<< wp b s post
+struct b (pre, _) s@(A.Assign _ _ l) post = do
+  tellPO' (AtAssignment l) pre =<< wp b s post
+struct b (pre, _) s@(A.AAssign _ _ _ l) post = do
+  tellPO' (AtAssignment l) pre =<< wp b s post
+struct b (pre, _) (A.If gcmds l) post = do
+  when b $ tellPO pre (disjunctGuards gcmds) (AtIf l)
   forM_ gcmds $ \(A.GdCmd guard body _) ->
-    structStmts b (Conjunct [pre, guardIf guard]) Nothing body post
-struct True inv (Just bnd) (A.Do gcmds l) post = do
+    structStmts b (Conjunct [pre, guardIf guard], Nothing) body post
+struct True (inv, Just bnd) (A.Do gcmds l) post = do
   let guards = A.getGuards gcmds
-  tellPO (emptySubs, Conjunct (inv : map (Negate . guardLoop) guards)) (emptySubs, post) (AtLoop l)
+  tellPO (Conjunct (inv : map (Negate . guardLoop) guards)) post (AtLoop l)
   forM_ gcmds (structGdcmdInduct inv)
   tellPO
-    (emptySubs, Conjunct (inv : map guardLoop guards))
-    (emptySubs, Bound (bnd `A.gte` A.Lit (A.Num 0) NoLoc) NoLoc)
+    (Conjunct (inv : map guardLoop guards))
+    (Bound (bnd `A.gte` A.Lit (A.Num 0) NoLoc) NoLoc)
     (AtTermination l)
   forM_ gcmds (structGdcmdBnd inv bnd)
-struct False inv _ (A.Do gcmds l) post = do
+struct False (inv, _) (A.Do gcmds l) post = do
   let guards = A.getGuards gcmds
-  tellPO (emptySubs, Conjunct (inv : map (Negate . guardLoop) guards)) (emptySubs, post) (AtLoop l)
-struct _ inv Nothing (A.Do gcmds l) post = do
+  tellPO (Conjunct (inv : map (Negate . guardLoop) guards)) post (AtLoop l)
+struct _ (inv, Nothing) (A.Do gcmds l) post = do
   case fromLoc l of
     Nothing -> return ()
     Just rng -> throwWarning (MissingBound rng)
   let guards = A.getGuards gcmds
-  tellPO (emptySubs, Conjunct (inv : map (Negate . guardLoop) guards)) (emptySubs, post) (AtLoop l)
+  tellPO (Conjunct (inv : map (Negate . guardLoop) guards)) post (AtLoop l)
   forM_ gcmds (structGdcmdInduct inv)
-  tellPO (emptySubs, Conjunct (inv : map guardLoop guards)) (emptySubs, post) (AtTermination l)
-struct b pre _ (A.Spec _ range) post = when b (tellSpec pre post range)
-struct _ _ _ (A.Proof _) _ = return ()
+--  tellPO (emptySubs, Conjunct (inv : map guardLoop guards)) (emptySubs, post) (AtTermination l)
+-- struct b (pre, _) (A.Spec _ range) post = when b (tellSpec pre post range)
+struct _ _ (A.Proof _) _ = return ()
+struct _ _ _ _ = error "missing case in struct"
 
 structGdcmdInduct :: Pred -> A.GdCmd -> WP ()
 structGdcmdInduct inv (A.GdCmd guard body _) =
-  structStmts True (Conjunct [inv, guardLoop guard]) Nothing body inv
+  structStmts True (Conjunct [inv, guardLoop guard], Nothing) body inv
 
 structGdcmdBnd :: Pred -> A.Expr -> A.GdCmd -> WP ()
 structGdcmdBnd inv bnd (A.GdCmd guard body _) = do
-  oldbnd <- freshText
+  oldbnd <- freshVar
   structStmts
     False
     ( Conjunct
         [ inv,
-          Bound (bnd `A.eqq` A.Var (Name oldbnd NoLoc) NoLoc) NoLoc,
+          Bound (bnd `A.eqq` oldbnd) NoLoc,
           guardLoop guard
-        ]
-    )
-    Nothing
+        ],
+    Nothing )
     body
-    (Bound (bnd `A.lt` A.Var (Name oldbnd NoLoc) NoLoc) NoLoc)
+    (Bound (bnd `A.lt` oldbnd) NoLoc)
+
+-- weakest precondition
 
 wpStmts :: Bool -> [A.Stmt] -> Pred -> WP Pred
-wpStmts _ [] post = return post
-wpStmts True (A.Assert pre l : stmts) post = do
-  structStmts True (Assertion pre l) Nothing stmts post
-  return (Assertion pre l)
-wpStmts False (A.Assert {} : stmts) post =
-  wpStmts False stmts post
-wpStmts True (A.LoopInvariant p b l : stmts) post = do
-  structStmts True (LoopInvariant p b l) (Just b) stmts post
-  return (LoopInvariant p b l)
-wpStmts False (A.LoopInvariant {} : stmts) post = do
-  wpStmts False stmts post
-wpStmts b (stmt : stmts) post = do
-  post' <- wpStmts b stmts post
+wpStmts b = wpSegs b . groupStmts
+
+wpSegs :: Bool -> [SegElm] -> Pred -> WP Pred
+wpSegs _ [] post = return post
+wpSegs b (SStmts ss : segs) post = do
+  post' <- wpSegs b segs post
+  wpSStmts b ss post'
+wpSegs b (SSpec (A.Spec _ range) : segs) post = do
+  post' <- wpSegs b segs post
+  when b (tellSpec post' post' range)
+  return post'
+wpSegs b (SAsrt (A.Assert p l) : segs) post = do
+  structSegs b (Assertion p l, Nothing) segs post
+  return (Assertion p l)
+wpSegs b (SAsrt (A.LoopInvariant p bd l) : segs) post = do
+  structSegs b (LoopInvariant p bd l, Just bd) segs post
+  return (Assertion p l) -- SCM: erasing bound information?
+wpSegs _ _ _ = error "Missing case in wpSegs"
+
+  -- "simple" version of wpStmts. need not deal with assertions and specs
+
+wpSStmts :: Bool -> [A.Stmt] -> Pred -> WP Pred
+wpSStmts _ [] post = return post
+wpSStmts b (stmt : stmts) post = do
+  post' <- wpSStmts b stmts post
   wp b stmt post'
 
 wp :: Bool -> A.Stmt -> Pred -> WP Pred
-wp _ (A.Skip _) post = return post
 wp _ (A.Abort _) _ = return (Constant A.false)
+wp _ (A.Skip _) post = return post
 wp _ (A.Assign xs es _) post = do
   let sub = Map.fromList . zip xs . map A.AssignBinding $ es
   alphaSubst sub post
-wp _ (A.Assert p l) post = do
-  tellPO (emptySubs, Assertion p l) (emptySubs, post) (AtAssertion l)
-  return (Assertion p l)
-wp _ (A.LoopInvariant p b l) post = do
-  tellPO (emptySubs, LoopInvariant p b l) (emptySubs, post) (AtAssertion l)
-  return (LoopInvariant p b l)
+wp _ (A.AAssign (A.Var x _) i e _) post = do
+  let sub = Map.fromList [(x, A.AssignBinding (A.ArrUpd (A.nameVar x) i e NoLoc))]
+  alphaSubst sub post
+wp _ (A.AAssign _ _ _ l) _ = throwError (MultiDimArrayAsgnNotImp l)
+-- wp _ (A.Assert p l) post = do
+--   tellPO (Assertion p l) post (AtAssertion l)
+--   return (Assertion p l)
+-- wp _ (A.LoopInvariant p b l) post = do
+--   tellPO (LoopInvariant p b l) post (AtAssertion l)
+--   return (LoopInvariant p b l)
 wp _ (A.Do _ l) _ = throwError $ MissingAssertion l
 wp b (A.If gcmds _) post = do
   pres <- forM gcmds $ \(A.GdCmd guard body _) ->
@@ -203,21 +253,148 @@ wp b (A.If gcmds _) post = do
       . toExpr
       <$> wpStmts b body post
   return (conjunct (disjunctGuards gcmds : pres))
-wp b (A.Spec _ range) post = do
-  when b (tellSpec post post range)
-  return post
 wp _ (A.Proof _) post = return post
+wp _ (A.Alloc x (e:es) _) post = do -- non-empty
+    {- wp (x := es) P = (forall x', (x' -> es) -* P[x'/x])-}
+   x' <- freshName
+   post' <- alphaSubst (sub x') (toExpr post)
+   return $ Constant
+     (A.forAll [x'] A.true
+        (newallocs x' `A.sImp` post'))
+  where sub x' = Map.fromList [(x, A.AssignBinding (A.nameVar x'))]
+        newallocs x' = A.sconjunct (
+          (A.nameVar x' `A.pointsTo` e) :
+           zipWith (\i -> A.pointsTo (A.nameVar x' `A.add` A.number i))
+               [1..] es)
+wp _ (A.HLookup x e _) post = do
+    {- wp (x := *e) P = (exists v . (e->v) * ((e->v) -* P[v/x])) -}
+   v <- freshName
+   post' <- alphaSubst (sub v) (toExpr post)
+   return $ Constant
+    (A.exists [v] A.true
+       (entry v `A.sConj` (entry v `A.sImp` post')))
+  where sub v = Map.fromList [(x, A.AssignBinding (A.nameVar v))]
+        entry v = e `A.pointsTo` A.nameVar v
+wp _ (A.HMutate e1 e2 _) post = do
+    {- wp (e1* := e2) P = (e1->_) * ((e1->e2) -* P) -}
+   e1_allocated <- allocated e1
+   return $ Constant (e1_allocated `A.sConj`
+                       ((e1 `A.pointsTo` e2) `A.sImp` toExpr post))
+wp _ (A.Dispose e _) post = do
+    {- wp (dispose e) P = (e -> _) * P -}
+  e_allocated <- allocated e
+  return $ Constant (e_allocated `A.sConj` toExpr post)
+wp _ _ _ = error "missing case in wp"
+
+allocated :: Fresh m => A.Expr -> m A.Expr
+allocated e = do v <- freshName
+                 return (A.exists [v] A.true (e `A.pointsTo` A.nameVar v))
+  -- allocated e = e -> _
 
 disjunctGuards :: [A.GdCmd] -> Pred
 disjunctGuards = disjunct . map guardIf . A.getGuards
 
-tellPO :: (Subs A.Bindings , Pred) -> (Subs A.Bindings, Pred) -> Origin -> WP ()
-tellPO (sp, p) (sq, q) l = unless (toExpr p == toExpr q) $ do
-  p' <- alphaSubst sp p
-  q' <- alphaSubst sq q
+-- strongest postcondition
+spStmts :: Bool -> (Pred, Maybe A.Expr) -> [A.Stmt] -> WP Pred
+spStmts b (pre, bnd) stmts =
+   spSegs b (pre, bnd) (groupStmts stmts)
+
+spSegs :: Bool -> (Pred, Maybe A.Expr) -> [SegElm] -> WP Pred
+spSegs b (pre, bnd) segs = case split segs of
+    (ls, Nothing) -> spSegs' b (pre, bnd) ls
+    (ls, Just (SAsrt (A.Assert p l), rs)) -> do
+       structSegs b (pre, bnd) ls (Assertion p l)
+       spSegs' b (Assertion p l, Nothing) rs
+    (ls, Just (SAsrt (A.LoopInvariant p bd l), rs)) -> do
+      structSegs b (pre, bnd) ls (Assertion p l)
+      spSegs' b (Assertion p l, Just bd) rs
+    (_, _) -> error "missing case in spSegs"
+ where
+  split :: [SegElm] -> ([SegElm], Maybe (SegElm, [SegElm]))
+  split [] = ([], Nothing)
+  split (s@(SStmts _):segs') = first (s:) (split segs')
+  split (s@(SSpec _):segs') = first (s:) (split segs')
+  split (s@(SAsrt _):segs') =
+          case split segs' of
+            (ls, Nothing) -> ([], Just (s, ls))
+            (ls, r@(Just _)) -> (s:ls, r)
+
+  -- spSeg' deals with a block with no assertions
+  spSegs' :: Bool -> (Pred, Maybe A.Expr) -> [SegElm] -> WP Pred
+  spSegs' _ (pre', _) [] = return pre'
+  spSegs' b' (pre', bnd') (SStmts ss : segs') = do
+    pre'' <- spSStmts b' (pre', bnd') ss
+    spSegs' b' (pre'', Nothing) segs'
+  spSegs' b' (pre', bnd') (SSpec (A.Spec _ range) : segs') = do
+    when b' (tellSpec pre' pre' range)
+    spSegs' b' (pre', bnd') segs'
+  spSegs' _ _ _ = error "missing case in spSegs'"
+
+  -- the "simple" version
+spSStmts :: Bool -> (Pred, Maybe A.Expr) -> [A.Stmt] -> WP Pred
+spSStmts _ (pre, _) [] = return pre
+spSStmts b (pre, bnd) (stmt : stmts) = do
+  pre' <- sp b (pre, bnd) stmt
+  spSStmts b (pre', Nothing) stmts
+
+sp :: Bool -> (Pred, Maybe A.Expr) -> A.Stmt -> WP Pred
+sp _ (_, _) (A.Abort _) = return (Constant A.true)
+sp _ (pre, _) (A.Skip _) = return pre
+sp _ (pre, _) (A.Assign xs es l) = do
+      -- {P} x := E { (exists x' :: x = E[x'/x] && P[x'/x]) }
+    frNames <- genFrNames xs
+    let sub = genSub xs frNames
+    pre' <- alphaSubst sub (toExpr pre)
+    return $ Constant (
+       A.exists frNames (A.conjunct (zipWith (genEq sub) xs es)) pre')
+  where
+    genFrNames :: [a] -> WP [Name]
+    genFrNames ys = map (`Name` l) <$> mapM (const freshText) ys
+    -- genSub :: [Name] -> [Name] -> Subs A.Bindings
+    genSub ys hs = Map.fromList . zip ys . map (A.AssignBinding . A.nameVar) $ hs
+    -- genEq :: Name -> A.Expr -> A.Expr
+    genEq sub x e = A.nameVar x `A.eqq` subst sub e
+sp _ (pre, _) (A.AAssign (A.Var x _) i e _) = do
+     -- {P} x[I] := E { (exist x' :: x = x'[I[x'/x] -> E[x'/x]] && P[x'/x]) }
+   x' <- freshText
+   let sub = Map.fromList [(x, A.AssignBinding (A.variable x'))]
+   pre' <- alphaSubst sub (toExpr pre)
+   return $ Constant (
+     A.exists [Name x' NoLoc]
+      (A.nameVar x `A.eqq` A.ArrUpd (A.variable x') (subst sub i) (subst sub e) NoLoc) pre')
+sp _ (_, _) (A.AAssign _ _ _ l) = throwError (MultiDimArrayAsgnNotImp l)
+sp b (pre, _) (A.If gcmds _) = do
+  posts <- forM gcmds $ \(A.GdCmd guard body _) ->
+    Constant . toExpr <$>
+      spStmts b (Constant (guard `A.conj` toExpr pre), Nothing) body
+  return (disjunct posts)
+sp b (pre, bnd) (A.Do gcmds l) = do
+  let guards = A.getGuards gcmds
+  let post = Conjunct (pre : map (Negate . guardLoop) guards)
+  struct b (pre, bnd) (A.Do gcmds l) post
+  return post
+sp _ (pre, _) _ = return pre
+
+--
+tellSubstPO :: (Subs A.Bindings, Pred) -> (Subs A.Bindings, Pred) -> Origin -> WP ()
+tellSubstPO (s1, p) (s2, q) l = unless (toExpr p == toExpr q) $ do
+  p' <- alphaSubst s1 p
+  q' <- alphaSubst s2 q
   (i, j, k) <- get
   put (succ i, j, k)
   tell ([PO i p' q' l], [], [])
+
+tellPO :: Pred -> Pred -> Origin -> WP ()
+tellPO p q = tellSubstPO (emptySubs, p) (emptySubs, q)
+
+  -- SCM: swapping the order of arguments, which
+  --      can be convenient in ceratin occassions.
+
+tellSubstPO' :: Origin -> (Subs A.Bindings, Pred) -> (Subs A.Bindings, Pred) -> WP ()
+tellSubstPO' l p q = tellSubstPO p q l
+
+tellPO' :: Origin -> Pred -> Pred -> WP ()
+tellPO' l p q = tellPO p q l
 
 tellSpec :: Pred -> Pred -> Range -> WP ()
 tellSpec p q l = do
@@ -231,6 +408,9 @@ throwWarning :: StructWarning -> WP ()
 throwWarning warning = do
   tell ([], [], [warning])
 
+freshVar :: Fresh m => m A.Expr
+freshVar = (\v -> A.Var (Name v NoLoc) NoLoc) <$> freshText
+
 data StructWarning
   = MissingBound Range
   | ExcessBound Range
@@ -243,10 +423,14 @@ instance Located StructWarning where
 data StructError
   = MissingAssertion Loc
   | MissingPostcondition Loc
+  | MultiDimArrayAsgnNotImp Loc
+     -- Assignment to multi-dimensional array not implemented.
+     -- SCM: will remove this when we figure out how.
   deriving (Eq, Show, Generic)
 
 instance Located StructError where
   locOf (MissingAssertion l) = l
   locOf (MissingPostcondition l) = l
+  locOf (MultiDimArrayAsgnNotImp l) = l
 
 instance ToJSON StructError

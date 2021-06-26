@@ -31,6 +31,7 @@ instance Pretty StructWarning where
 instance Pretty StructError where
   pretty (MissingAssertion loc) = "Missing Assertion" <+> pretty loc
   pretty (MissingPostcondition loc) = "Missing Postcondition" <+> pretty loc
+  pretty (MultiDimArrayAsgnNotImp loc) = "Assignment to Multi-Dimensional Array" <+> pretty loc
 
 instance Pretty TypeError where
   pretty (NotInScope name _) =
@@ -41,6 +42,8 @@ instance Pretty TypeError where
     "Recursive type variable: " <+> pretty v <+> "in" <+> pretty a
   pretty (NotFunction a _) =
     "The type" <+> pretty a <+> "is not a function type"
+  pretty (NotArray a _) =
+    "The type" <+> pretty a <+> "is not an array type"
   pretty (NotEnoughExprsInAssigment vars _) =
     "Not Enough Expressions:" <+> "Variables" <+> pretty vars <+> "do not have corresponing expressions in the assigment"
   pretty (TooManyExprsInAssigment exprs _) =
@@ -48,12 +51,12 @@ instance Pretty TypeError where
       <+> "Expressions"
       <+> pretty exprs
       <+> "do not have corresponing variables in the assigment"
-  pretty (AssignToConst n _) = 
+  pretty (AssignToConst n _) =
     "Assginment to Constant Declaration"
       <+> "Declaration"
       <+> pretty n
       <+> "is a constant, not a variable"
-  pretty (AssignToLet n _) = 
+  pretty (AssignToLet n _) =
     "Assginment to Let Declaration"
       <+> "Declaration"
       <+> pretty n

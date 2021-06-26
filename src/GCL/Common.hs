@@ -5,6 +5,7 @@ module GCL.Common where
 
 import Data.Text(Text)
 import qualified Data.Text as Text
+import Data.Loc (Loc (..))
 import Control.Monad (liftM2)
 import Data.Map (Map)
 import Syntax.Common (Name(..), nameToText)
@@ -24,6 +25,7 @@ class Monad m => Fresh m where
   freshText :: m Text
   freshWithLabel :: Text -> m Text
   freshTexts :: Int -> m [Text]
+  freshName :: m Name
 
   freshText =
     (\i -> Text.pack ("?m_" ++ show i)) <$> fresh
@@ -33,6 +35,8 @@ class Monad m => Fresh m where
 
   freshTexts 0 = return []
   freshTexts n = liftM2 (:) freshText (freshTexts (n - 1))
+
+  freshName = (\v -> Name v NoLoc) <$> freshText
 
 type FreshState = Int
 
@@ -78,6 +82,8 @@ instance Free A.Expr where
   fv (A.Hole _) = mempty -- banacorn: `subs` has been always empty anyway
   -- concat (map freeSubst subs) -- correct?
   fv (A.Subst _ _ after) = fv after
+  fv (A.ArrIdx e1 e2 _) = fv e1 <> fv e2
+  fv (A.ArrUpd e1 e2 e3 _) = fv e1 <> fv e2 <> fv e3
 
 instance Free A.Bindings where
   fv = fv . A.bindingsToExpr
@@ -120,6 +126,10 @@ instance Substitutable A.Expr A.Expr where
     let s' = Map.withoutKeys s (Set.fromList xs) in
     A.Quant (subst s' qop) xs (subst s' rng) (subst s' t) l
   subst s1 (A.Subst before s2 after) = A.Subst (subst s1 before) s2 (subst s1 after)
+  subst s (A.ArrIdx e1 e2 l) =
+    A.ArrIdx (subst s e1) (subst s e2) l
+  subst s (A.ArrUpd e1 e2 e3 l) =
+    A.ArrUpd (subst s e1) (subst s e2) (subst s e3) l
 
 instance {-# OVERLAPPABLE #-} Substitutable a b => Substitutable (Maybe a) b where
   subst = subst . Map.mapMaybe id
@@ -175,6 +185,11 @@ instance Substitutable A.Bindings A.Expr where
               then A.Subst b s' a'
               else A.Subst (A.Subst b s b3) s' a'
           _ -> A.Subst (A.Subst b s' a) s a'
+      A.ArrIdx e1 e2 l ->
+        A.ArrIdx (subst s e1) (subst s e2) l
+      A.ArrUpd e1 e2 e3 l ->
+        A.ArrUpd (subst s e1) (subst s e2) (subst s e3) l
+
 
 shrinkSubs :: A.Expr -> Subs a -> Subs a
 shrinkSubs expr = Map.filterWithKey (\n _ -> n `Set.member` fv expr)

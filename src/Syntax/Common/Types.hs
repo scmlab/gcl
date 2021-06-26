@@ -13,8 +13,8 @@ import Data.Loc.Range ()
 data Name = Name Text Loc
   deriving (Show, Generic)
 
--- | Compare regardless of their locations 
-instance Eq Name where 
+-- | Compare regardless of their locations
+instance Eq Name where
   (==) = (==) `on` nameToText
 
 instance Ord Name where
@@ -24,7 +24,7 @@ nameToText :: Name -> Text
 nameToText (Name x _) = x
 
 --------------------------------------------------------------------------------
-data ChainOp = 
+data ChainOp =
     EQProp Loc
   | EQPropU Loc
   | EQ Loc
@@ -39,7 +39,8 @@ data ChainOp =
   deriving (Eq, Show, Generic)
 
 data ArithOp =
-   Implies Loc
+    -- logic
+    Implies Loc
   | ImpliesU Loc
   | Conj Loc
   | ConjU Loc
@@ -47,21 +48,26 @@ data ArithOp =
   | DisjU Loc
   | Neg Loc
   | NegU Loc
+    -- arithmetics
   | Add Loc
   | Sub Loc
   | Mul Loc
   | Div Loc
-  | Mod Loc 
+  | Mod Loc
   | Max Loc
   | Min Loc
   | Exp Loc
+    -- pointers and sep. logic
+  | PointsTo Loc  -- a |-> v
+  | SConj Loc
+  | SImp Loc
   deriving (Eq, Show, Generic)
 
-data QuantOp = 
+data QuantOp =
     Sum Loc
   | Pi Loc
   | Forall Loc
-  | Exists Loc 
+  | Exists Loc
   | Hash Loc
   deriving (Eq, Show, Generic)
 
@@ -100,6 +106,9 @@ classifyArithOp (Mod _) = InfixL 9
 classifyArithOp (Max _) = Infix 10
 classifyArithOp (Min _) = Infix 10
 classifyArithOp (Exp _) = Infix 11
+classifyArithOp (PointsTo _) = Infix 4
+classifyArithOp (SConj _) = InfixL 3
+classifyArithOp (SImp _) = Infix 1
 
 classifyQuantOp :: QuantOp -> Fixity
 classifyQuantOp (Sum _) = Prefix (-1)
@@ -139,7 +148,7 @@ data Fixity = Infix Int | InfixR Int | InfixL Int | Prefix Int | Postfix Int
 -- type UseUnicodeSymbol = Bool
 
 -- useUnicodeSymbol :: UseUnicodeSymbol
--- useUnicodeSymbol = True 
+-- useUnicodeSymbol = True
 
 -- usePlainSymbol :: UseUnicodeSymbol
 -- usePlainSymbol = False
