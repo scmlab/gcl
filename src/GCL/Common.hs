@@ -136,10 +136,12 @@ instance Substitutable A.Bindings A.Expr where
       A.Lit {} -> expr
       (A.Var n _) ->
         case Map.lookup n s of
+          Just (A.BetaBinding v) -> v
           Just v -> simpleSubs expr s n (A.bindingsToExpr v)
           Nothing -> expr
       (A.Const n _) ->
         case Map.lookup n s of
+          Just (A.BetaBinding c) -> c
           Just c -> simpleSubs expr s n (A.bindingsToExpr c)
           Nothing -> expr
       A.Op {} -> expr
@@ -230,23 +232,17 @@ instance (Fresh m, AlphaRename m a) => AlphaRename m (Maybe a) where
 instance Fresh m => AlphaRename m A.Expr where
   alphaRename s expr =
     case expr of
-      -- A.Paren e l -> A.Paren <$> alphaRename s e <*> pure l
-      -- A.Lit {} -> return expr
-      -- A.Var {} -> return expr
-      -- A.Const {} -> return expr
-      -- A.Op {} -> return expr
-      -- A.Chain a op b l -> A.Chain <$> alphaRename s a <*> pure op <*> alphaRename s b <*> pure l
-      -- A.App a b l -> A.App <$> alphaRename s a <*> alphaRename s b <*> pure l
+      A.Paren e l -> A.Paren <$> alphaRename s e <*> pure l
+      A.Chain a op b l -> A.Chain <$> alphaRename s a <*> pure op <*> alphaRename s b <*> pure l
+      A.App a b l -> A.App <$> alphaRename s a <*> alphaRename s b <*> pure l
       A.Lam x body l -> do
         x' <- capture x
         let vx' = A.Var x' (locOf x)
         A.Lam x' <$> alphaRename s (subst (Map.singleton x vx') body) <*> pure l
-      -- A.Hole {} -> return expr
       A.Quant op ns rng t l -> do
         ns' <- mapM capture ns
         let mns' = Map.fromList . zip ns . map (\x -> A.Var x (locOf x)) $ ns'
         return $ A.Quant op ns' (subst mns' rng) (subst mns' t) l
-      -- A.Subst {} -> return expr
       _ -> return expr
     where
       capture x = do

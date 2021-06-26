@@ -81,22 +81,22 @@ structProgram stmts = do
 structStmts :: Bool -> Pred -> Maybe A.Expr -> [A.Stmt] -> Pred -> WP ()
 structStmts _ pre _ [] post = do
   case locOf pre of
-    NoLoc -> tellSubstPO (emptySubs, pre) (emptySubs, post) (AtAssertion (locOf post))
-    others -> tellSubstPO (emptySubs, pre) (emptySubs, post) (AtAssertion others)
+    NoLoc -> tellPO (emptySubs, pre) (emptySubs, post) (AtAssertion (locOf post))
+    others -> tellPO (emptySubs, pre) (emptySubs, post) (AtAssertion others)
   return ()
 structStmts b pre _ (A.Assert p l : stmts) post = do
   pre' <-
     if b
       then do
         let assert = Assertion p l
-        tellSubstPO (emptySubs, pre) (emptySubs, assert) (AtAssertion l)
+        tellPO (emptySubs, pre) (emptySubs, assert) (AtAssertion l)
         return assert
       else return pre
   structStmts b pre' Nothing stmts post
 structStmts True pre _ (A.LoopInvariant p bnd l : stmts) post = do
   let origin = if startsWithDo stmts then AtLoop l else AtAssertion l
   let loopInv = LoopInvariant p bnd l
-  tellSubstPO (emptySubs, pre) (emptySubs, loopInv) origin
+  tellPO (emptySubs, pre) (emptySubs, loopInv) origin
   structStmts True loopInv (Just bnd) stmts post
   where
     startsWithDo :: [A.Stmt] -> Bool
@@ -109,43 +109,43 @@ structStmts b pre bnd (stmt : stmts) post = do
   struct b pre bnd stmt post'
 
 struct :: Bool -> Pred -> Maybe A.Expr -> A.Stmt -> Pred -> WP ()
-struct _ pre _ (A.Abort l) _ = tellSubstPO (emptySubs, pre) (emptySubs, Constant A.false) (AtAbort l)
-struct _ pre _ (A.Skip l) post = tellSubstPO (emptySubs, pre) (emptySubs, post) (AtSkip l)
+struct _ pre _ (A.Abort l) _ = tellPO (emptySubs, pre) (emptySubs, Constant A.false) (AtAbort l)
+struct _ pre _ (A.Skip l) post = tellPO (emptySubs, pre) (emptySubs, post) (AtSkip l)
 struct _ pre _ (A.Assign xs es l) post = do
   let sub = Map.fromList . zip xs . map A.AssignBinding $ es
-  tellSubstPO (emptySubs, pre) (sub, post) (AtAssignment l)
+  tellPO (emptySubs, pre) (sub, post) (AtAssignment l)
 struct True pre _ (A.Assert p l) post = do
-  tellSubstPO (emptySubs, pre) (emptySubs, Assertion p l) (AtAssertion l)
-  tellSubstPO (emptySubs, Assertion p l) (emptySubs, post) (AtAssertion l)
+  tellPO (emptySubs, pre) (emptySubs, Assertion p l) (AtAssertion l)
+  tellPO (emptySubs, Assertion p l) (emptySubs, post) (AtAssertion l)
 struct False pre _ (A.Assert _ l) post = do
-  tellSubstPO (emptySubs, pre) (emptySubs, post) (AtAssertion l)
+  tellPO (emptySubs, pre) (emptySubs, post) (AtAssertion l)
 struct _ pre _ (A.LoopInvariant p b l) post = do
-  tellSubstPO (emptySubs, pre) (emptySubs, LoopInvariant p b l) (AtAssertion l)
-  tellSubstPO (emptySubs, LoopInvariant p b l) (emptySubs, post) (AtAssertion l)
+  tellPO (emptySubs, pre) (emptySubs, LoopInvariant p b l) (AtAssertion l)
+  tellPO (emptySubs, LoopInvariant p b l) (emptySubs, post) (AtAssertion l)
 struct b pre _ (A.If gcmds l) post = do
-  when b $ tellSubstPO (emptySubs, pre) (emptySubs, disjunctGuards gcmds) (AtIf l)
+  when b $ tellPO (emptySubs, pre) (emptySubs, disjunctGuards gcmds) (AtIf l)
   forM_ gcmds $ \(A.GdCmd guard body _) ->
     structStmts b (Conjunct [pre, guardIf guard]) Nothing body post
 struct True inv (Just bnd) (A.Do gcmds l) post = do
   let guards = A.getGuards gcmds
-  tellSubstPO (emptySubs, Conjunct (inv : map (Negate . guardLoop) guards)) (emptySubs, post) (AtLoop l)
+  tellPO (emptySubs, Conjunct (inv : map (Negate . guardLoop) guards)) (emptySubs, post) (AtLoop l)
   forM_ gcmds (structGdcmdInduct inv)
-  tellSubstPO
+  tellPO
     (emptySubs, Conjunct (inv : map guardLoop guards))
     (emptySubs, Bound (bnd `A.gte` A.Lit (A.Num 0) NoLoc) NoLoc)
     (AtTermination l)
   forM_ gcmds (structGdcmdBnd inv bnd)
 struct False inv _ (A.Do gcmds l) post = do
   let guards = A.getGuards gcmds
-  tellSubstPO (emptySubs, Conjunct (inv : map (Negate . guardLoop) guards)) (emptySubs, post) (AtLoop l)
+  tellPO (emptySubs, Conjunct (inv : map (Negate . guardLoop) guards)) (emptySubs, post) (AtLoop l)
 struct _ inv Nothing (A.Do gcmds l) post = do
   case fromLoc l of
     Nothing -> return ()
     Just rng -> throwWarning (MissingBound rng)
   let guards = A.getGuards gcmds
-  tellSubstPO (emptySubs, Conjunct (inv : map (Negate . guardLoop) guards)) (emptySubs, post) (AtLoop l)
+  tellPO (emptySubs, Conjunct (inv : map (Negate . guardLoop) guards)) (emptySubs, post) (AtLoop l)
   forM_ gcmds (structGdcmdInduct inv)
-  tellSubstPO (emptySubs, Conjunct (inv : map guardLoop guards)) (emptySubs, post) (AtTermination l)
+  tellPO (emptySubs, Conjunct (inv : map guardLoop guards)) (emptySubs, post) (AtTermination l)
 struct b pre _ (A.Spec _ range) post = when b (tellSpec pre post range)
 struct _ _ _ (A.Proof _) _ = return ()
 
@@ -191,10 +191,10 @@ wp _ (A.Assign xs es _) post = do
   let sub = Map.fromList . zip xs . map A.AssignBinding $ es
   alphaSubst sub post
 wp _ (A.Assert p l) post = do
-  tellSubstPO (emptySubs, Assertion p l) (emptySubs, post) (AtAssertion l)
+  tellPO (emptySubs, Assertion p l) (emptySubs, post) (AtAssertion l)
   return (Assertion p l)
 wp _ (A.LoopInvariant p b l) post = do
-  tellSubstPO (emptySubs, LoopInvariant p b l) (emptySubs, post) (AtAssertion l)
+  tellPO (emptySubs, LoopInvariant p b l) (emptySubs, post) (AtAssertion l)
   return (LoopInvariant p b l)
 wp _ (A.Do _ l) _ = throwError $ MissingAssertion l
 wp b (A.If gcmds _) post = do
@@ -211,23 +211,21 @@ wp _ (A.Proof _) post = return post
 disjunctGuards :: [A.GdCmd] -> Pred
 disjunctGuards = disjunct . map guardIf . A.getGuards
 
-tellSubstPO :: (Subs A.Bindings , Pred) -> (Subs A.Bindings, Pred) -> Origin -> WP ()
-tellSubstPO (sp, p) (sq, q) l = do
+tellPO :: (Subs A.Bindings , Pred) -> (Subs A.Bindings, Pred) -> Origin -> WP ()
+tellPO (sp, p) (sq, q) l = unless (toExpr p == toExpr q) $ do
   p' <- alphaSubst sp p
   q' <- alphaSubst sq q
-  tellPO p' q' l
-
-tellPO :: Pred -> Pred -> Origin -> WP ()
-tellPO p q l = unless (toExpr p == toExpr q) $ do
   (i, j, k) <- get
   put (succ i, j, k)
-  tell ([PO i p q l], [], [])
+  tell ([PO i p' q' l], [], [])
 
 tellSpec :: Pred -> Pred -> Range -> WP ()
 tellSpec p q l = do
+  p' <- alphaSubst emptySubs p
+  q' <- alphaSubst emptySubs q
   (i, j, k) <- get
   put (i, succ j, k)
-  tell ([], [Specification j p q l], [])
+  tell ([], [Specification j p' q' l], [])
 
 throwWarning :: StructWarning -> WP ()
 throwWarning warning = do
