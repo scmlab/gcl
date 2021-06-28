@@ -57,22 +57,15 @@ data ArithOp =
   | Max Loc
   | Min Loc
   | Exp Loc
+  | Hash Loc
     -- pointers and sep. logic
   | PointsTo Loc  -- a |-> v
   | SConj Loc
   | SImp Loc
   deriving (Eq, Show, Generic)
 
-data QuantOp =
-    Sum Loc
-  | Pi Loc
-  | Forall Loc
-  | Exists Loc
-  | Hash Loc
-  deriving (Eq, Show, Generic)
-
 -- | Operators
-data Op = ChainOp ChainOp | ArithOp ArithOp | QuantOp QuantOp
+data Op = ChainOp ChainOp | ArithOp ArithOp
   deriving (Show, Eq, Generic)
 
 
@@ -106,22 +99,14 @@ classifyArithOp (Mod _) = InfixL 9
 classifyArithOp (Max _) = Infix 10
 classifyArithOp (Min _) = Infix 10
 classifyArithOp (Exp _) = Infix 11
+classifyArithOp (Hash _) = Infix (-1)
 classifyArithOp (PointsTo _) = Infix 4
 classifyArithOp (SConj _) = InfixL 3
 classifyArithOp (SImp _) = Infix 1
 
-classifyQuantOp :: QuantOp -> Fixity
-classifyQuantOp (Sum _) = Prefix (-1)
-classifyQuantOp (Pi _) = Prefix (-1)
-classifyQuantOp (Exists _) = Prefix (-1)
-classifyQuantOp (Forall _) = Prefix (-1)
-classifyQuantOp (Hash _) = Prefix (-1)
-
 classify :: Op -> Fixity
 classify (ChainOp op) = classifyChainOp op
 classify (ArithOp op) = classifyArithOp op
-classify (QuantOp op) = classifyQuantOp op
-
 
 --------------------------------------------------------------------------------
 

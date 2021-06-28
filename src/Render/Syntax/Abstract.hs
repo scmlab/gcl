@@ -10,7 +10,7 @@ import Render.Element
 import Render.Syntax.Common ()
 import Syntax.Abstract
 import Syntax.Abstract.Util ( assignBindingToExpr )
-import Syntax.Common (Fixity (..), Op, classify, Name)
+import Syntax.Common (Fixity (..), Op(..), ArithOp(..), classify, Name)
 import Data.Map (Map)
 
 --------------------------------------------------------------------------------
@@ -91,13 +91,21 @@ handleExpr _ (Hole _) = return "{!!}"
 handleExpr _ (Quant op xs r t _) =
   return $
     "⟨"
-      <+> render op
+      <+> renderQOp op
       <+> horzE (map render xs)
       <+> ":"
       <+> render r
       <+> ":"
       <+> render t
       <+> "⟩"
+  where renderQOp (Op (ArithOp (Conj _)))  = "∀"
+        renderQOp (Op (ArithOp (ConjU _))) = "∀"
+        renderQOp (Op (ArithOp (Disj _)))  = "∃"
+        renderQOp (Op (ArithOp (DisjU _))) = "∃"
+        renderQOp (Op (ArithOp (Add _)))   = "Σ"
+        renderQOp (Op (ArithOp (Mul _)))   = "Π"
+        renderQOp (Op op') = render op'
+        renderQOp op' = render op'
 handleExpr _ (Subst before env after) =
   return $ substE (render before) (render env) (if isLam after then parensE (render after) else render after)
   where

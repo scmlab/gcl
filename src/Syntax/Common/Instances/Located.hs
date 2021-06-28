@@ -41,18 +41,11 @@ instance Located ArithOp where
   locOf (Max l) = l
   locOf (Min l) = l
   locOf (Exp l) = l
+  locOf (Hash l) = l
   locOf (PointsTo l) = l
   locOf (SConj l) = l
   locOf (SImp l) = l
 
-instance Located QuantOp where
-  locOf (Sum l) = l
-  locOf (Pi l) = l
-  locOf (Exists l) = l
-  locOf (Forall l) = l
-  locOf (Hash l) = l
-
 instance Located Op where
   locOf (ChainOp op) = locOf op
   locOf (ArithOp op) = locOf op
-  locOf (QuantOp op) = locOf op

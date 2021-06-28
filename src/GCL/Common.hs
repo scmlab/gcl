@@ -1,10 +1,11 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FlexibleContexts #-}
 module GCL.Common where
 
 import Data.Text(Text)
 import qualified Data.Text as Text
-import Data.Loc ( Loc(..), Located(..) )
+import Data.Loc ( Loc(..), Loc, Located(..) )
 import Control.Monad (liftM2)
 import Data.Map (Map)
 import Syntax.Common (Name(..), nameToText)
@@ -23,7 +24,7 @@ class Monad m => Fresh m where
   freshText :: m Text
   freshWithLabel :: Text -> m Text
   freshTexts :: Int -> m [Text]
-  freshName :: m Name
+  -- freshName :: m Name
 
   freshText =
     (\i -> Text.pack ("?m_" ++ show i)) <$> fresh
@@ -34,7 +35,12 @@ class Monad m => Fresh m where
   freshTexts 0 = return []
   freshTexts n = liftM2 (:) freshText (freshTexts (n - 1))
 
-  freshName = (\v -> Name v NoLoc) <$> freshText
+
+freshName :: Fresh m => Loc -> m Name
+freshName l = Name <$> freshText <*> pure l
+
+freshName' :: Fresh m => m Name
+freshName' = freshName NoLoc
 
 type FreshState = Int
 
@@ -57,7 +63,7 @@ class Free a where
 occurs :: Free a => Name -> a -> Bool
 occurs n x = n `Set.member` fv x
 
-instance Free a => Free (Map Name a) where
+instance Free a => Free (Subs a) where
   fv = Set.unions . Map.map fv
 
 instance Free A.Type where
@@ -93,7 +99,7 @@ class Substitutable a b where
 compose :: Substitutable a a => Subs a -> Subs a -> Subs a
 s1 `compose` s2 = s1 <> Map.map (subst s1) s2
 
-instance Substitutable a b => Substitutable a [b] where
+instance {-# INCOHERENT #-} Substitutable a b => Substitutable a [b] where
   subst = map . subst
 
 instance Substitutable A.Type A.Type where
@@ -129,11 +135,8 @@ instance Substitutable A.Expr A.Expr where
   subst s (A.ArrUpd e1 e2 e3 l) =
     A.ArrUpd (subst s e1) (subst s e2) (subst s e3) l
 
-singleBinding :: Name -> A.Bindings -> Subs A.Bindings
-singleBinding = Map.singleton
-
-shrinkSubs :: A.Expr -> Subs a -> Subs a
-shrinkSubs expr = Map.filterWithKey (\n _ -> n `Set.member` fv expr)
+instance {-# OVERLAPPABLE #-} Substitutable a b => Substitutable (Maybe a) b where
+  subst = subst . Map.mapMaybe id
 
 -- should make sure `fv Bindings` and `fv Expr` are disjoint before substitution
 instance Substitutable A.Bindings A.Expr where
@@ -147,10 +150,12 @@ instance Substitutable A.Bindings A.Expr where
       A.Lit {} -> expr
       (A.Var n _) ->
         case Map.lookup n s of
+          Just (A.BetaBinding v) -> v
           Just v -> simpleSubs expr s n (A.bindingsToExpr v)
           Nothing -> expr
       (A.Const n _) ->
         case Map.lookup n s of
+          Just (A.BetaBinding c) -> c
           Just c -> simpleSubs expr s n (A.bindingsToExpr c)
           Nothing -> expr
       A.Op {} -> expr
@@ -190,6 +195,9 @@ instance Substitutable A.Bindings A.Expr where
         A.ArrUpd (subst s e1) (subst s e2) (subst s e3) l
 
 
+shrinkSubs :: A.Expr -> Subs a -> Subs a
+shrinkSubs expr = Map.filterWithKey (\n _ -> n `Set.member` fv expr)
+
 -- e1 [s] -> e2
 -- e1 [s] -> e2 [s//(n, e2)]
 simpleSubs :: A.Expr -> Subs A.Bindings -> Name -> A.Expr -> A.Expr
@@ -220,26 +228,6 @@ isAllApp (A.Subst A.App {} _ A.App {}) = True
 isAllApp (A.Subst b@A.Subst {} _ A.App {}) = isAllApp b
 isAllApp _ = False
 
-alphaRename :: Fresh m => Set Name -> A.Expr -> m A.Expr
-alphaRename s expr =
-  case expr of
-    A.Lam x body l -> do
-      x' <- capture x
-      let vx' = A.Var x' (locOf x)
-      A.Lam x' <$> alphaRename s (subst (Map.singleton x vx') body) <*> pure l
-    A.Quant op ns rng t l -> do
-      ns' <- mapM capture ns
-      let mns' = Map.fromList . zip ns . map (\x -> A.Var x (locOf x)) $ ns'
-      return $ A.Quant op ns' (subst mns' rng) (subst mns' t) l
-    _ -> return expr
-  where
-    capture x =
-      if x `Set.member` s
-      then do
-        tx <- freshWithLabel (Text.pack "m" <> nameToText x)
-        return $ Name tx (locOf x)
-      else return x
-
 instance Substitutable A.Bindings Pred where
   subst s (Constant e) = Constant (subst s e)
   subst s (Bound e l) = Bound (subst s e) l
@@ -251,27 +239,54 @@ instance Substitutable A.Bindings Pred where
   subst s (Disjunct es) = Disjunct (subst s es)
   subst s (Negate x) = Negate (subst s x)
 
-  -- SCM: I don't think this is well-defined and I wonder whether
-  --      we ever need this. Applying a substitution to a statement
-  --      is not even syntatically correct in general.
-instance Substitutable A.Bindings A.Stmt where
-  subst _ st@(A.Skip _) = st
-  subst _ st@(A.Abort _) = st
-  subst s (A.Assign ns es l) = A.Assign ns (subst s es) l
-  subst s (A.AAssign a i e l) = A.AAssign a (subst s i) (subst s e) l
-  subst s (A.Assert e l) = A.Assert (subst s e) l
-  subst s (A.LoopInvariant p bnd l) = A.LoopInvariant (subst s p) (subst s bnd) l
-  subst s (A.Do gds l) = A.Do (subst s gds) l
-  subst s (A.If gds l) = A.If (subst s gds) l
-  subst _ st@(A.Spec _ _) = st
-  subst _ st@(A.Proof _) = st
-  subst s (A.Alloc x es l) = A.Alloc x (map (subst s) es) l
-  subst s (A.HLookup x e l) = A.HLookup x (subst s e) l
-  subst s (A.HMutate e1 e2 l) = A.HMutate (subst s e1) (subst s e2) l
-  subst s (A.Dispose e l) = A.Dispose (subst s e) l
+class Fresh m => AlphaRename m a where
+  alphaRename :: [Name] -> a -> m a
 
-instance Substitutable A.Bindings A.GdCmd where
-  subst s (A.GdCmd gd stmts l) = A.GdCmd (subst s gd) (subst s stmts) l
+instance (Fresh m, AlphaRename m a) => AlphaRename m (Subs a) where
+  alphaRename = mapM . alphaRename
+
+instance (Fresh m, AlphaRename m a) => AlphaRename m (Maybe a) where
+  alphaRename = mapM . alphaRename
+
+instance Fresh m => AlphaRename m A.Expr where
+  alphaRename s expr =
+    case expr of
+      A.Paren e l -> A.Paren <$> alphaRename s e <*> pure l
+      A.Chain a op b l -> A.Chain <$> alphaRename s a <*> pure op <*> alphaRename s b <*> pure l
+      A.App a b l -> A.App <$> alphaRename s a <*> alphaRename s b <*> pure l
+      A.Lam x body l -> do
+        x' <- capture x
+        let vx' = A.Var x' (locOf x)
+        A.Lam x' <$> alphaRename s (subst (Map.singleton x vx') body) <*> pure l
+      A.Quant op ns rng t l -> do
+        ns' <- mapM capture ns
+        let mns' = Map.fromList . zip ns . map (\x -> A.Var x (locOf x)) $ ns'
+        return $ A.Quant op ns' (subst mns' rng) (subst mns' t) l
+      _ -> return expr
+    where
+      capture x = do
+        if x `elem` s
+        then do
+          tx <- freshWithLabel (Text.pack "m" <> nameToText x)
+          return $ Name tx (locOf x)
+        else return x
+
+instance Fresh m => AlphaRename m A.Bindings where
+  alphaRename s (A.AssignBinding e) = A.AssignBinding <$> alphaRename s e
+  alphaRename s (A.LetBinding e) = A.LetBinding <$> alphaRename s e
+  alphaRename s (A.BetaBinding e) = A.BetaBinding <$> alphaRename s e
+  alphaRename s (A.AlphaBinding e) = A.AlphaBinding <$> alphaRename s e
+
+instance Fresh m => AlphaRename m Pred where
+  alphaRename s (Constant e) = Constant <$> alphaRename s e
+  alphaRename s (Bound e l) = Bound <$> alphaRename s e <*> pure l
+  alphaRename s (Assertion e l) = Assertion <$> alphaRename s e <*> pure l
+  alphaRename s (LoopInvariant e b l) = LoopInvariant <$> alphaRename s e <*> alphaRename s b <*> pure l
+  alphaRename s (GuardIf e l) = GuardIf <$> alphaRename s e <*> pure l
+  alphaRename s (GuardLoop e l) = GuardLoop <$> alphaRename s e <*> pure l
+  alphaRename s (Conjunct xs) = Conjunct <$> mapM (alphaRename s) xs
+  alphaRename s (Disjunct es) = Disjunct <$> mapM (alphaRename s) es
+  alphaRename s (Negate x) = Negate <$> alphaRename s x
 
 toStateT :: Monad m => r -> RWST r w s m a -> StateT s m a
 toStateT r m = StateT (\s -> do
