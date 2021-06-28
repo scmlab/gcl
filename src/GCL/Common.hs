@@ -160,11 +160,15 @@ instance Substitutable A.Bindings A.Expr where
           Nothing -> expr
       A.Op {} -> expr
       (A.Chain a op b l) -> A.Chain (subst s a) op (subst s b) l
-      A.App {} ->
-        let expr' = substApp s expr in
-        let r = reduceSubs expr s expr' in
+      A.App a b l -> 
+        let a' = subst s a in
+        let b' = subst s b in
+        let expr' = A.App a' b' l in
         let (s', r') = betaReduce expr' in
-        reduceSubs r s' r' 
+        if a == a'
+        then reduceSubs expr' s' r'
+        else let r = reduceSubs expr s expr' in
+          reduceSubs r s' r'
       (A.Lam x e l) ->
         let s' = Map.withoutKeys s (Set.singleton x) in
         let e' = subst s' e in
@@ -175,13 +179,17 @@ instance Substitutable A.Bindings A.Expr where
         A.Quant (subst s' qop) xs (subst s' rng) (subst s' t) l
       A.Subst b s1 a ->
         case b of
-          A.Subst _ _ b2
+          A.Subst b1 sb1 (A.App b2a b2b l)
             | isAllApp b && isAllBetaBindings s1 ->
-              let b' = substApp s b2 in
-              let r = reduceSubs b s b' in
-              let (s2, r') = betaReduce b' in
-              reduceSubs r s2 r'
-          _ ->
+              let b2a' = subst s b2a in
+              let b2b' = subst s b2b in
+              let b2' = A.App b2a' b2b' l in
+              let (sb2, a') = betaReduce b2' in
+              if b2a == b2a'
+              then reduceSubs (A.Subst b1 sb1 b2') sb2 a'
+              else let b' = reduceSubs b s b2' in
+                reduceSubs b' sb2 a'
+          _ -> 
             let a' = getSubstAfter (subst s a) in
             A.Subst expr s a'
       A.ArrIdx e1 e2 l ->
@@ -204,10 +212,10 @@ betaReduce (A.App a b l) =
   case a of
     A.Lam x body _ ->
       let s = Map.singleton x (A.BetaBinding b) in
-      (s, subst s body)
+      (s, getSubstAfter (subst s body))
     A.Subst _ _ (A.Lam x body _) ->
       let s = Map.singleton x (A.BetaBinding b) in
-      (s, subst s body)
+      (s, getSubstAfter (subst s body))
     _ -> (emptySubs, A.App a b l)
 betaReduce expr = (emptySubs, expr)
 
@@ -227,17 +235,22 @@ reduceSubs before s after
 
 getSubstAfter :: A.Expr -> A.Expr
 getSubstAfter (A.Subst _ _ after) = after
+getSubstAfter (A.Chain a op b l) = A.Chain (getSubstAfter a) op (getSubstAfter b) l
+getSubstAfter (A.App a b l) = A.App (getSubstAfter a) (getSubstAfter b) l
+getSubstAfter (A.Lam x body l) = A.Lam x (getSubstAfter body) l
 getSubstAfter expr = expr
 
-substApp :: Subs A.Bindings -> A.Expr -> A.Expr
-substApp s (A.App a b l) =
-  let a' = subst s a in
-  let b' = subst s b in
-  if a == a' && b == b'
-  then A.App a b l
-  else let b'a = getSubstAfter b' in
-    A.App a' b'a l
-substApp _ expr = expr
+-- substApp :: Subs A.Bindings -> A.Expr -> A.Expr
+-- substApp s expr@(A.App a b l) =
+--   let a' = subst s a in
+--   let b' = subst s b in
+--   let expr' = A.App a' b' l in
+--   let (s', r') = betaReduce expr' in
+--   if a == a'
+--   then reduceSubs expr' s' r'
+--   else let r = reduceSubs expr s expr' in
+--     reduceSubs r s' r' 
+-- substApp _ expr = expr
 
 isAllApp :: A.Expr -> Bool
 isAllApp (A.Subst A.App {} _ A.App {}) = True
