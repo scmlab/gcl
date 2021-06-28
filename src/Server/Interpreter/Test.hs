@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Server.Interpreter.Test (Trace (..), TestResult (..), runTest, serializeTestResult) where
+module Server.Interpreter.Test (Trace (..), TestResult (..), runTest, serializeTestResult, serializeTestResultValueOnly) where
 
 import Control.Monad.State
 import Control.Monad.Trans.Free
@@ -33,6 +33,9 @@ instance Pretty a => Pretty (TestResult a) where
 -- | Serialize TestResult for Golden tests
 serializeTestResult :: Pretty a => TestResult a -> BSL.ByteString
 serializeTestResult = BSL.fromStrict . Text.encodeUtf8 . toText 
+
+serializeTestResultValueOnly :: Pretty a => TestResult a -> BSL.ByteString
+serializeTestResultValueOnly = BSL.fromStrict . Text.encodeUtf8 . toText . testResultValue
 
 --------------------------------------------------------------------------------
 

@@ -1,0 +1,3 @@
+var a : Int
+let P x = a = x
+{ P a }

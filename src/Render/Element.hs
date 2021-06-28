@@ -6,6 +6,7 @@ module Render.Element
   ( Section(..)
   , Block(..)
   , Deco(..)
+  , isEmpty
   -- , proofObligationE
   -- , specE
   , Inlines(..)
