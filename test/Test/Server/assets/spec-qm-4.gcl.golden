@@ -1,17 +1,17 @@
 ### Result
 
 ([ Conditional at ./test/Test/Server/assets/spec-qm-4.gcl [0-52] 1:1-8:3
-`True
-⇒
-True
-` ], [ Precondition at ./test/Test/Server/assets/spec-qm-4.gcl [16-30] 2:5-4:7
-`True ∧ True`
-Precondition
-`True`
-, Precondition at ./test/Test/Server/assets/spec-qm-4.gcl [35-49] 5:5-7:7
-`True`
-Precondition
-`True` ], [  ], [  ])
+ `True
+ ⇒
+ True
+ ` ], [ Precondition at ./test/Test/Server/assets/spec-qm-4.gcl [16-30] 2:5-4:7
+      `True ∧ True`
+      Precondition
+      `True`
+      , Precondition at ./test/Test/Server/assets/spec-qm-4.gcl [35-49] 5:5-7:7
+      `True`
+      Precondition
+      `True` ], [], [])
 
 ### Source
 

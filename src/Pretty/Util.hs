@@ -2,6 +2,7 @@
 module Pretty.Util
   ( 
     docToText, toText,
+    docToByteString, toByteString,
     docToString, toString,
     PrettyPrec (..),
     PrettyWithLoc (..),
@@ -22,12 +23,21 @@ import qualified Data.Text.Prettyprint.Doc.Render.Text as Text
 import Prelude hiding (Ordering (..))
 import Render
 import qualified Data.Text as Text
+import qualified Data.Text.Encoding as Text
+import Data.ByteString.Lazy (ByteString)
+import qualified Data.ByteString.Lazy as BSL
 
 docToText :: Doc ann -> Text
-docToText = Text.renderStrict . layoutCompact
+docToText = Text.renderStrict . layoutPretty defaultLayoutOptions
 
 toText :: Pretty a => a -> Text
 toText = docToText . pretty
+
+docToByteString :: Doc ann -> ByteString
+docToByteString = BSL.fromStrict . Text.encodeUtf8 . docToText
+
+toByteString :: Pretty a => a -> ByteString
+toByteString = docToByteString . pretty
 
 docToString :: Doc ann -> String
 docToString = Text.unpack . docToText

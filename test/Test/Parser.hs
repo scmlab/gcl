@@ -207,16 +207,16 @@ parseError =
     [
       testCase "constant keyword collision" $ runDeclaration
         "con False : Int"
-        "[ ( <test>:1:5\n, using keyword as variable name\n ) ]\n",
+        "[(<test>:1:5, using keyword as variable name )]\n",
       testCase "variable keyword collision" $ runDeclaration
         "var if : Int"
-        "[ ( <test>:1:5\n, using keyword as variable name\n ) ]\n",
+        "[(<test>:1:5, using keyword as variable name )]\n",
       testCase "quant with parentheses" $ runExpr
         "<| (+) i : i > 0 : f i |>"
-        "[ ( <test>:1:5\n, unexpected \"+) i \"\nexpecting expression\n ) ]\n",
+        "[(<test>:1:5, unexpected \"+) i \" expecting expression )]\n",
       testCase "array" $ runType
         "array (  0 .. (Int) ) of \n Int"
-        "[ ( <test>:1:16\n, using keyword as variable name\n ) ]\n"
+        "[(<test>:1:16, using keyword as variable name )]\n"
     ]
   where
     runDeclaration = parserCompare pDeclaration

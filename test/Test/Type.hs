@@ -207,17 +207,17 @@ declarationTests =
     "Check Declaration"
     [
       testCase "const declaration" $
-        declarationCheck "con C : Int" "[ ( C\n, Int ) ]",
+        declarationCheck "con C : Int" "[(C, Int)]",
       testCase "const declaration w/ prop" $
-        declarationCheck "con C : Int { C > 0 }" "[ ( C\n, Int ) ]",
+        declarationCheck "con C : Int { C > 0 }" "[(C, Int)]",
       testCase "var declaration" $
-        declarationCheck "var x : Bool" "[ ( x\n, Bool ) ]",
+        declarationCheck "var x : Bool" "[(x, Bool)]",
       testCase "var declaration w/ prop" $
-        declarationCheck "var x : Bool { x = True }" "[ ( x\n, Bool ) ]",
+        declarationCheck "var x : Bool { x = True }" "[(x, Bool)]",
       testCase "let declaration 1" $
-        declarationCheck "let N = 5" "[ ( N\n, Int ) ]",
+        declarationCheck "let N = 5" "[(N, Int)]",
       testCase "let declaration 2" $
-        declarationCheck "let G i j = i + j" "[ ( G\n, Int → Int → Int ) ]"
+        declarationCheck "let G i j = i + j" "[(G, Int → Int → Int)]"
     ]
 
 blockDeclarationTests :: TestTree
@@ -230,20 +230,20 @@ blockDeclarationTests =
         "{:\n\
         \  A, B : Int\
         \:}" 
-        "[ ( A\n, Int )\n, ( B\n, Int ) ]",
+        "[(A, Int), (B, Int)]",
       testCase "block declaration 2" $
         blockDeclarationCheck
         "{:\n\
         \  A, B : Int { A = 0 }\
         \:}"
-        "[ ( A\n, Int )\n, ( B\n, Int ) ]",
+        "[(A, Int), (B, Int)]",
       testCase "block declaration 3" $
         blockDeclarationCheck
         "{:\n\
         \  A, B : Int\n\
         \    A = 0\n\
         \:}"
-        "[ ( A\n, Int )\n, ( B\n, Int ) ]",
+        "[(A, Int), (B, Int)]",
       testCase "block declaration 4" $
         blockDeclarationCheck
         "{:\n\
@@ -252,7 +252,7 @@ blockDeclarationTests =
         \  F : Int -> Int -> Int\n\
         \  P : Char -> Bool\n\
         \:}"
-        "[ ( A\n, Int )\n, ( B\n, Int )\n, ( F\n, Int → Int → Int )\n, ( P\n, Char → Bool ) ]"
+        "[(A, Int), (B, Int), (F, Int → Int → Int), (P, Char → Bool)]"
     ]
 
 programTest :: TestTree

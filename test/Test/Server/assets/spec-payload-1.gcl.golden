@@ -1,13 +1,6 @@
 ### Result
 
-[ [ "skip" ]
-, [ "skip" ]
-, [ "skip"
-, "    skip"
-, "abort" ]
-, [ "skip" ]
-, [ "skip" ]
-, [ "?" ] ]
+[["skip"], ["skip"], ["skip", "    skip", "abort"], ["skip"], ["skip"], ["?"]]
 
 ### Source
 

@@ -1,4 +1,0 @@
-Error Syntactic Error [ ( ./test/source/examples/posnegpairs.gcl:17:14
-, unexpected "+) i "
-expecting expression
- ) ]

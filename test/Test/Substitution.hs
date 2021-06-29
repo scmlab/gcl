@@ -10,10 +10,11 @@ import qualified Data.Map                      as Map
 import           GCL.Predicate                  ( PO(PO)
                                                 , Pred(..)
                                                 )
-import           Pretty                         ( Pretty(..)
+import           Pretty                         ( (<+>)
+                                                , Pretty(..)
                                                 , indent
                                                 , line
-                                                , vcat, (<+>)
+                                                , vcat
                                                 )
 import           Render                         ( Inlines
                                                 , Render(render)
@@ -55,7 +56,7 @@ instance Pretty SUBST where
    where
     next' = map (\(k, x) -> "\"" <> pretty k <> "\" =>" <+> pretty x
             -- "\"" <> pretty k <> "\" =>" <> line <> indent 4 (vcat (map pretty xs))
-                                                                           )
+                                                                    )
       $ Map.toList next
 
 

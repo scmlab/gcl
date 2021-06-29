@@ -1,10 +1,6 @@
 ### Result
 
-[ Abort at ./test/Test/WP/assets/abort.gcl [9-14] 2:1-6
-`True
-⇒
-False
-` ]
+[Abort at ./test/Test/WP/assets/abort.gcl [9-14] 2:1-6 `True ⇒ False `]
 
 ### Source
 
