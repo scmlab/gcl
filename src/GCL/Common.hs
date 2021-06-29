@@ -165,10 +165,7 @@ instance Substitutable A.Bindings A.Expr where
         let b' = subst s b in
         let expr' = A.App a' b' l in
         let (s', r') = betaReduce expr' in
-        if a == a'
-        then reduceSubs expr' s' r'
-        else let r = reduceSubs expr s expr' in
-          reduceSubs r s' r'
+        reduceSubs expr' s' r'
       (A.Lam x e l) ->
         let s' = Map.withoutKeys s (Set.singleton x) in
         let e' = subst s' e in
@@ -185,10 +182,7 @@ instance Substitutable A.Bindings A.Expr where
               let b2b' = subst s b2b in
               let b2' = A.App b2a' b2b' l in
               let (sb2, a') = betaReduce b2' in
-              if b2a == b2a'
-              then reduceSubs (A.Subst b1 sb1 b2') sb2 a'
-              else let b' = reduceSubs b s b2' in
-                reduceSubs b' sb2 a'
+              reduceSubs (A.Subst b1 sb1 b2') sb2 a'
           _ -> 
             let a' = getSubstAfter (subst s a) in
             A.Subst expr s a'
