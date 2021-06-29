@@ -12,7 +12,8 @@ module Pretty.Util
     fromRender,
     fromRenderPrec,
     fromRenderSection,
-    fromRenderAndLocated
+    fromRenderAndLocated,
+    VList(..)
   )
 where
 
@@ -133,3 +134,11 @@ instance (Pretty a, Pretty b) => Pretty (Either a b) where
   pretty (Left x) = pretty x
   pretty (Right x) = pretty x
 
+
+--------------------------------------------------------------------------------
+
+-- datatype for printing a list of items vertically without delimiters and enclosings
+newtype VList a = VList [a]
+
+instance Pretty a => Pretty (VList a) where
+  pretty (VList xs) = vcat (map pretty xs)

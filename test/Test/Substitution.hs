@@ -10,14 +10,9 @@ import qualified Data.Map                      as Map
 import           GCL.Predicate                  ( PO(PO)
                                                 , Pred(..)
                                                 )
-import           Pretty                         ( (<+>)
-                                                , Pretty(..)
-                                                , indent
-                                                , line
-                                                , vcat
-                                                )
+import           Pretty
 import           Render                         ( Inlines
-                                                , Render(render)
+                                                , Render(render), isEmpty
                                                 )
 import           Server.DSL                     ( parseProgram
                                                 , sweep
@@ -34,7 +29,7 @@ tests = testGroup "Substitution" [letBindings]
 
 
 letBindings :: TestTree
-letBindings = testGroup "Substitute let-bindings" [run "let-1" "let-1.gcl"]
+letBindings = testGroup "Substitute let-bindings" [run "let binding" "let-1.gcl", run "let binding with assignment" "let-2.gcl"]
  where
   run :: String -> FilePath -> TestTree
   run = runGoldenTest "Substitution/assets/" $ \sourcePath source -> do
@@ -42,7 +37,7 @@ letBindings = testGroup "Substitute let-bindings" [run "let-1" "let-1.gcl"]
       program        <- parseProgram source
       (pos, _, _, _) <- sweep program
       let substs = pos >>= extractSubst
-      return (Right substs)
+      return (Right (VList substs))
 
 -- datatype for representing a SUBSTITUTION
 data SUBST = SUBST Inlines -- BEFORE
@@ -51,13 +46,15 @@ data SUBST = SUBST Inlines -- BEFORE
 
 instance Pretty SUBST where
   pretty (SUBST before next) = if Map.null next
-    then "\"" <> pretty before <> "\""
-    else "\"" <> pretty before <> "\"" <> line <> indent 4 (vcat next')
+    then pretty before
+    else pretty before <> line <> indent 4 (vcat next')
    where
-    next' = map (\(k, x) -> "\"" <> pretty k <> "\" =>" <+> pretty x
-            -- "\"" <> pretty k <> "\" =>" <> line <> indent 4 (vcat (map pretty xs))
-                                                                    )
-      $ Map.toList next
+    next' = map
+      (\(k, x) -> if isEmpty k
+        then "[]" <+> "===>" <+> pretty x
+        else pretty k <+> "===>" <+> pretty x
+      )
+      (Map.toList next)
 
 
 --------------------------------------------------------------------------------
