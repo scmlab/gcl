@@ -21,6 +21,9 @@ import qualified Syntax.Abstract as A
 import qualified Syntax.Abstract.Operator as A
 import qualified Syntax.Abstract.Util as A
 import Syntax.Common (Name (Name))
+import qualified Data.Hashable as Hashable
+import Numeric (showHex)
+import qualified Data.Text as Text
 
 type TM = Except StructError
 
@@ -385,7 +388,8 @@ tellSubstPO (s1, p) (s2, q) l = unless (toExpr p == toExpr q) $ do
   q' <- alphaSubst s2 q
   (i, j, k) <- get
   put (succ i, j, k)
-  tell ([PO p' q' "EXPECTING HASH HERE" Nothing l], [], [])
+  let anchorHash = Text.pack $ showHex (abs (Hashable.hash (show (p', q')))) ""
+  tell ([PO p' q' anchorHash Nothing l], [], [])
 
 tellPO :: Pred -> Pred -> Origin -> WP ()
 tellPO p q = tellSubstPO (emptySubs, p) (emptySubs, q)
