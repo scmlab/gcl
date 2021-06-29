@@ -11,8 +11,9 @@ import           GCL.Predicate                  ( PO(PO)
                                                 , Pred(..)
                                                 )
 import           Pretty
-import           Render                         ( Inlines
-                                                , Render(render), isEmpty
+import           Render                         ( Inlines(..)
+                                                , Render(render)
+                                                , isEmpty
                                                 )
 import           Server.DSL                     ( parseProgram
                                                 , sweep
@@ -29,7 +30,9 @@ tests = testGroup "Substitution" [letBindings]
 
 
 letBindings :: TestTree
-letBindings = testGroup "Substitute let-bindings" [run "let binding" "let-1.gcl", run "let binding with assignment" "let-2.gcl"]
+letBindings = testGroup
+  "Substitute let-bindings"
+  [run "let binding" "let-1.gcl", run "let binding with assignment" "let-2.gcl"]
  where
   run :: String -> FilePath -> TestTree
   run = runGoldenTest "Substitution/assets/" $ \sourcePath source -> do
@@ -37,28 +40,52 @@ letBindings = testGroup "Substitute let-bindings" [run "let binding" "let-1.gcl"
       program        <- parseProgram source
       (pos, _, _, _) <- sweep program
       let substs = pos >>= extractSubst
-      return (Right (VList substs))
+      let trees  = map toTree substs
+      return (Right (VList trees))
 
--- datatype for representing a SUBSTITUTION
-data SUBST = SUBST Inlines -- BEFORE
-                           (Map Inlines SUBST) -- next possible transitions
-  deriving Show
 
-instance Pretty SUBST where
-  pretty (SUBST before next) = if Map.null next
-    then pretty before
-    else pretty before <> line <> indent 4 (vcat next')
+-- Tree-like structure for representing the transition from one Subst to the next 
+data Tree = Node Inlines -- BEFORE + MAPPING (before pressing any "buttons")
+                         (Map Inlines [Tree]) -- transitions
+
+                        --  MAPPING ==> AFTER 
+                        --  (Map Inlines Tree) --  "buttons" with the result after pressing them 
+
+instance Pretty Tree where
+  pretty (Node before transitions) = pretty before <> line <> indent
+    2
+    (vcat (prettyTransitions transitions))
    where
-    next' = map
-      (\(k, x) -> if isEmpty k
-        then "[]" <+> "===>" <+> pretty x
-        else pretty k <+> "===>" <+> pretty x
-      )
-      (Map.toList next)
+    prettyTransitions :: Map Inlines [Tree] -> [Doc ann]
+    prettyTransitions xs = Map.toList xs >>= prettyTransition
 
+    prettyTransition :: (Inlines, [Tree]) -> [Doc ann]
+    prettyTransition (transition, children) =
+      [pretty transition, indent 2 $ vcat (map pretty children)]
+
+toTree :: SUBST -> Tree
+toTree (SUBST before mapping after inBefore inAfter) = Node
+  (before <> " " <> mapping)
+  (toBefore <> toAfter)
+ where
+  toBefore :: Map Inlines [Tree] 
+  toBefore = Map.fromList $ map (\subst -> ("* " <> renderedMapping subst <> " ===>" <> renderedAfter subst ,map toTree (substsInAfter subst))) inBefore
+
+  toAfter :: Map Inlines [Tree]
+  toAfter = Map.singleton ("* " <> mapping <> " ===>" <> after) (map toTree inAfter)
 
 --------------------------------------------------------------------------------
--- | Typeclass for extracting `Subst` from the syntax tree 
+-- | Typeclass for extracting `Substs` from the syntax tree 
+
+-- like Subst, but augmented with Substs in "before" and "after"
+data SUBST = SUBST
+  { renderedBefore  :: Inlines
+  , renderedMapping :: Inlines
+  , renderedAfter   :: Inlines
+  , substsInBefore  :: [SUBST]
+  , substsInAfter   :: [SUBST]
+  }
+  deriving Show
 
 class ExtractSubst a where
   extractSubst :: a -> [SUBST]
@@ -80,77 +107,25 @@ instance ExtractSubst Pred where
 
 instance ExtractSubst Expr where
   extractSubst = \case
-    Paren x _                   -> extractSubst x
-    Chain x _ y _               -> extractSubst x <> extractSubst y
-    App x y _                   -> extractSubst x <> extractSubst y
-    Lam _ x _                   -> extractSubst x
+    Paren x _       -> extractSubst x
+    Chain x _ y _   -> extractSubst x <> extractSubst y
+    App x y _       -> extractSubst x <> extractSubst y
+    Lam _ x _       -> extractSubst x
     Quant x _ y z _ -> extractSubst x <> extractSubst y <> extractSubst z
-    Subst before mappings after -> [SUBST (render before) next]
+    Subst before mapping after ->
+      [ SUBST (render before)
+              renderedMapping'
+              (render after)
+              (extractSubst before)
+              (extractSubst after)
+      ]
      where
-      next :: Map Inlines SUBST
-      next =
-        Map.fromList [(render mappings, SUBST (render after) substsInAfter)]
-
-      substsInAfter :: Map Inlines SUBST
-      substsInAfter = Map.fromList $ map substToEntry (extractSubst after)
-
-      -- entryToSubst :: (Inlines, SUBST) -> SUBST
-      -- entryToSubst = snd 
-
+      -- render empty mapping as "[]"
+      renderedMapping' =
+        let rendered = render mapping
+        in  if isEmpty rendered then "[]" else rendered
     ArrIdx x y _   -> extractSubst x <> extractSubst y
     ArrUpd x y z _ -> extractSubst x <> extractSubst y <> extractSubst z
     _              -> []
 
-
-substToEntry :: SUBST -> (Inlines, SUBST)
-substToEntry s@(SUBST before _) = (before, s)
-
 --------------------------------------------------------------------------------
-
---   where
---     run :: String -> FilePath -> TestTree
---     run = runGoldenTest "Server/assets/" $ \sourcePath source -> do
---       return $ serializeTestResult $ runTest sourcePath source $ do
---             program <- parseProgram source
---             Right <$> sweep program
-
-
--- specPayloadWithoutIndentationTests :: TestTree
--- specPayloadWithoutIndentationTests =
---   testGroup
---     "Testing specPayloadWithoutIndentation"
---     [ run "mulitline 1" "spec-payload-1.gcl"
---     ]
---   where
---     run :: String -> FilePath -> TestTree
---     run = runGoldenTest "Server/assets/" $ \sourcePath source -> do
---       return $ serializeTestResult $ runTest sourcePath source $ do
---             program <- parseProgram source
---             (_, specs, _, _) <- sweep program
---             return $ Right $ map (map (\x -> "\"" <> x <> "\"") . specPayloadWithoutIndentation source) specs
-
-
-
--- refineSpecsTest :: TestTree
--- refineSpecsTest =
---   testGroup
---     "Refine Specs"
---     [ run "multiline, top-level" "spec-refine-1.gcl"
---     , run "multiline, top-level, indented" "spec-refine-2.gcl"
---     , run "multiline, top-level, poorly indented" "spec-refine-3.gcl"
---     , run "multiline, in IF, 1" "spec-refine-4.gcl"
---     , run "multiline, in IF, 2" "spec-refine-5.gcl"
---     ]
---   where
---     run :: String -> FilePath -> TestTree
---     run = runGoldenTest "Server/assets/" $ \sourcePath source -> do
---       return $ serializeTestResult $ runTest sourcePath source $ do
---             program <- parseProgram source
---             (_, specs, _, _) <- sweep program
---             case listToMaybe specs of
---               Just spec -> do
---                 let range = rangeOf spec
---                 resKind <- handleRefine range 
---                 return $ Right resKind
---               Nothing ->
---                 return $ Left [Others "cannot find any specs"]
