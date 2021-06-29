@@ -48,6 +48,7 @@ instance Show Response where
 data ReqKind
   = ReqInspect Range
   | ReqRefine Range
+  | ReqInsertAnchor Text
   | ReqDebug
   deriving (Generic)
 
@@ -56,6 +57,7 @@ instance FromJSON ReqKind
 instance Show ReqKind where
   show (ReqInspect range) = "Inspect " <> show range
   show (ReqRefine range) = "Refine " <> show range
+  show (ReqInsertAnchor hash) = "InsertAnchor " <> show hash
   show ReqDebug = "Debug"
 
 data Request = Req FilePath ReqKind

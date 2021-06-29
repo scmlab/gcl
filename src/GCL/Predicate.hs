@@ -12,10 +12,10 @@ import           Data.Loc.Range                 ( Range
                                                 , fromLoc
                                                 , within
                                                 )
+import           Data.Text                      ( Text )
 import           GHC.Generics                   ( Generic )
 import           Syntax.Abstract                ( Expr )
 import           Syntax.Common                  ( Name )
-import Data.Text (Text)
 
 -- | Predicates
 data Pred
@@ -81,11 +81,11 @@ instance Eq Stmt where
 
 -- | Proof obligation
 data PO = PO
-  { poPre    :: Pred -- precondition 
-  , poPost   :: Pred -- post-condition 
+  { poPre        :: Pred -- precondition 
+  , poPost       :: Pred -- post-condition 
   , poAnchorHash :: Text -- anchor hash
-  , poAnchorLoc :: Maybe Range -- anchor location, if it exists in the source 
-  , poOrigin :: Origin -- whereabouts
+  , poAnchorLoc  :: Maybe Range -- anchor location, if it exists in the source 
+  , poOrigin     :: Origin -- whereabouts
   }
   deriving (Eq, Show, Generic)
 

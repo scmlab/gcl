@@ -18,6 +18,7 @@ dependencies:
   - containers
   - megaparsec >= 8.0
   - free
+  - hashable
   - parser-combinators
   - prettyprinter
   - mtl

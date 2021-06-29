@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 622ee2307cbf3c39cc979ccd590a0c9399c547b0a6f6822982a8fa329c62d675
+-- hash: fa9c6f352066547ed98529d3b349e75f96d941967601d23a2845aacf36c6ef9a
 
 name:           gcl
 version:        0.1.0.0
@@ -94,6 +94,7 @@ library
     , bytestring
     , containers
     , free
+    , hashable
     , lens
     , lexer-applicative
     , lsp
@@ -126,6 +127,7 @@ executable gcl
     , containers
     , free
     , gcl
+    , hashable
     , lens
     , lexer-applicative
     , lsp
@@ -151,6 +153,7 @@ test-suite gcl-test
       Test.Parser
       Test.Server
       Test.SrcLoc
+      Test.Substitution
       Test.Type
       Test.Util
       Test.WP
@@ -227,6 +230,7 @@ test-suite gcl-test
     , bytestring
     , containers
     , free
+    , hashable
     , lens
     , lexer-applicative
     , lsp

@@ -1,6 +1,6 @@
 ### Result
 
-[ Abort at ./test/Test/WP/assets/abort.gcl [9-14] 2:1-6 #EXPECTING HASH HERE
+[ Abort at ./test/Test/WP/assets/abort.gcl [9-14] 2:1-6 #4a47ffb66aff8246
 `True
 ⇒
 False
