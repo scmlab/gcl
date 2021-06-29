@@ -1,6 +1,6 @@
 ### Result
 
-[ Assertion at ./test/Test/WP/assets/issue2-2.gcl [33-41] 3:1-9
+[ Assertion at ./test/Test/WP/assets/issue2-2.gcl [33-41] 3:1-9 #EXPECTING HASH HERE
 `True
 ⇒
 z   =   A   *   B

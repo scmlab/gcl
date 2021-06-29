@@ -1,6 +1,10 @@
 ### Result
 
-[Skip at ./test/Test/WP/assets/skip.gcl [9-13] 2:1-5 `True ⇒ 0   =   0 `]
+[ Skip at ./test/Test/WP/assets/skip.gcl [9-13] 2:1-5 #EXPECTING HASH HERE
+`True
+⇒
+0   =   0
+` ]
 
 ### Source
 

@@ -1,6 +1,6 @@
 ### Result
 
-([ Conditional at ./test/Test/Server/assets/spec-qm-4.gcl [0-52] 1:1-8:3
+([ Conditional at ./test/Test/Server/assets/spec-qm-4.gcl [0-52] 1:1-8:3 #EXPECTING HASH HERE
  `True
  ⇒
  True

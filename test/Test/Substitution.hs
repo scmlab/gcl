@@ -91,7 +91,7 @@ class ExtractSubst a where
   extractSubst :: a -> [SUBST]
 
 instance ExtractSubst PO where
-  extractSubst (PO _ pre post _) = extractSubst pre <> extractSubst post
+  extractSubst (PO pre post _ _ _) = extractSubst pre <> extractSubst post
 
 instance ExtractSubst Pred where
   extractSubst = \case

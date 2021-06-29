@@ -1,11 +1,11 @@
 ### Result
 
-[ Skip at ./test/Test/WP/assets/conditional.gcl [12-16] 1:13-17
+[ Skip at ./test/Test/WP/assets/conditional.gcl [12-16] 1:13-17 #EXPECTING HASH HERE
 `True ∧ False
 ⇒
 True
 `
-, Conditional at ./test/Test/WP/assets/conditional.gcl [0-20] 1:1-2:3
+, Conditional at ./test/Test/WP/assets/conditional.gcl [0-20] 1:1-2:3 #EXPECTING HASH HERE
 `True
 ⇒
 False
