@@ -87,7 +87,7 @@ instance ToJSON Block
 
 -- | Datatype for representing a consecutive series of inline elements
 newtype Inlines = Inlines {unInlines :: Seq Inline}
-  deriving (Eq)
+  deriving (Eq, Ord)
 
 -- Represent Inlines with String literals
 instance IsString Inlines where
@@ -203,7 +203,7 @@ data Inline
     Parn Inlines
   | -- | Parenthese around a Horizontal, special case
     PrHz [Inlines]
-  deriving (Eq, Generic)
+  deriving (Eq, Ord, Generic)
 
 instance ToJSON Inline
 
