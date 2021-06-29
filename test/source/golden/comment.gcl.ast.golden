@@ -1,9 +1,9 @@
 do True ->
-  -- comment
+
     skip
     skip
     skip
-  -- hey
+
  | True ->
     skip
     skip

@@ -1,6 +1,1 @@
-var b, n : Int
-
-b := <| + i k : 0 <= i < k : i |>
-n := 0
-
-{ True }
+()
