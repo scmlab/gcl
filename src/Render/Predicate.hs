@@ -46,9 +46,9 @@ instance Render Pred where
     Negate   p          -> "¬" <+> renderPrec n p
 
 instance RenderSection PO where
-  renderSection (PO _ pre post origin) = Section
+  renderSection (PO pre post anchorHash anchorLoc origin) = Section
     Plain
-    [ Header (Text.pack $ show $ render origin) (fromLoc (locOf origin))
+    [ HeaderWithAnchor (Text.pack $ show $ render origin) anchorHash anchorLoc (fromLoc (locOf origin))
     , Code (vertE [render pre, "⇒", render post])
     ]
 

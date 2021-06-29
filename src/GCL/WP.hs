@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -383,7 +385,7 @@ tellSubstPO (s1, p) (s2, q) l = unless (toExpr p == toExpr q) $ do
   q' <- alphaSubst s2 q
   (i, j, k) <- get
   put (succ i, j, k)
-  tell ([PO i p' q' l], [], [])
+  tell ([PO p' q' "EXPECTING HASH HERE" Nothing l], [], [])
 
 tellPO :: Pred -> Pred -> Origin -> WP ()
 tellPO p q = tellSubstPO (emptySubs, p) (emptySubs, q)

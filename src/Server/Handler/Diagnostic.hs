@@ -121,7 +121,7 @@ instance Collect StructWarning Diagnostic where
     "Unnecessary bound annotation at this assertion"
 
 instance Collect PO Diagnostic where
-  collect (PO _i _pre _post origin) = makeWarning loc title ""
+  collect (PO _pre _post _anchorHash _anchorLoc origin) = makeWarning loc title ""
    where
       -- we only mark the opening tokens ("do" and "if") for loops & conditionals
     first2Char :: Loc -> Loc

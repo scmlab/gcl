@@ -59,6 +59,7 @@ instance Pretty Section where
 -- | Block elements
 data Block
   = Header Text (Maybe Range)
+  | HeaderWithAnchor Text Text (Maybe Range) (Maybe Range)
   | Paragraph Inlines
   | Code Inlines
   deriving (Eq, Generic)
@@ -70,6 +71,8 @@ instance IsString Block where
 instance Pretty Block where
   pretty (Header header Nothing     ) = pretty header
   pretty (Header header (Just range)) = pretty header <> " at " <> pretty range
+  pretty (HeaderWithAnchor header hash _ Nothing     ) = pretty header <> " #" <> pretty hash
+  pretty (HeaderWithAnchor header hash _ (Just range)) = pretty header <> " #" <> pretty hash <> "at " <> pretty range
   pretty (Paragraph inlines         ) = pretty inlines
   pretty (Code      inlines         ) = "`" <> pretty inlines <> "`"
 
