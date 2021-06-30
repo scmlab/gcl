@@ -241,7 +241,8 @@ golden =
       parserGolden "assign" "./test/source/" "assign.gcl",
       parserGolden "quant 1" "./test/source/" "quant1.gcl",
       parserGolden "spec" "./test/source/" "spec.gcl",
-      parserGolden "gcd" "./test/source/examples/" "gcd.gcl"
+      parserGolden "gcd" "./test/source/examples/" "gcd.gcl",
+      parserGolden "proof" "./test/source/examples/" "proof.gcl"
     ]
 
 parserGolden :: String -> FilePath -> FilePath -> TestTree

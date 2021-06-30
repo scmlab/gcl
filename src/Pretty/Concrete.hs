@@ -224,8 +224,8 @@ instance Pretty Stmt where
   pretty = toDoc . prettyWithLoc
 
 instance PrettyWithLoc Stmt where
-  prettyWithLoc (Skip l) = fromDoc l "skip"
-  prettyWithLoc (Abort l) = fromDoc l "abort"
+  prettyWithLoc (Skip l) = fromDoc (locOf l) "skip"
+  prettyWithLoc (Abort l) = fromDoc (locOf l) "abort"
   prettyWithLoc (Assign xs a es) =
     prettyWithLoc xs <> prettyWithLoc a <> prettyWithLoc es
   prettyWithLoc (AAssign x l i r a e) =

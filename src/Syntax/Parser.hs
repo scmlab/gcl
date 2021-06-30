@@ -22,6 +22,7 @@ import Text.Megaparsec (MonadParsec (..), Pos, anySingle, parse, tokensToChunk, 
 import Text.Megaparsec.Char (eol)
 import qualified Text.Megaparsec.Char.Lexer as Lex
 import Data.Bifunctor (second)
+import Data.Loc.Range (rangeOf)
 
 -- The monad binding of ParserF will insert space consumer or indent guard inbetween,
 -- which sould be convenient for handling linefold indentation.
@@ -183,10 +184,10 @@ pStmt' =
     <?> "statement"
 
 pSkip :: ParserF Stmt
-pSkip = Skip . locOf <$> lexSkip
+pSkip = Skip . rangeOf <$> lexSkip
 
 pAbort :: ParserF Stmt
-pAbort = Abort . locOf <$> lexAbort
+pAbort = Abort . rangeOf <$> lexAbort
 
 pAssign :: ParserF Stmt
 pAssign = Assign <$> pList lowerName <*> lexAssign <*> pList pExpr'

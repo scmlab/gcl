@@ -61,8 +61,8 @@ instance ToAbstract BlockDeclaration [A.Declaration] where
 
 instance ToAbstract Stmt A.Stmt where
   toAbstract stmt = case stmt of
-    Skip l -> pure (A.Skip l)
-    Abort l -> pure (A.Abort l)
+    Skip l -> pure (A.Skip (locOf l))
+    Abort l -> pure (A.Abort (locOf l))
     Assign a _ b -> A.Assign (fromSepBy a) <$> mapM toAbstract (fromSepBy b) <*> pure (a <--> b)
     AAssign x _ i _ _ e -> A.AAssign (A.Var x (locOf x)) <$> toAbstract i <*> toAbstract e <*> pure (x <--> e)
     Assert l a r -> A.Assert <$> toAbstract a <*> pure (l <--> r)

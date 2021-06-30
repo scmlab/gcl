@@ -56,15 +56,15 @@ data Declaration
 data BlockDeclaration = BlockDeclaration (Token "{:") [BlockDecl] (Token ":}") deriving (Eq, Show)
 
 data Stmt
-  = Skip Loc
-  | Abort Loc
+  = Skip Range
+  | Abort Range
   | Assign (SepBy "," Name) (Token ":=") (SepBy "," Expr)
   | AAssign Name (Token "[") Expr (Token "]") (Token ":=") Expr
   | Assert (Token "{") Expr (Token "}")
   | LoopInvariant (Token "{") Expr (Token ",") (Token "bnd") (Token ":") Expr (Token "}")
   | Do (Token "do") (SepBy "|" GdCmd) (Token "od")
   | If (Token "if") (SepBy "|" GdCmd) (Token "fi")
-  | SpecQM Loc -- ? to be rewritten as {!!} by the frontend
+  | SpecQM Loc -- ? to be rewritten as {!!} 
   | Spec (Token "[!") Text (Token "!]")
   | Proof (Token "{-") (Token "-}")
   deriving (Eq, Show)

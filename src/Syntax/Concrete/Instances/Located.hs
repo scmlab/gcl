@@ -40,8 +40,8 @@ instance Located BlockDeclaration where
 -------------------------------------------------------------------------------
 
 instance Located Stmt where
-  locOf (Skip l) = l
-  locOf (Abort l) = l
+  locOf (Skip l) = locOf l
+  locOf (Abort l) = locOf l
   locOf (Assign l _ r) = l <--> r
   locOf (AAssign l _ _ _ _ r) = l <--> r
   locOf (Assert l _ r) = l <--> r
