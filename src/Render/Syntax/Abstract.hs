@@ -13,40 +13,6 @@ import Syntax.Abstract.Util ( assignBindingToExpr )
 import Syntax.Common (Fixity (..), Op(..), ArithOp(..), classify, Name)
 import Data.Map (Map)
 
---------------------------------------------------------------------------------
-
--- instance Render Stmt where
---   render (Skip _) = "skip"
---   render (Abort _) = "abort"
---   render (Assign xs es _) =
---     mconcat (punctuateE ", " (map render xs))
---       <> ":= "
---       <> mconcat (punctuateE ", " (map render es))
---   render (Assert p _) =
---     "{ " <> render p <> " }"
---   render (LoopInvariant p bnd _) =
---     "{ " <> render p <> " , bnd: " <> render bnd <> " }"
---   render (Do gdCmds _) =
---     "do"
---       <> line
---       <> vsep (map (\x -> " |" <+> render x <> line) gdCmds)
---       <> "od"
---   render (If gdCmds _) =
---     "if"
---       <> line
---       <> vsep (map (\x -> " |" <+> render x <> line) gdCmds)
---       <> "fi"
---   render (Spec content _) = "[!" <> render content <> "!]"
---   render (Proof _) = "{-  -}"
-
---------------------------------------------------------------------------------
-
--- instance Render GdCmd where
---   render (GdCmd guard body _) =
---     render guard
---       <+> "->"
---       <+> mconcat (map render body)
-
 ------------------------------------------------------------------------------
 
 -- | Literals
@@ -59,9 +25,6 @@ instance Render Lit where
 --------------------------------------------------------------------------------
 
 -- | Expr
--- instance RenderSection Expr where
---   renderSection expr = Block Nothing (fromLoc (locOf expr)) (render expr)
-
 instance Render Expr where
   renderPrec n expr = case handleExpr n expr of
     Expect _ -> mempty
