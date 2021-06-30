@@ -24,6 +24,7 @@ import Numeric (showHex)
 import qualified Data.Text as Text
 import qualified Data.List as List
 import GCL.WP.Type
+import Pretty (toString)
 
 type TM = Except StructError
 
@@ -410,7 +411,7 @@ tellSubstPO (s1, p) (s2, q) l = unless (toExpr p == toExpr q) $ do
   q' <- alphaSubst s2 q
   (i, j, k) <- get
   put (succ i, j, k)
-  let anchorHash = Text.pack $ showHex (abs (Hashable.hash (show (p', q')))) ""
+  let anchorHash = Text.pack $ showHex (abs (Hashable.hash (toString (p', q')))) ""
   tell ([PO p' q' anchorHash Nothing l], [], [])
 
 tellPO :: Pred -> Pred -> Origin -> WP ()
