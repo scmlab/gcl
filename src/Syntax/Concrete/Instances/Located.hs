@@ -50,7 +50,7 @@ instance Located Stmt where
   locOf (If l _ r) = l <--> r
   locOf (SpecQM l) = l
   locOf (Spec l _ r) = l <--> r
-  locOf (Proof l r) = l <--> r
+  locOf (Proof l _ r) = l <--> r
 
 --------------------------------------------------------------------------------
 

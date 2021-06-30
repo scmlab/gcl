@@ -241,7 +241,7 @@ pSpec = do
 pProof :: ParserF Stmt
 pProof = do
   (ts, _, te) <- pBlock lexProofStart anySingle lexProofEnd
-  return $ Proof ts te
+  return $ Proof ts [] te
 
 ------------------------------------------
 -- parse Type

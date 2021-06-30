@@ -130,6 +130,9 @@ tokProofStart = "{-"
 tokProofEnd :: Text
 tokProofEnd = "-}"
 
+tokProofAnchor :: Text
+tokProofAnchor = "#"
+
 tokBackSlash :: Text
 tokBackSlash = "\\"
 

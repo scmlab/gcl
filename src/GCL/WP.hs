@@ -185,7 +185,7 @@ struct _ (inv, Nothing) (A.Do gcmds l) post = do
   forM_ gcmds (structGdcmdInduct inv)
 --  tellPO (emptySubs, Conjunct (inv : map guardLoop guards)) (emptySubs, post) (AtTermination l)
 -- struct b (pre, _) (A.Spec _ range) post = when b (tellSpec pre post range)
-struct _ _ (A.Proof _) _ = return ()
+struct _ _ (A.Proof _ _) _ = return ()
 struct _ _ _ _ = error "missing case in struct"
 
 structGdcmdInduct :: Pred -> A.GdCmd -> WP ()
@@ -259,7 +259,7 @@ wp b (A.If gcmds _) post = do
       . toExpr
       <$> wpStmts b body post
   return (conjunct (disjunctGuards gcmds : pres))
-wp _ (A.Proof _) post = return post
+wp _ (A.Proof _ _) post = return post
 wp _ (A.Alloc x (e:es) _) post = do -- non-empty
     {- wp (x := es) P = (forall x', (x' -> es) -* P[x'/x])-}
    x' <- freshName'

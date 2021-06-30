@@ -78,6 +78,9 @@ instance PrettyWithLoc (Token "{-") where
 instance PrettyWithLoc (Token "-}") where
   prettyWithLoc (Token l r) = DocWithLoc (pretty tokBlockCommentEnd) l r
 
+instance PrettyWithLoc (Token "#") where
+  prettyWithLoc (Token l r) = DocWithLoc (pretty tokProofAnchor ) l r
+
 instance PrettyWithLoc (Token "{:") where
   prettyWithLoc (Token l r) = DocWithLoc (pretty tokDeclStart) l r
 
@@ -256,7 +259,10 @@ instance PrettyWithLoc Stmt where
     prettyWithLoc l
       <> fromDoc (translateLoc 2 0 (locOf l) <--> translateLoc 0 (-2) (locOf r)) (pretty s)
       <> prettyWithLoc r
-  prettyWithLoc (Proof l r) = prettyWithLoc l <> prettyWithLoc r
+  prettyWithLoc (Proof l anchors r) = 
+    prettyWithLoc l 
+      <> mconcat (map prettyWithLoc anchors)
+      <> prettyWithLoc r
 
 instance Pretty GdCmd where
   pretty = toDoc . prettyWithLoc
@@ -266,6 +272,12 @@ instance PrettyWithLoc GdCmd where
     prettyWithLoc guard
       <> prettyWithLoc a
       <> mconcat (map prettyWithLoc body)
+
+instance Pretty ProofAnchor where
+  pretty = toDoc . prettyWithLoc
+
+instance PrettyWithLoc ProofAnchor where
+  prettyWithLoc (ProofAnchor hashMark hash range) = fromDoc (hashMark <--> locOf range) ("#" <> pretty hash)
 
 --------------------------------------------------------------------------------
 

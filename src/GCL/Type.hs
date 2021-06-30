@@ -276,7 +276,7 @@ checkStmt env (LoopInvariant e1 e2 _) = do
 checkStmt env (Do gdcmds _) = mapM_ (checkGdCmd env) gdcmds
 checkStmt env (If gdcmds _) = mapM_ (checkGdCmd env) gdcmds
 checkStmt _ (Spec _ _) = return ()
-checkStmt _ (Proof _) = return ()
+checkStmt _ (Proof _ _) = return ()
 checkStmt env (Alloc x es l) =
   case Map.lookup x env of
     Nothing -> throwError $ NotInScope x (locOf x)

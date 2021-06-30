@@ -66,10 +66,11 @@ data Stmt
   | If (Token "if") (SepBy "|" GdCmd) (Token "fi")
   | SpecQM Loc -- ? to be rewritten as {!!} 
   | Spec (Token "[!") Text (Token "!]")
-  | Proof (Token "{-") (Token "-}")
+  | Proof (Token "{-") [ProofAnchor] (Token "-}")
   deriving (Eq, Show)
 
 data GdCmd = GdCmd Expr TokArrows [Stmt] deriving (Eq, Show)
+data ProofAnchor = ProofAnchor (Token "#") Text Range deriving (Eq, Show)
 
 --------------------------------------------------------------------------------
 

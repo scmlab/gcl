@@ -71,10 +71,13 @@ instance ToAbstract Stmt A.Stmt where
     If l a r -> A.If <$> mapM toAbstract (fromSepBy a) <*> pure (l <--> r)
     SpecQM l -> throwError l
     Spec l t r -> pure (A.Spec t (rangeOf l <> rangeOf r))
-    Proof l r -> pure (A.Proof (l <--> r))
+    Proof l anchors r -> A.Proof <$> mapM toAbstract anchors <*> pure (l <--> r)
 
 instance ToAbstract GdCmd A.GdCmd where
   toAbstract (GdCmd a _ b) = A.GdCmd <$> toAbstract a <*> mapM toAbstract b <*> pure (a <--> b)
+
+instance ToAbstract ProofAnchor A.ProofAnchor where
+  toAbstract (ProofAnchor _ hash range) = pure $ A.ProofAnchor hash range
 
 --------------------------------------------------------------------------------
 
