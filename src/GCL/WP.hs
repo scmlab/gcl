@@ -3,6 +3,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE LambdaCase #-}
 
 module GCL.WP where
 
@@ -41,7 +42,20 @@ runWP p defs = runExcept $ evalRWST p defs (0, 0, 0)
 
 sweep :: A.Program -> Either StructError ([PO], [Spec], [StructWarning])
 sweep (A.Program decls _ _ stmts _) = do
-  snd <$> runWP (structProgram stmts) decls'
+  (_, (pos, specs, warnings)) <- runWP (structProgram stmts) decls'
+  -- update Proof Obligations with corresponding Proof Anchors
+
+
+  let proofAnchors = stmts >>= \case {A.Proof anchors _ -> anchors ; _ -> []}
+  -- make a table of (#hash, range) from Proof Anchors 
+  let table = Map.fromList $ map (\(A.ProofAnchor hash range) -> (hash, range)) proofAnchors
+  let updatePO po = case Map.lookup (poAnchorHash po) table of 
+        Nothing -> po 
+        Just range -> po { poAnchorLoc = Just range }
+
+  let pos' = map updatePO pos 
+
+  return (pos', specs, warnings)
   where
     decls' = Map.map (A.LetBinding <$>) (A.extractDeclarations decls)
 

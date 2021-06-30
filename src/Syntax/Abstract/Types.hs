@@ -63,7 +63,7 @@ data Stmt
   deriving (Eq, Show)
 
 data GdCmd = GdCmd Expr [Stmt] Loc deriving (Eq, Show)
-data ProofAnchor = ProofAnchor Text Range deriving (Eq, Show)
+data ProofAnchor = ProofAnchor Text Range deriving (Eq, Ord, Show)
 
 --------------------------------------------------------------------------------
 
