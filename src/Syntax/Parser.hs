@@ -15,10 +15,10 @@ import Data.Maybe (isJust)
 import qualified Data.Ord as Ord
 import Data.Text (Text)
 import Syntax.Common (Name (..), ChainOp, ArithOp)
-import Syntax.Concrete (BlockDecl (..), BlockDeclaration (..), Decl (..), DeclProp (..), DeclBody (..), Declaration (..), EndpointClose (..), EndpointOpen (..), Expr (..), GdCmd (..), Interval (..), Program (..), SepBy (..), Stmt (..), TBase (..), Token (..), Type (..))
+import Syntax.Concrete (BlockDecl (..), BlockDeclaration (..), Decl (..), DeclProp (..), DeclBody (..), Declaration (..), EndpointClose (..), EndpointOpen (..), Expr (..), GdCmd (..), Interval (..), Program (..), SepBy (..), Stmt (..), TBase (..), Token (..), Type (..), ProofAnchor (ProofAnchor))
 import Syntax.Parser.Lexer
 import Syntax.Parser.Util
-import Text.Megaparsec (MonadParsec (..), Pos, anySingle, parse, tokensToChunk, (<?>))
+import Text.Megaparsec (MonadParsec (..), Pos, anySingle, parse, tokensToChunk, (<?>), manyTill_)
 import Text.Megaparsec.Char (eol)
 import qualified Text.Megaparsec.Char.Lexer as Lex
 import Data.Bifunctor (second)
@@ -169,6 +169,7 @@ pStmt' :: ParserF Stmt
 pStmt' =
   choice
     [ pSkip,
+      pProof,
       pAbort,
       try pAssert,
       pLoopInvariant,
@@ -177,8 +178,7 @@ pStmt' =
       pDo,
       pIf,
       pSpecQM,
-      pSpec,
-      pProof
+      pSpec
     ]
     <* lift sc
     <?> "statement"
@@ -238,10 +238,29 @@ pSpec = do
   (ts, t, te) <- pBlock lexSpecStart anySingle lexSpecEnd
   return $ Spec ts (tokensToChunk (Proxy :: Proxy Text) t) te
 
+pProofAnchor :: ParserF ProofAnchor
+pProofAnchor = uncurry ProofAnchor <$> lexProofAnchor
+
 pProof :: ParserF Stmt
-pProof = do
-  (ts, _, te) <- pBlock lexProofStart anySingle lexProofEnd
-  return $ Proof ts [] te
+pProof = Proof 
+          <$> lexProofStart
+          <*> pProofAnchorsOrProofEnd
+          <*> lexProofEnd
+  where 
+    pProofAnchorsOrProofEnd :: ParserF [ProofAnchor]
+    pProofAnchorsOrProofEnd = do
+      let anchorOrEnd = choice
+                          [ lexProofEnd >> return False
+                          , pProofAnchor >> return True
+                          ]
+      (_, continue) <- manyTill_ anySingle (lookAhead anchorOrEnd)
+      if continue
+        then do
+            x <- pProofAnchor
+            xs <- pProofAnchorsOrProofEnd
+            return (x:xs)
+        else return []
+
 
 ------------------------------------------
 -- parse Type

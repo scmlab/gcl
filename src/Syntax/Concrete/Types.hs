@@ -70,7 +70,7 @@ data Stmt
   deriving (Eq, Show)
 
 data GdCmd = GdCmd Expr TokArrows [Stmt] deriving (Eq, Show)
-data ProofAnchor = ProofAnchor (Token "#") Text Range deriving (Eq, Show)
+data ProofAnchor = ProofAnchor Text Range deriving (Eq, Show)
 
 --------------------------------------------------------------------------------
 

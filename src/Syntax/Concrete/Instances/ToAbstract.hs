@@ -77,7 +77,7 @@ instance ToAbstract GdCmd A.GdCmd where
   toAbstract (GdCmd a _ b) = A.GdCmd <$> toAbstract a <*> mapM toAbstract b <*> pure (a <--> b)
 
 instance ToAbstract ProofAnchor A.ProofAnchor where
-  toAbstract (ProofAnchor _ hash range) = pure $ A.ProofAnchor hash range
+  toAbstract (ProofAnchor hash range) = pure $ A.ProofAnchor hash range
 
 --------------------------------------------------------------------------------
 

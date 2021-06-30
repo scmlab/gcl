@@ -12,10 +12,10 @@ tokLineComment :: Text
 tokLineComment = "--"
 
 tokBlockCommentStart :: Text
-tokBlockCommentStart = "{-"
+tokBlockCommentStart = "{{"
 
 tokBlockCommentEnd :: Text
-tokBlockCommentEnd = "-}"
+tokBlockCommentEnd = "}}"
 
 tokSkip :: Text
 tokSkip = "skip"
@@ -123,15 +123,11 @@ tokQuantStartU = "⟨"
 tokQuantEndU :: Text
 tokQuantEndU = "⟩"
 
--- NOTE : the proof token is the same as declaration block token
 tokProofStart :: Text
 tokProofStart = "{-"
 
 tokProofEnd :: Text
 tokProofEnd = "-}"
-
-tokProofAnchor :: Text
-tokProofAnchor = "#"
 
 tokBackSlash :: Text
 tokBackSlash = "\\"

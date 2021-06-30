@@ -20,6 +20,7 @@ import Text.Megaparsec (MonadParsec (notFollowedBy, tokens, try), Parsec, Stream
 import Text.Megaparsec.Char (alphaNumChar, char, lowerChar, space1, string, upperChar)
 import qualified Text.Megaparsec.Char.Lexer as Lex
 import Data.Bifunctor (second)
+import qualified Data.Text as Text
 
 type Lexer = Parsec Void Text
 
@@ -157,6 +158,15 @@ lexProofStart = symbol tokProofStart
 
 lexProofEnd :: LexerF (Token tokProofEnd)
 lexProofEnd = symbol tokProofEnd
+
+
+-- expects someting like #3ab4bd33e7a32de7
+-- the range coverts the whole thing, but the text includes only the alphanum part (that is, without prefix '#')  
+lexProofAnchor :: LexerF (Text, Range)
+lexProofAnchor = lexeme $ do 
+  _ <- char '#' 
+  hash <- many . satisfy $ isAlphaNum
+  return $ Text.pack hash 
 
 lexBackSlash :: LexerF (Token tokBackSlash)
 lexBackSlash = symbol tokBackSlash
