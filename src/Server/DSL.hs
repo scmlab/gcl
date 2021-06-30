@@ -21,8 +21,8 @@ import           GCL.Predicate
 import           GCL.Predicate.Util             ( specPayloadWithoutIndentation
                                                 )
 import qualified GCL.Type                      as TypeChecking
-import           GCL.WP                         ( StructWarning )
 import qualified GCL.WP                        as WP
+import           GCL.WP.Type                    ( StructWarning )
 import           Language.LSP.Types             ( Diagnostic )
 import           Prelude                 hiding ( span )
 import           Pretty                         ( toText )
@@ -167,16 +167,16 @@ generateResponseAndDiagnosticsFromResult (Right (pos, specs, globalProps, warnin
     -- get Specs around the mouse selection
     lastSelection <- getLastSelection
     let overlappedSpecs = case lastSelection of
-          Nothing  -> specs
+          Nothing        -> specs
           Just selection -> filter (withinRange selection) specs
     -- get POs around the mouse selection (including their corresponding Proofs)
 
-    let withinPOrange sel po = case poAnchorLoc po of 
-          Nothing -> withinRange sel po
+    let withinPOrange sel po = case poAnchorLoc po of
+          Nothing     -> withinRange sel po
           Just anchor -> withinRange sel po || withinRange sel anchor
 
     let overlappedPOs = case lastSelection of
-          Nothing  -> pos
+          Nothing        -> pos
           Just selection -> filter (withinPOrange selection) pos
     -- render stuff
     let warningsSections =

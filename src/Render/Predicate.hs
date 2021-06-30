@@ -5,7 +5,7 @@ module Render.Predicate where
 import           Data.Loc                       ( locOf )
 import           Data.Loc.Range                 ( fromLoc )
 import           GCL.Predicate
-import           GCL.WP
+import           GCL.WP.Type 
 import           Render.Class
 import           Render.Element
 import           Render.Syntax.Abstract         ( )

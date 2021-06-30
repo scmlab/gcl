@@ -1,6 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase #-}
@@ -10,14 +9,12 @@ module GCL.WP where
 import Control.Monad.Except (Except, MonadError (throwError), forM, forM_, runExcept, unless, when)
 import Control.Monad.RWS (MonadReader (ask), MonadState (..), MonadWriter (..), RWST, evalRWST)
 import Control.Arrow(first)
-import Data.Aeson (ToJSON)
 import Data.Loc (Loc (..), Located (..))
 import Data.Loc.Range (Range, fromLoc)
 import qualified Data.Map as Map
 import GCL.Common (Fresh (..), Subs, Substitutable (..), AlphaRename (..), emptySubs, freshName')
 import GCL.Predicate (Origin (..), PO (..), Pred (..), Spec (Specification))
 import GCL.Predicate.Util (conjunct, disjunct, guardIf, guardLoop, toExpr)
-import GHC.Generics (Generic)
 import qualified Syntax.Abstract as A
 import qualified Syntax.Abstract.Operator as A
 import qualified Syntax.Abstract.Util as A
@@ -26,6 +23,7 @@ import qualified Data.Hashable as Hashable
 import Numeric (showHex)
 import qualified Data.Text as Text
 import qualified Data.List as List
+import GCL.WP.Type
 
 type TM = Except StructError
 
@@ -441,27 +439,3 @@ throwWarning warning = do
 
 freshVar :: Fresh m => m A.Expr
 freshVar = (\v -> A.Var (Name v NoLoc) NoLoc) <$> freshText
-
-data StructWarning
-  = MissingBound Range
-  | ExcessBound Range
-  deriving (Eq, Show, Generic)
-
-instance Located StructWarning where
-  locOf (MissingBound rng) = locOf rng
-  locOf (ExcessBound rng) = locOf rng
-
-data StructError
-  = MissingAssertion Loc
-  | MissingPostcondition Loc
-  | MultiDimArrayAsgnNotImp Loc
-     -- Assignment to multi-dimensional array not implemented.
-     -- SCM: will remove this when we figure out how.
-  deriving (Eq, Show, Generic)
-
-instance Located StructError where
-  locOf (MissingAssertion l) = l
-  locOf (MissingPostcondition l) = l
-  locOf (MultiDimArrayAsgnNotImp l) = l
-
-instance ToJSON StructError

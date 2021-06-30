@@ -6,7 +6,7 @@ import           Data.Foldable                  ( toList )
 import           Data.Loc.Range
 import           Error
 import           GCL.Type                       ( TypeError(..) )
-import           GCL.WP                         ( StructError(..) )
+import           GCL.WP.Type                    ( StructError(..) )
 import           Render.Class
 import           Render.Element
 import           Render.Syntax.Abstract         ( )
