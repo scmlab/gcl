@@ -31,7 +31,7 @@ import           Server.CustomMethod
 import           Server.Handler.Diagnostic      ( )
 import           Server.Stab                    ( collect )
 import qualified Syntax.Abstract               as A
-import Syntax.Concrete ( ToAbstract(toAbstract) )
+import           Syntax.Concrete                ( ToAbstract(toAbstract) )
 import           Syntax.Parser                  ( Parser
                                                 , pProgram
                                                 , pStmts
@@ -104,7 +104,7 @@ sendDiagnostics xs = do
 digHole :: Range -> CmdM Text
 digHole range = do
   logM $ " ### DigHole " <> toText range
-  let indent = Text.replicate (posCol (rangeStart range) - 1) " "
+  let indent   = Text.replicate (posCol (rangeStart range) - 1) " "
   let holeText = "[!\n" <> indent <> "\n" <> indent <> "!]"
   editText range holeText
 
@@ -122,21 +122,21 @@ refine source range = do
       let payloadIsEmpty = Text.null (Text.strip payload)
       if payloadIsEmpty then return () else void $ parse pStmts payload
       return (spec, specPayloadWithoutIndentation source' spec)
-  where
-    findPointedSpec :: CmdM (Maybe Spec)
-    findPointedSpec = do
-      program <- parseProgram source
-      (_, specs, _, _) <- sweep program
-      return $ find (withinRange range) specs
+ where
+  findPointedSpec :: CmdM (Maybe Spec)
+  findPointedSpec = do
+    program          <- parseProgram source
+    (_, specs, _, _) <- sweep program
+    return $ find (withinRange range) specs
 
 typeCheck :: A.Program -> CmdM ()
 typeCheck p = case TypeChecking.runTM (TypeChecking.checkProg p) of
-  Left e -> throwError [TypeError e]
+  Left  e -> throwError [TypeError e]
   Right v -> return v
 
 sweep :: A.Program -> CmdM ([PO], [Spec], [A.Expr], [StructWarning])
 sweep program@(A.Program _ globalProps _ _ _) = case WP.sweep program of
-  Left e -> throwError [StructError e]
+  Left  e                     -> throwError [StructError e]
   Right (pos, specs, warings) -> do
     return (List.sort pos, sortOn locOf specs, globalProps, warings)
 
@@ -147,31 +147,37 @@ parse :: Parser a -> Text -> CmdM a
 parse p source = do
   filepath <- getFilePath
   case runParse p filepath source of
-    Left errors -> throwError $ map SyntacticError errors
-    Right val -> return val
+    Left  errors -> throwError $ map SyntacticError errors
+    Right val    -> return val
 
 parseProgram :: Text -> CmdM A.Program
 parseProgram source = do
   concrete <- parse pProgram source
   case runExcept (toAbstract concrete) of
-    Left NoLoc -> throwError [Others "NoLoc in parseProgram"]
-    Left (Loc start end) -> digHole (Range start end) >>= parseProgram
-    Right program -> return program
+    Left  NoLoc           -> throwError [Others "NoLoc in parseProgram"]
+    Left  (Loc start end) -> digHole (Range start end) >>= parseProgram
+    Right program         -> return program
 
 --------------------------------------------------------------------------------
 
 generateResponseAndDiagnosticsFromResult :: Result -> CmdM [ResKind]
 generateResponseAndDiagnosticsFromResult (Left errors) = throwError errors
-generateResponseAndDiagnosticsFromResult (Right (pos, specs, globalProps, warnings)) =
-  do
-    -- leave only POs & Specs around the mouse selection
+generateResponseAndDiagnosticsFromResult (Right (pos, specs, globalProps, warnings))
+  = do
+    -- get Specs around the mouse selection
     lastSelection <- getLastSelection
     let overlappedSpecs = case lastSelection of
-          Nothing -> specs
-          Just sel -> filter (withinRange sel) specs
+          Nothing  -> specs
+          Just selection -> filter (withinRange selection) specs
+    -- get POs around the mouse selection (including their corresponding Proofs)
+
+    let withinPOrange sel po = case poAnchorLoc po of 
+          Nothing -> withinRange sel po
+          Just anchor -> withinRange sel po || withinRange sel anchor
+
     let overlappedPOs = case lastSelection of
-          Nothing -> pos
-          Just sel -> filter (withinRange sel) pos
+          Nothing  -> pos
+          Just selection -> filter (withinPOrange selection) pos
     -- render stuff
     let warningsSections =
           if null warnings then [] else map renderSection warnings
@@ -187,15 +193,15 @@ generateResponseAndDiagnosticsFromResult (Right (pos, specs, globalProps, warnin
           if null overlappedSpecs then [] else map renderSection overlappedSpecs
     let poSections =
           if null overlappedPOs then [] else map renderSection overlappedPOs
-    let sections =
-          mconcat [warningsSections, specsSections, poSections, globalPropsSections]
+    let sections = mconcat
+          [warningsSections, specsSections, poSections, globalPropsSections]
 
     version <- bumpVersion
     let encodeSpec spec =
-          ( specID spec,
-            toText $ render (specPreCond spec),
-            toText $ render (specPostCond spec),
-            specRange spec
+          ( specID spec
+          , toText $ render (specPreCond spec)
+          , toText $ render (specPostCond spec)
+          , specRange spec
           )
 
     let responses =
