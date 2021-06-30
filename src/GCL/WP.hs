@@ -24,6 +24,7 @@ import Syntax.Common (Name (Name))
 import qualified Data.Hashable as Hashable
 import Numeric (showHex)
 import qualified Data.Text as Text
+import qualified Data.List as List
 
 type TM = Except StructError
 
@@ -56,14 +57,23 @@ progView [] = ProgViewEmpty
 progView [A.Assert pre l] = do
   ProgViewMissingPrecondition [] (Assertion pre l)
 progView stmts = do
-  case (head stmts, last stmts) of
+  case (head stmts, last (removeLastProofs stmts)) of
     (A.Assert pre l, A.Assert post m) -> do
-      ProgViewOkay (Assertion pre l) (init (tail stmts)) (Assertion post m)
+      ProgViewOkay (Assertion pre l) (init (tail (removeLastProofs stmts))) (Assertion post m)
     (A.Assert pre l, _) -> do
-      ProgViewMissingPostcondition (Assertion pre l) (tail stmts)
+      ProgViewMissingPostcondition (Assertion pre l) (tail (removeLastProofs stmts))
     (_, A.Assert post m) -> do
       ProgViewMissingPrecondition (init stmts) (Assertion post m)
     _ -> ProgViewMissingBoth stmts
+  where
+    -- ignore Proofs after the Postcondition
+    removeLastProofs :: [A.Stmt] -> [A.Stmt]
+    removeLastProofs = List.dropWhileEnd isProof
+
+    isProof :: A.Stmt -> Bool
+    isProof A.Proof {} = True
+    isProof _ = False
+
 
 alphaSubst :: (Substitutable A.Bindings b, AlphaRename WP b) => Subs A.Bindings -> b -> WP b
 alphaSubst sub e = do
