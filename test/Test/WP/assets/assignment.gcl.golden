@@ -1,9 +1,9 @@
 ### Result
 
-[ Assigment at ./test/Test/WP/assets/assignment.gcl [9-15] 2:1-7 #50f13c3bc2c980cc
+[ Assigment at ./test/Test/WP/assets/assignment.gcl [9-15] 2:1-7 #15725138b003197c
 `True
 ⇒
-0   =   x[  1  /  x  ]
+0   =   1
 ` ]
 
 ### Source

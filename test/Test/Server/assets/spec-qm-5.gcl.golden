@@ -15,7 +15,7 @@
  ⇒
  N   -   n  ≥ 0
  ` ], [ Precondition at ./test/Test/Server/assets/spec-qm-5.gcl [113-143] 7:13-9:15
-      `⟨ ∃  ?m_0  :  n  =  n[  ?m_0  /  n  ]   +   1  :  f [ n[  ?m_0  /  n  ] ]  =   0  ∧  n[  ?m_0  /  n  ]   ≠   N  ⟩`
+      `⟨ ∃  ?m_0  :  n  =  n   +   1[  ?m_0  /  n  ]  :  f [ n ]  =   0  ∧  n   ≠   N[  ?m_0  /  n  ]  ⟩`
       Precondition
       `f [ n ]  =   0` ], [], [])
 
