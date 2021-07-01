@@ -111,8 +111,14 @@ instance Substitutable A.Type A.Type where
 instance Substitutable A.Expr A.Expr where
   subst s (A.Paren expr l) = A.Paren (subst s expr) l
   subst _ lit@A.Lit {} = lit
-  subst s v@(A.Var n _) = Map.findWithDefault v n s
-  subst s c@(A.Const n _) = Map.findWithDefault c n s
+  subst s v@(A.Var n _) = 
+    case Map.lookup n s of
+      Just v' -> subst (Map.delete n s) v'
+      Nothing -> v
+  subst s c@(A.Const n _) = 
+    case Map.lookup n s of
+      Just c' -> subst (Map.delete n s) c'
+      Nothing -> c
   subst _ o@A.Op {} = o
   subst s (A.Chain a op b l) = A.Chain (subst s a) op (subst s b) l
   subst s (A.App a b l) =
@@ -135,6 +141,9 @@ instance Substitutable A.Expr A.Expr where
   subst s (A.ArrUpd e1 e2 e3 l) =
     A.ArrUpd (subst s e1) (subst s e2) (subst s e3) l
 
+bindingToSubst :: Subs A.Bindings -> A.Expr -> A.Expr
+bindingToSubst = subst . Map.map A.bindingsToExpr 
+
 instance {-# OVERLAPPABLE #-} Substitutable a b => Substitutable (Maybe a) b where
   subst = subst . Map.mapMaybe id
 
@@ -149,14 +158,25 @@ instance Substitutable A.Bindings A.Expr where
       (A.Paren e l) -> A.Paren (subst s e) l
       A.Lit {} -> expr
       (A.Var n _) ->
+        let s' = Map.delete n s in
         case Map.lookup n s of
-          Just (A.LetBinding v) -> simpleSubs expr s n v
-          Just v -> A.bindingsToExpr v
+          Just (A.LetBinding v) -> A.Subst expr s (subst s' v)
+          Just v -> bindingToSubst s' (A.bindingsToExpr v) 
           Nothing -> expr
+
+-- (P, let binding c), c --subst (n // s)--> c'
+-- ---------------------------------------------
+-- P --[s]--> c'  
+
+-- (P, _ c), c --subst (n // s)--> c'
+-- ----------------------------------
+-- c'
+
       (A.Const n _) ->
+        let s' = Map.delete n s in
         case Map.lookup n s of
-          Just (A.LetBinding c) -> simpleSubs expr s n c
-          Just c -> A.bindingsToExpr c
+          Just (A.LetBinding c) -> A.Subst expr s (subst s' c)
+          Just c -> bindingToSubst s' (A.bindingsToExpr c)
           Nothing -> expr
       A.Op {} -> expr
       (A.Chain a op b l) -> A.Chain (subst s a) op (subst s b) l
@@ -187,7 +207,6 @@ instance Substitutable A.Bindings A.Expr where
               if b2a == b2a'
               then reduceSubs (A.Subst b1 sb1 b2') sb2 a'
               else reduceSubs (reduceSubs b s b2') sb2 a'
-              -- reduceSubs (A.Subst b s b2') sb2 a'
           A.App b1 b2 l
             | isAllBetaBindings s1 ->
               let b1' = subst s b1 in
