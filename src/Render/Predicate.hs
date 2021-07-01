@@ -29,7 +29,7 @@ instance RenderSection Spec where
     Blue
     [ Header "Precondition" (Just range)
     , Code (render pre)
-    , Header "Precondition" Nothing
+    , Header "Postcondition" Nothing
     , Code (render post)
     ]
 
