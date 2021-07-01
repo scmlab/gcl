@@ -1,3 +1,4 @@
+{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -111,11 +112,11 @@ instance Substitutable A.Type A.Type where
 instance Substitutable A.Expr A.Expr where
   subst s (A.Paren expr l) = A.Paren (subst s expr) l
   subst _ lit@A.Lit {} = lit
-  subst s v@(A.Var n _) = 
+  subst s v@(A.Var n _) =
     case Map.lookup n s of
       Just v' -> subst (Map.delete n s) v'
       Nothing -> v
-  subst s c@(A.Const n _) = 
+  subst s c@(A.Const n _) =
     case Map.lookup n s of
       Just c' -> subst (Map.delete n s) c'
       Nothing -> c
@@ -142,7 +143,7 @@ instance Substitutable A.Expr A.Expr where
     A.ArrUpd (subst s e1) (subst s e2) (subst s e3) l
 
 bindingToSubst :: Subs A.Bindings -> A.Expr -> A.Expr
-bindingToSubst = subst . Map.map A.bindingsToExpr 
+bindingToSubst = subst . Map.map A.bindingsToExpr
 
 instance {-# OVERLAPPABLE #-} Substitutable a b => Substitutable (Maybe a) b where
   subst = subst . Map.mapMaybe id
@@ -161,64 +162,39 @@ instance Substitutable A.Bindings A.Expr where
         let s' = Map.delete n s in
         case Map.lookup n s of
           Just (A.LetBinding v) -> A.Subst expr s (subst s' v)
-          Just v -> bindingToSubst s' (A.bindingsToExpr v) 
+          Just v -> subst s' (A.bindingsToExpr v)
           Nothing -> expr
-
--- (P, let binding c), c --subst (n // s)--> c'
--- ---------------------------------------------
--- P --[s]--> c'  
-
--- (P, _ c), c --subst (n // s)--> c'
--- ----------------------------------
--- c'
-
       (A.Const n _) ->
         let s' = Map.delete n s in
         case Map.lookup n s of
           Just (A.LetBinding c) -> A.Subst expr s (subst s' c)
-          Just c -> bindingToSubst s' (A.bindingsToExpr c)
+          Just c -> subst s' (A.bindingsToExpr c)
           Nothing -> expr
       A.Op {} -> expr
       (A.Chain a op b l) -> A.Chain (subst s a) op (subst s b) l
+      A.App (A.Op op) a l -> A.App (A.Op op) (subst s a) l
       A.App a b l ->
         let a' = subst s a in
         let b' = subst s b in
-        let expr' = A.App a' b' l in
-        let (s', r) = betaReduce expr' in
-        if a == a'
-        then reduceSubs expr' s' r
-        else reduceSubs (reduceSubs expr s expr') s' r
+        if
+        | a == a' && b == b' -> expr
+        | isAllLetBindings s -> A.App a' b' l
+        | otherwise -> A.Subst expr s (A.App a' b' l)
       (A.Lam x e l) ->
         let s' = Map.withoutKeys s (Set.singleton x) in
         let e' = subst s' e in
-        reduceSubs expr s (A.Lam x e' l)
+        if e == e'
+        then expr
+        else A.Subst expr s (A.Lam x e' l)
       A.Hole {} -> expr
       (A.Quant qop xs rng t l) ->
         let s' = Map.withoutKeys s (Set.fromList xs) in
         A.Quant (subst s' qop) xs (subst s' rng) (subst s' t) l
-      A.Subst b s1 a ->
-        case b of
-          A.Subst b1 sb1 (A.App b2a b2b l)
-            | isAllApp b && isAllBetaBindings s1 ->
-              let b2a' = subst s b2a in
-              let b2b' = subst s b2b in
-              let b2' = A.App b2a' b2b' l in
-              let (sb2, a') = betaReduce b2' in
-              if b2a == b2a'
-              then reduceSubs (A.Subst b1 sb1 b2') sb2 a'
-              else reduceSubs (reduceSubs b s b2') sb2 a'
-          A.App b1 b2 l
-            | isAllBetaBindings s1 ->
-              let b1' = subst s b1 in
-              let b2' = subst s b2 in
-              let b' = A.App b1' b2' l in
-              let (sb, a') = betaReduce b' in
-              if b1 == b1'
-              then reduceSubs b' sb a'
-              else reduceSubs (reduceSubs b s b') sb a'
-          _ ->
-            let a' = getSubstAfter (subst s a) in
-            A.Subst expr s a'
+      A.Subst _ _ b ->
+        let c = subst s b in
+        if b == c
+        then expr
+        else A.Subst expr s c
       A.ArrIdx e1 e2 l ->
         A.ArrIdx (subst s e1) (subst s e2) l
       A.ArrUpd e1 e2 e3 l ->
@@ -240,32 +216,31 @@ isAllLetBindings = Map.foldl f True
     f t A.LetBinding {} = t
     f _ _ = False
 
-betaReduce :: A.Expr -> (Subs A.Bindings, A.Expr)
-betaReduce (A.App a b l) =
-  case a of
-    A.Lam x body _ ->
-      let s = Map.singleton x b in
-      (Map.map A.BetaBinding s, getSubstAfter (subst s body))
-    A.Subst _ _ (A.Lam x body _) ->
-      let s = Map.singleton x b in
-      (Map.map A.BetaBinding s, getSubstAfter (subst s body))
-    _ -> (emptySubs, A.App a b l)
-betaReduce expr = (emptySubs, expr)
-
--- e1 [s] -> e2
--- e1 [s] -> e2 [s//(n, e2)]
-simpleSubs :: A.Expr -> Subs A.Bindings -> Name -> A.Expr -> A.Expr
-simpleSubs e1 s n e2 =
-  A.Subst e1 s
-    (reduceSubs e2 (Map.delete n s) (subst (Map.delete n s) e2))
-
-reduceSubs :: A.Expr -> Subs A.Bindings -> A.Expr -> A.Expr
-reduceSubs before s after
-  | before == after = before
-  | getSubstAfter before == after = before
-  | isAllLetBindings s = after
-  | null s = before
-  | otherwise = A.Subst before s after
+betaReduction :: A.Expr -> A.Expr
+betaReduction (A.Paren e l) = A.Paren (betaReduction e) l
+betaReduction e@A.Lit {} = e
+betaReduction e@A.Var {} = e
+betaReduction e@A.Const {} = e
+betaReduction e@A.Op {} = e
+betaReduction (A.Chain a op b l) = A.Chain (betaReduction a) op (betaReduction b) l
+betaReduction (A.App a@(A.Lam x e _) b l) =
+  let b' = betaReduction b in
+  let s = Map.singleton x (A.BetaBinding b') in
+  A.Subst (A.App a b' l) s (subst s e)
+betaReduction (A.App a b l) = A.App (betaReduction a) (betaReduction b) l
+betaReduction (A.Lam x e l) = A.Lam x (betaReduction e) l
+betaReduction e@A.Hole {} = e
+betaReduction (A.Quant op xs rng t l)= A.Quant (betaReduction op) xs (betaReduction rng) (betaReduction t) l
+betaReduction (A.Subst a s (A.App b1@(A.Lam x e _) b2 l)) = 
+  let b2' = betaReduction b2 in
+  let s' = Map.singleton x (A.BetaBinding b2') in
+  A.Subst 
+    (A.Subst (betaReduction a) s (A.App b1 b2' l))
+    s'
+    (subst s' e)
+betaReduction (A.Subst a s b) = A.Subst (betaReduction a) s (betaReduction b)
+betaReduction (A.ArrIdx e1 e2 l) = A.ArrIdx (betaReduction e1) (betaReduction e2) l
+betaReduction (A.ArrUpd e1 e2 e3 l) = A.ArrUpd (betaReduction e1) (betaReduction e2) (betaReduction e3) l
 
 getSubstAfter :: A.Expr -> A.Expr
 getSubstAfter (A.Subst _ _ after) = after
