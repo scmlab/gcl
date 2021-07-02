@@ -22,8 +22,8 @@
 
 - ### subst
 
-  - $\displaystyle \frac{s,\; \mathsf{Var}\; n\;\dashv\; (n,\; \mathsf{Let Binding}\; v)\; \in\; s,\;\; v\; \xrightarrow{\,s\; //\; n\, }\; v'}
-{\mathsf{Var}\; n\; \xrightarrow[s]{}\; v'}$
+  - $\displaystyle \frac{s,\; \mathsf{Var}\; n\;\dashv\; (n,\; \mathsf{Let Binding}\; v)\; \in\; s}
+{\mathsf{Var}\; n\; \xrightarrow[s]{}\; v}$
 
   - $\displaystyle \frac{s,\; \mathsf{Var}\; n\; \dashv\; (n,\; \mathsf{Other Binding}\; v)\; \in\; s,\;\; v\; \xrightarrow{\, s\; //\; n\, }\; v'}
 {v'}$
@@ -115,8 +115,9 @@ e'\; \xRightarrow{\{(x, a')\}}\; e''}
 
   - $\displaystyle \frac{\mathsf{App}\; (\lambda\, x.\; e)\; a\; \dashv\;
   a\; \rightarrow_\beta\; a',\;
-  e\; \xrightarrow{\{(x,\; \mathsf{BetaBinding}\; a')\}}\; e' }
-  {\mathsf{App}\; (\lambda\, x.\; e)\; a'\; \xrightarrow[\{(x,\; \mathsf{BetaBinding}\; a')\}]{}\; e'}$
+  e\; \xrightarrow{\{(x,\; \mathsf{BetaBinding}\; a')\}}\; e'\;
+  \rightarrow_\beta\; e'' }
+  {e''}$
 
   - $\displaystyle \frac{\mathsf{App}\; f\; a\; \dashv\;
   f\; \rightarrow_\beta\; f',\;
@@ -183,13 +184,11 @@ op\; \xrightarrow{s\; //\; args}\; op',\; rng\; \xrightarrow{s\; //\; args}\; rn
 - ### beta reduction **(NotSure)**
 
   - $\displaystyle \frac{a\; \xrightarrow[s]{}\; \mathsf{App}\; (\lambda\, x.\; e)\; b\; \dashv\;
-  a\; \rightarrow_\beta\; a',\;
-  e\; \xrightarrow{\{(x,\; \mathsf{BetaBinding}\; b)\}}\; e',\;
-  b\; \rightarrow_\beta\; b'}
-  {(a'\; \xrightarrow[s]{}\; \mathsf{App}\; (\lambda\, x.\; e)\; b')\; \xrightarrow[\{(x,\; \mathsf{BetaBinding}\; b')\}]{}\; e' }$
+  b\; \rightarrow_\beta\; b',\;
+  e\; \xrightarrow{\{(x,\; \mathsf{BetaBinding}\; b')\}}\; e'\; \rightarrow_\beta\; e''}
+  {a\; \xrightarrow[s]{}\; e''}$
 
   - $\displaystyle \frac{a\; \xrightarrow[s]{}\; b\; \dashv\;
-  a\; \rightarrow_\beta\; a',\;
   b\; \rightarrow_\beta\; b'}
-  {a'\; \rightarrow_\beta\; b'}$
+  {a\; \rightarrow_\beta\; b'}$
   

@@ -161,7 +161,7 @@ instance Substitutable A.Bindings A.Expr where
       (A.Var n _) ->
         let s' = Map.delete n s in
         case Map.lookup n s of
-          Just (A.LetBinding v) -> A.Subst expr s (subst s' v)
+          Just (A.LetBinding v) -> A.Subst expr s v
           Just v -> subst s' (A.bindingsToExpr v)
           Nothing -> expr
       (A.Const n _) ->
