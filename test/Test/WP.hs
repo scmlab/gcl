@@ -5,7 +5,7 @@ module Test.WP where
 import Pretty ()
 import Server.DSL (parseProgram, sweep)
 import Server.Interpreter.Test
-import Test.Server (runGoldenTest)
+import Test.Util (runGoldenTest)
 import Test.Tasty (TestTree, testGroup)
 import Prelude hiding (Ordering (..))
 
@@ -20,7 +20,7 @@ tests =
 --------------------------------------------------------------------------------
 
 run :: String -> FilePath -> TestTree
-run = runGoldenTest "WP/assets/" $ \sourcePath source -> do
+run = runGoldenTest "WP/assets/" "" $ \sourcePath source -> do
   return $
     serializeTestResult $
       runTest sourcePath source $ do

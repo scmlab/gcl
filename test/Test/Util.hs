@@ -14,6 +14,9 @@ import Prelude hiding (readFile)
 import Pretty ()
 import Syntax.Parser (Parser, runParse)
 import Syntax.Parser.Util (SyntacticError)
+import Data.ByteString.Lazy (ByteString)
+import qualified Test.Tasty.Golden as Golden
+import qualified Data.ByteString.Lazy as BSL
 
 goldenFileTest :: String -> 
   String -> 
@@ -67,3 +70,13 @@ removeTrailingWhitespace = Text.unlines . map Text.stripEnd . Text.lines
 
 parseTest :: Parser a -> Text -> Either [SyntacticError] a
 parseTest parser = runParse parser "<test>"
+
+
+runGoldenTest :: FilePath -> FilePath -> (FilePath -> Text -> IO ByteString) -> String -> FilePath -> TestTree
+runGoldenTest dir ext test name path = do
+  let goldenPath = "./test/Test/" <> dir <> path <> ext <> ".golden"
+  let sourcePath = "./test/Test/" <> dir <> path
+  Golden.goldenVsStringDiff name (\ref new -> ["diff", "-u", ref, new]) goldenPath $ do
+    source <- Text.decodeUtf8 . BSL.toStrict <$> BSL.readFile sourcePath
+    test sourcePath source
+

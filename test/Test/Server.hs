@@ -1,20 +1,16 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Test.Server (tests, runGoldenTest) where
+module Test.Server (tests) where
 
-import Data.ByteString.Lazy (ByteString)
-import qualified Data.ByteString.Lazy as BSL
-import qualified Data.Text.Encoding as Text
 import Server.DSL
 import Server.Interpreter.Test
 import Test.Tasty
-import qualified Test.Tasty.Golden as Golden
-import Data.Text (Text)
 import GCL.Predicate.Util (specPayloadWithoutIndentation)
 import Data.Maybe (listToMaybe)
 import Error (Error(Others))
 import Data.Loc.Range (rangeOf)
 import Server.Handler.CustomMethod (handleRefine)
+import Test.Util (runGoldenTest)
 
 tests :: TestTree
 tests = testGroup "Server" [instantiateSpec, specPayloadWithoutIndentationTests, refineSpecsTest]
@@ -33,7 +29,7 @@ instantiateSpec =
     ]
   where
     run :: String -> FilePath -> TestTree
-    run = runGoldenTest "Server/assets/" $ \sourcePath source -> do
+    run = runGoldenTest "Server/assets/" "" $ \sourcePath source -> do
       return $ serializeTestResult $ runTest sourcePath source $ do
             program <- parseProgram source
             Right <$> sweep program
@@ -47,7 +43,7 @@ specPayloadWithoutIndentationTests =
     ]
   where
     run :: String -> FilePath -> TestTree
-    run = runGoldenTest "Server/assets/" $ \sourcePath source -> do
+    run = runGoldenTest "Server/assets/" "" $ \sourcePath source -> do
       return $ serializeTestResult $ runTest sourcePath source $ do
             program <- parseProgram source
             (_, specs, _, _) <- sweep program
@@ -67,7 +63,7 @@ refineSpecsTest =
     ]
   where
     run :: String -> FilePath -> TestTree
-    run = runGoldenTest "Server/assets/" $ \sourcePath source -> do
+    run = runGoldenTest "Server/assets/" "" $ \sourcePath source -> do
       return $ serializeTestResult $ runTest sourcePath source $ do
             program <- parseProgram source
             (_, specs, _, _) <- sweep program
@@ -78,12 +74,3 @@ refineSpecsTest =
                 return $ Right resKind
               Nothing ->
                 return $ Left [Others "cannot find any specs"]
-
-runGoldenTest :: FilePath -> (FilePath -> Text -> IO ByteString) -> String -> FilePath -> TestTree
-runGoldenTest dir test name path = do
-  let goldenPath = "./test/Test/" <> dir <> path <> ".golden"
-  let sourcePath = "./test/Test/" <> dir <> path
-  Golden.goldenVsStringDiff name (\ref new -> ["diff", "-u", ref, new]) goldenPath $ do
-    source <- Text.decodeUtf8 . BSL.toStrict <$> BSL.readFile sourcePath
-    test sourcePath source
-

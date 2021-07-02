@@ -22,8 +22,8 @@ import           Server.Interpreter.Test        ( runTest
                                                 , serializeTestResultValueOnly
                                                 )
 import           Syntax.Abstract                ( Expr(..) )
-import           Test.Server                    ( runGoldenTest )
 import           Test.Tasty              hiding ( after )
+import Test.Util
 
 tests :: TestTree
 tests = testGroup "Substitution" [letBindings]
@@ -35,7 +35,7 @@ letBindings = testGroup
   [run "let binding" "let-1.gcl", run "let binding with assignment" "let-2.gcl"]
  where
   run :: String -> FilePath -> TestTree
-  run = runGoldenTest "Substitution/assets/" $ \sourcePath source -> do
+  run = runGoldenTest "Substitution/assets/" "" $ \sourcePath source -> do
     return $ serializeTestResultValueOnly $ runTest sourcePath source $ do
       program        <- parseProgram source
       (pos, _, _, _) <- sweep program
