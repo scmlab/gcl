@@ -61,54 +61,40 @@
 
   - $\displaystyle \frac{a\; \rightarrow_\beta\; a',\;
   b\; \rightarrow_\beta\; b'}
-  {a\;\bowtie\;b\; \xrightarrow{s}\; a'\; \bowtie\; b'}$
+  {a\;\bowtie\;b\; \rightarrow_\beta\; a'\; \bowtie\; b'}$
 
 ## 6. App
-
-<!-- - $\displaystyle \frac{s,\; \mathsf{App\; (\lambda\, x.\;e)\; a}\; \dashv\;
-  (\lambda\, x.\;e)\; \xrightarrow{s}\; (\lambda\, x.\;e),\;
-  a\; \xrightarrow{s}\; a,\;
-  e\; \xRightarrow{\{(x,\; a)\}}\; e'}
-  {\mathsf{App}\; (\lambda\, x.\; e)\; a\;
-  \xrightarrow[\{(x,\; \mathsf{BetaBinding}\; a)\}]{}\; e'}$
-
-- $\displaystyle \frac{s,\; \mathsf{App}\; (\lambda\, x.\;e)\; a\; \dashv\; (\lambda\, x.\; e)\; \xrightarrow{s}\; (\lambda\, x.\; e'),\;
-a\; \xrightarrow{s}\; a',\;
-e'\; \xRightarrow{\{(x, a')\}}\; e''}
-{(\mathsf{App}\;(\lambda\, x,\; e)\; a\;
-  \xrightarrow[s]{}\; \mathsf{App}\; (\lambda\, x.\; e')\; a')\;
-\xrightarrow[\{(x,\; \mathsf{BetaBinding}\; a'\}]{}\; e''}$
-
-- $\displaystyle \frac{s,\; \mathsf{App}\; (b\; \xrightarrow[sb]{}\; \lambda\,x.\; e)\; a\; \dashv\;
-  (b\; \xrightarrow[sb]{}\; \lambda\, x.\; e)\; \xrightarrow{s} (b\; \xrightarrow[sb]{}\; \lambda\, x.\; e),\;
-  a\; \xrightarrow{s}\; a,\;
-  e\; \xRightarrow{\{(x,\; a)\}}\; e'}
-  {\mathsf{App}\; (b\; \xrightarrow[sb]{}\; \lambda\, x.\; e)\; a\; \xrightarrow[\{(x,\; \mathsf{BetaBinding}\; a\}]{}\; e'}$ -->
-
-<!-- - $\displaystyle \frac{s,\; \mathsf{App}\; (b\; \xrightarrow[sb]{}\; \lambda\,x.\; e)\; a\; \dashv\;
-  (b\; \xrightarrow[sb]{}\; \lambda\, x.\; e)\; \xrightarrow{s} (b\; \xrightarrow[sb]{}\; \lambda\, x.\; e'),\;
-  a\; \xrightarrow{s}\; a',\;
-  e'\; \xRightarrow{\{(x,\; a')\}}\; e''}
-  {(\mathsf{App}\; (b\; \xrightarrow[sb]{}\; \lambda\, x.\; e)\;a\;
-  \xrightarrow[s]{}\; \mathsf{App}\; (b\; \xrightarrow[sb]{}\; \lambda\, x.\; e')\; a')\; \xrightarrow[\{(x,\; \mathsf{BetaBinding}\; a')\}]{}\; e''}$ -->
 
 - ### subst
   
   - $\displaystyle \frac{
-    f\; \xrightarrow{s}\; f,\;
-    a\; \xrightarrow{s}\; a
-  }
-  {
-    \mathsf{App\; f\; a}\; \xrightarrow{s}\; 
-    \mathsf{App}\; f\; a
+    a\; \xrightarrow{s}\; a'
+  } {
+    \mathsf{App\; (Op\; op)\;} a\; \xrightarrow{s}\;
+    \mathsf{App\; (Op\; op)\; } a'
   }$
 
   - $\displaystyle \frac{
-    a\; \xrightarrow{s}\; a'
+    a\; \xrightarrow{s}\; a',\;
+    b\; \xrightarrow{s}\; b'
+  } {
+    \mathsf{App}\;
+    (\mathsf{App}\; (\mathsf{Op}\; op)\; a)\;
+    b\; \xrightarrow{s}\;
+    \mathsf{App}\;
+    (\mathsf{App}\; (\mathsf{Op}\; op)\; a')\;
+    b'
+  }$
+
+  - $\displaystyle \frac{
+    f\; \xrightarrow{s}\; f',\;
+    a\; \xrightarrow{s}\; a',\;
+    f\; =\; f',\;
+    a\; =\; a'
   }
   {
-    \mathsf{App\; (Op\; op)\;} a\; \xrightarrow{s}\;
-    \mathsf{App\; (Op\; op)\; } a'
+    \mathsf{App\; f\; a}\; \xrightarrow{s}\;
+    \mathsf{App}\; f\; a
   }$
 
   - $\displaystyle \frac{
@@ -140,6 +126,16 @@ e'\; \xRightarrow{\{(x, a')\}}\; e''}
     \mathsf{App}\; (\lambda\, x.\; e)\; a\;
     \rightarrow_\beta e''
   }$
+
+  - $\displaystyle \frac{
+      a\; \rightarrow_\beta a',\;
+      e\; \xrightarrow{\{(x,\; \mathsf{BetaBinding\; a'})\}}\; e',\;
+      e'\; \rightarrow_\beta\; e''
+    } {
+      \mathsf{App}\; (f\; [s_1]\; (\lambda\, x.\; e))\; a\;
+      \rightarrow_\beta
+      \mathsf{App}\; f\; a\; [s_1]\; e''
+    }$
 
   - $\displaystyle \frac{
     f\; \rightarrow_\beta\; f',\;
@@ -221,7 +217,8 @@ e'\; \xRightarrow{\{(x, a')\}}\; e''}
 - ### subst
 
   - $\displaystyle \frac{
-    b\; \xrightarrow{s}\; b
+    b\; \xrightarrow{s}\; b',\;
+    b\; =\; b'
   } {
     a\; [s_1]\; b\; \xrightarrow{s}\;
     a\; [s_1]\; b
@@ -236,6 +233,13 @@ e'\; \xRightarrow{\{(x, a')\}}\; e''}
     }$
 
   - $\displaystyle \frac{
+      \lambda\, x.\; e\; \xrightarrow{s}\; \lambda\, x.\; e'\;
+    } {
+      a\; [s_1]\; \lambda\, x.\;e\; \xrightarrow{s}\;
+      a\; [s]\; \lambda\, x.\;e'
+    }$
+
+  - $\displaystyle \frac{
     b\; \xrightarrow{s}\; c
   } {
     a\; [s_1]\; b\; \xrightarrow{s}\;
@@ -245,13 +249,15 @@ e'\; \xRightarrow{\{(x, a')\}}\; e''}
 - ### beta reduction **(NotSure)**
 
   - $\displaystyle \frac{
-    b\; \rightarrow_\beta\; b',\;
-    e\; \xrightarrow{\{(x,\; \mathsf{BetaBinding}\; b')\}}\; e',\;
-    e'\; \rightarrow_\beta\; e''
+    \lambda\, x.\; e\; \xrightarrow{s_1}\; b_2',\;
+    c\; \rightarrow_\beta\; c',\;
+    e\; \xrightarrow{\{(x,\; \mathsf{BetaBinding}\; c')\}}\; e',\;
+    e'\; \rightarrow_\beta\; d,\;
   } {
-    a\; [s]\; \mathsf{App}\; (\lambda\, x.\; e)\; b\;
+    a\; [s_1]\;
+    \mathsf{App}\; (b_1\; [s_2]\; \lambda\, x.\; e)\; c
     \rightarrow_\beta
-    a\; [s]\; e''
+    a\; [s_1]\; \mathsf{App}\; (b_1\; [s_1]\; b_2')\; c\; [\{(x,\; \mathsf{BetaBinding}\; c')\}]\; d
   }$
 
   - $\displaystyle \frac {

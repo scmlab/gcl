@@ -12,7 +12,7 @@ import Control.Arrow(first)
 import Data.Loc (Loc (..), Located (..))
 import Data.Loc.Range (Range, fromLoc)
 import qualified Data.Map as Map
-import GCL.Common (Fresh (..), Subs, Substitutable (..), AlphaRename (..), emptySubs, freshName')
+import GCL.Common (Fresh (..), Subs, Substitutable (..), AlphaRename (..), emptySubs, freshName', betaReduction)
 import GCL.Predicate (Origin (..), PO (..), Pred (..), Spec (Specification))
 import GCL.Predicate.Util (conjunct, disjunct, guardIf, guardLoop, toExpr)
 import qualified Syntax.Abstract as A
@@ -407,8 +407,8 @@ sp _ (pre, _) _ = return pre
 --
 tellSubstPO :: (Subs A.Bindings, Pred) -> (Subs A.Bindings, Pred) -> Origin -> WP ()
 tellSubstPO (s1, p) (s2, q) l = unless (toExpr p == toExpr q) $ do
-  p' <- alphaSubst s1 p
-  q' <- alphaSubst s2 q
+  p' <- betaReduction <$> alphaSubst s1 p
+  q' <- betaReduction <$> alphaSubst s2 q
   (i, j, k) <- get
   put (succ i, j, k)
   let anchorHash = Text.pack $ showHex (abs (Hashable.hash (toString (p', q')))) ""
