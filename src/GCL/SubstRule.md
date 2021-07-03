@@ -3,18 +3,18 @@
 
 ## 1. Notations
 
-- $e_1 \xrightarrow[s]{}\; e_2 \equiv \mathsf{Subst}\; e_1\; s\; e_2$
+- $e_1\; [s]\; e_2 \equiv \mathsf{Subst}\; e_1\; s\; e_2$
 
-- $e1 \xrightarrow{s} e2$
+- $e_1 \xrightarrow{s} e_2$
 
-  - $\mathsf{subst}\; s\; e1 \equiv e2$
+  - $\mathsf{subst}\; s\; e_1 \equiv e_2$
   - $s\; ::\; \mathsf{Map}\; \mathsf{Name}\; \mathsf{Expr}$
 
-- $e1 \xRightarrow{s} e2$
+- $e_1 \xRightarrow{s} e_2$
 
-  - $\mathsf{subst}\; s\; e1 \equiv e2$
-  - $e_2 \neq e_{21}\; \xrightarrow[s_{e_2}]{}\; e_{22}$
-  - $s :: \mathsf{Map}\; \mathsf{Name}\; \mathsf{Expr}$
+  - $\mathsf{subst}\; s\; e_1 \equiv e_2$
+  - $e_2 \neq e_{21}\; [s_{e_2}]\; e_{22}$
+  - $s :: \mathsf{Map}\; \mathsf{Name}\; \mathsf{Bindings}$
 
 - $\displaystyle a\; \rightarrow_\beta b$
 
@@ -22,17 +22,18 @@
 
 - ### subst
 
-  - $\displaystyle \frac{s,\; \mathsf{Var}\; n\;\dashv\; (n,\; \mathsf{Let Binding}\; v)\; \in\; s}
-{\mathsf{Var}\; n\; \xrightarrow[s]{}\; v}$
+  - $\displaystyle \frac{(n,\; \mathsf{Let Binding}\; v)\; \in\; s}
+{\mathsf{Var}\; n\; \xrightarrow{s}\; \mathsf{Var}\; n\; [s]\; v}$
 
-  - $\displaystyle \frac{s,\; \mathsf{Var}\; n\; \dashv\; (n,\; \mathsf{Other Binding}\; v)\; \in\; s,\;\; v\; \xrightarrow{\, s\; //\; n\, }\; v'}
-{v'}$
+  - $\displaystyle \frac{(n,\; \mathsf{Other Binding}\; v)\; \in\; s,\;\; v\; \xrightarrow{\, s\; //\; n\, }\; v'}
+{\mathsf{Var}\; n\; \xrightarrow{s}\; v'}$
 
-  - $\displaystyle \frac{s,\; \mathsf{Var}\; n\; \dashv}{\mathsf{Var}\; n}$
+  - $\displaystyle \frac{(n,\; \_)\; \notin\; s}
+  {\mathsf{Var}\; n\; \xrightarrow{s}\; \mathsf{Var}\; n}$
 
 - ### beta reduction
 
-  - $\displaystyle \frac{\mathsf{Var}\; n\; \dashv}{\mathsf{Var}\; n}$
+  - $\displaystyle \frac{}{\mathsf{Var}\; n\;\rightarrow_\beta\mathsf{Var}\; n}$
 
 ## 3. Const
 
@@ -42,24 +43,25 @@
 
 - ### subst
 
-  - $\displaystyle \frac{s,\; Op\; op\; \dashv}{Op\; op}$
+  - $\displaystyle \frac{}
+  {\mathsf{Op}\; op\;\xrightarrow{s}\;\mathsf{Op}\; op}$
 
 - ### beta reduction
 
-  - $\displaystyle \frac{\mathsf{Op}\; op\; \dashv}{\mathsf{Op}\; op}$
+  - $\displaystyle \frac{}
+  {\mathsf{Op}\; op\; \rightarrow_\beta\; \mathsf{Op}\; op}$
 
 ## 5. Chain
 
 - ### subst
 
-  - $\displaystyle \frac{s,\; a\; \bowtie\; b\; \dashv\; a\; \xrightarrow{s}\; a',\; b\; \xrightarrow{s}\; b'}{a'\; \bowtie\; b'}$
+  - $\displaystyle \frac{a\; \xrightarrow{s}\; a',\; b\; \xrightarrow{s}\; b'}{a\; \bowtie\; b\; \xrightarrow{s}\; a'\; \bowtie\; b'}$
 
 - ### beta reduction
 
-  - $\displaystyle \frac{a\;\bowtie\;b\; \dashv\;
-  a\; \rightarrow_\beta\; a',\;
+  - $\displaystyle \frac{a\; \rightarrow_\beta\; a',\;
   b\; \rightarrow_\beta\; b'}
-  {a'\; \bowtie\; b'}$
+  {a\;\bowtie\;b\; \xrightarrow{s}\; a'\; \bowtie\; b'}$
 
 ## 6. App
 
@@ -92,79 +94,124 @@ e'\; \xRightarrow{\{(x, a')\}}\; e''}
 
 - ### subst
   
-  - $\displaystyle \frac{s,\; \mathsf{App\; f\; a}\; \dashv\;
-  f\; \xrightarrow{s}\; f,\; a\; \xrightarrow{s}\; a}
-  {\mathsf{App}\; f\; a}$
+  - $\displaystyle \frac{
+    f\; \xrightarrow{s}\; f,\;
+    a\; \xrightarrow{s}\; a
+  }
+  {
+    \mathsf{App\; f\; a}\; \xrightarrow{s}\; 
+    \mathsf{App}\; f\; a
+  }$
 
-  - $\displaystyle \frac{s,\; \mathsf{App\; (Op\; op)\;} a\; \dashv\;
-  a\; \xrightarrow{s}\; a'}
-  {\mathsf{App\; (Op\; op)\; } a'}$
+  - $\displaystyle \frac{
+    a\; \xrightarrow{s}\; a'
+  }
+  {
+    \mathsf{App\; (Op\; op)\;} a\; \xrightarrow{s}\;
+    \mathsf{App\; (Op\; op)\; } a'
+  }$
 
-  - $\displaystyle \frac{s,\; \mathsf{App}\; f\; a\; \dashv\;
-  \forall\; (n,\;v)\; \in\; s,\; \exists\; v',\; v \equiv (\mathsf{LetBinding}\; v'),\;
-  f\; \xrightarrow{s}\; f',\;
-  a\; \xrightarrow{s}\; a'}
-  {\mathsf{App}\; f'\; a'}$
+  - $\displaystyle \frac{
+    \forall\; (n,\;v)\; \in\; s,\; \exists\; v',\; v \equiv (\mathsf{LetBinding}\; v'),\;
+    f\; \xrightarrow{s}\; f',\;
+    a\; \xrightarrow{s}\; a'
+  }
+  {
+    \mathsf{App}\; f\; a\; \xrightarrow{s}\;
+    \mathsf{App}\; f'\; a'
+  }$
 
-  - $\displaystyle \frac{s,\; \mathsf{App}\; f\; a\; \dashv\;
-  f\; \xrightarrow{s}\; f',\;
-  a\; \xrightarrow{s}\; a',\;}
-  {\mathsf{App}\; f\; a\; \xrightarrow[s]{}\; \mathsf{App}\; f'\; a'}$
+  - $\displaystyle \frac{
+    f\; \xrightarrow{s}\; f',\;
+    a\; \xrightarrow{s}\; a',\;
+  }
+  {
+    \mathsf{App}\; f\; a\; \xrightarrow{s}\;
+    \mathsf{App}\; f\; a\; [s]\; \mathsf{App}\; f'\; a'
+  }$
 
 - ### beta reduction
 
-  - $\displaystyle \frac{\mathsf{App}\; (\lambda\, x.\; e)\; a\; \dashv\;
-  a\; \rightarrow_\beta\; a',\;
-  e\; \xrightarrow{\{(x,\; \mathsf{BetaBinding}\; a')\}}\; e'\;
-  \rightarrow_\beta\; e'' }
-  {e''}$
+  - $\displaystyle \frac{
+    a\; \rightarrow_\beta\; a',\;
+    e\; \xrightarrow{\{(x,\; \mathsf{BetaBinding}\; a')\}}\; e',\;
+    e'\; \rightarrow_\beta\; e'' }
+  {
+    \mathsf{App}\; (\lambda\, x.\; e)\; a\;
+    \rightarrow_\beta e''
+  }$
 
-  - $\displaystyle \frac{\mathsf{App}\; f\; a\; \dashv\;
-  f\; \rightarrow_\beta\; f',\;
-  a\; \rightarrow_\beta\; a'}
-  {\mathsf{App}\; f'\; a'}$
+  - $\displaystyle \frac{
+    f\; \rightarrow_\beta\; f',\;
+    a\; \rightarrow_\beta\; a'}
+  {
+    \mathsf{App}\; f\; a\;
+    \rightarrow_\beta\mathsf{App}\; f'\; a'}$
 
 ## 7. Lam
 
 - ### subst
 
-  - $\displaystyle \frac{s,\; \lambda\, x.\; e\; \dashv\; e\; \xrightarrow{s\; //\; x}\; e',\; e\; \neq\; e' }
-{\lambda\, x.\; e\; \xrightarrow[s]{}\; \lambda\, x.\; e'}$
+  - $\displaystyle \frac{
+    e\; \xrightarrow{s\; //\; x}\; e',\;
+    e\; \neq\; e'
+  }
+  {
+    \lambda\, x.\; e\; \xrightarrow{s}\;
+    \lambda\, x.\; e\; [s]\; \lambda\, x.\; e'
+  }$
 
-  - $\displaystyle \frac{s,\; \lambda\, x.\; e\; \dashv\; e\; \xrightarrow{s\; //\; x}\; e',\; e\; =\; e' }
-{\lambda\, x.\; e}$
+  - $\displaystyle \frac{
+    e\; \xrightarrow{s\; //\; x}\; e',\; e\; =\; e'
+  }
+  {
+    \lambda\, x.\; e\; \xrightarrow{s}\;
+    \lambda\, x.\; e
+  }$
 
 - ### beta reduction
 
-  - $\displaystyle \frac{\lambda\, x.\; e\; \dashv\;
-  e\; \rightarrow_\beta\; e'}
-  {\lambda\, x.\; e'}$
+  - $\displaystyle \frac{
+    e\; \rightarrow_\beta\; e'}
+  {
+    \lambda\, x.\; e\; \rightarrow_\beta
+    \lambda\, x.\; e'
+  }$
 
 ## 8. Hole
 
 - ### subst
 
-  - $\displaystyle \frac{s,\; \_\; \dashv}{ \_ }$
+  - $\displaystyle \frac{}{ \_\; \xrightarrow{s}\;\_ }$
 
 - ### beta reduction
 
-  - $\displaystyle \frac{\_\; \dashv}{\_}$
+  - $\displaystyle \frac{}{\_\; \rightarrow_\beta\; \_}$
 
 ## 9. Quant
 
 - ### subst
 
-  - $\displaystyle \frac{s,\; \langle op\; args : rng : e\rangle\; \dashv\;
-op\; \xrightarrow{s\; //\; args}\; op',\; rng\; \xrightarrow{s\; //\; args}\; rng',\; e\; \xrightarrow{s\; //\; args}\; e',\;}
-{\langle op'\; args : rng' : e' \rangle}$
+  - $\displaystyle \frac{
+    op\; \xrightarrow{s\; //\; args}\; op',\;
+    rng\; \xrightarrow{s\; //\; args}\; rng',\;
+    e\; \xrightarrow{s\; //\; args}\; e',\;
+  }
+  {
+    \langle op\; args : rng : e\rangle\;\xrightarrow{s}\;
+    \langle op'\; args : rng' : e' \rangle
+  }$
 
 - ### beta reduction
 
-  - $\displaystyle \frac{\langle op\; args : rng : e\rangle\; \dashv\;
-  op\; \rightarrow_\beta\; op',\;
-  rng\; \rightarrow_\beta\; rng',\;
-  e\; \rightarrow_\beta\; e'}
-  {\langle op'\; args : rng' : e'\rangle}$
+  - $\displaystyle \frac{
+    op\; \rightarrow_\beta\; op',\;
+    rng\; \rightarrow_\beta\; rng',\;
+    e\; \rightarrow_\beta\; e'
+  } {
+    \langle op\; args : rng : e\rangle\;\rightarrow_\beta\;
+    \langle op'\; args : rng' : e'\rangle
+  }$
 
 ## 10. Subst
 
@@ -173,22 +220,44 @@ op\; \xrightarrow{s\; //\; args}\; op',\; rng\; \xrightarrow{s\; //\; args}\; rn
 
 - ### subst
 
-  - $\displaystyle \frac{s,\; a\; \xrightarrow[s_1]{}\; b\; \dashv\;
-  b\; \xrightarrow{s}\; b}
-  {a\; \xrightarrow[s_1]{}\; b}$
+  - $\displaystyle \frac{
+    b\; \xrightarrow{s}\; b
+  } {
+    a\; [s_1]\; b\; \xrightarrow{s}\;
+    a\; [s_1]\; b
+  }$
 
-  - $\displaystyle \frac{s,\; a\; \xrightarrow[s_1]{}\; b\; \dashv\;
-  b\; \xrightarrow{s}\; c}
-  {(a\; \xrightarrow[s_1]{}\; b)\; \xrightarrow[s]{}\; c}$
+  - $\displaystyle \frac{
+      b\; \xrightarrow{\{(x,\; \mathsf{BetaBinding}\;e)\}}\;c
+    }
+    {
+      a\;[s_1]\; b\; \xrightarrow{s}\;
+      a\;[s_1]\; c
+    }$
+
+  - $\displaystyle \frac{
+    b\; \xrightarrow{s}\; c
+  } {
+    a\; [s_1]\; b\; \xrightarrow{s}\;
+    (a\; [s_1]\; b)\; [s]\; c
+  }$
 
 - ### beta reduction **(NotSure)**
 
-  - $\displaystyle \frac{a\; \xrightarrow[s]{}\; \mathsf{App}\; (\lambda\, x.\; e)\; b\; \dashv\;
-  b\; \rightarrow_\beta\; b',\;
-  e\; \xrightarrow{\{(x,\; \mathsf{BetaBinding}\; b')\}}\; e'\; \rightarrow_\beta\; e''}
-  {a\; \xrightarrow[s]{}\; e''}$
+  - $\displaystyle \frac{
+    b\; \rightarrow_\beta\; b',\;
+    e\; \xrightarrow{\{(x,\; \mathsf{BetaBinding}\; b')\}}\; e',\;
+    e'\; \rightarrow_\beta\; e''
+  } {
+    a\; [s]\; \mathsf{App}\; (\lambda\, x.\; e)\; b\;
+    \rightarrow_\beta
+    a\; [s]\; e''
+  }$
 
-  - $\displaystyle \frac{a\; \xrightarrow[s]{}\; b\; \dashv\;
-  b\; \rightarrow_\beta\; b'}
-  {a\; \rightarrow_\beta\; b'}$
+  - $\displaystyle \frac {
+    b\; \rightarrow_\beta\; b'
+  } {
+    a\; [s]\; b\; \rightarrow_\beta
+    a\; [s]\; b'
+  }$
   
