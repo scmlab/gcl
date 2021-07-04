@@ -11,7 +11,11 @@ instance Located Program where
 instance Located Declaration where
   locOf (ConstDecl _ _ _ l) = l
   locOf (VarDecl _ _ _ l) = l
-  locOf (LetDecl _ _ _ l) = l
+  locOf (LetDecl _ l) = l
+  locOf (BlockDecl _ _ _ _ l) = l
+
+instance Located DeclBody where
+  locOf (DeclBody l _ r) = l <--> r
 
 instance Located Stmt where
   locOf (Skip l) = l

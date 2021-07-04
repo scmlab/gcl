@@ -1,7 +1,7 @@
 module Syntax.Abstract.Util where
 
 import Syntax.Abstract
-    ( Expr(Lam), GdCmd(..), Stmt, Declaration(..), Bindings (..) )
+    ( Expr(Lam), GdCmd(..), Stmt, Declaration(..), Bindings (..), DeclBody (..) )
 import Syntax.Common (Name)
 import Data.Loc ((<-->))
 import Data.Map (Map)
@@ -11,11 +11,13 @@ extractAssertion :: Declaration -> Maybe Expr
 extractAssertion (ConstDecl _ _ e _) = e
 extractAssertion (VarDecl _ _ e _) = e
 extractAssertion LetDecl {} = Nothing
+extractAssertion (BlockDecl _ _ e _ _) = e
 
 extractLetBinding :: Declaration -> Maybe (Name, Expr)
 extractLetBinding ConstDecl {} = Nothing
 extractLetBinding VarDecl {} = Nothing
-extractLetBinding (LetDecl name args expr _) = Just (name, wrapLam args expr)
+extractLetBinding (LetDecl (DeclBody name args expr) _) = Just (name, wrapLam args expr)
+extractLetBinding BlockDecl {} = Nothing
 
 getGuards :: [GdCmd] -> [Expr]
 getGuards = fst . unzipGdCmds
@@ -42,7 +44,10 @@ assignBindingToExpr _ = Nothing
 extractDeclaration :: Declaration -> Map Name (Maybe Expr)
 extractDeclaration (ConstDecl ns _ _ _) = Map.fromList (zip ns (repeat Nothing))
 extractDeclaration (VarDecl ns _ _ _) = Map.fromList (zip ns (repeat Nothing))
-extractDeclaration (LetDecl n args body _) = Map.singleton n (Just (wrapLam args body))
+extractDeclaration (LetDecl (DeclBody n args body) _) = Map.singleton n (Just (wrapLam args body))
+extractDeclaration (BlockDecl ns _ _ ds _) = 
+  Map.fromList (map (\(DeclBody n args body) -> (n, Just (wrapLam args body))) ds) 
+    `Map.union` Map.fromList (zip ns (repeat Nothing))
 
 extractDeclarations :: [Declaration] -> Map Name (Maybe Expr)
 extractDeclarations = foldl (\m decl -> m `Map.union` extractDeclaration decl) mempty
