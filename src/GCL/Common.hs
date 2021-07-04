@@ -175,9 +175,8 @@ instance Substitutable A.Bindings A.Expr where
         let b' = subst s b in
         if
         | a == a' && b == b' -> expr
-        | isAllLetBindings s -> A.App a' b' l
-        | isAllBetaBindings s -> A.App a' b' l
-        | otherwise -> A.Subst expr s (A.App a' b' l)
+        | isAllAssignBindings s -> A.Subst expr s (A.App a' b' l)
+        | otherwise -> A.App a' b' l
       (A.Lam x e l) ->
         let s' = Map.withoutKeys s (Set.singleton x) in
         let e' = subst s' e in
@@ -195,16 +194,14 @@ instance Substitutable A.Bindings A.Expr where
         let b2' = subst s b2 in
         if
          | b1 == b1' && b2 == b2' -> expr
-         | isAllLetBindings s -> A.Subst a s1 (A.App b1' b2' l)
-         | isAllBetaBindings s -> A.Subst a s1 (A.App b1' b2' l)
-         | otherwise -> A.Subst expr s (A.App b1' b2' l)
+         | isAllAssignBindings s -> A.Subst expr s (A.App b1' b2' l)
+         | otherwise -> A.Subst a s1 (A.App b1' b2' l)
       A.Subst a s1 b ->
         let c = subst s b in
         if
         | b == c -> expr
-        | isAllBetaBindings s -> A.Subst a s1 c
-        | isAllLetBindings s -> A.Subst a s1 c
-        | otherwise -> A.Subst expr s c
+        | isAllAssignBindings s -> A.Subst expr s c
+        | otherwise -> A.Subst a s1 c
       A.ArrIdx e1 e2 l ->
         A.ArrIdx (subst s e1) (subst s e2) l
       A.ArrUpd e1 e2 e3 l ->
@@ -224,6 +221,12 @@ isAllLetBindings :: Subs A.Bindings -> Bool
 isAllLetBindings = Map.foldl f True
   where
     f t A.LetBinding {} = t
+    f _ _ = False
+
+isAllAssignBindings :: Subs A.Bindings -> Bool
+isAllAssignBindings = Map.foldl f True
+  where
+    f t A.AssignBinding {} = t
     f _ _ = False
 
 instance Substitutable A.Bindings Pred where
@@ -300,10 +303,10 @@ instance BetaReduction A.Expr where
     let a' = betaReduction a in
     let s = Map.singleton x (A.BetaBinding a') in
     betaReduction (subst s e)
-  betaReduction (A.App (A.Subst a _ (A.Lam x e _)) b l) =
+  betaReduction expr@(A.App (A.Subst _ _ (A.Lam x e _)) b _) =
     let b' = betaReduction b in
     let s = Map.singleton x (A.BetaBinding b') in
-    A.Subst (A.App a b l) s (betaReduction (subst s e))
+    A.Subst expr s (betaReduction (subst s e))
   betaReduction (A.App a b l) = 
     let a' = betaReduction a in
     let b' = betaReduction b in
@@ -314,12 +317,12 @@ instance BetaReduction A.Expr where
   betaReduction (A.Lam x e l) = A.Lam x (betaReduction e) l
   betaReduction e@A.Hole {} = e
   betaReduction (A.Quant op xs rng t l)= A.Quant (betaReduction op) xs (betaReduction rng) (betaReduction t) l
-  betaReduction (A.Subst a s1 (A.App (A.Subst b1 _ b2@(A.Lam x e _)) c l2)) =
+  betaReduction (A.Subst a s1 (A.App (A.Subst b1 s2 b2@(A.Lam x e _)) c l2)) =
     let c' = betaReduction c in
     let s = Map.singleton x (A.BetaBinding c') in
     let d = betaReduction (subst s e) in
     A.Subst 
-      (A.Subst a s1 (A.App (A.Subst b1 s1 (subst s1 b2)) c l2)) s d
+      (A.Subst a s1 (A.App (A.Subst b1 s2 b2) c l2)) s d
   betaReduction (A.Subst a s b) = A.Subst a s (betaReduction b)
   betaReduction (A.ArrIdx e1 e2 l) = A.ArrIdx (betaReduction e1) (betaReduction e2) l
   betaReduction (A.ArrUpd e1 e2 e3 l) = A.ArrUpd (betaReduction e1) (betaReduction e2) (betaReduction e3) l

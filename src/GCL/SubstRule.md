@@ -18,6 +18,12 @@
 
 - $\displaystyle a\; \rightarrow_\beta b$
 
+- $\displaystyle AssignBinding\; s$
+  - $\forall\; (x,\; v) \in s,\;\exists\; v',\; v=\mathsf{Assign Binding}\; v'$
+
+- $\displaystyle LetBinding\; s$
+  - $\forall\; (x,\; v) \in s,\;\exists\; v',\; v=\mathsf{Let Binding}\; v'$
+
 ## 2. Var
 
 - ### subst
@@ -70,19 +76,17 @@
   - $\displaystyle \frac{
     a\; \xrightarrow{s}\; a'
   } {
-    \mathsf{App\; (Op\; op)\;} a\; \xrightarrow{s}\;
-    \mathsf{App\; (Op\; op)\; } a'
+    (Op\; op)\; a\; \xrightarrow{s}\;
+    (Op\; op)\; a'
   }$
 
   - $\displaystyle \frac{
     a\; \xrightarrow{s}\; a',\;
     b\; \xrightarrow{s}\; b'
   } {
-    \mathsf{App}\;
-    (\mathsf{App}\; (\mathsf{Op}\; op)\; a)\;
+    ((\mathsf{Op}\; op)\; a)\;
     b\; \xrightarrow{s}\;
-    \mathsf{App}\;
-    (\mathsf{App}\; (\mathsf{Op}\; op)\; a')\;
+    ((\mathsf{Op}\; op)\; a')\;
     b'
   }$
 
@@ -93,27 +97,27 @@
     a\; =\; a'
   }
   {
-    \mathsf{App\; f\; a}\; \xrightarrow{s}\;
-    \mathsf{App}\; f\; a
+    f\; a\; \xrightarrow{s}\;
+    f\; a
   }$
 
   - $\displaystyle \frac{
-    \forall\; (n,\;v)\; \in\; s,\; \exists\; v',\; v \equiv (\mathsf{LetBinding}\; v'),\;
-    f\; \xrightarrow{s}\; f',\;
-    a\; \xrightarrow{s}\; a'
-  }
-  {
-    \mathsf{App}\; f\; a\; \xrightarrow{s}\;
-    \mathsf{App}\; f'\; a'
-  }$
-
-  - $\displaystyle \frac{
+    AssignBinding\; s,\;
     f\; \xrightarrow{s}\; f',\;
     a\; \xrightarrow{s}\; a',\;
   }
   {
-    \mathsf{App}\; f\; a\; \xrightarrow{s}\;
-    \mathsf{App}\; f\; a\; [s]\; \mathsf{App}\; f'\; a'
+    f\; a\; \xrightarrow{s}\;
+    f\; a\; [s]\; f'\; a'
+  }$
+
+  - $\displaystyle \frac{
+    f\; \xrightarrow{s}\; f',\;
+    a\; \xrightarrow{s}\; a'
+  }
+  {
+    f\; a\; \xrightarrow{s}\;
+    f'\; a'
   }$
 
 - ### beta reduction
@@ -123,7 +127,7 @@
     e\; \xrightarrow{\{(x,\; \mathsf{BetaBinding}\; a')\}}\; e',\;
     e'\; \rightarrow_\beta\; e'' }
   {
-    \mathsf{App}\; (\lambda\, x.\; e)\; a\;
+    (\lambda\, x.\; e)\; a\;
     \rightarrow_\beta e''
   }$
 
@@ -132,37 +136,46 @@
       e\; \xrightarrow{\{(x,\; \mathsf{BetaBinding\; a'})\}}\; e',\;
       e'\; \rightarrow_\beta\; e''
     } {
-      \mathsf{App}\; (f\; [s_1]\; (\lambda\, x.\; e))\; a\;
+      (f\; [s_1]\; (\lambda\, x.\; e))\; a\;
       \rightarrow_\beta
-      \mathsf{App}\; f\; a\; [s_1]\; e''
+      (f\; [s_1]\; (\lambda\, x.\; e))\; a\; [s_1]\; e''
     }$
+
+  - $\displaystyle \frac{
+    f\; \rightarrow_\beta\; \lambda\, x.\; e,\;
+    a\; \rightarrow_\beta\; a',\;
+    (\lambda\, x.\; e)\; a'\; \rightarrow_\beta e'
+  }
+  {
+    f\; a\;
+    \rightarrow_\beta e'}$
+
+  - $\displaystyle \frac{
+    f\; \rightarrow_\beta f'\;[s]\;\lambda\, x.\; e,\;
+    a\; \rightarrow_\beta\; a',\;
+    (f'\; [s]\; \lambda\, x.\; e)\; a'\; \rightarrow_\beta e'
+  }
+  {
+    f\; a\;
+    \rightarrow_\beta e'}$
 
   - $\displaystyle \frac{
     f\; \rightarrow_\beta\; f',\;
     a\; \rightarrow_\beta\; a'}
   {
-    \mathsf{App}\; f\; a\;
-    \rightarrow_\beta\mathsf{App}\; f'\; a'}$
+    f\; a\;
+    \rightarrow_\beta f'\; a'}$
 
 ## 7. Lam
 
 - ### subst
 
   - $\displaystyle \frac{
-    e\; \xrightarrow{s\; //\; x}\; e',\;
-    e\; \neq\; e'
+    e\; \xrightarrow{s\; //\; x}\; e'
   }
   {
     \lambda\, x.\; e\; \xrightarrow{s}\;
-    \lambda\, x.\; e\; [s]\; \lambda\, x.\; e'
-  }$
-
-  - $\displaystyle \frac{
-    e\; \xrightarrow{s\; //\; x}\; e',\; e\; =\; e'
-  }
-  {
-    \lambda\, x.\; e\; \xrightarrow{s}\;
-    \lambda\, x.\; e
+    \lambda\, x.\; e'
   }$
 
 - ### beta reduction
@@ -217,22 +230,7 @@
 - ### subst
 
   - $\displaystyle \frac{
-    b\; \xrightarrow{s}\; b',\;
-    b\; =\; b'
-  } {
-    a\; [s_1]\; b\; \xrightarrow{s}\;
-    a\; [s_1]\; b
-  }$
-
-  - $\displaystyle \frac{
-      b\; \xrightarrow{\{(x,\; \mathsf{BetaBinding}\;e)\}}\;c
-    }
-    {
-      a\;[s_1]\; b\; \xrightarrow{s}\;
-      a\;[s_1]\; c
-    }$
-
-  - $\displaystyle \frac{
+      LetBinding\; s_1,\;
       \lambda\, x.\; e\; \xrightarrow{s}\; \lambda\, x.\; e'\;
     } {
       a\; [s_1]\; \lambda\, x.\;e\; \xrightarrow{s}\;
@@ -240,24 +238,73 @@
     }$
 
   - $\displaystyle \frac{
+      \lambda\, x.\; e\; \xrightarrow{s}\; \lambda\, x.\; e'\;
+    } {
+      a\; [s_1]\; \lambda\, x.\;e\; \xrightarrow{s}\;
+      a\; [s_1]\; \lambda\, x.\;e\; [s]\; \lambda\, x.\;e'
+    }$
+
+  - $\displaystyle \frac{
+      b_1\; \xrightarrow{s}\; b_1',\;
+      b_2\; \xrightarrow{s}\; b_2',\;
+      b_1 = b_1',\;
+      b_2 = b_2'
+    }{
+      a\;[s_1]\; \mathsf{App}\; b1\; b2\; \xrightarrow{s}\;
+      a\;[s_1]\; \mathsf{App}\; b1\; b2
+    }$
+
+  - $\displaystyle \frac{
+      AssignBinding\; s,\;
+      b_1\; \xrightarrow{s}\; b_1',\;
+      b_2\; \xrightarrow{s}\; b_2'
+    }{
+      a\;[s_1]\; \mathsf{App}\; b1\; b2\; \xrightarrow{s}\;
+      a\;[s_1]\; \mathsf{App}\; b1\; b2\; [s]\; \mathsf{App}\; b1'\; b2'
+    }$
+
+  - $\displaystyle \frac{
+      b_1\; \xrightarrow{s}\; b_1',\;
+      b_2\; \xrightarrow{s}\; b_2'
+    }{
+      a\;[s_1]\; \mathsf{App}\; b1\; b2\; \xrightarrow{s}\;
+      a\;[s_1]\; \mathsf{App}\; b1'\; b2'
+    }$
+
+  - $\displaystyle \frac{
+    b\; \xrightarrow{s}\; c,\;
+    b\; =\; c
+  } {
+    a\; [s_1]\; b\; \xrightarrow{s}\;
+    a\; [s_1]\; b
+  }$
+
+  - $\displaystyle \frac{
+    AssignBinding\; s,\;
     b\; \xrightarrow{s}\; c
   } {
     a\; [s_1]\; b\; \xrightarrow{s}\;
-    (a\; [s_1]\; b)\; [s]\; c
+    a\; [s_1]\; b\; [s]\; c
+  }$
+
+  - $\displaystyle \frac{
+    b\; \xrightarrow{s}\; c
+  } {
+    a\; [s_1]\; b\; \xrightarrow{s}\;
+    a\; [s_1]\; c
   }$
 
 - ### beta reduction **(NotSure)**
 
   - $\displaystyle \frac{
-    \lambda\, x.\; e\; \xrightarrow{s_1}\; b_2',\;
     c\; \rightarrow_\beta\; c',\;
     e\; \xrightarrow{\{(x,\; \mathsf{BetaBinding}\; c')\}}\; e',\;
     e'\; \rightarrow_\beta\; d,\;
   } {
     a\; [s_1]\;
-    \mathsf{App}\; (b_1\; [s_2]\; \lambda\, x.\; e)\; c
+    (b_1\; [s_2]\; \lambda\, x.\; e)\; c
     \rightarrow_\beta
-    a\; [s_1]\; \mathsf{App}\; (b_1\; [s_1]\; b_2')\; c\; [\{(x,\; \mathsf{BetaBinding}\; c')\}]\; d
+    (a\; [s_1]\; (b_1\; [s_2]\; \lambda\, x.\; e)\; c)\; [\{(x,\; \mathsf{BetaBinding}\; c')\}]\; d
   }$
 
   - $\displaystyle \frac {
