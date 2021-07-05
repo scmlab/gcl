@@ -300,16 +300,16 @@ instance BetaReduction A.Expr where
   betaReduction e@A.Op {} = e
   betaReduction (A.Chain a op b l) = A.Chain (betaReduction a) op (betaReduction b) l
   betaReduction (A.App (A.Lam x e _) a _) =
-    let a' = betaReduction a in
+    let a' = betaReductionStar a in
     let s = Map.singleton x (A.BetaBinding a') in
     betaReduction (subst s e)
   betaReduction expr@(A.App (A.Subst _ _ (A.Lam x e _)) b _) =
-    let b' = betaReduction b in
+    let b' = betaReductionStar b in
     let s = Map.singleton x (A.BetaBinding b') in
     A.Subst expr s (betaReduction (subst s e))
   betaReduction (A.App a b l) = 
     let a' = betaReduction a in
-    let b' = betaReduction b in
+    let b' = betaReductionStar b in
     case a' of
       A.Lam {} -> betaReduction (A.App a' b' l)
       A.Subst _ _ A.Lam {} -> betaReduction (A.App a' b' l)
@@ -318,7 +318,7 @@ instance BetaReduction A.Expr where
   betaReduction e@A.Hole {} = e
   betaReduction (A.Quant op xs rng t l)= A.Quant (betaReduction op) xs (betaReduction rng) (betaReduction t) l
   betaReduction (A.Subst a s1 (A.App (A.Subst b1 s2 b2@(A.Lam x e _)) c l2)) =
-    let c' = betaReduction c in
+    let c' = betaReductionStar c in
     let s = Map.singleton x (A.BetaBinding c') in
     let d = betaReduction (subst s e) in
     A.Subst 
@@ -326,6 +326,12 @@ instance BetaReduction A.Expr where
   betaReduction (A.Subst a s b) = A.Subst a s (betaReduction b)
   betaReduction (A.ArrIdx e1 e2 l) = A.ArrIdx (betaReduction e1) (betaReduction e2) l
   betaReduction (A.ArrUpd e1 e2 e3 l) = A.ArrUpd (betaReduction e1) (betaReduction e2) (betaReduction e3) l
+
+betaReductionStar :: A.Expr -> A.Expr
+betaReductionStar expr = 
+  case betaReduction expr of
+    A.Subst _ _ expr' -> betaReductionStar expr'
+    expr' -> expr'
 
 instance BetaReduction Pred where
   betaReduction (Constant e) = Constant (betaReduction e)
