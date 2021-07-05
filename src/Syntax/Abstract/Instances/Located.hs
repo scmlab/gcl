@@ -58,7 +58,6 @@ instance Located Expr where
   locOf (Chain _ _ _ l) = l
   locOf (App _ _ l) = l
   locOf (Lam _ _ l) = l
-  locOf (Hole l) = l
   locOf (Quant _ _ _ _ l) = l
   locOf (Subst es _ _) = locOf es
   locOf (ArrIdx _ _ l) = l

@@ -50,7 +50,6 @@ handleExpr n (App p q _) = case handleExpr n p of
       App {} -> s <+> parensIf n (-1) t
       _ -> s <+> t
 handleExpr _ (Lam p q _) = return $ "λ" <+> render p <+> "→" <+> render q
-handleExpr _ (Hole _) = return "{!!}"
 handleExpr _ (Quant op xs r t _) =
   return $
     "⟨"

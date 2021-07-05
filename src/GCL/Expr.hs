@@ -34,7 +34,6 @@ expand (App a b l) = do
     Lam x body _ -> return $ subst (Map.singleton x (BetaBinding b')) body
     _ -> return $ App a' b' l
 expand (Lam x e l) = return (Lam x e l)
-expand h@(Hole _) = return h
 expand (Quant op xs rng t l) = do
   rng' <- expand rng
   t' <- expand t

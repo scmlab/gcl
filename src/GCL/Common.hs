@@ -84,8 +84,6 @@ instance Free A.Expr where
   fv (A.Lam x e _) = fv e \\ Set.singleton x
   fv (A.Quant op xs range term _) =
     (fv op <> fv range <> fv term) \\ Set.fromList xs
-  fv (A.Hole _) = mempty -- banacorn: `subs` has been always empty anyway
-  -- concat (map freeSubst subs) -- correct?
   fv (A.Subst _ _ after) = fv after
   fv (A.ArrIdx e1 e2 _) = fv e1 <> fv e2
   fv (A.ArrUpd e1 e2 e3 _) = fv e1 <> fv e2 <> fv e3
@@ -132,7 +130,6 @@ instance Substitutable A.Expr A.Expr where
   subst s (A.Lam x e l) =
     let s' = Map.withoutKeys s (Set.singleton x) in
     A.Lam x (subst s' e) l
-  subst _ h@A.Hole {} = h
   subst s (A.Quant qop xs rng t l) =
     let s' = Map.withoutKeys s (Set.fromList xs) in
     A.Quant (subst s' qop) xs (subst s' rng) (subst s' t) l
@@ -181,7 +178,6 @@ instance Substitutable A.Bindings A.Expr where
         let s' = Map.withoutKeys s (Set.singleton x) in
         let e' = subst s' e in
         A.Lam x e' l
-      A.Hole {} -> expr
       (A.Quant qop xs rng t l) ->
         let s' = Map.withoutKeys s (Set.fromList xs) in
         A.Quant (subst s' qop) xs (subst s' rng) (subst s' t) l
@@ -315,7 +311,6 @@ instance BetaReduction A.Expr where
       A.Subst _ _ A.Lam {} -> betaReduction (A.App a' b' l)
       _ -> A.App a' b' l
   betaReduction (A.Lam x e l) = A.Lam x (betaReduction e) l
-  betaReduction e@A.Hole {} = e
   betaReduction (A.Quant op xs rng t l)= A.Quant (betaReduction op) xs (betaReduction rng) (betaReduction t) l
   betaReduction (A.Subst a s1 (A.App (A.Subst b1 s2 b2@(A.Lam x e _)) c l2)) =
     let c' = betaReductionStar c in

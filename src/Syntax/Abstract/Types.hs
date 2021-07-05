@@ -99,7 +99,6 @@ data Expr
   | Chain Expr Op Expr Loc
   | App Expr Expr Loc
   | Lam Name Expr Loc
-  | Hole Loc
   | Quant Expr [Name] Expr Expr Loc
   | Subst Expr Subst Expr
   | ArrIdx Expr Expr Loc
