@@ -1,5 +1,6 @@
-var a, b : Int
+var a, b, c, d : Int
 let P x = a = x
 
-a := b
+c := d
+a, b := b, c
 {P a}

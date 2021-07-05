@@ -6,7 +6,7 @@
 module Syntax.Parser where
 
 import Control.Applicative.Combinators (choice, eitherP, many, optional, sepBy1, (<|>), manyTill, some)
-import Control.Monad (void)
+import Control.Monad (void, when)
 import Control.Monad.Combinators.Expr (Operator (..), makeExprParser)
 import Control.Monad.Trans (lift)
 import Data.Data (Proxy (Proxy))
@@ -84,7 +84,7 @@ pBlockDeclaration' :: ParserF BlockDeclaration
 pBlockDeclaration' =
   BlockDeclaration
   <$> lexDeclStart
-  <*> pIndentBlock pBlockDecl
+  <*> many pBlockDecl
   <*> lexDeclEnd
 
 pConstDecl :: ParserF Declaration
@@ -145,11 +145,10 @@ pBlockDecl :: ParserF BlockDecl
 pBlockDecl = do
   ref <- Lex.indentLevel
   (decl, mDeclProp) <- lift $ Lex.lineFold scn (constDecl ↓)
-  mDeclBody <- (try . optional) (declBodyGuard ref >> pDeclBody) <|> return Nothing
-  return $ BlockDecl decl mDeclProp mDeclBody
+  declBodys <- lift scn *> pIndentBlock (Just ref) pDeclBody
+  return $ BlockDecl decl mDeclProp declBodys
   where
     constDecl = (,) <$> pDecl pName <*> optional (eitherP pDeclProp pExpr')
-    declBodyGuard ref = lift $ Lex.indentGuard scn Ord.EQ ref
 
 
 ------------------------------------------
@@ -157,7 +156,7 @@ pBlockDecl = do
 ------------------------------------------
 
 pStmts :: Parser [Stmt]
-pStmts = (↓) (pIndentBlock (lift pStmt)) scn <|> return []
+pStmts = (↓) (pIndentBlock Nothing (lift pStmt)) scn <|> return []
 -- pStmts = many (pStmt <* scn)
 
 
@@ -228,7 +227,7 @@ pGdCmd =
   GdCmd
   <$> pExpr'
   <*> lexArrow
-  <*> pIndentBlock (lift pStmt)
+  <*> pIndentBlock Nothing (lift pStmt)
 
 pSpecQM :: ParserF Stmt
 pSpecQM = SpecQM . locOf <$> lexQM
@@ -242,11 +241,11 @@ pProofAnchor :: ParserF ProofAnchor
 pProofAnchor = uncurry ProofAnchor <$> lexProofAnchor
 
 pProof :: ParserF Stmt
-pProof = Proof 
+pProof = Proof
           <$> lexProofStart
           <*> pProofAnchorsOrProofEnd
           <*> lexProofEnd
-  where 
+  where
     pProofAnchorsOrProofEnd :: ParserF [ProofAnchor]
     pProofAnchorsOrProofEnd = do
       let anchorOrEnd = choice
@@ -506,25 +505,28 @@ pIndentSepBy p delim = do
             Delim x <$> lift (delim' gdPos) <*> parseP gdPos delimPos
       try g <|> return (Head x)
 
-
 pIndentBlock ::
+  Maybe Pos ->
   ParserF a ->                      -- parser to be indented
   ParserF [a]
-pIndentBlock p = do
+pIndentBlock mRef p = do
   pos <- Lex.indentLevel
-  p0 <- lift p'
+  mp0 <- optional . try . lift $ p'
 
-  isEol <- optional . try $ eol
-  done <- isJust <$> optional eof
-  case (isEol, done) of
-    (Just _, False) -> do
-      ps <- lift $ indentedItems pos scn p'
-      return (p0 : ps)
-    _ -> return [p0]                          -- eof or no newline => only one indented element
+  case mp0 of
+    Just p0 -> do
+      isEol <- optional . try $ eol
+      done <- isJust <$> optional eof
+      case (isEol, done) of
+        (Just _, False) -> do
+          guard pos mRef
+          ps <- lift $ indentedItems pos scn p'
+          return (p0 : ps)
+        _ -> guard pos mRef >> return [p0]                          -- eof or no newline => only one indented element
+    Nothing -> return []
   where
     p' = (↓) p sc                             -- make sure p doesn't parse newline
-    -- posMoveLeft pos i = mkPos (unPos pos - i) -- safe, since pos should be greater than ref,
-                                              -- by the definition of ParserF
+    guard pos = maybe (pure ()) (\ref -> when (ref /= pos) (Lex.incorrectIndent Ord.EQ ref pos))
 
 -- copied from Text.Megaparsec.Char.Lexer
 indentedItems ::
@@ -543,8 +545,6 @@ indentedItems lvl sc' p = go
         then return []
         else
           if
-              | pos < lvl -> return []
-              | pos == lvl -> (:) <$> p <*> go
-              | otherwise -> Lex.incorrectIndent Ord.EQ lvl pos
-
-              --   | pos <= ref -> return []
+          | pos < lvl -> return []
+          | pos == lvl -> try ((:) <$> p <*> go) <|> return []
+          | otherwise -> Lex.incorrectIndent Ord.EQ lvl pos

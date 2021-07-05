@@ -100,7 +100,8 @@ runGotoM (Program decls _ _ _ _) pos f = runReaderT (runReaderT f pos)
   splitDecl :: Declaration -> [(Name, Declaration)]
   splitDecl decl@(ConstDecl names _ _ _) = [ (name, decl) | name <- names ]
   splitDecl decl@(VarDecl   names _ _ _) = [ (name, decl) | name <- names ]
-  splitDecl decl@(LetDecl   name  _ _ _) = [(name, decl)]
+  splitDecl decl@(LetDecl   (DeclBody name  _ _) _) = [(name, decl)]
+  splitDecl decl@(BlockDecl names _ _ _ _) = [ (name, decl) | name <- names ]
 
   -- convert a declaration (and its name) to a LocationLink (that is waiting for the caller's Range)
   declToLocationLink
@@ -127,12 +128,20 @@ instance StabM GotoM Declaration LocationLink where
   stabM = \case
     ConstDecl _ _    c _ -> stabLocated c
     VarDecl   _ _    c _ -> stabLocated c
-    LetDecl   _ args c _ -> do
+    LetDecl   (DeclBody _ args c) _ -> do
       -- creates a local scope for arguments 
       let argsScope = Map.fromList $ mapMaybe nameToLocationLink args
       -- temporarily preppend this local scope to the scope list 
 
       localScope argsScope $ stabM c
+    BlockDecl _ _ c ds _ -> 
+      (<>) <$> stabLocated c <*> stabLocated ds
+
+instance StabM GotoM DeclBody LocationLink where
+  stabM (DeclBody _ args c) = do
+      let argsScope = Map.fromList $ mapMaybe nameToLocationLink args
+      localScope argsScope $ stabM c
+    
 
 instance StabM GotoM Stmt LocationLink where
   stabM = \case

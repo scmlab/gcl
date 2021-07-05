@@ -53,8 +53,8 @@ instance ToAbstract Declaration A.Declaration where
       prop' <- toAbstract prop
       return $ A.VarDecl name body (Just prop') (locOf decl)
     LetDecl _ decl -> do
-      (name, args, body) <- toAbstract decl
-      return $ A.LetDecl name args body (locOf decl)
+      decl' <- toAbstract decl
+      return $ A.LetDecl decl' (locOf decl)
 
 instance ToAbstract BlockDeclaration [A.Declaration] where
   toAbstract (BlockDeclaration _ decls _) = concat <$> mapM toAbstract decls
@@ -94,29 +94,18 @@ instance ToAbstract DeclProp' A.Expr where
   toAbstract (Left prop) = toAbstract prop
   toAbstract (Right prop) = toAbstract prop
 
-instance ToAbstract DeclBody (Name, [Name], A.Expr) where
+instance ToAbstract DeclBody A.DeclBody where
   toAbstract (DeclBody n args _ b) = do
-    b' <- toAbstract b
-    return (n, args, b')
+    A.DeclBody n args <$> toAbstract b
 
 -- One BlockDecl can be parse into a ConstDecl or a ConstDecl and a LetDecl
 instance ToAbstract BlockDecl [A.Declaration] where
-  toAbstract declaration@(BlockDecl decl mDeclProp mDeclBody) = do
+  toAbstract declaration@(BlockDecl decl mDeclProp declBodys) = do
     (names, type') <- toAbstract decl
-    case (mDeclProp, mDeclBody) of
-      (Nothing, Nothing) -> do
-        return [A.ConstDecl names type' Nothing (locOf declaration)]
-      (Nothing, Just declBody) -> do
-        (declBodyName, declBodyArgs, declBody') <- toAbstract declBody
-        return [A.ConstDecl names type' Nothing (locOf declaration), A.LetDecl declBodyName declBodyArgs declBody' (locOf declBody)]
-      (Just declProp, Nothing) -> do
-        prop <- toAbstract declProp
-        return [A.ConstDecl names type' (Just prop) (locOf declaration)]
-      (Just declProp, Just declBody) -> do
-        prop <- toAbstract declProp
-        (declBodyName, declBodyArgs, declBody') <- toAbstract declBody
-        return [A.ConstDecl names type' (Just prop) (locOf declaration), A.LetDecl declBodyName declBodyArgs declBody' (locOf declBody)]
-
+    mDeclProp' <- mapM toAbstract mDeclProp
+    declBodys' <- mapM toAbstract declBodys
+    return [A.BlockDecl names type' mDeclProp' declBodys' (locOf declaration)]
+    
 instance ToAbstract Declaration' [A.Declaration] where
   toAbstract (Left d) = (: []) <$> toAbstract d
   toAbstract (Right bd) = toAbstract bd
