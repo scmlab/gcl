@@ -1,14 +1,14 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Test.Parser where
-import Test.Util (goldenFileTest, parseTest, removeTrailingWhitespace)
+import Test.Util (parseTest, removeTrailingWhitespace, runGoldenTest)
 import Test.Tasty (TestTree, testGroup)
 import Data.Text.Prettyprint.Doc (Pretty)
 import Syntax.Parser (Parser, runParse, pProgram, pDeclaration, pType, pExpr, pBlockDeclaration, pStmt)
 import Syntax.Parser.Lexer ( scn )
 import Data.Text (Text)
 import Test.Tasty.HUnit (Assertion, testCase, (@?=))
-import Pretty (toText)
+import Pretty (toText, toByteString)
 import qualified Data.Text as Text
 
 
@@ -231,26 +231,24 @@ golden :: TestTree
 golden =
   testGroup
     "Program"
-    [ parserGolden "empty" "./test/source/" "empty.gcl",
-      parserGolden "2" "./test/source/" "2.gcl",
-      parserGolden "comment" "./test/source/" "comment.gcl",
-      parserGolden "issue 1" "./test/source/" "issue1.gcl",
-      -- parserGolden "issue 14" "./test/source/" "issue14.gcl",
-      -- parserGolden "no-decl" "./test/source/" "no-decl.gcl",
-      parserGolden "no-stmt" "./test/source/" "no-stmt.gcl",
-      parserGolden "assign" "./test/source/" "assign.gcl",
-      parserGolden "quant 1" "./test/source/" "quant1.gcl",
-      parserGolden "spec" "./test/source/" "spec.gcl",
-      parserGolden "gcd" "./test/source/examples/" "gcd.gcl",
-      parserGolden "proof" "./test/source/examples/" "proof.gcl"
+    [ parserGolden "" "empty" "empty.gcl",
+      parserGolden "" "2" "2.gcl",
+      parserGolden "" "comment" "comment.gcl",
+      parserGolden "" "issue 1" "issue1.gcl",
+      parserGolden "" "issue 14" "issue14.gcl",
+      parserGolden "" "no-decl" "no-decl.gcl",
+      parserGolden "" "no-stmt" "no-stmt.gcl",
+      parserGolden "" "assign" "assign.gcl",
+      parserGolden "" "quant 1" "quant1.gcl",
+      parserGolden "" "spec" "spec.gcl",
+      parserGolden "examples/" "gcd" "gcd.gcl",
+      parserGolden "examples/" "proof" "proof.gcl"
     ]
 
 parserGolden :: String -> FilePath -> FilePath -> TestTree
-parserGolden name filePath fileName =
-  goldenFileTest ".ast.golden" name filePath fileName runFile
-
-runFile :: (FilePath, Text) -> Text
-runFile (filePath, source) = toText $ runParse pProgram filePath source
+parserGolden dirName = 
+  runGoldenTest ("./test/source/" <> dirName) ("./test/golden/" <> dirName) ".ast" $ \sourcePath source -> do 
+    return $ toByteString $ runParse pProgram sourcePath source
 
 parserShow :: Show a => Parser a -> Text -> Text -> Assertion
 parserShow parser actual expected = (Text.pack . show . parseTest parser) actual @?= expected

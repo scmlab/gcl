@@ -2,7 +2,7 @@ con A, B : Int { A > 0 }
 var x, y, z : Int
 
 { z + x * y = A * B, bnd: y }
-do y /= 1 -> 
+do y /= 1 ->
     [!
     !]
 od

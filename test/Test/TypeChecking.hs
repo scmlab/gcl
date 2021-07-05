@@ -6,7 +6,7 @@ import Data.Loc (Loc(..))
 import qualified Data.Map as Map
 import Data.Text (Text)
 import Test.Tasty (TestTree, testGroup)
-import Test.Util (goldenFileTest, parseTest)
+import Test.Util (parseTest, runGoldenTest)
 import Test.Tasty.HUnit (testCase, (@?=), Assertion)
 import Control.Monad.Except (foldM, runExcept)
 import GCL.Type
@@ -22,7 +22,7 @@ import Syntax.Abstract
       Endpoint(..) )
 import Syntax.Common ( Name(Name), Op )
 import Syntax.Parser (runParse, pExpr, pProgram, Parser, pStmt, pType, pDeclaration, pBlockDeclaration)
-import Pretty ( Pretty(pretty), toText )
+import Pretty ( Pretty(pretty), toText, toByteString )
 import Error (Error(..))
 import Data.Map (Map)
 import Control.Monad.State (evalStateT)
@@ -273,15 +273,24 @@ fileTests =
   testGroup
     "Check file"
     [ 
-      typeCheckFile "2" "./test/source/" "2.gcl",
-      typeCheckFile "quant1" "./test/source/" "quant1.gcl"
+      typeCheckFile "" "2" "2.gcl",
+      typeCheckFile "" "quant1" "quant1.gcl"
       -- typeCheckFile "mss" "./test/source/" "mss.gcl",
       -- typeCheckFile "posnegpairs" "./test/source/examples/" "posnegpairs.gcl"
     ]
 
 typeCheckFile :: String -> FilePath -> FilePath -> TestTree
-typeCheckFile name filePath fileName =
-  goldenFileTest ".tc.golden" name filePath fileName fileCheck
+typeCheckFile dirName =
+  runGoldenTest ("./test/source/" <> dirName) ("./test/golden/" <> dirName) ".tc" $ \filepath source -> do 
+
+    let result = case runParse pProgram filepath source of
+          Left errors -> Left (map SyntacticError errors)
+          Right ast -> case runExcept (toAbstract ast) of
+            Left _ -> Left [Others "Should dig hole"]
+            Right prog -> case runTM (checkProg prog) of 
+              Left errors -> Left [TypeError errors]
+              Right val -> Right val
+    return $ toByteString result
 
 fileCheck :: (FilePath, Text) -> Text
 fileCheck (filepath, source) = toText result

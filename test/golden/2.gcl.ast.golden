@@ -1,0 +1,11 @@
+con A, B : Int
+
+var x, y : Int
+
+{ 0 = 0 }
+
+
+if 0 = 1 -> skip
+ | 0 = 2 -> abort
+fi
+{ 0 = 3 }
