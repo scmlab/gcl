@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleContexts #-}
-module Test.Type where
+module Test.TypeChecking where
 
 import Data.Loc (Loc(..))
 import qualified Data.Map as Map

@@ -1,6 +1,6 @@
 ### Result
 
-[ Assertion at ./test/Test/WP/assets/issue2-2.gcl [33-41] 3:1-9 #3028f61fb2d3e390
+[ Assertion at ./test/source/WP/issue2-1.gcl [33-46] 3:1-14 #3028f61fb2d3e390
 `True
 ⇒
 z   =   A   *   B
@@ -10,7 +10,6 @@ z   =   A   *   B
 
 con A, B : Int
 var x, y, z : Int
-{ True }
 { z = A * B }
 
 ### Trace

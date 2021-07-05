@@ -72,10 +72,10 @@ parseTest :: Parser a -> Text -> Either [SyntacticError] a
 parseTest parser = runParse parser "<test>"
 
 
-runGoldenTest :: FilePath -> FilePath -> (FilePath -> Text -> IO ByteString) -> String -> FilePath -> TestTree
-runGoldenTest dir ext test name path = do
-  let goldenPath = "./test/Test/" <> dir <> path <> ext <> ".golden"
-  let sourcePath = "./test/Test/" <> dir <> path
+runGoldenTest :: FilePath -> FilePath -> FilePath -> (FilePath -> Text -> IO ByteString) -> String -> FilePath -> TestTree
+runGoldenTest sourceDir goldenDir ext test name path = do
+  let goldenPath = goldenDir <> path <> ext <> ".golden"
+  let sourcePath = sourceDir <> path
   Golden.goldenVsStringDiff name (\ref new -> ["diff", "-u", ref, new]) goldenPath $ do
     source <- Text.decodeUtf8 . BSL.toStrict <$> BSL.readFile sourcePath
     test sourcePath source

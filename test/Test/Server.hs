@@ -29,7 +29,7 @@ instantiateSpec =
     ]
   where
     run :: String -> FilePath -> TestTree
-    run = runGoldenTest "Server/assets/" "" $ \sourcePath source -> do
+    run = runGoldenTest "./test/source/Server/" "./test/golden/Server/" "" $ \sourcePath source -> do
       return $ serializeTestResult $ runTest sourcePath source $ do
             program <- parseProgram source
             Right <$> sweep program
@@ -43,7 +43,7 @@ specPayloadWithoutIndentationTests =
     ]
   where
     run :: String -> FilePath -> TestTree
-    run = runGoldenTest "Server/assets/" "" $ \sourcePath source -> do
+    run = runGoldenTest "./test/source/Server/" "./test/golden/Server/" "" $ \sourcePath source -> do
       return $ serializeTestResult $ runTest sourcePath source $ do
             program <- parseProgram source
             (_, specs, _, _) <- sweep program
@@ -63,7 +63,7 @@ refineSpecsTest =
     ]
   where
     run :: String -> FilePath -> TestTree
-    run = runGoldenTest "Server/assets/" "" $ \sourcePath source -> do
+    run = runGoldenTest "./test/source/Server/" "./test/golden/Server/" "" $ \sourcePath source -> do
       return $ serializeTestResult $ runTest sourcePath source $ do
             program <- parseProgram source
             (_, specs, _, _) <- sweep program

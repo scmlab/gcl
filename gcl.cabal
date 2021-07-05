@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 32ebd2725fe960aecad481484983f433fc40c5060e31c6ae2f94a018fab3d149
+-- hash: 1f19de8fff42aa42820a74bc1cce1ee7467a40d7daf7462784b936d0b9f34079
 
 name:           gcl
 version:        0.1.0.0
@@ -155,7 +155,7 @@ test-suite gcl-test
       Test.Server
       Test.SrcLoc
       Test.Substitution
-      Test.Type
+      Test.TypeChecking
       Test.Util
       Test.WP
       Data.Loc.Range

@@ -20,7 +20,7 @@ tests =
 --------------------------------------------------------------------------------
 
 run :: String -> FilePath -> TestTree
-run = runGoldenTest "WP/assets/" "" $ \sourcePath source -> do
+run = runGoldenTest "./test/source/WP/" "./test/golden/WP/" "" $ \sourcePath source -> do
   return $
     serializeTestResult $
       runTest sourcePath source $ do

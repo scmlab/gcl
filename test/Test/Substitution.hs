@@ -35,7 +35,7 @@ letBindings = testGroup
   [run "let binding" "let-1.gcl", run "let binding with assignment" "let-2.gcl"]
  where
   run :: String -> FilePath -> TestTree
-  run = runGoldenTest "Substitution/assets/" "" $ \sourcePath source -> do
+  run = runGoldenTest "./test/source/Substitution/" "./test/golden/Substitution/" "" $ \sourcePath source -> do
     return $ serializeTestResultValueOnly $ runTest sourcePath source $ do
       program        <- parseProgram source
       (pos, _, _, _) <- sweep program

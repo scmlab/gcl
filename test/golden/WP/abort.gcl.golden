@@ -1,6 +1,6 @@
 ### Result
 
-[ Abort at ./test/Test/WP/assets/abort.gcl [9-14] 2:1-6 #4ea8b990688e819d
+[ Abort at ./test/source/WP/abort.gcl [9-14] 2:1-6 #4ea8b990688e819d
 `True
 ⇒
 False

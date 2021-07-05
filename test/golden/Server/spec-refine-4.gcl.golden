@@ -1,0 +1,25 @@
+### Result
+
+[Display, UpdateSpecs]
+
+### Source
+
+if True ->  [!
+            
+            !]
+fi
+
+{ True }
+
+### Trace
+
+TracePutLastSelection ./test/source/Server/spec-refine-4.gcl [12-43] 1:13-3:15
+TraceGetSource
+TraceGetSource
+TraceEditText ./test/source/Server/spec-refine-4.gcl [12-43] 1:13-3:15 "?"
+TraceLog " ### DigHole ./test/source/Server/spec-refine-4.gcl [12-13] 1:13-14"
+TraceEditText ./test/source/Server/spec-refine-4.gcl [12-13] 1:13-14 "[!\n            \n            !]"
+TraceGetLastSelection
+TraceBumpResponseVersion
+TraceLog " ### Diagnostic 1"
+TraceSendDiagnostics [Diagnostic {_range = Range {_start = Position {_line = 0, _character = 0}, _end = Position {_line = 0, _character = 2}}, _severity = Just DsWarning, _code = Nothing, _source = Nothing, _message = "Conditional", _tags = Nothing, _relatedInformation = Just (List [DiagnosticRelatedInformation {_location = Location {_uri = Uri {getUri = "./test/source/Server/spec-refine-4.gcl"}, _range = Range {_start = Position {_line = 0, _character = 0}, _end = Position {_line = 0, _character = 2}}}, _message = ""}])}]

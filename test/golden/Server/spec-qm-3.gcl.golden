@@ -1,0 +1,25 @@
+### Result
+
+([ Conditional at ./test/source/Server/spec-qm-3.gcl [0-33] 1:1-5:3 #68beda4372bea491
+ `True
+ ⇒
+ True
+ ` ], [ Precondition at ./test/source/Server/spec-qm-3.gcl [16-30] 2:5-4:7
+      `True ∧ True`
+      Postcondition
+      `True` ], [], [])
+
+### Source
+
+if True -> 
+    [!
+    
+    !]
+fi
+
+{ True }
+
+### Trace
+
+TraceLog " ### DigHole ./test/source/Server/spec-qm-3.gcl [16-17] 2:5-6"
+TraceEditText ./test/source/Server/spec-qm-3.gcl [16-17] 2:5-6 "[!\n    \n    !]"

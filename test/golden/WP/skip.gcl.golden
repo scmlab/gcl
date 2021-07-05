@@ -1,6 +1,6 @@
 ### Result
 
-[ Skip at ./test/Test/WP/assets/skip.gcl [9-13] 2:1-5 #7900e3bcf2b9d3cb
+[ Skip at ./test/source/WP/skip.gcl [9-13] 2:1-5 #7900e3bcf2b9d3cb
 `True
 ⇒
 0   =   0
