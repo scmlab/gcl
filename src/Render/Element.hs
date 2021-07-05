@@ -13,6 +13,7 @@ module Render.Element
   , textE
   , linkE
   , substE
+  , clickE
   , parensE
   , iconE
   , horzE
@@ -140,6 +141,8 @@ isEmpty inlines = all elemIsEmpty (Seq.viewl (unInlines inlines))
   elemIsEmpty (Link _ xs _) = all elemIsEmpty $ unInlines xs
   elemIsEmpty (Sbst xs env ys _) =
     all elemIsEmpty $ unInlines xs <> unInlines env <> unInlines ys
+  elemIsEmpty (Clck xs ys) =
+    all elemIsEmpty $ unInlines xs <> unInlines ys
   elemIsEmpty (Horz xs) = all isEmpty xs
   elemIsEmpty (Vert xs) = all isEmpty xs
   elemIsEmpty (Parn _ ) = False
@@ -164,6 +167,9 @@ linkE range xs = Inlines $ Seq.singleton $ Link range xs []
 -- | Text that changes after clicked
 substE :: Inlines -> Inlines -> Inlines -> Inlines
 substE before env after = Inlines $ Seq.singleton $ Sbst before env after []
+
+clickE :: Inlines -> Inlines -> Inlines
+clickE before after = Inlines $ Seq.singleton $ Clck before after
 
 -- | Note: when there's only 1 Horz inside a Parn, convert it to PrHz
 parensE :: Inlines -> Inlines
@@ -200,6 +206,8 @@ data Inline
   | Link Range Inlines ClassNames
   | -- | For Subst
     Sbst Inlines Inlines Inlines ClassNames
+  | -- | For Click
+    Clck Inlines Inlines
   | -- | Horizontal grouping, wrap when there's no space
     Horz [Inlines]
   | -- | Vertical grouping, each children would end with a newline
@@ -217,6 +225,7 @@ instance Show Inline where
   show (Text s _       ) = Text.unpack s
   show (Link _ xs _    ) = show xs
   show (Sbst xs env _ _) = show xs <> show env
+  show (Clck xs _)       = show xs
   show (Horz xs        ) = unwords (map show $ toList xs)
   show (Vert xs        ) = unlines (map show $ toList xs)
   show (Parn x         ) = "(" <> show x <> ")"

@@ -85,6 +85,7 @@ instance Free A.Expr where
   fv (A.Quant op xs range term _) =
     (fv op <> fv range <> fv term) \\ Set.fromList xs
   fv (A.Subst _ _ after) = fv after
+  fv (A.Click _ after) = fv after
   fv (A.ArrIdx e1 e2 _) = fv e1 <> fv e2
   fv (A.ArrUpd e1 e2 e3 _) = fv e1 <> fv e2 <> fv e3
 
@@ -134,6 +135,7 @@ instance Substitutable A.Expr A.Expr where
     let s' = Map.withoutKeys s (Set.fromList xs) in
     A.Quant (subst s' qop) xs (subst s' rng) (subst s' t) l
   subst s1 (A.Subst before s2 after) = A.Subst (subst s1 before) s2 (subst s1 after)
+  subst s1 (A.Click before after) = A.Click (subst s1 before) (subst s1 after)
   subst s (A.ArrIdx e1 e2 l) =
     A.ArrIdx (subst s e1) (subst s e2) l
   subst s (A.ArrUpd e1 e2 e3 l) =
@@ -198,6 +200,8 @@ instance Substitutable A.Bindings A.Expr where
         | b == c -> expr
         | isAllAssignBindings s -> A.Subst expr s c
         | otherwise -> A.Subst a s1 c
+      -- TODO: implement this 
+      A.Click _ _ -> error "subst `A.Click a b` not implemented yet"
       A.ArrIdx e1 e2 l ->
         A.ArrIdx (subst s e1) (subst s e2) l
       A.ArrUpd e1 e2 e3 l ->
@@ -319,6 +323,7 @@ instance BetaReduction A.Expr where
     A.Subst 
       (A.Subst a s1 (A.App (A.Subst b1 s2 b2) c l2)) s d
   betaReduction (A.Subst a s b) = A.Subst a s (betaReduction b)
+  betaReduction (A.Click a b) = A.Click a b
   betaReduction (A.ArrIdx e1 e2 l) = A.ArrIdx (betaReduction e1) (betaReduction e2) l
   betaReduction (A.ArrUpd e1 e2 e3 l) = A.ArrUpd (betaReduction e1) (betaReduction e2) (betaReduction e3) l
 

@@ -9,6 +9,7 @@ import qualified Data.Map as Map
 
 type Expand = ReaderT (Env Expr) (State FreshState)
 
+-- replace "abstract names" with concrete definitions
 expand :: Expr -> Expand Expr
 expand (Paren expr l) = Paren <$> expand expr <*> pure l
 expand lit@(Lit _ _) = return lit
@@ -41,6 +42,7 @@ expand (Quant op xs rng t l) = do
 expand (Subst e s _) = do
   e' <- expand e
   return $ subst s e'
+expand (Click a b) = return $ Click a b 
 expand (ArrIdx e1 e2 l) = do
   e1' <- expand e1
   e2' <- expand e2

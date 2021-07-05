@@ -101,6 +101,7 @@ data Expr
   | Lam Name Expr Loc
   | Quant Expr [Name] Expr Expr Loc
   | Subst Expr Subst Expr
+  | Click Expr Expr
   | ArrIdx Expr Expr Loc
   | ArrUpd Expr Expr Expr Loc
   deriving (Eq, Show, Generic)
