@@ -511,7 +511,7 @@ pIndentBlock ::
   ParserF [a]
 pIndentBlock mRef p = do
   pos <- Lex.indentLevel
-  mp0 <- optional $ lift p'
+  mp0 <- optional . try . lift $ p'
 
   case mp0 of
     Just p0 -> do
