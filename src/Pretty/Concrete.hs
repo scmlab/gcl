@@ -193,10 +193,10 @@ instance Pretty BlockDecl where
   pretty = toDoc . prettyWithLoc
 
 instance PrettyWithLoc BlockDecl where
-  prettyWithLoc (BlockDecl decl mDeclProp mDeclBody) =
+  prettyWithLoc (BlockDecl decl mDeclProp declBodys) =
     prettyWithLoc decl
     <> maybe Empty (either prettyWithLoc prettyWithLoc) mDeclProp
-    <> maybe Empty prettyWithLoc mDeclBody
+    <> mconcat (map prettyWithLoc declBodys)
 
 instance Pretty BlockDeclaration where
   pretty = toDoc . prettyWithLoc

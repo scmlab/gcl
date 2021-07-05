@@ -83,7 +83,7 @@ type DeclProp' = Either DeclProp Expr
 
 data DeclBody = DeclBody Name [Name] (Token "=") Expr deriving (Eq, Show)
 
-data BlockDecl = BlockDecl Decl (Maybe DeclProp') (Maybe DeclBody) deriving (Eq, Show)
+data BlockDecl = BlockDecl Decl (Maybe DeclProp') [DeclBody] deriving (Eq, Show)
 
 type Declaration' = Either Declaration BlockDeclaration
 
