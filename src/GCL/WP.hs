@@ -28,6 +28,7 @@ import Pretty (toString)
 import qualified GCL.Substitute as Substitute
 import Syntax.Abstract (Bindings(..))
 import Syntax.Abstract.Util (bindingsToExpr)
+import Debug.Trace
 
 type TM = Except StructError
 
@@ -51,11 +52,11 @@ sweep (A.Program decls _ _ stmts _) = do
   let proofAnchors = stmts >>= \case {A.Proof anchors _ -> anchors ; _ -> []}
   -- make a table of (#hash, range) from Proof Anchors 
   let table = Map.fromList $ map (\(A.ProofAnchor hash range) -> (hash, range)) proofAnchors
-  let updatePO po = case Map.lookup (poAnchorHash po) table of 
-        Nothing -> po 
+  let updatePO po = case Map.lookup (poAnchorHash po) table of
+        Nothing -> po
         Just range -> po { poAnchorLoc = Just range }
 
-  let pos' = map updatePO pos 
+  let pos' = map updatePO pos
 
   return (pos', specs, warnings)
   where
@@ -266,13 +267,20 @@ wp :: Bool -> A.Stmt -> Pred -> WP Pred
 wp _ (A.Abort _) _ = return (Constant A.false)
 wp _ (A.Skip _) post = return post
 wp _ (A.Assign xs es _) post = do
+  -- let sub = Map.fromList . zip xs . map A.AssignBinding $ es
+  -- alphaSubst sub post
 
   env <- ask
-  let letBindings = Map.mapKeys nameToText $ fmap toBinding env 
-  let assigmentBindings = Map.mapKeys nameToText $ Map.fromList $ zip xs (map (Substitute.OthersBinding . A.Value) es) 
+
+
+  let letBindings = Map.mapKeys nameToText $ fmap toBinding env
+  -- traceShow letBindings (return ())
+  let assigmentBindings = Map.mapKeys nameToText $ Map.fromList $ zip xs (map (Substitute.OthersBinding . A.Value) es)
+  -- traceShow assigmentBindings (return ())
+  -- traceShow post (return ())
   return $ Substitute.reducePred [assigmentBindings, letBindings] post
-  where 
-    toBinding Nothing = Substitute.NoBinding 
+  where
+    toBinding Nothing = Substitute.NoBinding
     toBinding (Just (LetBinding x)) = Substitute.UserDefinedBinding (A.Value x)
     toBinding (Just others) = Substitute.OthersBinding (A.Value $ bindingsToExpr others)
 

@@ -9,6 +9,7 @@ import           Syntax.Common                  ( Name
                                                 )
 import GCL.Predicate (Pred (..))
 import Data.Loc (locOf)
+import Debug.Trace
 
 ------------------------------------------------------------------
 
@@ -37,7 +38,7 @@ reducePred scopes x = case x of
 
 extract :: Reason -> Expr
 extract (ExpandOthers      _ x) = extract x
-extract (ExpandUserDefined y x) = Expand x y (extract x)
+extract (ExpandUserDefined before after) = Expand after before (extract after)
 extract (ExpandStuck name)      = Const name (locOf name)
 extract (Reduce            _ x) = extract x
 extract (ReduceSub         _ x) = x
@@ -63,14 +64,14 @@ reduceValue scopes expr = case expr of
     Var name _ -> case lookupScopes scopes name of
         Nothing -> error $ "panic: " ++ show (nameToText name) ++ " is not in scope"
         Just (UserDefinedBinding binding) ->
-            ExpandUserDefined name (reduce scopes binding)
+            ExpandUserDefined expr (reduce scopes binding)
         Just (OthersBinding binding) -> ExpandOthers name (reduce scopes binding)
         Just NoBinding -> ExpandStuck name
 
     Const name _ -> case lookupScopes scopes name of
         Nothing -> error $ "panic: " ++ show (nameToText name) ++ " is not in scope"
         Just (UserDefinedBinding binding) ->
-            ExpandUserDefined name (reduce scopes binding)
+            ExpandUserDefined expr (reduce scopes binding)
         Just (OthersBinding binding) -> ExpandOthers name (reduce scopes binding)
         Just NoBinding -> ExpandStuck name
 
@@ -84,12 +85,50 @@ reduceValue scopes expr = case expr of
         let (aReason, a') = reduce' scopes a
             (bReason, b') = reduce' scopes b
         in case a' of
-            -- "App a' b'" is a redex 
-            Lam n x _ ->
-                -- reduce "x" all the way down 
-                reduceValue (Map.singleton (nameToText n) (OthersBinding bReason) : scopes) x
-            -- "App a' b'" is not a redex 
-            _ -> ReduceSub [aReason, bReason] $ App a' b' l
+            -- ExpandUserDefined name _ -> traceShow "ExpandUserDefined" $ do
+            --     case a' of 
+            --         -- "App a' b'" is a redex 
+            --         Lam n x _ ->
+            --             -- reduce "x" all the way down 
+            --             traceShow "USER DEFINED LAM" $ 
+            --                 ExpandUserDefined name $ reduceValue (Map.singleton (nameToText n) (OthersBinding bReason) : scopes) x
+            --         -- "App a' b'" is not a redex 
+            --         _ -> traceShow ("otherwise", a') $ ReduceSub [aReason, bReason] $ App a' b' l
+
+            --     -- ExpandUserDefined name x
+
+            -- traceShow "OTHERWISE" $ case a' of 
+
+
+                -- "App a' b'" is a redex 
+                Expand reasons before after ->
+
+                    case after of 
+                        -- "App after b'" is a redex 
+                        Lam n x _ ->
+                            let before = App a' b' l 
+                                after = reduceValue (Map.singleton (nameToText n) (OthersBinding bReason) : scopes) x
+                            in ExpandUserDefined before after
+                            -- reduce "x" all the way down 
+                            
+                        -- "App after b'" is not a redex 
+                        _ -> ReduceSub [aReason, bReason] $ App a' b' l
+                    -- traceShow "LAM" $ reduceValue (Map.singleton (nameToText n) (OthersBinding bReason) : scopes) x
+
+                -- "App a' b'" is a redex 
+                Lam n x _ ->
+                    -- reduce "x" all the way down 
+                    traceShow "LAM" $ reduceValue (Map.singleton (nameToText n) (OthersBinding bReason) : scopes) x
+                -- "App a' b'" is not a redex 
+                _ -> ReduceSub [aReason, bReason] $ App a' b' l
+
+-- extract (ExpandOthers      _ x) = extract x
+-- extract (ExpandUserDefined y x) = Expand x y (extract x)
+-- extract (ExpandStuck name)      = Const name (locOf name)
+-- extract (Reduce            _ x) = extract x
+-- extract (ReduceSub         _ x) = x
+-- extract (Value x              ) = x
+
     -- App (Lam n x _) b l ->
     --     let (bReason, b') = reduce' scopes b
     --         (aReason, a') =
@@ -115,6 +154,7 @@ data Binding
     = UserDefinedBinding Reason 
     | NoBinding
     | OthersBinding Reason
+    deriving (Show)
 
 ------------------------------------------------------------------
 
