@@ -124,7 +124,7 @@ data Reason
     = ExpandContinue Name Reason
     | ExpandPause [Reason] Expr Expr
     | ExpandStuck Name
-    | Congruence [Reason] Expr Expr
+    | Congruence [Reason] Expr Reason
     | Value Expr
     deriving (Eq, Show, Generic)
 

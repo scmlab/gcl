@@ -272,12 +272,8 @@ wp _ (A.Assign xs es _) post = do
 
   env <- ask
 
-
   let letBindings = Map.mapKeys nameToText $ fmap toBinding env
-  -- traceShow letBindings (return ())
   let assigmentBindings = Map.mapKeys nameToText $ Map.fromList $ zip xs (map (Substitute.AssignmentBinding . A.Value) es)
-  -- traceShow assigmentBindings (return ())
-  -- traceShow post (return ())
   return $ Substitute.reducePred [assigmentBindings, letBindings] post
   where
     toBinding Nothing = Substitute.NoBinding
@@ -424,23 +420,27 @@ sp b (pre, bnd) (A.Do gcmds l) = do
 sp _ (pre, _) _ = return pre
 
 --
-tellSubstPO :: (Subs A.Bindings, Pred) -> (Subs A.Bindings, Pred) -> Origin -> WP ()
-tellSubstPO (s1, p) (s2, q) l = unless (toExpr p == toExpr q) $ do
-  p' <- betaReduction <$> alphaSubst s1 p
-  q' <- betaReduction <$> alphaSubst s2 q
-  (i, j, k) <- get
-  put (succ i, j, k)
-  let anchorHash = Text.pack $ showHex (abs (Hashable.hash (toString (p', q')))) ""
-  tell ([PO p' q' anchorHash Nothing l], [], [])
+
+toBinding :: Maybe Bindings -> Substitute.Binding
+toBinding Nothing = Substitute.NoBinding
+toBinding (Just (LetBinding x)) = Substitute.UserDefinedBinding x
+toBinding (Just others) = Substitute.AssignmentBinding (A.Value $ bindingsToExpr others)
 
 tellPO :: Pred -> Pred -> Origin -> WP ()
-tellPO p q = tellSubstPO (emptySubs, p) (emptySubs, q)
+tellPO p q origin = unless (toExpr p == toExpr q) $ do
+      
+    env <- ask
+    let letBindings = Map.mapKeys nameToText $ fmap toBinding env
+    let p' = Substitute.reducePred [letBindings] p
+    let q' = Substitute.reducePred [letBindings] q
 
-  -- SCM: swapping the order of arguments, which
-  --      can be convenient in ceratin occassions.
+    -- p' <- betaReduction <$> alphaSubst s1 p
+    -- q' <- betaReduction <$> alphaSubst s2 q
+    (i, j, k) <- get
+    put (succ i, j, k)
+    let anchorHash = Text.pack $ showHex (abs (Hashable.hash (toString (p', q')))) ""
+    tell ([PO p' q' anchorHash Nothing origin], [], [])
 
-tellSubstPO' :: Origin -> (Subs A.Bindings, Pred) -> (Subs A.Bindings, Pred) -> WP ()
-tellSubstPO' l p q = tellSubstPO p q l
 
 tellPO' :: Origin -> Pred -> Pred -> WP ()
 tellPO' l p q = tellPO p q l

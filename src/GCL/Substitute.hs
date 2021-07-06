@@ -43,7 +43,7 @@ extract (ExpandContinue _ x              ) = extract x
 extract (ExpandPause reasons before after) = Expand reasons before after
 extract (ExpandStuck name                ) = Const name (locOf name)
 -- extract (Reduce _ x                      ) = extract x
-extract (Congruence _ _ after            ) = after
+extract (Congruence _ _ after            ) = extract after
 extract (Value x                         ) = x
 
 reduce' :: Scopes -> Expr -> (Reason, Expr)
@@ -61,7 +61,7 @@ reduceValue scopes expr = case expr of
 
     Paren e l ->
         let (eReason, e') = reduce' scopes e
-        in  Congruence [eReason] expr $ Paren e' l
+        in  Congruence [eReason] expr (Value $ Paren e' l)
 
     Var name _ -> case lookupScopes scopes name of
         Nothing ->
@@ -82,7 +82,7 @@ reduceValue scopes expr = case expr of
     Chain a op b l ->
         let (aReason, a') = reduce' scopes a
             (bReason, b') = reduce' scopes b
-        in  Congruence [aReason, bReason] expr $ Chain a' op b' l
+        in  Congruence [aReason, bReason] expr $ Value $ Chain a' op b' l
 
     App a b l ->
         let
@@ -99,16 +99,16 @@ reduceValue scopes expr = case expr of
                             : scopes
                             )
                             x
-                    in  ExpandPause [reason] after (extract reason)
+                    in  Congruence [aReason, bReason] expr $ ExpandPause [reason] after (extract reason)
 
                 -- "App a' b'" is a redex 
-                Lam n x _ -> reduceValue
+                Lam n x _ -> Congruence [aReason, bReason] expr $ reduceValue
                     ( Map.singleton (nameToText n) (AssignmentBinding bReason)
                     : scopes
                     )
                     x
                 -- "App a' b'" is not a redex 
-                _ -> Congruence [aReason, bReason] expr after
+                _ -> Congruence [aReason, bReason] expr (Value after)
 
     others -> Value others
 
