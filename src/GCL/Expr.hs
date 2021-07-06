@@ -42,7 +42,7 @@ expand (Quant op xs rng t l) = do
 expand (Subst e s _) = do
   e' <- expand e
   return $ subst s e'
-expand (Click a b) = return $ Click a b 
+expand (Expand a b) = return $ Expand a b 
 expand (ArrIdx e1 e2 l) = do
   e1' <- expand e1
   e2' <- expand e2

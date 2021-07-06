@@ -74,7 +74,7 @@ handleExpr _ (Subst before env after) =
     isLam :: Expr -> Bool
     isLam Lam {} = True
     isLam _ = False
-handleExpr _ (Click before after) =
+handleExpr _ (Expand before after) =
   return $ clickE (render before) (if isLam after then parensE (render after) else render after)
   where
     isLam :: Expr -> Bool

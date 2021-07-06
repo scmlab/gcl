@@ -12,7 +12,7 @@ import           Syntax.Common                  ( Name
 
 -- explains how a value or expression came to be 
 data Reason
-    = Expand Name Reason
+    = ExpandOthers Name Reason
     | ExpandUserDefined Name Reason
     | Reduce Expr Reason
     | ReduceSub [Reason] Expr
@@ -36,8 +36,8 @@ data Derivation = Derivation [Derivation] Reason
 ------------------------------------------------------------------
 
 extract :: Reason -> Expr
-extract (Expand            _ x) = extract x
-extract (ExpandUserDefined _ x) = extract x
+extract (ExpandOthers      _ x) = extract x
+extract (ExpandUserDefined y x) = Expand y (extract x)
 extract (Reduce            _ x) = extract x
 extract (ReduceSub         _ x) = x
 extract (Value x              ) = x
@@ -63,13 +63,13 @@ reduceValue scopes expr = case expr of
         Nothing -> error "panic: not in scope"
         Just (UserDefinedBinding binding) ->
             ExpandUserDefined name (reduce scopes binding)
-        Just (OthersBinding binding) -> Expand name (reduce scopes binding)
+        Just (OthersBinding binding) -> ExpandOthers name (reduce scopes binding)
 
     Const name _ -> case lookupScopes scopes name of
         Nothing -> error "panic: not in scope"
         Just (UserDefinedBinding binding) ->
             ExpandUserDefined name (reduce scopes binding)
-        Just (OthersBinding binding) -> Expand name (reduce scopes binding)
+        Just (OthersBinding binding) -> ExpandOthers name (reduce scopes binding)
 
     Chain a op b l ->
         let (aReason, a') = reduce' scopes a

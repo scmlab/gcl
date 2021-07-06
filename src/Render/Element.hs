@@ -206,7 +206,7 @@ data Inline
   | Link Range Inlines ClassNames
   | -- | For Subst
     Sbst Inlines Inlines Inlines ClassNames
-  | -- | For Click
+  | -- | For Expand
     Clck Inlines Inlines
   | -- | Horizontal grouping, wrap when there's no space
     Horz [Inlines]
