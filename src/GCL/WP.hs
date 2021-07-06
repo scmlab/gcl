@@ -371,17 +371,17 @@ sp _ (_, _) (A.Abort _) = return (Constant A.true)
 sp _ (pre, _) (A.Skip _) = return pre
 sp _ (pre, _) (A.Assign xs es l) = do
       -- {P} x := E { (exists x' :: x = E[x'/x] && P[x'/x]) }
-    frNames <- genFrNames xs
-    let sub = genSub xs frNames
+    freeNames <- genFreeNames xs
+    let sub = genSub xs freeNames
     pre' <- alphaSubst sub (toExpr pre)
     return $ Constant (
-       A.exists frNames (A.conjunct (zipWith (genEq sub) xs es)) pre')
+       A.exists freeNames (A.conjunct (zipWith (genEq sub) xs es)) pre')
   where
-    genFrNames :: [a] -> WP [Name]
-    genFrNames ys = map (`Name` l) <$> mapM (const freshText) ys
+    genFreeNames :: [a] -> WP [Name]
+    genFreeNames ys = map (`Name` l) <$> mapM (const freshText) ys
     -- genSub :: [Name] -> [Name] -> Subs A.Bindings
     genSub ys hs = Map.fromList . zip ys . map (A.AssignBinding . A.nameVar) $ hs
-    -- genEq :: Name -> A.Expr -> A.Expr
+    -- genEq :: Map Name Bindings -> Name -> A.Expr -> A.Expr
     genEq sub x e = A.nameVar x `A.eqq` subst sub e
 sp _ (pre, _) (A.AAssign (A.Var x _) i e _) = do
      -- {P} x[I] := E { (exist x' :: x = x'[I[x'/x] -> E[x'/x]] && P[x'/x]) }
