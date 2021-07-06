@@ -18,13 +18,16 @@ import GCL.Predicate.Util (conjunct, disjunct, guardIf, guardLoop, toExpr)
 import qualified Syntax.Abstract as A
 import qualified Syntax.Abstract.Operator as A
 import qualified Syntax.Abstract.Util as A
-import Syntax.Common (Name (Name))
+import Syntax.Common (Name (Name), nameToText)
 import qualified Data.Hashable as Hashable
 import Numeric (showHex)
 import qualified Data.Text as Text
 import qualified Data.List as List
 import GCL.WP.Type
 import Pretty (toString)
+import qualified GCL.Substitute as Substitute
+import Syntax.Abstract (Bindings(..))
+import Syntax.Abstract.Util (bindingsToExpr)
 
 type TM = Except StructError
 
@@ -263,8 +266,16 @@ wp :: Bool -> A.Stmt -> Pred -> WP Pred
 wp _ (A.Abort _) _ = return (Constant A.false)
 wp _ (A.Skip _) post = return post
 wp _ (A.Assign xs es _) post = do
-  let sub = Map.fromList . zip xs . map A.AssignBinding $ es
-  alphaSubst sub post
+
+  env <- ask
+  let letBindings = Map.mapKeys nameToText $ fmap toBinding env 
+  let assigmentBindings = Map.mapKeys nameToText $ Map.fromList $ zip xs (map (Substitute.OthersBinding . A.Value) es) 
+  return $ Substitute.reducePred [assigmentBindings, letBindings] post
+  where 
+    toBinding Nothing = Substitute.NoBinding 
+    toBinding (Just (LetBinding x)) = Substitute.UserDefinedBinding (A.Value x)
+    toBinding (Just others) = Substitute.OthersBinding (A.Value $ bindingsToExpr others)
+
 wp _ (A.AAssign (A.Var x _) i e _) post = do
   let sub = Map.fromList [(x, A.AssignBinding (A.ArrUpd (A.nameVar x) i e NoLoc))]
   alphaSubst sub post

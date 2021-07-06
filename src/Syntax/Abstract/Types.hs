@@ -101,7 +101,7 @@ data Expr
   | Lam Name Expr Loc
   | Quant Expr [Name] Expr Expr Loc
   | Subst Expr Subst Expr
-  | Expand Name Expr
+  | Expand Reason Name Expr
   | ArrIdx Expr Expr Loc
   | ArrUpd Expr Expr Expr Loc
   deriving (Eq, Show, Generic)
@@ -116,6 +116,18 @@ data Bindings =
   deriving (Eq, Show, Generic)
 
 type Subst = Map Name Bindings
+
+------------------------------------------------------------------
+
+-- explains how a value or expression came to be 
+data Reason
+    = ExpandOthers Name Reason
+    | ExpandUserDefined Name Reason
+    | ExpandStuck Name
+    | Reduce Expr Reason
+    | ReduceSub [Reason] Expr
+    | Value Expr
+    deriving (Eq, Show, Generic)
 
 ----------------------------------------------------------------
 

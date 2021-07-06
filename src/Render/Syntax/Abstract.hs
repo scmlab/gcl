@@ -1,5 +1,6 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE LambdaCase #-}
 
 module Render.Syntax.Abstract where
 
@@ -74,8 +75,8 @@ handleExpr _ (Subst before env after) =
     isLam :: Expr -> Bool
     isLam Lam {} = True
     isLam _ = False
-handleExpr _ (Expand before after) =
-  return $ clickE (render before) (if isLam after then parensE (render after) else render after)
+handleExpr _ (Expand reasons before after) =
+  return $ expandE (render reasons) (render before) (if isLam after then parensE (render after) else render after)
   where
     isLam :: Expr -> Bool
     isLam Lam {} = True
@@ -96,6 +97,17 @@ instance Render (Map Name Expr) where
       where
         vars = punctuateE "," $ map render $ Map.keys env
         exprs = punctuateE "," $ map render $ Map.elems env
+
+--------------------------------------------------------------------------------
+
+instance Render Reason where
+  render = \case
+    ExpandOthers name reason -> "ExpandOthers " <> render name <+> render reason
+    ExpandUserDefined name reason -> "ExpandUserDefined " <> render name <+> render reason
+    ExpandStuck name -> "ExpandStuck " <> render name
+    Reduce expr reason -> "Reduce " <> render reason <+> render expr
+    ReduceSub reasons expr -> "ReduceSubs " <> vertE (map render reasons) <+> render expr
+    Value expr -> "Value" <+> render expr
 
 --------------------------------------------------------------------------------
 
