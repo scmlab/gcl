@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE FlexibleInstances #-}
 module GCL.Substitute where
 
 import           Data.Loc                       ( locOf )
@@ -13,6 +15,8 @@ import           Syntax.Abstract.Util           ( bindingsToExpr )
 import           Syntax.Common                  ( Name
                                                 , nameToText
                                                 )
+import Debug.Trace
+import Pretty
 
 ------------------------------------------------------------------
 
@@ -81,29 +85,48 @@ reduceValue scopes expr = case expr of
     App a b l ->
         let
             (aReason, a') = reduce' scopes a
-            (bReason, b') = reduce' scopes b
-            after         = App a' b' l
+            -- (bReason, b') = reduce' scopes b
+            -- after         = App a' b' l
         in
             case a' of
-                Expand _ _ (Lam n x _) ->
-                    let
-                        reason = reduceValue
-                            ( Map.singleton (nameToText n)
+                Expand _ _ (Lam n x _) -> 
+                    let scopes' = Map.singleton (nameToText n)
                                             (AssignmentBinding bReason)
                             : scopes
-                            )
-                            x
+                        (bReason, b') = reduce' scopes' b
+                        after         = App a' b' l
+                    in 
+                        traceShow (pretty n, pretty x, pretty (reduceValue scopes' x), pretty scopes') $
+                    let reason = reduceValue scopes' x
                     in  Congruence [aReason, bReason] expr
                             $ ExpandPause [reason] after (extract reason)
 
                 -- "App a' b'" is a redex 
-                Lam n x _ -> Congruence [aReason, bReason] expr $ reduceValue
-                    ( Map.singleton (nameToText n) (AssignmentBinding bReason)
-                    : scopes
-                    )
+                Lam n x _ -> 
+                    let scopes' = Map.singleton (nameToText n)
+                                            (AssignmentBinding bReason)
+                            : scopes
+                        (bReason, _) = reduce' scopes' b
+                    in 
+                    Congruence [aReason, bReason] expr $ reduceValue scopes'
                     x
                 -- "App a' b'" is not a redex 
-                _ -> Congruence [aReason, bReason] expr (Value after)
+                _ -> 
+                    let (bReason, b') = reduce' scopes b
+                        after         = App a' b' l
+                    in 
+                    Congruence [aReason, bReason] expr (Value after)
+
+    Lam arg body l -> 
+        let (bodyReason, body') = reduce' scopes body
+        in Congruence [bodyReason] expr (Value $ Lam arg body' l)
+            -- traceShow ("LAMBDA", pretty arg, pretty body, pretty scopes) undefined
+        -- let scopes' = Map.singleton (nameToText n)
+        --                                     (AssignmentBinding bReason)
+        --                     : scopes
+        --                 (bReason, b') = reduce' scopes' b
+        --                 after         = App a' b' l
+        --             in 
 
     others -> Value others
 
@@ -118,6 +141,23 @@ data Binding
     | NoBinding
     | AssignmentBinding Reason
     deriving (Show)
+
+instance Pretty (Map Text Binding) where 
+    pretty = pretty . Map.toList
+
+instance Pretty Binding where 
+    pretty (UserDefinedBinding expr) = "UserDefinedBinding" <+> pretty expr
+    pretty (AssignmentBinding reason) = "AssignmentBinding" <+> pretty reason
+    pretty NoBinding = "NoBinding"
+
+instance Pretty Reason where 
+    pretty (Value val) = "Value" <+> pretty val
+    pretty (ExpandContinue name reason) = pretty name <+> "=Continue=>" <+> pretty reason
+    pretty (ExpandPause _ before after) = pretty before <+> "=Pause=>" <+> pretty after
+    pretty (ExpandStuck name) = "Stuck" <+> pretty name
+    pretty (Congruence _ before after) = pretty before <+> "=Cong=>" <+> pretty after
+    -- pretty (ExpandStuck name) = "Stuck" <+> pretty name
+    -- | Congruence [Reason] Expr Reason
 
 ------------------------------------------------------------------
 

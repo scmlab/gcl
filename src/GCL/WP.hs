@@ -12,7 +12,7 @@ import Control.Arrow(first)
 import Data.Loc (Loc (..), Located (..))
 import Data.Loc.Range (Range, fromLoc)
 import qualified Data.Map as Map
-import GCL.Common (Fresh (..), Subs, Substitutable (..), AlphaRename (..), emptySubs, freshName')
+import GCL.Common (Fresh (..), Subs, Substitutable (..), AlphaRename (..), freshName')
 import GCL.Predicate (Origin (..), PO (..), Pred (..), Spec (Specification))
 import GCL.Predicate.Util (conjunct, disjunct, guardIf, guardLoop, toExpr)
 import qualified Syntax.Abstract as A
@@ -432,8 +432,13 @@ tellPO' l p q = tellPO p q l
 
 tellSpec :: Pred -> Pred -> Range -> WP ()
 tellSpec p q l = do
-  p' <- alphaSubst emptySubs p
-  q' <- alphaSubst emptySubs q
+
+  letBindings <- Substitute.scopeFromLetBindings <$> ask
+  let p' = Substitute.reducePred [letBindings] p
+  let q' = Substitute.reducePred [letBindings] q
+
+  -- p' <- alphaSubst emptySubs p
+  -- q' <- alphaSubst emptySubs q
   (i, j, k) <- get
   put (i, succ j, k)
   tell ([], [Specification j p' q' l], [])
