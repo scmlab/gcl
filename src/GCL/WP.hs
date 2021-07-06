@@ -275,14 +275,14 @@ wp _ (A.Assign xs es _) post = do
 
   let letBindings = Map.mapKeys nameToText $ fmap toBinding env
   -- traceShow letBindings (return ())
-  let assigmentBindings = Map.mapKeys nameToText $ Map.fromList $ zip xs (map (Substitute.OthersBinding . A.Value) es)
+  let assigmentBindings = Map.mapKeys nameToText $ Map.fromList $ zip xs (map (Substitute.AssignmentBinding . A.Value) es)
   -- traceShow assigmentBindings (return ())
   -- traceShow post (return ())
   return $ Substitute.reducePred [assigmentBindings, letBindings] post
   where
     toBinding Nothing = Substitute.NoBinding
-    toBinding (Just (LetBinding x)) = Substitute.UserDefinedBinding (A.Value x)
-    toBinding (Just others) = Substitute.OthersBinding (A.Value $ bindingsToExpr others)
+    toBinding (Just (LetBinding x)) = Substitute.UserDefinedBinding x
+    toBinding (Just others) = Substitute.AssignmentBinding (A.Value $ bindingsToExpr others)
 
 wp _ (A.AAssign (A.Var x _) i e _) post = do
   let sub = Map.fromList [(x, A.AssignBinding (A.ArrUpd (A.nameVar x) i e NoLoc))]
