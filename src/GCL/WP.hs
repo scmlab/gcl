@@ -12,13 +12,13 @@ import Control.Arrow(first)
 import Data.Loc (Loc (..), Located (..))
 import Data.Loc.Range (Range, fromLoc)
 import qualified Data.Map as Map
-import GCL.Common (Fresh (..), Subs, Substitutable (..), AlphaRename (..), emptySubs, freshName', betaReduction)
+import GCL.Common (Fresh (..), Subs, Substitutable (..), AlphaRename (..), emptySubs, freshName')
 import GCL.Predicate (Origin (..), PO (..), Pred (..), Spec (Specification))
 import GCL.Predicate.Util (conjunct, disjunct, guardIf, guardLoop, toExpr)
 import qualified Syntax.Abstract as A
 import qualified Syntax.Abstract.Operator as A
 import qualified Syntax.Abstract.Util as A
-import Syntax.Common (Name (Name), nameToText)
+import Syntax.Common (Name (Name))
 import qualified Data.Hashable as Hashable
 import Numeric (showHex)
 import qualified Data.Text as Text
@@ -26,9 +26,6 @@ import qualified Data.List as List
 import GCL.WP.Type
 import Pretty (toString)
 import qualified GCL.Substitute as Substitute
-import Syntax.Abstract (Bindings(..))
-import Syntax.Abstract.Util (bindingsToExpr)
-import Debug.Trace
 
 type TM = Except StructError
 
@@ -270,15 +267,9 @@ wp _ (A.Assign xs es _) post = do
   -- let sub = Map.fromList . zip xs . map A.AssignBinding $ es
   -- alphaSubst sub post
 
-  env <- ask
-
-  let letBindings = Map.mapKeys nameToText $ fmap toBinding env
-  let assigmentBindings = Map.mapKeys nameToText $ Map.fromList $ zip xs (map (Substitute.AssignmentBinding . A.Value) es)
+  letBindings <- Substitute.scopeFromLetBindings <$> ask
+  let assigmentBindings = Substitute.scopeFromAssignments xs es
   return $ Substitute.reducePred [assigmentBindings, letBindings] post
-  where
-    toBinding Nothing = Substitute.NoBinding
-    toBinding (Just (LetBinding x)) = Substitute.UserDefinedBinding x
-    toBinding (Just others) = Substitute.AssignmentBinding (A.Value $ bindingsToExpr others)
 
 wp _ (A.AAssign (A.Var x _) i e _) post = do
   let sub = Map.fromList [(x, A.AssignBinding (A.ArrUpd (A.nameVar x) i e NoLoc))]
@@ -421,16 +412,10 @@ sp _ (pre, _) _ = return pre
 
 --
 
-toBinding :: Maybe Bindings -> Substitute.Binding
-toBinding Nothing = Substitute.NoBinding
-toBinding (Just (LetBinding x)) = Substitute.UserDefinedBinding x
-toBinding (Just others) = Substitute.AssignmentBinding (A.Value $ bindingsToExpr others)
-
 tellPO :: Pred -> Pred -> Origin -> WP ()
 tellPO p q origin = unless (toExpr p == toExpr q) $ do
       
-    env <- ask
-    let letBindings = Map.mapKeys nameToText $ fmap toBinding env
+    letBindings <- Substitute.scopeFromLetBindings <$> ask
     let p' = Substitute.reducePred [letBindings] p
     let q' = Substitute.reducePred [letBindings] q
 

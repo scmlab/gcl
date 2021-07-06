@@ -4,22 +4,17 @@ import           Data.Loc                       ( locOf )
 import           Data.Map                       ( Map )
 import qualified Data.Map                      as Map
 import           Data.Text                      ( Text )
-import           Debug.Trace
 import           GCL.Predicate                  ( Pred(..) )
-import           Syntax.Abstract                ( Expr(..)
+import           Syntax.Abstract                ( Bindings(LetBinding)
+                                                , Expr(..)
                                                 , Reason(..)
                                                 )
+import           Syntax.Abstract.Util           ( bindingsToExpr )
 import           Syntax.Common                  ( Name
                                                 , nameToText
                                                 )
 
 ------------------------------------------------------------------
-
--- data Reduction = Reduction Expr Expr
-            --    | 
-
--- reduce :: Expr -> Reduction
--- reduce expr = Reduction expr (betaReduction expr)
 
 reducePred :: Scopes -> Pred -> Pred
 reducePred scopes x = case x of
@@ -42,7 +37,6 @@ extract :: Reason -> Expr
 extract (ExpandContinue _ x              ) = extract x
 extract (ExpandPause reasons before after) = Expand reasons before after
 extract (ExpandStuck name                ) = Const name (locOf name)
--- extract (Reduce _ x                      ) = extract x
 extract (Congruence _ _ after            ) = extract after
 extract (Value x                         ) = x
 
@@ -99,7 +93,8 @@ reduceValue scopes expr = case expr of
                             : scopes
                             )
                             x
-                    in  Congruence [aReason, bReason] expr $ ExpandPause [reason] after (extract reason)
+                    in  Congruence [aReason, bReason] expr
+                            $ ExpandPause [reason] after (extract reason)
 
                 -- "App a' b'" is a redex 
                 Lam n x _ -> Congruence [aReason, bReason] expr $ reduceValue
@@ -138,3 +133,14 @@ lookupScopes scopes name = foldl findFirst Nothing scopes
     findFirst (Just found) _     = Just found
     findFirst Nothing      scope = Map.lookup (nameToText name) scope
 
+scopeFromLetBindings :: Map Name (Maybe Bindings) -> Scope Binding
+scopeFromLetBindings = Map.mapKeys nameToText . fmap toBinding
+  where
+    toBinding Nothing = NoBinding
+    toBinding (Just (LetBinding x)) = UserDefinedBinding x
+    toBinding (Just others) = AssignmentBinding (Value $ bindingsToExpr others)
+
+scopeFromAssignments :: [Name] -> [Expr] -> Scope Binding
+scopeFromAssignments xs es = Map.mapKeys nameToText $ Map.fromList $ zip
+    xs
+    (map (AssignmentBinding . Value) es)
