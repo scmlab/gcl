@@ -16,7 +16,7 @@ import Syntax.Common
 import Prelude hiding (Ordering (..))
 import GCL.Common
 import Control.Monad.State (StateT(..), evalStateT)
-import Syntax.Abstract.Util (bindingsToExpr)
+import Syntax.Abstract.Util (bindingsToExpr, wrapLam)
 
 data TypeError
   = NotInScope Name Loc
@@ -175,13 +175,6 @@ inferExpr env e = do
   s <- solveConstraints cs
   return $ subst s t
 
-inferDeclBody :: Env Type -> DeclBody -> TM ()
-inferDeclBody env (DeclBody n args expr) = do
-  let expr' = foldr (\a e' -> Lam a e' (a <--> e')) expr args
-  case Map.lookup n env of
-    Nothing -> throwError (NotInScope n (locOf n))
-    Just t -> checkIsType env expr' t
-
 inferDecl' :: Env Type -> [Name] -> Type -> Maybe Expr -> TM (Env Type)
 inferDecl' env ns t p = do
   checkType env t
@@ -194,14 +187,13 @@ inferDecl' env ns t p = do
 inferDecl :: Env Type -> Declaration -> TM (Env Type)
 inferDecl env (ConstDecl ns t p _) = inferDecl' env ns t p
 inferDecl env (VarDecl ns t p _) = inferDecl' env ns t p
-inferDecl env (LetDecl (DeclBody n args expr) _) = do
-  let expr' = foldr (\a e' -> Lam a e' (a <--> e')) expr args
-  s <- inferExpr env expr'
-  env `extend` (n, s)
-inferDecl env (BlockDecl ns t p ds _) = do
-  env' <- inferDecl' env ns t p
-  mapM_ (inferDeclBody env') ds
-  return env'
+inferDecl env (LetDecl n args expr _) = do
+  let expr' = wrapLam args expr
+  case Map.lookup n env of
+    Just t -> checkIsType env expr' t >> return env
+    Nothing -> do
+      s <- inferExpr env expr'
+      return $ Map.insert n s env
 
 lookupInferEnv :: Name -> Infer Type
 lookupInferEnv n = do
@@ -332,8 +324,7 @@ checkIsVarAssign declarations (Assign ns _ _) =
       case d of
         VarDecl n _ _ _ -> (n ++ vs, cs, ls)
         ConstDecl n _ _ _ -> (vs, n ++ cs, ls)
-        LetDecl (DeclBody n _ _) _  -> (vs, cs, n : ls)
-        BlockDecl n _ _ _ _ -> (vs, n ++ cs, ls)
+        LetDecl n _ _ _  -> (vs, cs, n : ls)
 checkIsVarAssign _ _ = return ()
 
 checkProg :: Program -> TM ()

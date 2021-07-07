@@ -6,7 +6,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 module Syntax.Concrete.Instances.ToAbstract where
 
-import Control.Monad.Except ( Except, forM, throwError )
+import Control.Monad.Except ( Except, throwError )
 import Data.Loc (Loc (..), (<-->), Located (locOf))
 import Syntax.Concrete.Types
 import Syntax.Concrete.Instances.Located()

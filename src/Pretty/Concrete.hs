@@ -142,11 +142,11 @@ instance PrettyWithLoc Program where
 --------------------------------------------------------------------------------
 
 -- | Declaration
-instance Pretty Decl where
+instance Pretty DeclBase where
   pretty = toDoc . prettyWithLoc
 
-instance PrettyWithLoc Decl where
-  prettyWithLoc (Decl names colon t) =
+instance PrettyWithLoc DeclBase where
+  prettyWithLoc (DeclBase names colon t) =
     prettyWithLoc names
     <> prettyWithLoc colon
     <> prettyWithLoc t
@@ -159,6 +159,13 @@ instance PrettyWithLoc DeclProp where
     prettyWithLoc l
     <> prettyWithLoc p
     <> prettyWithLoc r
+
+instance Pretty DeclType where
+  pretty = toDoc . prettyWithLoc
+
+instance PrettyWithLoc DeclType where
+  prettyWithLoc (DeclType decl prop) =
+    prettyWithLoc decl <> maybe Empty prettyWithLoc prop
 
 instance Pretty DeclBody where
   pretty = toDoc . prettyWithLoc
@@ -177,26 +184,17 @@ instance PrettyWithLoc Declaration where
   prettyWithLoc (ConstDecl con decl) =
     prettyWithLoc con
       <> prettyWithLoc decl
-  prettyWithLoc (ConstDeclWithProp con decl declprop ) =
-    prettyWithLoc con
-      <> prettyWithLoc decl
-      <> prettyWithLoc declprop
   prettyWithLoc (VarDecl v decl) =
-    prettyWithLoc v <> prettyWithLoc decl
-  prettyWithLoc (VarDeclWithProp v decl declprop) =
-    prettyWithLoc v <> prettyWithLoc decl <> prettyWithLoc declprop
-  prettyWithLoc (LetDecl a declBody) =
-    prettyWithLoc a
-      <> prettyWithLoc declBody
+    prettyWithLoc v 
+    <> prettyWithLoc decl
 
-instance Pretty BlockDecl where
+instance Pretty BlockDeclType where
   pretty = toDoc . prettyWithLoc
 
-instance PrettyWithLoc BlockDecl where
-  prettyWithLoc (BlockDecl decl mDeclProp declBodys) =
+instance PrettyWithLoc BlockDeclType where
+  prettyWithLoc (BlockDeclType decl prop) =
     prettyWithLoc decl
-    <> maybe Empty (either prettyWithLoc prettyWithLoc) mDeclProp
-    <> mconcat (map prettyWithLoc declBodys)
+    <> maybe Empty prettyWithLoc prop
 
 instance Pretty BlockDeclaration where
   pretty = toDoc . prettyWithLoc
