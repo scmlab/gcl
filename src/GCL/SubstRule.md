@@ -8,13 +8,7 @@
 - $e_1 \xrightarrow{s} e_2$
 
   - $\mathsf{subst}\; s\; e_1 \equiv e_2$
-  - $s\; ::\; \mathsf{Map}\; \mathsf{Name}\; \mathsf{Expr}$
-
-- $e_1 \xRightarrow{s} e_2$
-
-  - $\mathsf{subst}\; s\; e_1 \equiv e_2$
-  - $e_2 \neq e_{21}\; [s_{e_2}]\; e_{22}$
-  - $s :: \mathsf{Map}\; \mathsf{Name}\; \mathsf{Bindings}$
+  - $s\; ::\; \mathsf{Map}\; \mathsf{Name}\; \mathsf{Bindings}$
 
 - $\displaystyle a\; \rightarrow_\beta b$
 
@@ -250,8 +244,8 @@
       b_1 = b_1',\;
       b_2 = b_2'
     }{
-      a\;[s_1]\; \mathsf{App}\; b1\; b2\; \xrightarrow{s}\;
-      a\;[s_1]\; \mathsf{App}\; b1\; b2
+      a\;[s_1]\; b1\; b2\; \xrightarrow{s}\;
+      a\;[s_1]\; b1\; b2
     }$
 
   - $\displaystyle \frac{
@@ -259,16 +253,16 @@
       b_1\; \xrightarrow{s}\; b_1',\;
       b_2\; \xrightarrow{s}\; b_2'
     }{
-      a\;[s_1]\; \mathsf{App}\; b1\; b2\; \xrightarrow{s}\;
-      a\;[s_1]\; \mathsf{App}\; b1\; b2\; [s]\; \mathsf{App}\; b1'\; b2'
+      a\;[s_1]\; b1\; b2\; \xrightarrow{s}\;
+      a\;[s_1]\; b1\; b2\; [s]\; b1'\; b2'
     }$
 
   - $\displaystyle \frac{
       b_1\; \xrightarrow{s}\; b_1',\;
       b_2\; \xrightarrow{s}\; b_2'
     }{
-      a\;[s_1]\; \mathsf{App}\; b1\; b2\; \xrightarrow{s}\;
-      a\;[s_1]\; \mathsf{App}\; b1'\; b2'
+      a\;[s_1]\; b1\; b2\; \xrightarrow{s}\;
+      a\;[s_1]\; b1'\; b2'
     }$
 
   - $\displaystyle \frac{
@@ -294,7 +288,7 @@
     a\; [s_1]\; c
   }$
 
-- ### beta reduction **(NotSure)**
+- ### beta reduction
 
   - $\displaystyle \frac{
     c\; \rightarrow_\beta\; c',\;

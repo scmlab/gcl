@@ -46,10 +46,10 @@ data Program
   deriving (Eq, Show)
 
 data Declaration
-  = ConstDecl (Token "con") Decl
-  | ConstDeclWithProp (Token "con") Decl DeclProp
-  | VarDecl (Token "var") Decl
-  | VarDeclWithProp (Token "var") Decl DeclProp
+  = ConstDecl (Token "con") DeclBase
+  | ConstDeclWithProp (Token "con") DeclBase DeclProp
+  | VarDecl (Token "var") DeclBase
+  | VarDeclWithProp (Token "var") DeclBase DeclProp
   | LetDecl (Token "let") DeclBody
   deriving (Eq, Show)
 
@@ -75,15 +75,15 @@ data ProofAnchor = ProofAnchor Text Range deriving (Eq, Show)
 --------------------------------------------------------------------------------
 
 -- Low level Declaration wrapper, and synonym types
-data Decl = Decl (SepBy "," Name) (Token ":") Type deriving (Eq, Show)
+data DeclBase = DeclBase (SepBy "," Name) (Token ":") Type deriving (Eq, Show)
 
 data DeclProp = DeclProp (Token "{") Expr (Token "}") deriving (Eq, Show)
-
-type DeclProp' = Either DeclProp Expr
-
+data DeclType = DeclType DeclBase (Maybe DeclProp) deriving (Eq, Show)
 data DeclBody = DeclBody Name [Name] (Token "=") Expr deriving (Eq, Show)
 
-data BlockDecl = BlockDecl Decl (Maybe DeclProp') [DeclBody] deriving (Eq, Show)
+type BlockDeclProp = Either DeclProp Expr
+data BlockDeclType = BlockDeclType DeclBase (Maybe BlockDeclProp) deriving (Eq, Show)
+type BlockDecl = Either BlockDeclType DeclBody
 
 type Declaration' = Either Declaration BlockDeclaration
 

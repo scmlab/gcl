@@ -1,6 +1,13 @@
 var a, b, c, d : Int
 let P x = a = x
 
+{:
+    A, B : Int
+    
+    F : Int -> Int -> Int
+:}
+
+
 c := d
 a, b := b, c
 {P a}
