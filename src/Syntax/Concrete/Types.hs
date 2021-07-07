@@ -46,11 +46,8 @@ data Program
   deriving (Eq, Show)
 
 data Declaration
-  = ConstDecl (Token "con") DeclBase
-  | ConstDeclWithProp (Token "con") DeclBase DeclProp
-  | VarDecl (Token "var") DeclBase
-  | VarDeclWithProp (Token "var") DeclBase DeclProp
-  | LetDecl (Token "let") DeclBody
+  = ConstDecl (Token "con") DeclType
+  | VarDecl (Token "var") DeclType
   deriving (Eq, Show)
 
 data BlockDeclaration = BlockDeclaration (Token "{:") [BlockDecl] (Token ":}") deriving (Eq, Show)

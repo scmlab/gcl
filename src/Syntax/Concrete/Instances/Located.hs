@@ -17,10 +17,7 @@ instance Located Program where
 
 instance Located Declaration where
   locOf (ConstDecl l r) = l <--> r
-  locOf (ConstDeclWithProp l _ r) = l <--> r
   locOf (VarDecl l r) = l <--> r
-  locOf (VarDeclWithProp l _ r) = l <--> r
-  locOf (LetDecl l r) = l <--> r
 
 instance Located BlockDeclaration where
   locOf (BlockDeclaration l _ r) = l <--> r

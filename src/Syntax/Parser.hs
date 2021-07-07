@@ -15,7 +15,7 @@ import Data.Maybe (isJust)
 import qualified Data.Ord as Ord
 import Data.Text (Text)
 import Syntax.Common (Name (..), ChainOp, ArithOp)
-import Syntax.Concrete (BlockDecl (..), BlockDeclaration (..), Decl (..), DeclProp (..), DeclBody (..), Declaration (..), EndpointClose (..), EndpointOpen (..), Expr (..), GdCmd (..), Interval (..), Program (..), SepBy (..), Stmt (..), TBase (..), Token (..), Type (..), ProofAnchor (ProofAnchor))
+import Syntax.Concrete 
 import Syntax.Parser.Lexer
 import Syntax.Parser.Util
 import Text.Megaparsec (MonadParsec (..), Pos, anySingle, parse, tokensToChunk, (<?>), manyTill_)
@@ -67,13 +67,7 @@ pProgram = do
 pDeclaration :: Parser Declaration
 pDeclaration = Lex.lineFold scn (parser p)
   where
-    p = choice
-        [ try pConstDeclWithProp,
-          pConstDecl,
-          try pVarDeclWithProp,
-          pVarDecl,
-          pLetDecl
-        ]
+    p = (pConstDecl <|> pVarDecl)
         <* lift scn
         <?> "declaration"
 
@@ -84,44 +78,27 @@ pBlockDeclaration' :: ParserF BlockDeclaration
 pBlockDeclaration' =
   BlockDeclaration
   <$> lexDeclStart
-  <*> many pBlockDecl
+  <*> pIndentBlock Nothing pBlockDecl
   <*> lexDeclEnd
 
 pConstDecl :: ParserF Declaration
 pConstDecl =
   ConstDecl
   <$> lexCon
-  <*> pDecl pName
-
-pConstDeclWithProp :: ParserF Declaration
-pConstDeclWithProp =
-  ConstDeclWithProp
-  <$> lexCon
-  <*> pDecl pName
-  <*> pDeclProp
+  <*> pDeclType pName
 
 pVarDecl :: ParserF Declaration
 pVarDecl =
   VarDecl
   <$> lexVar
-  <*> pDecl lowerName
+  <*> pDeclType lowerName
 
-pVarDeclWithProp :: ParserF Declaration
-pVarDeclWithProp =
-  VarDeclWithProp
-  <$> lexVar
-  <*> pDecl lowerName
-  <*> pDeclProp
+pBlockDecl :: ParserF BlockDecl
+pBlockDecl = eitherP pBlockDeclType pDeclBody
 
-pLetDecl :: ParserF Declaration
-pLetDecl =
-  LetDecl
-  <$> lexLet
-  <*> pDeclBody
-
-pDecl :: ParserF Name -> ParserF Decl
-pDecl name =
-  Decl
+pDeclBase :: ParserF Name -> ParserF DeclBase
+pDeclBase name =
+  DeclBase
   <$> pList name
   <*> lexColon
   <*> pType'
@@ -133,6 +110,12 @@ pDeclProp =
   <*> pExpr'
   <*> lexBraceEnd
 
+pDeclType :: ParserF Name -> ParserF DeclType
+pDeclType name = 
+  DeclType
+  <$> pDeclBase name
+  <*> optional pDeclProp
+
 pDeclBody :: ParserF DeclBody
 pDeclBody =
   DeclBody
@@ -141,15 +124,14 @@ pDeclBody =
   <*> lexEQ'
   <*> pExpr'
 
-pBlockDecl :: ParserF BlockDecl
-pBlockDecl = do
-  ref <- Lex.indentLevel
-  (decl, mDeclProp) <- lift $ Lex.lineFold scn (constDecl ↓)
-  declBodys <- lift scn *> pIndentBlock (Just ref) pDeclBody
-  return $ BlockDecl decl mDeclProp declBodys
-  where
-    constDecl = (,) <$> pDecl pName <*> optional (eitherP pDeclProp pExpr')
+pBlockDeclProp :: ParserF BlockDeclProp 
+pBlockDeclProp = eitherP pDeclProp pExpr'
 
+pBlockDeclType :: ParserF BlockDeclType
+pBlockDeclType = do
+  BlockDeclType
+  <$> pDeclBase pName
+  <*> optional pBlockDeclProp
 
 ------------------------------------------
 -- parse Stmt
