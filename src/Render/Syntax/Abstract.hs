@@ -20,6 +20,7 @@ import           Syntax.Common                  ( ArithOp(..)
                                                 , Op(..)
                                                 , classify
                                                 )
+import Debug.Trace
 
 ------------------------------------------------------------------------------
 
@@ -39,20 +40,17 @@ instance Render Expr where
     Complete s -> s
 
 handleExpr :: Int -> Expr -> Variadic Expr Inlines
-handleExpr _ (Paren x l     ) = return $ tempHandleLoc l $ render x
-handleExpr _ (Var   x l     ) = return $ tempHandleLoc l $ render x
-handleExpr _ (Const x l     ) = return $ tempHandleLoc l $ render x
-handleExpr _ (Lit   x l     ) = return $ tempHandleLoc l $ render x
+handleExpr n (Paren x l     ) = return $ tempHandleLoc l $ renderPrec n x
+handleExpr n (Var   x l     ) = return $ tempHandleLoc l $ renderPrec n x
+handleExpr n (Const x l     ) = return $ tempHandleLoc l $ renderPrec n x
+handleExpr n (Lit   x l     ) = return $ tempHandleLoc l $ renderPrec n x
 handleExpr n (Op x          ) = handleOp n x
-handleExpr _ (Chain a op b _) = return $ render a <+> render op <+> render b
-handleExpr n (App p q _     ) = case handleExpr n p of
-  Expect   f -> f q
-  Complete s -> do
-    t <- handleExpr n q
-    -- see if the second argument is an application, apply parenthesis when needed
-    return $ case q of
-      App{} -> s <+> parensIf n (-1) t
-      _     -> s <+> t
+handleExpr n (Chain a op b _) = return $ renderPrec n a <+> render op <+> renderPrec n b
+handleExpr n (App p q _     ) = do 
+  -- function application is left-associative
+  let s = renderPrec n p 
+  let t = renderPrec (succ n) q
+  return $ parensIf n 0 $ s <+> t 
 handleExpr _ (Lam p q _) = return $ "λ" <+> render p <+> "→" <+> render q
 handleExpr _ (Quant op xs r t _) =
   return
@@ -81,14 +79,14 @@ handleExpr _ (Subst before env after) = return $ substE
   isLam :: Expr -> Bool
   isLam Lam{} = True
   isLam _     = False
-handleExpr _ (Expand reasons before after) = return $ expandE
+handleExpr n (Expand reasons before after) = return $ expandE
   ("[" <+> renderManySepByComma reasons <+> "]")
-  (render before)
-  (if isLam after then parensE (render after) else render after)
- where
-  isLam :: Expr -> Bool
-  isLam Lam{} = True
-  isLam _     = False
+  (renderPrec n before)
+  (renderPrec n after)
+--  where
+--   isLam :: Expr -> Bool
+--   isLam Lam{} = True
+--   isLam _     = False
 handleExpr _ (ArrIdx e1 e2 _) = return $ render e1 <> "[" <> render e2 <> "]"
 handleExpr _ (ArrUpd e1 e2 e3 _) =
   return $ "(" <+> render e1 <+> ":" <+> render e2 <+> "↣" <+> render e3 <+> ")"
@@ -118,7 +116,7 @@ instance Render Reason where
         <+> "["
         <+> vertE (map render reasons)
         <+> "]"
-    ExpandStuck name   -> "ExpandStuck " <> render name
+    ExpandStuck name -> "ExpandStuck " <> render name
     -- Reduce expr reason -> "Reduce " <> render reason <+> render expr
     Congruence reasons before after ->
       "Congruence "

@@ -126,7 +126,14 @@ data Reason
     | ExpandStuck Name
     | Congruence [Reason] Expr Reason
     | Value Expr
-    deriving (Eq, Show, Generic)
+    deriving (Eq, Generic)
+
+instance Show Reason where 
+  show ExpandContinue {} = "ExpandContinue"
+  show ExpandPause {} = "ExpandContinue"
+  show ExpandStuck {} = "ExpandContinue"
+  show Congruence {} = "ExpandContinue"
+  show Value {} = "ExpandContinue"
 
 ----------------------------------------------------------------
 
