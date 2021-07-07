@@ -19,7 +19,7 @@ import           Syntax.Common                  ( Name
                                                 )
 
 ------------------------------------------------------------------
-reducePred :: Scopes -> Pred -> Pred
+reducePred :: [Scope] -> Pred -> Pred
 reducePred scopes x = case x of
     Constant a          -> Constant (reduceExpr a)
     GuardIf   a l       -> GuardIf (reduceExpr a) l
@@ -42,92 +42,92 @@ extract (ExpandStuck name                ) = Const name (locOf name)
 extract (Congruence _ _ after            ) = extract after
 extract (Value x                         ) = x
 
-reduce' :: Scopes -> Expr -> (Reason, Expr)
-reduce' scopes expr =
-    let reason = reduceValue scopes expr in (reason, extract reason)
+-- reduce' :: [Scope] -> Expr -> (Reason, Expr)
+-- reduce' scopes expr =
+--     let reason = reduceValue scopes expr in (reason, extract reason)
 
-reduce :: Scopes -> Reason -> Reason
+reduce :: [Scope] -> Reason -> Reason
 reduce scopes expr = case expr of
     Value val -> reduceValue scopes val
     others    -> others
 
-reduceValue :: Scopes -> Expr -> Reason
+reduceValue :: [Scope] -> Expr -> Reason
 reduceValue scopes expr = case expr of
     Paren e l ->
-        let (eReason, e') = reduce' scopes e
-        in  Congruence [eReason] expr (Value $ Paren e' l)
+        let e' = reduce scopes (Value e)
+        in  Congruence [e'] expr (Value $ Paren (extract e') l)
     Var name _ -> case lookupScopes scopes name of
         Nothing ->
             error $ "panic: " ++ show (nameToText name) ++ " is not in scope"
         Just (UserDefinedBinding binding) -> ExpandPause [] expr binding
-        Just (AssignmentBinding binding) ->
+        Just (SubstitutionBinding binding) ->
             ExpandContinue name (reduce scopes binding)
         Just NoBinding -> ExpandStuck name
     Const name _ -> case lookupScopes scopes name of
         Nothing ->
             error $ "panic: " ++ show (nameToText name) ++ " is not in scope"
         Just (UserDefinedBinding binding) -> ExpandPause [] expr binding
-        Just (AssignmentBinding binding) ->
+        Just (SubstitutionBinding binding) ->
             ExpandContinue name (reduce scopes binding)
         Just NoBinding -> ExpandStuck name
     Chain a op b l ->
-        let (aReason, a') = reduce' scopes a
-            (bReason, b') = reduce' scopes b
-        in  Congruence [aReason, bReason] expr $ Value $ Chain a' op b' l
+        let a' = reduce scopes (Value a)
+            b' = reduce scopes (Value b)
+        in  Congruence [a', b'] expr $ Value $ Chain (extract a')
+                                                     op
+                                                     (extract b')
+                                                     l
     App a b l ->
-        let (aReason, a') = reduce' scopes a
+        let a' = reduce scopes (Value a)
+            b' = reduce scopes (Value b)
         in
-            case a' of
+            case extract a' of
                 Expand _ _ (Lam n x _) ->
                     let
                         scopes' =
                             Map.singleton (nameToText n)
-                                          (AssignmentBinding bReason)
+                                          (SubstitutionBinding b')
                                 : scopes
-                        (bReason, b') = reduce' scopes b
-                        after         = App a' b' l
-                        reason        = reduceValue scopes' x
+                        after  = App (extract a') (extract b') l
+                        reason = reduceValue scopes' x
                     in
-                        Congruence [aReason, bReason] expr
+                        Congruence [a', b'] expr
                             $ ExpandPause [reason] after (extract reason)
                 -- "App a' b'" is a redex
                 Lam n x _ ->
                     let
                         scopes' =
                             Map.singleton (nameToText n)
-                                          (AssignmentBinding bReason)
+                                          (SubstitutionBinding b')
                                 : scopes
-                        (bReason, _) = reduce' scopes' b
                     in
-                        Congruence [aReason, bReason] expr
-                            $ reduceValue scopes' x
+                        Congruence [a', b'] expr $ reduceValue scopes' x
                 -- "App a' b'" is not a redex
                 _ ->
-                    let (bReason, b') = reduce' scopes b
-                        after         = App a' b' l
-                    in  Congruence [aReason, bReason] expr (Value after)
+                    let after = App (extract a') (extract b') l
+                    in  Congruence [a', b'] expr (Value after)
     Lam arg body l ->
         let scopes' = Map.singleton (nameToText arg) NoBinding : scopes
-            (bodyReason, body') = reduce' scopes' body
-        in  Congruence [bodyReason] expr (Value $ Lam arg body' l)
+            body'   = reduce scopes' (Value body)
+        in  Congruence [body'] expr (Value $ Lam arg (extract body') l)
     others -> Value others
 
 ------------------------------------------------------------------
-type Scopes = [Scope Binding]
 
 data Binding
   = UserDefinedBinding Expr
   | NoBinding
-  | AssignmentBinding Reason
+  | SubstitutionBinding Reason
   deriving (Show)
 
 instance Pretty (Map Text Binding) where
     pretty = pretty . Map.toList
 
 instance Pretty Binding where
-    pretty (UserDefinedBinding expr  ) = "UserDefinedBinding" <+> pretty expr
-    pretty (AssignmentBinding  reason) = "AssignmentBinding" <+> pretty reason
-    pretty NoBinding                   = "NoBinding"
+    pretty (UserDefinedBinding expr) = "UserDefinedBinding" <+> pretty expr
+    pretty (SubstitutionBinding reason) =
+        "SubstitutionBinding" <+> pretty reason
+    pretty NoBinding = "NoBinding"
 
 instance Pretty Reason where
     pretty (Value val) = "Value" <+> pretty val
@@ -142,26 +142,27 @@ instance Pretty Reason where
 -- pretty (ExpandStuck name) = "Stuck" <+> pretty name
 ------------------------------------------------------------------
 
--- | A "Scope" is a mapping from names to values
-type Scope a = Map Text a
+-- | A "Scope" is a mapping from names to Bindings 
+type Scope = Map Text Binding
 
 -- | See if a name is in a series of scopes (from local to global)
 -- | Return the first result (which should be the most local target)
-lookupScopes :: [Scope a] -> Name -> Maybe a
+lookupScopes :: [Scope] -> Name -> Maybe Binding
 lookupScopes scopes name = foldl findFirst Nothing scopes
   where
-    findFirst :: Maybe a -> Scope a -> Maybe a
+    findFirst :: Maybe Binding -> Scope -> Maybe Binding
     findFirst (Just found) _     = Just found
     findFirst Nothing      scope = Map.lookup (nameToText name) scope
 
-scopeFromLetBindings :: Map Name (Maybe Bindings) -> Scope Binding
+scopeFromLetBindings :: Map Name (Maybe Bindings) -> Scope
 scopeFromLetBindings = Map.mapKeys nameToText . fmap toBinding
   where
-    toBinding Nothing = NoBinding
+    toBinding Nothing               = NoBinding
     toBinding (Just (LetBinding x)) = UserDefinedBinding x
-    toBinding (Just others) = AssignmentBinding (Value $ bindingsToExpr others)
+    toBinding (Just others) =
+        SubstitutionBinding (Value $ bindingsToExpr others)
 
-scopeFromAssignments :: [Name] -> [Expr] -> Scope Binding
-scopeFromAssignments xs es = Map.mapKeys nameToText $ Map.fromList $ zip
+scopeFromSubstitution :: [Name] -> [Expr] -> Scope
+scopeFromSubstitution xs es = Map.mapKeys nameToText $ Map.fromList $ zip
     xs
-    (map (AssignmentBinding . Value) es)
+    (map (SubstitutionBinding . Value) es)

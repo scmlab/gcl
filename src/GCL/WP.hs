@@ -268,7 +268,7 @@ wp _ (A.Assign xs es _) post = do
   -- alphaSubst sub post
 
   letBindings <- Substitute.scopeFromLetBindings <$> ask
-  let assigmentBindings = Substitute.scopeFromAssignments xs es
+  let assigmentBindings = Substitute.scopeFromSubstitution xs es
   return $ Substitute.reducePred [assigmentBindings, letBindings] post
 
 wp _ (A.AAssign (A.Var x _) i e _) post = do
