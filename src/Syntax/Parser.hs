@@ -6,7 +6,7 @@
 module Syntax.Parser where
 
 import Control.Applicative.Combinators (choice, eitherP, many, optional, sepBy1, (<|>), manyTill, some)
-import Control.Monad (void, when)
+import Control.Monad (void)
 import Control.Monad.Combinators.Expr (Operator (..), makeExprParser)
 import Control.Monad.Trans (lift)
 import Data.Data (Proxy (Proxy))
@@ -15,7 +15,7 @@ import Data.Maybe (isJust)
 import qualified Data.Ord as Ord
 import Data.Text (Text)
 import Syntax.Common (Name (..), ChainOp, ArithOp)
-import Syntax.Concrete (BlockDecl (..), BlockDeclaration (..), Decl (..), DeclProp (..), DeclBody (..), Declaration (..), EndpointClose (..), EndpointOpen (..), Expr (..), GdCmd (..), Interval (..), Program (..), SepBy (..), Stmt (..), TBase (..), Token (..), Type (..), ProofAnchor (ProofAnchor))
+import Syntax.Concrete
 import Syntax.Parser.Lexer
 import Syntax.Parser.Util
 import Text.Megaparsec (MonadParsec (..), Pos, anySingle, parse, tokensToChunk, (<?>), manyTill_)
@@ -67,13 +67,7 @@ pProgram = do
 pDeclaration :: Parser Declaration
 pDeclaration = Lex.lineFold scn (parser p)
   where
-    p = choice
-        [ try pConstDeclWithProp,
-          pConstDecl,
-          try pVarDeclWithProp,
-          pVarDecl,
-          pLetDecl
-        ]
+    p = (pConstDecl <|> pVarDecl)
         <* lift scn
         <?> "declaration"
 
@@ -84,44 +78,27 @@ pBlockDeclaration' :: ParserF BlockDeclaration
 pBlockDeclaration' =
   BlockDeclaration
   <$> lexDeclStart
-  <*> many pBlockDecl
+  <*> pIndentBlock pBlockDecl
   <*> lexDeclEnd
 
 pConstDecl :: ParserF Declaration
 pConstDecl =
   ConstDecl
   <$> lexCon
-  <*> pDecl pName
-
-pConstDeclWithProp :: ParserF Declaration
-pConstDeclWithProp =
-  ConstDeclWithProp
-  <$> lexCon
-  <*> pDecl pName
-  <*> pDeclProp
+  <*> pDeclType pName
 
 pVarDecl :: ParserF Declaration
 pVarDecl =
   VarDecl
   <$> lexVar
-  <*> pDecl lowerName
+  <*> pDeclType lowerName
 
-pVarDeclWithProp :: ParserF Declaration
-pVarDeclWithProp =
-  VarDeclWithProp
-  <$> lexVar
-  <*> pDecl lowerName
-  <*> pDeclProp
+pBlockDecl :: ParserF BlockDecl
+pBlockDecl = lift $ Lex.lineFold scn (eitherP (try pBlockDeclType) pDeclBody ↓)
 
-pLetDecl :: ParserF Declaration
-pLetDecl =
-  LetDecl
-  <$> lexLet
-  <*> pDeclBody
-
-pDecl :: ParserF Name -> ParserF Decl
-pDecl name =
-  Decl
+pDeclBase :: ParserF Name -> ParserF DeclBase
+pDeclBase name =
+  DeclBase
   <$> pList name
   <*> lexColon
   <*> pType'
@@ -133,6 +110,12 @@ pDeclProp =
   <*> pExpr'
   <*> lexBraceEnd
 
+pDeclType :: ParserF Name -> ParserF DeclType
+pDeclType name =
+  DeclType
+  <$> pDeclBase name
+  <*> optional pDeclProp
+
 pDeclBody :: ParserF DeclBody
 pDeclBody =
   DeclBody
@@ -141,22 +124,21 @@ pDeclBody =
   <*> lexEQ'
   <*> pExpr'
 
-pBlockDecl :: ParserF BlockDecl
-pBlockDecl = do
-  ref <- Lex.indentLevel
-  (decl, mDeclProp) <- lift $ Lex.lineFold scn (constDecl ↓)
-  declBodys <- lift scn *> pIndentBlock (Just ref) pDeclBody
-  return $ BlockDecl decl mDeclProp declBodys
-  where
-    constDecl = (,) <$> pDecl pName <*> optional (eitherP pDeclProp pExpr')
+pBlockDeclProp :: ParserF BlockDeclProp
+pBlockDeclProp = eitherP pDeclProp pExpr'
 
+pBlockDeclType :: ParserF BlockDeclType
+pBlockDeclType = do
+  BlockDeclType
+  <$> pDeclBase pName
+  <*> optional pBlockDeclProp
 
 ------------------------------------------
 -- parse Stmt
 ------------------------------------------
 
 pStmts :: Parser [Stmt]
-pStmts = (↓) (pIndentBlock Nothing (lift pStmt)) scn <|> return []
+pStmts = (↓) (pIndentBlock (lift pStmt)) scn <|> return []
 -- pStmts = many (pStmt <* scn)
 
 
@@ -227,7 +209,7 @@ pGdCmd =
   GdCmd
   <$> pExpr'
   <*> lexArrow
-  <*> pIndentBlock Nothing (lift pStmt)
+  <*> pIndentBlock (lift pStmt)
 
 pSpecQM :: ParserF Stmt
 pSpecQM = SpecQM . locOf <$> lexQM
@@ -506,10 +488,9 @@ pIndentSepBy p delim = do
       try g <|> return (Head x)
 
 pIndentBlock ::
-  Maybe Pos ->
   ParserF a ->                      -- parser to be indented
   ParserF [a]
-pIndentBlock mRef p = do
+pIndentBlock p = do
   pos <- Lex.indentLevel
   mp0 <- optional . try . lift $ p'
 
@@ -519,14 +500,13 @@ pIndentBlock mRef p = do
       done <- isJust <$> optional eof
       case (isEol, done) of
         (Just _, False) -> do
-          guard pos mRef
           ps <- lift $ indentedItems pos scn p'
           return (p0 : ps)
-        _ -> guard pos mRef >> return [p0]                          -- eof or no newline => only one indented element
+        _ -> do
+          return [p0]                          -- eof or no newline => only one indented element
     Nothing -> return []
   where
     p' = (↓) p sc                             -- make sure p doesn't parse newline
-    guard pos = maybe (pure ()) (\ref -> when (ref /= pos) (Lex.incorrectIndent Ord.EQ ref pos))
 
 -- copied from Text.Megaparsec.Char.Lexer
 indentedItems ::

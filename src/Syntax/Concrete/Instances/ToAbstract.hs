@@ -6,7 +6,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 module Syntax.Concrete.Instances.ToAbstract where
 
-import Control.Monad.Except ( Except, forM, throwError )
+import Control.Monad.Except ( Except, throwError )
 import Data.Loc (Loc (..), (<-->), Located (locOf))
 import Syntax.Concrete.Types
 import Syntax.Concrete.Instances.Located()
@@ -22,59 +22,54 @@ import Data.Loc.Range (rangeOf)
 class ToAbstract a b | a -> b where
   toAbstract :: a -> Except Loc b
 
+instance ToAbstract a b => ToAbstract (Maybe a) (Maybe b) where
+  toAbstract Nothing = return Nothing
+  toAbstract (Just x) = Just <$> toAbstract x
+
+instance ToAbstract a b => ToAbstract [a] [b] where
+  toAbstract = mapM toAbstract
 --------------------------------------------------------------------------------
 
 -- | Program / Declaration / Statement
 instance ToAbstract Program A.Program where
   toAbstract prog@(Program decls' stmts') = do
-    decls <- concat <$> forM decls' toAbstract
+    decls <- concat <$> toAbstract decls'
     -- let declarations = ConstExpr.pickDeclarations decls
     let letBindings = ConstExpr.pickLetBindings decls
     let (globProps, assertions) = ConstExpr.pickGlobals decls
     let pre = [A.Assert (A.conjunct assertions) NoLoc | not (null assertions)]
-    stmts <- mapM toAbstract stmts'
+    stmts <- toAbstract stmts'
 
     return $ A.Program decls globProps letBindings (pre ++ stmts) (locOf prog)
 
 instance ToAbstract Declaration A.Declaration where
   toAbstract declaration = case declaration of
     ConstDecl _ decl -> do
-      (name, body) <- toAbstract decl
-      return $ A.ConstDecl name body Nothing (locOf decl)
-    ConstDeclWithProp _ decl prop -> do
-      (name, body) <- toAbstract decl
-      prop' <- toAbstract prop
-      return $ A.ConstDecl name body (Just prop') (locOf decl)
+      (name, body, prop) <- toAbstract decl
+      return $ A.ConstDecl name body prop (locOf decl)
     VarDecl _ decl -> do
-      (name, body) <- toAbstract decl
-      return $ A.VarDecl name body Nothing (locOf decl)
-    VarDeclWithProp _ decl prop -> do
-      (name, body) <- toAbstract decl
-      prop' <- toAbstract prop
-      return $ A.VarDecl name body (Just prop') (locOf decl)
-    LetDecl _ decl -> do
-      decl' <- toAbstract decl
-      return $ A.LetDecl decl' (locOf decl)
+      (name, body, prop) <- toAbstract decl
+      return $ A.VarDecl name body prop (locOf decl)
 
 instance ToAbstract BlockDeclaration [A.Declaration] where
-  toAbstract (BlockDeclaration _ decls _) = concat <$> mapM toAbstract decls
+  toAbstract (BlockDeclaration _ decls _) = toAbstract decls
 
 instance ToAbstract Stmt A.Stmt where
   toAbstract stmt = case stmt of
-    Skip l -> pure (A.Skip (locOf l))
-    Abort l -> pure (A.Abort (locOf l))
-    Assign a _ b -> A.Assign (fromSepBy a) <$> mapM toAbstract (fromSepBy b) <*> pure (a <--> b)
-    AAssign x _ i _ _ e -> A.AAssign (A.Var x (locOf x)) <$> toAbstract i <*> toAbstract e <*> pure (x <--> e)
-    Assert l a r -> A.Assert <$> toAbstract a <*> pure (l <--> r)
-    LoopInvariant l a _ _ _ b r -> A.LoopInvariant <$> toAbstract a <*> toAbstract b <*> pure (l <--> r)
-    Do l a r -> A.Do <$> mapM toAbstract (fromSepBy a) <*> pure (l <--> r)
-    If l a r -> A.If <$> mapM toAbstract (fromSepBy a) <*> pure (l <--> r)
+    Skip _ -> pure (A.Skip (locOf stmt))
+    Abort _ -> pure (A.Abort (locOf stmt))
+    Assign a _ b -> A.Assign (fromSepBy a) <$> toAbstract (fromSepBy b) <*> pure (locOf stmt)
+    AAssign x _ i _ _ e -> A.AAssign (A.Var x (locOf x)) <$> toAbstract i <*> toAbstract e <*> pure (locOf stmt)
+    Assert _ a _ -> A.Assert <$> toAbstract a <*> pure (locOf stmt)
+    LoopInvariant _ a _ _ _ b _ -> A.LoopInvariant <$> toAbstract a <*> toAbstract b <*> pure (locOf stmt)
+    Do _ a _ -> A.Do <$> toAbstract (fromSepBy a) <*> pure (locOf stmt)
+    If _ a _ -> A.If <$> toAbstract (fromSepBy a) <*> pure (locOf stmt)
     SpecQM l -> throwError l
     Spec l t r -> pure (A.Spec t (rangeOf l <> rangeOf r))
-    Proof l anchors r -> A.Proof <$> mapM toAbstract anchors <*> pure (l <--> r)
+    Proof _ anchors _ -> A.Proof <$> toAbstract anchors <*> pure (locOf stmt)
 
 instance ToAbstract GdCmd A.GdCmd where
-  toAbstract (GdCmd a _ b) = A.GdCmd <$> toAbstract a <*> mapM toAbstract b <*> pure (a <--> b)
+  toAbstract (GdCmd a _ b) = A.GdCmd <$> toAbstract a <*> toAbstract b <*> pure (a <--> b)
 
 instance ToAbstract ProofAnchor A.ProofAnchor where
   toAbstract (ProofAnchor hash range) = pure $ A.ProofAnchor hash range
@@ -82,32 +77,40 @@ instance ToAbstract ProofAnchor A.ProofAnchor where
 --------------------------------------------------------------------------------
 
 -- Low level Declaration wrapper, and synonym types
-instance ToAbstract Decl ([Name], A.Type) where
-  toAbstract (Decl a _ b) = do
+instance ToAbstract DeclBase ([Name], A.Type) where
+  toAbstract (DeclBase a _ b) = do
     b' <- toAbstract b
     return (fromSepBy a, b')
 
 instance ToAbstract DeclProp A.Expr where
   toAbstract (DeclProp _ e _) = toAbstract e
 
-instance ToAbstract DeclProp' A.Expr where
+instance ToAbstract DeclType ([Name], A.Type, Maybe A.Expr) where
+  toAbstract (DeclType decl prop) = do
+    (ns, t) <- toAbstract decl
+    e <- toAbstract prop
+    return (ns, t, e)
+
+instance ToAbstract BlockDeclProp A.Expr where
   toAbstract (Left prop) = toAbstract prop
   toAbstract (Right prop) = toAbstract prop
 
-instance ToAbstract DeclBody A.DeclBody where
-  toAbstract (DeclBody n args _ b) = do
-    A.DeclBody n args <$> toAbstract b
+instance ToAbstract DeclBody A.Declaration where
+  toAbstract d@(DeclBody n args _ b) = do
+    A.LetDecl n args <$> toAbstract b <*> pure (locOf d)
+
+instance ToAbstract BlockDeclType A.Declaration where
+  toAbstract d@(BlockDeclType decl prop) = do
+    (ns, t) <- toAbstract decl
+    A.ConstDecl ns t <$> toAbstract prop <*> pure (locOf d)
 
 -- One BlockDecl can be parse into a ConstDecl or a ConstDecl and a LetDecl
-instance ToAbstract BlockDecl [A.Declaration] where
-  toAbstract declaration@(BlockDecl decl mDeclProp declBodys) = do
-    (names, type') <- toAbstract decl
-    mDeclProp' <- mapM toAbstract mDeclProp
-    declBodys' <- mapM toAbstract declBodys
-    return [A.BlockDecl names type' mDeclProp' declBodys' (locOf declaration)]
-    
+instance ToAbstract BlockDecl A.Declaration where
+  toAbstract (Left decl) = toAbstract decl
+  toAbstract (Right decl) = toAbstract decl
+
 instance ToAbstract Declaration' [A.Declaration] where
-  toAbstract (Left d) = (: []) <$> toAbstract d
+  toAbstract (Left d) = (:[]) <$> toAbstract d
   toAbstract (Right bd) = toAbstract bd
 
 --------------------------------------------------------------------------------
@@ -123,7 +126,7 @@ instance ToAbstract EndpointClose A.Endpoint where
 
 -- | Interval
 instance ToAbstract Interval A.Interval where
-  toAbstract (Interval a _ b) = A.Interval <$> toAbstract a <*> toAbstract b <*> pure (a <--> b)
+  toAbstract i@(Interval a _ b) = A.Interval <$> toAbstract a <*> toAbstract b <*> pure (locOf i)
 
 -- | Base Type
 instance ToAbstract TBase A.TBase where
@@ -133,11 +136,19 @@ instance ToAbstract TBase A.TBase where
 
 -- | Type
 instance ToAbstract Type A.Type where
-  toAbstract (TParen _ a _) = toAbstract a
-  toAbstract (TBase a) = A.TBase <$> toAbstract a <*> pure (locOf a)
-  toAbstract (TArray l a _ b) = A.TArray <$> toAbstract a <*> toAbstract b <*> pure (l <--> b)
-  toAbstract (TFunc a _ b) = A.TFunc <$> toAbstract a <*> toAbstract b <*> pure (a <--> b)
-  toAbstract (TVar a) = pure $ A.TVar a (locOf a)
+  toAbstract t = 
+    case t of
+      (TBase a) -> A.TBase <$> toAbstract a <*> pure (locOf t)
+      (TArray _ a _ b) -> A.TArray <$> toAbstract a <*> toAbstract b <*> pure (locOf t)
+      (TFunc a _ b) -> A.TFunc <$> toAbstract a <*> toAbstract b <*> pure (locOf t)
+      (TVar a) -> pure $ A.TVar a (locOf t)
+      (TParen _ a _) -> do
+        t' <- toAbstract a
+        case t' of
+          A.TBase a' _ -> pure$ A.TBase a' (locOf t)
+          A.TArray a' b' _ -> pure $ A.TArray a' b' (locOf t)
+          A.TFunc a' b' _ -> pure $ A.TFunc a' b' (locOf t)
+          A.TVar a' _ -> pure $ A.TVar a' (locOf t)
 
 --------------------------------------------------------------------------------
 

@@ -38,11 +38,9 @@ type Defns = Map Name Expr
 data Declaration
   = ConstDecl [Name] Type (Maybe Expr) Loc
   | VarDecl [Name] Type (Maybe Expr) Loc
-  | LetDecl DeclBody Loc
-  | BlockDecl [Name] Type (Maybe Expr) [DeclBody] Loc
+  | LetDecl Name [Name] Expr Loc
   deriving (Eq, Show)
 
-data DeclBody = DeclBody Name [Name] Expr deriving (Eq, Show)
 --------------------------------------------------------------------------------
 
 data Stmt
