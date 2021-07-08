@@ -13,7 +13,6 @@ import           GCL.Predicate                  ( PO(PO)
 import           Pretty
 import           Render                         ( Inlines(..)
                                                 , Render(render)
-                                                , isEmpty
                                                 )
 import           Server.DSL                     ( parseProgram
                                                 , sweep
@@ -39,17 +38,14 @@ letBindings = testGroup
     return $ serializeTestResultValueOnly $ runTest sourcePath source $ do
       program        <- parseProgram source
       (pos, _, _, _) <- sweep program
-      let substs = pos >>= extractSubst
+      let substs = pos >>= extractExpand
       let trees  = map toTree substs
       return (Right (VList trees))
 
 
--- Tree-like structure for representing the transition from one Subst to the next 
+-- Tree-like structure for representing the transition from one Expn to the next 
 data Tree = Node Inlines -- BEFORE + MAPPING (before pressing any "buttons")
                          (Map Inlines [Tree]) -- transitions
-
-                        --  MAPPING ==> AFTER 
-                        --  (Map Inlines Tree) --  "buttons" with the result after pressing them 
 
 instance Pretty Tree where
   pretty (Node before transitions) = pretty before <> line <> indent
@@ -63,69 +59,65 @@ instance Pretty Tree where
     prettyTransition (transition, children) =
       [pretty transition, indent 2 $ vcat (map pretty children)]
 
-toTree :: SUBST -> Tree
-toTree (SUBST before mapping after inBefore inAfter) = Node
-  (before <> " " <> mapping)
-  (toBefore <> toAfter)
+toTree :: EXPN -> Tree
+toTree (EXPN before after inAfter) = Node
+  before
+  toAfter
  where
-  toBefore :: Map Inlines [Tree] 
-  toBefore = Map.fromList $ map (\subst -> ("* " <> renderedMapping subst <> " ===>" <> renderedAfter subst ,map toTree (substsInAfter subst))) inBefore
+  -- toBefore :: Map Inlines [Tree] 
+  -- toBefore = Map.fromList $ map (\subst -> ("* ===> " <> renderedAfter subst ,map toTree (substsInAfter subst))) inBefore
 
   toAfter :: Map Inlines [Tree]
-  toAfter = Map.singleton ("* " <> mapping <> " ===>" <> after) (map toTree inAfter)
+  toAfter = Map.singleton ("* ===> " <> after) (map toTree inAfter)
 
 --------------------------------------------------------------------------------
 -- | Typeclass for extracting `Substs` from the syntax tree 
 
 -- like Subst, but augmented with Substs in "before" and "after"
-data SUBST = SUBST
+data EXPN = EXPN
   { renderedBefore  :: Inlines
-  , renderedMapping :: Inlines
   , renderedAfter   :: Inlines
-  , substsInBefore  :: [SUBST]
-  , substsInAfter   :: [SUBST]
+  , substsInAfter   :: [EXPN]
   }
   deriving Show
 
-class ExtractSubst a where
-  extractSubst :: a -> [SUBST]
+class ExtractExpand a where
+  extractExpand :: a -> [EXPN]
 
-instance ExtractSubst PO where
-  extractSubst (PO pre post _ _ _) = extractSubst pre <> extractSubst post
+instance ExtractExpand PO where
+  extractExpand (PO pre post _ _ _) = extractExpand pre <> extractExpand post
 
-instance ExtractSubst Pred where
-  extractSubst = \case
-    Constant x          -> extractSubst x
-    GuardIf   x _       -> extractSubst x
-    GuardLoop x _       -> extractSubst x
-    Assertion x _       -> extractSubst x
-    LoopInvariant x y _ -> extractSubst x <> extractSubst y
-    Bound x _           -> extractSubst x
-    Conjunct xs         -> xs >>= extractSubst
-    Disjunct xs         -> xs >>= extractSubst
-    Negate   x          -> extractSubst x
+instance ExtractExpand Pred where
+  extractExpand = \case
+    Constant x          -> extractExpand x
+    GuardIf   x _       -> extractExpand x
+    GuardLoop x _       -> extractExpand x
+    Assertion x _       -> extractExpand x
+    LoopInvariant x y _ -> extractExpand x <> extractExpand y
+    Bound x _           -> extractExpand x
+    Conjunct xs         -> xs >>= extractExpand
+    Disjunct xs         -> xs >>= extractExpand
+    Negate   x          -> extractExpand x
 
-instance ExtractSubst Expr where
-  extractSubst = \case
-    Paren x _       -> extractSubst x
-    Chain x _ y _   -> extractSubst x <> extractSubst y
-    App x y _       -> extractSubst x <> extractSubst y
-    Lam _ x _       -> extractSubst x
-    Quant x _ y z _ -> extractSubst x <> extractSubst y <> extractSubst z
-    Subst before mapping after ->
-      [ SUBST (render before)
-              renderedMapping'
+instance ExtractExpand Expr where
+  extractExpand = \case
+    Paren x _       -> extractExpand x
+    Chain x _ y _   -> extractExpand x <> extractExpand y
+    App x y _       -> extractExpand x <> extractExpand y
+    Lam _ x _       -> extractExpand x
+    Quant x _ y z _ -> extractExpand x <> extractExpand y <> extractExpand z
+    Expand _ before after -> 
+      [ EXPN (render before)
               (render after)
-              (extractSubst before)
-              (extractSubst after)
+              (extractExpand after)
+      ] 
+    Subst before _mapping after ->
+      [ EXPN (render before)
+              (render after)
+              (extractExpand after)
       ]
-     where
-      -- render empty mapping as "[]"
-      renderedMapping' =
-        let rendered = render mapping
-        in  if isEmpty rendered then "[]" else rendered
-    ArrIdx x y _   -> extractSubst x <> extractSubst y
-    ArrUpd x y z _ -> extractSubst x <> extractSubst y <> extractSubst z
+    ArrIdx x y _   -> extractExpand x <> extractExpand y
+    ArrUpd x y z _ -> extractExpand x <> extractExpand y <> extractExpand z
     _              -> []
 
 --------------------------------------------------------------------------------
