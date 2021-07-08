@@ -112,7 +112,7 @@ instance StabM HoverM Declaration HoverResult where
   stabM = \case
     ConstDecl a    _    c    _ -> (<>) <$> stabLocated a <*> stabLocated c
     VarDecl   a    _    c    _ -> (<>) <$> stabLocated a <*> stabLocated c
-    LetDecl   (DeclBody name args body) _ -> do
+    LetDecl   name args body _ -> do
       name' <- stabLocated name
       -- creates a local scope for arguments 
       args' <- stabM (toArgs name args)
@@ -121,23 +121,6 @@ instance StabM HoverM Declaration HoverResult where
       body' <- localScope argsScope $ stabLocated body
 
       return $ concat [name', args', body']
-    BlockDecl a _ c ds _ -> do
-      a' <- stabLocated a
-      c' <- stabLocated c
-      ds' <- stabLocated ds
-      return (a' <> c' <> ds')
-
-instance StabM HoverM DeclBody HoverResult where
-  stabM (DeclBody name args body) = do
-    name' <- stabLocated name
-    -- creates a local scope for arguments 
-    args' <- stabM (toArgs name args)
-    let argsScope = Map.fromList $ zip (map nameToText args) args'
-    -- temporarily prepend this local scope to the scope list 
-    body' <- localScope argsScope $ stabLocated body
-
-    return $ concat [name', args', body']
-
 
 instance StabM HoverM Expr HoverResult where
   stabM = \case

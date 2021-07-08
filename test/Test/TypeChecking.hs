@@ -213,11 +213,7 @@ declarationTests =
       testCase "var declaration" $
         declarationCheck "var x : Bool" "[(x, Bool)]",
       testCase "var declaration w/ prop" $
-        declarationCheck "var x : Bool { x = True }" "[(x, Bool)]",
-      testCase "let declaration 1" $
-        declarationCheck "let N = 5" "[(N, Int)]",
-      testCase "let declaration 2" $
-        declarationCheck "let G i j = i + j" "[(G, Int → Int → Int)]"
+        declarationCheck "var x : Bool { x = True }" "[(x, Bool)]"
     ]
 
 blockDeclarationTests :: TestTree
@@ -252,7 +248,19 @@ blockDeclarationTests =
         \  F : Int -> Int -> Int\n\
         \  P : Char -> Bool\n\
         \:}"
-        "[(A, Int), (B, Int), (F, Int → Int → Int), (P, Char → Bool)]"
+        "[(A, Int), (B, Int), (F, Int → Int → Int), (P, Char → Bool)]",
+      testCase "block declaration 5" $
+        blockDeclarationCheck
+        "{:\n\
+        \   N = 5\n\
+        \:}"
+        "[(N, Int)]",
+      testCase "block declaration 6" $
+        blockDeclarationCheck
+        "{:\n\
+        \    G i j = i + j\n\
+        \:}"
+        "[(G, Int → Int → Int)]"
     ]
 
 programTest :: TestTree
@@ -263,7 +271,7 @@ programTest =
       testCase "program check 1" $
         programCheck
           "var i, j : Int\n\
-          \let P x = i = j\n\
+          \{: P x = i = j :}\n\
           \{ P 1 }\n\
           \"
     ]
