@@ -17,22 +17,24 @@ import           Syntax.Abstract.Util           ( bindingsToExpr )
 import           Syntax.Common                  ( Name
                                                 , nameToText
                                                 )
+import Debug.Trace
 
 ------------------------------------------------------------------
+
 reducePred :: [Scope] -> Pred -> Pred
 reducePred scopes x = case x of
-    Constant a          -> Constant (reduceExpr a)
-    GuardIf   a l       -> GuardIf (reduceExpr a) l
-    GuardLoop a l       -> GuardLoop (reduceExpr a) l
-    Assertion a l       -> Assertion (reduceExpr a) l
-    LoopInvariant a b l -> LoopInvariant (reduceExpr a) (reduceExpr b) l
-    Bound a l           -> Bound (reduceExpr a) l
+    Constant a          -> Constant (reduceExpr scopes a)
+    GuardIf   a l       -> GuardIf (reduceExpr scopes a) l
+    GuardLoop a l       -> GuardLoop (reduceExpr scopes a) l
+    Assertion a l       -> Assertion (reduceExpr scopes a) l
+    LoopInvariant a b l -> LoopInvariant (reduceExpr scopes a) (reduceExpr scopes b) l
+    Bound a l           -> Bound (reduceExpr scopes a) l
     Conjunct as         -> Conjunct (map (reducePred scopes) as)
     Disjunct as         -> Disjunct (map (reducePred scopes) as)
     Negate   a          -> Negate (reducePred scopes a)
-  where
-    reduceExpr :: Expr -> Expr
-    reduceExpr = extract . reduce scopes . Value
+
+reduceExpr :: [Scope] -> Expr -> Expr
+reduceExpr scopes = extract . reduce scopes . Value
 
 ------------------------------------------------------------------
 extract :: Reason -> Expr
@@ -56,13 +58,20 @@ reduceValue scopes expr = case expr of
     Paren e l ->
         let e' = reduce scopes (Value e)
         in  Congruence [e'] expr (Value $ Paren (extract e') l)
+    
     Var name _ -> case lookupScopes scopes name of
         Nothing ->
             error $ "panic: " ++ show (nameToText name) ++ " is not in scope"
-        Just (UserDefinedBinding binding) -> ExpandPause [] expr binding
-        Just (SubstitutionBinding binding) ->
-            ExpandContinue name (reduce scopes binding)
-        Just NoBinding -> ExpandStuck name
+        Just (UserDefinedBinding binding) -> traceShow ("Var Pause", pretty name, pretty binding) $ ExpandPause [] expr binding
+        Just (SubstitutionBinding binding) -> 
+            let scopes' = Map.singleton (nameToText name) NoBinding : scopes 
+            in 
+            
+            traceShow ("Var SubstitutionBinding", pretty name, pretty binding, pretty scopes') $ 
+            -- ExpandContinue name binding
+            ExpandContinue name (reduce scopes' binding)
+        Just NoBinding -> traceShow ("Var NoBinding") $ ExpandStuck name
+
     Const name _ -> case lookupScopes scopes name of
         Nothing ->
             error $ "panic: " ++ show (nameToText name) ++ " is not in scope"
@@ -77,7 +86,7 @@ reduceValue scopes expr = case expr of
                                                      op
                                                      (extract b')
                                                      l
-    App a b l ->
+    App a b l -> traceShow ("App", pretty a, pretty b) $ 
         let a' = reduce scopes (Value a)
             b' = reduce scopes (Value b)
         in
@@ -109,8 +118,18 @@ reduceValue scopes expr = case expr of
     Lam arg body l ->
         let scopes' = Map.singleton (nameToText arg) NoBinding : scopes
             body'   = reduce scopes' (Value body)
-        in  Congruence [body'] expr (Value $ Lam arg (extract body') l)
-    others -> Value others
+        in  Congruence [body'] expr (Value $ Lam arg (extract 
+        body') l)
+
+    Quant op binders range x l -> 
+        let bindersScope = Map.fromList $ map (\binder -> (nameToText binder, NoBinding)) binders
+            scopes' = bindersScope : scopes
+            op'   = reduce scopes' (Value op)
+            range'   = reduce scopes' (Value range)
+            x'          = reduce scopes' (Value x)
+        in  Congruence [op', range', x'] expr (Value $ Quant (extract op') binders (extract x') (extract x') l)
+    Subst {} -> error "Subst in reduceValue"
+    others -> traceShow ("Others", pretty expr) Value others
 
 ------------------------------------------------------------------
 

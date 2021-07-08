@@ -20,7 +20,6 @@ import           Syntax.Common                  ( ArithOp(..)
                                                 , Op(..)
                                                 , classify
                                                 )
-import Debug.Trace
 
 ------------------------------------------------------------------------------
 

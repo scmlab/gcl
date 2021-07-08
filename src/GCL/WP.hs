@@ -6,19 +6,19 @@
 
 module GCL.WP where
 
-import Control.Monad.Except (Except, MonadError (throwError), forM, forM_, runExcept, unless, when)
+import Control.Monad.Except (Except, MonadError (throwError), forM, forM_, runExcept, unless, when, replicateM)
 import Control.Monad.RWS (MonadReader (ask), MonadState (..), MonadWriter (..), RWST, evalRWST)
 import Control.Arrow(first)
 import Data.Loc (Loc (..), Located (..))
 import Data.Loc.Range (Range, fromLoc)
 import qualified Data.Map as Map
-import GCL.Common (Fresh (..), Subs, Substitutable (..), AlphaRename (..), freshName')
+import GCL.Common (Fresh (..), Subs, Substitutable (..), AlphaRename (..), freshName', freshName)
 import GCL.Predicate (Origin (..), PO (..), Pred (..), Spec (Specification))
 import GCL.Predicate.Util (conjunct, disjunct, guardIf, guardLoop, toExpr)
 import qualified Syntax.Abstract as A
 import qualified Syntax.Abstract.Operator as A
 import qualified Syntax.Abstract.Util as A
-import Syntax.Common (Name (Name))
+import Syntax.Common (Name (Name), nameToText)
 import qualified Data.Hashable as Hashable
 import Numeric (showHex)
 import qualified Data.Text as Text
@@ -377,18 +377,34 @@ sp _ (_, _) (A.Abort _) = return (Constant A.true)
 sp _ (pre, _) (A.Skip _) = return pre
 sp _ (pre, _) (A.Assign xs es l) = do
       -- {P} x := E { (exists x' :: x = E[x'/x] && P[x'/x]) }
-    freeNames <- genFreeNames xs
-    let sub = genSub xs freeNames
-    pre' <- alphaSubst sub (toExpr pre)
+
+    -- generate fresh names from "xs"
+    freshNames <- replicateM (length xs) (freshName l)
+
+    -- generate new scope from fresh names 
+    let scope = Map.mapKeys nameToText $ Map.fromList $ zip xs $ map (Substitute.SubstitutionBinding . A.Value . flip A.Var l) freshNames
+    -- substitute "xs"s with fresh names in "pre"
+    let pre' = Substitute.reduceExpr [scope] (toExpr pre)
+    -- 
+    let predicate = A.conjunct $ zipWith (\x e -> A.nameVar x `A.eqq` Substitute.reduceExpr [scope] e) xs es
+
     return $ Constant (
-       A.exists freeNames (A.conjunct (zipWith (genEq sub) xs es)) pre')
-  where
-    genFreeNames :: [a] -> WP [Name]
-    genFreeNames ys = map (`Name` l) <$> mapM (const freshText) ys
-    -- genSub :: [Name] -> [Name] -> Subs A.Bindings
-    genSub ys hs = Map.fromList . zip ys . map (A.AssignBinding . A.nameVar) $ hs
-    -- genEq :: Map Name Bindings -> Name -> A.Expr -> A.Expr
-    genEq sub x e = A.nameVar x `A.eqq` subst sub e
+       A.exists freshNames predicate pre')
+
+
+
+  --   freshNames <- genFreshNames xs
+  --   let sub = genSub xs freshNames
+  --   pre' <- alphaSubst sub (toExpr pre)
+  --   return $ Constant (
+  --      A.exists freshNames (A.conjunct (zipWith (genEq sub) xs es)) pre')
+  -- where
+  --   genFreshNames :: [a] -> WP [Name]
+  --   genFreshNames ys = map (`Name` l) <$> mapM (const freshText) ys
+  --   -- genSub :: [Name] -> [Name] -> Subs A.Bindings
+  --   genSub ys hs = Map.fromList . zip ys . map (A.AssignBinding . A.nameVar) $ hs
+  --   -- genEq :: Map Name Bindings -> Name -> A.Expr -> A.Expr
+  --   genEq sub x e = A.nameVar x `A.eqq` subst sub e
 sp _ (pre, _) (A.AAssign (A.Var x _) i e _) = do
      -- {P} x[I] := E { (exist x' :: x = x'[I[x'/x] -> E[x'/x]] && P[x'/x]) }
    x' <- freshText
@@ -419,8 +435,6 @@ tellPO p q origin = unless (toExpr p == toExpr q) $ do
     let p' = Substitute.reducePred [letBindings] p
     let q' = Substitute.reducePred [letBindings] q
 
-    -- p' <- betaReduction <$> alphaSubst s1 p
-    -- q' <- betaReduction <$> alphaSubst s2 q
     (i, j, k) <- get
     put (succ i, j, k)
     let anchorHash = Text.pack $ showHex (abs (Hashable.hash (toString (p', q')))) ""
@@ -437,8 +451,6 @@ tellSpec p q l = do
   let p' = Substitute.reducePred [letBindings] p
   let q' = Substitute.reducePred [letBindings] q
 
-  -- p' <- alphaSubst emptySubs p
-  -- q' <- alphaSubst emptySubs q
   (i, j, k) <- get
   put (i, succ j, k)
   tell ([], [Specification j p' q' l], [])
