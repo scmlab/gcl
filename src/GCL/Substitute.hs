@@ -22,15 +22,16 @@ import           Syntax.Common                  ( Name
 
 reducePred :: [Scope] -> Pred -> Pred
 reducePred scopes x = case x of
-    Constant a          -> Constant (reduceExpr scopes a)
-    GuardIf   a l       -> GuardIf (reduceExpr scopes a) l
-    GuardLoop a l       -> GuardLoop (reduceExpr scopes a) l
-    Assertion a l       -> Assertion (reduceExpr scopes a) l
-    LoopInvariant a b l -> LoopInvariant (reduceExpr scopes a) (reduceExpr scopes b) l
-    Bound a l           -> Bound (reduceExpr scopes a) l
-    Conjunct as         -> Conjunct (map (reducePred scopes) as)
-    Disjunct as         -> Disjunct (map (reducePred scopes) as)
-    Negate   a          -> Negate (reducePred scopes a)
+    Constant a    -> Constant (reduceExpr scopes a)
+    GuardIf   a l -> GuardIf (reduceExpr scopes a) l
+    GuardLoop a l -> GuardLoop (reduceExpr scopes a) l
+    Assertion a l -> Assertion (reduceExpr scopes a) l
+    LoopInvariant a b l ->
+        LoopInvariant (reduceExpr scopes a) (reduceExpr scopes b) l
+    Bound a l   -> Bound (reduceExpr scopes a) l
+    Conjunct as -> Conjunct (map (reducePred scopes) as)
+    Disjunct as -> Disjunct (map (reducePred scopes) as)
+    Negate   a  -> Negate (reducePred scopes a)
 
 reduceExpr :: [Scope] -> Expr -> Expr
 reduceExpr scopes = extract . reduce scopes . Value
@@ -60,17 +61,25 @@ reduceValue scopes expr = case expr of
 
     Var name _ -> case lookupScopes scopes name of
         Nothing ->
-            error $ "panic: " ++ show (nameToText name) ++ " is not in scope: " ++ show (pretty scopes)
+            error
+                $  "panic: "
+                ++ show (nameToText name)
+                ++ " is not in scope: "
+                ++ show (pretty scopes)
         Just (UserDefinedBinding binding) -> ExpandPause [] expr binding
         Just (SubstitutionBinding binding) ->
-            let scopes' = Map.singleton (nameToText name) NoBinding : scopes in 
-            ExpandContinue name (reduce scopes' binding)
+            let scopes' = Map.singleton (nameToText name) NoBinding : scopes
+            in  ExpandContinue name (reduce scopes' binding)
             -- traceShow ("Var SubstitutionBinding", pretty binding) $ ExpandContinue name binding 
         Just NoBinding -> ExpandStuck name
 
     Const name _ -> case lookupScopes scopes name of
         Nothing ->
-            error $ "panic: " ++ show (nameToText name) ++ " is not in scope: " ++ show (pretty scopes)
+            error
+                $  "panic: "
+                ++ show (nameToText name)
+                ++ " is not in scope: "
+                ++ show (pretty scopes)
         Just (UserDefinedBinding binding) -> ExpandPause [] expr binding
         Just (SubstitutionBinding binding) ->
             ExpandContinue name (reduce scopes binding)
@@ -82,8 +91,9 @@ reduceValue scopes expr = case expr of
                                                      op
                                                      (extract b')
                                                      l
-    App a b l -> 
-        let a' = reduce scopes (Value a)
+    App a b l ->
+        let
+            a' = reduce scopes (Value a)
             b' = reduce scopes (Value b)
         in
             case extract a' of
@@ -105,8 +115,7 @@ reduceValue scopes expr = case expr of
                             Map.singleton (nameToText n)
                                           (SubstitutionBinding b')
                                 : scopes
-                    in
-                        Congruence [a', b'] expr $ reduceValue scopes' x
+                    in  Congruence [a', b'] expr $ reduceValue scopes' x
                 -- "App a' b'" is not a redex
                 _ ->
                     let after = App (extract a') (extract b') l
@@ -114,17 +123,46 @@ reduceValue scopes expr = case expr of
     Lam arg body l ->
         let scopes' = Map.singleton (nameToText arg) NoBinding : scopes
             body'   = reduce scopes' (Value body)
-        in  Congruence [body'] expr (Value $ Lam arg (extract
-        body') l)
+        in  Congruence [body'] expr (Value $ Lam arg (extract body') l)
 
     Quant op binders range x l ->
-        let bindersScope = Map.fromList $ map (\binder -> (nameToText binder, NoBinding)) binders
+        let bindersScope = Map.fromList
+                $ map (\binder -> (nameToText binder, NoBinding)) binders
             scopes' = bindersScope : scopes
-            op'   = reduce scopes' (Value op)
-            range'   = reduce scopes' (Value range)
-            x'          = reduce scopes' (Value x)
-        in  Congruence [op', range', x'] expr (Value $ Quant (extract op') binders (extract range') (extract x') l)
-    Subst {} -> error "Subst in reduceValue"
+            op'     = reduce scopes' (Value op)
+            range'  = reduce scopes' (Value range)
+            x'      = reduce scopes' (Value x)
+        in  Congruence
+                [op', range', x']
+                expr
+                (Value $ Quant (extract op')
+                               binders
+                               (extract range')
+                               (extract x')
+                               l
+                )
+    Subst{} -> error "Subst in reduceValue"
+
+    ArrIdx array index l ->
+        let array' = reduce scopes (Value array)
+            index' = reduce scopes (Value index)
+        in  Congruence [array', index']
+                       expr
+                       (Value $ ArrIdx (extract array') (extract index') l)
+
+    ArrUpd array index value l ->
+        let array' = reduce scopes (Value array)
+            index' = reduce scopes (Value index)
+            value' = reduce scopes (Value value)
+        in  Congruence
+                [array', index', value']
+                expr
+                (Value $ ArrUpd (extract array')
+                                (extract index')
+                                (extract value')
+                                l
+                )
+
     others -> Value others
 
 ------------------------------------------------------------------
