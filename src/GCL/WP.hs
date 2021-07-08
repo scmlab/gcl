@@ -11,7 +11,6 @@ import           Control.Monad.Except           ( Except
                                                 , MonadError(throwError)
                                                 , forM
                                                 , forM_
-                                                , replicateM
                                                 , runExcept
                                                 , unless
                                                 , when
@@ -20,7 +19,8 @@ import           Control.Monad.RWS              ( MonadReader(ask)
                                                 , MonadState(..)
                                                 , MonadWriter(..)
                                                 , RWST
-                                                , evalRWST, withRWST
+                                                , evalRWST
+                                                , withRWST
                                                 )
 import qualified Data.Hashable                 as Hashable
 import qualified Data.List                     as List
@@ -33,7 +33,6 @@ import           Data.Loc.Range                 ( Range
 import qualified Data.Map                      as Map
 import qualified Data.Text                     as Text
 import           GCL.Common                     ( Fresh(..)
-                                                , freshName
                                                 , freshName'
                                                 )
 import           GCL.Predicate                  ( Origin(..)
@@ -50,7 +49,7 @@ import           GCL.Predicate.Util             ( conjunct
 import qualified GCL.Substitute                as Substitute
 import           GCL.WP.Type
 import           Numeric                        ( showHex )
-import           Pretty                         ( toString )
+import           Pretty                         ( toString, toText )
 import qualified Syntax.Abstract               as A
 import qualified Syntax.Abstract.Operator      as A
 import qualified Syntax.Abstract.Util          as A
@@ -336,14 +335,12 @@ wp _ (A.Proof _ _         ) post = return post
 wp _ (A.Alloc x (e : es) _) post = do
     {- wp (x := es) P = (forall x', (x' -> es) -* P[x'/x])-}
 
-
   scopes <- ask
-  x'     <- freshName'
+  x'     <- freshName' (toText x) -- generate fresh name using the exisiting "x"
   let assigmentBindings = Substitute.scopeFromSubstitution [x] [A.nameVar x']
   let post' = Substitute.reduceExpr (assigmentBindings : scopes) (toExpr post)
 
   return $ Constant (A.forAll [x'] A.true (newallocs x' `A.sImp` post'))
-
 
  where
   newallocs x' = A.sconjunct
@@ -365,7 +362,7 @@ wp _ (A.HLookup x e _) post = do
     {- wp (x := *e) P = (exists v . (e->v) * ((e->v) -* P[v/x])) -}
 
   scopes <- ask
-  v      <- freshName'
+  v     <- freshName' (toText x) -- generate fresh name using the exisiting "x"
   let assigmentBindings = Substitute.scopeFromSubstitution [x] [A.nameVar v]
   let post' = Substitute.reduceExpr (assigmentBindings : scopes) (toExpr post)
   return $ Constant
@@ -391,7 +388,7 @@ wp _ _ _ = error "missing case in wp"
 
 allocated :: Fresh m => A.Expr -> m A.Expr
 allocated e = do
-  v <- freshName'
+  v <- freshName' "new"
   return (A.exists [v] A.true (e `A.pointsTo` A.nameVar v))
   -- allocated e = e -> _
 
@@ -443,20 +440,25 @@ sp :: Bool -> (Pred, Maybe A.Expr) -> A.Stmt -> WP Pred
 sp _ (_  , _) (A.Abort _       ) = return (Constant A.true)
 sp _ (pre, _) (A.Skip  _       ) = return pre
 sp _ (pre, _) (A.Assign xs es l) = do
-      -- {P} x := E { (exists x' :: x = E[x'/x] && P[x'/x]) }
+  -- {P} x := E { (exists x' :: x = E[x'/x] && P[x'/x]) }
 
-    -- generate fresh names from "xs"
-  freshNames <- replicateM (length xs) (freshName l)
+  -- generate fresh names from the assignees "xs"
+  freshNames <- forM xs $ \x -> do 
+    x' <- freshWithLabel (toText x)
+    return $ Name x' NoLoc
+  let freshVars = map (`A.Var` l) freshNames
+  -- generate new scope for fresh names
+  scopes <- ask
+  let varsToFreshVars = Substitute.scopeFromSubstitution xs freshVars
+  let freshVarToNothing = Map.fromList
+        $ map (\name -> (nameToText name, Substitute.NoBinding)) freshNames
+  let scopes' = varsToFreshVars : freshVarToNothing : scopes
 
-  -- generate new scope from fresh names 
-  let scope = Map.mapKeys nameToText $ Map.fromList $ zip xs $ map
-        (Substitute.SubstitutionBinding . A.Value . flip A.Var l)
-        freshNames
   -- substitute "xs"s with fresh names in "pre"
-  let pre' = Substitute.reduceExpr [scope] (toExpr pre)
+  let pre'    = Substitute.reduceExpr scopes' (toExpr pre)
   -- 
   let predicate = A.conjunct $ zipWith
-        (\x e -> A.nameVar x `A.eqq` Substitute.reduceExpr [scope] e)
+        (\x e -> A.nameVar x `A.eqq` Substitute.reduceExpr scopes' e)
         xs
         es
 
@@ -480,9 +482,9 @@ sp _ (pre, _) (A.AAssign (A.Var x _) i e _) = do
      -- {P} x[I] := E { (exist x' :: x = x'[I[x'/x] -> E[x'/x]] && P[x'/x]) }
 
   scopes <- ask
-  x'          <- freshText
+  x'     <- freshText
   let assigmentBindings = Substitute.scopeFromSubstitution [x] [A.variable x']
-  let scopes' = assigmentBindings : scopes
+  let scopes'           = assigmentBindings : scopes
   let pre'              = Substitute.reduceExpr scopes' (toExpr pre)
   return $ Constant
     (A.exists
@@ -552,8 +554,8 @@ throwWarning warning = do
 
 
 withFreshVar :: (A.Expr -> WP a) -> WP a
-withFreshVar f = do 
-  name <- freshName'
-  let var = A.Var name NoLoc
+withFreshVar f = do
+  name <- freshName' "bnd"
+  let var   = A.Var name NoLoc
   let scope = Map.singleton (nameToText name) Substitute.NoBinding
-  withRWST (\scopes st -> (scope: scopes, st)) (f var) 
+  withRWST (\scopes st -> (scope : scopes, st)) (f var)

@@ -37,11 +37,11 @@ class Monad m => Fresh m where
   freshTexts n = liftM2 (:) freshText (freshTexts (n - 1))
 
 
-freshName :: Fresh m => Loc -> m Name
-freshName l = Name <$> freshText <*> pure l
+freshName :: Fresh m => Text -> Loc -> m Name
+freshName prefix l = Name <$> freshWithLabel prefix <*> pure l
 
-freshName' :: Fresh m => m Name
-freshName' = freshName NoLoc
+freshName' :: Fresh m => Text -> m Name
+freshName' prefix = freshName prefix NoLoc
 
 type FreshState = Int
 

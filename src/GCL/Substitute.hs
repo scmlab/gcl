@@ -60,7 +60,7 @@ reduceValue scopes expr = case expr of
 
     Var name _ -> case lookupScopes scopes name of
         Nothing ->
-            error $ "panic: " ++ show (nameToText name) ++ " is not in scope" ++ show (pretty scopes)
+            error $ "panic: " ++ show (nameToText name) ++ " is not in scope: " ++ show (pretty scopes)
         Just (UserDefinedBinding binding) -> ExpandPause [] expr binding
         Just (SubstitutionBinding binding) ->
             let scopes' = Map.singleton (nameToText name) NoBinding : scopes in 
@@ -70,7 +70,7 @@ reduceValue scopes expr = case expr of
 
     Const name _ -> case lookupScopes scopes name of
         Nothing ->
-            error $ "panic: " ++ show (nameToText name) ++ " is not in scope"
+            error $ "panic: " ++ show (nameToText name) ++ " is not in scope: " ++ show (pretty scopes)
         Just (UserDefinedBinding binding) -> ExpandPause [] expr binding
         Just (SubstitutionBinding binding) ->
             ExpandContinue name (reduce scopes binding)
