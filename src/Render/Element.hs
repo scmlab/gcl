@@ -72,12 +72,22 @@ instance IsString Block where
 instance Pretty Block where
   pretty (Header header Nothing     ) = pretty header
   pretty (Header header (Just range)) = pretty header <> " at " <> pretty range
-  pretty (HeaderWithAnchor header hash Nothing Nothing     ) = pretty header <> " #" <> pretty hash
-  pretty (HeaderWithAnchor header hash (Just anchor) Nothing     ) = pretty header <> " #" <> pretty hash <> " anchored at " <> pretty anchor
-  pretty (HeaderWithAnchor header hash Nothing (Just range)) = pretty header <> " at " <> pretty range <> " #" <> pretty hash
-  pretty (HeaderWithAnchor header hash (Just anchor) (Just range)) = pretty header <> " at " <> pretty range <> " #" <> pretty hash <> " anchored at " <> pretty anchor
-  pretty (Paragraph inlines         ) = pretty inlines
-  pretty (Code      inlines         ) = "`" <> pretty inlines <> "`"
+  pretty (HeaderWithAnchor header hash Nothing Nothing) =
+    pretty header <> " #" <> pretty hash
+  pretty (HeaderWithAnchor header hash (Just anchor) Nothing) =
+    pretty header <> " #" <> pretty hash <> " anchored at " <> pretty anchor
+  pretty (HeaderWithAnchor header hash Nothing (Just range)) =
+    pretty header <> " at " <> pretty range <> " #" <> pretty hash
+  pretty (HeaderWithAnchor header hash (Just anchor) (Just range)) =
+    pretty header
+      <> " at "
+      <> pretty range
+      <> " #"
+      <> pretty hash
+      <> " anchored at "
+      <> pretty anchor
+  pretty (Paragraph inlines) = pretty inlines
+  pretty (Code      inlines) = "`" <> pretty inlines <> "`"
 
 instance ToJSON Block
 
@@ -141,12 +151,11 @@ isEmpty inlines = all elemIsEmpty (Seq.viewl (unInlines inlines))
   elemIsEmpty (Link _ xs _) = all elemIsEmpty $ unInlines xs
   elemIsEmpty (Sbst xs env ys _) =
     all elemIsEmpty $ unInlines xs <> unInlines env <> unInlines ys
-  elemIsEmpty (Expn _ xs ys) =
-    all elemIsEmpty $ unInlines xs <> unInlines ys
-  elemIsEmpty (Horz xs) = all isEmpty xs
-  elemIsEmpty (Vert xs) = all isEmpty xs
-  elemIsEmpty (Parn _ ) = False
-  elemIsEmpty (PrHz _ ) = False
+  elemIsEmpty (Expn _ xs ys) = all elemIsEmpty $ unInlines xs <> unInlines ys
+  elemIsEmpty (Horz xs     ) = all isEmpty xs
+  elemIsEmpty (Vert xs     ) = all isEmpty xs
+  elemIsEmpty (Parn _      ) = False
+  elemIsEmpty (PrHz _      ) = False
 
 infixr 6 <+>
 
@@ -169,7 +178,8 @@ substE :: Inlines -> Inlines -> Inlines -> Inlines
 substE before env after = Inlines $ Seq.singleton $ Sbst before env after []
 
 expandE :: Inlines -> Inlines -> Inlines -> Inlines
-expandE reasons before after = Inlines $ Seq.singleton $ Expn reasons before after
+expandE reasons before after =
+  Inlines $ Seq.singleton $ Expn reasons before after
 
 -- | Note: when there's only 1 Horz inside a Parn, convert it to PrHz
 parensE :: Inlines -> Inlines
@@ -225,7 +235,7 @@ instance Show Inline where
   show (Text s _       ) = Text.unpack s
   show (Link _ xs _    ) = show xs
   show (Sbst xs env _ _) = show xs <> show env
-  show (Expn _ xs _)       = show xs
+  show (Expn _ xs _    ) = show xs
   show (Horz xs        ) = unwords (map show $ toList xs)
   show (Vert xs        ) = unlines (map show $ toList xs)
   show (Parn x         ) = "(" <> show x <> ")"

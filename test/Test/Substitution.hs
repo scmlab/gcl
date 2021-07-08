@@ -22,7 +22,7 @@ import           Server.Interpreter.Test        ( runTest
                                                 )
 import           Syntax.Abstract                ( Expr(..) )
 import           Test.Tasty              hiding ( after )
-import Test.Util
+import           Test.Util
 
 tests :: TestTree
 tests = testGroup "Substitution" [letBindings]
@@ -31,16 +31,22 @@ tests = testGroup "Substitution" [letBindings]
 letBindings :: TestTree
 letBindings = testGroup
   "Substitute let-bindings"
-  [run "let binding" "let-1.gcl", run "let binding with assignment" "let-2.gcl"]
+  [ run "let binding"                   "let-1.gcl"
+  , run "let binding with assignment 1" "let-2.gcl"
+  , run "let binding with assignment 2" "let-3.gcl"
+  , run "let binding with assignment and application" "let-4.gcl"
+  ]
  where
   run :: String -> FilePath -> TestTree
-  run = runGoldenTest "./test/source/Substitution/" "./test/golden/Substitution/" "" $ \sourcePath source -> do
-    return $ serializeTestResultValueOnly $ runTest sourcePath source $ do
-      program        <- parseProgram source
-      (pos, _, _, _) <- sweep program
-      let substs = pos >>= extractExpand
-      let trees  = map toTree substs
-      return (Right (VList trees))
+  run =
+    runGoldenTest "./test/source/Substitution/" "./test/golden/Substitution/" ""
+      $ \sourcePath source -> do
+          return $ serializeTestResultValueOnly $ runTest sourcePath source $ do
+            program        <- parseProgram source
+            (pos, _, _, _) <- sweep program
+            let substs = pos >>= extractExpand
+            let trees  = map toTree substs
+            return (Right (VList trees))
 
 
 -- Tree-like structure for representing the transition from one Expn to the next 
@@ -60,9 +66,7 @@ instance Pretty Tree where
       [pretty transition, indent 2 $ vcat (map pretty children)]
 
 toTree :: EXPN -> Tree
-toTree (EXPN before after inAfter) = Node
-  before
-  toAfter
+toTree (EXPN before after inAfter) = Node before toAfter
  where
   -- toBefore :: Map Inlines [Tree] 
   -- toBefore = Map.fromList $ map (\subst -> ("* ===> " <> renderedAfter subst ,map toTree (substsInAfter subst))) inBefore
@@ -75,9 +79,9 @@ toTree (EXPN before after inAfter) = Node
 
 -- like Subst, but augmented with Substs in "before" and "after"
 data EXPN = EXPN
-  { renderedBefore  :: Inlines
-  , renderedAfter   :: Inlines
-  , substsInAfter   :: [EXPN]
+  { renderedBefore :: Inlines
+  , renderedAfter  :: Inlines
+  , substsInAfter  :: [EXPN]
   }
   deriving Show
 
@@ -106,16 +110,10 @@ instance ExtractExpand Expr where
     App x y _       -> extractExpand x <> extractExpand y
     Lam _ x _       -> extractExpand x
     Quant x _ y z _ -> extractExpand x <> extractExpand y <> extractExpand z
-    Expand _ before after -> 
-      [ EXPN (render before)
-              (render after)
-              (extractExpand after)
-      ] 
+    Expand _ before after ->
+      [EXPN (render before) (render after) (extractExpand after)]
     Subst before _mapping after ->
-      [ EXPN (render before)
-              (render after)
-              (extractExpand after)
-      ]
+      [EXPN (render before) (render after) (extractExpand after)]
     ArrIdx x y _   -> extractExpand x <> extractExpand y
     ArrUpd x y z _ -> extractExpand x <> extractExpand y <> extractExpand z
     _              -> []
