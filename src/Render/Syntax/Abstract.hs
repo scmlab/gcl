@@ -20,7 +20,6 @@ import           Syntax.Common                  ( ArithOp(..)
                                                 , Op(..)
                                                 , classify
                                                 )
-import Debug.Trace
 
 ------------------------------------------------------------------------------
 
@@ -50,8 +49,9 @@ handleExpr n (App p q _     ) = do
   case handleExpr n p of 
     Expect p' -> p' q 
     Complete p' -> do 
+      
       -- function application is left-associative
-      let t = renderPrec (succ n) q
+      t <-  handleExpr 9 q
       return $ parensIf n 0 $ p' <+> t 
 handleExpr _ (Lam p q _) = return $ "λ" <+> render p <+> "→" <+> render q
 handleExpr _ (Quant op xs r t _) =

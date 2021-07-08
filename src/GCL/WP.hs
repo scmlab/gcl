@@ -20,7 +20,7 @@ import           Control.Monad.RWS              ( MonadReader(ask)
                                                 , MonadState(..)
                                                 , MonadWriter(..)
                                                 , RWST
-                                                , evalRWST
+                                                , evalRWST, withRWST
                                                 )
 import qualified Data.Hashable                 as Hashable
 import qualified Data.List                     as List
@@ -260,8 +260,8 @@ structGdcmdInduct inv (A.GdCmd guard body _) =
   structStmts True (Conjunct [inv, guardLoop guard], Nothing) body inv
 
 structGdcmdBnd :: Pred -> A.Expr -> A.GdCmd -> WP ()
-structGdcmdBnd inv bnd (A.GdCmd guard body _) = do
-  oldbnd <- freshVar
+structGdcmdBnd inv bnd (A.GdCmd guard body _) = withFreshVar $ \oldbnd -> do
+  -- oldbnd <- freshVar
   structStmts
     False
     (Conjunct [inv, Bound (bnd `A.eqq` oldbnd) NoLoc, guardLoop guard], Nothing)
@@ -550,5 +550,10 @@ throwWarning :: StructWarning -> WP ()
 throwWarning warning = do
   tell ([], [], [warning])
 
-freshVar :: Fresh m => m A.Expr
-freshVar = (\v -> A.Var (Name v NoLoc) NoLoc) <$> freshText
+
+withFreshVar :: (A.Expr -> WP a) -> WP a
+withFreshVar f = do 
+  name <- freshName'
+  let var = A.Var name NoLoc
+  let scope = Map.singleton (nameToText name) Substitute.NoBinding
+  withRWST (\scopes st -> (scope: scopes, st)) (f var) 

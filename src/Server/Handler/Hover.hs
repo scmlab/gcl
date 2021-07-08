@@ -117,7 +117,7 @@ instance StabM HoverM Declaration HoverResult where
       -- creates a local scope for arguments 
       args' <- stabM (toArgs name args)
       let argsScope = Map.fromList $ zip (map nameToText args) args'
-      -- temporarily preppend this local scope to the scope list 
+      -- temporarily prepend this local scope to the scope list 
       body' <- localScope argsScope $ stabLocated body
 
       return $ concat [name', args', body']
@@ -133,7 +133,7 @@ instance StabM HoverM DeclBody HoverResult where
     -- creates a local scope for arguments 
     args' <- stabM (toArgs name args)
     let argsScope = Map.fromList $ zip (map nameToText args) args'
-    -- temporarily preppend this local scope to the scope list 
+    -- temporarily prepend this local scope to the scope list 
     body' <- localScope argsScope $ stabLocated body
 
     return $ concat [name', args', body']

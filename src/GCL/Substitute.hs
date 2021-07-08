@@ -17,7 +17,6 @@ import           Syntax.Abstract.Util           ( bindingsToExpr )
 import           Syntax.Common                  ( Name
                                                 , nameToText
                                                 )
-import Debug.Trace
 
 ------------------------------------------------------------------
 
@@ -62,13 +61,12 @@ reduceValue scopes expr = case expr of
     Var name _ -> case lookupScopes scopes name of
         Nothing ->
             error $ "panic: " ++ show (nameToText name) ++ " is not in scope" ++ show (pretty scopes)
-        Just (UserDefinedBinding binding) -> traceShow ("Var Pause", pretty name, pretty binding) $ ExpandPause [] expr binding
+        Just (UserDefinedBinding binding) -> ExpandPause [] expr binding
         Just (SubstitutionBinding binding) ->
-            let scopes' = Map.singleton (nameToText name) NoBinding : scopes
-            in traceShow ("Var SubstitutionBinding", pretty name, pretty binding, pretty scopes') $
+            let scopes' = Map.singleton (nameToText name) NoBinding : scopes in 
             ExpandContinue name (reduce scopes' binding)
             -- traceShow ("Var SubstitutionBinding", pretty binding) $ ExpandContinue name binding 
-        Just NoBinding -> traceShow "Var NoBinding" $ ExpandStuck name
+        Just NoBinding -> ExpandStuck name
 
     Const name _ -> case lookupScopes scopes name of
         Nothing ->
@@ -84,7 +82,7 @@ reduceValue scopes expr = case expr of
                                                      op
                                                      (extract b')
                                                      l
-    App a b l -> traceShow ("App", pretty a, pretty b) $
+    App a b l -> 
         let a' = reduce scopes (Value a)
             b' = reduce scopes (Value b)
         in
