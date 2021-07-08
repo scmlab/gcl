@@ -12,7 +12,7 @@ import Control.Arrow(first)
 import Data.Loc (Loc (..), Located (..))
 import Data.Loc.Range (Range, fromLoc)
 import qualified Data.Map as Map
-import GCL.Common (Fresh (..), Subs, Substitutable (..), AlphaRename (..), freshName', freshName)
+import GCL.Common (Fresh (..), Subs, freshName', freshName)
 import GCL.Predicate (Origin (..), PO (..), Pred (..), Spec (Specification))
 import GCL.Predicate.Util (conjunct, disjunct, guardIf, guardLoop, toExpr)
 import qualified Syntax.Abstract as A
@@ -89,12 +89,12 @@ progView stmts = do
     isProof _ = False
 
 
-alphaSubst :: (Substitutable A.Bindings b, AlphaRename WP b) => Subs A.Bindings -> b -> WP b
-alphaSubst sub e = do
-  env <- ask
-  let ns = Map.keys env
-  env' <- alphaRename ns env
-  subst sub . subst env' <$> alphaRename ns e
+-- alphaSubst :: (Substitutable A.Bindings b, AlphaRename WP b) => Subs A.Bindings -> b -> WP b
+-- alphaSubst sub e = do
+--   env <- ask
+--   let ns = Map.keys env
+--   env' <- alphaRename ns env
+--   subst sub . subst env' <$> alphaRename ns e
   -- return . subst sub . subst env $ e
 
 
@@ -272,8 +272,14 @@ wp _ (A.Assign xs es _) post = do
   return $ Substitute.reducePred [assigmentBindings, letBindings] post
 
 wp _ (A.AAssign (A.Var x _) i e _) post = do
-  let sub = Map.fromList [(x, A.AssignBinding (A.ArrUpd (A.nameVar x) i e NoLoc))]
-  alphaSubst sub post
+  -- let sub = Map.fromList [(x, A.AssignBinding (A.ArrUpd (A.nameVar x) i e NoLoc))]
+  -- alphaSubst sub post
+
+  letBindings <- Substitute.scopeFromLetBindings <$> ask
+  let assigmentBindings = Substitute.scopeFromSubstitution [x] [A.ArrUpd (A.nameVar x) i e NoLoc]
+  return $ Substitute.reducePred [assigmentBindings, letBindings] post
+
+
 wp _ (A.AAssign _ _ _ l) _ = throwError (MultiDimArrayAsgnNotImp l)
 -- wp _ (A.Assert p l) post = do
 --   tellPO (Assertion p l) post (AtAssertion l)
@@ -289,27 +295,55 @@ wp b (A.If gcmds _) post = do
       <$> wpStmts b body post
   return (conjunct (disjunctGuards gcmds : pres))
 wp _ (A.Proof _ _) post = return post
-wp _ (A.Alloc x (e:es) _) post = do -- non-empty
+wp _ (A.Alloc x (e:es) _) post = do 
     {- wp (x := es) P = (forall x', (x' -> es) -* P[x'/x])-}
-   x' <- freshName'
-   post' <- alphaSubst (sub x') (toExpr post)
-   return $ Constant
-     (A.forAll [x'] A.true
-        (newallocs x' `A.sImp` post'))
-  where sub x' = Map.fromList [(x, A.AssignBinding (A.nameVar x'))]
-        newallocs x' = A.sconjunct (
+
+
+  letBindings <- Substitute.scopeFromLetBindings <$> ask
+  x' <- freshName'
+  let assigmentBindings = Substitute.scopeFromSubstitution [x] [A.nameVar x']
+  let scopes = [assigmentBindings, letBindings]
+  let post' = Substitute.reduceExpr scopes (toExpr post)
+
+  return $ Constant
+    (A.forAll [x'] A.true
+      (newallocs x' `A.sImp` post'))
+
+
+  where newallocs x' = A.sconjunct (
           (A.nameVar x' `A.pointsTo` e) :
            zipWith (\i -> A.pointsTo (A.nameVar x' `A.add` A.number i))
                [1..] es)
+
+  --  x' <- freshName'
+  --  post' <- alphaSubst (sub x') (toExpr post)
+  --  return $ Constant
+  --    (A.forAll [x'] A.true
+  --       (newallocs x' `A.sImp` post'))
+  -- where sub x' = Map.fromList [(x, A.AssignBinding (A.nameVar x'))]
+  --       newallocs x' = A.sconjunct (
+  --         (A.nameVar x' `A.pointsTo` e) :
+  --          zipWith (\i -> A.pointsTo (A.nameVar x' `A.add` A.number i))
+  --              [1..] es)
 wp _ (A.HLookup x e _) post = do
     {- wp (x := *e) P = (exists v . (e->v) * ((e->v) -* P[v/x])) -}
-   v <- freshName'
-   post' <- alphaSubst (sub v) (toExpr post)
-   return $ Constant
+
+  letBindings <- Substitute.scopeFromLetBindings <$> ask
+  v <- freshName'
+  let assigmentBindings = Substitute.scopeFromSubstitution [x] [A.nameVar v]
+  let scopes = [assigmentBindings, letBindings]
+  let post' = Substitute.reduceExpr scopes (toExpr post)
+  return $ Constant
     (A.exists [v] A.true
-       (entry v `A.sConj` (entry v `A.sImp` post')))
-  where sub v = Map.fromList [(x, A.AssignBinding (A.nameVar v))]
-        entry v = e `A.pointsTo` A.nameVar v
+      (entry v `A.sConj` (entry v `A.sImp` post')))
+  where entry v = e `A.pointsTo` A.nameVar v
+  --  v <- freshName'
+  --  post' <- alphaSubst (sub v) (toExpr post)
+  --  return $ Constant
+  --   (A.exists [v] A.true
+  --      (entry v `A.sConj` (entry v `A.sImp` post')))
+  -- where sub v = Map.fromList [(x, A.AssignBinding (A.nameVar v))]
+  --       entry v = e `A.pointsTo` A.nameVar v
 wp _ (A.HMutate e1 e2 _) post = do
     {- wp (e1* := e2) P = (e1->_) * ((e1->e2) -* P) -}
    e1_allocated <- allocated e1
@@ -407,12 +441,22 @@ sp _ (pre, _) (A.Assign xs es l) = do
   --   genEq sub x e = A.nameVar x `A.eqq` subst sub e
 sp _ (pre, _) (A.AAssign (A.Var x _) i e _) = do
      -- {P} x[I] := E { (exist x' :: x = x'[I[x'/x] -> E[x'/x]] && P[x'/x]) }
-   x' <- freshText
-   let sub = Map.fromList [(x, A.AssignBinding (A.variable x'))]
-   pre' <- alphaSubst sub (toExpr pre)
-   return $ Constant (
+
+  letBindings <- Substitute.scopeFromLetBindings <$> ask
+  x' <- freshText
+  let assigmentBindings = Substitute.scopeFromSubstitution [x] [A.variable x']
+  let scopes = [assigmentBindings, letBindings]
+  let pre' = Substitute.reduceExpr scopes (toExpr pre)
+  return $  Constant (
      A.exists [Name x' NoLoc]
-      (A.nameVar x `A.eqq` A.ArrUpd (A.variable x') (subst sub i) (subst sub e) NoLoc) pre')
+      (A.nameVar x `A.eqq` A.ArrUpd (A.variable x') (Substitute.reduceExpr scopes i) (Substitute.reduceExpr scopes e) NoLoc) pre')
+
+  --  x' <- freshText
+  --  let sub = Map.fromList [(x, A.AssignBinding (A.variable x'))]
+  --  pre' <- alphaSubst sub (toExpr pre)
+  --  return $ Constant (
+  --    A.exists [Name x' NoLoc]
+  --     (A.nameVar x `A.eqq` A.ArrUpd (A.variable x') (subst sub i) (subst sub e) NoLoc) pre')
 sp _ (_, _) (A.AAssign _ _ _ l) = throwError (MultiDimArrayAsgnNotImp l)
 sp b (pre, _) (A.If gcmds _) = do
   posts <- forM gcmds $ \(A.GdCmd guard body _) ->

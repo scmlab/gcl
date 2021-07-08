@@ -58,17 +58,17 @@ reduceValue scopes expr = case expr of
     Paren e l ->
         let e' = reduce scopes (Value e)
         in  Congruence [e'] expr (Value $ Paren (extract e') l)
-    
+
     Var name _ -> case lookupScopes scopes name of
         Nothing ->
-            error $ "panic: " ++ show (nameToText name) ++ " is not in scope"
+            error $ "panic: " ++ show (nameToText name) ++ " is not in scope" ++ show (pretty scopes)
         Just (UserDefinedBinding binding) -> traceShow ("Var Pause", pretty name, pretty binding) $ ExpandPause [] expr binding
-        Just (SubstitutionBinding binding) -> 
-            -- let scopes' = Map.singleton (nameToText name) NoBinding : scopes 
-            -- in traceShow ("Var SubstitutionBinding", pretty name, pretty binding, pretty scopes') $ 
-            traceShow ("Var SubstitutionBinding", pretty binding, show (extract binding)) $ ExpandContinue name binding 
-            -- ExpandContinue name (reduce scopes' binding)
-        Just NoBinding -> traceShow ("Var NoBinding") $ ExpandStuck name
+        Just (SubstitutionBinding binding) ->
+            let scopes' = Map.singleton (nameToText name) NoBinding : scopes
+            in traceShow ("Var SubstitutionBinding", pretty name, pretty binding, pretty scopes') $
+            ExpandContinue name (reduce scopes' binding)
+            -- traceShow ("Var SubstitutionBinding", pretty binding) $ ExpandContinue name binding 
+        Just NoBinding -> traceShow "Var NoBinding" $ ExpandStuck name
 
     Const name _ -> case lookupScopes scopes name of
         Nothing ->
@@ -84,7 +84,7 @@ reduceValue scopes expr = case expr of
                                                      op
                                                      (extract b')
                                                      l
-    App a b l -> traceShow ("App", pretty a, pretty b) $ 
+    App a b l -> traceShow ("App", pretty a, pretty b) $
         let a' = reduce scopes (Value a)
             b' = reduce scopes (Value b)
         in
@@ -116,10 +116,10 @@ reduceValue scopes expr = case expr of
     Lam arg body l ->
         let scopes' = Map.singleton (nameToText arg) NoBinding : scopes
             body'   = reduce scopes' (Value body)
-        in  Congruence [body'] expr (Value $ Lam arg (extract 
+        in  Congruence [body'] expr (Value $ Lam arg (extract
         body') l)
 
-    Quant op binders range x l -> 
+    Quant op binders range x l ->
         let bindersScope = Map.fromList $ map (\binder -> (nameToText binder, NoBinding)) binders
             scopes' = bindersScope : scopes
             op'   = reduce scopes' (Value op)
@@ -127,7 +127,7 @@ reduceValue scopes expr = case expr of
             x'          = reduce scopes' (Value x)
         in  Congruence [op', range', x'] expr (Value $ Quant (extract op') binders (extract range') (extract x') l)
     Subst {} -> error "Subst in reduceValue"
-    others -> traceShow ("Others", pretty expr) Value others
+    others -> Value others
 
 ------------------------------------------------------------------
 

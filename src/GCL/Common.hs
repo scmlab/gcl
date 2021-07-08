@@ -6,10 +6,10 @@ module GCL.Common where
 
 import Data.Text(Text)
 import qualified Data.Text as Text
-import Data.Loc ( Loc(..), Loc, Located(..) )
+import Data.Loc ( Loc(..), Loc )
 import Control.Monad (liftM2)
 import Data.Map (Map)
-import Syntax.Common (Name(..), nameToText)
+import Syntax.Common (Name(..))
 import Data.Set (Set, (\\))
 import qualified Data.Map as Map
 import qualified Data.Set as Set
@@ -240,54 +240,54 @@ instance Substitutable A.Bindings Pred where
   subst s (Disjunct es) = Disjunct (subst s es)
   subst s (Negate x) = Negate (subst s x)
 
-class Fresh m => AlphaRename m a where
-  alphaRename :: [Name] -> a -> m a
+-- class Fresh m => AlphaRename m a where
+--   alphaRename :: [Name] -> a -> m a
 
-instance (Fresh m, AlphaRename m a) => AlphaRename m (Subs a) where
-  alphaRename = mapM . alphaRename
+-- instance (Fresh m, AlphaRename m a) => AlphaRename m (Subs a) where
+--   alphaRename = mapM . alphaRename
 
-instance (Fresh m, AlphaRename m a) => AlphaRename m (Maybe a) where
-  alphaRename = mapM . alphaRename
+-- instance (Fresh m, AlphaRename m a) => AlphaRename m (Maybe a) where
+--   alphaRename = mapM . alphaRename
 
-instance Fresh m => AlphaRename m A.Expr where
-  alphaRename s expr =
-    case expr of
-      A.Paren e l -> A.Paren <$> alphaRename s e <*> pure l
-      A.Chain a op b l -> A.Chain <$> alphaRename s a <*> pure op <*> alphaRename s b <*> pure l
-      A.App a b l -> A.App <$> alphaRename s a <*> alphaRename s b <*> pure l
-      A.Lam x body l -> do
-        x' <- capture x
-        let vx' = A.Var x' (locOf x)
-        A.Lam x' <$> alphaRename s (subst (Map.singleton x vx') body) <*> pure l
-      A.Quant op ns rng t l -> do
-        ns' <- mapM capture ns
-        let mns' = Map.fromList . zip ns . map (\x -> A.Var x (locOf x)) $ ns'
-        return $ A.Quant op ns' (subst mns' rng) (subst mns' t) l
-      _ -> return expr
-    where
-      capture x = do
-        if x `elem` s
-        then do
-          tx <- freshWithLabel (Text.pack "m" <> nameToText x)
-          return $ Name tx (locOf x)
-        else return x
+-- instance Fresh m => AlphaRename m A.Expr where
+--   alphaRename s expr =
+--     case expr of
+--       A.Paren e l -> A.Paren <$> alphaRename s e <*> pure l
+--       A.Chain a op b l -> A.Chain <$> alphaRename s a <*> pure op <*> alphaRename s b <*> pure l
+--       A.App a b l -> A.App <$> alphaRename s a <*> alphaRename s b <*> pure l
+--       A.Lam x body l -> do
+--         x' <- capture x
+--         let vx' = A.Var x' (locOf x)
+--         A.Lam x' <$> alphaRename s (subst (Map.singleton x vx') body) <*> pure l
+--       A.Quant op ns rng t l -> do
+--         ns' <- mapM capture ns
+--         let mns' = Map.fromList . zip ns . map (\x -> A.Var x (locOf x)) $ ns'
+--         return $ A.Quant op ns' (subst mns' rng) (subst mns' t) l
+--       _ -> return expr
+--     where
+--       capture x = do
+--         if x `elem` s
+--         then do
+--           tx <- freshWithLabel (Text.pack "m" <> nameToText x)
+--           return $ Name tx (locOf x)
+--         else return x
 
-instance Fresh m => AlphaRename m A.Bindings where
-  alphaRename s (A.AssignBinding e) = A.AssignBinding <$> alphaRename s e
-  alphaRename s (A.LetBinding e) = A.LetBinding <$> alphaRename s e
-  alphaRename s (A.BetaBinding e) = A.BetaBinding <$> alphaRename s e
-  alphaRename s (A.AlphaBinding e) = A.AlphaBinding <$> alphaRename s e
+-- instance Fresh m => AlphaRename m A.Bindings where
+--   alphaRename s (A.AssignBinding e) = A.AssignBinding <$> alphaRename s e
+--   alphaRename s (A.LetBinding e) = A.LetBinding <$> alphaRename s e
+--   alphaRename s (A.BetaBinding e) = A.BetaBinding <$> alphaRename s e
+--   alphaRename s (A.AlphaBinding e) = A.AlphaBinding <$> alphaRename s e
 
-instance Fresh m => AlphaRename m Pred where
-  alphaRename s (Constant e) = Constant <$> alphaRename s e
-  alphaRename s (Bound e l) = Bound <$> alphaRename s e <*> pure l
-  alphaRename s (Assertion e l) = Assertion <$> alphaRename s e <*> pure l
-  alphaRename s (LoopInvariant e b l) = LoopInvariant <$> alphaRename s e <*> alphaRename s b <*> pure l
-  alphaRename s (GuardIf e l) = GuardIf <$> alphaRename s e <*> pure l
-  alphaRename s (GuardLoop e l) = GuardLoop <$> alphaRename s e <*> pure l
-  alphaRename s (Conjunct xs) = Conjunct <$> mapM (alphaRename s) xs
-  alphaRename s (Disjunct es) = Disjunct <$> mapM (alphaRename s) es
-  alphaRename s (Negate x) = Negate <$> alphaRename s x
+-- instance Fresh m => AlphaRename m Pred where
+--   alphaRename s (Constant e) = Constant <$> alphaRename s e
+--   alphaRename s (Bound e l) = Bound <$> alphaRename s e <*> pure l
+--   alphaRename s (Assertion e l) = Assertion <$> alphaRename s e <*> pure l
+--   alphaRename s (LoopInvariant e b l) = LoopInvariant <$> alphaRename s e <*> alphaRename s b <*> pure l
+--   alphaRename s (GuardIf e l) = GuardIf <$> alphaRename s e <*> pure l
+--   alphaRename s (GuardLoop e l) = GuardLoop <$> alphaRename s e <*> pure l
+--   alphaRename s (Conjunct xs) = Conjunct <$> mapM (alphaRename s) xs
+--   alphaRename s (Disjunct es) = Disjunct <$> mapM (alphaRename s) es
+--   alphaRename s (Negate x) = Negate <$> alphaRename s x
 
 class BetaReduction a where
   betaReduction :: a -> a
