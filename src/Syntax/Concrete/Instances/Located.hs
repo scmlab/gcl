@@ -15,8 +15,15 @@ instance Located a => Located (SepBy sep a) where
 instance Located Program where
   locOf (Program a b) = a <--> b
 
-instance Located Decl where
-  locOf (Decl l _ r) = l <--> r
+instance Located Declaration where
+  locOf (ConstDecl l r) = l <--> r
+  locOf (VarDecl l r) = l <--> r
+
+instance Located BlockDeclaration where
+  locOf (BlockDeclaration l _ r) = l <--> r
+
+instance Located DeclBase where
+  locOf (DeclBase l _ r) = l <--> r
 
 instance Located DeclProp where
   locOf (DeclProp l _ r) = l <--> r
@@ -24,18 +31,11 @@ instance Located DeclProp where
 instance Located DeclBody where
   locOf (DeclBody l _ _ r) = l <--> r
 
-instance Located Declaration where
-  locOf (ConstDecl l r) = l <--> r
-  locOf (ConstDeclWithProp l _ r) = l <--> r
-  locOf (VarDecl l r) = l <--> r
-  locOf (VarDeclWithProp l _ r) = l <--> r
-  locOf (LetDecl l r) = l <--> r
+instance Located DeclType where
+  locOf (DeclType l r) = l <--> r
 
-instance Located BlockDecl where
-  locOf (BlockDecl l _ r) = l <--> r
-
-instance Located BlockDeclaration where
-  locOf (BlockDeclaration l _ r) = l <--> r
+instance Located BlockDeclType where
+  locOf (BlockDeclType l r) = l <--> r
 
 -------------------------------------------------------------------------------
 

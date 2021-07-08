@@ -40,27 +40,9 @@ instance Pretty Declaration where
       <> "{ "
       <> pretty p
       <> " }"
-  pretty (LetDecl (DeclBody name args expr) _) =
+  pretty (LetDecl name args expr _) =
     "let " <> pretty name <> hsep (map pretty args) <> " = " <> pretty expr
-  pretty (BlockDecl names t Nothing ds _) = 
-    hsep (punctuate ", " (map pretty names))
-    <> ": "
-    <> pretty t
-    <> line
-    <> vsep (map pretty ds)
-  pretty (BlockDecl names t (Just p) ds _) =
-    hsep (punctuate ", " (map pretty names))
-    <> ": "
-    <> pretty t
-    <> "{ "
-    <> pretty p
-    <> " }"
-    <> line
-    <> vsep (map pretty ds)
 
-instance Pretty DeclBody where
-  pretty (DeclBody name args expr) =
-    pretty name <> hsep (map pretty args) <> " = " <> pretty expr
 --------------------------------------------------------------------------------
 
 -- | Stmt

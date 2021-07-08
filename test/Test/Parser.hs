@@ -144,7 +144,6 @@ declaration =
       testCase "constant keyword collision 2" $ run "con Trueu : Int",
       testCase "constant keyword collision 3" $ run "con Intt : Int",
       testCase "constant keyword collision 4" $ run "con Boola : Int",
-      testCase "let binding 1" $ run "let  X   i  =  N  >   (0)  ",
       testCase "block declaration 1" $ runBlock
         "{:\n\
         \   A, B : Int\n\
@@ -168,8 +167,26 @@ declaration =
         \   A, B : Int\n\
         \     {A > 0}\n\
         \   F : Int -> Int -> Int\n\
+        \:}",
+      testCase "block declaration 4" $ runBlock
+        "{:\n\
+        \   A, B : Int\n\
+        \     {A > 0}\n\
+        \   A = 1\n\
+        \   F : Int -> Int -> Int\n\
+        \   F x y = x\n\
+        \:}",
+      testCase "block declaration 5" $ runBlock
+        "{:\n\
+        \   A = 5\n\
+        \   F a b = a + b\n\
+        \:}",
+      testCase "block declaration 6" $ runBlock
+        "{:\n\
+        \   A = 5\n\
+        \   F a b = a + b\n\
+        \   B, C : Int\n\
         \:}"
-      
     ]
   where
     run = parserIso pDeclaration
