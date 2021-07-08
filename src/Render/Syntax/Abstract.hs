@@ -20,6 +20,7 @@ import           Syntax.Common                  ( ArithOp(..)
                                                 , Op(..)
                                                 , classify
                                                 )
+import Debug.Trace
 
 ------------------------------------------------------------------------------
 
@@ -35,7 +36,7 @@ instance Render Lit where
 -- | Expr
 instance Render Expr where
   renderPrec n expr = case handleExpr n expr of
-    Expect   _ -> mempty
+    Expect   _ -> "<Render pending>"
     Complete s -> s
 
 handleExpr :: Int -> Expr -> Variadic Expr Inlines
@@ -46,10 +47,12 @@ handleExpr n (Lit   x l     ) = return $ tempHandleLoc l $ renderPrec n x
 handleExpr n (Op x          ) = handleOp n x
 handleExpr n (Chain a op b _) = return $ renderPrec n a <+> render op <+> renderPrec n b
 handleExpr n (App p q _     ) = do 
-  -- function application is left-associative
-  let s = renderPrec n p 
-  let t = renderPrec (succ n) q
-  return $ parensIf n 0 $ s <+> t 
+  case handleExpr n p of 
+    Expect p' -> p' q 
+    Complete p' -> do 
+      -- function application is left-associative
+      let t = renderPrec (succ n) q
+      return $ parensIf n 0 $ p' <+> t 
 handleExpr _ (Lam p q _) = return $ "λ" <+> render p <+> "→" <+> render q
 handleExpr _ (Quant op xs r t _) =
   return

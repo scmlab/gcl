@@ -64,12 +64,10 @@ reduceValue scopes expr = case expr of
             error $ "panic: " ++ show (nameToText name) ++ " is not in scope"
         Just (UserDefinedBinding binding) -> traceShow ("Var Pause", pretty name, pretty binding) $ ExpandPause [] expr binding
         Just (SubstitutionBinding binding) -> 
-            let scopes' = Map.singleton (nameToText name) NoBinding : scopes 
-            in 
-            
-            traceShow ("Var SubstitutionBinding", pretty name, pretty binding, pretty scopes') $ 
-            -- ExpandContinue name binding
-            ExpandContinue name (reduce scopes' binding)
+            -- let scopes' = Map.singleton (nameToText name) NoBinding : scopes 
+            -- in traceShow ("Var SubstitutionBinding", pretty name, pretty binding, pretty scopes') $ 
+            traceShow ("Var SubstitutionBinding", pretty binding, show (extract binding)) $ ExpandContinue name binding 
+            -- ExpandContinue name (reduce scopes' binding)
         Just NoBinding -> traceShow ("Var NoBinding") $ ExpandStuck name
 
     Const name _ -> case lookupScopes scopes name of
@@ -127,7 +125,7 @@ reduceValue scopes expr = case expr of
             op'   = reduce scopes' (Value op)
             range'   = reduce scopes' (Value range)
             x'          = reduce scopes' (Value x)
-        in  Congruence [op', range', x'] expr (Value $ Quant (extract op') binders (extract x') (extract x') l)
+        in  Congruence [op', range', x'] expr (Value $ Quant (extract op') binders (extract range') (extract x') l)
     Subst {} -> error "Subst in reduceValue"
     others -> traceShow ("Others", pretty expr) Value others
 
