@@ -1,5 +1,5 @@
 var y : Int 
-let P x = x = 3
+{: P x = x = 3 :}
 
 y := y + 1
 

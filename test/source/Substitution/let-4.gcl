@@ -1,6 +1,8 @@
 var y : Int 
-let Q x = y
-let P x y = x = y
+{: 
+    Q x = y
+    P x y = x = y
+:}
 
 y := y + 1
 
