@@ -50,9 +50,11 @@ handleExpr n (App p q _     ) = do
     Expect p' -> p' q 
     Complete p' -> do 
       
-      -- function application is left-associative
-      t <-  handleExpr 9 q
-      return $ parensIf n 0 $ p' <+> t 
+      -- function application is left-associative with the precedence of 9
+      let precedence = 9
+      t <-  handleExpr (succ precedence) q
+      return $ parensIf n precedence $ p' <+> t 
+
 handleExpr _ (Lam p q _) = return $ "λ" <+> render p <+> "→" <+> render q
 handleExpr _ (Quant op xs r t _) =
   return
