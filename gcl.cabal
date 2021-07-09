@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: ba8da02118c79167f4d575bf61f896792c5b83b294c9823d0033e6fd35f0203f
+-- hash: 4f4ec5d6ebcb3d84bd1ebca3ba6d66d4f711551a00f8f13d4bee57731e834a46
 
 name:           gcl
 version:        0.1.0.0
@@ -34,6 +34,7 @@ library
       GCL.Predicate
       GCL.Predicate.Located
       GCL.Predicate.Util
+      GCL.Substitute
       GCL.Type
       GCL.WP
       GCL.WP.Type
@@ -172,6 +173,7 @@ test-suite gcl-test
       GCL.Predicate
       GCL.Predicate.Located
       GCL.Predicate.Util
+      GCL.Substitute
       GCL.Type
       GCL.WP
       GCL.WP.Type

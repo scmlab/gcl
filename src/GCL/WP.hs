@@ -56,6 +56,7 @@ import qualified Syntax.Abstract.Util          as A
 import           Syntax.Common                  ( Name(Name)
                                                 , nameToText
                                                 )
+import qualified GCL.Substitute as Substitute
 
 type TM = Except StructError
 
@@ -304,9 +305,13 @@ wp _ (A.Assign xs es _) post = do
   -- let sub = Map.fromList . zip xs . map A.AssignBinding $ es
   -- alphaSubst sub post
 
+  -- scopes <- ask
+  -- let assigmentBindings = Expand.scopeFromSubstitution xs es
+  -- return $ Substitute.run (assigmentBindings : scopes) post
+
   scopes <- ask
   let assigmentBindings = Expand.scopeFromSubstitution xs es
-  return $ Expand.reducePred (assigmentBindings : scopes) post
+  return $ Substitute.run (assigmentBindings : scopes) post
 
 wp _ (A.AAssign (A.Var x _) i e _) post = do
   -- let sub = Map.fromList [(x, A.AssignBinding (A.ArrUpd (A.nameVar x) i e NoLoc))]
@@ -316,7 +321,7 @@ wp _ (A.AAssign (A.Var x _) i e _) post = do
   let assigmentBindings = Expand.scopeFromSubstitution
         [x]
         [A.ArrUpd (A.nameVar x) i e NoLoc]
-  return $ Expand.reducePred (assigmentBindings : scopes) post
+  return $ Substitute.run (assigmentBindings : scopes) post
 
 
 wp _ (A.AAssign _ _ _ l) _    = throwError (MultiDimArrayAsgnNotImp l)
@@ -338,7 +343,7 @@ wp _ (A.Alloc x (e : es) _) post = do
   scopes <- ask
   x'     <- freshName' (toText x) -- generate fresh name using the exisiting "x"
   let assigmentBindings = Expand.scopeFromSubstitution [x] [A.nameVar x']
-  let post' = Expand.reduceExpr (assigmentBindings : scopes) (toExpr post)
+  let post' = Substitute.runExpr (assigmentBindings : scopes) (toExpr post)
 
   return $ Constant (A.forAll [x'] A.true (newallocs x' `A.sImp` post'))
 
@@ -364,7 +369,7 @@ wp _ (A.HLookup x e _) post = do
   scopes <- ask
   v     <- freshName' (toText x) -- generate fresh name using the exisiting "x"
   let assigmentBindings = Expand.scopeFromSubstitution [x] [A.nameVar v]
-  let post' = Expand.reduceExpr (assigmentBindings : scopes) (toExpr post)
+  let post' = Substitute.runExpr (assigmentBindings : scopes) (toExpr post)
   return $ Constant
     (A.exists [v] A.true (entry v `A.sConj` (entry v `A.sImp` post')))
   where entry v = e `A.pointsTo` A.nameVar v
@@ -455,10 +460,10 @@ sp _ (pre, _) (A.Assign xs es l) = do
   let scopes' = varsToFreshVars : freshVarToNothing : scopes
 
   -- substitute "xs"s with fresh names in "pre"
-  let pre'    = Expand.reduceExpr scopes' (toExpr pre)
+  let pre'    = Substitute.runExpr scopes' (toExpr pre)
   -- 
   let predicate = A.conjunct $ zipWith
-        (\x e -> A.nameVar x `A.eqq` Expand.reduceExpr scopes' e)
+        (\x e -> A.nameVar x `A.eqq` Substitute.runExpr scopes' e)
         xs
         es
 
@@ -485,14 +490,14 @@ sp _ (pre, _) (A.AAssign (A.Var x _) i e _) = do
   x'     <- freshText
   let assigmentBindings = Expand.scopeFromSubstitution [x] [A.variable x']
   let scopes'           = assigmentBindings : scopes
-  let pre'              = Expand.reduceExpr scopes' (toExpr pre)
+  let pre'              = Substitute.runExpr scopes' (toExpr pre)
   return $ Constant
     (A.exists
       [Name x' NoLoc]
       (       A.nameVar x
       `A.eqq` A.ArrUpd (A.variable x')
-                       (Expand.reduceExpr scopes' i)
-                       (Expand.reduceExpr scopes' e)
+                       (Substitute.runExpr scopes' i)
+                       (Substitute.runExpr scopes' e)
                        NoLoc
       )
       pre'
@@ -524,8 +529,8 @@ tellPO :: Pred -> Pred -> Origin -> WP ()
 tellPO p q origin = unless (toExpr p == toExpr q) $ do
 
   scopes <- ask
-  let p' = Expand.reducePred scopes p
-  let q' = Expand.reducePred scopes q
+  let p' = Substitute.run scopes p
+  let q' = Substitute.run scopes q
 
   (i, j, k) <- get
   put (succ i, j, k)
@@ -541,8 +546,8 @@ tellSpec :: Pred -> Pred -> Range -> WP ()
 tellSpec p q l = do
 
   scopes <- ask
-  let p' = Expand.reducePred scopes p
-  let q' = Expand.reducePred scopes q
+  let p' = Substitute.run scopes p
+  let q' = Substitute.run scopes q
 
   (i, j, k) <- get
   put (i, succ j, k)
