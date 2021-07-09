@@ -20,7 +20,6 @@ import           Syntax.Common                  ( ArithOp(..)
                                                 , Op(..)
                                                 , classify
                                                 )
-import Debug.Trace
 
 ------------------------------------------------------------------------------
 
@@ -56,7 +55,7 @@ handleExpr n (App p q _     ) = do
       t <-  handleExpr (succ precedence) q
       return $ parensIf n precedence $ p' <+> t 
 
-handleExpr n (Lam p q _) = return $ traceShow n $ parensIf n 0 $ "λ" <+> render p <+> "→" <+> render q
+handleExpr n (Lam p q _) = return $ parensIf n 0 $ "λ" <+> render p <+> "→" <+> render q
 handleExpr _ (Quant op xs r t _) =
   return
     $   "⟨"
