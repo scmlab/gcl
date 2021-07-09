@@ -1,7 +1,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module GCL.Substitute where
+module GCL.Expand where
 
 import           Data.Loc                       ( locOf )
 import           Data.Map                       ( Map )

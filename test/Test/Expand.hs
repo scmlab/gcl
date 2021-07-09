@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE LambdaCase #-}
 
-module Test.Substitution
+module Test.Expand
   ( tests
   ) where
 
@@ -25,12 +25,12 @@ import           Test.Tasty              hiding ( after )
 import           Test.Util
 
 tests :: TestTree
-tests = testGroup "Substitution" [letBindings]
+tests = testGroup "Expansion" [letBindings]
 
 
 letBindings :: TestTree
 letBindings = testGroup
-  "Substitute let-bindings"
+  "Expanding let-bindings"
   [ run "let binding"                   "let-1.gcl"
   , run "let binding with assignment 1" "let-2.gcl"
   , run "let binding with assignment 2" "let-3.gcl"
@@ -39,7 +39,7 @@ letBindings = testGroup
  where
   run :: String -> FilePath -> TestTree
   run =
-    runGoldenTest "./test/source/Substitution/" "./test/golden/Substitution/" ""
+    runGoldenTest "./test/source/Expand/" "./test/golden/Expand/" ""
       $ \sourcePath source -> do
           return $ serializeTestResultValueOnly $ runTest sourcePath source $ do
             program        <- parseProgram source
