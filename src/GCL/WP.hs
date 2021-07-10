@@ -122,11 +122,14 @@ groupStmts (s : stmts) = case groupStmts stmts of
     (SStmts ss : segs) -> SStmts (s:ss) : segs
     (s' : segs) -> SStmts [s] : s' : segs
 
---- removing all assertions. succeed if there are no specs.
+--- removing assertions (while keeping loop invariants).
+--- succeed if there are no specs.
 
 stripAsserts :: [A.Stmt] -> Maybe [A.Stmt]
 stripAsserts [] = Just []
 stripAsserts (A.Assert _ _ : stmts) = stripAsserts stmts
+stripAsserts (s1@A.LoopInvariant {} : s2@A.Do {} : stmts) = 
+  (s1 :) <$> stripAsserts (s2 : stmts)
 stripAsserts (A.LoopInvariant {} : stmts) = stripAsserts stmts
 stripAsserts (A.Spec _ _ : _) = Nothing
 stripAsserts (A.If gcmds l : stmts) = do
@@ -227,13 +230,10 @@ struct (inv, Just bnd) (A.Do gcmds l) post = do
   tellPO (Conjunct (inv : map (Negate . guardLoop) guards)) post (AtLoop l)
   forM_ gcmds (structGdcmdInduct inv)
   tellPO
-    (Conjunct (inv : map guardLoop guards))
+    (Conjunct [inv, Disjunct (map guardLoop guards)])
     (Bound (bnd `A.gte` A.Lit (A.Num 0) NoLoc) NoLoc)
     (AtTermination l)
   forM_ gcmds (structGdcmdBnd inv bnd)
--- struct False (inv, _) (A.Do gcmds l) post = do
---   let guards = A.getGuards gcmds
---   tellPO (Conjunct (inv : map (Negate . guardLoop) guards)) post (AtLoop l)
 struct (inv, Nothing) (A.Do gcmds l) post = do
   case fromLoc l of
     Nothing -> return ()
@@ -241,8 +241,6 @@ struct (inv, Nothing) (A.Do gcmds l) post = do
   let guards = A.getGuards gcmds
   tellPO (Conjunct (inv : map (Negate . guardLoop) guards)) post (AtLoop l)
   forM_ gcmds (structGdcmdInduct inv)
---  tellPO (emptySubs, Conjunct (inv : map guardLoop guards)) (emptySubs, post) (AtTermination l)
--- struct b (pre, _) (A.Spec _ range) post = when b (tellSpec pre post range)
 struct _ (A.Proof _ _) _ = return ()
 struct _ _ _ = error "missing case in struct"
 
@@ -289,10 +287,19 @@ wpSegs (SAsrt (A.LoopInvariant p bd l) : segs) post = do
 wpSegs _ _ = error "Missing case in wpSegs"
 
   -- "simple" version of wpStmts. 
-  -- need not deal with assertions and specs (in the outer level)
+  -- no assertions and specs (in the outer level), 
+  -- but may contain invariants in secondary run
 
 wpSStmts :: [A.Stmt] -> Pred -> WP Pred
 wpSStmts [] post = return post
+wpSStmts (A.LoopInvariant inv _ _ : A.Do gcmds _ : stmts) post = 
+  do  -- this happens only in secondary run
+   post' <- wpSStmts stmts post   
+   let guards = A.getGuards gcmds
+   return . Constant $ 
+           inv `A.conj` 
+             ((inv `A.conj` A.conjunct (map A.neg guards)) `A.implies` 
+                 toExpr post')
 wpSStmts (stmt : stmts) post = do
   post' <- wpSStmts stmts post
   wp stmt post'
@@ -313,7 +320,7 @@ wp (A.AAssign _ _ _ l) _ = throwError (MultiDimArrayAsgnNotImp l)
 -- wp _ (A.LoopInvariant p b l) post = do
 --   tellPO (LoopInvariant p b l) post (AtAssertion l)
 --   return (LoopInvariant p b l)
-wp (A.Do _ _) post = return post -- SCM: TODO throwError $ MissingAssertion l
+wp (A.Do _ l) _ = throwError $ MissingAssertion l -- shouldn't happen
 wp (A.If gcmds _) post = do
   pres <- forM gcmds $ \(A.GdCmd guard body _) ->
     Constant . (guard `A.imply`)
