@@ -3,15 +3,14 @@
 {-# LANGUAGE LambdaCase #-}
 
 module GCL.Substitute
-    ( runExpr
-    , run
-    , substScopes
+    ( run
     , Scope
     , Binding(..)
-    , scopeFromLetBindings, scopeFromSubstitution
+    , scopeFromLetBindings
+    , mappingFromSubstitution
     ) where
 
-import           Control.Monad.State
+import           Control.Monad.RWS
 import           Data.Loc                       ( locOf )
 import           Data.Map                       ( Map )
 import qualified Data.Map                      as Map
@@ -25,24 +24,25 @@ import           GCL.Predicate                  ( Pred(..) )
 import           Pretty                         ( (<+>)
                                                 , Pretty(pretty)
                                                 )
-import           Syntax.Abstract                ( Expr(..), Bindings(..) )
+import           Syntax.Abstract                ( Bindings(..)
+                                                , Expr(..)
+                                                )
+import           Syntax.Abstract.Util           ( bindingsToExpr )
 import           Syntax.Common                  ( Name(Name)
                                                 , nameToText
                                                 )
-import Syntax.Abstract.Util (bindingsToExpr)
-import Debug.Trace
 
 
 ------------------------------------------------------------------
 
-run :: [Scope] -> Pred -> Pred
-run scopes x = evalState (substPred (mconcat scopes) x) 0
+run :: Subst a => Scope -> Mapping -> a -> a
+run scope mapping predicate = fst $ evalRWS (subst mapping predicate) scope 0
 
-runExpr :: [Scope] -> Expr -> Expr
-runExpr scopes x = evalState (substExpr (mconcat scopes) x) 0
+-- runExpr :: [Scope] -> Expr -> Expr
+-- runExpr scopes x = evalState (subst (mconcat scopes) x) 0
 
-substScopes :: Mapping -> [Scope] -> [Scope]
-substScopes mapping scopes = traceShow ("substScopes", pretty mapping, pretty scopes, pretty $ evalState (mapM (substScope mapping) scopes) 0) evalState (mapM (substScope mapping) scopes) 0
+-- substScopes :: Mapping -> [Scope] -> [Scope]
+-- substScopes mapping scopes = traceShow ("substScopes", pretty mapping, pretty scopes, pretty $ evalState (mapM (substScope mapping) scopes) 0) evalState (mapM (substScope mapping) scopes) 0
 
 ------------------------------------------------------------------
 
@@ -52,27 +52,28 @@ type Scope = Map Text Binding
 scopeFromLetBindings :: Map Name (Maybe Bindings) -> Scope
 scopeFromLetBindings = Map.mapKeys nameToText . fmap toBinding
   where
-    toBinding Nothing               = NoBinding
+    toBinding Nothing = NoBinding
     toBinding (Just (LetBinding x)) = UserDefinedBinding x
-    toBinding (Just others) =
-        SubstitutionBinding (bindingsToExpr others)
+    toBinding (Just others) = UserDefinedBinding (bindingsToExpr others)
 
-scopeFromSubstitution :: [Name] -> [Expr] -> Scope
-scopeFromSubstitution xs es = Map.mapKeys nameToText $ Map.fromList $ zip
-    xs
-    (map SubstitutionBinding es)
+-- scopeFromSubstitution :: [Name] -> [Expr] -> Scope
+-- scopeFromSubstitution xs es =
+--     Map.mapKeys nameToText $ Map.fromList $ zip xs (map SubstitutionBinding es)
+
+mappingFromSubstitution :: [Name] -> [Expr] -> Mapping
+mappingFromSubstitution xs es =
+    Map.mapKeys nameToText $ Map.fromList $ zip xs es
 
 ------------------------------------------------------------------
 
 data Binding
     = UserDefinedBinding Expr
-    | SubstitutionBinding Expr
     | NoBinding
     deriving (Show)
 
-type Mapping = Map Text Binding
+type Mapping = Map Text Expr
 
-type M = State Int
+type M = RWS Scope () Int
 
 instance Fresh M where
     fresh = do
@@ -82,7 +83,6 @@ instance Fresh M where
 
 instance Free Binding where
     fv (UserDefinedBinding  x) = fv x
-    fv (SubstitutionBinding x) = fv x
     fv NoBinding               = Set.empty
 
 instance Pretty (Map Text Binding) where
@@ -90,133 +90,255 @@ instance Pretty (Map Text Binding) where
 
 instance Pretty Binding where
     pretty (UserDefinedBinding expr) = "UserDefinedBinding" <+> pretty expr
-    pretty (SubstitutionBinding reason) =
-        "SubstitutionBinding" <+> pretty reason
     pretty NoBinding = "NoBinding"
 
 ------------------------------------------------------------------
 
 -- perform substitution when there's a redex
-reduceExpr :: Mapping -> Expr -> M Expr
-reduceExpr mapping expr = case expr of
+-- reduceExpr :: Mapping -> Expr -> M Expr
+-- reduceExpr mapping expr = case expr of
+--     App f x _ -> case f of
+--         Expand _ _ (Lam binder body _) -> do
+--             let
+--                 mapping' = Map.insert (nameToText binder)
+--                                       (SubstitutionBinding x)
+--                                       mapping
+--             -- perform substitution
+--             Expand [] expr <$> subst mapping' body
+
+--         Lam binder body _ -> do
+--             let
+--                 mapping' = Map.insert (nameToText binder)
+--                                       (SubstitutionBinding x)
+--                                       mapping
+--             -- perform substitution
+--             subst mapping' body
+
+--         _ -> return expr
+--     _ -> return expr
+
+-- perform substitution when there's a redex
+reduce :: Mapping -> Expr -> M Expr
+reduce mapping expr = case expr of
     App f x _ -> case f of
         Expand _ _ (Lam binder body _) -> do
-            let
-                mapping' = Map.insert (nameToText binder)
-                                      (SubstitutionBinding x)
-                                      mapping
+            let mapping' = mappingFromSubstitution [binder] [x] <> mapping
             -- perform substitution
-            Expand [] expr <$> substExpr mapping' body
+            Expand [] expr <$> subst mapping' body
 
         Lam binder body _ -> do
-            let
-                mapping' = Map.insert (nameToText binder)
-                                      (SubstitutionBinding x)
-                                      mapping
-            -- perform substitution
-            substExpr mapping' body
+            let mapping' = mappingFromSubstitution [binder] [x] <> mapping
+            subst mapping' body
 
         _ -> return expr
     _ -> return expr
 
 ------------------------------------------------------------------
 
-substScope :: Mapping -> Scope -> M Scope
-substScope mapping = mapM (substBinding mapping)
+class Subst a where
+    subst :: Mapping -> a -> M a
 
-substBinding :: Mapping -> Binding -> M Binding
-substBinding _ NoBinding = return NoBinding
-substBinding mapping (SubstitutionBinding expr) = SubstitutionBinding <$> substExpr mapping expr
-substBinding mapping (UserDefinedBinding expr) = UserDefinedBinding <$> substExpr mapping expr
+instance Subst Pred where
+    subst mapping = \case
+        Constant a    -> Constant <$> subst mapping a
+        GuardIf   a l -> GuardIf <$> subst mapping a <*> pure l
+        GuardLoop a l -> GuardLoop <$> subst mapping a <*> pure l
+        Assertion a l -> Assertion <$> subst mapping a <*> pure l
+        LoopInvariant a b l ->
+            LoopInvariant <$> subst mapping a <*> subst mapping b <*> pure l
+        Bound a l   -> Bound <$> subst mapping a <*> pure l
+        Conjunct as -> Conjunct <$> mapM (subst mapping) as
+        Disjunct as -> Disjunct <$> mapM (subst mapping) as
+        Negate   a  -> Negate <$> subst mapping a
 
-substPred :: Mapping -> Pred -> M Pred
-substPred mapping = \case
-    Constant a    -> Constant <$> substExpr mapping a
-    GuardIf   a l -> GuardIf <$> substExpr mapping a <*> pure l
-    GuardLoop a l -> GuardLoop <$> substExpr mapping a <*> pure l
-    Assertion a l -> Assertion <$> substExpr mapping a <*> pure l
-    LoopInvariant a b l ->
-        LoopInvariant <$> substExpr mapping a <*> substExpr mapping b <*> pure l
-    Bound a l   -> Bound <$> substExpr mapping a <*> pure l
-    Conjunct as -> Conjunct <$> mapM (substPred mapping) as
-    Disjunct as -> Disjunct <$> mapM (substPred mapping) as
-    Negate   a  -> Negate <$> substPred mapping a
+instance Subst Expr where
+    subst mapping expr = reduce mapping =<< case expr of
 
-substExpr :: Mapping -> Expr -> M Expr
-substExpr mapping expr = reduceExpr mapping =<< case expr of
+        Paren e l  -> Paren <$> subst mapping e <*> pure l
 
-    Paren e l  -> Paren <$> substExpr mapping e <*> pure l
+        Lit{}      -> return expr
 
-    Lit{}      -> return expr
+        Var name _ -> case Map.lookup (nameToText name) mapping of
+            Just value -> return value
+            Nothing    -> do
+                scope <- ask
+                case Map.lookup (nameToText name) scope of
+                    Just (UserDefinedBinding  binding) -> return $ Expand [] expr binding
+                    Just NoBinding                     -> return expr
+                    Nothing   -> return expr
 
-    Var name _ -> case Map.lookup (nameToText name) mapping of
-        Nothing                            -> return expr
-        Just (UserDefinedBinding  binding) -> return $ Expand [] expr binding
-        Just (SubstitutionBinding binding) -> return binding
-        Just NoBinding                     -> return expr
+        Const name _ -> case Map.lookup (nameToText name) mapping of
+            Just value -> return value
+            Nothing    -> do
+                scope <- ask
+                case Map.lookup (nameToText name) scope of
+                    Just (UserDefinedBinding  binding) -> return $ Expand [] expr binding
+                    Just NoBinding                     -> return expr
+                    Nothing   -> return expr
 
-    Const name _ -> case Map.lookup (nameToText name) mapping of
-        Nothing                            -> return expr
-        Just (UserDefinedBinding  binding) -> return $ Expand [] expr binding
-        Just (SubstitutionBinding binding) -> return binding
-        Just NoBinding                     -> return expr
+        Op{} -> return expr
 
-    Op{} -> return expr
+        Chain a op b l ->
+            Chain
+                <$> subst mapping a
+                <*> pure op
+                <*> subst mapping b
+                <*> pure l
 
-    Chain a op b l ->
-        Chain
-            <$> substExpr mapping a
-            <*> pure op
-            <*> substExpr mapping b
-            <*> pure l
+        App f x l -> App <$> subst mapping f <*> subst mapping x <*> pure l
 
-    App f x l -> App <$> substExpr mapping f <*> substExpr mapping x <*> pure l
+        Lam binder body l -> do
 
-    Lam binder body l -> do
+            -- rename the binder to avoid capturing only when necessary! 
+            let (capturableNames, shrinkedMapping) =
+                    getCapturableNames mapping body
 
-        -- rename the binder to avoid capturing only when necessary! 
-        let (capturableNames, shrinkedMapping) =
-                getCapturableNames mapping body
+            (binder', alphaRenameMapping) <- alphaRename capturableNames binder
 
-        (binder', alphaRenameMapping) <- alphaRename capturableNames binder
+            Lam binder'
+                <$> subst (alphaRenameMapping <> shrinkedMapping) body
+                <*> pure l
 
-        Lam binder'
-            <$> substExpr (alphaRenameMapping <> shrinkedMapping) body
-            <*> pure l
+        Quant op binders range body l -> do
+            -- rename binders to avoid capturing only when necessary! 
+            let (capturableNames, shrinkedMapping) =
+                    getCapturableNames mapping expr
 
-    Quant op binders range body l -> do
-        -- rename binders to avoid capturing only when necessary! 
-        let (capturableNames, shrinkedMapping) =
-                getCapturableNames mapping expr
+            (binders', alphaRenameMapping) <-
+                unzip <$> mapM (alphaRename capturableNames) binders
 
-        (binders', alphaRenameMapping) <-
-            unzip <$> mapM (alphaRename capturableNames) binders
+            -- combine individual renamings to get a new mapping 
+            -- and use that mapping to rename other stuff
+            let alphaRenameMappings = mconcat alphaRenameMapping
 
-        -- combine individual renamings to get a new mapping 
-        -- and use that mapping to rename other stuff
-        let alphaRenameMappings = mconcat alphaRenameMapping
+            Quant op binders'
+                <$> subst (alphaRenameMappings <> shrinkedMapping) range
+                <*> subst (alphaRenameMappings <> shrinkedMapping) body
+                <*> pure l
 
-        Quant op binders'
-            <$> substExpr (alphaRenameMappings <> shrinkedMapping) range
-            <*> substExpr (alphaRenameMappings <> shrinkedMapping) body
-            <*> pure l
+        Subst{}  -> return expr
 
-    Subst{}  -> return expr
+        Expand{} -> return expr
 
-    Expand{} -> return expr
+        ArrIdx array index l ->
+            ArrIdx
+                <$> subst mapping array
+                <*> subst mapping index
+                <*> pure l
 
-    ArrIdx array index l ->
-        ArrIdx
-            <$> substExpr mapping array
-            <*> substExpr mapping index
-            <*> pure l
+        ArrUpd array index value l ->
+            ArrUpd
+                <$> subst mapping array
+                <*> subst mapping index
+                <*> subst mapping value
+                <*> pure l
 
-    ArrUpd array index value l ->
-        ArrUpd
-            <$> substExpr mapping array
-            <*> substExpr mapping index
-            <*> substExpr mapping value
-            <*> pure l
+-- subst2 :: Scope -> Mapping -> Expr -> M Expr
+-- subst2 scope mapping expr = reduceExpr mapping =<< case expr of
+--     _ -> return expr 
+
+
+------------------------------------------------------------------
+
+-- substScope :: Mapping -> Scope -> M Scope
+-- substScope mapping = mapM (substBinding mapping)
+
+-- substBinding :: Mapping -> Binding -> M Binding
+-- substBinding _ NoBinding = return NoBinding
+-- substBinding mapping (SubstitutionBinding expr) =
+--     SubstitutionBinding <$> subst mapping expr
+-- substBinding mapping (UserDefinedBinding expr) =
+--     UserDefinedBinding <$> subst mapping expr
+
+-- substPred :: Mapping -> Pred -> M Pred
+-- substPred mapping = \case
+--     Constant a    -> Constant <$> subst mapping a
+--     GuardIf   a l -> GuardIf <$> subst mapping a <*> pure l
+--     GuardLoop a l -> GuardLoop <$> subst mapping a <*> pure l
+--     Assertion a l -> Assertion <$> subst mapping a <*> pure l
+--     LoopInvariant a b l ->
+--         LoopInvariant <$> subst mapping a <*> subst mapping b <*> pure l
+--     Bound a l   -> Bound <$> subst mapping a <*> pure l
+--     Conjunct as -> Conjunct <$> mapM (substPred mapping) as
+--     Disjunct as -> Disjunct <$> mapM (substPred mapping) as
+--     Negate   a  -> Negate <$> substPred mapping a
+
+
+-- subst :: Mapping -> Expr -> M Expr
+-- subst mapping expr = reduceExpr mapping =<< case expr of
+
+--     Paren e l  -> Paren <$> subst mapping e <*> pure l
+
+--     Lit{}      -> return expr
+
+--     Var name _ -> case Map.lookup (nameToText name) mapping of
+--         Nothing                            -> return expr
+--         Just (UserDefinedBinding  binding) -> return $ Expand [] expr binding
+--         Just (SubstitutionBinding binding) -> return binding
+--         Just NoBinding                     -> return expr
+
+--     Const name _ -> case Map.lookup (nameToText name) mapping of
+--         Nothing                            -> return expr
+--         Just (UserDefinedBinding  binding) -> return $ Expand [] expr binding
+--         Just (SubstitutionBinding binding) -> return binding
+--         Just NoBinding                     -> return expr
+
+--     Op{} -> return expr
+
+--     Chain a op b l ->
+--         Chain
+--             <$> subst mapping a
+--             <*> pure op
+--             <*> subst mapping b
+--             <*> pure l
+
+--     App f x l -> App <$> subst mapping f <*> subst mapping x <*> pure l
+
+--     Lam binder body l -> do
+
+--         -- rename the binder to avoid capturing only when necessary! 
+--         let (capturableNames, shrinkedMapping) =
+--                 getCapturableNames mapping body
+
+--         (binder', alphaRenameMapping) <- alphaRename capturableNames binder
+
+--         Lam binder'
+--             <$> subst (alphaRenameMapping <> shrinkedMapping) body
+--             <*> pure l
+
+--     Quant op binders range body l -> do
+--         -- rename binders to avoid capturing only when necessary! 
+--         let (capturableNames, shrinkedMapping) =
+--                 getCapturableNames mapping expr
+
+--         (binders', alphaRenameMapping) <-
+--             unzip <$> mapM (alphaRename capturableNames) binders
+
+--         -- combine individual renamings to get a new mapping 
+--         -- and use that mapping to rename other stuff
+--         let alphaRenameMappings = mconcat alphaRenameMapping
+
+--         Quant op binders'
+--             <$> subst (alphaRenameMappings <> shrinkedMapping) range
+--             <*> subst (alphaRenameMappings <> shrinkedMapping) body
+--             <*> pure l
+
+--     Subst{}  -> return expr
+
+--     Expand{} -> return expr
+
+--     ArrIdx array index l ->
+--         ArrIdx
+--             <$> subst mapping array
+--             <*> subst mapping index
+--             <*> pure l
+
+--     ArrUpd array index value l ->
+--         ArrUpd
+--             <$> subst mapping array
+--             <*> subst mapping index
+--             <*> subst mapping value
+--             <*> pure l
 
 ------------------------------------------------------------------
 -- | Perform Alpha renaming only when necessary
@@ -233,9 +355,7 @@ alphaRename capturableNames binder =
                 (locOf binder)
             return
                 ( binder'
-                , Map.singleton
-                    (nameToText binder)
-                    (SubstitutionBinding (Var binder' (locOf binder)))
+                , Map.singleton (nameToText binder) (Var binder' (locOf binder))
                 )
         -- not captured, returns the original binder 
         else return (binder, Map.empty)

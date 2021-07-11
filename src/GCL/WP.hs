@@ -60,7 +60,7 @@ import qualified GCL.Substitute as Substitute
 type TM = Except StructError
 
 type WP
-  = RWST [Substitute.Scope] ([PO], [Spec], [StructWarning]) (Int, Int, Int) TM
+  = RWST Substitute.Scope ([PO], [Spec], [StructWarning]) (Int, Int, Int) TM
 
 instance Fresh WP where
   fresh = do
@@ -70,7 +70,7 @@ instance Fresh WP where
 
 runWP
   :: WP a
-  -> [Substitute.Scope]
+  -> Substitute.Scope
   -> Either StructError (a, ([PO], [Spec], [StructWarning]))
 runWP p defs = runExcept $ evalRWST p defs (0, 0, 0)
 
@@ -79,7 +79,7 @@ sweep (A.Program decls _ _ stmts _) = do
   let scope = Map.mapKeys nameToText $ Map.map
         (maybe Substitute.NoBinding Substitute.UserDefinedBinding)
         (A.extractDeclarations decls)
-  (_, (pos, specs, warnings)) <- runWP (structProgram stmts) [scope]
+  (_, (pos, specs, warnings)) <- runWP (structProgram stmts) scope
   -- update Proof Obligations with corresponding Proof Anchors
 
 
@@ -305,28 +305,25 @@ wp _ (A.Assign xs es _) post = do
   -- alphaSubst sub post
 
   -- scopes <- ask
-  -- let assigmentBindings = Substitute.scopeFromSubstitution xs es
+  -- let assigmentBindings = Substitute.mappingFromSubstitution xs es
   -- return $ Substitute.run (assigmentBindings : scopes) post
-  let assigmentBindings = Substitute.scopeFromSubstitution xs es
+  
+  let mapping = Substitute.mappingFromSubstitution xs es
 
-  scopes <- ask
-  let scopes' = Substitute.substScopes assigmentBindings scopes
-
-  return $ Substitute.run (assigmentBindings : scopes') post
+  scope <- ask
+  return $ Substitute.run scope mapping post
 
 wp _ (A.AAssign (A.Var x _) i e _) post = do
   -- let sub = Map.fromList [(x, A.AssignBinding (A.ArrUpd (A.nameVar x) i e NoLoc))]
   -- alphaSubst sub post
 
-  let assigmentBindings = Substitute.scopeFromSubstitution
+  let mapping = Substitute.mappingFromSubstitution
         [x]
         [A.ArrUpd (A.nameVar x) i e NoLoc]
 
+  scope <- ask
 
-  scopes <- ask
-  let scopes' = Substitute.substScopes assigmentBindings scopes
-
-  return $ Substitute.run (assigmentBindings : scopes') post
+  return $ Substitute.run scope mapping post
 
 
 wp _ (A.AAssign _ _ _ l) _    = throwError (MultiDimArrayAsgnNotImp l)
@@ -346,12 +343,10 @@ wp _ (A.Alloc x (e : es) _) post = do
     {- wp (x := es) P = (forall x', (x' -> es) -* P[x'/x])-}
 
   x'     <- freshName' (toText x) -- generate fresh name using the exisiting "x"
-  let assigmentBindings = Substitute.scopeFromSubstitution [x] [A.nameVar x']
 
-  scopes <- ask
-  let scopes' = Substitute.substScopes assigmentBindings scopes
-
-  let post' = Substitute.runExpr (assigmentBindings : scopes') (toExpr post)
+  scope <- ask
+  let mapping = Substitute.mappingFromSubstitution [x] [A.nameVar x']
+  let post' = Substitute.run scope mapping (toExpr post)
 
   return $ Constant (A.forAll [x'] A.true (newallocs x' `A.sImp` post'))
 
@@ -375,13 +370,11 @@ wp _ (A.HLookup x e _) post = do
     {- wp (x := *e) P = (exists v . (e->v) * ((e->v) -* P[v/x])) -}
 
   v     <- freshName' (toText x) -- generate fresh name using the exisiting "x"
-  let assigmentBindings = Substitute.scopeFromSubstitution [x] [A.nameVar v]
 
-  scopes <- ask
-  let scopes' = Substitute.substScopes assigmentBindings scopes
+  scope <- ask
+  let mapping = Substitute.mappingFromSubstitution [x] [A.nameVar v]
+  let post' = Substitute.run scope mapping (toExpr post)
 
-
-  let post' = Substitute.runExpr (assigmentBindings : scopes') (toExpr post)
   return $ Constant
     (A.exists [v] A.true (entry v `A.sConj` (entry v `A.sImp` post')))
   where entry v = e `A.pointsTo` A.nameVar v
@@ -465,17 +458,24 @@ sp _ (pre, _) (A.Assign xs es l) = do
     return $ Name x' NoLoc
   let freshVars = map (`A.Var` l) freshNames
   -- generate new scope for fresh names
-  scopes <- ask
-  let varsToFreshVars = Substitute.scopeFromSubstitution xs freshVars
-  let freshVarToNothing = Map.fromList
-        $ map (\name -> (nameToText name, Substitute.NoBinding)) freshNames
-  let scopes' = varsToFreshVars : freshVarToNothing : Substitute.substScopes (varsToFreshVars <> freshVarToNothing) scopes
+
+  -- let varsToFreshVars = Substitute.mappingFromSubstitution xs freshVars
+  -- let freshVarToNothing = Map.fromList
+  --       $ map (\name -> (nameToText name, Substitute.NoBinding)) freshNames
+
+  -- let scopes' = varsToFreshVars : freshVarToNothing : scopes
+
+
+  -- scope <- ask
+  let mapping = Substitute.mappingFromSubstitution xs freshVars
+  scope <- ask
+
 
   -- substitute "xs"s with fresh names in "pre"
-  let pre'    = Substitute.runExpr scopes' (toExpr pre)
+  let pre'    = Substitute.run scope mapping (toExpr pre)
   -- 
   let predicate = A.conjunct $ zipWith
-        (\x e -> A.nameVar x `A.eqq` Substitute.runExpr scopes' e)
+        (\x e -> A.nameVar x `A.eqq` Substitute.run scope mapping e)
         xs
         es
 
@@ -498,18 +498,18 @@ sp _ (pre, _) (A.Assign xs es l) = do
 sp _ (pre, _) (A.AAssign (A.Var x _) i e _) = do
      -- {P} x[I] := E { (exist x' :: x = x'[I[x'/x] -> E[x'/x]] && P[x'/x]) }
 
-  scopes <- ask
+  scope <- ask
   x'     <- freshText
-  let assigmentBindings = Substitute.scopeFromSubstitution [x] [A.variable x']
-  let scopes'           = assigmentBindings : scopes
-  let pre'              = Substitute.runExpr scopes' (toExpr pre)
+
+  let mapping = Substitute.mappingFromSubstitution [x] [A.variable x']
+  let pre'              = Substitute.run scope mapping (toExpr pre)
   return $ Constant
     (A.exists
       [Name x' NoLoc]
       (       A.nameVar x
       `A.eqq` A.ArrUpd (A.variable x')
-                       (Substitute.runExpr scopes' i)
-                       (Substitute.runExpr scopes' e)
+                       (Substitute.run scope mapping i)
+                       (Substitute.run scope mapping e)
                        NoLoc
       )
       pre'
@@ -540,9 +540,9 @@ sp _ (pre, _) _ = return pre
 tellPO :: Pred -> Pred -> Origin -> WP ()
 tellPO p q origin = unless (toExpr p == toExpr q) $ do
 
-  scopes <- ask
-  let p' = Substitute.run scopes p
-  let q' = Substitute.run scopes q
+  scope <- ask
+  let p' = Substitute.run scope mempty p
+  let q' = Substitute.run scope mempty q
 
   (i, j, k) <- get
   put (succ i, j, k)
@@ -557,9 +557,9 @@ tellPO' l p q = tellPO p q l
 tellSpec :: Pred -> Pred -> Range -> WP ()
 tellSpec p q l = do
 
-  scopes <- ask
-  let p' = Substitute.run scopes p
-  let q' = Substitute.run scopes q
+  scope <- ask
+  let p' = Substitute.run scope mempty p
+  let q' = Substitute.run scope mempty q
 
   (i, j, k) <- get
   put (i, succ j, k)
@@ -574,5 +574,4 @@ withFreshVar :: (A.Expr -> WP a) -> WP a
 withFreshVar f = do
   name <- freshName' "bnd"
   let var   = A.Var name NoLoc
-  let scope = Map.singleton (nameToText name) Substitute.NoBinding
-  withRWST (\scopes st -> (scope : scopes, st)) (f var)
+  withRWST (\scope st -> (Map.insert (nameToText name) Substitute.NoBinding scope, st)) (f var)
