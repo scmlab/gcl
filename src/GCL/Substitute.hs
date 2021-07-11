@@ -8,11 +8,9 @@ import           Control.Monad.State
 import           Data.Loc                       ( locOf )
 import           Data.Map                       ( Map )
 import qualified Data.Map                      as Map
-import qualified Data.Maybe                    as Maybe
 import qualified Data.Set                      as Set
 import           Data.Set                       ( Set )
 import           Data.Text                      ( Text )
-import           Debug.Trace
 import           GCL.Common                     ( Free(fv)
                                                 , Fresh(fresh, freshWithLabel)
                                                 )
@@ -60,96 +58,28 @@ instance Pretty Binding where
 
 ------------------------------------------------------------------
 
--- type Scope = Map Text (Maybe Expr)
-
+-- perform substitution when there's a redex
 reduceExpr :: Mapping -> Expr -> M Expr
 reduceExpr mapping expr = case expr of
     App f x _ -> case f of
-        Expand _ _ lambda@(Lam binder body _) ->
-            traceShow ("App-Expand-f", pretty lambda, pretty mapping) $ do
-                let
-                    mapping' = Map.insert (nameToText binder)
-                                          (SubstitutionBinding x)
-                                          mapping
-                -- traceShow (pretty binder, pretty body, pretty mapping, pretty mapping') $ return ()
-                -- perform substitution
-                Expand [] expr <$> substExpr mapping' body
+        Expand _ _ (Lam binder body _) -> do
+            let
+                mapping' = Map.insert (nameToText binder)
+                                      (SubstitutionBinding x)
+                                      mapping
+            -- perform substitution
+            Expand [] expr <$> substExpr mapping' body
 
-        -- Lam binder body _ -> do 
-        --     let mapping' = Map.insert (nameToText binder) (SubstitutionBinding x) mapping
-        --     substExpr mapping' body 
+        Lam binder body _ -> do 
+            let
+                mapping' = Map.insert (nameToText binder)
+                                      (SubstitutionBinding x)
+                                      mapping
+            -- perform substitution
+            substExpr mapping' body
+
         _ -> return expr
     _ -> return expr
-
-
--- reduceExpr :: [Scope] -> Expr -> M Expr
--- reduceExpr scopes expr = case expr of 
---     Paren e l  -> Paren <$> reduceExpr scopes e <*> pure l
---     Lit{}      -> return expr
---     Var{}      -> return expr
---     Var name _ -> case Map.lookup (nameToText name) shrinkedMapping of
---         Nothing -> return expr
---         Just (UserDefinedBinding binding) ->
---             return $ Expand [] expr binding
---         Just (SubstitutionBinding binding) -> return binding
---         Just NoBinding                     -> return expr
---     Const name _ ->
---         case Map.lookup (nameToText name) shrinkedMapping of
---             Nothing -> return expr
---             Just (UserDefinedBinding binding) ->
---                 return $ Expand [] expr binding
---             Just (SubstitutionBinding binding) -> return binding
---             Just NoBinding                     -> return expr
---     Op{} -> return expr
---     Chain a op b l ->
---         Chain
---             <$> substExpr shrinkedMapping a
---             <*> pure op
---             <*> substExpr shrinkedMapping b
---             <*> pure l
---     App f x l ->
---         App
---             <$> substExpr shrinkedMapping f
---             <*> substExpr shrinkedMapping x
---             <*> pure l
---     Lam binder body l -> do
---         -- rename the binder to avoid capturing only when necessary! 
---         let (capturableNames, shrinkedMapping') =
---                 getCapturableNames shrinkedMapping body
---         binder' <- alphaRename capturableNames binder 
---         Lam binder' <$> substExpr shrinkedMapping' body <*> pure l
-
---     Quant op binders range body l -> do
---         -- rename binders to avoid capturing only when necessary! 
---         let (capturableNames, shrinkedMapping') =
---                 getCapturableNames shrinkedMapping body
---         binders' <- mapM (alphaRename capturableNames) binders 
-
---         Quant op binders'
---             <$> substExpr shrinkedMapping' range
---             <*> substExpr shrinkedMapping' body
---             <*> pure l
-
-
---     Subst {} -> return expr 
-
---     Expand {} -> return expr 
-
---     ArrIdx array index l -> 
---         ArrIdx
---             <$> substExpr shrinkedMapping array
---             <*> substExpr shrinkedMapping index
---             <*> pure l
-
---     ArrUpd array index value l -> 
---         ArrUpd
---             <$> substExpr shrinkedMapping array
---             <*> substExpr shrinkedMapping index
---             <*> substExpr shrinkedMapping value
---             <*> pure l
-
--- substitute :: Map Name Expr -> Expr -> Expr
--- substitute mapping x = evalState (substExpr (Map.map SubstitutionBinding $ Map.mapKeys nameToText mapping) x) 0
 
 run :: [Map Text Expand.Binding] -> Pred -> Pred
 run scopes x = evalState (substPred (fromScopes scopes) x) 0
@@ -184,62 +114,62 @@ substPred mapping = \case
 
 substExpr :: Mapping -> Expr -> M Expr
 substExpr mapping expr = reduceExpr mapping =<< case expr of
+
     Paren e l  -> Paren <$> substExpr mapping e <*> pure l
+
     Lit{}      -> return expr
+
     Var name _ -> case Map.lookup (nameToText name) mapping of
         Nothing                            -> return expr
         Just (UserDefinedBinding  binding) -> return $ Expand [] expr binding
         Just (SubstitutionBinding binding) -> return binding
         Just NoBinding                     -> return expr
+
     Const name _ -> case Map.lookup (nameToText name) mapping of
         Nothing                            -> return expr
         Just (UserDefinedBinding  binding) -> return $ Expand [] expr binding
         Just (SubstitutionBinding binding) -> return binding
         Just NoBinding                     -> return expr
+
     Op{} -> return expr
+
     Chain a op b l ->
         Chain
             <$> substExpr mapping a
             <*> pure op
             <*> substExpr mapping b
             <*> pure l
-    App f x l ->
-        App
-            <$> substExpr mapping f
-            <*> substExpr mapping x
-            <*> pure l
+
+    App f x l -> App <$> substExpr mapping f <*> substExpr mapping x <*> pure l
+
     Lam binder body l -> do
 
         -- rename the binder to avoid capturing only when necessary! 
-                  let (capturableNames, shrinkedMapping) =
-                          getCapturableNames mapping body
+        let (capturableNames, shrinkedMapping) =
+                getCapturableNames mapping body
 
+        (binder', alphaRenameMapping) <- alphaRename capturableNames binder
 
-                  (binder', alphaRenameMapping) <- alphaRename2 capturableNames binder
-
-                  body' <- substExpr alphaRenameMapping body
-                  -- binder' <- alphaRename capturableNames binder
-                  Lam binder' <$> substExpr shrinkedMapping body' <*> pure l
+        Lam binder'
+            <$> substExpr (alphaRenameMapping <> shrinkedMapping) body
+            <*> pure l
 
     Quant op binders range body l -> do
         -- rename binders to avoid capturing only when necessary! 
         let (capturableNames, shrinkedMapping) =
                 getCapturableNames mapping expr
 
-        (binders', mappings') <-
-            unzip <$> mapM (alphaRename2 capturableNames) binders
+        (binders', alphaRenameMapping) <-
+            unzip <$> mapM (alphaRename capturableNames) binders
 
-        let alphaRenameMapping = Map.unions mappings'
-
-
-        range' <- substExpr alphaRenameMapping range
-        body'  <- substExpr alphaRenameMapping body
+        -- combine individual renamings to get a new mapping 
+        -- and use that mapping to rename other stuff
+        let alphaRenameMappings = mconcat alphaRenameMapping
 
         Quant op binders'
-            <$> substExpr shrinkedMapping range'
-            <*> substExpr shrinkedMapping body'
+            <$> substExpr (alphaRenameMappings <> shrinkedMapping) range
+            <*> substExpr (alphaRenameMappings <> shrinkedMapping) body
             <*> pure l
-
 
     Subst{}  -> return expr
 
@@ -258,16 +188,10 @@ substExpr mapping expr = reduceExpr mapping =<< case expr of
             <*> substExpr mapping value
             <*> pure l
 
--- renames a binder it captures any free variable 
-alphaRename :: Set Text -> Name -> M Name
+-- rename a binder if it is in the set of "capturableNames"
+-- returns the renamed binder and the mapping of alpha renaming (for renaming other stuff)
+alphaRename :: Set Text -> Name -> M (Name, Mapping)
 alphaRename capturableNames binder =
-    if Set.member (nameToText binder) capturableNames
-        then Name <$> freshWithLabel (nameToText binder) <*> pure (locOf binder)
-        else return binder
-
-
-alphaRename2 :: Set Text -> Name -> M (Name, Mapping)
-alphaRename2 capturableNames binder =
     if Set.member (nameToText binder) capturableNames
         then do
             binder' <- Name <$> freshWithLabel (nameToText binder) <*> pure
