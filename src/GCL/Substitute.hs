@@ -5,6 +5,7 @@
 module GCL.Substitute
     ( runExpr
     , run
+    , substScopes
     , Scope
     , Binding(..)
     , scopeFromLetBindings, scopeFromSubstitution
@@ -29,14 +30,19 @@ import           Syntax.Common                  ( Name(Name)
                                                 , nameToText
                                                 )
 import Syntax.Abstract.Util (bindingsToExpr)
+import Debug.Trace
+
 
 ------------------------------------------------------------------
 
-run :: [Map Text Binding] -> Pred -> Pred
+run :: [Scope] -> Pred -> Pred
 run scopes x = evalState (substPred (mconcat scopes) x) 0
 
-runExpr :: [Map Text Binding] -> Expr -> Expr
+runExpr :: [Scope] -> Expr -> Expr
 runExpr scopes x = evalState (substExpr (mconcat scopes) x) 0
+
+substScopes :: Mapping -> [Scope] -> [Scope]
+substScopes mapping scopes = traceShow ("substScopes", pretty mapping, pretty scopes, pretty $ evalState (mapM (substScope mapping) scopes) 0) evalState (mapM (substScope mapping) scopes) 0
 
 ------------------------------------------------------------------
 
@@ -62,6 +68,7 @@ data Binding
     = UserDefinedBinding Expr
     | SubstitutionBinding Expr
     | NoBinding
+    deriving (Show)
 
 type Mapping = Map Text Binding
 
@@ -113,6 +120,14 @@ reduceExpr mapping expr = case expr of
     _ -> return expr
 
 ------------------------------------------------------------------
+
+substScope :: Mapping -> Scope -> M Scope
+substScope mapping = mapM (substBinding mapping)
+
+substBinding :: Mapping -> Binding -> M Binding
+substBinding _ NoBinding = return NoBinding
+substBinding mapping (SubstitutionBinding expr) = SubstitutionBinding <$> substExpr mapping expr
+substBinding mapping (UserDefinedBinding expr) = UserDefinedBinding <$> substExpr mapping expr
 
 substPred :: Mapping -> Pred -> M Pred
 substPred mapping = \case

@@ -307,20 +307,26 @@ wp _ (A.Assign xs es _) post = do
   -- scopes <- ask
   -- let assigmentBindings = Substitute.scopeFromSubstitution xs es
   -- return $ Substitute.run (assigmentBindings : scopes) post
+  let assigmentBindings = Substitute.scopeFromSubstitution xs es
 
   scopes <- ask
-  let assigmentBindings = Substitute.scopeFromSubstitution xs es
-  return $ Substitute.run (assigmentBindings : scopes) post
+  let scopes' = Substitute.substScopes assigmentBindings scopes
+
+  return $ Substitute.run (assigmentBindings : scopes') post
 
 wp _ (A.AAssign (A.Var x _) i e _) post = do
   -- let sub = Map.fromList [(x, A.AssignBinding (A.ArrUpd (A.nameVar x) i e NoLoc))]
   -- alphaSubst sub post
 
-  scopes <- ask
   let assigmentBindings = Substitute.scopeFromSubstitution
         [x]
         [A.ArrUpd (A.nameVar x) i e NoLoc]
-  return $ Substitute.run (assigmentBindings : scopes) post
+
+
+  scopes <- ask
+  let scopes' = Substitute.substScopes assigmentBindings scopes
+
+  return $ Substitute.run (assigmentBindings : scopes') post
 
 
 wp _ (A.AAssign _ _ _ l) _    = throwError (MultiDimArrayAsgnNotImp l)
@@ -339,10 +345,13 @@ wp _ (A.Proof _ _         ) post = return post
 wp _ (A.Alloc x (e : es) _) post = do
     {- wp (x := es) P = (forall x', (x' -> es) -* P[x'/x])-}
 
-  scopes <- ask
   x'     <- freshName' (toText x) -- generate fresh name using the exisiting "x"
   let assigmentBindings = Substitute.scopeFromSubstitution [x] [A.nameVar x']
-  let post' = Substitute.runExpr (assigmentBindings : scopes) (toExpr post)
+
+  scopes <- ask
+  let scopes' = Substitute.substScopes assigmentBindings scopes
+
+  let post' = Substitute.runExpr (assigmentBindings : scopes') (toExpr post)
 
   return $ Constant (A.forAll [x'] A.true (newallocs x' `A.sImp` post'))
 
@@ -365,10 +374,14 @@ wp _ (A.Alloc x (e : es) _) post = do
 wp _ (A.HLookup x e _) post = do
     {- wp (x := *e) P = (exists v . (e->v) * ((e->v) -* P[v/x])) -}
 
-  scopes <- ask
   v     <- freshName' (toText x) -- generate fresh name using the exisiting "x"
   let assigmentBindings = Substitute.scopeFromSubstitution [x] [A.nameVar v]
-  let post' = Substitute.runExpr (assigmentBindings : scopes) (toExpr post)
+
+  scopes <- ask
+  let scopes' = Substitute.substScopes assigmentBindings scopes
+
+
+  let post' = Substitute.runExpr (assigmentBindings : scopes') (toExpr post)
   return $ Constant
     (A.exists [v] A.true (entry v `A.sConj` (entry v `A.sImp` post')))
   where entry v = e `A.pointsTo` A.nameVar v
@@ -456,7 +469,7 @@ sp _ (pre, _) (A.Assign xs es l) = do
   let varsToFreshVars = Substitute.scopeFromSubstitution xs freshVars
   let freshVarToNothing = Map.fromList
         $ map (\name -> (nameToText name, Substitute.NoBinding)) freshNames
-  let scopes' = varsToFreshVars : freshVarToNothing : scopes
+  let scopes' = varsToFreshVars : freshVarToNothing : Substitute.substScopes (varsToFreshVars <> freshVarToNothing) scopes
 
   -- substitute "xs"s with fresh names in "pre"
   let pre'    = Substitute.runExpr scopes' (toExpr pre)

@@ -35,6 +35,7 @@ letBindings = testGroup
   , run "let binding with assignment 1" "let-2.gcl"
   , run "let binding with assignment 2" "let-3.gcl"
   , run "let binding with assignment and application" "let-4.gcl"
+  , run "fastmul" "subst-fastmul.gcl"
   ]
  where
   run :: String -> FilePath -> TestTree
