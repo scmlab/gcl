@@ -1,11 +1,11 @@
 INV
-  * ===>  (x   *   y)   +   z   =   A   *   B
+  * ===>  (A   *   B)   +   0   =   A   *   B
     
 INV
   * ===>  (x   *   y)   +   z   =   A   *   B
     
 INV
-  * ===>  (x   *   y)   +   z   =   A   *   B
+  * ===>  ((x   -   1)   *   y)   +   z   =   A   *   B
     
 INV
   * ===>  (x   *   y)   +   z   =   A   *   B
