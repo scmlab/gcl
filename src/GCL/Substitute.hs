@@ -2,7 +2,13 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE LambdaCase #-}
 
-module GCL.Substitute where
+module GCL.Substitute
+    ( runExpr
+    , run
+    , Scope
+    , Binding(..)
+    , scopeFromLetBindings, scopeFromSubstitution
+    ) where
 
 import           Control.Monad.State
 import           Data.Loc                       ( locOf )
@@ -14,16 +20,41 @@ import           Data.Text                      ( Text )
 import           GCL.Common                     ( Free(fv)
                                                 , Fresh(fresh, freshWithLabel)
                                                 )
-import qualified GCL.Expand                    as Expand
 import           GCL.Predicate                  ( Pred(..) )
 import           Pretty                         ( (<+>)
                                                 , Pretty(pretty)
                                                 )
-import           Syntax.Abstract                ( Expr(..) )
+import           Syntax.Abstract                ( Expr(..), Bindings(..) )
 import           Syntax.Common                  ( Name(Name)
                                                 , nameToText
                                                 )
+import Syntax.Abstract.Util (bindingsToExpr)
 
+------------------------------------------------------------------
+
+run :: [Map Text Binding] -> Pred -> Pred
+run scopes x = evalState (substPred (mconcat scopes) x) 0
+
+runExpr :: [Map Text Binding] -> Expr -> Expr
+runExpr scopes x = evalState (substExpr (mconcat scopes) x) 0
+
+------------------------------------------------------------------
+
+-- | A "Scope" is a mapping from names to Bindings 
+type Scope = Map Text Binding
+
+scopeFromLetBindings :: Map Name (Maybe Bindings) -> Scope
+scopeFromLetBindings = Map.mapKeys nameToText . fmap toBinding
+  where
+    toBinding Nothing               = NoBinding
+    toBinding (Just (LetBinding x)) = UserDefinedBinding x
+    toBinding (Just others) =
+        SubstitutionBinding (bindingsToExpr others)
+
+scopeFromSubstitution :: [Name] -> [Expr] -> Scope
+scopeFromSubstitution xs es = Map.mapKeys nameToText $ Map.fromList $ zip
+    xs
+    (map SubstitutionBinding es)
 
 ------------------------------------------------------------------
 
@@ -70,7 +101,7 @@ reduceExpr mapping expr = case expr of
             -- perform substitution
             Expand [] expr <$> substExpr mapping' body
 
-        Lam binder body _ -> do 
+        Lam binder body _ -> do
             let
                 mapping' = Map.insert (nameToText binder)
                                       (SubstitutionBinding x)
@@ -80,22 +111,6 @@ reduceExpr mapping expr = case expr of
 
         _ -> return expr
     _ -> return expr
-
-run :: [Map Text Expand.Binding] -> Pred -> Pred
-run scopes x = evalState (substPred (fromScopes scopes) x) 0
-
-
-runExpr :: [Map Text Expand.Binding] -> Expr -> Expr
-runExpr scopes x = evalState (substExpr (fromScopes scopes) x) 0
-
-
-fromScopes :: [Map Text Expand.Binding] -> Mapping
-fromScopes = Map.map fromBinding . Map.unions
-  where
-    fromBinding Expand.NoBinding                 = NoBinding
-    fromBinding (Expand.UserDefinedBinding expr) = UserDefinedBinding expr
-    fromBinding (Expand.SubstitutionBinding reason) =
-        SubstitutionBinding (Expand.extract reason)
 
 ------------------------------------------------------------------
 
@@ -188,11 +203,16 @@ substExpr mapping expr = reduceExpr mapping =<< case expr of
             <*> substExpr mapping value
             <*> pure l
 
+------------------------------------------------------------------
+-- | Perform Alpha renaming only when necessary
+
 -- rename a binder if it is in the set of "capturableNames"
 -- returns the renamed binder and the mapping of alpha renaming (for renaming other stuff)
 alphaRename :: Set Text -> Name -> M (Name, Mapping)
 alphaRename capturableNames binder =
     if Set.member (nameToText binder) capturableNames
+        -- CAPTURED! 
+        -- returns the alpha renamed binder along with its mapping 
         then do
             binder' <- Name <$> freshWithLabel (nameToText binder) <*> pure
                 (locOf binder)
@@ -202,6 +222,7 @@ alphaRename capturableNames binder =
                     (nameToText binder)
                     (SubstitutionBinding (Var binder' (locOf binder)))
                 )
+        -- not captured, returns the original binder 
         else return (binder, Map.empty)
 
 -- returns a set of free names that is susceptible to capturing 

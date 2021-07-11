@@ -46,7 +46,6 @@ import           GCL.Predicate.Util             ( conjunct
                                                 , guardLoop
                                                 , toExpr
                                                 )
-import qualified GCL.Expand                as Expand
 import           GCL.WP.Type
 import           Numeric                        ( showHex )
 import           Pretty                         ( toString, toText )
@@ -61,7 +60,7 @@ import qualified GCL.Substitute as Substitute
 type TM = Except StructError
 
 type WP
-  = RWST [Expand.Scope] ([PO], [Spec], [StructWarning]) (Int, Int, Int) TM
+  = RWST [Substitute.Scope] ([PO], [Spec], [StructWarning]) (Int, Int, Int) TM
 
 instance Fresh WP where
   fresh = do
@@ -71,14 +70,14 @@ instance Fresh WP where
 
 runWP
   :: WP a
-  -> [Expand.Scope]
+  -> [Substitute.Scope]
   -> Either StructError (a, ([PO], [Spec], [StructWarning]))
 runWP p defs = runExcept $ evalRWST p defs (0, 0, 0)
 
 sweep :: A.Program -> Either StructError ([PO], [Spec], [StructWarning])
 sweep (A.Program decls _ _ stmts _) = do
   let scope = Map.mapKeys nameToText $ Map.map
-        (maybe Expand.NoBinding Expand.UserDefinedBinding)
+        (maybe Substitute.NoBinding Substitute.UserDefinedBinding)
         (A.extractDeclarations decls)
   (_, (pos, specs, warnings)) <- runWP (structProgram stmts) [scope]
   -- update Proof Obligations with corresponding Proof Anchors
@@ -306,11 +305,11 @@ wp _ (A.Assign xs es _) post = do
   -- alphaSubst sub post
 
   -- scopes <- ask
-  -- let assigmentBindings = Expand.scopeFromSubstitution xs es
+  -- let assigmentBindings = Substitute.scopeFromSubstitution xs es
   -- return $ Substitute.run (assigmentBindings : scopes) post
 
   scopes <- ask
-  let assigmentBindings = Expand.scopeFromSubstitution xs es
+  let assigmentBindings = Substitute.scopeFromSubstitution xs es
   return $ Substitute.run (assigmentBindings : scopes) post
 
 wp _ (A.AAssign (A.Var x _) i e _) post = do
@@ -318,7 +317,7 @@ wp _ (A.AAssign (A.Var x _) i e _) post = do
   -- alphaSubst sub post
 
   scopes <- ask
-  let assigmentBindings = Expand.scopeFromSubstitution
+  let assigmentBindings = Substitute.scopeFromSubstitution
         [x]
         [A.ArrUpd (A.nameVar x) i e NoLoc]
   return $ Substitute.run (assigmentBindings : scopes) post
@@ -342,7 +341,7 @@ wp _ (A.Alloc x (e : es) _) post = do
 
   scopes <- ask
   x'     <- freshName' (toText x) -- generate fresh name using the exisiting "x"
-  let assigmentBindings = Expand.scopeFromSubstitution [x] [A.nameVar x']
+  let assigmentBindings = Substitute.scopeFromSubstitution [x] [A.nameVar x']
   let post' = Substitute.runExpr (assigmentBindings : scopes) (toExpr post)
 
   return $ Constant (A.forAll [x'] A.true (newallocs x' `A.sImp` post'))
@@ -368,7 +367,7 @@ wp _ (A.HLookup x e _) post = do
 
   scopes <- ask
   v     <- freshName' (toText x) -- generate fresh name using the exisiting "x"
-  let assigmentBindings = Expand.scopeFromSubstitution [x] [A.nameVar v]
+  let assigmentBindings = Substitute.scopeFromSubstitution [x] [A.nameVar v]
   let post' = Substitute.runExpr (assigmentBindings : scopes) (toExpr post)
   return $ Constant
     (A.exists [v] A.true (entry v `A.sConj` (entry v `A.sImp` post')))
@@ -454,9 +453,9 @@ sp _ (pre, _) (A.Assign xs es l) = do
   let freshVars = map (`A.Var` l) freshNames
   -- generate new scope for fresh names
   scopes <- ask
-  let varsToFreshVars = Expand.scopeFromSubstitution xs freshVars
+  let varsToFreshVars = Substitute.scopeFromSubstitution xs freshVars
   let freshVarToNothing = Map.fromList
-        $ map (\name -> (nameToText name, Expand.NoBinding)) freshNames
+        $ map (\name -> (nameToText name, Substitute.NoBinding)) freshNames
   let scopes' = varsToFreshVars : freshVarToNothing : scopes
 
   -- substitute "xs"s with fresh names in "pre"
@@ -488,7 +487,7 @@ sp _ (pre, _) (A.AAssign (A.Var x _) i e _) = do
 
   scopes <- ask
   x'     <- freshText
-  let assigmentBindings = Expand.scopeFromSubstitution [x] [A.variable x']
+  let assigmentBindings = Substitute.scopeFromSubstitution [x] [A.variable x']
   let scopes'           = assigmentBindings : scopes
   let pre'              = Substitute.runExpr scopes' (toExpr pre)
   return $ Constant
@@ -562,5 +561,5 @@ withFreshVar :: (A.Expr -> WP a) -> WP a
 withFreshVar f = do
   name <- freshName' "bnd"
   let var   = A.Var name NoLoc
-  let scope = Map.singleton (nameToText name) Expand.NoBinding
+  let scope = Map.singleton (nameToText name) Substitute.NoBinding
   withRWST (\scopes st -> (scope : scopes, st)) (f var)
