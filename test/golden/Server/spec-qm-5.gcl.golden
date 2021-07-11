@@ -15,7 +15,7 @@
  ⇒
  N   -   n  ≥ 0
  ` ], [ Precondition at ./test/source/Server/spec-qm-5.gcl [113-143] 7:13-9:15
-      `⟨ ∃ ?n_0  :  n  = ?n_0  +   1  :  f [?n_0]  =   0  ∧ ?n_0  ≠   N  ⟩`
+      `⟨ ∃ ?n_0  :  n  =  ?n_0   +   1  :  f [ ?n_0 ]  =   0  ∧  ?n_0   ≠   N  ⟩`
       Postcondition
       `f [ n ]  =   0` ], [], [])
 
