@@ -1,4 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE UndecidableInstances #-}
 module Pretty.Util
   ( 
     docToText, toText,
@@ -133,7 +135,6 @@ instance (PrettyPrec a, PrettyPrec b) => PrettyPrec (Either a b) where
 instance (Pretty a, Pretty b) => Pretty (Either a b) where
   pretty (Left x) = pretty x
   pretty (Right x) = pretty x
-
 
 --------------------------------------------------------------------------------
 

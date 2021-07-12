@@ -67,6 +67,10 @@ instance ToAbstract Stmt A.Stmt where
     SpecQM l -> throwError l
     Spec l t r -> pure (A.Spec t (rangeOf l <> rangeOf r))
     Proof _ anchors _ -> A.Proof <$> toAbstract anchors <*> pure (locOf stmt)
+    Alloc p _ _ _ es _ -> A.Alloc p <$> toAbstract (fromSepBy es) <*> pure (locOf stmt)
+    HLookup x _ _ e -> A.HLookup x <$> toAbstract e <*> pure (locOf stmt)
+    HMutate _ e1 _ e2 -> A.HMutate <$> toAbstract e1 <*> toAbstract e2 <*> pure (locOf stmt)
+    Dispose _ e -> A.Dispose <$> toAbstract e <*> pure (locOf stmt)
 
 instance ToAbstract GdCmd A.GdCmd where
   toAbstract (GdCmd a _ b) = A.GdCmd <$> toAbstract a <*> toAbstract b <*> pure (a <--> b)

@@ -51,6 +51,10 @@ instance Located Stmt where
   locOf (SpecQM l) = l
   locOf (Spec l _ r) = l <--> r
   locOf (Proof l _ r) = l <--> r
+  locOf (Alloc l _ _ _ _ r) = l <--> r
+  locOf (HLookup l _ _ r) = l <--> r
+  locOf (HMutate l _ _ r) = l <--> r
+  locOf (Dispose l r) = l <--> r
 
 --------------------------------------------------------------------------------
 
