@@ -5,7 +5,6 @@
 module GCL.Substitute
     ( run
     , Scope
-    , Binding(..)
     , mappingFromSubstitution
     ) where
 
@@ -20,9 +19,6 @@ import           GCL.Common                     ( Free(fv)
                                                 , Fresh(fresh, freshWithLabel)
                                                 )
 import           GCL.Predicate                  ( Pred(..) )
-import           Pretty                         ( (<+>)
-                                                , Pretty(pretty)
-                                                )
 import           Syntax.Abstract                ( Expr(..)
                                                 )
 import           Syntax.Common                  ( Name(Name)
@@ -37,7 +33,7 @@ run scope mapping predicate = fst $ evalRWS (subst mapping predicate) scope 0
 ------------------------------------------------------------------
 
 -- | A "Scope" is a mapping from names to Bindings 
-type Scope = Map Text Binding
+type Scope = Map Text (Maybe Expr)
 
 -- scopeFromLetBindings :: Map Name (Maybe Bindings) -> Scope
 -- scopeFromLetBindings = Map.mapKeys nameToText . fmap toBinding
@@ -52,11 +48,6 @@ mappingFromSubstitution xs es =
 
 ------------------------------------------------------------------
 
-data Binding
-    = UserDefinedBinding Expr
-    | NoBinding
-    deriving (Show)
-
 type Mapping = Map Text Expr
 
 type M = RWS Scope () Int
@@ -66,17 +57,6 @@ instance Fresh M where
         i <- get
         put (succ i)
         return i
-
-instance Free Binding where
-    fv (UserDefinedBinding  x) = fv x
-    fv NoBinding               = Set.empty
-
-instance Pretty (Map Text Binding) where
-    pretty = pretty . Map.toList
-
-instance Pretty Binding where
-    pretty (UserDefinedBinding expr) = "UserDefinedBinding" <+> pretty expr
-    pretty NoBinding = "NoBinding"
 
 ------------------------------------------------------------------
 
@@ -127,10 +107,10 @@ instance Subst Expr where
             Nothing    -> do
                 scope <- ask
                 case Map.lookup (nameToText name) scope of
-                    Just (UserDefinedBinding binding) -> do 
+                    Just (Just binding) -> do 
                         binding' <- subst mapping binding 
                         return $ Expand [] expr binding'
-                    Just NoBinding                     -> return expr
+                    Just Nothing                     -> return expr
                     Nothing   -> return expr
 
         Const name _ -> case Map.lookup (nameToText name) mapping of
@@ -138,10 +118,10 @@ instance Subst Expr where
             Nothing    -> do
                 scope <- ask
                 case Map.lookup (nameToText name) scope of
-                    Just (UserDefinedBinding binding) -> do 
+                    Just (Just binding) -> do 
                         binding' <- subst mapping binding 
                         return $ Expand [] expr binding'
-                    Just NoBinding                     -> return expr
+                    Just Nothing                     -> return expr
                     Nothing   -> return expr
 
         Op{} -> return expr

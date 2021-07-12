@@ -76,9 +76,7 @@ runWP p defs = runExcept $ evalRWST p defs (0, 0, 0)
 
 sweep :: A.Program -> Either StructError ([PO], [Spec], [StructWarning])
 sweep (A.Program decls _ _ stmts _) = do
-  let scope = Map.mapKeys nameToText $ Map.map
-        (maybe Substitute.NoBinding Substitute.UserDefinedBinding)
-        (A.extractDeclarations decls)
+  let scope = Map.mapKeys nameToText $ A.extractDeclarations decls
   (_, (pos, specs, warnings)) <- runWP (structProgram stmts) scope
   -- update Proof Obligations with corresponding Proof Anchors
 
@@ -307,7 +305,7 @@ wp _ (A.Assign xs es _) post = do
   -- scopes <- ask
   -- let assigmentBindings = Substitute.mappingFromSubstitution xs es
   -- return $ Substitute.run (assigmentBindings : scopes) post
-  
+
   let mapping = Substitute.mappingFromSubstitution xs es
 
   scope <- ask
@@ -453,7 +451,7 @@ sp _ (pre, _) (A.Assign xs es l) = do
   -- {P} x := E { (exists x' :: x = E[x'/x] && P[x'/x]) }
 
   -- generate fresh names from the assignees "xs"
-  freshNames <- forM xs $ \x -> do 
+  freshNames <- forM xs $ \x -> do
     x' <- freshWithLabel (toText x)
     return $ Name x' NoLoc
   let freshVars = map (`A.Var` l) freshNames
@@ -574,4 +572,4 @@ withFreshVar :: (A.Expr -> WP a) -> WP a
 withFreshVar f = do
   name <- freshName' "bnd"
   let var   = A.Var name NoLoc
-  withRWST (\scope st -> (Map.insert (nameToText name) Substitute.NoBinding scope, st)) (f var)
+  withRWST (\scope st -> (Map.insert (nameToText name) Nothing scope, st)) (f var)
