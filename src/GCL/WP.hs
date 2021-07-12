@@ -6,29 +6,60 @@
 
 module GCL.WP where
 
-import Control.Monad.Except (Except, MonadError (throwError), forM, forM_, runExcept, unless) -- when
-import Control.Monad.RWS (MonadReader (ask), MonadState (..), MonadWriter (..), RWST, evalRWST)
-import Control.Arrow(first)
-import Data.Loc (Loc (..), Located (..))
-import Data.Loc.Range (Range, fromLoc)
-import qualified Data.Map as Map
-import GCL.Common (Fresh (..), Subs, Substitutable (..), AlphaRename (..), emptySubs, freshName', betaReduction)
-import GCL.Predicate (Origin (..), PO (..), Pred (..), Spec (Specification))
-import GCL.Predicate.Util (conjunct, disjunct, guardIf, guardLoop, toExpr)
-import qualified Syntax.Abstract as A
-import qualified Syntax.Abstract.Operator as A
-import qualified Syntax.Abstract.Util as A
-import Syntax.Common (Name (Name))
-import qualified Data.Hashable as Hashable
-import Numeric (showHex)
-import qualified Data.Text as Text
-import qualified Data.List as List
-import GCL.WP.Type
-import Pretty (toString)
+import           Control.Arrow                  ( first )
+import           Control.Monad.Except           ( Except
+                                                , MonadError(throwError)
+                                                , forM
+                                                , forM_
+                                                , runExcept
+                                                , unless
+                                                )
+import           Control.Monad.RWS              ( MonadReader(ask)
+                                                , MonadState(..)
+                                                , MonadWriter(..)
+                                                , RWST
+                                                , evalRWST
+                                                , withRWST
+                                                )
+import qualified Data.Hashable                 as Hashable
+import qualified Data.List                     as List
+import           Data.Loc                       ( Loc(..)
+                                                , Located(..)
+                                                )
+import           Data.Loc.Range                 ( Range
+                                                , fromLoc
+                                                )
+import qualified Data.Map                      as Map
+import qualified Data.Text                     as Text
+import           GCL.Common                     ( Fresh(..)
+                                                , freshName'
+                                                )
+import           GCL.Predicate                  ( Origin(..)
+                                                , PO(..)
+                                                , Pred(..)
+                                                , Spec(Specification)
+                                                )
+import           GCL.Predicate.Util             ( conjunct
+                                                , disjunct
+                                                , guardIf
+                                                , guardLoop
+                                                , toExpr
+                                                )
+import           GCL.WP.Type
+import           Numeric                        ( showHex )
+import           Pretty                         ( toString, toText )
+import qualified Syntax.Abstract               as A
+import qualified Syntax.Abstract.Operator      as A
+import qualified Syntax.Abstract.Util          as A
+import           Syntax.Common                  ( Name(Name)
+                                                , nameToText
+                                                )
+import qualified GCL.Substitute as Substitute
 
 type TM = Except StructError
 
-type WP = RWST (Subs (Maybe A.Bindings)) ([PO], [Spec], [StructWarning]) (Int, Int, Int) TM
+type WP
+  = RWST Substitute.Scope ([PO], [Spec], [StructWarning]) (Int, Int, Int) TM
 
 instance Fresh WP where
   fresh = do
@@ -36,27 +67,34 @@ instance Fresh WP where
     put (i, j, succ k)
     return k
 
-runWP :: WP a -> Subs (Maybe A.Bindings) -> Either StructError (a, ([PO], [Spec], [StructWarning]))
+runWP
+  :: WP a
+  -> Substitute.Scope
+  -> Either StructError (a, ([PO], [Spec], [StructWarning]))
 runWP p defs = runExcept $ evalRWST p defs (0, 0, 0)
 
 sweep :: A.Program -> Either StructError ([PO], [Spec], [StructWarning])
 sweep (A.Program decls _ _ stmts _) = do
-  (_, (pos, specs, warnings)) <- runWP (structProgram stmts) decls'
+  let scope = Map.mapKeys nameToText $ Map.map
+        (maybe Substitute.NoBinding Substitute.UserDefinedBinding)
+        (A.extractDeclarations decls)
+  (_, (pos, specs, warnings)) <- runWP (structProgram stmts) scope
   -- update Proof Obligations with corresponding Proof Anchors
 
 
-  let proofAnchors = stmts >>= \case {A.Proof anchors _ -> anchors ; _ -> []}
-  -- make a table of (#hash, range) from Proof Anchors
-  let table = Map.fromList $ map (\(A.ProofAnchor hash range) -> (hash, range)) proofAnchors
+  let proofAnchors = stmts >>= \case
+        A.Proof anchors _ -> anchors
+        _                 -> []
+  -- make a table of (#hash, range) from Proof Anchors 
+  let table = Map.fromList
+        $ map (\(A.ProofAnchor hash range) -> (hash, range)) proofAnchors
   let updatePO po = case Map.lookup (poAnchorHash po) table of
-        Nothing -> po
+        Nothing    -> po
         Just range -> po { poAnchorLoc = Just range }
 
   let pos' = map updatePO pos
 
   return (pos', specs, warnings)
-  where
-    decls' = Map.map (A.LetBinding <$>) (A.extractDeclarations decls)
 
 data ProgView
   = ProgViewEmpty
@@ -66,45 +104,51 @@ data ProgView
   | ProgViewMissingBoth [A.Stmt]
 
 progView :: [A.Stmt] -> ProgView
-progView [] = ProgViewEmpty
+progView []               = ProgViewEmpty
 progView [A.Assert pre l] = do
   ProgViewMissingPrecondition [] (Assertion pre l)
 progView stmts = do
   case (head stmts, last (removeLastProofs stmts)) of
     (A.Assert pre l, A.Assert post m) -> do
-      ProgViewOkay (Assertion pre l) (init (tail (removeLastProofs stmts))) (Assertion post m)
+      ProgViewOkay (Assertion pre l)
+                   (init (tail (removeLastProofs stmts)))
+                   (Assertion post m)
     (A.Assert pre l, _) -> do
-      ProgViewMissingPostcondition (Assertion pre l) (tail (removeLastProofs stmts))
+      ProgViewMissingPostcondition (Assertion pre l)
+                                   (tail (removeLastProofs stmts))
     (_, A.Assert post m) -> do
       ProgViewMissingPrecondition (init stmts) (Assertion post m)
     _ -> ProgViewMissingBoth stmts
-  where
+ where
     -- ignore Proofs after the Postcondition
-    removeLastProofs :: [A.Stmt] -> [A.Stmt]
-    removeLastProofs = List.dropWhileEnd isProof
+  removeLastProofs :: [A.Stmt] -> [A.Stmt]
+  removeLastProofs = List.dropWhileEnd isProof
 
-    isProof :: A.Stmt -> Bool
-    isProof A.Proof {} = True
-    isProof _ = False
+  isProof :: A.Stmt -> Bool
+  isProof A.Proof{} = True
+  isProof _         = False
 
 
-alphaSubst :: (Substitutable A.Bindings b, AlphaRename WP b) => Subs A.Bindings -> b -> WP b
-alphaSubst sub e = do
-  env <- ask
-  let ns = Map.keys env
-  env' <- alphaRename ns env
-  subst sub . subst env' <$> alphaRename ns e
+-- alphaSubst :: (Substitutable A.Bindings b, AlphaRename WP b) => Subs A.Bindings -> b -> WP b
+-- alphaSubst sub e = do
+--   env <- ask
+--   let ns = Map.keys env
+--   env' <- alphaRename ns env
+--   subst sub . subst env' <$> alphaRename ns e
   -- return . subst sub . subst env $ e
 
 
 structProgram :: [A.Stmt] -> WP ()
 structProgram stmts = do
   case progView stmts of
-    ProgViewEmpty -> return ()
-    ProgViewOkay pre stmts' post -> structStmts Primary (pre,Nothing) stmts' post
-    ProgViewMissingPrecondition stmts' post -> structStmts Primary (Constant A.true, Nothing) stmts' post
-    ProgViewMissingPostcondition _ stmts' -> throwError . MissingPostcondition . locOf . last $ stmts'
-    ProgViewMissingBoth stmts' -> throwError . MissingPostcondition . locOf . last $ stmts'
+    ProgViewEmpty                -> return ()
+    ProgViewOkay pre stmts' post -> structStmts Primary (pre, Nothing) stmts' post
+    ProgViewMissingPrecondition stmts' post ->
+      structStmts Primary (Constant A.true, Nothing) stmts' post
+    ProgViewMissingPostcondition _ stmts' ->
+      throwError . MissingPostcondition . locOf . last $ stmts'
+    ProgViewMissingBoth stmts' ->
+      throwError . MissingPostcondition . locOf . last $ stmts'
 
 --- grouping a sequence of statement by assertions and specs
 
@@ -113,14 +157,14 @@ data SegElm = SAsrt A.Stmt
             | SStmts [A.Stmt]
 
 groupStmts :: [A.Stmt] -> [SegElm]
-groupStmts [] = []
-groupStmts (s@(A.Assert _ _) : stmts) = SAsrt s : groupStmts stmts
-groupStmts (s@A.LoopInvariant {} : stmts) = SAsrt s : groupStmts stmts
-groupStmts (s@(A.Spec _ _) : stmts) = SSpec s : groupStmts stmts
-groupStmts (s : stmts) = case groupStmts stmts of
-    [] -> [SStmts [s]]
-    (SStmts ss : segs) -> SStmts (s:ss) : segs
-    (s' : segs) -> SStmts [s] : s' : segs
+groupStmts []                            = []
+groupStmts (s@(A.Assert _ _)    : stmts) = SAsrt s : groupStmts stmts
+groupStmts (s@A.LoopInvariant{} : stmts) = SAsrt s : groupStmts stmts
+groupStmts (s@(A.Spec _ _)      : stmts) = SSpec s : groupStmts stmts
+groupStmts (s                   : stmts) = case groupStmts stmts of
+  []                 -> [SStmts [s]]
+  (SStmts ss : segs) -> SStmts (s : ss) : segs
+  (s'        : segs) -> SStmts [s] : s' : segs
 
 --- removing assertions (while keeping loop invariants).
 --- succeed if there are no specs.
@@ -236,7 +280,7 @@ struct (inv, Just bnd) (A.Do gcmds l) post = do
   forM_ gcmds (structGdcmdBnd inv bnd)
 struct (inv, Nothing) (A.Do gcmds l) post = do
   case fromLoc l of
-    Nothing -> return ()
+    Nothing  -> return ()
     Just rng -> throwWarning (MissingBound rng)
   let guards = A.getGuards gcmds
   tellPO (Conjunct (inv : map (Negate . guardLoop) guards)) post (AtLoop l)
@@ -249,16 +293,11 @@ structGdcmdInduct inv (A.GdCmd guard body _) =
   structStmts Primary (Conjunct [inv, guardLoop guard], Nothing) body inv
 
 structGdcmdBnd :: Pred -> A.Expr -> A.GdCmd -> WP ()
-structGdcmdBnd inv bnd (A.GdCmd guard body _) = do
-  oldbnd <- freshVar
+structGdcmdBnd inv bnd (A.GdCmd guard body _) = withFreshVar $ \oldbnd -> do
+  -- oldbnd <- freshVar
   structStmts
     Secondary
-    ( Conjunct
-        [ inv,
-          Bound (bnd `A.eqq` oldbnd) NoLoc,
-          guardLoop guard
-        ],
-    Nothing )
+    (Conjunct [inv, Bound (bnd `A.eqq` oldbnd) NoLoc, guardLoop guard], Nothing)
     body
     (Bound (bnd `A.lt` oldbnd) NoLoc)
 
@@ -307,62 +346,74 @@ wpSStmts (stmt : stmts) post = do
 wp :: A.Stmt -> Pred -> WP Pred
 wp (A.Abort _) _ = return (Constant A.false)
 wp (A.Skip _) post = return post
+
 wp (A.Assign xs es _) post = do
-  let sub = Map.fromList . zip xs . map A.AssignBinding $ es
-  alphaSubst sub post
+  let mapping = Substitute.mappingFromSubstitution xs es
+  scope <- ask
+  return $ Substitute.run scope mapping post
+
 wp (A.AAssign (A.Var x _) i e _) post = do
-  let sub = Map.fromList [(x, A.AssignBinding (A.ArrUpd (A.nameVar x) i e NoLoc))]
-  alphaSubst sub post
+  let mapping = Substitute.mappingFromSubstitution
+        [x]
+        [A.ArrUpd (A.nameVar x) i e NoLoc]
+  scope <- ask
+  return $ Substitute.run scope mapping post
+
 wp (A.AAssign _ _ _ l) _ = throwError (MultiDimArrayAsgnNotImp l)
--- wp _ (A.Assert p l) post = do
---   tellPO (Assertion p l) post (AtAssertion l)
---   return (Assertion p l)
--- wp _ (A.LoopInvariant p b l) post = do
---   tellPO (LoopInvariant p b l) post (AtAssertion l)
---   return (LoopInvariant p b l)
+
 wp (A.Do _ l) _ = throwError $ MissingAssertion l -- shouldn't happen
+
 wp (A.If gcmds _) post = do
   pres <- forM gcmds $ \(A.GdCmd guard body _) ->
     Constant . (guard `A.imply`)
       . toExpr
       <$> wpStmts body post
   return (conjunct (disjunctGuards gcmds : pres))
+
 wp (A.Proof _ _) post = return post
+
 wp (A.Alloc x (e:es) _) post = do -- non-empty
     {- wp (x := es) P = (forall x', (x' -> es) -* P[x'/x])-}
-   x' <- freshName'
-   post' <- alphaSubst (sub x') (toExpr post)
-   return $ Constant
-     (A.forAll [x'] A.true
-        (newallocs x' `A.sImp` post'))
-  where sub x' = Map.fromList [(x, A.AssignBinding (A.nameVar x'))]
-        newallocs x' = A.sconjunct (
-          (A.nameVar x' `A.pointsTo` e) :
-           zipWith (\i -> A.pointsTo (A.nameVar x' `A.add` A.number i))
-               [1..] es)
+  x'     <- freshName' (toText x) -- generate fresh name using the exisiting "x"
+  scope <- ask
+  let mapping = Substitute.mappingFromSubstitution [x] [A.nameVar x']
+  let post' = Substitute.run scope mapping (toExpr post)
+
+  return $ Constant (A.forAll [x'] A.true (newallocs x' `A.sImp` post'))
+ where
+  newallocs x' = A.sconjunct
+    ( (A.nameVar x' `A.pointsTo` e)
+    : zipWith (\i -> A.pointsTo (A.nameVar x' `A.add` A.number i)) [1 ..] es
+    )
+
 wp (A.HLookup x e _) post = do
     {- wp (x := *e) P = (exists v . (e->v) * ((e->v) -* P[v/x])) -}
-   v <- freshName'
-   post' <- alphaSubst (sub v) (toExpr post)
-   return $ Constant
-    (A.exists [v] A.true
-       (entry v `A.sConj` (entry v `A.sImp` post')))
-  where sub v = Map.fromList [(x, A.AssignBinding (A.nameVar v))]
-        entry v = e `A.pointsTo` A.nameVar v
+  v     <- freshName' (toText x) -- generate fresh name using the exisiting "x"
+  scope <- ask
+  let mapping = Substitute.mappingFromSubstitution [x] [A.nameVar v]
+  let post' = Substitute.run scope mapping (toExpr post)
+
+  return $ Constant
+    (A.exists [v] A.true (entry v `A.sConj` (entry v `A.sImp` post')))
+  where entry v = e `A.pointsTo` A.nameVar v
+
 wp (A.HMutate e1 e2 _) post = do
     {- wp (e1* := e2) P = (e1->_) * ((e1->e2) -* P) -}
    e1_allocated <- allocated e1
    return $ Constant (e1_allocated `A.sConj`
                        ((e1 `A.pointsTo` e2) `A.sImp` toExpr post))
+
 wp (A.Dispose e _) post = do
     {- wp (dispose e) P = (e -> _) * P -}
   e_allocated <- allocated e
   return $ Constant (e_allocated `A.sConj` toExpr post)
+
 wp _ _ = error "missing case in wp"
 
 allocated :: Fresh m => A.Expr -> m A.Expr
-allocated e = do v <- freshName'
-                 return (A.exists [v] A.true (e `A.pointsTo` A.nameVar v))
+allocated e = do
+  v <- freshName' "new"
+  return (A.exists [v] A.true (e `A.pointsTo` A.nameVar v))
   -- allocated e = e -> _
 
 disjunctGuards :: [A.GdCmd] -> Pred
@@ -384,13 +435,12 @@ spSegs (pre, bnd) segs = case split segs of
     (_, _) -> error "missing case in spSegs"
  where
   split :: [SegElm] -> ([SegElm], Maybe (SegElm, [SegElm]))
-  split [] = ([], Nothing)
-  split (s@(SStmts _):segs') = first (s:) (split segs')
-  split (s@(SSpec _):segs') = first (s:) (split segs')
-  split (s@(SAsrt _):segs') =
-          case split segs' of
-            (ls, Nothing) -> ([], Just (s, ls))
-            (ls, r@(Just _)) -> (s:ls, r)
+  split []                     = ([], Nothing)
+  split (s@(SStmts _) : segs') = first (s :) (split segs')
+  split (s@(SSpec  _) : segs') = first (s :) (split segs')
+  split (s@(SAsrt  _) : segs') = case split segs' of
+    (ls, Nothing   ) -> ([], Just (s, ls))
+    (ls, r@(Just _)) -> (s : ls, r)
 
   -- spSeg' deals with a block with no assertions
   spSegs' :: (Pred, Maybe A.Expr) -> [SegElm] -> WP Pred
@@ -412,30 +462,52 @@ spSStmts (pre, bnd) (stmt : stmts) = do
 
 sp :: (Pred, Maybe A.Expr) -> A.Stmt -> WP Pred
 sp (_, _) (A.Abort _) = return (Constant A.true)
+
 sp (pre, _) (A.Skip _) = return pre
+
 sp (pre, _) (A.Assign xs es l) = do
       -- {P} x := E { (exists x' :: x = E[x'/x] && P[x'/x]) }
-    frNames <- genFrNames xs
-    let sub = genSub xs frNames
-    pre' <- alphaSubst sub (toExpr pre)
-    return $ Constant (
-       A.exists frNames (A.conjunct (zipWith (genEq sub) xs es)) pre')
-  where
-    genFrNames :: [a] -> WP [Name]
-    genFrNames ys = map (`Name` l) <$> mapM (const freshText) ys
-    -- genSub :: [Name] -> [Name] -> Subs A.Bindings
-    genSub ys hs = Map.fromList . zip ys . map (A.AssignBinding . A.nameVar) $ hs
-    -- genEq :: Name -> A.Expr -> A.Expr
-    genEq sub x e = A.nameVar x `A.eqq` subst sub e
+  -- generate fresh names from the assignees "xs"
+  freshNames <- forM xs $ \x -> do 
+    x' <- freshWithLabel (toText x)
+    return $ Name x' NoLoc
+  let freshVars = map (`A.Var` l) freshNames
+  -- generate new scope for fresh names
+
+  let mapping = Substitute.mappingFromSubstitution xs freshVars
+  scope <- ask
+
+  -- substitute "xs"s with fresh names in "pre"
+  let pre'    = Substitute.run scope mapping (toExpr pre)
+  -- 
+  let predicate = A.conjunct $ zipWith
+        (\x e -> A.nameVar x `A.eqq` Substitute.run scope mapping e)
+        xs
+        es
+
+  return $ Constant (A.exists freshNames predicate pre')
+ 
 sp (pre, _) (A.AAssign (A.Var x _) i e _) = do
      -- {P} x[I] := E { (exist x' :: x = x'[I[x'/x] -> E[x'/x]] && P[x'/x]) }
-   x' <- freshText
-   let sub = Map.fromList [(x, A.AssignBinding (A.variable x'))]
-   pre' <- alphaSubst sub (toExpr pre)
-   return $ Constant (
-     A.exists [Name x' NoLoc]
-      (A.nameVar x `A.eqq` A.ArrUpd (A.variable x') (subst sub i) (subst sub e) NoLoc) pre')
+  scope <- ask
+  x'     <- freshText
+
+  let mapping = Substitute.mappingFromSubstitution [x] [A.variable x']
+  let pre'              = Substitute.run scope mapping (toExpr pre)
+  return $ Constant
+    (A.exists
+      [Name x' NoLoc]
+      (       A.nameVar x
+      `A.eqq` A.ArrUpd (A.variable x')
+                       (Substitute.run scope mapping i)
+                       (Substitute.run scope mapping e)
+                       NoLoc
+      )
+      pre'
+    )
+
 sp (_, _) (A.AAssign _ _ _ l) = throwError (MultiDimArrayAsgnNotImp l)
+
 sp (pre, _) (A.If gcmds _) = do
   posts <- forM gcmds $ \(A.GdCmd guard body _) ->
     Constant . toExpr <$>
@@ -449,31 +521,31 @@ sp (pre, bnd) (A.Do gcmds l) = do
 sp (pre, _) _ = return pre
 
 --
-tellSubstPO :: (Subs A.Bindings, Pred) -> (Subs A.Bindings, Pred) -> Origin -> WP ()
-tellSubstPO (s1, p) (s2, q) l = unless (toExpr p == toExpr q) $ do
-  p' <- betaReduction <$> alphaSubst s1 p
-  q' <- betaReduction <$> alphaSubst s2 q
-  (i, j, k) <- get
-  put (succ i, j, k)
-  let anchorHash = Text.pack $ showHex (abs (Hashable.hash (toString (p', q')))) ""
-  tell ([PO p' q' anchorHash Nothing l], [], [])
 
 tellPO :: Pred -> Pred -> Origin -> WP ()
-tellPO p q = tellSubstPO (emptySubs, p) (emptySubs, q)
+tellPO p q origin = unless (toExpr p == toExpr q) $ do
 
-  -- SCM: swapping the order of arguments, which
-  --      can be convenient in ceratin occassions.
+  scope <- ask
+  let p' = Substitute.run scope mempty p
+  let q' = Substitute.run scope mempty q
 
-tellSubstPO' :: Origin -> (Subs A.Bindings, Pred) -> (Subs A.Bindings, Pred) -> WP ()
-tellSubstPO' l p q = tellSubstPO p q l
+  (i, j, k) <- get
+  put (succ i, j, k)
+  let anchorHash =
+        Text.pack $ showHex (abs (Hashable.hash (toString (p', q')))) ""
+  tell ([PO p' q' anchorHash Nothing origin], [], [])
+
 
 tellPO' :: Origin -> Pred -> Pred -> WP ()
 tellPO' l p q = tellPO p q l
 
 tellSpec :: Pred -> Pred -> Range -> WP ()
 tellSpec p q l = do
-  p' <- alphaSubst emptySubs p
-  q' <- alphaSubst emptySubs q
+
+  scope <- ask
+  let p' = Substitute.run scope mempty p
+  let q' = Substitute.run scope mempty q
+
   (i, j, k) <- get
   put (i, succ j, k)
   tell ([], [Specification j p' q' l], [])
@@ -482,5 +554,9 @@ throwWarning :: StructWarning -> WP ()
 throwWarning warning = do
   tell ([], [], [warning])
 
-freshVar :: Fresh m => m A.Expr
-freshVar = (\v -> A.Var (Name v NoLoc) NoLoc) <$> freshText
+
+withFreshVar :: (A.Expr -> WP a) -> WP a
+withFreshVar f = do
+  name <- freshName' "bnd"
+  let var   = A.Var name NoLoc
+  withRWST (\scope st -> (Map.insert (nameToText name) Substitute.NoBinding scope, st)) (f var)

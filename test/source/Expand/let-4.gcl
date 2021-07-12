@@ -1,0 +1,9 @@
+var y : Int 
+{: 
+    Q x = y
+    P x y = x = y
+:}
+
+y := y + 1
+
+{ P 3 (Q 1) }

@@ -130,7 +130,7 @@ instance StabM GotoM Declaration LocationLink where
     LetDecl   _ args c _ -> do
       -- creates a local scope for arguments 
       let argsScope = Map.fromList $ mapMaybe nameToLocationLink args
-      -- temporarily preppend this local scope to the scope list 
+      -- temporarily prepend this local scope to the scope list 
 
       localScope argsScope $ stabM c
 
@@ -157,7 +157,7 @@ instance StabM GotoM Expr LocationLink where
     Quant _ args c d _ -> do
       -- creates a local scope for arguments 
       let argsScope = Map.fromList $ mapMaybe nameToLocationLink args
-      -- temporarily preppend this local scope to the scope list 
+      -- temporarily prepend this local scope to the scope list 
       localScope argsScope $ (<>) <$> stabLocated c <*> stabLocated d
     _ -> return []
 

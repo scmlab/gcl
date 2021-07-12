@@ -55,7 +55,7 @@ class HasPosition m where
 
 class HasScopes m a where
   askScopes :: m [Scope a]
-  -- temporarily preppend a local scope to the scope list 
+  -- temporarily prepend a local scope to the scope list 
   localScope :: Scope a -> m b -> m b
 
 lookupScopes :: (HasScopes m a, Monad m) => Text -> m (Maybe a)

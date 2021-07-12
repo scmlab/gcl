@@ -6,10 +6,10 @@ module GCL.Common where
 
 import Data.Text(Text)
 import qualified Data.Text as Text
-import Data.Loc ( Loc(..), Loc, Located(..) )
+import Data.Loc ( Loc(..), Loc )
 import Control.Monad (liftM2)
 import Data.Map (Map)
-import Syntax.Common (Name(..), nameToText)
+import Syntax.Common (Name(..))
 import Data.Set (Set, (\\))
 import qualified Data.Map as Map
 import qualified Data.Set as Set
@@ -37,11 +37,11 @@ class Monad m => Fresh m where
   freshTexts n = liftM2 (:) freshText (freshTexts (n - 1))
 
 
-freshName :: Fresh m => Loc -> m Name
-freshName l = Name <$> freshText <*> pure l
+freshName :: Fresh m => Text -> Loc -> m Name
+freshName prefix l = Name <$> freshWithLabel prefix <*> pure l
 
-freshName' :: Fresh m => m Name
-freshName' = freshName NoLoc
+freshName' :: Fresh m => Text -> m Name
+freshName' prefix = freshName prefix NoLoc
 
 type FreshState = Int
 
@@ -84,9 +84,8 @@ instance Free A.Expr where
   fv (A.Lam x e _) = fv e \\ Set.singleton x
   fv (A.Quant op xs range term _) =
     (fv op <> fv range <> fv term) \\ Set.fromList xs
-  fv (A.Hole _) = mempty -- banacorn: `subs` has been always empty anyway
-  -- concat (map freeSubst subs) -- correct?
   fv (A.Subst _ _ after) = fv after
+  fv (A.Expand _ _ after) = fv after
   fv (A.ArrIdx e1 e2 _) = fv e1 <> fv e2
   fv (A.ArrUpd e1 e2 e3 _) = fv e1 <> fv e2 <> fv e3
 
@@ -132,11 +131,11 @@ instance Substitutable A.Expr A.Expr where
   subst s (A.Lam x e l) =
     let s' = Map.withoutKeys s (Set.singleton x) in
     A.Lam x (subst s' e) l
-  subst _ h@A.Hole {} = h
   subst s (A.Quant qop xs rng t l) =
     let s' = Map.withoutKeys s (Set.fromList xs) in
     A.Quant (subst s' qop) xs (subst s' rng) (subst s' t) l
   subst s1 (A.Subst before s2 after) = A.Subst (subst s1 before) s2 (subst s1 after)
+  subst _ A.Expand {} = error "unimplemented: instance of Substitutable A.Expr A.Expr"
   subst s (A.ArrIdx e1 e2 l) =
     A.ArrIdx (subst s e1) (subst s e2) l
   subst s (A.ArrUpd e1 e2 e3 l) =
@@ -147,7 +146,7 @@ instance {-# OVERLAPPABLE #-} Substitutable a b => Substitutable (Maybe a) b whe
 
 -- should make sure `fv Bindings` and `fv Expr` are disjoint before substitution
 instance Substitutable A.Bindings A.Expr where
-  subst s expr = 
+  subst s expr =
     -- let s = shrinkSubs expr sub in
     if null s
     then expr
@@ -181,7 +180,6 @@ instance Substitutable A.Bindings A.Expr where
         let s' = Map.withoutKeys s (Set.singleton x) in
         let e' = subst s' e in
         A.Lam x e' l
-      A.Hole {} -> expr
       (A.Quant qop xs rng t l) ->
         let s' = Map.withoutKeys s (Set.fromList xs) in
         A.Quant (subst s' qop) xs (subst s' rng) (subst s' t) l
@@ -202,6 +200,8 @@ instance Substitutable A.Bindings A.Expr where
         | b == c -> expr
         | isAllAssignBindings s -> A.Subst expr s c
         | otherwise -> A.Subst a s1 c
+      -- TODO: implement this 
+      A.Expand rs a b -> A.Expand rs a b
       A.ArrIdx e1 e2 l ->
         A.ArrIdx (subst s e1) (subst s e2) l
       A.ArrUpd e1 e2 e3 l ->
@@ -240,54 +240,54 @@ instance Substitutable A.Bindings Pred where
   subst s (Disjunct es) = Disjunct (subst s es)
   subst s (Negate x) = Negate (subst s x)
 
-class Fresh m => AlphaRename m a where
-  alphaRename :: [Name] -> a -> m a
+-- class Fresh m => AlphaRename m a where
+--   alphaRename :: [Name] -> a -> m a
 
-instance (Fresh m, AlphaRename m a) => AlphaRename m (Subs a) where
-  alphaRename = mapM . alphaRename
+-- instance (Fresh m, AlphaRename m a) => AlphaRename m (Subs a) where
+--   alphaRename = mapM . alphaRename
 
-instance (Fresh m, AlphaRename m a) => AlphaRename m (Maybe a) where
-  alphaRename = mapM . alphaRename
+-- instance (Fresh m, AlphaRename m a) => AlphaRename m (Maybe a) where
+--   alphaRename = mapM . alphaRename
 
-instance Fresh m => AlphaRename m A.Expr where
-  alphaRename s expr =
-    case expr of
-      A.Paren e l -> A.Paren <$> alphaRename s e <*> pure l
-      A.Chain a op b l -> A.Chain <$> alphaRename s a <*> pure op <*> alphaRename s b <*> pure l
-      A.App a b l -> A.App <$> alphaRename s a <*> alphaRename s b <*> pure l
-      A.Lam x body l -> do
-        x' <- capture x
-        let vx' = A.Var x' (locOf x)
-        A.Lam x' <$> alphaRename s (subst (Map.singleton x vx') body) <*> pure l
-      A.Quant op ns rng t l -> do
-        ns' <- mapM capture ns
-        let mns' = Map.fromList . zip ns . map (\x -> A.Var x (locOf x)) $ ns'
-        return $ A.Quant op ns' (subst mns' rng) (subst mns' t) l
-      _ -> return expr
-    where
-      capture x = do
-        if x `elem` s
-        then do
-          tx <- freshWithLabel (Text.pack "m" <> nameToText x)
-          return $ Name tx (locOf x)
-        else return x
+-- instance Fresh m => AlphaRename m A.Expr where
+--   alphaRename s expr =
+--     case expr of
+--       A.Paren e l -> A.Paren <$> alphaRename s e <*> pure l
+--       A.Chain a op b l -> A.Chain <$> alphaRename s a <*> pure op <*> alphaRename s b <*> pure l
+--       A.App a b l -> A.App <$> alphaRename s a <*> alphaRename s b <*> pure l
+--       A.Lam x body l -> do
+--         x' <- capture x
+--         let vx' = A.Var x' (locOf x)
+--         A.Lam x' <$> alphaRename s (subst (Map.singleton x vx') body) <*> pure l
+--       A.Quant op ns rng t l -> do
+--         ns' <- mapM capture ns
+--         let mns' = Map.fromList . zip ns . map (\x -> A.Var x (locOf x)) $ ns'
+--         return $ A.Quant op ns' (subst mns' rng) (subst mns' t) l
+--       _ -> return expr
+--     where
+--       capture x = do
+--         if x `elem` s
+--         then do
+--           tx <- freshWithLabel (Text.pack "m" <> nameToText x)
+--           return $ Name tx (locOf x)
+--         else return x
 
-instance Fresh m => AlphaRename m A.Bindings where
-  alphaRename s (A.AssignBinding e) = A.AssignBinding <$> alphaRename s e
-  alphaRename s (A.LetBinding e) = A.LetBinding <$> alphaRename s e
-  alphaRename s (A.BetaBinding e) = A.BetaBinding <$> alphaRename s e
-  alphaRename s (A.AlphaBinding e) = A.AlphaBinding <$> alphaRename s e
+-- instance Fresh m => AlphaRename m A.Bindings where
+--   alphaRename s (A.AssignBinding e) = A.AssignBinding <$> alphaRename s e
+--   alphaRename s (A.LetBinding e) = A.LetBinding <$> alphaRename s e
+--   alphaRename s (A.BetaBinding e) = A.BetaBinding <$> alphaRename s e
+--   alphaRename s (A.AlphaBinding e) = A.AlphaBinding <$> alphaRename s e
 
-instance Fresh m => AlphaRename m Pred where
-  alphaRename s (Constant e) = Constant <$> alphaRename s e
-  alphaRename s (Bound e l) = Bound <$> alphaRename s e <*> pure l
-  alphaRename s (Assertion e l) = Assertion <$> alphaRename s e <*> pure l
-  alphaRename s (LoopInvariant e b l) = LoopInvariant <$> alphaRename s e <*> alphaRename s b <*> pure l
-  alphaRename s (GuardIf e l) = GuardIf <$> alphaRename s e <*> pure l
-  alphaRename s (GuardLoop e l) = GuardLoop <$> alphaRename s e <*> pure l
-  alphaRename s (Conjunct xs) = Conjunct <$> mapM (alphaRename s) xs
-  alphaRename s (Disjunct es) = Disjunct <$> mapM (alphaRename s) es
-  alphaRename s (Negate x) = Negate <$> alphaRename s x
+-- instance Fresh m => AlphaRename m Pred where
+--   alphaRename s (Constant e) = Constant <$> alphaRename s e
+--   alphaRename s (Bound e l) = Bound <$> alphaRename s e <*> pure l
+--   alphaRename s (Assertion e l) = Assertion <$> alphaRename s e <*> pure l
+--   alphaRename s (LoopInvariant e b l) = LoopInvariant <$> alphaRename s e <*> alphaRename s b <*> pure l
+--   alphaRename s (GuardIf e l) = GuardIf <$> alphaRename s e <*> pure l
+--   alphaRename s (GuardLoop e l) = GuardLoop <$> alphaRename s e <*> pure l
+--   alphaRename s (Conjunct xs) = Conjunct <$> mapM (alphaRename s) xs
+--   alphaRename s (Disjunct es) = Disjunct <$> mapM (alphaRename s) es
+--   alphaRename s (Negate x) = Negate <$> alphaRename s x
 
 class BetaReduction a where
   betaReduction :: a -> a
@@ -307,7 +307,7 @@ instance BetaReduction A.Expr where
     let b' = betaReductionStar b in
     let s = Map.singleton x (A.BetaBinding b') in
     A.Subst expr s (betaReduction (subst s e))
-  betaReduction (A.App a b l) = 
+  betaReduction (A.App a b l) =
     let a' = betaReduction a in
     let b' = betaReductionStar b in
     case a' of
@@ -315,20 +315,20 @@ instance BetaReduction A.Expr where
       A.Subst _ _ A.Lam {} -> betaReduction (A.App a' b' l)
       _ -> A.App a' b' l
   betaReduction (A.Lam x e l) = A.Lam x (betaReduction e) l
-  betaReduction e@A.Hole {} = e
   betaReduction (A.Quant op xs rng t l)= A.Quant (betaReduction op) xs (betaReduction rng) (betaReduction t) l
   betaReduction (A.Subst a s1 (A.App (A.Subst b1 s2 b2@(A.Lam x e _)) c l2)) =
     let c' = betaReductionStar c in
     let s = Map.singleton x (A.BetaBinding c') in
     let d = betaReduction (subst s e) in
-    A.Subst 
+    A.Subst
       (A.Subst a s1 (A.App (A.Subst b1 s2 b2) c l2)) s d
   betaReduction (A.Subst a s b) = A.Subst a s (betaReduction b)
+  betaReduction (A.Expand rs a b) = A.Expand rs a b
   betaReduction (A.ArrIdx e1 e2 l) = A.ArrIdx (betaReduction e1) (betaReduction e2) l
   betaReduction (A.ArrUpd e1 e2 e3 l) = A.ArrUpd (betaReduction e1) (betaReduction e2) (betaReduction e3) l
 
 betaReductionStar :: A.Expr -> A.Expr
-betaReductionStar expr = 
+betaReductionStar expr =
   case betaReduction expr of
     A.Subst _ _ expr' -> betaReductionStar expr'
     expr' -> expr'

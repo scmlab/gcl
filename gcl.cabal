@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 1f19de8fff42aa42820a74bc1cce1ee7467a40d7daf7462784b936d0b9f34079
+-- hash: 4f4ec5d6ebcb3d84bd1ebca3ba6d66d4f711551a00f8f13d4bee57731e834a46
 
 name:           gcl
 version:        0.1.0.0
@@ -29,10 +29,12 @@ library
       GCL.Exec.ExecMonad
       GCL.Exec.ExNondet
       GCL.Exec.ExRand
+      GCL.Expand
       GCL.Expr
       GCL.Predicate
       GCL.Predicate.Located
       GCL.Predicate.Util
+      GCL.Substitute
       GCL.Type
       GCL.WP
       GCL.WP.Type
@@ -151,10 +153,10 @@ test-suite gcl-test
   type: exitcode-stdio-1.0
   main-is: Test.hs
   other-modules:
+      Test.Expand
       Test.Parser
       Test.Server
       Test.SrcLoc
-      Test.Substitution
       Test.TypeChecking
       Test.Util
       Test.WP
@@ -166,10 +168,12 @@ test-suite gcl-test
       GCL.Exec.ExecMonad
       GCL.Exec.ExNondet
       GCL.Exec.ExRand
+      GCL.Expand
       GCL.Expr
       GCL.Predicate
       GCL.Predicate.Located
       GCL.Predicate.Util
+      GCL.Substitute
       GCL.Type
       GCL.WP
       GCL.WP.Type

@@ -18,12 +18,12 @@ constExpr _ (Op _) = True
 constExpr bvars (Chain a _ b _) = constExpr bvars a && constExpr bvars b
 constExpr bvars (App e1 e2 _) = constExpr bvars e1 && constExpr bvars e2
 constExpr bvars (Lam x e _) = constExpr (x : bvars) e
-constExpr _ (Hole _) = True --- is this right?
 constExpr bvars (Quant op bvs range body _) =
     constExpr bvars op
     && constExpr (bvs ++ bvars) range
     && constExpr (bvs ++ bvars) body
 constExpr _ Subst {} = error "constExpr Subst to be implemented"
+constExpr _ Expand {} = error "constExpr Expand to be implemented"
 constExpr bvars (ArrIdx e1 e2 _) =
   constExpr bvars e1 && constExpr bvars e2
 constExpr bvars (ArrUpd e1 e2 e3 _) =

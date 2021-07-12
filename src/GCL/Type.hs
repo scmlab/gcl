@@ -124,7 +124,6 @@ infer (Lam x e l) = do
   v <- freshVar l
   t <- inEnv [(x, v)] (infer e)
   return (TFunc v t l)
-infer (Hole l) = freshVar l
 infer (Quant qop iters rng t l) = do
   tr <- inEnv [(n, TBase TInt (locOf n)) | n <- iters] (infer rng)
   unify tr (TBase TBool (locOf rng))
@@ -144,6 +143,7 @@ infer (Subst expr sub _) = do
   t <- infer expr
   s <- mapM infer (Map.map bindingsToExpr sub)
   return $ subst s t
+infer (Expand _ _ after) = infer after
 infer (ArrIdx e1 e2 l) = do
   t1 <- infer e1
   let interval = case t1 of
@@ -205,7 +205,7 @@ lookupInferEnv n = do
 
 freshVar :: Loc -> Infer Type
 freshVar l = do
-  TVar <$> freshName l <*> pure l
+  TVar <$> freshName "Type.freshVar" l <*> pure l
 
 ------------------------------------------
 -- type check
