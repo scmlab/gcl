@@ -89,13 +89,6 @@ inferInEnv l m = do
   let scope = Map.union (Map.fromList l)
   local scope m
 
-runInferInEnv :: [(Name, Type)] -> Infer Type -> Infer Type
-runInferInEnv l m = do
-  -- env <- ask
-  let scope = Map.union (Map.fromList l)
-  env' <- scope <$> ask
-  lift $ runTM' (runInfer env' (local scope m))
-
 infer :: Expr -> Infer Type
 infer (Paren expr _) = infer expr
 infer (Lit lit l) = return (litTypes lit l)
@@ -233,9 +226,6 @@ checkIsType :: Env Type -> Expr -> Type -> TM ()
 checkIsType env expr t = do
   eType <- inferExpr env expr
   void $ solveConstraints [(eType, t)]
-
-  -- (eType, cs) <- runSolver env (infer expr)
-  -- void $ solveConstraints (cs `mappend` [(eType, t)])
 
 checkPredicate :: Env Type -> Expr -> TM ()
 checkPredicate env p =
