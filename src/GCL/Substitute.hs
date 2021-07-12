@@ -5,7 +5,6 @@
 module GCL.Substitute
     ( run
     , Scope
-    , mappingFromSubstitution
     ) where
 
 import           Control.Monad.RWS
@@ -19,28 +18,25 @@ import           GCL.Common                     ( Free(fv)
                                                 , Fresh(fresh, freshWithLabel)
                                                 )
 import           GCL.Predicate                  ( Pred(..) )
-import           Syntax.Abstract                ( Expr(..)
-                                                )
+import           Syntax.Abstract                ( Expr(..) )
 import           Syntax.Common                  ( Name(Name)
                                                 , nameToText
                                                 )
 
 ------------------------------------------------------------------
 
-run :: Subst a => Scope -> Mapping -> a -> a
-run scope mapping predicate = fst $ evalRWS (subst mapping predicate) scope 0
-
-------------------------------------------------------------------
-
--- | A "Scope" is a mapping from names to Bindings 
-type Scope = Map Text (Maybe Expr)
-
--- scopeFromLetBindings :: Map Name (Maybe Bindings) -> Scope
--- scopeFromLetBindings = Map.mapKeys nameToText . fmap toBinding
---   where
---     toBinding Nothing = NoBinding
---     toBinding (Just (LetBinding x)) = UserDefinedBinding x
---     toBinding (Just others) = UserDefinedBinding (bindingsToExpr others)
+run
+    :: Substitutable a
+    => Scope -- declarations
+    -> [Name] -- name of variables to be substituted
+    -> [Expr] -- values to be substituted for  
+    -> a
+    -> a
+run scope names exprs predicate = fst
+    $ evalRWS (subst mapping predicate) scope 0
+  where
+    mapping :: Mapping
+    mapping = mappingFromSubstitution names exprs
 
 mappingFromSubstitution :: [Name] -> [Expr] -> Mapping
 mappingFromSubstitution xs es =
@@ -48,8 +44,8 @@ mappingFromSubstitution xs es =
 
 ------------------------------------------------------------------
 
+type Scope = Map Text (Maybe Expr)
 type Mapping = Map Text Expr
-
 type M = RWS Scope () Int
 
 instance Fresh M where
@@ -79,23 +75,10 @@ reduce expr = case expr of
 
 ------------------------------------------------------------------
 
-class Subst a where
+class Substitutable a where
     subst :: Mapping -> a -> M a
 
-instance Subst Pred where
-    subst mapping = \case
-        Constant a    -> Constant <$> subst mapping a
-        GuardIf   a l -> GuardIf <$> subst mapping a <*> pure l
-        GuardLoop a l -> GuardLoop <$> subst mapping a <*> pure l
-        Assertion a l -> Assertion <$> subst mapping a <*> pure l
-        LoopInvariant a b l ->
-            LoopInvariant <$> subst mapping a <*> subst mapping b <*> pure l
-        Bound a l   -> Bound <$> subst mapping a <*> pure l
-        Conjunct as -> Conjunct <$> mapM (subst mapping) as
-        Disjunct as -> Disjunct <$> mapM (subst mapping) as
-        Negate   a  -> Negate <$> subst mapping a
-
-instance Subst Expr where
+instance Substitutable Expr where
     subst mapping expr = reduce =<< case expr of
 
         Paren e l  -> Paren <$> subst mapping e <*> pure l
@@ -107,31 +90,27 @@ instance Subst Expr where
             Nothing    -> do
                 scope <- ask
                 case Map.lookup (nameToText name) scope of
-                    Just (Just binding) -> do 
-                        binding' <- subst mapping binding 
+                    Just (Just binding) -> do
+                        binding' <- subst mapping binding
                         return $ Expand [] expr binding'
-                    Just Nothing                     -> return expr
-                    Nothing   -> return expr
+                    Just Nothing -> return expr
+                    Nothing      -> return expr
 
         Const name _ -> case Map.lookup (nameToText name) mapping of
             Just value -> return value
             Nothing    -> do
                 scope <- ask
                 case Map.lookup (nameToText name) scope of
-                    Just (Just binding) -> do 
-                        binding' <- subst mapping binding 
+                    Just (Just binding) -> do
+                        binding' <- subst mapping binding
                         return $ Expand [] expr binding'
-                    Just Nothing                     -> return expr
-                    Nothing   -> return expr
+                    Just Nothing -> return expr
+                    Nothing      -> return expr
 
         Op{} -> return expr
 
         Chain a op b l ->
-            Chain
-                <$> subst mapping a
-                <*> pure op
-                <*> subst mapping b
-                <*> pure l
+            Chain <$> subst mapping a <*> pure op <*> subst mapping b <*> pure l
 
         App f x l -> App <$> subst mapping f <*> subst mapping x <*> pure l
 
@@ -169,10 +148,7 @@ instance Subst Expr where
         Expand{} -> return expr
 
         ArrIdx array index l ->
-            ArrIdx
-                <$> subst mapping array
-                <*> subst mapping index
-                <*> pure l
+            ArrIdx <$> subst mapping array <*> subst mapping index <*> pure l
 
         ArrUpd array index value l ->
             ArrUpd
@@ -181,9 +157,18 @@ instance Subst Expr where
                 <*> subst mapping value
                 <*> pure l
 
--- subst2 :: Scope -> Mapping -> Expr -> M Expr
--- subst2 scope mapping expr = reduceExpr mapping =<< case expr of
---     _ -> return expr 
+instance Substitutable Pred where
+    subst mapping = \case
+        Constant a    -> Constant <$> subst mapping a
+        GuardIf   a l -> GuardIf <$> subst mapping a <*> pure l
+        GuardLoop a l -> GuardLoop <$> subst mapping a <*> pure l
+        Assertion a l -> Assertion <$> subst mapping a <*> pure l
+        LoopInvariant a b l ->
+            LoopInvariant <$> subst mapping a <*> subst mapping b <*> pure l
+        Bound a l   -> Bound <$> subst mapping a <*> pure l
+        Conjunct as -> Conjunct <$> mapM (subst mapping) as
+        Disjunct as -> Disjunct <$> mapM (subst mapping) as
+        Negate   a  -> Negate <$> subst mapping a
 
 
 ------------------------------------------------------------------
