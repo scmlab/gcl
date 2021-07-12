@@ -95,6 +95,12 @@ lexArray = symbol tokArray
 lexOf :: LexerF (Token tokOf)
 lexOf = symbol tokOf
 
+lexNew :: LexerF (Token tokNew)
+lexNew = symbol tokNew
+
+lexDispose :: LexerF (Token tokDispose)
+lexDispose = symbol tokDispose
+
 lexRange :: LexerF (Token tokRange)
 lexRange = symbol tokRange
 
@@ -103,6 +109,12 @@ lexGuardBar = symbol tokGuardBar
 
 lexArrow :: LexerF (Either (Token tokArrow) (Token tokArrowU))
 lexArrow = choice [Left <$> symbol tokArrow, Right <$> symbol tokArrowU]
+
+lexStar :: LexerF (Token tokStar)
+lexStar = symbol tokStar
+
+lexEqual :: LexerF (Token tokEQ)
+lexEqual = symbol tokEQ
 
 ------------------------------------------
 -- delimiters
@@ -187,8 +199,6 @@ lexEQProp = EQProp . locOf <$> symbol tokEQProp
 lexEQPropU :: LexerF ChainOp
 lexEQPropU = EQPropU . locOf <$> symbol tokEQPropU
 
-lexEQ' :: LexerF (Token tokEQ)
-lexEQ' = symbol tokEQ
 
 lexEQ :: LexerF ChainOp
 lexEQ = Syntax.Common.EQ . locOf <$> symbol tokEQ

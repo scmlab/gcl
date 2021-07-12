@@ -64,6 +64,10 @@ data Stmt
   | SpecQM Loc -- ? to be rewritten as {!!} 
   | Spec (Token "[!") Text (Token "!]")
   | Proof (Token "{-") [ProofAnchor] (Token "-}")
+  | Alloc Name (Token ":=") (Token "new") (Token "(") (SepBy "," Expr) (Token ")")
+  | HLookup Name (Token ":=") (Token "*") Expr
+  | HMutate (Token "*") Expr (Token ":=") Expr
+  | Dispose (Token "dispose") Expr
   deriving (Eq, Show)
 
 data GdCmd = GdCmd Expr TokArrows [Stmt] deriving (Eq, Show)
