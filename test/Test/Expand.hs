@@ -111,8 +111,8 @@ instance ExtractExpand Expr where
     App x y _       -> extractExpand x <> extractExpand y
     Lam _ x _       -> extractExpand x
     Quant x _ y z _ -> extractExpand x <> extractExpand y <> extractExpand z
-    Expand before mapping after ->
-      [EXPN (render before <> " " <> render mapping) (render after) (extractExpand after)]
+    Expand before after ->
+      [EXPN (render before) (render after) (extractExpand after)]
     Subst before _mapping after ->
       [EXPN (render before) (render after) (extractExpand after)]
     ArrIdx x y _   -> extractExpand x <> extractExpand y

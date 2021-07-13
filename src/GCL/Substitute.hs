@@ -22,9 +22,6 @@ import           Syntax.Abstract                ( Expr(..), Mapping )
 import           Syntax.Common                  ( Name(Name)
                                                 , nameToText
                                                 )
--- import Pretty
--- import Debug.Trace
--- import Render (render)
 
 ------------------------------------------------------------------
 
@@ -58,7 +55,7 @@ instance Fresh M where
 
 ------------------------------------------------------------------
 
---  
+--  TODO: REVISE & FIX THESE RULES
 --      f                       --expand-->     \binder . body
 --      body [ x / binder ]     ~~~~~~~~~~>     y
 -- --------------------------------------------------------------- [App-Expand-Lam]
@@ -77,11 +74,17 @@ instance Fresh M where
 -- perform substitution when there's a redex
 reduce :: Expr -> M Expr
 reduce expr = case expr of
-    App f x _ -> case f of
+    App f x l1 -> case f of
         -- [App-Expand-Lam]
-        Expand _ (Lam binder body _) -> do
+        Expand before (Lam binder body l2) -> do
             let mapping = mappingFromSubstitution [binder] [x]
-            Expand expr <$> subst mapping body
+            -- Expand (App (Expand before (Lam binder body l2)) x l1) <$> subst mapping body
+
+            -- distribute App inwards
+            after <- reduce (App (Lam binder body l2) x l1)
+            before' <- reduce (App before x l1)
+
+            Expand (Expand before' after) <$> subst mapping body
         -- [App-Lam]
         Lam binder body _ -> do
             let mapping = mappingFromSubstitution [binder] [x]
@@ -89,6 +92,7 @@ reduce expr = case expr of
         -- [Others]
         _ -> return expr
     -- [Others]
+
     _ -> return expr
 
 ------------------------------------------------------------------
@@ -119,8 +123,9 @@ instance Substitutable Expr where
                 scope <- ask
                 case Map.lookup (nameToText name) scope of
                     Just (Just binding) -> do
-                        binding' <- subst mapping binding
-                        return $ Expand expr binding'
+                        after <- subst mapping binding
+                        let before = Subst2 expr mapping
+                        return $ Expand before after
                     Just Nothing -> return expr
                     Nothing      -> return expr
 
@@ -130,8 +135,9 @@ instance Substitutable Expr where
                 scope <- ask
                 case Map.lookup (nameToText name) scope of
                     Just (Just binding) -> do
-                        binding' <- subst mapping binding
-                        return $ Expand expr binding'
+                        after <- subst mapping binding
+                        let before = Subst2 expr mapping
+                        return $ Expand before after
                     Just Nothing -> return expr
                     Nothing      -> return expr
 
@@ -173,6 +179,7 @@ instance Substitutable Expr where
 
         Subst{}  -> return expr
         Subst2{}  -> return expr
+        Expand{}  -> return expr
 
         -- Expand (Expand e1 m1 _) m2 e3 -> traceShow "MERGE1" $ return (Expand e1 (m1 <> m2) e3)
         -- Expand e1 m1 (Expand _ m2 e3) -> traceShow "MERGE2" $return (Expand e1 (m1 <> m2) e3)
@@ -180,8 +187,12 @@ instance Substitutable Expr where
         -- Expand (Expand e1 m1 _) m2 e3 -> return (Expand e1 (m1 <> m2) e3)
         -- Expand e1 m1 (Expand _ m2 e3) -> return (Expand e1 (m1 <> m2) e3)
 
-        Expand {} -> return expr 
-            -- Expand <$> subst mapping before <*> pure (mapping <> oldMapping) <*> subst mapping after
+        -- Expand before after -> do 
+        --     case before of 
+        --         App (Expand before' after') x _ -> 
+
+        --     return expr 
+        --     -- Expand <$> subst mapping before <*> pure (mapping <> oldMapping) <*> subst mapping after
 
         ArrIdx array index l ->
             ArrIdx <$> subst mapping array <*> subst mapping index <*> pure l

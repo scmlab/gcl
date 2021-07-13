@@ -99,7 +99,7 @@ data Expr
   | Lam Name Expr Loc
   | Quant Expr [Name] Expr Expr Loc
   | Subst Expr Subst Expr
-  | Subst2 Expr Subst
+  | Subst2 Expr Mapping
   | Expand Expr Expr
   | ArrIdx Expr Expr Loc
   | ArrUpd Expr Expr Expr Loc
