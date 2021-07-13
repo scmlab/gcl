@@ -22,11 +22,14 @@ import           Syntax.Abstract                ( Expr(..), Mapping )
 import           Syntax.Common                  ( Name(Name)
                                                 , nameToText
                                                 )
+-- import Pretty
+-- import Debug.Trace
+-- import Render (render)
 
 ------------------------------------------------------------------
 
 run
-    :: Substitutable a
+    :: (Substitutable a)
     => Scope -- declarations
     -> [Name] -- name of variables to be substituted
     -> [Expr] -- values to be substituted for  
@@ -170,7 +173,14 @@ instance Substitutable Expr where
 
         Subst{}  -> return expr
 
-        Expand{} -> return expr
+        -- Expand (Expand e1 m1 _) m2 e3 -> traceShow "MERGE1" $ return (Expand e1 (m1 <> m2) e3)
+        -- Expand e1 m1 (Expand _ m2 e3) -> traceShow "MERGE2" $return (Expand e1 (m1 <> m2) e3)
+
+        -- Expand (Expand e1 m1 _) m2 e3 -> return (Expand e1 (m1 <> m2) e3)
+        -- Expand e1 m1 (Expand _ m2 e3) -> return (Expand e1 (m1 <> m2) e3)
+
+        Expand before oldMapping after ->
+            Expand <$> subst mapping before <*> pure (mapping <> oldMapping) <*> subst mapping after
 
         ArrIdx array index l ->
             ArrIdx <$> subst mapping array <*> subst mapping index <*> pure l
