@@ -172,6 +172,7 @@ instance Substitutable Expr where
                 <*> pure l
 
         Subst{}  -> return expr
+        Subst2{}  -> return expr
 
         -- Expand (Expand e1 m1 _) m2 e3 -> traceShow "MERGE1" $ return (Expand e1 (m1 <> m2) e3)
         -- Expand e1 m1 (Expand _ m2 e3) -> traceShow "MERGE2" $return (Expand e1 (m1 <> m2) e3)

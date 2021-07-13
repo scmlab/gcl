@@ -1,7 +1,6 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE TupleSections #-}
 module GCL.Type where
 
 import Control.Monad.Except
@@ -145,6 +144,7 @@ infer (Subst expr sub _) = do
   s <- mapM infer (Map.map bindingsToExpr sub)
   return $ subst s t
 infer (Expand _ _ after) = infer after
+infer (Subst2 expr _) = infer expr
 infer (ArrIdx e1 e2 l) = do
   t1 <- infer e1
   let interval = case t1 of
