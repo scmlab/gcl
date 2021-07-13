@@ -22,7 +22,6 @@ import           Syntax.Abstract                ( Expr(..), Mapping )
 import           Syntax.Common                  ( Name(Name)
                                                 , nameToText
                                                 )
-
 ------------------------------------------------------------------
 
 run
@@ -178,21 +177,10 @@ instance Substitutable Expr where
                 <*> pure l
 
         Subst{}  -> return expr
-        Subst2{}  -> return expr
-        Expand{}  -> return expr
 
-        -- Expand (Expand e1 m1 _) m2 e3 -> traceShow "MERGE1" $ return (Expand e1 (m1 <> m2) e3)
-        -- Expand e1 m1 (Expand _ m2 e3) -> traceShow "MERGE2" $return (Expand e1 (m1 <> m2) e3)
+        Subst2 e mapping' -> return $ Subst2 e (mapping' <> mapping)
 
-        -- Expand (Expand e1 m1 _) m2 e3 -> return (Expand e1 (m1 <> m2) e3)
-        -- Expand e1 m1 (Expand _ m2 e3) -> return (Expand e1 (m1 <> m2) e3)
-
-        -- Expand before after -> do 
-        --     case before of 
-        --         App (Expand before' after') x _ -> 
-
-        --     return expr 
-        --     -- Expand <$> subst mapping before <*> pure (mapping <> oldMapping) <*> subst mapping after
+        Expand before after -> Expand <$> subst mapping before <*> subst mapping after 
 
         ArrIdx array index l ->
             ArrIdx <$> subst mapping array <*> subst mapping index <*> pure l
