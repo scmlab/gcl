@@ -143,7 +143,7 @@ infer (Subst expr sub _) = do
   t <- infer expr
   s <- mapM infer (Map.map bindingsToExpr sub)
   return $ subst s t
-infer (Expand _ _ after) = infer after
+infer (Expand _ after) = infer after
 infer (Subst2 expr _) = infer expr
 infer (ArrIdx e1 e2 l) = do
   t1 <- infer e1

@@ -57,7 +57,7 @@ instance Located Expr where
   locOf (Quant _ _ _ _ l) = l
   locOf (Subst2 es _) = locOf es
   locOf (Subst es _ _) = locOf es
-  locOf (Expand es _ _) = locOf es
+  locOf (Expand es _) = locOf es
   locOf (ArrIdx _ _ l) = l
   locOf (ArrUpd _ _ _ l) = l
 

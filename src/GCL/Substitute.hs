@@ -79,9 +79,9 @@ reduce :: Expr -> M Expr
 reduce expr = case expr of
     App f x _ -> case f of
         -- [App-Expand-Lam]
-        Expand _ _ (Lam binder body _) -> do
+        Expand _ (Lam binder body _) -> do
             let mapping = mappingFromSubstitution [binder] [x]
-            Expand expr mempty <$> subst mapping body
+            Expand expr <$> subst mapping body
         -- [App-Lam]
         Lam binder body _ -> do
             let mapping = mappingFromSubstitution [binder] [x]
@@ -120,7 +120,7 @@ instance Substitutable Expr where
                 case Map.lookup (nameToText name) scope of
                     Just (Just binding) -> do
                         binding' <- subst mapping binding
-                        return $ Expand expr mapping binding'
+                        return $ Expand expr binding'
                     Just Nothing -> return expr
                     Nothing      -> return expr
 
@@ -131,7 +131,7 @@ instance Substitutable Expr where
                 case Map.lookup (nameToText name) scope of
                     Just (Just binding) -> do
                         binding' <- subst mapping binding
-                        return $ Expand expr mapping binding'
+                        return $ Expand expr binding'
                     Just Nothing -> return expr
                     Nothing      -> return expr
 
@@ -180,8 +180,8 @@ instance Substitutable Expr where
         -- Expand (Expand e1 m1 _) m2 e3 -> return (Expand e1 (m1 <> m2) e3)
         -- Expand e1 m1 (Expand _ m2 e3) -> return (Expand e1 (m1 <> m2) e3)
 
-        Expand before oldMapping after ->
-            Expand <$> subst mapping before <*> pure (mapping <> oldMapping) <*> subst mapping after
+        Expand {} -> return expr 
+            -- Expand <$> subst mapping before <*> pure (mapping <> oldMapping) <*> subst mapping after
 
         ArrIdx array index l ->
             ArrIdx <$> subst mapping array <*> subst mapping index <*> pure l

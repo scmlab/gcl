@@ -86,7 +86,7 @@ instance Free A.Expr where
     (fv op <> fv range <> fv term) \\ Set.fromList xs
   fv (A.Subst _ _ after) = fv after
   fv (A.Subst2 e _) = fv e
-  fv (A.Expand _ _ after) = fv after
+  fv (A.Expand _ after) = fv after
   fv (A.ArrIdx e1 e2 _) = fv e1 <> fv e2
   fv (A.ArrUpd e1 e2 e3 _) = fv e1 <> fv e2 <> fv e3
 
@@ -203,8 +203,8 @@ instance Substitutable A.Bindings A.Expr where
         | isAllAssignBindings s -> A.Subst expr s c
         | otherwise -> A.Subst a s1 c
       -- TODO: implement this 
-      A.Subst2 rs a -> A.Subst2 rs a
-      A.Expand rs a b -> A.Expand rs a b
+      A.Subst2 a b -> A.Subst2 a b
+      A.Expand a b -> A.Expand a b 
       A.ArrIdx e1 e2 l ->
         A.ArrIdx (subst s e1) (subst s e2) l
       A.ArrUpd e1 e2 e3 l ->
@@ -326,8 +326,8 @@ instance BetaReduction A.Expr where
     A.Subst
       (A.Subst a s1 (A.App (A.Subst b1 s2 b2) c l2)) s d
   betaReduction (A.Subst a s b) = A.Subst a s (betaReduction b)
-  betaReduction (A.Expand rs a b) = A.Expand rs a b
   betaReduction (A.Subst2 a b) = A.Subst2 a b
+  betaReduction (A.Expand a b) = A.Expand a b
   betaReduction (A.ArrIdx e1 e2 l) = A.ArrIdx (betaReduction e1) (betaReduction e2) l
   betaReduction (A.ArrUpd e1 e2 e3 l) = A.ArrUpd (betaReduction e1) (betaReduction e2) (betaReduction e3) l
 

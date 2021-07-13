@@ -86,8 +86,8 @@ handleExpr _ (Subst before env after) = return $ substE
   isLam _     = False
 handleExpr n (Subst2 expr mapping) =
   return $ renderPrec n expr <+> render mapping
-handleExpr n (Expand before mapping after) =
-  return $ expandE (renderPrec n before) (render mapping) (renderPrec n after)
+handleExpr n (Expand before after) =
+  return $ expandE (renderPrec n before) mempty (renderPrec n after)
 handleExpr _ (ArrIdx e1 e2 _) = return $ render e1 <> "[" <> render e2 <> "]"
 handleExpr _ (ArrUpd e1 e2 e3 _) =
   return $ "(" <+> render e1 <+> ":" <+> render e2 <+> "↣" <+> render e3 <+> ")"

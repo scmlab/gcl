@@ -100,7 +100,7 @@ data Expr
   | Quant Expr [Name] Expr Expr Loc
   | Subst Expr Subst Expr
   | Subst2 Expr Subst
-  | Expand Expr Mapping Expr
+  | Expand Expr Expr
   | ArrIdx Expr Expr Loc
   | ArrUpd Expr Expr Expr Loc
   deriving (Eq, Show, Generic)
