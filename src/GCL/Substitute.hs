@@ -55,21 +55,37 @@ instance Fresh M where
 
 ------------------------------------------------------------------
 
+--  
+--      f                       --expand-->     \binder . body
+--      body [ x / binder ]     ~~~~~~~~~~>     y
+-- --------------------------------------------------------------- [App-Expand-Lam]
+--      f x                     --expand-->     y
+-- 
+--  
+--      body [ x / binder ]     ~~~~~~~~~~>     y
+-- --------------------------------------------------------------- [App-Lam]
+--      (\binder . body) x      ~~~~~~~~~~>     y
+--
+--
+-- --------------------------------------------------------------- [Others]
+--      other constructs        ~~~~~~~~~~>     other constructs
+-- 
+
 -- perform substitution when there's a redex
 reduce :: Expr -> M Expr
 reduce expr = case expr of
     App f x _ -> case f of
+        -- [App-Expand-Lam]
         Expand _ _ (Lam binder body _) -> do
             let mapping = mappingFromSubstitution [binder] [x]
-            -- perform substitution
             Expand expr mempty <$> subst mapping body
-
+        -- [App-Lam]
         Lam binder body _ -> do
             let mapping = mappingFromSubstitution [binder] [x]
-            -- perform substitution
             subst mapping body
-
+        -- [Others]
         _ -> return expr
+    -- [Others]
     _ -> return expr
 
 ------------------------------------------------------------------
@@ -80,8 +96,18 @@ class Substitutable a where
 instance Substitutable Expr where
     subst mapping expr = reduce =<< case expr of
 
+-- 
+--      e [../..]           ~~~~~~~~~~>     a
+--      Paren a             ~~~~~~~~~~>     b
+-- ---------------------------------------------------------------
+--      Paren e [../..]     ~~~~~~~~~~>     b
+-- 
         Paren e l  -> Paren <$> subst mapping e <*> pure l
 
+-- 
+-- ---------------------------------------------------------------
+--      Lit a               ~~~~~~~~~~>     Lit a
+-- 
         Lit{}      -> return expr
 
         Var name _ -> case Map.lookup (nameToText name) mapping of
