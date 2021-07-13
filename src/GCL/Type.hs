@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE TupleSections #-}
 module GCL.Type where
 
 import Control.Monad.Except
@@ -83,9 +84,9 @@ runSolver = toEvalStateT
 unify :: Type -> Type -> Infer ()
 unify x y = tell [(x, y)]
 
-inEnv :: [(Name, Type)] -> Infer Type -> Infer Type
-inEnv l m = do
-  let scope e = foldl (\e' (x, sc) -> Map.insert x sc e') e l
+inferInEnv :: [(Name, Type)] -> Infer Type -> Infer Type
+inferInEnv l m = do
+  let scope = Map.union (Map.fromList l)
   local scope m
 
 infer :: Expr -> Infer Type
@@ -122,13 +123,13 @@ infer (App e1 e2 l) = do
   return v
 infer (Lam x e l) = do
   v <- freshVar l
-  t <- inEnv [(x, v)] (infer e)
+  t <- inferInEnv [(x, v)] (infer e)
   return (TFunc v t l)
 infer (Quant qop iters rng t l) = do
-  tr <- inEnv [(n, TBase TInt (locOf n)) | n <- iters] (infer rng)
+  titers <- mapM (freshVar . locOf) iters
+  tr <- inferInEnv [(n, tn) | n <- iters, tn <- titers] (infer rng)
   unify tr (TBase TBool (locOf rng))
-
-  tt <- inEnv [(n, TBase TInt (locOf n)) | n <- iters] (infer t)
+  tt <- inferInEnv [(n, tn) | n <- iters, tn <- titers] (infer t)
   case qop of
     Op (ArithOp (Hash _)) -> do
       unify tt (TBase TBool (locOf t))
@@ -169,11 +170,14 @@ emptyInterval :: Interval
 emptyInterval = Interval (Including zero) (Excluding zero) NoLoc
   where zero = Lit (Num 0) NoLoc
 
-inferExpr :: Env Type -> Expr -> TM Type
-inferExpr env e = do
-  (t, cs) <- runSolver env (infer e)
+runInfer :: Env Type -> Infer Type -> TM Type
+runInfer env m = do
+  (t, cs) <- runSolver env m
   s <- solveConstraints cs
   return $ subst s t
+
+inferExpr :: Env Type -> Expr -> TM Type
+inferExpr env = runInfer env . infer
 
 inferDecl' :: Env Type -> [Name] -> Type -> Maybe Expr -> TM (Env Type)
 inferDecl' env ns t p = do
@@ -220,8 +224,8 @@ checkAssign env (n, expr) =
 
 checkIsType :: Env Type -> Expr -> Type -> TM ()
 checkIsType env expr t = do
-  (eType, cs) <- runSolver env (infer expr)
-  void $ solveConstraints (cs `mappend` [(eType, t)])
+  eType <- inferExpr env expr
+  void $ solveConstraints [(eType, t)]
 
 checkPredicate :: Env Type -> Expr -> TM ()
 checkPredicate env p =
@@ -335,8 +339,11 @@ checkProg (Program decls exprs defs stmts _) = do
   mapM_ (checkAssign env) (Map.toList defs)
   mapM_ (checkStmt env) stmts
 
+runTM' :: TM a -> Except TypeError a
+runTM' p = evalStateT p initFreshState
+
 runTM :: TM a -> Either TypeError a
-runTM p = runExcept (evalStateT p initFreshState)
+runTM = runExcept . runTM'
 
 ------------------------------------------
 -- unification
