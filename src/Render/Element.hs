@@ -178,8 +178,10 @@ substE :: Inlines -> Inlines -> Inlines -> Inlines
 substE before env after = Inlines $ Seq.singleton $ Sbst before env after []
 
 expandE :: Inlines -> Inlines -> Inlines -> Inlines
-expandE reasons before after =
-  Inlines $ Seq.singleton $ Expn reasons before after
+expandE before mapping after = if isEmpty mapping 
+  then Inlines $ Seq.singleton $ Expn mempty before after
+  else Inlines $ Seq.singleton $ Expn mempty (before <+> mapping) after
+  
 
 -- | Note: when there's only 1 Horz inside a Parn, convert it to PrHz
 parensE :: Inlines -> Inlines
@@ -234,8 +236,8 @@ instance Show Inline where
   show (Icon s _       ) = s
   show (Text s _       ) = Text.unpack s
   show (Link _ xs _    ) = show xs
-  show (Sbst xs env _ _) = show xs <> show env
-  show (Expn _ xs _    ) = show xs
+  show (Sbst xs mapping _ _) = show xs <> show mapping
+  show (Expn xs mapping _) = show xs <> show mapping
   show (Horz xs        ) = unwords (map show $ toList xs)
   show (Vert xs        ) = unlines (map show $ toList xs)
   show (Parn x         ) = "(" <> show x <> ")"

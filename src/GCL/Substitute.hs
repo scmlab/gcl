@@ -18,7 +18,7 @@ import           GCL.Common                     ( Free(fv)
                                                 , Fresh(fresh, freshWithLabel)
                                                 )
 import           GCL.Predicate                  ( Pred(..) )
-import           Syntax.Abstract                ( Expr(..) )
+import           Syntax.Abstract                ( Expr(..), Mapping )
 import           Syntax.Common                  ( Name(Name)
                                                 , nameToText
                                                 )
@@ -45,7 +45,6 @@ mappingFromSubstitution xs es =
 ------------------------------------------------------------------
 
 type Scope = Map Text (Maybe Expr)
-type Mapping = Map Text Expr
 type M = RWS Scope () Int
 
 instance Fresh M where
@@ -63,7 +62,7 @@ reduce expr = case expr of
         Expand _ _ (Lam binder body _) -> do
             let mapping = mappingFromSubstitution [binder] [x]
             -- perform substitution
-            Expand [] expr <$> subst mapping body
+            Expand expr mempty <$> subst mapping body
 
         Lam binder body _ -> do
             let mapping = mappingFromSubstitution [binder] [x]
@@ -92,7 +91,7 @@ instance Substitutable Expr where
                 case Map.lookup (nameToText name) scope of
                     Just (Just binding) -> do
                         binding' <- subst mapping binding
-                        return $ Expand [] expr binding'
+                        return $ Expand expr mapping binding'
                     Just Nothing -> return expr
                     Nothing      -> return expr
 
@@ -103,7 +102,7 @@ instance Substitutable Expr where
                 case Map.lookup (nameToText name) scope of
                     Just (Just binding) -> do
                         binding' <- subst mapping binding
-                        return $ Expand [] expr binding'
+                        return $ Expand expr mapping binding'
                     Just Nothing -> return expr
                     Nothing      -> return expr
 

@@ -99,7 +99,7 @@ data Expr
   | Lam Name Expr Loc
   | Quant Expr [Name] Expr Expr Loc
   | Subst Expr Subst Expr
-  | Expand [Reason] Expr Expr
+  | Expand Expr Mapping Expr
   | ArrIdx Expr Expr Loc
   | ArrUpd Expr Expr Expr Loc
   deriving (Eq, Show, Generic)
@@ -114,24 +114,7 @@ data Bindings =
   deriving (Eq, Show, Generic)
 
 type Subst = Map Name Bindings
-
-------------------------------------------------------------------
-
--- explains how a value or expression came to be 
-data Reason
-    = ExpandContinue Name Reason
-    | ExpandPause [Reason] Expr Expr
-    | ExpandStuck Name
-    | Congruence [Reason] Expr Reason
-    | Value Expr
-    deriving (Eq, Generic)
-
-instance Show Reason where 
-  show ExpandContinue {} = "ExpandContinue"
-  show ExpandPause {} = "ExpandContinue"
-  show ExpandStuck {} = "ExpandContinue"
-  show Congruence {} = "ExpandContinue"
-  show Value {} = "ExpandContinue"
+type Mapping = Map Text Expr
 
 ----------------------------------------------------------------
 
