@@ -57,20 +57,21 @@ instance Fresh M where
 
 ------------------------------------------------------------------
 
---      f x                     ~~~~~~~~~~>     y
---      f                       --expand-->     \binder . body
---      (\binder . body) x      ~~~~~~~~~~>     y'
+
+
+--      a                  x    ~~~~~~~~~~~>    b
+--             (\n . body) x    ~~~~~~~~~~~>           c
 -- --------------------------------------------------------------- [reduce-App-Expand-Lam]
---      y                       --expand-->     y'
+--      (a ===> \n . body) x    ~~~~~~~~~~~>    b ===> c
 --  
 --  
---      body [ x / binder ]     ~~~~~~~~~~>     y
+--      body                    ~[ x / n ]~>    y
 -- --------------------------------------------------------------- [reduce-App-Lam]
---      (\binder . body) x      ~~~~~~~~~~>     y
+--      (\n . body) x           ~~~~~~~~~~~>    y
 --
 --
 -- --------------------------------------------------------------- [reduce-Others]
---      other constructs        ~~~~~~~~~~>     other constructs
+--      other constructs        ~~~~~~~~~~~>    other constructs
 -- 
 
 -- perform substitution when there's a redex
@@ -78,11 +79,11 @@ reduce :: Expr -> M Expr
 reduce expr = case expr of
     App f x l1 -> case f of
         -- [reduce-App-Expand-Lam]
-        Expand before (Lam binder body l2) ->
+        Expand before (Lam n body l2) ->
             Expand <$> reduce (App before x l1) <*> reduce
-                (App (Lam binder body l2) x l1)
+                (App (Lam n body l2) x l1)
         -- [reduce-App-Lam]
-        Lam binder body _ -> subst (mappingFromSubstitution [binder] [x]) body
+        Lam n body _ -> subst (mappingFromSubstitution [n] [x]) body
         -- [Others]
         _                 -> return expr
     -- [Others]
@@ -95,36 +96,39 @@ class Substitutable a where
     subst :: Mapping -> a -> M a
 
 instance Substitutable Expr where
-    subst mapping expr = reduce =<< case expr of
+    subst mapping expr = case expr of
 
 -- 
---       e [../..]          ~~~~~~~~~~>     a
---       Paren a            ~~~~~~~~~~>     b
+--       a                  ~[.../...]~>    a'
 -- ---------------------------------------------------------------[subst-Paren]
---      (Paren e) [../..]   ~~~~~~~~~~>     b
+--       Paren a            ~[.../...]~>    Paren a'
 -- 
         Paren e l  -> Paren <$> subst mapping e <*> pure l
 
 -- 
 -- ---------------------------------------------------------------[subst-Lit]
---      Lit a               ~~~~~~~~~~>     Lit a
+--      Lit a               ~[.../...]~>    Lit a
 -- 
         Lit{}      -> return expr
 
 -- 
---       val                ~~~~~~~~~~>     val'
+--      a                   ~~~~~~~~~~~>    a'
 -- ---------------------------------------------------------------[subst-Var-substituted]
---      (Var x) [val/x]     ~~~~~~~~~~>     val'
+--      Var x               ~[ a / x ]~>    a'
 -- 
 -- 
---      x is defined as val
---      val     [../..]     ~~~~~~~~~~>     after
---      (Var x) [../..]     ~~~~~~~~~~>     before
+--      x                   is defined as   a
+--      a                   ~[.../...]~>    a'
 -- ---------------------------------------------------------------[subst-Var-defined]
---      before              ~~expand~~>     after
+--      Var x               ~[.../...]~>    Var x ===> a'
+-- 
+-- 
+--      x                   is not defined
+-- ---------------------------------------------------------------[subst-Var-not-defined]
+--      Var x               ~[.../...]~>    Var x
 -- 
         Var name _ -> case Map.lookup (nameToText name) mapping of
-            Just value -> return value -- [subst-Var-substituted]
+            Just value -> reduce value -- [subst-Var-substituted]
             Nothing    -> do
                 scope <- ask
                 case Map.lookup (nameToText name) scope of
@@ -133,28 +137,70 @@ instance Substitutable Expr where
                         after <- subst mapping binding
                         let before = Subst2 expr mapping
                         return $ Expand before after
+                    -- [subst-Var-defined]
                     Just Nothing -> return expr
                     Nothing      -> return expr
 
+-- 
+--      a                   ~~~~~~~~~~~>    a'
+-- ---------------------------------------------------------------[subst-Const-substituted]
+--      Const x             ~[ a / x ]~>    a'
+-- 
+-- 
+--      x                   is defined as   a
+--      a                   ~[.../...]~>    a'
+-- ---------------------------------------------------------------[subst-Const-defined]
+--      Const x             ~[.../...]~>    Const x ===> a'
+-- 
+-- 
+--      x                   is not defined
+-- ---------------------------------------------------------------[subst-Const-not-defined]
+--      Const x             ~[.../...]~>    Const x
+-- 
         Const name _ -> case Map.lookup (nameToText name) mapping of
-            Just value -> return value
+            Just value -> reduce value -- [subst-Const-substituted]
             Nothing    -> do
                 scope <- ask
                 case Map.lookup (nameToText name) scope of
+                    -- [subst-Const-defined]
                     Just (Just binding) -> do
                         after <- subst mapping binding
                         let before = Subst2 expr mapping
                         return $ Expand before after
+                    -- [subst-Const-not-defined]
                     Just Nothing -> return expr
                     Nothing      -> return expr
 
+-- 
+-- ---------------------------------------------------------------[subst-Op]
+--      Op a                ~[.../...]~>    Op a
+-- 
         Op{} -> return expr
 
+-- 
+--      a                   ~[.../...]~>    a'
+--      b                   ~[.../...]~>    b'
+-- ---------------------------------------------------------------[subst-Chain]
+--      Chan a op b         ~[.../...]~>    Op a' op b' 
+-- 
         Chain a op b l ->
             Chain <$> subst mapping a <*> pure op <*> subst mapping b <*> pure l
 
-        App f x l -> App <$> subst mapping f <*> subst mapping x <*> pure l
+-- 
+--      f                   ~[.../...]~>    f'
+--      x                   ~[.../...]~>    x'
+--      f' x'               ~~~~~~~~~~~>    y' 
+-- ---------------------------------------------------------------[subst-App]
+--      f  x                ~[.../...]~>    y
+-- 
+        App f x l -> reduce =<< App <$> subst mapping f <*> subst mapping x <*> pure l
 
+-- 
+--      n                   ~~~rename~~>    n'
+--      body                ~[.../...]~>    body'
+-- ---------------------------------------------------------------[subst-Lam]
+--      \n . body           ~[.../...]~>    \n' . body'
+-- 
         Lam binder body l -> do
 
             -- rename the binder to avoid capturing only when necessary! 
@@ -167,6 +213,13 @@ instance Substitutable Expr where
                 <$> subst (alphaRenameMapping <> shrinkedMapping) body
                 <*> pure l
 
+-- 
+--      ns                  ~~~rename~~>    ns'
+--      a                   ~[.../...]~>    a'
+--      b                   ~[.../...]~>    b'
+-- ---------------------------------------------------------------[subst-Quant]
+--      Quant op ns a b     ~[.../...]~>    Quant op ns' a' b'
+-- 
         Quant op binders range body l -> do
             -- rename binders to avoid capturing only when necessary! 
             let (capturableNames, shrinkedMapping) =
@@ -186,14 +239,36 @@ instance Substitutable Expr where
 
         Subst{}           -> return expr
 
+-- 
+-- ---------------------------------------------------------------[subst-Subst]
+--      Subst a mapping     ~[.../...]~>    Subst a mapping'
+-- 
         Subst2 e mapping' -> return $ Subst2 e (mapping' <> mapping)
 
+-- 
+--      a                   ~[.../...]~>    a'
+--      b                   ~[.../...]~>    b'
+-- ---------------------------------------------------------------[subst-Subst]
+--      a ===> b            ~[.../...]~>    a' ===> b'
+-- 
         Expand before after ->
             Expand <$> subst mapping before <*> subst mapping after
 
+-- 
+--      a                   ~[.../...]~>    a'
+--      b                   ~[.../...]~>    b'
+-- ---------------------------------------------------------------[subst-ArrIdx]
+--      ArrIdx a b          ~[.../...]~>    ArrIdx a b
+-- 
         ArrIdx array index l ->
             ArrIdx <$> subst mapping array <*> subst mapping index <*> pure l
 
+-- 
+--      a                   ~[.../...]~>    a'
+--      b                   ~[.../...]~>    b'
+-- ---------------------------------------------------------------[subst-ArrUpd]
+--      ArrUpd a b          ~[.../...]~>    ArrUpd a b
+-- 
         ArrUpd array index value l ->
             ArrUpd
                 <$> subst mapping array
