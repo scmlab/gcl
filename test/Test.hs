@@ -2,7 +2,7 @@
 import qualified Test.Parser                   as Parser
 import qualified Test.Server                   as Server
 import qualified Test.SrcLoc                   as SrcLoc
-import qualified Test.Expand             as Expand
+import qualified Test.Substitution             as Substitution
 import           Test.Tasty                     ( TestTree
                                                 , defaultMain
                                                 , testGroup
@@ -17,7 +17,7 @@ tests :: TestTree
 tests = testGroup
     "Tests"
     [ Parser.tests
-    , Expand.tests
+    , Substitution.tests
     , WP.tests
     , TypeChecking.tests
     , SrcLoc.tests

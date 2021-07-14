@@ -2,7 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE LambdaCase #-}
 
-module GCL.Substitute
+module GCL.Substitution
     ( run
     , Scope
     ) where
@@ -85,7 +85,7 @@ reduce expr = case expr of
         -- [reduce-App-Lam]
         Lam n body _ -> subst (mappingFromSubstitution [n] [x]) body
         -- [Others]
-        _                 -> return expr
+        _            -> return expr
     -- [Others]
 
     _ -> return expr
@@ -193,7 +193,8 @@ instance Substitutable Expr where
 -- ---------------------------------------------------------------[subst-App]
 --      f  x                ~[.../...]~>    y
 -- 
-        App f x l -> reduce =<< App <$> subst mapping f <*> subst mapping x <*> pure l
+        App f x l ->
+            reduce =<< App <$> subst mapping f <*> subst mapping x <*> pure l
 
 -- 
 --      n                   ~~~rename~~>    n'
