@@ -134,11 +134,11 @@ instance Monoid Inlines where
 instance ToJSON Inlines where
   toJSON (Inlines xs) = toJSON xs
 
-instance Show Inlines where
-  show (Inlines xs) = unwords $ map show $ toList xs
-
 instance Pretty Inlines where
-  pretty = pretty . show
+  pretty = Pretty.hcat . map pretty . toList . unInlines
+
+instance Show Inlines where
+  show = show . pretty 
 
 -- | To see if the rendered text is "empty"
 isEmpty :: Inlines -> Bool
@@ -178,7 +178,8 @@ substE :: Inlines -> Inlines -> Inlines -> Inlines
 substE before env after = Inlines $ Seq.singleton $ Sbst before env after []
 
 expandE :: Inlines -> Inlines -> Inlines -> Inlines
-expandE before mapping after = Inlines $ Seq.singleton $ Expn before mapping after
+expandE before mapping after =
+  Inlines $ Seq.singleton $ Expn before mapping after
 
 -- | Note: when there's only 1 Horz inside a Parn, convert it to PrHz
 parensE :: Inlines -> Inlines
@@ -229,16 +230,29 @@ data Inline
 
 instance ToJSON Inline
 
+-- instance Show Inline where
+--   show (Icon s _           ) = s
+--   show (Text s _           ) = Text.unpack s
+--   show (Link _ xs _        ) = show xs
+--   show (Sbst xs mapping _ _) = show xs <> show mapping
+--   show (Expn xs _ _        ) = show xs
+--   show (Horz xs            ) = unwords (map show $ toList xs)
+--   show (Vert xs            ) = unlines (map show $ toList xs)
+--   show (Parn x             ) = "(" <> show x <> ")"
+--   show (PrHz xs            ) = "(" <> unwords (map show $ toList xs) <> ")"
+
 instance Show Inline where
-  show (Icon s _       ) = s
-  show (Text s _       ) = Text.unpack s
-  show (Link _ xs _    ) = show xs
-  show (Sbst xs mapping _ _) = show xs <> show mapping
-  show (Expn xs mapping _) = show xs <> " " <> show mapping
-  show (Horz xs        ) = unwords (map show $ toList xs)
-  show (Vert xs        ) = unlines (map show $ toList xs)
-  show (Parn x         ) = "(" <> show x <> ")"
-  show (PrHz xs        ) = "(" <> unwords (map show $ toList xs) <> ")"
+  show = show . pretty 
+
 
 instance Pretty Inline where
-  pretty = pretty . show
+  pretty (Icon _ _           ) = mempty
+  pretty (Text s _           ) = pretty s
+  pretty (Link _ xs _        ) = pretty xs
+  pretty Sbst {} = mempty
+  pretty (Expn xs _ _        ) = pretty xs
+  pretty (Horz xs            ) = Pretty.hcat (map pretty $ toList xs)
+  pretty (Vert xs            ) = Pretty.vcat (map pretty $ toList xs)
+  pretty (Parn x             ) = "(" <> pretty x <> ")"
+  pretty (PrHz xs            ) = "(" <> Pretty.hcat (map pretty $ toList xs) <> ")"
+

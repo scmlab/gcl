@@ -1,23 +1,20 @@
 ### Result
 
-([ Loop Invariant at ./test/source/Server/spec-qm-5.gcl [53-77] 5:1-25 #6f94f88f4f8d052
+([ Loop Invariant at ./test/source/Server/spec-qm-5.gcl [53-77] 5:1-25 #3f1c80b07d9989dc
  `True
  ⇒
- f [ n ]  =   0
- `
- , Loop Invariant at ./test/source/Server/spec-qm-5.gcl [78-146] 6:1-10:3 #4e89f2ae6506faf9
- `f [ n ]  =   0  ∧ ¬  n   ≠   N
+ f[n] = 0`
+ , Loop Invariant at ./test/source/Server/spec-qm-5.gcl [78-146] 6:1-10:3 #10b2d1130ba729f6
+ `f[n] = 0 ∧¬ n ≠ N
  ⇒
- True
- `
- , Loop Termination at ./test/source/Server/spec-qm-5.gcl [78-146] 6:1-10:3 #2165c4eac630549a
- `f [ n ]  =   0  ∧ n   ≠   N
+ True`
+ , Loop Termination at ./test/source/Server/spec-qm-5.gcl [78-146] 6:1-10:3 #762377d90313a209
+ `f[n] = 0 ∧n ≠ N
  ⇒
- N   -   n  ≥ 0
- ` ], [ Precondition at ./test/source/Server/spec-qm-5.gcl [113-143] 7:13-9:15
-      `⟨ ∃ ?n_0  :  n  =  ?n_0   +   1  :  f [ ?n_0 ]  =   0  ∧  ?n_0   ≠   N  ⟩`
-      Postcondition
-      `f [ n ]  =   0` ], [], [])
+ N - n ≥ 0` ], [ Precondition at ./test/source/Server/spec-qm-5.gcl [113-143] 7:13-9:15
+               `⟨ ∃ ?n_0 : n = ?n_0 + 1 : f[?n_0] = 0 ∧ ?n_0 ≠ N ⟩`
+               Postcondition
+               `f[n] = 0` ], [], [])
 
 ### Source
 
