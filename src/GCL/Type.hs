@@ -1,7 +1,6 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE TupleSections #-}
 module GCL.Type where
 
 import Control.Monad.Except
@@ -77,9 +76,6 @@ instance Fresh Infer where
     i <- get
     (put . succ) i
     return i
-
-runSolver :: Env Type ->  Infer Type -> TM (Type, [Constraint])
-runSolver = toEvalStateT
 
 unify :: Type -> Type -> Infer ()
 unify x y = tell [(x, y)]
@@ -172,7 +168,7 @@ emptyInterval = Interval (Including zero) (Excluding zero) NoLoc
 
 runInfer :: Env Type -> Infer Type -> TM Type
 runInfer env m = do
-  (t, cs) <- runSolver env m
+  (t, cs) <- toEvalStateT env m
   s <- solveConstraints cs
   return $ subst s t
 
