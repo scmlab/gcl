@@ -22,6 +22,7 @@ import           Syntax.Abstract                ( Expr(..), Mapping )
 import           Syntax.Common                  ( Name(Name)
                                                 , nameToText
                                                 )
+
 ------------------------------------------------------------------
 
 run
@@ -76,14 +77,12 @@ reduce expr = case expr of
     App f x l1 -> case f of
         -- [App-Expand-Lam]
         Expand before (Lam binder body l2) -> do
-            let mapping = mappingFromSubstitution [binder] [x]
-            -- Expand (App (Expand before (Lam binder body l2)) x l1) <$> subst mapping body
-
             -- distribute App inwards
-            after <- reduce (App (Lam binder body l2) x l1)
             before' <- reduce (App before x l1)
+            after <- reduce (App (Lam binder body l2) x l1)
 
-            Expand (Expand before' after) <$> subst mapping body
+            return $ Expand before' after 
+
         -- [App-Lam]
         Lam binder body _ -> do
             let mapping = mappingFromSubstitution [binder] [x]
