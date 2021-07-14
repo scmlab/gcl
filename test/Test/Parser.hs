@@ -26,8 +26,10 @@ expression =
       testCase "literal (True)" $ run "True",
       testCase "literal (False)" $ run "False",
       testCase "literal (Char)" $ run "'a'",
-      testCase "variable" $ run "x",
-      testCase "constant" $ run "(X)",
+      testCase "variable 1" $ run "x",
+      testCase "variable 2" $ run "Falsee",
+      testCase "constant 1" $ run "(X)",
+      testCase "constant 2" $ run "Intt",
       testCase "numeric 1" $ run "(1   \n  +  \n  (   \n   1))",
       testCase "numeric 2" $ run "A + X * Y",
       testCase "numeric 3" $ run "(A + X) * Y % 2",
@@ -201,15 +203,25 @@ statement =
     "Single statement"
     [ testCase "abort" $ run "abort",
       testCase "skip" $ run "skip",
-      testCase "assertion" $ run "{ \n True   }",
       testCase "assignment" $ run "x := 0",
       testCase "assignment (parallel)" $ run "x   , y  := 0    ,    1",
+      testCase "array assignment" $ run "x[i] := e",
+      testCase "assertion" $ run "{ \n True   }",
+      testCase "loop invariant" $ run "{ True ,     bnd      : a  }",
       testCase "conditional 1" $ run "if True -> skip fi",
       testCase "conditional 2" $ run "if True ->    skip   \n | False -> abort \nfi",
-      testCase "loop invariant" $ run "{ True ,     bnd      : a  }",
       testCase "loop body 1" $ run "do True -> skip od",
       testCase "loop body 2" $ run "do True    →       skip od",
-      testCase "indentifier include keyword" $ run "{ Falsee }"
+      testCase "spec QM" $ run "?",
+      testCase "spec 1" $ run "[!!]",
+      testCase "spec 2" $ run "[!\n   !]",
+      testCase "proof" $ run "{-   -}",
+      testCase "alloc 1" $ run "p := new(e1)",
+      testCase "alloc 2" $ run "p := new(e1, e2)",
+      testCase "alloc 3" $ run "p := new(e1, e2, e3)",
+      testCase "hlookup" $ run "x := *e",
+      testCase "hmutate" $ run "*e1 := e2",
+      testCase "dispose" $ run "dispose e"
     ]
   where
     run = parserIso pStmt

@@ -27,6 +27,21 @@ instance (PrettyWithLoc (Token sep), PrettyWithLoc a) => PrettyWithLoc (SepBy se
     prettyWithLoc x <> prettyWithLoc sep <> prettyWithLoc xs
 
 -- | Tokens
+instance PrettyWithLoc (Token "do") where
+  prettyWithLoc (Token l r) = DocWithLoc (pretty tokDo) l r
+
+instance PrettyWithLoc (Token "od") where
+  prettyWithLoc (Token l r) = DocWithLoc (pretty tokOd) l r
+
+instance PrettyWithLoc (Token "if") where
+  prettyWithLoc (Token l r) = DocWithLoc (pretty tokIf) l r
+
+instance PrettyWithLoc (Token "fi") where
+  prettyWithLoc (Token l r) = DocWithLoc (pretty tokFi) l r
+
+instance PrettyWithLoc (Token "bnd") where
+  prettyWithLoc (Token l r) = DocWithLoc (pretty tokBnd) l r
+
 instance PrettyWithLoc (Token "con") where
   prettyWithLoc (Token l r) = DocWithLoc (pretty tokCon) l r
 
@@ -36,17 +51,51 @@ instance PrettyWithLoc (Token "var") where
 instance PrettyWithLoc (Token "let") where
   prettyWithLoc (Token l r) = DocWithLoc (pretty tokLet) l r
 
-instance PrettyWithLoc (Token "{") where
-  prettyWithLoc (Token l r) = DocWithLoc (pretty tokBraceStart) l r
+instance PrettyWithLoc (Token "array") where
+  prettyWithLoc (Token l r) = DocWithLoc (pretty tokArray) l r
 
-instance PrettyWithLoc (Token "}") where
-  prettyWithLoc (Token l r) = DocWithLoc (pretty tokBraceEnd) l r
+instance PrettyWithLoc (Token "of") where
+  prettyWithLoc (Token l r) = DocWithLoc (pretty tokOf) l r
 
-instance PrettyWithLoc (Token "[") where
-  prettyWithLoc (Token l r) = DocWithLoc (pretty tokBracketStart) l r
+instance PrettyWithLoc (Token "new") where
+  prettyWithLoc (Token l r) = DocWithLoc (pretty tokNew) l r
 
-instance PrettyWithLoc (Token "]") where
-  prettyWithLoc (Token l r) = DocWithLoc (pretty tokBracketEnd) l r
+instance PrettyWithLoc (Token "dispose") where
+  prettyWithLoc (Token l r) = DocWithLoc (pretty tokDispose) l r
+
+instance PrettyWithLoc (Token "..") where
+  prettyWithLoc (Token l r) = DocWithLoc (pretty tokRange) l r
+
+instance PrettyWithLoc (Token "|") where
+  prettyWithLoc (Token l r) = DocWithLoc (pretty tokGuardBar) l r
+
+instance PrettyWithLoc (Token "->") where
+  prettyWithLoc (Token l r) = DocWithLoc (pretty tokArrow) l r
+
+instance PrettyWithLoc (Token "→") where
+  prettyWithLoc (Token l r) = DocWithLoc (pretty tokArrowU) l r
+
+instance PrettyWithLoc (Token "*") where
+  prettyWithLoc (Token l r) = DocWithLoc (pretty tokStar) l r
+
+instance PrettyWithLoc (Token "=") where
+  prettyWithLoc (Token l r) = DocWithLoc (pretty tokEQ) l r
+
+
+instance PrettyWithLoc (Token ",") where
+  prettyWithLoc (Token l r) = DocWithLoc (pretty tokComma) l r
+
+instance PrettyWithLoc (Token ":") where
+  prettyWithLoc (Token l r) = DocWithLoc (pretty tokColon) l r
+
+instance PrettyWithLoc (Token ":=") where
+  prettyWithLoc (Token l r) = DocWithLoc (pretty tokAssign) l r
+
+instance PrettyWithLoc (Token "[!") where
+  prettyWithLoc (Token l r) = DocWithLoc (pretty tokSpecStart) l r
+
+instance PrettyWithLoc (Token "!]") where
+  prettyWithLoc (Token l r) = DocWithLoc (pretty tokSpecEnd) l r
 
 instance PrettyWithLoc (Token "(") where
   prettyWithLoc (Token l r) = DocWithLoc (pretty tokParenStart) l r
@@ -54,23 +103,29 @@ instance PrettyWithLoc (Token "(") where
 instance PrettyWithLoc (Token ")") where
   prettyWithLoc (Token l r) = DocWithLoc (pretty tokParenEnd) l r
 
+instance PrettyWithLoc (Token "[") where
+  prettyWithLoc (Token l r) = DocWithLoc (pretty tokBracketStart) l r
+
+instance PrettyWithLoc (Token "]") where
+  prettyWithLoc (Token l r) = DocWithLoc (pretty tokBracketEnd) l r
+
+instance PrettyWithLoc (Token "{") where
+  prettyWithLoc (Token l r) = DocWithLoc (pretty tokBraceStart) l r
+
+instance PrettyWithLoc (Token "}") where
+  prettyWithLoc (Token l r) = DocWithLoc (pretty tokBraceEnd) l r
+
 instance PrettyWithLoc (Token "<|") where
   prettyWithLoc (Token l r) = DocWithLoc (pretty tokQuantStarts) l r
-
-instance PrettyWithLoc (Token "⟨") where
-  prettyWithLoc (Token l r) = DocWithLoc (pretty tokQuantStartU) l r
 
 instance PrettyWithLoc (Token "|>") where
   prettyWithLoc (Token l r) = DocWithLoc (pretty tokQuantEnds) l r
 
+instance PrettyWithLoc (Token "⟨") where
+  prettyWithLoc (Token l r) = DocWithLoc (pretty tokQuantStartU) l r
+
 instance PrettyWithLoc (Token "⟩") where
   prettyWithLoc (Token l r) = DocWithLoc (pretty tokQuantEndU) l r
-
-instance PrettyWithLoc (Token "[!") where
-  prettyWithLoc (Token l r) = DocWithLoc (pretty tokSpecStart) l r
-
-instance PrettyWithLoc (Token "!]") where
-  prettyWithLoc (Token l r) = DocWithLoc (pretty tokSpecEnd) l r
 
 instance PrettyWithLoc (Token "{-") where
   prettyWithLoc (Token l r) = DocWithLoc (pretty tokProofStart) l r
@@ -83,51 +138,6 @@ instance PrettyWithLoc (Token "{:") where
 
 instance PrettyWithLoc (Token ":}") where
   prettyWithLoc (Token l r) = DocWithLoc (pretty tokDeclEnd) l r
-
-instance PrettyWithLoc (Token ":") where
-  prettyWithLoc (Token l r) = DocWithLoc (pretty tokColon) l r
-
-instance PrettyWithLoc (Token ",") where
-  prettyWithLoc (Token l r) = DocWithLoc (pretty tokComma) l r
-
-instance PrettyWithLoc (Token "..") where
-  prettyWithLoc (Token l r) = DocWithLoc (pretty tokRange) l r
-
-instance PrettyWithLoc (Token "array") where
-  prettyWithLoc (Token l r) = DocWithLoc (pretty tokArray) l r
-
-instance PrettyWithLoc (Token "of") where
-  prettyWithLoc (Token l r) = DocWithLoc (pretty tokOf) l r
-
-instance PrettyWithLoc (Token "bnd") where
-  prettyWithLoc (Token l r) = DocWithLoc (pretty tokBnd) l r
-
-instance PrettyWithLoc (Token "if") where
-  prettyWithLoc (Token l r) = DocWithLoc (pretty tokIf) l r
-
-instance PrettyWithLoc (Token "fi") where
-  prettyWithLoc (Token l r) = DocWithLoc (pretty tokFi) l r
-
-instance PrettyWithLoc (Token "do") where
-  prettyWithLoc (Token l r) = DocWithLoc (pretty tokDo) l r
-
-instance PrettyWithLoc (Token "od") where
-  prettyWithLoc (Token l r) = DocWithLoc (pretty tokOd) l r
-
-instance PrettyWithLoc (Token ":=") where
-  prettyWithLoc (Token l r) = DocWithLoc (pretty tokAssign) l r
-
-instance PrettyWithLoc (Token "=") where
-  prettyWithLoc (Token l r) = DocWithLoc (pretty tokEQ) l r
-
-instance PrettyWithLoc (Token "|") where
-  prettyWithLoc (Token l r) = DocWithLoc (pretty tokGuardBar) l r
-
-instance PrettyWithLoc (Token "->") where
-  prettyWithLoc (Token l r) = DocWithLoc (pretty tokArrow) l r
-
-instance PrettyWithLoc (Token "→") where
-  prettyWithLoc (Token l r) = DocWithLoc (pretty tokArrowU) l r
 
 --------------------------------------------------------------------------------
 
@@ -209,9 +219,10 @@ instance PrettyWithLoc BlockDeclaration where
 -- | Literals
 instance Pretty Lit where
   pretty = toDoc . prettyWithLoc
+
 instance PrettyWithLoc Lit where
-  prettyWithLoc (LitBool True l) = fromDoc l "True"
-  prettyWithLoc (LitBool False l) = fromDoc l "False"
+  prettyWithLoc (LitBool True l) = fromDoc l (pretty tokTrue)
+  prettyWithLoc (LitBool False l) = fromDoc l (pretty tokFalse)
   prettyWithLoc (LitInt n l) = fromDoc l (pretty n)
   prettyWithLoc (LitChar c l) = fromDoc l ("'" <> pretty [c] <> "'")
 
@@ -222,8 +233,8 @@ instance Pretty Stmt where
   pretty = toDoc . prettyWithLoc
 
 instance PrettyWithLoc Stmt where
-  prettyWithLoc (Skip l) = fromDoc (locOf l) "skip"
-  prettyWithLoc (Abort l) = fromDoc (locOf l) "abort"
+  prettyWithLoc (Skip l) = fromDoc (locOf l) (pretty tokSkip)
+  prettyWithLoc (Abort l) = fromDoc (locOf l) (pretty tokAbort)
   prettyWithLoc (Assign xs a es) =
     prettyWithLoc xs <> prettyWithLoc a <> prettyWithLoc es
   prettyWithLoc (AAssign x l i r a e) =
@@ -249,7 +260,7 @@ instance PrettyWithLoc Stmt where
     prettyWithLoc l
       <> prettyWithLoc gdCmds
       <> prettyWithLoc r
-  prettyWithLoc (SpecQM l) = fromDoc l "?"
+  prettyWithLoc (SpecQM l) = fromDoc l (pretty tokQM)
   prettyWithLoc (Spec l s r) =
     prettyWithLoc l
       <> fromDoc (translateLoc 2 0 (locOf l) <--> translateLoc 0 (-2) (locOf r)) (pretty s)
@@ -258,6 +269,24 @@ instance PrettyWithLoc Stmt where
     prettyWithLoc l 
       <> mconcat (map prettyWithLoc anchors)
       <> prettyWithLoc r
+  prettyWithLoc (Alloc p a n l es r) = 
+    prettyWithLoc p
+    <> prettyWithLoc a
+    <> prettyWithLoc n
+    <> prettyWithLoc l
+    <> prettyWithLoc es
+    <> prettyWithLoc r
+  prettyWithLoc (HLookup x a s e) = 
+    prettyWithLoc x
+    <> prettyWithLoc a
+    <> prettyWithLoc s
+    <> prettyWithLoc e
+  prettyWithLoc (HMutate s e1 a e2) = 
+    prettyWithLoc s
+    <> prettyWithLoc e1
+    <> prettyWithLoc a
+    <> prettyWithLoc e2
+  prettyWithLoc (Dispose l e) = prettyWithLoc l <> prettyWithLoc e
 
 instance Pretty GdCmd where
   pretty = toDoc . prettyWithLoc
@@ -272,7 +301,7 @@ instance Pretty ProofAnchor where
   pretty = toDoc . prettyWithLoc
 
 instance PrettyWithLoc ProofAnchor where
-  prettyWithLoc (ProofAnchor hash range) = fromDoc (locOf range) ("#" <> pretty hash)
+  prettyWithLoc (ProofAnchor hash range) = fromDoc (locOf range) (pretty tokHash <> pretty hash)
 
 --------------------------------------------------------------------------------
 
@@ -361,9 +390,9 @@ instance Pretty Type where
 instance PrettyWithLoc Type where
   prettyWithLoc (TParen l t r) = prettyWithLoc l <> prettyWithLoc t <> prettyWithLoc r
   -- DocWithLoc "(" l l <> prettyWithLoc t <> DocWithLoc ")" m m
-  prettyWithLoc (TBase (TInt l)) = fromDoc l "Int"
-  prettyWithLoc (TBase (TBool l)) = fromDoc l "Bool"
-  prettyWithLoc (TBase (TChar l)) = fromDoc l "Char"
+  prettyWithLoc (TBase (TInt l)) = fromDoc l (pretty tokTypeInt)
+  prettyWithLoc (TBase (TBool l)) = fromDoc l (pretty tokTypeBool)
+  prettyWithLoc (TBase (TChar l)) = fromDoc l (pretty tokTypeChar)
   prettyWithLoc (TFunc a l b) = prettyWithLoc a <> prettyWithLoc l <> prettyWithLoc b
   prettyWithLoc (TArray l a r b) =
     prettyWithLoc l <> prettyWithLoc a <> prettyWithLoc r <> prettyWithLoc b

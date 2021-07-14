@@ -58,7 +58,7 @@ data Stmt
   | Alloc   Name [Expr] Loc    --  p := new (e1,e2,..,en)
   | HLookup Name Expr Loc      --  x := *e
   | HMutate Expr Expr Loc      --  *e1 := e2
-  | Dispose Expr Loc           --  free e
+  | Dispose Expr Loc           --  dispose e
 
   deriving (Eq, Show)
 

@@ -99,8 +99,10 @@ exprTests =
         exprCheck "Q b" "Bool",
       -- testCase "Hole" $
       --   exprCheck "_" "TVar",
-      testCase "Quant" $
-        exprCheck "<| + i : 0 ≤ i < N : F i |>" "Int"
+      testCase "Quant 1" $
+        exprCheck "<| + i : 0 ≤ i < N : F i |>" "Int",
+      testCase "Quant 2" $
+        exprCheck "<| ∃ c : c = 'a' : G c |>" "Bool"
     ]
 
 typeTests :: TestTree
@@ -367,6 +369,7 @@ env =
         (name' "P", tfunc tint tbool),
         (name' "Q", tfunc (tvar "?m") tbool),
         (name' "F", tfunc tint tint),
+        (name' "G", tfunc tchar tbool),
         (name' "Max", tfunc tint (tfunc tint tbool)),
         (name' "i", tint),
         (name' "j", tint),

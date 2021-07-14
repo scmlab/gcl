@@ -121,7 +121,7 @@ pDeclBody =
   DeclBody
   <$> pName
   <*> many lowerName
-  <*> lexEQ'
+  <*> lexEqual
   <*> pExpr'
 
 pBlockDeclProp :: ParserF BlockDeclProp
@@ -155,7 +155,11 @@ pStmt' =
       try pAssert,
       pLoopInvariant,
       try pAssign,
-      pAAssign,
+      try pAAssign,
+      try pAlloc,
+      try pHLookup,
+      pHMutate,
+      pDispose,
       pDo,
       pIf,
       pSpecQM,
@@ -242,6 +246,37 @@ pProof = Proof
             return (x:xs)
         else return []
 
+pAlloc :: ParserF Stmt
+pAlloc = 
+  Alloc
+  <$> lowerName
+  <*> lexAssign 
+  <*> lexNew
+  <*> lexParenStart 
+  <*> pList pExpr'
+  <*> lexParenEnd 
+
+pHLookup :: ParserF Stmt
+pHLookup = 
+  HLookup
+  <$> lowerName
+  <*> lexAssign
+  <*> lexStar 
+  <*> pExpr'
+
+pHMutate :: ParserF Stmt
+pHMutate = 
+  HMutate 
+  <$> lexStar
+  <*> pExpr'
+  <*> lexAssign
+  <*> pExpr'
+
+pDispose :: ParserF Stmt
+pDispose =
+  Dispose
+  <$> lexDispose
+  <*> pExpr'
 
 ------------------------------------------
 -- parse Type

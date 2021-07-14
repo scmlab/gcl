@@ -56,6 +56,12 @@ tokArray = "array"
 tokOf :: Text
 tokOf = "of"
 
+tokNew :: Text
+tokNew = "new"
+
+tokDispose :: Text
+tokDispose = "dispose"
+
 tokRange :: Text
 tokRange = ".."
 
@@ -67,6 +73,9 @@ tokArrow = "->"
 
 tokArrowU :: Text
 tokArrowU = "→"
+
+tokStar :: Text
+tokStar = "*"
 
 ------------------------------------------
 -- delimiters
@@ -273,7 +282,7 @@ notUpperKeywords :: Text -> Bool
 notUpperKeywords t = t `notElem` upperKeywords
 
 lowerKeywords :: [Text]
-lowerKeywords = [tokSkip, tokAbort, tokIf, tokFi, tokDo, tokOd, tokBnd, tokCon, tokVar, tokLet, tokArray, tokOf]
+lowerKeywords = [tokSkip, tokAbort, tokIf, tokFi, tokDo, tokOd, tokBnd, tokCon, tokVar, tokLet, tokArray, tokOf, tokNew, tokDispose]
 
 upperKeywords :: [Text]
 upperKeywords = [tokTypeInt, tokTypeBool, tokTypeChar, tokTrue, tokFalse]

@@ -77,9 +77,6 @@ instance Fresh Infer where
     (put . succ) i
     return i
 
-runSolver :: Env Type ->  Infer Type -> TM (Type, [Constraint])
-runSolver = toEvalStateT
-
 unify :: Type -> Type -> Infer ()
 unify x y = tell [(x, y)]
 
@@ -172,7 +169,7 @@ emptyInterval = Interval (Including zero) (Excluding zero) NoLoc
 
 runInfer :: Env Type -> Infer Type -> TM Type
 runInfer env m = do
-  (t, cs) <- runSolver env m
+  (t, cs) <- toEvalStateT env m
   s <- solveConstraints cs
   return $ subst s t
 
