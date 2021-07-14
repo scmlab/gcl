@@ -65,9 +65,9 @@ instance Fresh M where
 --      (a ===> \n . body) x    ~~~~~~~~~~~>    b ===> c
 --  
 --  
---      body                    ~[ x / n ]~>    y
+--      body                    ~[ x / n ]~>    b
 -- --------------------------------------------------------------- [reduce-App-Lam]
---      (\n . body) x           ~~~~~~~~~~~>    y
+--      (\n . body) x           ~~~~~~~~~~~>    b
 --
 --
 -- --------------------------------------------------------------- [reduce-Others]
@@ -189,7 +189,7 @@ instance Substitutable Expr where
 -- 
 --      f                   ~[.../...]~>    f'
 --      x                   ~[.../...]~>    x'
---      f' x'               ~~~~~~~~~~~>    y' 
+--      f' x'               ~~~~~~~~~~~>    y 
 -- ---------------------------------------------------------------[subst-App]
 --      f  x                ~[.../...]~>    y
 -- 
@@ -207,7 +207,7 @@ instance Substitutable Expr where
             let (capturableNames, shrinkedMapping) =
                     getCapturableNames mapping body
 
-            (binder', alphaRenameMapping) <- alphaRename capturableNames binder
+            (binder', alphaRenameMapping) <- rename capturableNames binder
 
             Lam binder'
                 <$> subst (alphaRenameMapping <> shrinkedMapping) body
@@ -226,7 +226,7 @@ instance Substitutable Expr where
                     getCapturableNames mapping expr
 
             (binders', alphaRenameMapping) <-
-                unzip <$> mapM (alphaRename capturableNames) binders
+                unzip <$> mapM (rename capturableNames) binders
 
             -- combine individual renamings to get a new mapping 
             -- and use that mapping to rename other stuff
@@ -248,7 +248,7 @@ instance Substitutable Expr where
 -- 
 --      a                   ~[.../...]~>    a'
 --      b                   ~[.../...]~>    b'
--- ---------------------------------------------------------------[subst-Subst]
+-- ---------------------------------------------------------------[subst-Expand]
 --      a ===> b            ~[.../...]~>    a' ===> b'
 -- 
         Expand before after ->
@@ -266,8 +266,9 @@ instance Substitutable Expr where
 -- 
 --      a                   ~[.../...]~>    a'
 --      b                   ~[.../...]~>    b'
+--      c                   ~[.../...]~>    c'
 -- ---------------------------------------------------------------[subst-ArrUpd]
---      ArrUpd a b          ~[.../...]~>    ArrUpd a b
+--      ArrUpd a b c        ~[.../...]~>    ArrUpd a b c
 -- 
         ArrUpd array index value l ->
             ArrUpd
@@ -295,8 +296,8 @@ instance Substitutable Pred where
 
 -- rename a binder if it is in the set of "capturableNames"
 -- returns the renamed binder and the mapping of alpha renaming (for renaming other stuff)
-alphaRename :: Set Text -> Name -> M (Name, Mapping)
-alphaRename capturableNames binder =
+rename :: Set Text -> Name -> M (Name, Mapping)
+rename capturableNames binder =
     if Set.member (nameToText binder) capturableNames
         -- CAPTURED! 
         -- returns the alpha renamed binder along with its mapping 
