@@ -45,16 +45,18 @@ import           GCL.Predicate.Util             ( conjunct
                                                 , guardLoop
                                                 , toExpr
                                                 )
+import qualified GCL.Substitute                as Substitute
 import           GCL.WP.Type
 import           Numeric                        ( showHex )
-import           Pretty                         ( toString, toText )
+import           Pretty                         ( toString
+                                                , toText
+                                                )
 import qualified Syntax.Abstract               as A
 import qualified Syntax.Abstract.Operator      as A
 import qualified Syntax.Abstract.Util          as A
 import           Syntax.Common                  ( Name(Name)
                                                 , nameToText
                                                 )
-import qualified GCL.Substitute as Substitute
 
 type TM = Except StructError
 
@@ -71,13 +73,11 @@ runWP
   :: WP a
   -> Substitute.Scope
   -> Either StructError (a, ([PO], [Spec], [StructWarning]))
-runWP p defs = runExcept $ evalRWST p defs (0, 0, 0)
+runWP p decls = runExcept $ evalRWST p decls (0, 0, 0)
 
 sweep :: A.Program -> Either StructError ([PO], [Spec], [StructWarning])
 sweep (A.Program decls _ _ stmts _) = do
-  let scope = Map.mapKeys nameToText $ Map.map
-        (maybe Substitute.NoBinding Substitute.UserDefinedBinding)
-        (A.extractDeclarations decls)
+  let scope = Map.mapKeys nameToText $ A.extractDeclarations decls
   (_, (pos, specs, warnings)) <- runWP (structProgram stmts) scope
   -- update Proof Obligations with corresponding Proof Anchors
 
@@ -127,7 +127,6 @@ progView stmts = do
   isProof :: A.Stmt -> Bool
   isProof A.Proof{} = True
   isProof _         = False
-
 
 -- alphaSubst :: (Substitutable A.Bindings b, AlphaRename WP b) => Subs A.Bindings -> b -> WP b
 -- alphaSubst sub e = do
@@ -348,16 +347,12 @@ wp (A.Abort _) _ = return (Constant A.false)
 wp (A.Skip _) post = return post
 
 wp (A.Assign xs es _) post = do
-  let mapping = Substitute.mappingFromSubstitution xs es
   scope <- ask
-  return $ Substitute.run scope mapping post
+  return $ Substitute.run scope xs es post
 
 wp (A.AAssign (A.Var x _) i e _) post = do
-  let mapping = Substitute.mappingFromSubstitution
-        [x]
-        [A.ArrUpd (A.nameVar x) i e NoLoc]
   scope <- ask
-  return $ Substitute.run scope mapping post
+  return $ Substitute.run scope [x] [A.ArrUpd (A.nameVar x) i e NoLoc] post
 
 wp (A.AAssign _ _ _ l) _ = throwError (MultiDimArrayAsgnNotImp l)
 
@@ -376,8 +371,7 @@ wp (A.Alloc x (e:es) _) post = do -- non-empty
     {- wp (x := es) P = (forall x', (x' -> es) -* P[x'/x])-}
   x'     <- freshName' (toText x) -- generate fresh name using the exisiting "x"
   scope <- ask
-  let mapping = Substitute.mappingFromSubstitution [x] [A.nameVar x']
-  let post' = Substitute.run scope mapping (toExpr post)
+  let post' = Substitute.run scope [x] [A.nameVar x'] (toExpr post)
 
   return $ Constant (A.forAll [x'] A.true (newallocs x' `A.sImp` post'))
  where
@@ -390,8 +384,7 @@ wp (A.HLookup x e _) post = do
     {- wp (x := *e) P = (exists v . (e->v) * ((e->v) -* P[v/x])) -}
   v     <- freshName' (toText x) -- generate fresh name using the exisiting "x"
   scope <- ask
-  let mapping = Substitute.mappingFromSubstitution [x] [A.nameVar v]
-  let post' = Substitute.run scope mapping (toExpr post)
+  let post' = Substitute.run scope [x] [A.nameVar v] (toExpr post)
 
   return $ Constant
     (A.exists [v] A.true (entry v `A.sConj` (entry v `A.sImp` post')))
@@ -468,20 +461,16 @@ sp (pre, _) (A.Skip _) = return pre
 sp (pre, _) (A.Assign xs es l) = do
       -- {P} x := E { (exists x' :: x = E[x'/x] && P[x'/x]) }
   -- generate fresh names from the assignees "xs"
-  freshNames <- forM xs $ \x -> do 
+  freshNames <- forM xs $ \x -> do
     x' <- freshWithLabel (toText x)
     return $ Name x' NoLoc
   let freshVars = map (`A.Var` l) freshNames
-  -- generate new scope for fresh names
-
-  let mapping = Substitute.mappingFromSubstitution xs freshVars
-  scope <- ask
-
   -- substitute "xs"s with fresh names in "pre"
-  let pre'    = Substitute.run scope mapping (toExpr pre)
+  scope <- ask
+  let pre' = Substitute.run scope xs freshVars (toExpr pre)
   -- 
   let predicate = A.conjunct $ zipWith
-        (\x e -> A.nameVar x `A.eqq` Substitute.run scope mapping e)
+        (\x e -> A.nameVar x `A.eqq` Substitute.run scope xs freshVars e)
         xs
         es
 
@@ -490,17 +479,16 @@ sp (pre, _) (A.Assign xs es l) = do
 sp (pre, _) (A.AAssign (A.Var x _) i e _) = do
      -- {P} x[I] := E { (exist x' :: x = x'[I[x'/x] -> E[x'/x]] && P[x'/x]) }
   scope <- ask
-  x'     <- freshText
+  x'    <- freshText
 
-  let mapping = Substitute.mappingFromSubstitution [x] [A.variable x']
-  let pre'              = Substitute.run scope mapping (toExpr pre)
+  let pre' = Substitute.run scope [x] [A.variable x'] (toExpr pre)
   return $ Constant
     (A.exists
       [Name x' NoLoc]
       (       A.nameVar x
       `A.eqq` A.ArrUpd (A.variable x')
-                       (Substitute.run scope mapping i)
-                       (Substitute.run scope mapping e)
+                       (Substitute.run scope [x] [A.variable x'] i)
+                       (Substitute.run scope [x] [A.variable x'] e)
                        NoLoc
       )
       pre'
@@ -526,8 +514,8 @@ tellPO :: Pred -> Pred -> Origin -> WP ()
 tellPO p q origin = unless (toExpr p == toExpr q) $ do
 
   scope <- ask
-  let p' = Substitute.run scope mempty p
-  let q' = Substitute.run scope mempty q
+  let p' = Substitute.run scope [] [] p
+  let q' = Substitute.run scope [] [] q
 
   (i, j, k) <- get
   put (succ i, j, k)
@@ -543,8 +531,8 @@ tellSpec :: Pred -> Pred -> Range -> WP ()
 tellSpec p q l = do
 
   scope <- ask
-  let p' = Substitute.run scope mempty p
-  let q' = Substitute.run scope mempty q
+  let p' = Substitute.run scope [] [] p
+  let q' = Substitute.run scope [] [] q
 
   (i, j, k) <- get
   put (i, succ j, k)
@@ -558,5 +546,6 @@ throwWarning warning = do
 withFreshVar :: (A.Expr -> WP a) -> WP a
 withFreshVar f = do
   name <- freshName' "bnd"
-  let var   = A.Var name NoLoc
-  withRWST (\scope st -> (Map.insert (nameToText name) Substitute.NoBinding scope, st)) (f var)
+  let var = A.Var name NoLoc
+  withRWST (\scope st -> (Map.insert (nameToText name) Nothing scope, st))
+           (f var)

@@ -23,6 +23,7 @@ constExpr bvars (Quant op bvs range body _) =
     && constExpr (bvs ++ bvars) range
     && constExpr (bvs ++ bvars) body
 constExpr _ Subst {} = error "constExpr Subst to be implemented"
+constExpr _ Subst2 {} = error "constExpr Subst2 to be implemented"
 constExpr _ Expand {} = error "constExpr Expand to be implemented"
 constExpr bvars (ArrIdx e1 e2 _) =
   constExpr bvars e1 && constExpr bvars e2

@@ -11,10 +11,8 @@ instance ToJSON Type
 instance ToJSON Expr
 instance ToJSON Lit
 instance ToJSON Bindings 
-instance ToJSON Reason
 
 instance FromJSON Expr
 instance FromJSON Lit
 instance FromJSON Bindings
-instance FromJSON Reason
 

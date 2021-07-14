@@ -35,7 +35,7 @@ letBindings = testGroup
   , run "let binding with assignment 1" "let-2.gcl"
   , run "let binding with assignment 2" "let-3.gcl"
   , run "let binding with assignment and application" "let-4.gcl"
-  , run "fastmul" "subst-fastmul.gcl"
+  , run "fastmul"                       "subst-fastmul.gcl"
   ]
  where
   run :: String -> FilePath -> TestTree
@@ -111,7 +111,7 @@ instance ExtractExpand Expr where
     App x y _       -> extractExpand x <> extractExpand y
     Lam _ x _       -> extractExpand x
     Quant x _ y z _ -> extractExpand x <> extractExpand y <> extractExpand z
-    Expand _ before after ->
+    Expand before after ->
       [EXPN (render before) (render after) (extractExpand after)]
     Subst before _mapping after ->
       [EXPN (render before) (render after) (extractExpand after)]

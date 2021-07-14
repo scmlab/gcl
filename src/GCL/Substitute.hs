@@ -5,8 +5,6 @@
 module GCL.Substitute
     ( run
     , Scope
-    , Binding(..)
-    , mappingFromSubstitution
     ) where
 
 import           Control.Monad.RWS
@@ -20,31 +18,24 @@ import           GCL.Common                     ( Free(fv)
                                                 , Fresh(fresh, freshWithLabel)
                                                 )
 import           GCL.Predicate                  ( Pred(..) )
-import           Pretty                         ( (<+>)
-                                                , Pretty(pretty)
-                                                )
-import           Syntax.Abstract                ( Expr(..)
-                                                )
+import           Syntax.Abstract                ( Expr(..), Mapping )
 import           Syntax.Common                  ( Name(Name)
                                                 , nameToText
                                                 )
-
 ------------------------------------------------------------------
 
-run :: Subst a => Scope -> Mapping -> a -> a
-run scope mapping predicate = fst $ evalRWS (subst mapping predicate) scope 0
-
-------------------------------------------------------------------
-
--- | A "Scope" is a mapping from names to Bindings 
-type Scope = Map Text Binding
-
--- scopeFromLetBindings :: Map Name (Maybe Bindings) -> Scope
--- scopeFromLetBindings = Map.mapKeys nameToText . fmap toBinding
---   where
---     toBinding Nothing = NoBinding
---     toBinding (Just (LetBinding x)) = UserDefinedBinding x
---     toBinding (Just others) = UserDefinedBinding (bindingsToExpr others)
+run
+    :: (Substitutable a)
+    => Scope -- declarations
+    -> [Name] -- name of variables to be substituted
+    -> [Expr] -- values to be substituted for  
+    -> a
+    -> a
+run scope names exprs predicate = fst
+    $ evalRWS (subst mapping predicate) scope 0
+  where
+    mapping :: Mapping
+    mapping = mappingFromSubstitution names exprs
 
 mappingFromSubstitution :: [Name] -> [Expr] -> Mapping
 mappingFromSubstitution xs es =
@@ -52,13 +43,7 @@ mappingFromSubstitution xs es =
 
 ------------------------------------------------------------------
 
-data Binding
-    = UserDefinedBinding Expr
-    | NoBinding
-    deriving (Show)
-
-type Mapping = Map Text Expr
-
+type Scope = Map Text (Maybe Expr)
 type M = RWS Scope () Int
 
 instance Fresh M where
@@ -67,59 +52,68 @@ instance Fresh M where
         put (succ i)
         return i
 
-instance Free Binding where
-    fv (UserDefinedBinding  x) = fv x
-    fv NoBinding               = Set.empty
-
-instance Pretty (Map Text Binding) where
-    pretty = pretty . Map.toList
-
-instance Pretty Binding where
-    pretty (UserDefinedBinding expr) = "UserDefinedBinding" <+> pretty expr
-    pretty NoBinding = "NoBinding"
-
 ------------------------------------------------------------------
+
+--  TODO: REVISE & FIX THESE RULES
+--      f                       --expand-->     \binder . body
+--      body [ x / binder ]     ~~~~~~~~~~>     y
+-- --------------------------------------------------------------- [App-Expand-Lam]
+--      f x                     --expand-->     y
+-- 
+--  
+--      body [ x / binder ]     ~~~~~~~~~~>     y
+-- --------------------------------------------------------------- [App-Lam]
+--      (\binder . body) x      ~~~~~~~~~~>     y
+--
+--
+-- --------------------------------------------------------------- [Others]
+--      other constructs        ~~~~~~~~~~>     other constructs
+-- 
 
 -- perform substitution when there's a redex
 reduce :: Expr -> M Expr
 reduce expr = case expr of
-    App f x _ -> case f of
-        Expand _ _ (Lam binder body _) -> do
+    App f x l1 -> case f of
+        -- [App-Expand-Lam]
+        Expand before (Lam binder body l2) -> do
             let mapping = mappingFromSubstitution [binder] [x]
-            -- perform substitution
-            Expand [] expr <$> subst mapping body
+            -- Expand (App (Expand before (Lam binder body l2)) x l1) <$> subst mapping body
 
+            -- distribute App inwards
+            after <- reduce (App (Lam binder body l2) x l1)
+            before' <- reduce (App before x l1)
+
+            Expand (Expand before' after) <$> subst mapping body
+        -- [App-Lam]
         Lam binder body _ -> do
             let mapping = mappingFromSubstitution [binder] [x]
-            -- perform substitution
             subst mapping body
-
+        -- [Others]
         _ -> return expr
+    -- [Others]
+
     _ -> return expr
 
 ------------------------------------------------------------------
 
-class Subst a where
+class Substitutable a where
     subst :: Mapping -> a -> M a
 
-instance Subst Pred where
-    subst mapping = \case
-        Constant a    -> Constant <$> subst mapping a
-        GuardIf   a l -> GuardIf <$> subst mapping a <*> pure l
-        GuardLoop a l -> GuardLoop <$> subst mapping a <*> pure l
-        Assertion a l -> Assertion <$> subst mapping a <*> pure l
-        LoopInvariant a b l ->
-            LoopInvariant <$> subst mapping a <*> subst mapping b <*> pure l
-        Bound a l   -> Bound <$> subst mapping a <*> pure l
-        Conjunct as -> Conjunct <$> mapM (subst mapping) as
-        Disjunct as -> Disjunct <$> mapM (subst mapping) as
-        Negate   a  -> Negate <$> subst mapping a
-
-instance Subst Expr where
+instance Substitutable Expr where
     subst mapping expr = reduce =<< case expr of
 
+-- 
+--      e [../..]           ~~~~~~~~~~>     a
+--      Paren a             ~~~~~~~~~~>     b
+-- ---------------------------------------------------------------
+--      Paren e [../..]     ~~~~~~~~~~>     b
+-- 
         Paren e l  -> Paren <$> subst mapping e <*> pure l
 
+-- 
+-- ---------------------------------------------------------------
+--      Lit a               ~~~~~~~~~~>     Lit a
+-- 
         Lit{}      -> return expr
 
         Var name _ -> case Map.lookup (nameToText name) mapping of
@@ -127,31 +121,29 @@ instance Subst Expr where
             Nothing    -> do
                 scope <- ask
                 case Map.lookup (nameToText name) scope of
-                    Just (UserDefinedBinding binding) -> do 
-                        binding' <- subst mapping binding 
-                        return $ Expand [] expr binding'
-                    Just NoBinding                     -> return expr
-                    Nothing   -> return expr
+                    Just (Just binding) -> do
+                        after <- subst mapping binding
+                        let before = Subst2 expr mapping
+                        return $ Expand before after
+                    Just Nothing -> return expr
+                    Nothing      -> return expr
 
         Const name _ -> case Map.lookup (nameToText name) mapping of
             Just value -> return value
             Nothing    -> do
                 scope <- ask
                 case Map.lookup (nameToText name) scope of
-                    Just (UserDefinedBinding binding) -> do 
-                        binding' <- subst mapping binding 
-                        return $ Expand [] expr binding'
-                    Just NoBinding                     -> return expr
-                    Nothing   -> return expr
+                    Just (Just binding) -> do
+                        after <- subst mapping binding
+                        let before = Subst2 expr mapping
+                        return $ Expand before after
+                    Just Nothing -> return expr
+                    Nothing      -> return expr
 
         Op{} -> return expr
 
         Chain a op b l ->
-            Chain
-                <$> subst mapping a
-                <*> pure op
-                <*> subst mapping b
-                <*> pure l
+            Chain <$> subst mapping a <*> pure op <*> subst mapping b <*> pure l
 
         App f x l -> App <$> subst mapping f <*> subst mapping x <*> pure l
 
@@ -186,13 +178,12 @@ instance Subst Expr where
 
         Subst{}  -> return expr
 
-        Expand{} -> return expr
+        Subst2 e mapping' -> return $ Subst2 e (mapping' <> mapping)
+
+        Expand before after -> Expand <$> subst mapping before <*> subst mapping after 
 
         ArrIdx array index l ->
-            ArrIdx
-                <$> subst mapping array
-                <*> subst mapping index
-                <*> pure l
+            ArrIdx <$> subst mapping array <*> subst mapping index <*> pure l
 
         ArrUpd array index value l ->
             ArrUpd
@@ -201,9 +192,18 @@ instance Subst Expr where
                 <*> subst mapping value
                 <*> pure l
 
--- subst2 :: Scope -> Mapping -> Expr -> M Expr
--- subst2 scope mapping expr = reduceExpr mapping =<< case expr of
---     _ -> return expr 
+instance Substitutable Pred where
+    subst mapping = \case
+        Constant a    -> Constant <$> subst mapping a
+        GuardIf   a l -> GuardIf <$> subst mapping a <*> pure l
+        GuardLoop a l -> GuardLoop <$> subst mapping a <*> pure l
+        Assertion a l -> Assertion <$> subst mapping a <*> pure l
+        LoopInvariant a b l ->
+            LoopInvariant <$> subst mapping a <*> subst mapping b <*> pure l
+        Bound a l   -> Bound <$> subst mapping a <*> pure l
+        Conjunct as -> Conjunct <$> mapM (subst mapping) as
+        Disjunct as -> Disjunct <$> mapM (subst mapping) as
+        Negate   a  -> Negate <$> subst mapping a
 
 
 ------------------------------------------------------------------

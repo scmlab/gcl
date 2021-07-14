@@ -1,6 +1,5 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE LambdaCase #-}
 
 module Render.Syntax.Abstract where
 
@@ -39,23 +38,25 @@ instance Render Expr where
     Complete s -> s
 
 handleExpr :: Int -> Expr -> Variadic Expr Inlines
-handleExpr n (Paren x l     ) = return $ tempHandleLoc l $ renderPrec n x
-handleExpr n (Var   x l     ) = return $ tempHandleLoc l $ renderPrec n x
-handleExpr n (Const x l     ) = return $ tempHandleLoc l $ renderPrec n x
-handleExpr n (Lit   x l     ) = return $ tempHandleLoc l $ renderPrec n x
-handleExpr n (Op x          ) = handleOp n x
-handleExpr n (Chain a op b _) = return $ renderPrec n a <+> render op <+> renderPrec n b
-handleExpr n (App p q _     ) = do 
-  case handleExpr (succ n) p of 
-    Expect p' -> p' q 
-    Complete p' -> do 
-      
+handleExpr n (Paren x l) = return $ tempHandleLoc l $ renderPrec n x
+handleExpr n (Var   x l) = return $ tempHandleLoc l $ renderPrec n x
+handleExpr n (Const x l) = return $ tempHandleLoc l $ renderPrec n x
+handleExpr n (Lit   x l) = return $ tempHandleLoc l $ renderPrec n x
+handleExpr n (Op x     ) = handleOp n x
+handleExpr n (Chain a op b _) =
+  return $ renderPrec n a <+> render op <+> renderPrec n b
+handleExpr n (App p q _) = do
+  case handleExpr (succ n) p of
+    Expect   p' -> p' q
+    Complete p' -> do
+
       -- function application is left-associative with the precedence of 9
       let precedence = 9
-      t <-  handleExpr (succ precedence) q
-      return $ parensIf n precedence $ p' <+> t 
+      t <- handleExpr (succ precedence) q
+      return $ parensIf n precedence $ p' <+> t
 
-handleExpr n (Lam p q _) = return $ parensIf n 0 $ "λ" <+> render p <+> "→" <+> render q
+handleExpr n (Lam p q _) =
+  return $ parensIf n 0 $ "λ" <+> render p <+> "→" <+> render q
 handleExpr _ (Quant op xs r t _) =
   return
     $   "⟨"
@@ -83,14 +84,10 @@ handleExpr _ (Subst before env after) = return $ substE
   isLam :: Expr -> Bool
   isLam Lam{} = True
   isLam _     = False
-handleExpr n (Expand reasons before after) = return $ expandE
-  ("[" <+> renderManySepByComma reasons <+> "]")
-  (renderPrec n before)
-  (renderPrec n after)
---  where
---   isLam :: Expr -> Bool
---   isLam Lam{} = True
---   isLam _     = False
+handleExpr n (Subst2 expr mapping) =
+  return $ renderPrec n expr <+> render mapping
+handleExpr n (Expand before after) =
+  return $ expandE (renderPrec n before) mempty (renderPrec n after)
 handleExpr _ (ArrIdx e1 e2 _) = return $ render e1 <> "[" <> render e2 <> "]"
 handleExpr _ (ArrUpd e1 e2 e3 _) =
   return $ "(" <+> render e1 <+> ":" <+> render e2 <+> "↣" <+> render e3 <+> ")"
@@ -99,38 +96,19 @@ handleExpr _ (ArrUpd e1 e2 e3 _) =
 instance Render Subst where
   render = render . Map.mapMaybe assignBindingToExpr
 
-instance Render (Map Name Expr) where
+instance Render Mapping where
   render env | null env  = mempty
              | otherwise = "[" <+> exprs <+> "/" <+> vars <+> "]"
    where
     vars  = punctuateE "," $ map render $ Map.keys env
     exprs = punctuateE "," $ map render $ Map.elems env
 
---------------------------------------------------------------------------------
-
-instance Render Reason where
-  render = \case
-    ExpandContinue name reason ->
-      "ExpandContinue " <> render name <+> render reason
-    ExpandPause reasons before after ->
-      "ExpandPause "
-        <>  render before
-        <>  " => "
-        <>  render after
-        <+> "["
-        <+> vertE (map render reasons)
-        <+> "]"
-    ExpandStuck name -> "ExpandStuck " <> render name
-    -- Reduce expr reason -> "Reduce " <> render reason <+> render expr
-    Congruence reasons before after ->
-      "Congruence "
-        <>  render before
-        <>  " => "
-        <>  render after
-        <+> "["
-        <+> vertE (map render reasons)
-        <+> "]"
-    Value expr -> "Value" <+> render expr
+instance Render (Map Name Expr) where
+  render env | null env  = mempty
+             | otherwise = "[" <+> exprs <+> "/" <+> vars <+> "]"
+   where
+    vars  = punctuateE "," $ map render $ Map.keys env
+    exprs = punctuateE "," $ map render $ Map.elems env
 
 --------------------------------------------------------------------------------
 
