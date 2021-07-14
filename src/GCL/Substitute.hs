@@ -18,7 +18,9 @@ import           GCL.Common                     ( Free(fv)
                                                 , Fresh(fresh, freshWithLabel)
                                                 )
 import           GCL.Predicate                  ( Pred(..) )
-import           Syntax.Abstract                ( Expr(..), Mapping )
+import           Syntax.Abstract                ( Expr(..)
+                                                , Mapping
+                                                )
 import           Syntax.Common                  ( Name(Name)
                                                 , nameToText
                                                 )
@@ -55,19 +57,19 @@ instance Fresh M where
 
 ------------------------------------------------------------------
 
---  TODO: REVISE & FIX THESE RULES
+--      f x                     ~~~~~~~~~~>     y
 --      f                       --expand-->     \binder . body
---      body [ x / binder ]     ~~~~~~~~~~>     y
--- --------------------------------------------------------------- [App-Expand-Lam]
---      f x                     --expand-->     y
--- 
+--      (\binder . body) x      ~~~~~~~~~~>     y'
+-- --------------------------------------------------------------- [reduce-App-Expand-Lam]
+--      y                       --expand-->     y'
+--  
 --  
 --      body [ x / binder ]     ~~~~~~~~~~>     y
--- --------------------------------------------------------------- [App-Lam]
+-- --------------------------------------------------------------- [reduce-App-Lam]
 --      (\binder . body) x      ~~~~~~~~~~>     y
 --
 --
--- --------------------------------------------------------------- [Others]
+-- --------------------------------------------------------------- [reduce-Others]
 --      other constructs        ~~~~~~~~~~>     other constructs
 -- 
 
@@ -75,20 +77,14 @@ instance Fresh M where
 reduce :: Expr -> M Expr
 reduce expr = case expr of
     App f x l1 -> case f of
-        -- [App-Expand-Lam]
-        Expand before (Lam binder body l2) -> do
-            -- distribute App inwards
-            before' <- reduce (App before x l1)
-            after <- reduce (App (Lam binder body l2) x l1)
-
-            return $ Expand before' after 
-
-        -- [App-Lam]
-        Lam binder body _ -> do
-            let mapping = mappingFromSubstitution [binder] [x]
-            subst mapping body
+        -- [reduce-App-Expand-Lam]
+        Expand before (Lam binder body l2) ->
+            Expand <$> reduce (App before x l1) <*> reduce
+                (App (Lam binder body l2) x l1)
+        -- [reduce-App-Lam]
+        Lam binder body _ -> subst (mappingFromSubstitution [binder] [x]) body
         -- [Others]
-        _ -> return expr
+        _                 -> return expr
     -- [Others]
 
     _ -> return expr
@@ -102,24 +98,37 @@ instance Substitutable Expr where
     subst mapping expr = reduce =<< case expr of
 
 -- 
---      e [../..]           ~~~~~~~~~~>     a
---      Paren a             ~~~~~~~~~~>     b
--- ---------------------------------------------------------------
---      Paren e [../..]     ~~~~~~~~~~>     b
+--       e [../..]          ~~~~~~~~~~>     a
+--       Paren a            ~~~~~~~~~~>     b
+-- ---------------------------------------------------------------[subst-Paren]
+--      (Paren e) [../..]   ~~~~~~~~~~>     b
 -- 
         Paren e l  -> Paren <$> subst mapping e <*> pure l
 
 -- 
--- ---------------------------------------------------------------
+-- ---------------------------------------------------------------[subst-Lit]
 --      Lit a               ~~~~~~~~~~>     Lit a
 -- 
         Lit{}      -> return expr
 
+-- 
+--       val                ~~~~~~~~~~>     val'
+-- ---------------------------------------------------------------[subst-Var-substituted]
+--      (Var x) [val/x]     ~~~~~~~~~~>     val'
+-- 
+-- 
+--      x is defined as val
+--      val     [../..]     ~~~~~~~~~~>     after
+--      (Var x) [../..]     ~~~~~~~~~~>     before
+-- ---------------------------------------------------------------[subst-Var-defined]
+--      before              ~~expand~~>     after
+-- 
         Var name _ -> case Map.lookup (nameToText name) mapping of
-            Just value -> return value
+            Just value -> return value -- [subst-Var-substituted]
             Nothing    -> do
                 scope <- ask
                 case Map.lookup (nameToText name) scope of
+                    -- [subst-Var-defined]
                     Just (Just binding) -> do
                         after <- subst mapping binding
                         let before = Subst2 expr mapping
@@ -175,11 +184,12 @@ instance Substitutable Expr where
                 <*> subst (alphaRenameMappings <> shrinkedMapping) body
                 <*> pure l
 
-        Subst{}  -> return expr
+        Subst{}           -> return expr
 
         Subst2 e mapping' -> return $ Subst2 e (mapping' <> mapping)
 
-        Expand before after -> Expand <$> subst mapping before <*> subst mapping after 
+        Expand before after ->
+            Expand <$> subst mapping before <*> subst mapping after
 
         ArrIdx array index l ->
             ArrIdx <$> subst mapping array <*> subst mapping index <*> pure l
