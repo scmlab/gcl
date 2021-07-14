@@ -1,0 +1,8 @@
+con f : Int -> Bool
+var i, n : Int
+
+{: P n = ⟨ ∧ i : 0 ≤ i < n : f i ⟩ 
+:}
+
+n := n + i
+{ P n }
