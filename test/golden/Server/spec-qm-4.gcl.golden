@@ -3,15 +3,14 @@
 ([ Conditional at ./test/source/Server/spec-qm-4.gcl [0-52] 1:1-8:3 #68beda4372bea491
  `True
  ⇒
- True
- ` ], [ Precondition at ./test/source/Server/spec-qm-4.gcl [16-30] 2:5-4:7
-      `True ∧ True`
-      Postcondition
-      `True`
-      , Precondition at ./test/source/Server/spec-qm-4.gcl [35-49] 5:5-7:7
-      `True`
-      Postcondition
-      `True` ], [], [])
+ True` ], [ Precondition at ./test/source/Server/spec-qm-4.gcl [16-30] 2:5-4:7
+          `True ∧True`
+          Postcondition
+          `True`
+          , Precondition at ./test/source/Server/spec-qm-4.gcl [35-49] 5:5-7:7
+          `True`
+          Postcondition
+          `True` ], [], [])
 
 ### Source
 

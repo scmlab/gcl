@@ -1,0 +1,11 @@
+con N : Int { N ≥ 0 }
+con f : array [0..N) of Int
+var r, n : Int
+
+n, r := 0, 0
+{ r = ⟨ Σ i : 0 ≤ i < n : f[i] ⟩, bnd: N - n }
+do n ≠ N -> 
+    r := r + f[n]
+    n := n + 1        
+od
+{ r = ⟨ Σ i : 0 ≤ i < N : f[i] ⟩ }

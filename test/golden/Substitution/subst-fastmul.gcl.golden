@@ -1,0 +1,18 @@
+INV [ A,B,0 / x,y,z ]
+  INV [ A,B,0 / x,y,z ] ===> (A * B) + 0 = A * B
+    
+INV
+  INV ===> (x * y) + z = A * B
+    
+INV [ x - 1,z + y / x,z ]
+  INV [ x - 1,z + y / x,z ] ===> ((x - 1) * y) + (z + y) = A * B
+    
+INV
+  INV ===> (x * y) + z = A * B
+    
+INV
+  INV ===> (x * y) + z = A * B
+    
+INV
+  INV ===> (x * y) + z = A * B
+    

@@ -1,10 +1,9 @@
 ### Result
 
-[ Assertion at ./test/source/WP/issue2-1.gcl [33-46] 3:1-14 #3028f61fb2d3e390
+[ Assertion at ./test/source/WP/issue2-1.gcl [33-46] 3:1-14 #479deb1e3916ef60
 `True
 ⇒
-z   =   A   *   B
-` ]
+z = A * B` ]
 
 ### Source
 

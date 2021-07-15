@@ -4,7 +4,8 @@ var x, y : Int
 
 x, y := A, B
 
-{ gcd x y = gcd A B ∧ x > 0 ∧ y > 0, bnd: x + y }
+{ gcd x y = gcd A B ∧ x > 0 ∧ y > 0, 
+  bnd: x + y }
 do x < y -> y := y - x
  | x > y -> x := x - y
 od

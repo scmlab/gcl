@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE LambdaCase #-}
 
-module Test.Expand
+module Test.Substitution
   ( tests
   ) where
 
@@ -25,7 +25,7 @@ import           Test.Tasty              hiding ( after )
 import           Test.Util
 
 tests :: TestTree
-tests = testGroup "Expansion" [letBindings]
+tests = testGroup "Substitution" [letBindings]
 
 
 letBindings :: TestTree
@@ -36,11 +36,12 @@ letBindings = testGroup
   , run "let binding with assignment 2" "let-3.gcl"
   , run "let binding with assignment and application" "let-4.gcl"
   , run "fastmul"                       "subst-fastmul.gcl"
+  , run "Issue #41"                     "issue41.gcl"
   ]
  where
   run :: String -> FilePath -> TestTree
   run =
-    runGoldenTest "./test/source/Expand/" "./test/golden/Expand/" ""
+    runGoldenTest "./test/source/Substitution/" "./test/golden/Substitution/" ""
       $ \sourcePath source -> do
           return $ serializeTestResultValueOnly $ runTest sourcePath source $ do
             program        <- parseProgram source
@@ -67,22 +68,23 @@ instance Pretty Tree where
       [pretty transition, indent 2 $ vcat (map pretty children)]
 
 toTree :: EXPN -> Tree
-toTree (EXPN before after inAfter) = Node before toAfter
+toTree (EXPN before after inBefore inAfter) = Node before (toBefore <> toAfter)
  where
-  -- toBefore :: Map Inlines [Tree] 
-  -- toBefore = Map.fromList $ map (\subst -> ("* ===> " <> renderedAfter subst ,map toTree (substsInAfter subst))) inBefore
+  toBefore :: Map Inlines [Tree] 
+  toBefore = Map.fromList $ map (\expn -> (renderedBefore expn <> " ===> " <> renderedAfter expn ,map toTree (buttonsInBefore expn))) inBefore
 
   toAfter :: Map Inlines [Tree]
-  toAfter = Map.singleton ("* ===> " <> after) (map toTree inAfter)
+  toAfter = Map.singleton (before <> " ===> " <> after) (map toTree inAfter)
 
 --------------------------------------------------------------------------------
--- | Typeclass for extracting `Substs` from the syntax tree 
+-- | Typeclass for extracting `Expand` from the syntax tree 
 
--- like Subst, but augmented with Substs in "before" and "after"
+-- like `Expand`, but augmented with "buttons" in "before" and "after"
 data EXPN = EXPN
-  { renderedBefore :: Inlines
-  , renderedAfter  :: Inlines
-  , substsInAfter  :: [EXPN]
+  { renderedBefore  :: Inlines
+  , renderedAfter   :: Inlines
+  , buttonsInBefore :: [EXPN]
+  , buttonsInAfter  :: [EXPN]
   }
   deriving Show
 
@@ -112,9 +114,9 @@ instance ExtractExpand Expr where
     Lam _ x _       -> extractExpand x
     Quant x _ y z _ -> extractExpand x <> extractExpand y <> extractExpand z
     Expand before after ->
-      [EXPN (render before) (render after) (extractExpand after)]
+      [EXPN (render before) (render after) (extractExpand before) (extractExpand after)]
     Subst before _mapping after ->
-      [EXPN (render before) (render after) (extractExpand after)]
+      [EXPN (render before) (render after) (extractExpand before) (extractExpand after)]
     ArrIdx x y _   -> extractExpand x <> extractExpand y
     ArrUpd x y z _ -> extractExpand x <> extractExpand y <> extractExpand z
     _              -> []
