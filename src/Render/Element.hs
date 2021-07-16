@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE LambdaCase #-}
 
 module Render.Element
   ( Section(..)
@@ -129,7 +130,13 @@ instance ToJSON Inlines where
   toJSON (Inlines xs) = toJSON xs
 
 instance Pretty Inlines where
-  pretty = Pretty.hcat . map pretty . toList . unInlines
+  pretty = Pretty.hcat . map pretty . insertSpaces . toList . unInlines
+    where 
+      -- insert space before and after inline code snippets 
+      insertSpaces :: [Inline] -> [Inline]
+      insertSpaces xs = xs >>= \case 
+          Snpt x -> [Text " " [], Snpt x, Text " " []] 
+          others -> [others]
 
 instance Show Inlines where
   show = show . pretty 
@@ -240,7 +247,7 @@ instance Show Inline where
 instance Pretty Inline where
   pretty (Icon _ _           ) = mempty
   pretty (Text s _           ) = pretty s
-  pretty (Snpt s           ) = pretty s
+  pretty (Snpt s             ) = pretty s
   pretty (Link _ xs _        ) = pretty xs
   pretty Sbst {} = mempty
   pretty (Expn xs _ _        ) = pretty xs

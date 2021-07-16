@@ -1,6 +1,7 @@
 ### Result
 
 [ Assigment at ./test/source/WP/assignment.gcl [9-15] 2:1-7 #2992979340444012
+Substitutes x with 1 in post condition 0 = x 
 `True
 ⇒
 0 = 1` ]
