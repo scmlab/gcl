@@ -16,6 +16,7 @@ import           Data.Text                      ( Text )
 import           GHC.Generics                   ( Generic )
 import           Syntax.Abstract                ( Expr )
 import           Syntax.Common                  ( Name )
+import Render.Element
 
 -- | Predicates
 data Pred
@@ -95,6 +96,10 @@ instance Ord PO where
 instance Located PO where
   locOf (PO _ _ _ _ o) = locOf o
 
+data InfMode = Primary     -- the main inference mode
+             | Secondary   -- non-functional postconditions. ignore assertions
+             deriving (Eq, Show, Generic)
+
 data Origin
   = AtAbort Loc
   | AtSkip Loc
@@ -104,6 +109,11 @@ data Origin
   | AtIf Loc
   | AtLoop Loc
   | AtTermination Loc
+  | Elaborated { originHeader :: Text -- the text you see on the top of a PO 
+               , originDetail :: Inlines -- the text you see below the header 
+               , originInfMode :: InfMode 
+               , originLoc :: Loc 
+               }
   deriving (Eq, Show, Generic)
 
 -- | This ordering would affect how they are presented to the user 
@@ -127,6 +137,7 @@ instance Located Origin where
   locOf (AtIf          l) = l
   locOf (AtLoop        l) = l
   locOf (AtTermination l) = l
+  locOf (Elaborated _ _ _ l) = l
 
 data Spec = Specification
   { specID       :: Int

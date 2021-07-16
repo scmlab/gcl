@@ -11,6 +11,7 @@ module Render.Element
   -- , specE
   , Inlines(..)
   , textE
+  , codeE
   , linkE
   , substE
   , expandE
@@ -23,6 +24,7 @@ module Render.Element
     (<+>)
   , punctuateAfterE
   , punctuateE
+  , sepByCommaE
   ) where
 
 import           Data.Aeson                     ( ToJSON(toJSON) )
@@ -91,14 +93,6 @@ instance Pretty Block where
 
 instance ToJSON Block
 
--- -- | Constructor for `PO`
--- proofObligationE :: Maybe String -> Maybe Range -> Inlines -> Block
--- proofObligationE = PO
-
--- -- | Constructor for `Spec`
--- specE :: Range -> Inlines -> Inlines -> Block
--- specE = Spec
-
 --------------------------------------------------------------------------------
 
 -- | Datatype for representing a consecutive series of inline elements
@@ -147,6 +141,7 @@ isEmpty inlines = all elemIsEmpty (Seq.viewl (unInlines inlines))
   elemIsEmpty :: Inline -> Bool
   elemIsEmpty (Icon _  _  ) = False
   elemIsEmpty (Text "" _  ) = True
+  elemIsEmpty (Snpt xs) = isEmpty xs
   elemIsEmpty (Text _  _  ) = False
   elemIsEmpty (Link _ xs _) = all elemIsEmpty $ unInlines xs
   elemIsEmpty (Sbst xs env ys _) =
@@ -168,6 +163,10 @@ x <+> y | isEmpty x = y
 -- |
 textE :: Text -> Inlines
 textE s = Inlines $ Seq.singleton $ Text s mempty
+
+-- | Mark a piece of inline elements as inline code
+codeE :: Inlines -> Inlines
+codeE xs = Inlines $ Seq.singleton $ Snpt xs
 
 -- | Text with source location
 linkE :: Range -> Inlines -> Inlines
@@ -205,6 +204,9 @@ punctuateAfterE delim xs =
 punctuateE :: Inlines -> [Inlines] -> Inlines
 punctuateE delim = horzE . punctuateAfterE delim
 
+sepByCommaE :: [Inlines] -> Inlines
+sepByCommaE = punctuateE ","
+
 --------------------------------------------------------------------------------
 
 type ClassNames = [String]
@@ -213,6 +215,8 @@ type ClassNames = [String]
 data Inline
   = Icon String ClassNames
   | Text Text ClassNames
+  -- | "Snippet" for inline code 
+  | Snpt Inlines 
   | Link Range Inlines ClassNames
   | -- | For Subst
     Sbst Inlines Inlines Inlines ClassNames
@@ -230,24 +234,13 @@ data Inline
 
 instance ToJSON Inline
 
--- instance Show Inline where
---   show (Icon s _           ) = s
---   show (Text s _           ) = Text.unpack s
---   show (Link _ xs _        ) = show xs
---   show (Sbst xs mapping _ _) = show xs <> show mapping
---   show (Expn xs _ _        ) = show xs
---   show (Horz xs            ) = unwords (map show $ toList xs)
---   show (Vert xs            ) = unlines (map show $ toList xs)
---   show (Parn x             ) = "(" <> show x <> ")"
---   show (PrHz xs            ) = "(" <> unwords (map show $ toList xs) <> ")"
-
 instance Show Inline where
   show = show . pretty 
-
 
 instance Pretty Inline where
   pretty (Icon _ _           ) = mempty
   pretty (Text s _           ) = pretty s
+  pretty (Snpt s           ) = pretty s
   pretty (Link _ xs _        ) = pretty xs
   pretty Sbst {} = mempty
   pretty (Expn xs _ _        ) = pretty xs

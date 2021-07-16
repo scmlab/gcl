@@ -1,5 +1,4 @@
 {-# LANGUAGE OverloadedStrings #-}
-
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase #-}
@@ -34,7 +33,8 @@ import qualified Data.Text                     as Text
 import           GCL.Common                     ( Fresh(..)
                                                 , freshName'
                                                 )
-import           GCL.Predicate                  ( Origin(..)
+import           GCL.Predicate                  ( InfMode(..)
+                                                , Origin(..)
                                                 , PO(..)
                                                 , Pred(..)
                                                 , Spec(Specification)
@@ -51,6 +51,7 @@ import           Numeric                        ( showHex )
 import           Pretty                         ( toString
                                                 , toText
                                                 )
+import           Render
 import qualified Syntax.Abstract               as A
 import qualified Syntax.Abstract.Operator      as A
 import qualified Syntax.Abstract.Util          as A
@@ -192,16 +193,21 @@ stripAsserts (s : stmts) = (s :) <$> stripAsserts stmts
 
 --- struct
 
-data InfMode = Primary     -- the main inference mode
-             | Secondary   -- non-functional postconditions. ignore assertions
-
 structStmts :: InfMode -> (Pred, Maybe A.Expr) -> [A.Stmt] -> Pred -> WP ()
 structStmts Primary pre stmts post = structSegs pre (groupStmts stmts) post
 structStmts Secondary (pre, _) stmts post = case stripAsserts stmts of
   Nothing     -> return ()  -- skip if the program is incomplete
   Just stmts' -> do
     post' <- wpSStmts stmts' post
-    tellPO pre post' (AtAssertion (locOf pre))
+    tellPO
+      pre
+      post'
+      (Elaborated { originHeader  = "Assertion (Secondary)"
+                  , originDetail  = mempty
+                  , originInfMode = Secondary
+                  , originLoc     = locOf pre
+                  }
+      )
 
 structSegs :: (Pred, Maybe A.Expr) -> [SegElm] -> Pred -> WP ()
 structSegs (pre, _) [] post = do
@@ -256,10 +262,23 @@ structSStmts (pre, bnd) (stmt : stmts) post = do
   struct (pre, bnd) stmt post'
 
 struct :: (Pred, Maybe A.Expr) -> A.Stmt -> Pred -> WP ()
-struct (pre, _) s@(A.Abort l     ) post = tellPO' (AtAbort l) pre =<< wp s post
-struct (pre, _) s@(A.Skip  l     ) post = tellPO' (AtSkip l) pre =<< wp s post
-struct (pre, _) s@(A.Assign _ _ l) post = do
-  tellPO' (AtAssignment l) pre =<< wp s post
+struct (pre, _) s@(A.Abort l) post = tellPO' (AtAbort l) pre =<< wp s post
+struct (pre, _) s@(A.Skip l) post = tellPO' (AtSkip l) pre =<< wp s post
+struct (pre, _) s@(A.Assign vars exprs l) post = do
+  tellPO' origin pre =<< wp s post
+ where
+  origin :: Origin
+  origin = Elaborated
+    { originHeader  = "Assigment"
+    , originDetail  = "Substitutes"
+                      <> sepByCommaE (map (codeE . render) vars)
+                      <> "with"
+                      <> sepByCommaE (map (codeE . render) exprs)
+                      <> "in post condition"
+                      <> (codeE . render) post
+    , originInfMode = Primary
+    , originLoc     = l
+    }
 struct (pre, _) s@(A.AAssign _ _ _ l) post = do
   tellPO' (AtAssignment l) pre =<< wp s post
 struct (pre, _) (A.If gcmds l) post = do

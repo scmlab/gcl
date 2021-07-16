@@ -8,7 +8,7 @@ import Data.Aeson (FromJSON, ToJSON)
 import Data.Text (Text)
 import GHC.Generics (Generic)
 import Render
-import GCL.Predicate (Origin, PO, Spec)
+import GCL.Predicate (Origin, PO, Spec, InfMode)
 import Data.Loc.Range
 import Pretty
 
@@ -71,6 +71,7 @@ instance Show Request where
 --------------------------------------------------------------------------------
 
 instance ToJSON Origin
+instance ToJSON InfMode
 
 instance ToJSON PO
 

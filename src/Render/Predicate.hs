@@ -4,12 +4,12 @@ module Render.Predicate where
 
 import           Data.Loc                       ( locOf )
 import           Data.Loc.Range                 ( fromLoc )
+import qualified Data.Text                     as Text
 import           GCL.Predicate
-import           GCL.WP.Type 
+import           GCL.WP.Type
 import           Render.Class
 import           Render.Element
 import           Render.Syntax.Abstract         ( )
-import qualified Data.Text as Text
 
 instance Render StructWarning where
   render (MissingBound _)
@@ -46,18 +46,29 @@ instance Render Pred where
     Negate   p          -> "¬" <+> renderPrec n p
 
 instance RenderSection PO where
-  renderSection (PO pre post anchorHash anchorLoc origin) = Section
-    Plain
-    [ HeaderWithAnchor (Text.pack $ show $ render origin) anchorHash anchorLoc (fromLoc (locOf origin))
-    , Code (vertE [render pre, "⇒", render post])
-    ]
+  renderSection (PO pre post anchorHash anchorLoc origin) =
+    Section Plain
+      $  [ HeaderWithAnchor (Text.pack $ show $ render origin)
+                            anchorHash
+                            anchorLoc
+                            (fromLoc (locOf origin))
+         ]
+      <> detail
+      <> [Code (vertE [render pre, "⇒", render post])]
+   where
 
+    detail = case origin of
+      Elaborated _ x _ _ -> if isEmpty x then [] else [Paragraph x] {- HLINT ignore "Use list comprehension" -}
+      _                  -> []
+
+-- as header 
 instance Render Origin where
-  render AtAbort{}       = "Abort"
-  render AtSkip{}        = "Skip"
-  render AtSpec{}        = "Spec"
-  render AtAssignment{}  = "Assigment"
-  render AtAssertion{}   = "Assertion"
-  render AtIf{}          = "Conditional"
-  render AtLoop{}        = "Loop Invariant"
-  render AtTermination{} = "Loop Termination"
+  render AtAbort{}                 = "Abort"
+  render AtSkip{}                  = "Skip"
+  render AtSpec{}                  = "Spec"
+  render AtAssignment{}            = "Assigment"
+  render AtAssertion{}             = "Assertion"
+  render AtIf{}                    = "Conditional"
+  render AtLoop{}                  = "Loop Invariant"
+  render AtTermination{}           = "Loop Termination"
+  render (Elaborated header _ _ _) = render header
