@@ -1,9 +1,11 @@
 con N : Int { N ≥ 0 }
 con A : array [0 .. N) of Int
-var r : Int
+var max : Int -> Int -> Int 
+var n, r, s : Int
 
-let P = r = ⟨ max i j : 0 ≤ i < j < n : A i - A j ⟩
-let Q = s = ⟨ max i : 0 ≤ i < n : A i ⟩
+{:  P = r = ⟨ max i j : 0 ≤ i < j < n : A i - A j ⟩
+    Q = s = ⟨ max i : 0 ≤ i < n : A i ⟩
+:}
 
 r, s, n := 0, 0, 0 
 { P ∧ Q ∧ 0 ≤ n ≤ N, bnd: N - n }

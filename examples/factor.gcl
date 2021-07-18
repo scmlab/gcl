@@ -1,8 +1,10 @@
 con N : Int { 0 < N }
 var p, x, y, n : Int
+var mod : Int -> Int -> Int
 
-let P = x * y + p = N
-let Q = x > 0 ∧ y > 0
+{:  P = x * y + p = N
+    Q = x > 0 ∧ y > 0
+:}
 
 p,x,y := N-1, 1, 1
 

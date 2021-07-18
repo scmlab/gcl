@@ -4,7 +4,7 @@ con inf : Int
 var r, s, n : Int
 var p : Bool
 
-let P x = (r = s)
+{: P x = (r = s) :}
 
 { True }
 r := s
