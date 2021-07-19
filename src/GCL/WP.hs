@@ -202,11 +202,11 @@ structStmts Secondary (pre, _) stmts post = case stripAsserts stmts of
     tellPO
       pre
       post'
-      (Elaborated { originHeader  = "Assertion (Secondary)"
-                  , originDetail  = mempty
-                  , originInfMode = Secondary
-                  , originLoc     = locOf pre
-                  }
+      (Explain { originHeader      = "Assertion (Secondary)"
+               , originExplanation = mempty
+               , originInfMode     = Secondary
+               , originLoc         = locOf pre
+               }
       )
 
 structSegs :: (Pred, Maybe A.Expr) -> [SegElm] -> Pred -> WP ()
@@ -268,16 +268,18 @@ struct (pre, _) s@(A.Assign vars exprs l) post = do
   tellPO' origin pre =<< wp s post
  where
   origin :: Origin
-  origin = Elaborated
-    { originHeader  = "Assigment"
-    , originDetail  = "Substitutes"
-                      <> sepByCommaE (map (codeE . render) vars)
-                      <> "with"
-                      <> sepByCommaE (map (codeE . render) exprs)
-                      <> "in post condition"
-                      <> (codeE . render) post
-    , originInfMode = Primary
-    , originLoc     = l
+  origin = Explain
+    { originHeader      = "Assigment"
+    , originExplanation = "After assignment, the postcondition"
+                          <> (codeE . render) post
+                          <> "should be implied by the precondition" 
+                          <> (codeE . render) pre
+                          <> "after free variables"
+                          <> sepByCommaE (map (codeE . render) vars)
+                          <> "have been substituted with"
+                          <> sepByCommaE (map (codeE . render) exprs)
+    , originInfMode     = Primary
+    , originLoc         = l
     }
 struct (pre, _) s@(A.AAssign _ _ _ l) post = do
   tellPO' (AtAssignment l) pre =<< wp s post
@@ -287,11 +289,34 @@ struct (pre, _) (A.If gcmds l) post = do
     structStmts Primary (Conjunct [pre, guardIf guard], Nothing) body post
 struct (inv, Just bnd) (A.Do gcmds l) post = do
   let guards = A.getGuards gcmds
-  tellPO (Conjunct (inv : map (Negate . guardLoop) guards)) post (AtLoop l)
+  let explainAfterLoop = Explain
+        { originHeader      = "After Loop"
+        , originExplanation = "The loop invariant"
+                              <> (codeE . render) inv
+                              <> "should remain true while all the guards"
+                              <> sepByCommaE (map (codeE . render) guards)
+                              <> "become false after executing the loop" 
+        , originInfMode     = Primary
+        , originLoc         = l
+        }
+  let explainTermination = Explain
+        { originHeader      = "Loop Termination"
+        , originExplanation = "When the loop invariant"
+                              <> (codeE . render) inv
+                              <> "and one of the guards"
+                              <> sepByCommaE (map (codeE . render) guards)
+                              <> "remain true (that is, whilst looping), the bound" 
+                              <> (codeE . render) bnd
+                              <> "should be greater then"
+                              <> (codeE . render) (A.Lit (A.Num 0) NoLoc)
+        , originInfMode     = Primary
+        , originLoc         = l
+        }
+  tellPO (Conjunct (inv : map (Negate . guardLoop) guards)) post explainAfterLoop
   forM_ gcmds (structGdcmdInduct inv)
   tellPO (Conjunct [inv, Disjunct (map guardLoop guards)])
          (Bound (bnd `A.gte` A.Lit (A.Num 0) NoLoc) NoLoc)
-         (AtTermination l)
+         explainTermination
   forM_ gcmds (structGdcmdBnd inv bnd)
 struct (inv, Nothing) (A.Do gcmds l) post = do
   case fromLoc l of

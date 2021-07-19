@@ -14,9 +14,9 @@ import           Data.Loc.Range                 ( Range
                                                 )
 import           Data.Text                      ( Text )
 import           GHC.Generics                   ( Generic )
+import           Render.Element
 import           Syntax.Abstract                ( Expr )
 import           Syntax.Common                  ( Name )
-import Render.Element
 
 -- | Predicates
 data Pred
@@ -109,11 +109,11 @@ data Origin
   | AtIf Loc
   | AtLoop Loc
   | AtTermination Loc
-  | Elaborated { originHeader :: Text -- the text you see on the top of a PO 
-               , originDetail :: Inlines -- the text you see below the header 
-               , originInfMode :: InfMode 
-               , originLoc :: Loc 
-               }
+  | Explain { originHeader :: Text -- the text you see on the top of a PO 
+            , originExplanation :: Inlines -- the text you see at the bottom of a PO (after clicking the header)
+            , originInfMode :: InfMode
+            , originLoc :: Loc
+            }
   deriving (Eq, Show, Generic)
 
 -- | This ordering would affect how they are presented to the user 
@@ -129,15 +129,15 @@ instance Ord Origin where
         if a `within` b then LT else if b `within` a then GT else compare a b
 
 instance Located Origin where
-  locOf (AtAbort       l) = l
-  locOf (AtSkip        l) = l
-  locOf (AtSpec        l) = l
-  locOf (AtAssignment  l) = l
-  locOf (AtAssertion   l) = l
-  locOf (AtIf          l) = l
-  locOf (AtLoop        l) = l
-  locOf (AtTermination l) = l
-  locOf (Elaborated _ _ _ l) = l
+  locOf (AtAbort       l   ) = l
+  locOf (AtSkip        l   ) = l
+  locOf (AtSpec        l   ) = l
+  locOf (AtAssignment  l   ) = l
+  locOf (AtAssertion   l   ) = l
+  locOf (AtIf          l   ) = l
+  locOf (AtLoop        l   ) = l
+  locOf (AtTermination l   ) = l
+  locOf (Explain    _ _ _ l) = l
 
 data Spec = Specification
   { specID       :: Int
