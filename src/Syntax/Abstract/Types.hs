@@ -89,8 +89,7 @@ data Type
 
 -- | Expressions
 data Expr
-  = Paren Expr Loc
-  | Lit Lit Loc
+  = Lit Lit Loc
   | Var Name Loc
   | Const Name Loc
   | Op Op

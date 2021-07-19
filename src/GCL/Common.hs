@@ -72,7 +72,6 @@ instance Free A.Type where
   fv (A.TVar x _) = Set.singleton x
 
 instance Free A.Expr where
-  fv (A.Paren expr _) = fv expr
   fv (A.Var x _) = Set.singleton x
   fv (A.Const x _) = Set.singleton x
   fv (A.Op _) = mempty

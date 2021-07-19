@@ -46,7 +46,6 @@ instance Located Type where
   locOf (TVar _ l) = l
 
 instance Located Expr where
-  locOf (Paren _ l) = l
   locOf (Var _ l) = l
   locOf (Const _ l) = l
   locOf (Lit _ l) = l

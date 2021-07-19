@@ -99,13 +99,6 @@ instance Substitutable Expr where
     subst mapping expr = case expr of
 
 -- 
---       a                  ~[.../...]~>    a'
--- ---------------------------------------------------------------[subst-Paren]
---       Paren a            ~[.../...]~>    Paren a'
--- 
-        Paren e l  -> Paren <$> subst mapping e <*> pure l
-
--- 
 -- ---------------------------------------------------------------[subst-Lit]
 --      Lit a               ~[.../...]~>    Lit a
 -- 

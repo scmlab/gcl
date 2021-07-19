@@ -150,7 +150,6 @@ instance StabM GotoM Expr LocationLink where
   stabM = \case
     Var   a _          -> stabLocated a
     Const a _          -> stabLocated a
-    Paren a _          -> stabLocated a
     Chain a _ c _      -> (<>) <$> stabLocated a <*> stabLocated c
     App a b _          -> (<>) <$> stabLocated a <*> stabLocated b
     Lam _ b _          -> stabLocated b

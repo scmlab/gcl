@@ -38,7 +38,6 @@ instance Render Expr where
     Complete s -> s
 
 handleExpr :: Int -> Expr -> Variadic Expr Inlines
-handleExpr n (Paren x l) = return $ tempHandleLoc l $ renderPrec n x
 handleExpr n (Var   x l) = return $ tempHandleLoc l $ renderPrec n x
 handleExpr n (Const x l) = return $ tempHandleLoc l $ renderPrec n x
 handleExpr n (Lit   x l) = return $ tempHandleLoc l $ renderPrec n x

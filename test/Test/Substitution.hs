@@ -108,7 +108,6 @@ instance ExtractExpand Pred where
 
 instance ExtractExpand Expr where
   extractExpand = \case
-    Paren x _       -> extractExpand x
     Chain x _ y _   -> extractExpand x <> extractExpand y
     App x y _       -> extractExpand x <> extractExpand y
     Lam _ x _       -> extractExpand x

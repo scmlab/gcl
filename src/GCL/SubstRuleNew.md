@@ -44,13 +44,6 @@ Mostly the same as in Haskell, with a few exceptions, we write:
 
 ## Rules for `subst`
 
-- `Paren` 
-  - $\displaystyle \frac
-        { a \rightarrow a'
-        }{
-          Paren \; a \rightarrow Paren \; a'
-        }$ [subst-Paren]
-
 - `Lit` 
   - $\displaystyle \frac
         { 
