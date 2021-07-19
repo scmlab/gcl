@@ -53,13 +53,12 @@ instance RenderSection PO where
                             anchorHash
                             anchorLoc
          ]
-      <> detail
       <> [Code (vertE [render pre, "⇒", render post])]
+      <> explanation
    where
-
-    detail = case origin of
-      Elaborated _ x _ _ -> if isEmpty x then [] else [Paragraph x] {- HLINT ignore "Use list comprehension" -}
-      _                  -> []
+    explanation = case origin of
+      Elaborated _ x _ _ -> [Paragraph x]
+      _                  -> [Paragraph "explanation not available"]
 
 -- as header 
 instance Render Origin where
