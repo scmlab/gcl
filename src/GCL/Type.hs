@@ -104,9 +104,7 @@ infer (Chain a op b loc) = do
     (Chain _ _ l _, _) -> do
       tl <- infer l
       unify top (TFunc tl (TFunc tb (TBase TBool (locOf op)) (locOf b)) (l <--> b))
-    (_, Chain r _ _ _) -> do
-      tr <- infer r
-      unify top (TFunc ta (TFunc tr (TBase TBool (locOf op)) (locOf r)) (a <--> r))
+    -- this case also subsumes (_, Chain r _ _ _), which is fine since Chain is left-associative
     (_, _) -> do
       unify top (TFunc ta (TFunc tb (TBase TBool (locOf op)) (locOf b)) (a <--> b))
   return (TBase TBool loc)
