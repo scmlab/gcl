@@ -48,10 +48,10 @@ instance Render Pred where
 instance RenderSection PO where
   renderSection (PO pre post anchorHash anchorLoc origin) =
     Section Plain
-      $  [ HeaderWithAnchor (Text.pack $ show $ render origin)
+      $  [ HeaderWithButtons (Text.pack $ show $ render origin)
+                            (fromLoc (locOf origin))
                             anchorHash
                             anchorLoc
-                            (fromLoc (locOf origin))
          ]
       <> detail
       <> [Code (vertE [render pre, "⇒", render post])]

@@ -47,11 +47,9 @@ data Deco = Plain | Red | Yellow | Blue | Green
   deriving (Eq, Generic)
 instance ToJSON Deco
 
--- | Section
-data Section = Section
-  { sectionDeco   :: Deco
-  , sectionBlocks :: [Block]
-  }
+-- | Basic unit for representing something like a PO or a Spec
+--   A Section is comprised of a series of Block elements
+data Section = Section Deco [Block]
   deriving (Eq, Generic)
 instance ToJSON Section
 
@@ -62,8 +60,14 @@ instance Pretty Section where
 
 -- | Block elements
 data Block
+  -- Plain header with optional location
   = Header Text (Maybe Range)
-  | HeaderWithAnchor Text Text (Maybe Range) (Maybe Range)
+  -- Special header for Proof Obligations
+  | HeaderWithButtons 
+      Text -- Header text
+      (Maybe Range) -- Header location 
+      Text -- Anchor hash
+      (Maybe Range) -- Anchor location
   | Paragraph Inlines
   | Code Inlines
   deriving (Eq, Generic)
@@ -75,13 +79,13 @@ instance IsString Block where
 instance Pretty Block where
   pretty (Header header Nothing     ) = pretty header
   pretty (Header header (Just range)) = pretty header <> " at " <> pretty range
-  pretty (HeaderWithAnchor header hash Nothing Nothing) =
+  pretty (HeaderWithButtons header Nothing hash Nothing) =
     pretty header <> " #" <> pretty hash
-  pretty (HeaderWithAnchor header hash (Just anchor) Nothing) =
+  pretty (HeaderWithButtons header Nothing hash (Just anchor)) =
     pretty header <> " #" <> pretty hash <> " anchored at " <> pretty anchor
-  pretty (HeaderWithAnchor header hash Nothing (Just range)) =
+  pretty (HeaderWithButtons header (Just range) hash Nothing) =
     pretty header <> " at " <> pretty range <> " #" <> pretty hash
-  pretty (HeaderWithAnchor header hash (Just anchor) (Just range)) =
+  pretty (HeaderWithButtons header (Just range) hash (Just anchor)) =
     pretty header
       <> " at "
       <> pretty range
@@ -131,15 +135,15 @@ instance ToJSON Inlines where
 
 instance Pretty Inlines where
   pretty = Pretty.hcat . map pretty . insertSpaces . toList . unInlines
-    where 
+   where
       -- insert space before and after inline code snippets 
-      insertSpaces :: [Inline] -> [Inline]
-      insertSpaces xs = xs >>= \case 
-          Snpt x -> [Text " " [], Snpt x, Text " " []] 
-          others -> [others]
+    insertSpaces :: [Inline] -> [Inline]
+    insertSpaces xs = xs >>= \case
+      Snpt x -> [Text " " [], Snpt x, Text " " []]
+      others -> [others]
 
 instance Show Inlines where
-  show = show . pretty 
+  show = show . pretty
 
 -- | To see if the rendered text is "empty"
 isEmpty :: Inlines -> Bool
@@ -148,8 +152,8 @@ isEmpty inlines = all elemIsEmpty (Seq.viewl (unInlines inlines))
   elemIsEmpty :: Inline -> Bool
   elemIsEmpty (Icon _  _  ) = False
   elemIsEmpty (Text "" _  ) = True
-  elemIsEmpty (Snpt xs) = isEmpty xs
-  elemIsEmpty (Text _  _  ) = False
+  elemIsEmpty (Snpt xs    ) = isEmpty xs
+  elemIsEmpty (Text _ _   ) = False
   elemIsEmpty (Link _ xs _) = all elemIsEmpty $ unInlines xs
   elemIsEmpty (Sbst xs env ys _) =
     all elemIsEmpty $ unInlines xs <> unInlines env <> unInlines ys
@@ -223,7 +227,7 @@ data Inline
   = Icon String ClassNames
   | Text Text ClassNames
   -- | "Snippet" for inline code 
-  | Snpt Inlines 
+  | Snpt Inlines
   | Link Range Inlines ClassNames
   | -- | For Subst
     Sbst Inlines Inlines Inlines ClassNames
@@ -242,17 +246,17 @@ data Inline
 instance ToJSON Inline
 
 instance Show Inline where
-  show = show . pretty 
+  show = show . pretty
 
 instance Pretty Inline where
-  pretty (Icon _ _           ) = mempty
-  pretty (Text s _           ) = pretty s
-  pretty (Snpt s             ) = pretty s
-  pretty (Link _ xs _        ) = pretty xs
-  pretty Sbst {} = mempty
-  pretty (Expn xs _ _        ) = pretty xs
-  pretty (Horz xs            ) = Pretty.hcat (map pretty $ toList xs)
-  pretty (Vert xs            ) = Pretty.vcat (map pretty $ toList xs)
-  pretty (Parn x             ) = "(" <> pretty x <> ")"
-  pretty (PrHz xs            ) = "(" <> Pretty.hcat (map pretty $ toList xs) <> ")"
+  pretty (Icon _ _   ) = mempty
+  pretty (Text s _   ) = pretty s
+  pretty (Snpt s     ) = pretty s
+  pretty (Link _ xs _) = pretty xs
+  pretty Sbst{}        = mempty
+  pretty (Expn xs _ _) = pretty xs
+  pretty (Horz xs    ) = Pretty.hcat (map pretty $ toList xs)
+  pretty (Vert xs    ) = Pretty.vcat (map pretty $ toList xs)
+  pretty (Parn x     ) = "(" <> pretty x <> ")"
+  pretty (PrHz xs    ) = "(" <> Pretty.hcat (map pretty $ toList xs) <> ")"
 
