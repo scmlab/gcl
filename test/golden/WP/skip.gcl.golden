@@ -1,6 +1,10 @@
 ### Result
 
-[Skip at ./test/source/WP/skip.gcl [9-13] 2:1-5 #299397966446b76f `True⇒0 = 0`]
+[ Skip at ./test/source/WP/skip.gcl [9-13] 2:1-5 #299397966446b76f
+`True
+⇒
+0 = 0`
+explanation not available ]
 
 ### Source
 

@@ -3,7 +3,8 @@
 [ Assertion at ./test/source/WP/issue2-2.gcl [33-41] 3:1-9 #479deb1e3916ef60
 `True
 ⇒
-z = A * B` ]
+z = A * B`
+explanation not available ]
 
 ### Source
 

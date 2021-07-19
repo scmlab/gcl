@@ -3,7 +3,8 @@
 [ Abort at ./test/source/WP/abort.gcl [9-14] 2:1-6 #4ea8b990688e819d
 `True
 ⇒
-False` ]
+False`
+explanation not available ]
 
 ### Source
 

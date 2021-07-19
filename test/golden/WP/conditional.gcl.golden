@@ -4,10 +4,12 @@
 `True ∧False
 ⇒
 True`
+explanation not available
 , Conditional at ./test/source/WP/conditional.gcl [0-20] 1:1-2:3 #4ea8b990688e819d
 `True
 ⇒
-False` ]
+False`
+explanation not available ]
 
 ### Source
 
