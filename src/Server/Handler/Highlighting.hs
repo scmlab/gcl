@@ -90,22 +90,47 @@ instance Collect AsVariable J.SemanticTokenAbsolute where
 --------------------------------------------------------------------------------
 
 instance Collect Program J.SemanticTokenAbsolute where
-  collect (Program as _bs) = as >>= collect
+  collect (Program as bs) = (as >>= collect) <> (bs >>= collect)
 
 instance Collect Declaration' J.SemanticTokenAbsolute where
-  collect (Left  a ) = collect a
-  collect (Right _a) = []-- collect a
+  collect (Left  a) = collect a
+  collect (Right a) = collect a
 
 instance Collect Declaration J.SemanticTokenAbsolute where
-  collect (ConstDecl _tokCon a) = collect a
-  collect (VarDecl   _tokVar a) = collect a
+  collect (ConstDecl tok a) = toToken J.SttKeyword [] tok <> collect a
+  collect (VarDecl   tok a) = toToken J.SttKeyword [] tok <> collect a
 
-instance Collect DeclType J.SemanticTokenAbsolute where
-  collect (DeclType a _b) = collect a
+instance Collect BlockDeclaration J.SemanticTokenAbsolute where
+  collect (BlockDeclaration _tokA as _tokB) = toList as >>= collect
 
 instance Collect DeclBase J.SemanticTokenAbsolute where
   collect (DeclBase as _ b) =
     (map AsVariable (toList as) >>= collect) <> collect b
+
+instance Collect DeclProp J.SemanticTokenAbsolute where
+  collect (DeclProp _tokA a _tokB) = collect a
+instance Collect DeclType J.SemanticTokenAbsolute where
+  collect (DeclType a b) = collect a <> collect b
+instance Collect DeclBody J.SemanticTokenAbsolute where
+  collect (DeclBody a bs _tok c) =
+    toToken' J.SttFunction [J.StmDeclaration] a
+      <> (map AsVariable (toList bs) >>= collect)
+      <> collect c
+
+instance Collect BlockDeclProp J.SemanticTokenAbsolute where
+  collect (Left  a) = collect a
+  collect (Right a) = collect a
+instance Collect BlockDeclType J.SemanticTokenAbsolute where
+  collect (BlockDeclType a b) = collect a <> collect b
+instance Collect BlockDecl J.SemanticTokenAbsolute where
+  collect (Left  a) = collect a
+  collect (Right a) = collect a
+
+--------------------------------------------------------------------------------
+-- Stmt 
+
+instance Collect Stmt J.SemanticTokenAbsolute where
+  collect _ = []
 
 --------------------------------------------------------------------------------
 -- Expr 
@@ -140,7 +165,5 @@ instance Collect Type J.SemanticTokenAbsolute where
       <> toToken J.SttKeyword [] tokOf
       <> collect b
   collect (TFunc a tok b) =
-    collect a
-      <> toToken J.SttOperator  [] tok
-      <> collect b
+    collect a <> toToken J.SttOperator [] tok <> collect b
   collect (TVar name) = toToken' J.SttType [] name

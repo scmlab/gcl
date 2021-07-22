@@ -108,3 +108,7 @@ stabbedLocated position node = case fromLoc (locOf node) of
 
 class Collect a b where
   collect :: a -> [b]
+
+instance Collect a b => Collect (Maybe a) b where 
+  collect Nothing = []
+  collect (Just x) = collect x
