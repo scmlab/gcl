@@ -27,6 +27,10 @@ instance Located (Token a) where
 instance Ranged (Token a) where
   rangeOf (Token l r) = Range l r
 
+instance Ranged (Either (Token a) (Token b)) where
+  rangeOf (Left x) = rangeOf x
+  rangeOf (Right x) = rangeOf x
+
 -- unicode token wraper
 type TokQuantStarts = Either (Token "<|") (Token "⟨")
 
