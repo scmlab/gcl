@@ -1,5 +1,6 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE FlexibleInstances #-}
 
 module Server.Handler.Highlighting where
 
@@ -10,13 +11,13 @@ import qualified Language.LSP.Types            as J
 import           Server.Stab
 import           Syntax.Concrete
 
-import           Data.Loc
+import           Data.Loc hiding (fromLoc)
 
 import           Error                          ( Error )
 import           Server.DSL
 import           Server.Interpreter.RealWorld
 import           Syntax.Parser                  ( pProgram )
-
+import Data.Foldable (toList)
 
 ignoreErrors
   :: Either [Error] (Either J.ResponseError (Maybe J.SemanticTokens))
@@ -57,67 +58,34 @@ toToken types modifiers x =
                               types
                               modifiers
 
+toToken'
+  :: Located a
+  => J.SemanticTokenTypes
+  -> [J.SemanticTokenModifiers]
+  -> a
+  -> [J.SemanticTokenAbsolute]
+toToken' types modifiers x = case fromLoc (locOf x) of
+  Nothing -> []
+  Just range ->
+    [J.SemanticTokenAbsolute (posLine (rangeStart range) - 1)
+                              (posCol (rangeStart range) - 1)
+                              (rangeSpan range)
+                              types
+                              modifiers]
+
 instance Collect Program J.SemanticTokenAbsolute where
-  collect (Program _ _) = []
+  collect (Program as _bs) = as >>= collect
 
--- instance Collect Definition J.SemanticTokenAbsolute where
---   collect (ProcDefn name args _tokDefn process) =
---     [toToken J.SttFunction [J.StmDefinition] name]
---       <> map (toToken J.SttVariable []) args
---       <> [toToken J.SttFunction [J.StmDefinition] name]
---       <> collect process
---   collect (TypeSign name _tokHasType typ) =
---     [toToken J.SttInterface [J.StmDeclaration] name] <> collect typ
+instance Collect Declaration' J.SemanticTokenAbsolute where
+  collect (Left a) = collect a
+  collect (Right _a) = []-- collect a
 
--- instance Collect Process J.SemanticTokenAbsolute where
---   collect = \case
---     Call name -> [toToken J.SttFunction [] name]
---     Link x tokLink y ->
---       [ toToken J.SttVariable [] x
---       , toToken J.SttOperator [] tokLink
---       , toToken J.SttVariable [] y
---       ]
---     Output x tokBrOpen y tokBrClose tokSeq _ a tokComp b _ ->
---       [ toToken J.SttVariable [] x
---         , toToken J.SttOperator [] tokBrOpen
---         , toToken J.SttVariable [] y
---         , toToken J.SttOperator [] tokBrClose
---         , toToken J.SttOperator [] tokSeq
---         ]
---         <> collect a
---         <> [toToken J.SttOperator [] tokComp]
---         <> collect b
---     Input x tokPrOpen y tokPrClose tokSeq a ->
---       [ toToken J.SttVariable [] x
---         , toToken J.SttOperator [] tokPrOpen
---         , toToken J.SttVariable [] y
---         , toToken J.SttOperator [] tokPrClose
---         , toToken J.SttOperator [] tokSeq
---         ]
---         <> collect a
---     Compose tokScope x tokSeq _ a tokComp b _ ->
---       [ toToken J.SttVariable [] x
---         , toToken J.SttOperator [] tokScope
---         , toToken J.SttOperator [] tokSeq
---         ]
---         <> collect a
---         <> [toToken J.SttOperator [] tokComp]
---         <> collect b
---     EmptyOutput x tokBrOpen tokBrClose tokSeq tokEnd ->
---       [ toToken J.SttVariable [] x
---         , toToken J.SttOperator [] tokBrOpen
---         , toToken J.SttOperator [] tokBrClose
---         , toToken J.SttOperator [] tokSeq
---         , toToken J.SttKeyword  [] tokEnd
---         ]
---     EmptyInput x tokPrOpen tokPrClose tokSeq a ->
---       [ toToken J.SttVariable [] x
---         , toToken J.SttOperator [] tokPrOpen
---         , toToken J.SttOperator [] tokPrClose
---         , toToken J.SttOperator [] tokSeq
---         ]
---         <> collect a
---     End tokEnd -> [toToken J.SttKeyword  [] tokEnd]
+instance Collect Declaration J.SemanticTokenAbsolute where
+  collect (ConstDecl _tokCon a) = collect a
+  collect (VarDecl _tokVar a) = collect a
 
--- instance Collect Type J.SemanticTokenAbsolute where
---   collect x = [toToken J.SttType [] x]
+instance Collect DeclType J.SemanticTokenAbsolute where
+  collect (DeclType a _b) = collect a
+
+instance Collect DeclBase J.SemanticTokenAbsolute where
+  collect (DeclBase as _ _ ) = toList as >>= toToken' J.SttVariable []

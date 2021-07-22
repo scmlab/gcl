@@ -82,11 +82,19 @@ handler params responder = do
     -- JSON Value => Request => Response
   case JSON.fromJSON params of
     JSON.Error msg -> do
-      logText " --> CustomMethod: CannotDecodeRequest"
+      logText $ " --> CustomMethod: CannotDecodeRequest " <> Text.pack (show msg) <> " " <> Text.pack (show params)
       responder $ CannotDecodeRequest $ show msg ++ "\n" ++ show params
-    JSON.Success request@(Req filepath kind) -> do
-      logText $ " --> Custom Reqeust: " <> Text.pack (show request)
-      -- convert Request to Response
-      interpret filepath
-                (customRequestResponder filepath responder)
-                (handleCustomMethod kind)
+    JSON.Success requests -> handleRequests requests
+    where 
+      -- make the type explicit to appease the type checker 
+      handleRequests :: [Request] -> ServerM ()
+      handleRequests = mapM_ handleRequest 
+
+      handleRequest :: Request -> ServerM ()
+      handleRequest request@(Req filepath kind) = do
+        logText $ " --> Custom Reqeust: " <> Text.pack (show request)
+        -- convert Request to Response
+        interpret filepath
+                  (customRequestResponder filepath responder)
+                  (handleCustomMethod kind)
+    
