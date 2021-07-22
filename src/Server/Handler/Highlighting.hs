@@ -1,6 +1,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE LambdaCase #-}
 
 module Server.Handler.Highlighting where
 
@@ -30,20 +31,19 @@ handler
   :: J.Uri
   -> (Either J.ResponseError (Maybe J.SemanticTokens) -> ServerM ())
   -> ServerM ()
-handler uri responder = do
-  case J.uriToFilePath uri of
-    Nothing       -> return ()
-    Just filepath -> do
-      interpret filepath (responder . ignoreErrors) $ do
-        source  <- getSource
-        program <- parse pProgram source
-        let legend = J.SemanticTokensLegend
-              (J.List J.knownSemanticTokenTypes)
-              (J.List J.knownSemanticTokenModifiers)
-        let tokens = J.makeSemanticTokens legend (collect program)
-        case tokens of
-          Left t -> return $ Left $ J.ResponseError J.InternalError t Nothing
-          Right tokens' -> return $ Right $ Just tokens'
+handler uri responder = case J.uriToFilePath uri of
+  Nothing       -> return ()
+  Just filepath -> do
+    interpret filepath (responder . ignoreErrors) $ do
+      source  <- getSource
+      program <- parse pProgram source
+      let legend = J.SemanticTokensLegend
+            (J.List J.knownSemanticTokenTypes)
+            (J.List J.knownSemanticTokenModifiers)
+      let tokens = J.makeSemanticTokens legend (collect program)
+      case tokens of
+        Left t -> return $ Left $ J.ResponseError J.InternalError t Nothing
+        Right tokens' -> return $ Right $ Just tokens'
 
 --------------------------------------------------------------------------------
 -- Helper functions for converting stuff to SemanticTokenAbsolute
@@ -86,6 +86,11 @@ newtype AsVariable = AsVariable Name
 
 instance Collect AsVariable J.SemanticTokenAbsolute where
   collect (AsVariable a) = toToken' J.SttVariable [] a
+
+newtype AsName = AsName Name
+
+instance Collect AsName J.SemanticTokenAbsolute where
+  collect (AsName a) = toToken' J.SttFunction [] a
 
 --------------------------------------------------------------------------------
 
@@ -130,7 +135,54 @@ instance Collect BlockDecl J.SemanticTokenAbsolute where
 -- Stmt 
 
 instance Collect Stmt J.SemanticTokenAbsolute where
-  collect _ = []
+  collect = \case
+    Skip x -> toToken' J.SttKeyword [] x
+    Abort x -> toToken' J.SttKeyword [] x
+    Assign as tok bs ->
+      (map AsVariable (toList as) >>= collect)
+        <> toToken' J.SttKeyword [] tok
+        <> (toList bs >>= collect)
+    AAssign a _ b _ tok c ->
+      collect (AsVariable a)
+        <> toToken' J.SttKeyword [] tok
+        <> collect b
+        <> collect c
+    Assert _ a _ -> collect a
+    LoopInvariant _ a _ tok _ b _ ->
+      collect a <> toToken' J.SttKeyword [] tok <> collect b
+    Do tokA as tokB ->
+      toToken' J.SttKeyword [] tokA
+        <> (toList as >>= collect)
+        <> toToken' J.SttKeyword [] tokB
+    If tokA as tokB ->
+      toToken' J.SttKeyword [] tokA
+        <> (toList as >>= collect)
+        <> toToken' J.SttKeyword [] tokB
+    SpecQM _ -> []
+    Spec tokA _ tokB ->
+      toToken' J.SttKeyword [] tokA <> toToken' J.SttKeyword [] tokB
+    Proof tokA _ tokB ->
+      toToken' J.SttKeyword [] tokA <> toToken' J.SttKeyword [] tokB
+    Alloc a tok tokNew _ bs _ ->
+      collect (AsVariable a)
+        <> toToken' J.SttKeyword []                  tok
+        <> toToken' J.SttKeyword [J.StmModification] tokNew
+        <> (toList bs >>= collect)
+    HLookup a tok tokStar b ->
+      collect (AsVariable a)
+        <> toToken' J.SttKeyword []                  tok
+        <> toToken' J.SttKeyword [J.StmModification] tokStar
+        <> collect b
+    HMutate tokStar a tok b ->
+      toToken' J.SttKeyword [J.StmModification] tokStar
+        <> collect a
+        <> toToken' J.SttKeyword [] tok
+        <> collect b
+    Dispose tok a -> toToken' J.SttKeyword [] tok <> collect a
+
+instance Collect GdCmd J.SemanticTokenAbsolute where
+  collect (GdCmd a tok bs) =
+    collect a <> toToken' J.SttMacro [] tok <> (bs >>= collect)
 
 --------------------------------------------------------------------------------
 -- Expr 
