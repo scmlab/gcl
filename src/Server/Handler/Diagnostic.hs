@@ -17,12 +17,11 @@ import           GCL.Type                       ( TypeError(..) )
 import           GCL.WP.Type                    ( StructError(..)
                                                 , StructWarning(..)
                                                 )
-import           Language.LSP.Types      hiding ( Range(..)
-                                                , TextDocumentSyncClientCapabilities(..)
+import           Language.LSP.Types      hiding (line, Range, TextDocumentSyncClientCapabilities(..)
                                                 )
 import           Pretty
 import           Server.Stab
-import qualified Server.Util                   as J
+import qualified Server.Util                   as J 
 
 instance Collect StructError Diagnostic where
   collect (MissingAssertion loc) = makeError

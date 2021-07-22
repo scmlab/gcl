@@ -12,31 +12,31 @@ packages:
   original:
     hackage: lexer-applicative-2.1.0.2
 - completed:
+    size: 152752
     subdir: lsp
+    url: https://github.com/haskell/lsp/archive/dce30c9d345f63921cf9cf5045e1dcd753e4fe34.tar.gz
     name: lsp
-    version: 1.2.0.0
-    git: https://github.com/banacorn/lsp.git
+    version: 1.2.0.1
+    sha256: db3371a2cfe5d74f421cc5e8be58d65d680883e78ffc7ef395a55d0e7ba3e588
     pantry-tree:
-      size: 1350
-      sha256: 337ac919300d03102766e4608d6a56ad261a3a9b3270e8e354b7b6ad7e992d62
-    commit: 66f3fc54680f77c3fe5c5379bff8ff2dd4a2b926
+      size: 1417
+      sha256: 702fd234b87a032dbed7dbedefab77bf19aa510fb594ebbfc65f6ec184c31f73
   original:
     subdir: lsp
-    git: https://github.com/banacorn/lsp.git
-    commit: 66f3fc54680f77c3fe5c5379bff8ff2dd4a2b926
+    url: https://github.com/haskell/lsp/archive/dce30c9d345f63921cf9cf5045e1dcd753e4fe34.tar.gz
 - completed:
+    size: 152752
     subdir: lsp-types
+    url: https://github.com/haskell/lsp/archive/dce30c9d345f63921cf9cf5045e1dcd753e4fe34.tar.gz
     name: lsp-types
-    version: 1.2.0.0
-    git: https://github.com/banacorn/lsp.git
+    version: 1.3.0.0
+    sha256: db3371a2cfe5d74f421cc5e8be58d65d680883e78ffc7ef395a55d0e7ba3e588
     pantry-tree:
-      size: 3984
-      sha256: fed994498f8ec8753ea2b40baec554397b938b6f032c2c8fb9e0063e687f5bd8
-    commit: 66f3fc54680f77c3fe5c5379bff8ff2dd4a2b926
+      size: 4146
+      sha256: 1ba25c9631a23de4b88da3d4a94cc660f0633e174cb02dc65515d6a5011af93d
   original:
     subdir: lsp-types
-    git: https://github.com/banacorn/lsp.git
-    commit: 66f3fc54680f77c3fe5c5379bff8ff2dd4a2b926
+    url: https://github.com/haskell/lsp/archive/dce30c9d345f63921cf9cf5045e1dcd753e4fe34.tar.gz
 - completed:
     hackage: dependent-map-0.4.0.0@sha256:ca2b131046f4340a1c35d138c5a003fe4a5be96b14efc26291ed35fd08c62221,1657
     pantry-tree:

@@ -25,6 +25,7 @@ import qualified Language.LSP.Types.Lens       as J
 import qualified Server.Handler.AutoCompletion as AutoCompletion
 import qualified Server.Handler.CustomMethod   as CustomMethod
 import qualified Server.Handler.Definition     as Definition
+import qualified Server.Handler.Highlighting   as Highlighting
 import qualified Server.Handler.Hover          as Hover
 
 -- handlers of the LSP server
@@ -82,4 +83,8 @@ handlers = mconcat
     let uri = req ^. (J.params . J.textDocument . J.uri)
     let pos = req ^. (J.params . J.position)
     Hover.handler uri pos (responder . Right)
+  , requestHandler J.STextDocumentSemanticTokensFull $ \req responder -> do
+    logText "<-- Syntax Highlighting"
+    let uri = req ^. (J.params . J.textDocument . J.uri)
+    Highlighting.handler uri responder
   ]

@@ -103,8 +103,8 @@ mergeRanges :: NonEmpty Range -> Range
 mergeRanges xs = foldl (<>) (NE.head xs) xs
 
 -- | Calculates the length covered by a range
-span :: Range -> Int
-span (Range a b) = posCol b - posCol a
+rangeSpan :: Range -> Int
+rangeSpan (Range a b) = posCol b - posCol a
 
 -- | See if a Range is within another Range 
 within :: Range -> Range -> Bool
