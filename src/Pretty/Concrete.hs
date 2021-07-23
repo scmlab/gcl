@@ -221,10 +221,10 @@ instance Pretty Lit where
   pretty = toDoc . prettyWithLoc
 
 instance PrettyWithLoc Lit where
-  prettyWithLoc (LitBool True l) = fromDoc l (pretty tokTrue)
-  prettyWithLoc (LitBool False l) = fromDoc l (pretty tokFalse)
-  prettyWithLoc (LitInt n l) = fromDoc l (pretty n)
-  prettyWithLoc (LitChar c l) = fromDoc l ("'" <> pretty [c] <> "'")
+  prettyWithLoc (LitBool True l) = fromDoc (locOf l) (pretty tokTrue)
+  prettyWithLoc (LitBool False l) = fromDoc (locOf l) (pretty tokFalse)
+  prettyWithLoc (LitInt n l) = fromDoc (locOf l) (pretty n)
+  prettyWithLoc (LitChar c l) = fromDoc (locOf l) ("'" <> pretty [c] <> "'")
 
 --------------------------------------------------------------------------------
 

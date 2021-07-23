@@ -364,16 +364,16 @@ lexText = lexeme . try . withPredicate (\t -> notUpperKeywords t && notLowerKeyw
   return $ tokensToChunk (Proxy :: Proxy Text) (x : xs)
 
 lexTrue :: LexerF Lit
-lexTrue = LitBool True . locOf <$> symbol tokTrue
+lexTrue = LitBool True . rangeOf <$> symbol tokTrue
 
 lexFalse :: LexerF Lit
-lexFalse = LitBool False . locOf <$> symbol tokFalse
+lexFalse = LitBool False . rangeOf <$> symbol tokFalse
 
 lexInt :: LexerF Lit
-lexInt = uncurry LitInt . second locOf <$> lexeme Lex.decimal
+lexInt = uncurry LitInt . second rangeOf <$> lexeme Lex.decimal
 
 lexChar :: LexerF Lit
-lexChar = uncurry LitChar . second locOf <$> lexeme (char '\'' *> Lex.charLiteral <* char '\'')
+lexChar = uncurry LitChar . second rangeOf <$> lexeme (char '\'' *> Lex.charLiteral <* char '\'')
 
 lexLits :: LexerF Lit
 lexLits = choice [lexTrue, lexFalse, lexInt, lexChar] <?> "literals"

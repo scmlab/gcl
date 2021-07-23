@@ -97,6 +97,6 @@ instance Located Expr where
 --------------------------------------------------------------------------------
 
 instance Located Lit where
-  locOf (LitInt _ l) = l
-  locOf (LitBool _ l) = l
-  locOf (LitChar _ l) = l
+  locOf (LitInt _ l) = locOf l
+  locOf (LitBool _ l) = locOf l
+  locOf (LitChar _ l) = locOf l

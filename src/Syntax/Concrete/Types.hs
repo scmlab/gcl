@@ -154,7 +154,7 @@ type QuantOp' = Either Op Expr
 --------------------------------------------------------------------------------
 
 -- | Literals (Integer / Boolean / Character)
-data Lit = LitInt Int Loc | LitBool Bool Loc | LitChar Char Loc
+data Lit = LitInt Int Range | LitBool Bool Range | LitChar Char Range
   deriving (Show, Eq, Generic)
 
 --------------------------------------------------------------------------------
