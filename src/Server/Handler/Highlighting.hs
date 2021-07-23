@@ -20,6 +20,8 @@ import           Server.DSL
 import           Server.Interpreter.RealWorld
 import           Syntax.Common                  ( Name )
 import           Syntax.Parser                  ( pProgram )
+import Debug.Trace
+import Data.List (sort)
 
 ignoreErrors
   :: Either [Error] (Either J.ResponseError (Maybe J.SemanticTokens))
@@ -110,7 +112,7 @@ instance Collect BlockDeclaration J.SemanticTokenAbsolute where
 
 instance Collect DeclBase J.SemanticTokenAbsolute where
   collect (DeclBase as _ b) =
-    (map AsVariable (toList as) >>= collect) <> collect b
+    (toList as >>= collect . AsVariable) <> collect b
 
 instance Collect DeclProp J.SemanticTokenAbsolute where
   collect (DeclProp _tokA a _tokB) = collect a
@@ -119,7 +121,7 @@ instance Collect DeclType J.SemanticTokenAbsolute where
 instance Collect DeclBody J.SemanticTokenAbsolute where
   collect (DeclBody a bs _tok c) =
     toToken' J.SttFunction [J.StmDeclaration] a
-      <> (map AsVariable (toList bs) >>= collect)
+      <> (bs >>= collect . AsVariable)
       <> collect c
 
 instance Collect BlockDeclProp J.SemanticTokenAbsolute where
@@ -139,7 +141,7 @@ instance Collect Stmt J.SemanticTokenAbsolute where
     Skip x -> toToken' J.SttKeyword [] x
     Abort x -> toToken' J.SttKeyword [] x
     Assign as tok bs ->
-      (map AsVariable (toList as) >>= collect)
+      (toList as >>= collect . AsVariable)
         <> toToken' J.SttKeyword [] tok
         <> (toList bs >>= collect)
     AAssign a _ b _ tok c ->
@@ -188,7 +190,34 @@ instance Collect GdCmd J.SemanticTokenAbsolute where
 -- Expr 
 
 instance Collect Expr J.SemanticTokenAbsolute where
-  collect _ = []
+  collect = \case
+    Paren _ a _ -> collect a
+    Lit a -> collect a
+    Var a -> collect (AsVariable a)
+    Const a -> collect (AsVariable a)
+    Op a -> toToken' J.SttOperator [] a
+    Chain a b c ->
+      collect a <>
+      toToken' J.SttOperator [] b <>
+      collect c
+    Arr a _ b _ ->
+      collect a <> collect b
+    -- NOTE: sorting is need here, because: 
+    --  1. the client will ignore tokens that are out of order
+    --  2. `App` may create tokens that are out of order 
+    --      (e.g. "1 +" will be parsed as `App + 1`)
+    App a b -> sort $ collect a <> collect b
+    Quant tokA op names tokB a tokC b tokD ->
+      toToken' J.SttKeyword [] tokA <>
+      toToken' J.SttKeyword [] tokB <>
+      toToken' J.SttKeyword [] tokC <>
+      toToken' J.SttKeyword [] tokD <>
+      toToken' J.SttOperator [] op <>
+      (names >>= collect . AsVariable) <>
+      collect a <> collect b
+
+instance Collect Lit J.SemanticTokenAbsolute where
+  collect = toToken' J.SttNumber []
 
 --------------------------------------------------------------------------------
 -- Type 
