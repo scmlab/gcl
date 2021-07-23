@@ -14,13 +14,13 @@ import qualified Syntax.Abstract as A
 import qualified Syntax.Abstract.Operator as A
 import qualified Syntax.ConstExpr as ConstExpr
 import Syntax.Common (Name, Op(..))
-import Data.Loc.Range (rangeOf)
+import Data.Loc.Range
 
 --------------------------------------------------------------------------------
 
 -- | Typeclass for converting Syntax.Concrete to Syntax.Abstract
 class ToAbstract a b | a -> b where
-  toAbstract :: a -> Except Loc b
+  toAbstract :: a -> Except Range b
 
 instance ToAbstract a b => ToAbstract (Maybe a) (Maybe b) where
   toAbstract Nothing = return Nothing

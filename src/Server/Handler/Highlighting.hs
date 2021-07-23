@@ -15,12 +15,12 @@ import           Syntax.Concrete
 import           Data.Loc                hiding ( fromLoc )
 
 import           Data.Foldable                  ( toList )
+import           Data.List                      ( sort )
 import           Error                          ( Error )
 import           Server.DSL
 import           Server.Interpreter.RealWorld
 import           Syntax.Common                  ( Name )
 import           Syntax.Parser                  ( pProgram )
-import Data.List (sort)
 
 ignoreErrors
   :: Either [Error] (Either J.ResponseError (Maybe J.SemanticTokens))
@@ -110,8 +110,7 @@ instance Collect BlockDeclaration J.SemanticTokenAbsolute where
   collect (BlockDeclaration _tokA as _tokB) = toList as >>= collect
 
 instance Collect DeclBase J.SemanticTokenAbsolute where
-  collect (DeclBase as _ b) =
-    (toList as >>= collect . AsVariable) <> collect b
+  collect (DeclBase as _ b) = (toList as >>= collect . AsVariable) <> collect b
 
 instance Collect DeclProp J.SemanticTokenAbsolute where
   collect (DeclProp _tokA a _tokB) = collect a
@@ -137,7 +136,7 @@ instance Collect BlockDecl J.SemanticTokenAbsolute where
 
 instance Collect Stmt J.SemanticTokenAbsolute where
   collect = \case
-    Skip x -> toToken' J.SttKeyword [] x
+    Skip  x -> toToken' J.SttKeyword [] x
     Abort x -> toToken' J.SttKeyword [] x
     Assign as tok bs ->
       (toList as >>= collect . AsVariable)
@@ -191,30 +190,26 @@ instance Collect GdCmd J.SemanticTokenAbsolute where
 instance Collect Expr J.SemanticTokenAbsolute where
   collect = \case
     Paren _ a _ -> collect a
-    Lit a -> collect a
-    Var a -> collect (AsVariable a)
-    Const a -> collect (AsVariable a)
-    Op a -> toToken' J.SttOperator [] a
-    Chain a b c ->
-      collect a <>
-      toToken' J.SttOperator [] b <>
-      collect c
-    Arr a _ b _ ->
-      collect a <> collect b
+    Lit   a     -> collect a
+    Var   a     -> collect (AsVariable a)
+    Const a     -> collect (AsVariable a)
+    Op    a     -> toToken' J.SttOperator [] a
+    Chain a b c -> collect a <> toToken' J.SttOperator [] b <> collect c
+    Arr a _ b _ -> collect a <> collect b
     -- NOTE: sorting is need here, because: 
     --  1. the client will ignore tokens that are out of order
     --  2. `App` may create tokens that are out of order 
     --      (e.g. "1 +" will be parsed as `App + 1`)
-    App a b -> sort $ collect a <> collect b
+    App a b     -> sort $ collect a <> collect b
     Quant tokA op names tokB a tokC b tokD ->
-      toToken' J.SttKeyword [] tokA <>
-      toToken' J.SttOperator [] op <>
-      (names >>= collect . AsVariable) <>
-      toToken' J.SttKeyword [] tokB <>
-      collect a <>
-      toToken' J.SttKeyword [] tokC <>
-      collect b <>
-      toToken' J.SttKeyword [] tokD
+      toToken' J.SttKeyword [] tokA
+        <> toToken' J.SttOperator [] op
+        <> (names >>= collect . AsVariable)
+        <> toToken' J.SttKeyword [] tokB
+        <> collect a
+        <> toToken' J.SttKeyword [] tokC
+        <> collect b
+        <> toToken' J.SttKeyword [] tokD
 
 instance Collect Lit J.SemanticTokenAbsolute where
   collect = toToken' J.SttNumber []

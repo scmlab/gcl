@@ -26,6 +26,7 @@ import Pretty ( Pretty(pretty), toText, toByteString )
 import Error (Error(..))
 import Data.Map (Map)
 import Control.Monad.State (evalStateT)
+import Data.Loc.Range
 
 tests :: TestTree
 tests = testGroup "Type" [exprTests, typeTests, stmtTests, declarationTests, blockDeclarationTests, fileTests]
@@ -380,7 +381,7 @@ env =
         (name' "r", tbool)
       ]
 
-runParser :: ToAbstract a b => Parser a -> Text -> Either (Either [Error] Loc) b
+runParser :: ToAbstract a b => Parser a -> Text -> Either (Either [Error] Range) b
 runParser p t =
   case runExcept . toAbstract <$> parseTest p t of
     Left errs -> Left $ Left $ map SyntacticError errs

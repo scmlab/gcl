@@ -154,8 +154,7 @@ parseProgram :: Text -> CmdM A.Program
 parseProgram source = do
   concrete <- parse pProgram source
   case runExcept (toAbstract concrete) of
-    Left  NoLoc           -> throwError [Others "NoLoc in parseProgram"]
-    Left  (Loc start end) -> digHole (Range start end) >>= parseProgram
+    Left  (Range start end) -> digHole (Range start end) >>= parseProgram
     Right program         -> return program
 
 --------------------------------------------------------------------------------

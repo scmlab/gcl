@@ -67,7 +67,7 @@ data Stmt
   | LoopInvariant (Token "{") Expr (Token ",") (Token "bnd") (Token ":") Expr (Token "}")
   | Do (Token "do") (SepBy "|" GdCmd) (Token "od")
   | If (Token "if") (SepBy "|" GdCmd) (Token "fi")
-  | SpecQM Loc -- ? to be rewritten as {!!} 
+  | SpecQM Range -- ? to be rewritten as {!!} 
   | Spec (Token "[!") Text (Token "!]")
   | Proof (Token "{-") [ProofAnchor] (Token "-}")
   | Alloc Name (Token ":=") (Token "new") (Token "(") (SepBy "," Expr) (Token ")")

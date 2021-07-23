@@ -216,7 +216,7 @@ pGdCmd =
   <*> pIndentBlock (lift pStmt)
 
 pSpecQM :: ParserF Stmt
-pSpecQM = SpecQM . locOf <$> lexQM
+pSpecQM = SpecQM . rangeOf <$> lexQM
 
 pSpec :: ParserF Stmt
 pSpec = do

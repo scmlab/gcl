@@ -260,7 +260,7 @@ instance PrettyWithLoc Stmt where
     prettyWithLoc l
       <> prettyWithLoc gdCmds
       <> prettyWithLoc r
-  prettyWithLoc (SpecQM l) = fromDoc l (pretty tokQM)
+  prettyWithLoc (SpecQM l) = fromDoc (locOf l) (pretty tokQM)
   prettyWithLoc (Spec l s r) =
     prettyWithLoc l
       <> fromDoc (translateLoc 2 0 (locOf l) <--> translateLoc 0 (-2) (locOf r)) (pretty s)

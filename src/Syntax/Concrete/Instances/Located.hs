@@ -48,7 +48,7 @@ instance Located Stmt where
   locOf (LoopInvariant l _ _ _ _ _ r) = l <--> r
   locOf (Do l _ r) = l <--> r
   locOf (If l _ r) = l <--> r
-  locOf (SpecQM l) = l
+  locOf (SpecQM l) = locOf l
   locOf (Spec l _ r) = l <--> r
   locOf (Proof l _ r) = l <--> r
   locOf (Alloc l _ _ _ _ r) = l <--> r
