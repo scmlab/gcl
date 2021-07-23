@@ -20,7 +20,6 @@ import           Server.DSL
 import           Server.Interpreter.RealWorld
 import           Syntax.Common                  ( Name )
 import           Syntax.Parser                  ( pProgram )
-import Debug.Trace
 import Data.List (sort)
 
 ignoreErrors
@@ -209,12 +208,13 @@ instance Collect Expr J.SemanticTokenAbsolute where
     App a b -> sort $ collect a <> collect b
     Quant tokA op names tokB a tokC b tokD ->
       toToken' J.SttKeyword [] tokA <>
-      toToken' J.SttKeyword [] tokB <>
-      toToken' J.SttKeyword [] tokC <>
-      toToken' J.SttKeyword [] tokD <>
       toToken' J.SttOperator [] op <>
       (names >>= collect . AsVariable) <>
-      collect a <> collect b
+      toToken' J.SttKeyword [] tokB <>
+      collect a <>
+      toToken' J.SttKeyword [] tokC <>
+      collect b <>
+      toToken' J.SttKeyword [] tokD
 
 instance Collect Lit J.SemanticTokenAbsolute where
   collect = toToken' J.SttNumber []
