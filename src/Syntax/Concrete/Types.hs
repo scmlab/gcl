@@ -7,13 +7,13 @@
 
 module Syntax.Concrete.Types where
 
-import Data.Loc (Loc (..), Located (locOf), Pos)
 import Data.Loc.Range
 import Data.Text (Text)
 import GHC.Base (Symbol)
 import GHC.Generics (Generic)
 import Syntax.Common (ArithOp, ChainOp, Name, Op)
 import Prelude hiding (Ordering (..))
+import Data.Loc (Located (locOf), Pos, Loc (Loc))
 
 --------------------------------------------------------------------------------
 
@@ -112,9 +112,9 @@ data Interval = Interval EndpointOpen (Token "..") EndpointClose deriving (Eq, S
 
 -- | Base Type
 data TBase
-  = TInt Loc
-  | TBool Loc
-  | TChar Loc
+  = TInt Range
+  | TBool Range
+  | TChar Range
   deriving (Eq, Show)
 
 -- | Type

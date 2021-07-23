@@ -70,9 +70,9 @@ instance Located Interval where
   locOf (Interval l _ r) = l <--> r
 
 instance Located TBase where
-  locOf (TInt l) = l
-  locOf (TBool l) = l
-  locOf (TChar l) = l
+  locOf (TInt l) = locOf l
+  locOf (TBool l) = locOf l
+  locOf (TChar l) = locOf l
 
 instance Located Type where
   locOf (TParen l _ r) = l <--> r

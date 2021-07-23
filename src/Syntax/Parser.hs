@@ -307,9 +307,9 @@ pBase :: ParserF Type
 pBase =
   TBase
     <$> choice
-      [ TInt . locOf <$> lexTypeInt,
-        TBool . locOf <$> lexTypeBool,
-        TChar . locOf <$> lexTypeChar
+      [ TInt . rangeOf <$> lexTypeInt,
+        TBool . rangeOf <$> lexTypeBool,
+        TChar . rangeOf <$> lexTypeChar
       ]
 
 pTVar :: ParserF Type

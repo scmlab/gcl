@@ -390,9 +390,9 @@ instance Pretty Type where
 instance PrettyWithLoc Type where
   prettyWithLoc (TParen l t r) = prettyWithLoc l <> prettyWithLoc t <> prettyWithLoc r
   -- DocWithLoc "(" l l <> prettyWithLoc t <> DocWithLoc ")" m m
-  prettyWithLoc (TBase (TInt l)) = fromDoc l (pretty tokTypeInt)
-  prettyWithLoc (TBase (TBool l)) = fromDoc l (pretty tokTypeBool)
-  prettyWithLoc (TBase (TChar l)) = fromDoc l (pretty tokTypeChar)
+  prettyWithLoc (TBase (TInt l)) = fromDoc (locOf l) (pretty tokTypeInt)
+  prettyWithLoc (TBase (TBool l)) = fromDoc (locOf l) (pretty tokTypeBool)
+  prettyWithLoc (TBase (TChar l)) = fromDoc (locOf l) (pretty tokTypeChar)
   prettyWithLoc (TFunc a l b) = prettyWithLoc a <> prettyWithLoc l <> prettyWithLoc b
   prettyWithLoc (TArray l a r b) =
     prettyWithLoc l <> prettyWithLoc a <> prettyWithLoc r <> prettyWithLoc b
