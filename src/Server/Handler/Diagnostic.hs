@@ -17,11 +17,13 @@ import           GCL.Type                       ( TypeError(..) )
 import           GCL.WP.Type                    ( StructError(..)
                                                 , StructWarning(..)
                                                 )
-import           Language.LSP.Types      hiding (line, Range, TextDocumentSyncClientCapabilities(..)
+import           Language.LSP.Types      hiding ( Range
+                                                , TextDocumentSyncClientCapabilities(..)
+                                                , line
                                                 )
 import           Pretty
 import           Server.Stab
-import qualified Server.Util                   as J 
+import qualified Server.Util                   as J
 
 instance Collect StructError Diagnostic where
   collect (MissingAssertion loc) = makeError
@@ -129,11 +131,11 @@ instance Collect PO Diagnostic where
 
     loc :: Loc
     loc = case origin of
-      -- we only mark the closing tokens ("od" and "fi") for loops & conditionals
-      AtLoop        l -> first2Char l
-      AtTermination l -> first2Char l
-      AtIf          l -> first2Char l
-      others          -> locOf others
+      AtLoop        l      -> first2Char l
+      AtTermination l      -> first2Char l
+      AtIf          l      -> first2Char l
+      Explain _ _ _ True l -> first2Char l -- Explain with "originHighlightPartial" as True
+      others               -> locOf others
 
     title :: Text
     title = toText origin
