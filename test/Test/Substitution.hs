@@ -37,6 +37,7 @@ letBindings = testGroup
   , run "let binding with assignment and application" "let-4.gcl"
   , run "fastmul"                       "subst-fastmul.gcl"
   , run "Issue #41"                     "issue41.gcl"
+  , run "shrinking the mapping"         "shrink.gcl"
   ]
  where
   run :: String -> FilePath -> TestTree
@@ -70,8 +71,14 @@ instance Pretty Tree where
 toTree :: EXPN -> Tree
 toTree (EXPN before after inBefore inAfter) = Node before (toBefore <> toAfter)
  where
-  toBefore :: Map Inlines [Tree] 
-  toBefore = Map.fromList $ map (\expn -> (renderedBefore expn <> " ===> " <> renderedAfter expn ,map toTree (buttonsInBefore expn))) inBefore
+  toBefore :: Map Inlines [Tree]
+  toBefore = Map.fromList $ map
+    (\expn ->
+      ( renderedBefore expn <> " ===> " <> renderedAfter expn
+      , map toTree (buttonsInBefore expn)
+      )
+    )
+    inBefore
 
   toAfter :: Map Inlines [Tree]
   toAfter = Map.singleton (before <> " ===> " <> after) (map toTree inAfter)
@@ -113,9 +120,17 @@ instance ExtractExpand Expr where
     Lam _ x _       -> extractExpand x
     Quant x _ y z _ -> extractExpand x <> extractExpand y <> extractExpand z
     Expand before after ->
-      [EXPN (render before) (render after) (extractExpand before) (extractExpand after)]
+      [ EXPN (render before)
+             (render after)
+             (extractExpand before)
+             (extractExpand after)
+      ]
     Subst before _mapping after ->
-      [EXPN (render before) (render after) (extractExpand before) (extractExpand after)]
+      [ EXPN (render before)
+             (render after)
+             (extractExpand before)
+             (extractExpand after)
+      ]
     ArrIdx x y _   -> extractExpand x <> extractExpand y
     ArrUpd x y z _ -> extractExpand x <> extractExpand y <> extractExpand z
     _              -> []

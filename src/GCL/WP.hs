@@ -202,10 +202,11 @@ structStmts Secondary (pre, _) stmts post = case stripAsserts stmts of
     tellPO
       pre
       post'
-      (Explain { originHeader      = "Assertion (Secondary)"
-               , originExplanation = mempty
-               , originInfMode     = Secondary
-               , originLoc         = locOf pre
+      (Explain { originHeader           = "Assertion (Secondary)"
+               , originExplanation      = mempty
+               , originInfMode          = Secondary
+               , originHighlightPartial = False
+               , originLoc              = locOf pre
                }
       )
 
@@ -269,17 +270,18 @@ struct (pre, _) s@(A.Assign vars exprs l) post = do
  where
   origin :: Origin
   origin = Explain
-    { originHeader      = "Assigment"
-    , originExplanation = "After assignment, the postcondition"
-                          <> (codeE . render) post
-                          <> "should be implied by the precondition" 
-                          <> (codeE . render) pre
-                          <> "after free variables"
-                          <> sepByCommaE (map (codeE . render) vars)
-                          <> "have been substituted with"
-                          <> sepByCommaE (map (codeE . render) exprs)
-    , originInfMode     = Primary
-    , originLoc         = l
+    { originHeader           = "Assigment"
+    , originExplanation      = "After assignment, the postcondition"
+                               <> (codeE . render) post
+                               <> "should be implied by the precondition"
+                               <> (codeE . render) pre
+                               <> "after free variables"
+                               <> sepByCommaE (map (codeE . render) vars)
+                               <> "have been substituted with"
+                               <> sepByCommaE (map (codeE . render) exprs)
+    , originInfMode          = Primary
+    , originHighlightPartial = False
+    , originLoc              = l
     }
 struct (pre, _) s@(A.AAssign _ _ _ l) post = do
   tellPO' (AtAssignment l) pre =<< wp s post
@@ -290,29 +292,34 @@ struct (pre, _) (A.If gcmds l) post = do
 struct (inv, Just bnd) (A.Do gcmds l) post = do
   let guards = A.getGuards gcmds
   let explainAfterLoop = Explain
-        { originHeader      = "After Loop"
-        , originExplanation = "The loop invariant"
-                              <> (codeE . render) inv
-                              <> "should remain true while all the guards"
-                              <> sepByCommaE (map (codeE . render) guards)
-                              <> "become false after executing the loop" 
-        , originInfMode     = Primary
-        , originLoc         = l
+        { originHeader           = "After Loop"
+        , originExplanation      = "The loop invariant"
+                                   <> (codeE . render) inv
+                                   <> "should remain true while all the guards"
+                                   <> sepByCommaE (map (codeE . render) guards)
+                                   <> "become false after executing the loop"
+        , originInfMode          = Primary
+        , originHighlightPartial = True
+        , originLoc              = l
         }
   let explainTermination = Explain
         { originHeader      = "Loop Termination"
-        , originExplanation = "When the loop invariant"
-                              <> (codeE . render) inv
-                              <> "and one of the guards"
-                              <> sepByCommaE (map (codeE . render) guards)
-                              <> "remain true (that is, whilst looping), the bound" 
-                              <> (codeE . render) bnd
-                              <> "should be greater then"
-                              <> (codeE . render) (A.Lit (A.Num 0) NoLoc)
+        , originExplanation =
+          "When the loop invariant"
+          <> (codeE . render) inv
+          <> "and one of the guards"
+          <> sepByCommaE (map (codeE . render) guards)
+          <> "remain true (that is, whilst looping), the bound"
+          <> (codeE . render) bnd
+          <> "should be greater then"
+          <> (codeE . render) (A.Lit (A.Num 0) NoLoc)
         , originInfMode     = Primary
+        , originHighlightPartial = True
         , originLoc         = l
         }
-  tellPO (Conjunct (inv : map (Negate . guardLoop) guards)) post explainAfterLoop
+  tellPO (Conjunct (inv : map (Negate . guardLoop) guards))
+         post
+         explainAfterLoop
   forM_ gcmds (structGdcmdInduct inv)
   tellPO (Conjunct [inv, Disjunct (map guardLoop guards)])
          (Bound (bnd `A.gte` A.Lit (A.Num 0) NoLoc) NoLoc)

@@ -112,6 +112,7 @@ data Origin
   | Explain { originHeader :: Text -- the text you see on the top of a PO 
             , originExplanation :: Inlines -- the text you see at the bottom of a PO (after clicking the header)
             , originInfMode :: InfMode
+            , originHighlightPartial :: Bool -- for highlighting only "if" in conditionals and "do" in loops
             , originLoc :: Loc
             }
   deriving (Eq, Show, Generic)
@@ -129,15 +130,15 @@ instance Ord Origin where
         if a `within` b then LT else if b `within` a then GT else compare a b
 
 instance Located Origin where
-  locOf (AtAbort       l   ) = l
-  locOf (AtSkip        l   ) = l
-  locOf (AtSpec        l   ) = l
-  locOf (AtAssignment  l   ) = l
-  locOf (AtAssertion   l   ) = l
-  locOf (AtIf          l   ) = l
-  locOf (AtLoop        l   ) = l
-  locOf (AtTermination l   ) = l
-  locOf (Explain    _ _ _ l) = l
+  locOf (AtAbort       l  ) = l
+  locOf (AtSkip        l  ) = l
+  locOf (AtSpec        l  ) = l
+  locOf (AtAssignment  l  ) = l
+  locOf (AtAssertion   l  ) = l
+  locOf (AtIf          l  ) = l
+  locOf (AtLoop        l  ) = l
+  locOf (AtTermination l  ) = l
+  locOf (Explain _ _ _ _ l) = l
 
 data Spec = Specification
   { specID       :: Int

@@ -57,17 +57,17 @@ instance RenderSection PO where
       <> explanation
    where
     explanation = case origin of
-      Explain _ x _ _ -> [Paragraph x]
-      _               -> [Paragraph "explanation not available"]
+      Explain _ x _ _ _ -> [Paragraph x]
+      _                 -> [Paragraph "explanation not available"]
 
 -- as header 
 instance Render Origin where
-  render AtAbort{}              = "Abort"
-  render AtSkip{}               = "Skip"
-  render AtSpec{}               = "Spec"
-  render AtAssignment{}         = "Assigment"
-  render AtAssertion{}          = "Assertion"
-  render AtIf{}                 = "Conditional"
-  render AtLoop{}               = "Loop Invariant"
-  render AtTermination{}        = "Loop Termination"
-  render (Explain header _ _ _) = render header
+  render AtAbort{}                = "Abort"
+  render AtSkip{}                 = "Skip"
+  render AtSpec{}                 = "Spec"
+  render AtAssignment{}           = "Assigment"
+  render AtAssertion{}            = "Assertion"
+  render AtIf{}                   = "Conditional"
+  render AtLoop{}                 = "Loop Invariant"
+  render AtTermination{}          = "Loop Termination"
+  render (Explain header _ _ _ _) = render header

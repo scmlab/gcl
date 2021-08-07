@@ -1,0 +1,10 @@
+var global1 : Int 
+var global2 : Int 
+{: 
+    P bound = global1 = bound
+:}
+
+global1 := global1 + 1
+global2 := global2 + 1
+
+{ P 3 }

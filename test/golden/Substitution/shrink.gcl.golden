@@ -1,0 +1,3 @@
+P [ global1 + 1 / global1 ] 3
+  P [ global1 + 1 / global1 ] 3 ===> global1 + 1 = 3
+    

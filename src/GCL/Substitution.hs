@@ -128,7 +128,8 @@ instance Substitutable Expr where
                     -- [subst-Var-defined]
                     Just (Just binding) -> do
                         after <- subst mapping binding
-                        let before = Subst2 expr mapping
+                        let before =
+                                Subst2 expr (shrinkMapping binding mapping)
                         return $ Expand before after
                     -- [subst-Var-defined]
                     Just Nothing -> return expr
@@ -158,7 +159,8 @@ instance Substitutable Expr where
                     -- [subst-Const-defined]
                     Just (Just binding) -> do
                         after <- subst mapping binding
-                        let before = Subst2 expr mapping
+                        let before =
+                                Subst2 expr (shrinkMapping binding mapping)
                         return $ Expand before after
                     -- [subst-Const-not-defined]
                     Just Nothing -> return expr
@@ -311,12 +313,23 @@ getCapturableNames :: Mapping -> Expr -> (Set Text, Mapping)
 getCapturableNames mapping body =
     let
         -- collect all free variables in "body"
-        freeVarsInBody  = Set.map nameToText (fv body)
-        -- reduce the mapping further with free variables in "body" 
-        shrinkedMapping = Map.restrictKeys mapping freeVarsInBody
+        -- and reduce the mapping further with free variables in "body" 
+        shrinkedMapping = shrinkMapping body mapping
         -- collect all free varialbes in the mapped expressions 
         mappedExprs     = Map.elems shrinkedMapping
         freeVarsInMappedExprs =
             Set.map nameToText $ Set.unions (map fv mappedExprs)
     in
         (freeVarsInMappedExprs, shrinkedMapping)
+
+
+------------------------------------------------------------------
+-- | Shrink the Mapping in Substs 
+
+shrinkMapping :: Expr -> Mapping -> Mapping
+shrinkMapping expr mapping =
+    let
+        -- collect all free variables in the expression
+        freeVars = Set.map nameToText (fv expr)
+        -- restrict the mapping with only free variables
+    in  Map.restrictKeys mapping freeVars
