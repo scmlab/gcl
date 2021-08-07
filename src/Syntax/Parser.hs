@@ -247,26 +247,26 @@ pProof = Proof
         else return []
 
 pAlloc :: ParserF Stmt
-pAlloc = 
+pAlloc =
   Alloc
   <$> lowerName
-  <*> lexAssign 
+  <*> lexAssign
   <*> lexNew
-  <*> lexParenStart 
+  <*> lexParenStart
   <*> pList pExpr'
-  <*> lexParenEnd 
+  <*> lexParenEnd
 
 pHLookup :: ParserF Stmt
-pHLookup = 
+pHLookup =
   HLookup
   <$> lowerName
   <*> lexAssign
-  <*> lexStar 
+  <*> lexStar
   <*> pExpr'
 
 pHMutate :: ParserF Stmt
-pHMutate = 
-  HMutate 
+pHMutate =
+  HMutate
   <$> lexStar
   <*> pExpr'
   <*> lexAssign
@@ -559,7 +559,6 @@ indentedItems lvl sc' p = go
       if done
         then return []
         else
-          if
-          | pos < lvl -> return []
-          | pos == lvl -> try ((:) <$> p <*> go) <|> return []
-          | otherwise -> Lex.incorrectIndent Ord.EQ lvl pos
+          if pos == lvl
+          then try ((:) <$> p <*> go) <|> return []
+          else return []
