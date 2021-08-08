@@ -39,7 +39,10 @@ data Declaration
   = ConstDecl [Name] Type (Maybe Expr) Loc
   | VarDecl [Name] Type (Maybe Expr) Loc
   | LetDecl Name [Name] Expr Loc
+  | TypeDecl Name [Name] [Constructor] Loc
   deriving (Eq, Show)
+
+data Constructor = Constructor Name [Type] deriving (Eq, Show)
 
 --------------------------------------------------------------------------------
 

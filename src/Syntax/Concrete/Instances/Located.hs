@@ -18,6 +18,10 @@ instance Located Program where
 instance Located Declaration where
   locOf (ConstDecl l r) = l <--> r
   locOf (VarDecl l r) = l <--> r
+  locOf (TypeDecl l _ _ _ r) = l <--> r
+
+instance Located Constructor where
+  locOf (Constructor l r) = l <--> r
 
 instance Located BlockDeclaration where
   locOf (BlockDeclaration l _ r) = l <--> r

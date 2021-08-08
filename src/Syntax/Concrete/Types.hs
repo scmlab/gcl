@@ -54,9 +54,13 @@ data Program
 data Declaration
   = ConstDecl (Token "con") DeclType
   | VarDecl (Token "var") DeclType
+  -- data T a1 a2 ... = K1 v1 v2 ... | K2 u1 u2 ...
+  | TypeDecl (Token "data") Name [Name] (Token "=") (SepBy "|" Constructor)
   deriving (Eq, Show)
 
 data BlockDeclaration = BlockDeclaration (Token "{:") [BlockDecl] (Token ":}") deriving (Eq, Show)
+
+data Constructor = Constructor Name [Type] deriving (Eq, Show)
 
 data Stmt
   = Skip Range
@@ -67,7 +71,7 @@ data Stmt
   | LoopInvariant (Token "{") Expr (Token ",") (Token "bnd") (Token ":") Expr (Token "}")
   | Do (Token "do") (SepBy "|" GdCmd) (Token "od")
   | If (Token "if") (SepBy "|" GdCmd) (Token "fi")
-  | SpecQM Range -- ? to be rewritten as {!!} 
+  | SpecQM Range -- ? to be rewritten as {!!}
   | Spec (Token "[!") Text (Token "!]")
   | Proof (Token "{-") [ProofAnchor] (Token "-}")
   | Alloc Name (Token ":=") (Token "new") (Token "(") (SepBy "," Expr) (Token ")")

@@ -12,6 +12,10 @@ instance Located Declaration where
   locOf (ConstDecl _ _ _ l) = l
   locOf (VarDecl _ _ _ l) = l
   locOf (LetDecl _ _ _ l) = l
+  locOf (TypeDecl _ _ _ l) = l
+
+instance Located Constructor where
+  locOf (Constructor n ts) = n <--> ts
 
 instance Located Stmt where
   locOf (Skip l) = l
@@ -30,8 +34,8 @@ instance Located Stmt where
   locOf (Dispose _ l) = l
 
 instance Located GdCmd where
-  locOf (GdCmd _ _ l) = l 
-  
+  locOf (GdCmd _ _ l) = l
+
 instance Located Endpoint where
   locOf (Including e) = locOf e
   locOf (Excluding e) = locOf e

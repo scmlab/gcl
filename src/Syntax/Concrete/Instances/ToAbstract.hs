@@ -50,9 +50,13 @@ instance ToAbstract Declaration A.Declaration where
     VarDecl _ decl -> do
       (name, body, prop) <- toAbstract decl
       return $ A.VarDecl name body prop (locOf decl)
+    TypeDecl _ n ts _ constrs  -> A.TypeDecl n ts <$> toAbstract (fromSepBy constrs) <*> pure (locOf decl)
 
 instance ToAbstract BlockDeclaration [A.Declaration] where
   toAbstract (BlockDeclaration _ decls _) = toAbstract decls
+
+instance ToAbstract Constructor A.Constructor where
+  toAbstract (Constructor c ts) = A.Constructor c <$> toAbstract ts
 
 instance ToAbstract Stmt A.Stmt where
   toAbstract stmt = case stmt of
@@ -140,7 +144,7 @@ instance ToAbstract TBase A.TBase where
 
 -- | Type
 instance ToAbstract Type A.Type where
-  toAbstract t = 
+  toAbstract t =
     case t of
       (TBase a) -> A.TBase <$> toAbstract a <*> pure (locOf t)
       (TArray _ a _ b) -> A.TArray <$> toAbstract a <*> toAbstract b <*> pure (locOf t)
