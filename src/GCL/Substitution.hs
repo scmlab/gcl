@@ -241,13 +241,13 @@ instance Substitutable Expr where
 
 -- 
 -- ---------------------------------------------------------------[subst-Subst]
---      Subst a mapping     ~[.../...]~>    Subst a mapping'
+--      Subst a mapping     ~[.../...]~>    Subst (Subst a mapping) mapping'
 -- 
+
+        -- apply new mappings on the outside instead of merging them (Issue #54)
         Subst2 e freeVars mapping' ->
-            let shinkedMapping = Map.restrictKeys
-                    (mapping' <> mapping)
-                    (Set.map nameToText freeVars)
-            in  return $ Subst2 e freeVars shinkedMapping
+            let shinkedMapping = Map.restrictKeys mapping (Set.map nameToText freeVars)
+            in  return $ Subst2 (Subst2 e freeVars mapping') freeVars shinkedMapping
 -- 
 --      a                   ~[.../...]~>    a'
 --      b                   ~[.../...]~>    b'

@@ -39,6 +39,7 @@ letBindings = testGroup
     , run "Issue #41"                     "issue41.gcl"
     , run "shrinking the mapping 1"       "shrink.gcl"
     , run "shrinking the mapping 2"       "issue51.gcl"
+    , run "consecutive vs parallel"       "issue54.gcl"
   ]
  where
   run :: String -> FilePath -> TestTree
