@@ -2,13 +2,16 @@
 
 module Syntax.Abstract.Types where
 
-import Data.Loc ( Loc )
-import Data.Map (Map)
-import Data.Text (Text)
-import GHC.Generics (Generic)
-import Syntax.Common ( Op, Name )
-import Prelude hiding (Ordering (..))
-import Data.Loc.Range ( Range )
+import           Data.Loc                       ( Loc )
+import           Data.Loc.Range                 ( Range )
+import           Data.Map                       ( Map )
+import           Data.Set                       ( Set )
+import           Data.Text                      ( Text )
+import           GHC.Generics                   ( Generic )
+import           Prelude                 hiding ( Ordering(..) )
+import           Syntax.Common                  ( Name
+                                                , Op
+                                                )
 
 --------------------------------------------------------------------------------
 
@@ -21,13 +24,11 @@ type TypeVar = Text
 --------------------------------------------------------------------------------
 
 -- | Program
-data Program
-  = Program
-      [Declaration] -- constant and variable declarations
-      [Expr] -- global properties
-      Defns -- let bindings
-      [Stmt] -- main program
-      Loc
+data Program = Program [Declaration] -- constant and variable declarations
+                                     [Expr] -- global properties
+                                            Defns -- let bindings
+                                                  [Stmt] -- main program
+                                                         Loc
   deriving (Eq, Show)
 
 type Defns = Map Name Expr
@@ -62,8 +63,10 @@ data Stmt
 
   deriving (Eq, Show)
 
-data GdCmd = GdCmd Expr [Stmt] Loc deriving (Eq, Show)
-data ProofAnchor = ProofAnchor Text Range deriving (Eq, Ord, Show)
+data GdCmd = GdCmd Expr [Stmt] Loc
+  deriving (Eq, Show)
+data ProofAnchor = ProofAnchor Text Range
+  deriving (Eq, Ord, Show)
 
 --------------------------------------------------------------------------------
 
@@ -71,7 +74,8 @@ data ProofAnchor = ProofAnchor Text Range deriving (Eq, Ord, Show)
 data Endpoint = Including Expr | Excluding Expr deriving (Eq, Show, Generic)
 
 -- | Interval
-data Interval = Interval Endpoint Endpoint Loc deriving (Eq, Show, Generic)
+data Interval = Interval Endpoint Endpoint Loc
+  deriving (Eq, Show, Generic)
 
 -- | Base Types
 data TBase = TInt | TBool | TChar
@@ -98,7 +102,11 @@ data Expr
   | Lam Name Expr Loc
   | Quant Expr [Name] Expr Expr Loc
   | Subst Expr Subst Expr
-  | Subst2 Expr Mapping
+  | Subst2 Expr -- expression to be substituted
+    (Set Name) -- free variables in that expression
+               -- NOTE, the expression may be some definition like "P", 
+              --  in that case, the free variables should be that of after it's been expanded
+    Mapping -- mapping of substitution to be displayed to users 
   | Expand Expr Expr
   | ArrIdx Expr Expr Loc
   | ArrUpd Expr Expr Expr Loc

@@ -128,8 +128,10 @@ instance Substitutable Expr where
                     -- [subst-Var-defined]
                     Just (Just binding) -> do
                         after <- subst mapping binding
-                        let before =
-                                Subst2 expr (shrinkMapping binding mapping)
+                        let
+                            before = Subst2 expr
+                                            (fv binding)
+                                            (shrinkMapping binding mapping)
                         return $ Expand before after
                     -- [subst-Var-defined]
                     Just Nothing -> return expr
@@ -159,8 +161,10 @@ instance Substitutable Expr where
                     -- [subst-Const-defined]
                     Just (Just binding) -> do
                         after <- subst mapping binding
-                        let before =
-                                Subst2 expr (shrinkMapping binding mapping)
+                        let
+                            before = Subst2 expr
+                                            (fv binding)
+                                            (shrinkMapping binding mapping)
                         return $ Expand before after
                     -- [subst-Const-not-defined]
                     Just Nothing -> return expr
@@ -233,14 +237,17 @@ instance Substitutable Expr where
                 <*> subst (alphaRenameMappings <> shrinkedMapping) body
                 <*> pure l
 
-        Subst{}           -> return expr
+        Subst{} -> return expr
 
 -- 
 -- ---------------------------------------------------------------[subst-Subst]
 --      Subst a mapping     ~[.../...]~>    Subst a mapping'
 -- 
-        Subst2 e mapping' -> return $ Subst2 e (mapping' <> mapping)
-
+        Subst2 e freeVars mapping' ->
+            let shinkedMapping = Map.restrictKeys
+                    (mapping' <> mapping)
+                    (Set.map nameToText freeVars)
+            in  return $ Subst2 e freeVars shinkedMapping
 -- 
 --      a                   ~[.../...]~>    a'
 --      b                   ~[.../...]~>    b'

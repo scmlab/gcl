@@ -31,13 +31,14 @@ tests = testGroup "Substitution" [letBindings]
 letBindings :: TestTree
 letBindings = testGroup
   "Expanding let-bindings"
-  [ run "let binding"                   "let-1.gcl"
-  , run "let binding with assignment 1" "let-2.gcl"
-  , run "let binding with assignment 2" "let-3.gcl"
-  , run "let binding with assignment and application" "let-4.gcl"
-  , run "fastmul"                       "subst-fastmul.gcl"
-  , run "Issue #41"                     "issue41.gcl"
-  , run "shrinking the mapping"         "shrink.gcl"
+  [   run "let binding"                   "let-1.gcl"
+    , run "let binding with assignment 1" "let-2.gcl"
+    , run "let binding with assignment 2" "let-3.gcl"
+    , run "let binding with assignment and application" "let-4.gcl"
+    , run "fastmul"                       "subst-fastmul.gcl"
+    , run "Issue #41"                     "issue41.gcl"
+    , run "shrinking the mapping 1"       "shrink.gcl"
+    , run "shrinking the mapping 2"       "issue51.gcl"
   ]
  where
   run :: String -> FilePath -> TestTree

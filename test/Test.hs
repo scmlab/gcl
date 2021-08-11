@@ -1,4 +1,3 @@
--- import qualified Test.Lexer as Lexer
 import qualified Test.Parser                   as Parser
 import qualified Test.Server                   as Server
 import qualified Test.SrcLoc                   as SrcLoc

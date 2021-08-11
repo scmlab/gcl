@@ -83,7 +83,7 @@ handleExpr _ (Subst before env after) = return $ substE
   isLam :: Expr -> Bool
   isLam Lam{} = True
   isLam _     = False
-handleExpr n (Subst2 expr mapping) =
+handleExpr n (Subst2 expr _ mapping) =
   return $ renderPrec n expr <+> render mapping
 handleExpr n (Expand before after) =
   return $ expandE (renderPrec n before) mempty (renderPrec n after)

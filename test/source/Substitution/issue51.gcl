@@ -1,0 +1,18 @@
+con N : Int { N ≥ 0 }
+con f : array [0..N) of Int 
+var s, r, n : Int
+
+{: sum i j = ⟨ Σ k : i ≤ k < j : f[k] ⟩ :}
+{: P n = (s = ⟨ ↑ i j : 0 ≤ i ≤ j ≤ n : sum i j ⟩) :} 
+{: Q n = (r = ⟨ ↑ i : 0 ≤ i ≤ n : sum i n ⟩) :}
+
+s, n := 0, 0
+{ P n ∧ Q n ∧ 0 ≤ n ≤ N , bnd: N - n }
+do n ≠ N ->  
+    r := (r + f[n]) ↑ 0
+    s := s ↑ r    
+    n := n + 1
+od
+
+{ s = ⟨ ↑ i j : 0 ≤ i ≤ j ≤ N : 
+          ⟨ + k : i ≤ k < j : f[k] ⟩ ⟩ }
