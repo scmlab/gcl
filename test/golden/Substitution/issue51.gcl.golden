@@ -8,8 +8,8 @@ Q n
     sum i n
       sum i n ===> ⟨ Σ k : i ≤ k < n : f[k] ⟩
         
-P [ s ↑ r / s ] (n + 1)
-  P [ s ↑ r / s ] (n + 1) ===> s ↑ ((r + f[n]) ↑ 0) = ⟨ ↑ ij : 0 ≤ i ≤ j ≤ n + 1 : sum i j ⟩
+P [ s ↑ r / s ] [ (r + f[n]) ↑ 0 / r ] (n + 1)
+  P [ s ↑ r / s ] [ (r + f[n]) ↑ 0 / r ] (n + 1) ===> s ↑ ((r + f[n]) ↑ 0) = ⟨ ↑ ij : 0 ≤ i ≤ j ≤ n + 1 : sum i j ⟩
     sum i j
       sum i j ===> ⟨ Σ k : i ≤ k < j : f[k] ⟩
         

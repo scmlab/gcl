@@ -245,9 +245,15 @@ instance Substitutable Expr where
 -- 
 
         -- apply new mappings on the outside instead of merging them (Issue #54)
-        Subst2 e freeVars mapping' ->
-            let shinkedMapping = Map.restrictKeys mapping (Set.map nameToText freeVars)
-            in  return $ Subst2 (Subst2 e freeVars mapping') freeVars shinkedMapping
+        -- NOTE: 
+        --      when shrinking the applied outer new mapping (`mapping` in this case)
+        --      free variables occured from the inner old mapping (`mapping'` in this case) 
+        --      should be taken into consideration 
+        Subst2 e freeVarsInE mapping' ->
+            let freeVarsInMapping' = fv mapping'    
+                freeVars = freeVarsInE <> freeVarsInMapping'
+                shrinkedMapping = Map.restrictKeys mapping (Set.map nameToText freeVars)
+            in  return $ Subst2 (Subst2 e freeVars mapping') freeVars shrinkedMapping
 -- 
 --      a                   ~[.../...]~>    a'
 --      b                   ~[.../...]~>    b'
