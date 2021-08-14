@@ -46,17 +46,21 @@ instance ToAbstract Declaration A.Declaration where
   toAbstract declaration = case declaration of
     ConstDecl _ decl -> do
       (name, body, prop) <- toAbstract decl
-      return $ A.ConstDecl name body prop (locOf decl)
+      return $ A.ConstDecl name body prop (locOf declaration)
     VarDecl _ decl -> do
       (name, body, prop) <- toAbstract decl
-      return $ A.VarDecl name body prop (locOf decl)
-    TypeDecl _ n ts _ constrs  -> A.TypeDecl n ts <$> toAbstract (fromSepBy constrs) <*> pure (locOf decl)
+      return $ A.VarDecl name body prop (locOf declaration)
+    TypeDecl _ tycon _ cons  ->
+        A.TypeDecl <$> toAbstract tycon <*> toAbstract (fromSepBy cons) <*> pure (locOf declaration)
 
 instance ToAbstract BlockDeclaration [A.Declaration] where
   toAbstract (BlockDeclaration _ decls _) = toAbstract decls
 
-instance ToAbstract Constructor A.Constructor where
-  toAbstract (Constructor c ts) = A.Constructor c <$> toAbstract ts
+instance ToAbstract QTyCon A.QTyCon where
+    toAbstract (QTyCon n ns) = pure $ A.QTyCon n ns
+
+instance ToAbstract QDCon A.QDCon where
+  toAbstract (QDCon c ts) = A.QDCon c <$> toAbstract ts
 
 instance ToAbstract Stmt A.Stmt where
   toAbstract stmt = case stmt of
@@ -149,6 +153,7 @@ instance ToAbstract Type A.Type where
       (TBase a) -> A.TBase <$> toAbstract a <*> pure (locOf t)
       (TArray _ a _ b) -> A.TArray <$> toAbstract a <*> toAbstract b <*> pure (locOf t)
       (TFunc a _ b) -> A.TFunc <$> toAbstract a <*> toAbstract b <*> pure (locOf t)
+      (TCon a) -> A.TCon <$> toAbstract a
       (TVar a) -> pure $ A.TVar a (locOf t)
       (TParen _ a _) -> do
         t' <- toAbstract a
@@ -156,6 +161,7 @@ instance ToAbstract Type A.Type where
           A.TBase a' _ -> pure$ A.TBase a' (locOf t)
           A.TArray a' b' _ -> pure $ A.TArray a' b' (locOf t)
           A.TFunc a' b' _ -> pure $ A.TFunc a' b' (locOf t)
+          A.TCon a' -> pure $ A.TCon a'
           A.TVar a' _ -> pure $ A.TVar a' (locOf t)
 
 --------------------------------------------------------------------------------

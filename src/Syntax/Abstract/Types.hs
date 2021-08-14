@@ -39,10 +39,11 @@ data Declaration
   = ConstDecl [Name] Type (Maybe Expr) Loc
   | VarDecl [Name] Type (Maybe Expr) Loc
   | LetDecl Name [Name] Expr Loc
-  | TypeDecl Name [Name] [Constructor] Loc
+  | TypeDecl QTyCon [QDCon] Loc
   deriving (Eq, Show)
 
-data Constructor = Constructor Name [Type] deriving (Eq, Show)
+data QTyCon = QTyCon Name [Name] deriving (Eq, Show, Generic)
+data QDCon = QDCon Name [Type] deriving (Eq, Show)
 
 --------------------------------------------------------------------------------
 
@@ -85,6 +86,7 @@ data Type
   = TBase TBase Loc
   | TArray Interval Type Loc
   | TFunc Type Type Loc
+  | TCon QTyCon
   | TVar Name Loc
   deriving (Eq, Show, Generic)
 

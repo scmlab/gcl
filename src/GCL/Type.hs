@@ -61,6 +61,7 @@ typeWithLoc :: Loc -> Type -> Type
 typeWithLoc l (TBase b _) = TBase b l
 typeWithLoc l (TArray i t _) = TArray i t l
 typeWithLoc l (TFunc t1 t2 _) = TFunc t1 t2 l
+typeWithLoc _ (TCon c) = TCon c
 typeWithLoc l (TVar n _) = TVar n l
 
 ------------------------------------------
@@ -192,6 +193,8 @@ inferDecl env (LetDecl n args expr _) = do
     Nothing -> do
       s <- inferExpr env expr'
       return $ Map.insert n s env
+-- TODO
+inferDecl env TypeDecl {} = return env
 
 lookupInferEnv :: Name -> Infer Type
 lookupInferEnv n = do
@@ -235,6 +238,8 @@ checkType env (TArray (Interval e1 e2 _) t _) = do
     getEndpointExpr (Including e) = e
     getEndpointExpr (Excluding e) = e
 checkType env (TFunc t1 t2 _) = checkType env t1 >> checkType env t2
+-- TODO:
+checkType _ (TCon _) = return ()
 checkType _ (TVar _ _) = return ()
 
 checkExpr :: Env Type -> Expr -> TM ()
@@ -323,6 +328,8 @@ checkIsVarAssign declarations (Assign ns _ _) =
         VarDecl n _ _ _ -> (n ++ vs, cs, ls)
         ConstDecl n _ _ _ -> (vs, n ++ cs, ls)
         LetDecl n _ _ _  -> (vs, cs, n : ls)
+        -- TODO
+        TypeDecl {}-> (vs, cs, ls)
 checkIsVarAssign _ _ = return ()
 
 checkProg :: Program -> TM ()

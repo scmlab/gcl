@@ -89,6 +89,9 @@ lexVar = symbol tokVar
 lexLet :: LexerF (Token tokLet)
 lexLet = symbol tokLet
 
+lexData :: LexerF (Token tokData)
+lexData = symbol tokData
+
 lexArray :: LexerF (Token tokArray)
 lexArray = symbol tokArray
 
@@ -173,12 +176,12 @@ lexProofEnd = symbol tokProofEnd
 
 
 -- expects someting like #3ab4bd33e7a32de7
--- the range coverts the whole thing, but the text includes only the alphanum part (that is, without prefix '#')  
+-- the range coverts the whole thing, but the text includes only the alphanum part (that is, without prefix '#')
 lexProofAnchor :: LexerF (Text, Range)
-lexProofAnchor = lexeme $ do 
-  _ <- char '#' 
+lexProofAnchor = lexeme $ do
+  _ <- char '#'
   hash <- many . satisfy $ isAlphaNum
-  return $ Text.pack hash 
+  return $ Text.pack hash
 
 lexBackSlash :: LexerF (Token tokBackSlash)
 lexBackSlash = symbol tokBackSlash
@@ -266,16 +269,16 @@ lexDiv = Div . locOf <$> symbol tokDiv
 lexMod :: LexerF ArithOp
 lexMod = Mod . locOf <$> symbol tokMod
 
-lexMax :: LexerF ArithOp  
+lexMax :: LexerF ArithOp
 lexMax = Max . locOf <$> symbol tokMax
 
-lexMin :: LexerF ArithOp  
+lexMin :: LexerF ArithOp
 lexMin = Min . locOf <$> symbol tokMin
 
-lexExp :: LexerF ArithOp  
+lexExp :: LexerF ArithOp
 lexExp = Exp . locOf <$> symbol tokExp
 
-lexSum :: LexerF ArithOp 
+lexSum :: LexerF ArithOp
 lexSum = Add . locOf <$> symbol tokSum
 
 lexPi :: LexerF ArithOp
@@ -287,50 +290,50 @@ lexForall = Conj . locOf <$> symbol tokForall
 lexExists :: LexerF ArithOp
 lexExists = Disj . locOf <$> symbol tokExists
 
-lexHash :: LexerF ArithOp 
+lexHash :: LexerF ArithOp
 lexHash = Hash . locOf <$> symbol tokHash
 
-lexChainOps :: LexerF ChainOp 
-lexChainOps = 
-  choice 
-    [ lexEQProp, 
+lexChainOps :: LexerF ChainOp
+lexChainOps =
+  choice
+    [ lexEQProp,
       lexEQPropU,
-      lexEQ, 
-      lexNEQ, 
-      lexNEQU, 
-      lexGT, 
-      lexGTE, 
+      lexEQ,
+      lexNEQ,
+      lexNEQU,
+      lexGT,
+      lexGTE,
       lexGTEU,
-      lexLT, 
-      lexLTE, 
+      lexLT,
+      lexLTE,
       lexLTEU
     ]
 
-lexArithOps :: LexerF ArithOp 
-lexArithOps = 
-  choice 
-    [ lexImpl, 
-      lexImplU, 
-      lexConj, 
-      lexConjU, 
-      lexDisj, 
+lexArithOps :: LexerF ArithOp
+lexArithOps =
+  choice
+    [ lexImpl,
+      lexImplU,
+      lexConj,
+      lexConjU,
+      lexDisj,
       lexDisjU,
-      lexNeg, 
-      lexNegU, 
-      lexAdd, 
-      lexSub, 
-      lexMul, 
-      lexDiv, 
+      lexNeg,
+      lexNegU,
+      lexAdd,
+      lexSub,
+      lexMul,
+      lexDiv,
       lexMod,
-      lexMax, 
+      lexMax,
       lexMin,
       lexExp,
-      lexSum, 
+      lexSum,
       lexPi,
-      lexForall, 
-      lexExists, 
+      lexForall,
+      lexExists,
       lexHash
-     
+
     ]
 
 lexOps :: LexerF Op

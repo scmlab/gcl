@@ -55,12 +55,13 @@ data Declaration
   = ConstDecl (Token "con") DeclType
   | VarDecl (Token "var") DeclType
   -- data T a1 a2 ... = K1 v1 v2 ... | K2 u1 u2 ...
-  | TypeDecl (Token "data") Name [Name] (Token "=") (SepBy "|" Constructor)
+  | TypeDecl (Token "data") QTyCon (Token "=") (SepBy "|" QDCon)
   deriving (Eq, Show)
 
 data BlockDeclaration = BlockDeclaration (Token "{:") [BlockDecl] (Token ":}") deriving (Eq, Show)
 
-data Constructor = Constructor Name [Type] deriving (Eq, Show)
+data QTyCon = QTyCon Name [Name] deriving (Eq, Show)
+data QDCon = QDCon Name [Type] deriving (Eq, Show)
 
 data Stmt
   = Skip Range
@@ -127,6 +128,7 @@ data Type
   | TBase TBase
   | TArray (Token "array") Interval (Token "of") Type
   | TFunc Type TokArrows Type
+  | TCon QTyCon
   | TVar Name
   deriving (Eq, Show)
 
