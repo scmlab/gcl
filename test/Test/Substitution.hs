@@ -127,12 +127,7 @@ instance ExtractExpand Expr where
              (extractExpand before)
              (extractExpand after)
       ]
-    Subst before _mapping after ->
-      [ EXPN (render before)
-             (render after)
-             (extractExpand before)
-             (extractExpand after)
-      ]
+    Subst x _ _ -> extractExpand x
     ArrIdx x y _   -> extractExpand x <> extractExpand y
     ArrUpd x y z _ -> extractExpand x <> extractExpand y <> extractExpand z
     _              -> []

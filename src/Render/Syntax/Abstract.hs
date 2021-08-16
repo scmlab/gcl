@@ -75,15 +75,7 @@ handleExpr _ (Quant op xs r t _) =
   renderQOp (Op (ArithOp (Mul   _))) = "Π"
   renderQOp (Op op'                ) = render op'
   renderQOp op'                      = render op'
-handleExpr _ (Subst before env after) = return $ substE
-  (render before)
-  (render env)
-  (if isLam after then parensE (render after) else render after)
- where
-  isLam :: Expr -> Bool
-  isLam Lam{} = True
-  isLam _     = False
-handleExpr n (Subst2 expr _ mapping) =
+handleExpr n (Subst expr _ mapping) =
   return $ renderPrec n expr <+> render mapping
 handleExpr n (Expand before after) =
   return $ expandE (renderPrec n before) mempty (renderPrec n after)

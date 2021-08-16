@@ -16,7 +16,7 @@ import Syntax.Common
 import Prelude hiding (Ordering (..))
 import GCL.Common
 import Control.Monad.State (StateT(..), evalStateT)
-import Syntax.Abstract.Util (bindingsToExpr, wrapLam)
+import Syntax.Abstract.Util (wrapLam)
 
 data TypeError
   = NotInScope Name Loc
@@ -133,12 +133,8 @@ infer (Quant qop iters rng t l) = do
       unify to (TFunc x (TFunc x x (locOf qop)) (locOf qop))
       unify tt x
       return x
-infer (Subst expr sub _) = do
-  t <- infer expr
-  s <- mapM infer (Map.map bindingsToExpr sub)
-  return $ subst s t
 infer (Expand _ after) = infer after
-infer (Subst2 expr _ _) = infer expr
+infer (Subst expr _ _) = infer expr
 infer (ArrIdx e1 e2 l) = do
   t1 <- infer e1
   let interval = case t1 of

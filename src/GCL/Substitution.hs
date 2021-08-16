@@ -129,7 +129,7 @@ instance Substitutable Expr where
                     Just (Just binding) -> do
                         after <- subst mapping binding
                         let
-                            before = Subst2 expr
+                            before = Subst expr
                                             (fv binding)
                                             (shrinkMapping binding mapping)
                         return $ Expand before after
@@ -162,7 +162,7 @@ instance Substitutable Expr where
                     Just (Just binding) -> do
                         after <- subst mapping binding
                         let
-                            before = Subst2 expr
+                            before = Subst expr
                                             (fv binding)
                                             (shrinkMapping binding mapping)
                         return $ Expand before after
@@ -237,8 +237,6 @@ instance Substitutable Expr where
                 <*> subst (alphaRenameMappings <> shrinkedMapping) body
                 <*> pure l
 
-        Subst{} -> return expr
-
 -- 
 -- ---------------------------------------------------------------[subst-Subst]
 --      Subst a mapping     ~[.../...]~>    Subst (Subst a mapping) mapping'
@@ -249,11 +247,11 @@ instance Substitutable Expr where
         --      when shrinking the applied outer new mapping (`mapping` in this case)
         --      free variables occured from the inner old mapping (`mapping'` in this case) 
         --      should be taken into consideration 
-        Subst2 e freeVarsInE mapping' ->
+        Subst e freeVarsInE mapping' ->
             let freeVarsInMapping' = fv mapping'    
                 freeVars = freeVarsInE <> freeVarsInMapping'
                 shrinkedMapping = Map.restrictKeys mapping (Set.map nameToText freeVars)
-            in  return $ Subst2 (Subst2 e freeVarsInE mapping') freeVars shrinkedMapping
+            in  return $ Subst (Subst e freeVarsInE mapping') freeVars shrinkedMapping
 -- 
 --      a                   ~[.../...]~>    a'
 --      b                   ~[.../...]~>    b'

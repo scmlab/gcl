@@ -83,8 +83,7 @@ instance Free A.Expr where
   fv (A.Lam x  e  _  ) = fv e \\ Set.singleton x
   fv (A.Quant op xs range term _) =
     (fv op <> fv range <> fv term) \\ Set.fromList xs
-  fv (A.Subst  _ _   after) = fv after
-  fv (A.Subst2 _ set _    ) = set
+  fv (A.Subst _ set _    ) = set
   fv (A.Expand _ after    ) = fv after
   fv (A.ArrIdx e1 e2 _    ) = fv e1 <> fv e2
   fv (A.ArrUpd e1 e2 e3 _ ) = fv e1 <> fv e2 <> fv e3

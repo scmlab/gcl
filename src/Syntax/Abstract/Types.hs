@@ -101,8 +101,7 @@ data Expr
   | App Expr Expr Loc
   | Lam Name Expr Loc
   | Quant Expr [Name] Expr Expr Loc
-  | Subst Expr Subst Expr
-  | Subst2 Expr -- expression to be substituted
+  | Subst Expr -- expression to be substituted
     (Set Name) -- free variables in that expression
                -- NOTE, the expression may be some definition like "P", 
               --  in that case, the free variables should be that of after it's been expanded
