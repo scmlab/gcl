@@ -253,7 +253,7 @@ instance Substitutable Expr where
             let freeVarsInMapping' = fv mapping'    
                 freeVars = freeVarsInE <> freeVarsInMapping'
                 shrinkedMapping = Map.restrictKeys mapping (Set.map nameToText freeVars)
-            in  return $ Subst2 (Subst2 e freeVars mapping') freeVars shrinkedMapping
+            in  return $ Subst2 (Subst2 e freeVarsInE mapping') freeVars shrinkedMapping
 -- 
 --      a                   ~[.../...]~>    a'
 --      b                   ~[.../...]~>    b'
