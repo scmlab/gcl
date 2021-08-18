@@ -67,3 +67,13 @@ instance Pretty TypeError where
       <+> "Declaration"
       <+> pretty n
       <+> "is a let binding, not a variable"
+  pretty (UndefinedType n _) =
+    "Undefined Type: "
+      <+> "Type"
+      <+> pretty n
+      <+> "is undefined"
+  pretty (DuplicatedType n _) =
+    "Duplicated Type: "
+      <+> "Type"
+      <+> pretty n
+      <+> "is duplicated"

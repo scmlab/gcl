@@ -1,7 +1,7 @@
 module Syntax.Abstract.Util where
 
 import Syntax.Abstract
-    ( Expr(Lam), GdCmd(..), Stmt, Declaration(..), QDCon (..), Bindings (..))
+    ( Expr(Lam), GdCmd(..), Stmt, Declaration(..), QDCon (..), Bindings (..), Type (..), QTyCon (..))
 import Syntax.Common (Name)
 import Data.Loc ((<-->))
 import Data.Map (Map)
@@ -19,6 +19,10 @@ extractLetBinding VarDecl {} = Nothing
 extractLetBinding (LetDecl name args expr _) = Just (name, wrapLam args expr)
 -- TODO:
 extractLetBinding TypeDecl {} = Nothing
+
+extractTypeDecls :: Declaration -> Maybe Type
+extractTypeDecls (TypeDecl (QTyCon n args) _ _) = Just (TCon (QTyCon n args))
+extractTypeDecls _ = Nothing
 
 getGuards :: [GdCmd] -> [Expr]
 getGuards = fst . unzipGdCmds

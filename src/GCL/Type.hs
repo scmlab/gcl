@@ -9,6 +9,7 @@ import Data.Aeson (ToJSON)
 import Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NE
 import Data.Loc
+import Data.Map (Map)
 import qualified Data.Map as Map
 import GHC.Generics (Generic)
 import Syntax.Abstract
@@ -28,6 +29,8 @@ data TypeError
   | TooManyExprsInAssigment (NonEmpty Expr) Loc
   | AssignToConst Name Loc
   | AssignToLet Name Loc
+  | UndefinedType Name Loc
+  | DuplicatedType Name Loc
   deriving (Show, Eq, Generic)
 
 instance ToJSON TypeError
@@ -42,12 +45,14 @@ instance Located TypeError where
   locOf (TooManyExprsInAssigment _ l) = l
   locOf (AssignToConst _ l) = l
   locOf (AssignToLet _ l) = l
+  locOf (UndefinedType _ l) = l
+  locOf (DuplicatedType _ l) = l
 
 ------------------------------------------
 -- type enviornment
 ------------------------------------------
 
-extend :: Env Type -> (Name, Type) -> TM (Env Type)
+extend :: Map Name Type -> (Name, Type) -> TM (Map Name Type)
 extend env (x, s) =
   case Map.lookup x env of
     Nothing -> return $ Map.insert x s env
@@ -68,7 +73,22 @@ typeWithLoc l (TVar n _) = TVar n l
 -- type inference
 ------------------------------------------
 
-type Infer = RWST (Env Type) [Constraint] FreshState (Except TypeError)
+data Enviornment = Enviornment {
+    localDecls :: Map Name Type,
+    localProps :: Map Name Expr,
+    typeDecls :: Map Name Type,
+    localContext :: Map Name Expr
+} deriving (Eq, Show)
+
+instance Semigroup Enviornment where
+    (Enviornment lds1 lps1 tds1 lctx1) <> (Enviornment lds2 lps2 tds2 lctx2) =
+        Enviornment (lds1 <> lds2) (lps1 <> lps2) (tds1 <> tds2) (lctx1 <> lctx2)
+
+instance Monoid Enviornment where
+    mempty = Enviornment mempty mempty mempty mempty
+
+
+type Infer = RWST Enviornment [Constraint] FreshState (Except TypeError)
 type TM = StateT FreshState (Except TypeError)
 
 
@@ -83,7 +103,9 @@ unify x y = tell [(x, y)]
 
 inferInEnv :: [(Name, Type)] -> Infer Type -> Infer Type
 inferInEnv l m = do
-  let scope = Map.union (Map.fromList l)
+  --Enviornment{localDecls, typeDecls} <- ask
+  let scope = \(Enviornment lds lps tds lctx) ->
+                Enviornment (Map.union (Map.fromList l) lds) lps tds lctx
   local scope m
 
 infer :: Expr -> Infer Type
@@ -165,36 +187,45 @@ emptyInterval :: Interval
 emptyInterval = Interval (Including zero) (Excluding zero) NoLoc
   where zero = Lit (Num 0) NoLoc
 
-runInfer :: Env Type -> Infer Type -> TM Type
+runInfer :: Enviornment -> Infer Type -> TM Type
 runInfer env m = do
   (t, cs) <- toEvalStateT env m
   s <- solveConstraints cs
   return $ subst s t
 
-inferExpr :: Env Type -> Expr -> TM Type
+inferExpr :: Enviornment -> Expr -> TM Type
 inferExpr env = runInfer env . infer
 
-inferDecl' :: Env Type -> [Name] -> Type -> Maybe Expr -> TM (Env Type)
-inferDecl' env ns t p = do
-  checkType env t
-  env' <- foldM f env ns
-  forM_ p (checkPredicate env')
-  return env'
-  where
-    f env' n = env' `extend` (n, t)
+typeDeclToEnv :: Declaration -> TM Enviornment
+typeDeclToEnv (TypeDecl qty@(QTyCon n _) qdcons _) = do
+    ds <- foldM (\ds' (QDCon cn ts) -> ds' `extend` (cn, wrapQDCon cn ts)) mempty qdcons
+    return $ Enviornment ds mempty (Map.singleton n (TCon qty)) mempty
+    where
+        wrapQDCon _ [] = TCon qty
+        wrapQDCon cn (t:ts) = TFunc t (wrapQDCon cn ts) (cn <--> (t:ts))
+typeDeclToEnv _ = return mempty
 
-inferDecl :: Env Type -> Declaration -> TM (Env Type)
-inferDecl env (ConstDecl ns t p _) = inferDecl' env ns t p
-inferDecl env (VarDecl ns t p _) = inferDecl' env ns t p
-inferDecl env (LetDecl n args expr _) = do
-  let expr' = wrapLam args expr
-  case Map.lookup n env of
-    Just t -> checkIsType env expr' t >> return env
-    Nothing -> do
-      s <- inferExpr env expr'
-      return $ Map.insert n s env
--- TODO
-inferDecl env TypeDecl {} = return env
+declsToEnv :: Enviornment -> Declaration -> TM Enviornment
+declsToEnv env (ConstDecl ns t p _) = do
+   --forM_ p (checkPredicate (Enviornment ldecls mempty mempty))
+   foldM f env ns
+   where
+    f (Enviornment lds lps tds lctx) n = do
+        lds' <- lds `extend` (n, t)
+        let lps' = foldMap (\p' -> Map.insert n p' lps) p
+        return $ Enviornment lds' lps' tds lctx
+declsToEnv env (VarDecl ns t p _) = do
+   --forM_ p (checkPredicate (Enviornment ldecls mempty mempty))
+   foldM f env ns
+   where
+    f (Enviornment lds lps tds lctx) n = do
+        lds' <- lds `extend` (n, t)
+        let lps' = foldMap (\p' -> Map.insert n p' lps) p
+        return $ Enviornment lds' lps' tds lctx
+declsToEnv (Enviornment lds lps tds lctx) (LetDecl n args expr _) = do
+    let expr' = wrapLam args expr
+    return $ Enviornment lds lps tds (Map.insert n expr' lctx)
+declsToEnv env _ = return env
 
 lookupInferEnv :: Name -> Infer Type
 lookupInferEnv n = do
@@ -202,7 +233,7 @@ lookupInferEnv n = do
   maybe
     (throwError $ NotInScope n (locOf n))
     (return . typeWithLoc (locOf n))
-    (Map.lookup n env)
+    (Map.lookup n (localDecls env))
 
 freshVar :: Loc -> Infer Type
 freshVar l = do
@@ -212,23 +243,23 @@ freshVar l = do
 -- type check
 ------------------------------------------
 
-checkAssign :: Env Type -> (Name, Expr) -> TM ()
+checkAssign :: Enviornment -> (Name, Expr) -> TM ()
 checkAssign env (n, expr) =
-  case Map.lookup n env of
+  case Map.lookup n (localDecls env) of
     Nothing -> throwError $ NotInScope n (locOf n)
     Just t -> do
       checkIsType env expr t
 
-checkIsType :: Env Type -> Expr -> Type -> TM ()
+checkIsType :: Enviornment -> Expr -> Type -> TM ()
 checkIsType env expr t = do
   eType <- inferExpr env expr
   void $ solveConstraints [(eType, t)]
 
-checkPredicate :: Env Type -> Expr -> TM ()
+checkPredicate :: Enviornment -> Expr -> TM ()
 checkPredicate env p =
   checkIsType env p (TBase TBool NoLoc)
 
-checkType :: Env Type -> Type -> TM ()
+checkType :: Enviornment -> Type -> TM ()
 checkType _ (TBase _ _) = return ()
 checkType env (TArray (Interval e1 e2 _) t _) = do
   checkIsType env (getEndpointExpr e1) (TBase TInt NoLoc)
@@ -238,19 +269,22 @@ checkType env (TArray (Interval e1 e2 _) t _) = do
     getEndpointExpr (Including e) = e
     getEndpointExpr (Excluding e) = e
 checkType env (TFunc t1 t2 _) = checkType env t1 >> checkType env t2
--- TODO:
-checkType _ (TCon _) = return ()
+checkType env t@(TCon (QTyCon n _)) = do
+  maybe
+    (throwError $ UndefinedType n (locOf t))
+    (\_ -> return ())
+    (Map.lookup n (typeDecls env))
 checkType _ (TVar _ _) = return ()
 
-checkExpr :: Env Type -> Expr -> TM ()
+checkExpr :: Enviornment -> Expr -> TM ()
 checkExpr env expr = void $ inferExpr env expr
 
-checkGdCmd :: Env Type -> GdCmd -> TM ()
+checkGdCmd :: Enviornment -> GdCmd -> TM ()
 checkGdCmd env (GdCmd expr stmts _) = do
   checkPredicate env expr
   mapM_ (checkStmt env) stmts
 
-checkStmt :: Env Type -> Stmt -> TM ()
+checkStmt :: Enviornment -> Stmt -> TM ()
 checkStmt _ (Skip _) = return ()
 checkStmt _ (Abort _) = return ()
 checkStmt env (Assign ns es loc) -- NOTE : Not sure if Assign work this way
@@ -284,13 +318,13 @@ checkStmt env (If gdcmds _) = mapM_ (checkGdCmd env) gdcmds
 checkStmt _ (Spec _ _) = return ()
 checkStmt _ (Proof _ _) = return ()
 checkStmt env (Alloc x es l) =
-  case Map.lookup x env of
+  case Map.lookup x (localDecls env) of
     Nothing -> throwError $ NotInScope x (locOf x)
     Just (TBase TInt _) ->
       mapM_ (\e -> checkIsType env e (tInt NoLoc)) es
     Just t -> throwError (UnifyFailed t (tInt NoLoc) l)
 checkStmt env (HLookup x e l) =
-  case Map.lookup x env of
+  case Map.lookup x (localDecls env) of
     Nothing -> throwError $ NotInScope x (locOf x)
     Just (TBase TInt _) ->
       checkIsType env e (tInt NoLoc)
@@ -300,17 +334,6 @@ checkStmt env (HMutate e1 e2 _) = do
   checkIsType env e2 (tInt NoLoc)
 checkStmt env (Dispose e _) =
   checkIsType env e (tInt NoLoc)
-
--- declsMap :: [Declaration] -> Map Name (Either Type Expr)
--- declsMap [] = mempty
--- declsMap (ConstDecl ns t _ _ : decls) =
---   foldl (\m n -> Map.insert n (Left t) m) (declsMap decls) ns
--- declsMap (VarDecl ns t _ _ : decls) =
---   foldl (\m n -> Map.insert n (Left t) m) (declsMap decls) ns
--- declsMap (LetDecl n xs body _ : decls) =
---   Map.insert n (Right expr') (declsMap decls)
---   where
---     expr' = foldr (\x b -> Lam x b (b <--> locOf x)) body xs
 
 -- NOTE : should this be check here?
 checkIsVarAssign :: [Declaration] -> Stmt -> TM ()
@@ -332,10 +355,31 @@ checkIsVarAssign declarations (Assign ns _ _) =
         TypeDecl {}-> (vs, cs, ls)
 checkIsVarAssign _ _ = return ()
 
+checkEnviornment :: Enviornment -> TM ()
+checkEnviornment env@(Enviornment lds lps tds lctx) = do
+    -- infer types of local context and add to enviornment
+    env' <- Map.foldlWithKey (\envM n expr -> envM >>=
+                    (\env' -> do
+                        (eType, cs) <- toEvalStateT env' (infer expr)
+                        subs <- solveConstraints cs
+                        let lds' = Map.map (subst subs) (Map.insert n eType (localDecls env'))
+                        return $ env'{localDecls=lds'}
+        )) (pure env) lctx
+
+    -- check local declaration type
+    mapM_ (checkType env') lds
+
+    -- check if local property is predicate
+    mapM_ (checkPredicate env') lps
+
+    -- TODO: check type declaration
+
+
 checkProg :: Program -> TM ()
 checkProg (Program decls exprs defs stmts _) = do
   mapM_ (checkIsVarAssign decls) stmts
-  env <- foldM inferDecl emptyEnv decls
+  env <- mapM typeDeclToEnv decls >>= (\env -> foldM declsToEnv env decls) . foldl (<>) mempty
+  checkEnviornment env
   mapM_ (checkExpr env) exprs
   mapM_ (checkAssign env) (Map.toList defs)
   mapM_ (checkStmt env) stmts
