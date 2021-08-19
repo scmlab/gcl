@@ -4,6 +4,12 @@
 
 Prebuilt binaries should come with [the VS Code Extension](https://marketplace.visualstudio.com/items?itemName=scmlab.guacamole). There's no need of building this project from source unless you are using platforms other than *Windows*, *macOS*, or *Ubuntu*.
 
+### Update prebuilt binary
+
+The VS Code extension will automatically download the latest prebuilt binary from GitHub when a new release is available. 
+However, the extension would only checkout the latest release once every 24hrs (to prevent GitHub from hating us).
+If you know there's a new release on GitHub and you can't wait that long, please execute `Guabao: Force check update` in the VS Code command palette.
+
 ### Build from source
 
 
