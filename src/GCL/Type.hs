@@ -1,6 +1,8 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleContexts #-}
+
 module GCL.Type where
 
 import Control.Monad.Except
@@ -11,6 +13,7 @@ import qualified Data.List.NonEmpty as NE
 import Data.Loc
 import Data.Map (Map)
 import qualified Data.Map as Map
+import qualified Data.Set as Set
 import GHC.Generics (Generic)
 import Syntax.Abstract
 import Syntax.Common
@@ -52,11 +55,12 @@ instance Located TypeError where
 -- type enviornment
 ------------------------------------------
 
+-- TODO: loc handle or not ?
 extend :: Map Name Type -> (Name, Type) -> TM (Map Name Type)
 extend env (x, s) =
   case Map.lookup x env of
     Nothing -> return $ Map.insert x s env
-    Just t -> throwError $ RecursiveType x t (locOf t)
+    Just _ -> throwError $ DuplicatedType x (locOf x)
 
 ------------------------------------------
 -- Substitution
@@ -76,7 +80,7 @@ typeWithLoc l (TVar n _) = TVar n l
 data Enviornment = Enviornment {
     localDecls :: Map Name Type,
     localProps :: Map Name Expr,
-    typeDecls :: Map Name Type,
+    typeDecls :: Map Name (QTyCon, [QDCon]),
     localContext :: Map Name Expr
 } deriving (Eq, Show)
 
@@ -187,19 +191,22 @@ emptyInterval :: Interval
 emptyInterval = Interval (Including zero) (Excluding zero) NoLoc
   where zero = Lit (Num 0) NoLoc
 
-runInfer :: Enviornment -> Infer Type -> TM Type
+runInfer :: Enviornment -> Infer Type -> TM (Type, Subs Type)
 runInfer env m = do
   (t, cs) <- toEvalStateT env m
   s <- solveConstraints cs
-  return $ subst s t
+  return (subst s t, s)
+
+inferExpr' :: Enviornment -> Expr -> TM (Type, Subs Type)
+inferExpr' env = runInfer env . infer
 
 inferExpr :: Enviornment -> Expr -> TM Type
-inferExpr env = runInfer env . infer
+inferExpr = curry (fmap fst . uncurry inferExpr')
 
 typeDeclToEnv :: Declaration -> TM Enviornment
 typeDeclToEnv (TypeDecl qty@(QTyCon n _) qdcons _) = do
     ds <- foldM (\ds' (QDCon cn ts) -> ds' `extend` (cn, wrapQDCon cn ts)) mempty qdcons
-    return $ Enviornment ds mempty (Map.singleton n (TCon qty)) mempty
+    return $ Enviornment ds mempty (Map.singleton n (qty, qdcons)) mempty
     where
         wrapQDCon _ [] = TCon qty
         wrapQDCon cn (t:ts) = TFunc t (wrapQDCon cn ts) (cn <--> (t:ts))
@@ -253,7 +260,7 @@ checkAssign env (n, expr) =
 checkIsType :: Enviornment -> Expr -> Type -> TM ()
 checkIsType env expr t = do
   eType <- inferExpr env expr
-  void $ solveConstraints [(eType, t)]
+  void $ unifies eType t
 
 checkPredicate :: Enviornment -> Expr -> TM ()
 checkPredicate env p =
@@ -355,25 +362,32 @@ checkIsVarAssign declarations (Assign ns _ _) =
         TypeDecl {}-> (vs, cs, ls)
 checkIsVarAssign _ _ = return ()
 
+checkTypeDecl :: QTyCon -> QDCon -> TM ()
+checkTypeDecl (QTyCon _ args) (QDCon _ ts) = do
+    forM_ (fv ts) (\n ->
+        if n `Set.member` Set.fromList args
+        then return ()
+        else throwError $ NotInScope n (locOf n))
+
 checkEnviornment :: Enviornment -> TM ()
 checkEnviornment env@(Enviornment lds lps tds lctx) = do
-    -- infer types of local context and add to enviornment
-    env' <- Map.foldlWithKey (\envM n expr -> envM >>=
-                    (\env' -> do
-                        (eType, cs) <- toEvalStateT env' (infer expr)
-                        subs <- solveConstraints cs
-                        let lds' = Map.map (subst subs) (Map.insert n eType (localDecls env'))
-                        return $ env'{localDecls=lds'}
-        )) (pure env) lctx
+    -- infer types of local context and add to the local declaration of the enviornment
+    env' <- Map.foldlWithKey (\envM n expr -> do
+                    env' <- envM
+                    (eType, subs) <- inferExpr' env' expr
+
+                    let lds' = Map.map (subst subs) (Map.insert n eType (localDecls env'))
+                    return $ env'{localDecls=lds'}
+            ) (pure env) lctx
+
+    -- check type declarations
+    forM_ tds (uncurry (mapM_ . checkTypeDecl))
 
     -- check local declaration type
     mapM_ (checkType env') lds
 
     -- check if local property is predicate
     mapM_ (checkPredicate env') lps
-
-    -- TODO: check type declaration
-
 
 checkProg :: Program -> TM ()
 checkProg (Program decls exprs defs stmts _) = do
