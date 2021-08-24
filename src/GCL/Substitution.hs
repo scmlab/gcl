@@ -24,7 +24,6 @@ import           Syntax.Abstract                ( Expr(..)
 import           Syntax.Common                  ( Name(Name)
                                                 , nameToText
                                                 )
-
 ------------------------------------------------------------------
 
 run
@@ -35,7 +34,7 @@ run
     -> a
     -> a
 run scope names exprs predicate = fst
-    $ evalRWS (subst mapping predicate) scope 0
+    $ evalRWS (subst mapping predicate >>= reduce) scope 0
   where
     mapping :: Mapping
     mapping = mappingFromSubstitution names exprs
@@ -74,28 +73,37 @@ instance Fresh M where
 --      other constructs        ~~~~~~~~~~~>    other constructs
 -- 
 
--- perform substitution when there's a redex
-reduce :: Expr -> M Expr
-reduce expr = case expr of
-    App f x l1 -> case f of
-        -- [reduce-App-Expand-Lam]
-        Expand before (Lam n body l2) ->
-            Expand <$> reduce (App before x l1) <*> reduce
-                (App (Lam n body l2) x l1)
-        -- [reduce-App-Lam]
-        Lam n body _ -> subst (mappingFromSubstitution [n] [x]) body
-        -- [Others]
-        _            -> return expr
-    -- [Others]
-
-    _ -> return expr
-
 ------------------------------------------------------------------
 
 class Substitutable a where
     subst :: Mapping -> a -> M a
+    reduce :: a -> M a
 
 instance Substitutable Expr where
+
+    -- perform substitution when there's a redex
+    reduce expr = case expr of
+        App f x l1 -> do 
+            f' <- reduce f
+            x' <- reduce x
+            case f' of 
+                -- [reduce-App-Expand-Lam]
+                Expand before (Lam n body l2) ->
+                    Expand <$> reduce (App before x' l1) <*> reduce
+                        (App (Lam n body l2) x' l1)
+                -- [reduce-App-Lam]
+                Lam n body _ -> subst (mappingFromSubstitution [n] [x']) body
+                -- [Others]
+                _            -> return $ App f' x' l1
+        Chain a op b l -> Chain <$> reduce a <*> return op <*> reduce b <*> return l
+        Lam binder body l -> Lam binder <$> reduce body <*> return l
+        Quant op binders range body l -> Quant op binders range <$> reduce body <*> return l
+        Subst e freeVarsInE mapping -> Subst <$> reduce e <*> return freeVarsInE <*> return mapping
+        Expand before after -> Expand <$> reduce before <*> reduce after
+        ArrIdx array index l -> ArrIdx <$> reduce array <*> reduce index <*> pure l
+        ArrUpd array index value l -> ArrUpd <$> reduce array <*> reduce index <*> reduce value <*> pure l
+        _ -> return expr 
+
     subst mapping expr = case expr of
 
 -- 
@@ -121,7 +129,7 @@ instance Substitutable Expr where
 --      Var x               ~[.../...]~>    Var x
 -- 
         Var name _ -> case Map.lookup (nameToText name) mapping of
-            Just value -> reduce value -- [subst-Var-substituted]
+            Just value -> return value -- [subst-Var-substituted]
             Nothing    -> do
                 scope <- ask
                 case Map.lookup (nameToText name) scope of
@@ -192,8 +200,7 @@ instance Substitutable Expr where
 -- ---------------------------------------------------------------[subst-App]
 --      f  x                ~[.../...]~>    y
 -- 
-        App f x l ->
-            reduce =<< App <$> subst mapping f <*> subst mapping x <*> pure l
+        App f x l -> App <$> subst mapping f <*> subst mapping x <*> pure l
 
 -- 
 --      n                   ~~~rename~~>    n'
@@ -248,7 +255,7 @@ instance Substitutable Expr where
         --      free variables occured from the inner old mapping (`mapping'` in this case) 
         --      should be taken into consideration 
         Subst e freeVarsInE mapping' ->
-            let freeVarsInMapping' = fv mapping'    
+            let freeVarsInMapping' = fv mapping'
                 freeVars = freeVarsInE <> freeVarsInMapping'
                 shrinkedMapping = Map.restrictKeys mapping (Set.map nameToText freeVars)
             in  return $ Subst (Subst e freeVarsInE mapping') freeVars shrinkedMapping
@@ -285,6 +292,18 @@ instance Substitutable Expr where
                 <*> pure l
 
 instance Substitutable Pred where
+    reduce = \case
+        Constant a    -> Constant <$> reduce a
+        GuardIf   a l -> GuardIf <$> reduce a <*> pure l
+        GuardLoop a l -> GuardLoop <$> reduce a <*> pure l
+        Assertion a l -> Assertion <$> reduce a <*> pure l
+        LoopInvariant a b l ->
+            LoopInvariant <$> reduce a <*> reduce b <*> pure l
+        Bound a l   -> Bound <$> reduce a <*> pure l
+        Conjunct as -> Conjunct <$> mapM reduce as
+        Disjunct as -> Disjunct <$> mapM reduce as
+        Negate   a  -> Negate <$> reduce a
+
     subst mapping = \case
         Constant a    -> Constant <$> subst mapping a
         GuardIf   a l -> GuardIf <$> subst mapping a <*> pure l

@@ -14,7 +14,7 @@ main = defaultMain tests
 
 tests :: TestTree
 tests = testGroup
-    "Tests"
+    "Tests" 
     [ Parser.tests
     , Substitution.tests
     , WP.tests
