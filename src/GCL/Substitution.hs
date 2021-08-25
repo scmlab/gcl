@@ -27,7 +27,7 @@ import           Syntax.Common                  ( Name(Name)
 ------------------------------------------------------------------
 
 run
-    :: (Substitutable a)
+    :: (Substitutable a, Reducible a)
     => Scope -- declarations
     -> [Name] -- name of variables to be substituted
     -> [Expr] -- values to be substituted for  
@@ -73,20 +73,16 @@ instance Fresh M where
 --      other constructs        ~~~~~~~~~~~>    other constructs
 -- 
 
-------------------------------------------------------------------
-
-class Substitutable a where
-    subst :: Mapping -> a -> M a
+class Reducible a where
     reduce :: a -> M a
 
-instance Substitutable Expr where
-
+instance Reducible Expr where
     -- perform substitution when there's a redex
     reduce expr = case expr of
-        App f x l1 -> do 
+        App f x l1 -> do
             f' <- reduce f
             x' <- reduce x
-            case f' of 
+            case f' of
                 -- [reduce-App-Expand-Lam]
                 Expand before (Lam n body l2) ->
                     Expand <$> reduce (App before x' l1) <*> reduce
@@ -95,14 +91,39 @@ instance Substitutable Expr where
                 Lam n body _ -> subst (mappingFromSubstitution [n] [x']) body
                 -- [Others]
                 _            -> return $ App f' x' l1
-        Chain a op b l -> Chain <$> reduce a <*> return op <*> reduce b <*> return l
+        Chain a op b l ->
+            Chain <$> reduce a <*> return op <*> reduce b <*> return l
         Lam binder body l -> Lam binder <$> reduce body <*> return l
-        Quant op binders range body l -> Quant op binders range <$> reduce body <*> return l
-        Subst e freeVarsInE mapping -> Subst <$> reduce e <*> return freeVarsInE <*> return mapping
+        Quant op binders range body l ->
+            Quant op binders range <$> reduce body <*> return l
+        Subst e freeVarsInE mapping ->
+            Subst <$> reduce e <*> return freeVarsInE <*> return mapping
         Expand before after -> Expand <$> reduce before <*> reduce after
-        ArrIdx array index l -> ArrIdx <$> reduce array <*> reduce index <*> pure l
-        ArrUpd array index value l -> ArrUpd <$> reduce array <*> reduce index <*> reduce value <*> pure l
-        _ -> return expr 
+        ArrIdx array index l ->
+            ArrIdx <$> reduce array <*> reduce index <*> pure l
+        ArrUpd array index value l ->
+            ArrUpd <$> reduce array <*> reduce index <*> reduce value <*> pure l
+        _ -> return expr
+
+instance Reducible Pred where
+    reduce = \case
+        Constant a    -> Constant <$> reduce a
+        GuardIf   a l -> GuardIf <$> reduce a <*> pure l
+        GuardLoop a l -> GuardLoop <$> reduce a <*> pure l
+        Assertion a l -> Assertion <$> reduce a <*> pure l
+        LoopInvariant a b l ->
+            LoopInvariant <$> reduce a <*> reduce b <*> pure l
+        Bound a l   -> Bound <$> reduce a <*> pure l
+        Conjunct as -> Conjunct <$> mapM reduce as
+        Disjunct as -> Disjunct <$> mapM reduce as
+        Negate   a  -> Negate <$> reduce a
+
+------------------------------------------------------------------
+
+class Substitutable a where
+    subst :: Mapping -> a -> M a
+
+instance Substitutable Expr where
 
     subst mapping expr = case expr of
 
@@ -138,8 +159,8 @@ instance Substitutable Expr where
                         after <- subst mapping binding
                         let
                             before = Subst expr
-                                            (fv binding)
-                                            (shrinkMapping binding mapping)
+                                           (fv binding)
+                                           (shrinkMapping binding mapping)
                         return $ Expand before after
                     -- [subst-Var-defined]
                     Just Nothing -> return expr
@@ -171,8 +192,8 @@ instance Substitutable Expr where
                         after <- subst mapping binding
                         let
                             before = Subst expr
-                                            (fv binding)
-                                            (shrinkMapping binding mapping)
+                                           (fv binding)
+                                           (shrinkMapping binding mapping)
                         return $ Expand before after
                     -- [subst-Const-not-defined]
                     Just Nothing -> return expr
@@ -255,10 +276,15 @@ instance Substitutable Expr where
         --      free variables occured from the inner old mapping (`mapping'` in this case) 
         --      should be taken into consideration 
         Subst e freeVarsInE mapping' ->
-            let freeVarsInMapping' = fv mapping'
-                freeVars = freeVarsInE <> freeVarsInMapping'
-                shrinkedMapping = Map.restrictKeys mapping (Set.map nameToText freeVars)
-            in  return $ Subst (Subst e freeVarsInE mapping') freeVars shrinkedMapping
+            let
+                freeVarsInMapping' = fv mapping'
+                freeVars           = freeVarsInE <> freeVarsInMapping'
+                shrinkedMapping =
+                    Map.restrictKeys mapping (Set.map nameToText freeVars)
+            in
+                return $ Subst (Subst e freeVarsInE mapping')
+                               freeVars
+                               shrinkedMapping
 -- 
 --      a                   ~[.../...]~>    a'
 --      b                   ~[.../...]~>    b'
@@ -291,19 +317,8 @@ instance Substitutable Expr where
                 <*> subst mapping value
                 <*> pure l
 
-instance Substitutable Pred where
-    reduce = \case
-        Constant a    -> Constant <$> reduce a
-        GuardIf   a l -> GuardIf <$> reduce a <*> pure l
-        GuardLoop a l -> GuardLoop <$> reduce a <*> pure l
-        Assertion a l -> Assertion <$> reduce a <*> pure l
-        LoopInvariant a b l ->
-            LoopInvariant <$> reduce a <*> reduce b <*> pure l
-        Bound a l   -> Bound <$> reduce a <*> pure l
-        Conjunct as -> Conjunct <$> mapM reduce as
-        Disjunct as -> Disjunct <$> mapM reduce as
-        Negate   a  -> Negate <$> reduce a
 
+instance Substitutable Pred where
     subst mapping = \case
         Constant a    -> Constant <$> subst mapping a
         GuardIf   a l -> GuardIf <$> subst mapping a <*> pure l
