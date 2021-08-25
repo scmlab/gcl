@@ -50,7 +50,7 @@ extractDeclaration :: Declaration -> Map Name (Maybe Expr)
 extractDeclaration (ConstDecl ns _ _ _) = Map.fromList (zip ns (repeat Nothing))
 extractDeclaration (VarDecl ns _ _ _) = Map.fromList (zip ns (repeat Nothing))
 extractDeclaration (LetDecl n args body _) = Map.singleton n (Just (wrapLam args body))
--- TODO : extract type constructor to env
+-- extract type constructor to env
 extractDeclaration (TypeDecl _ cons _) = Map.fromList $ map (\(QDCon n _) -> (n, Nothing)) cons
 
 extractDeclarations :: [Declaration] -> Map Name (Maybe Expr)

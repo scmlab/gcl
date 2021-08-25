@@ -2,7 +2,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
 module Pretty.Util
-  ( 
+  (
     docToText, toText,
     docToByteString, toByteString,
     docToString, toString,
@@ -136,6 +136,8 @@ instance (Pretty a, Pretty b) => Pretty (Either a b) where
   pretty (Left x) = pretty x
   pretty (Right x) = pretty x
 
+instance PrettyWithLoc a => PrettyWithLoc [a] where
+  prettyWithLoc = mconcat . map prettyWithLoc
 --------------------------------------------------------------------------------
 
 -- datatype for printing a list of items vertically without delimiters and enclosings

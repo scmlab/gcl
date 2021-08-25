@@ -33,7 +33,7 @@ data TypeError
   | AssignToConst Name Loc
   | AssignToLet Name Loc
   | UndefinedType Name Loc
-  | DuplicatedType Name Loc
+  | DuplicatedIdentifier Name Loc
   deriving (Show, Eq, Generic)
 
 instance ToJSON TypeError
@@ -49,18 +49,18 @@ instance Located TypeError where
   locOf (AssignToConst _ l) = l
   locOf (AssignToLet _ l) = l
   locOf (UndefinedType _ l) = l
-  locOf (DuplicatedType _ l) = l
+  locOf (DuplicatedIdentifier _ l) = l
 
 ------------------------------------------
 -- type enviornment
 ------------------------------------------
 
 -- TODO: loc handle or not ?
-extend :: Map Name Type -> (Name, Type) -> TM (Map Name Type)
+extend :: Map Name a -> (Name, a) -> TM (Map Name a)
 extend env (x, s) =
   case Map.lookup x env of
     Nothing -> return $ Map.insert x s env
-    Just _ -> throwError $ DuplicatedType x (locOf x)
+    Just _ -> throwError $ DuplicatedIdentifier x (locOf x)
 
 ------------------------------------------
 -- Substitution
@@ -91,10 +91,8 @@ instance Semigroup Enviornment where
 instance Monoid Enviornment where
     mempty = Enviornment mempty mempty mempty mempty
 
-
 type Infer = RWST Enviornment [Constraint] FreshState (Except TypeError)
 type TM = StateT FreshState (Except TypeError)
-
 
 instance Fresh Infer where
   fresh = do
@@ -362,13 +360,6 @@ checkIsVarAssign declarations (Assign ns _ _) =
         TypeDecl {}-> (vs, cs, ls)
 checkIsVarAssign _ _ = return ()
 
-checkTypeDecl :: QTyCon -> QDCon -> TM ()
-checkTypeDecl (QTyCon _ args) (QDCon _ ts) = do
-    forM_ (fv ts) (\n ->
-        if n `Set.member` Set.fromList args
-        then return ()
-        else throwError $ NotInScope n (locOf n))
-
 checkEnviornment :: Enviornment -> TM ()
 checkEnviornment env@(Enviornment lds lps tds lctx) = do
     -- infer types of local context and add to the local declaration of the enviornment
@@ -381,13 +372,29 @@ checkEnviornment env@(Enviornment lds lps tds lctx) = do
             ) (pure env) lctx
 
     -- check type declarations
-    forM_ tds (uncurry (mapM_ . checkTypeDecl))
+    forM_ tds checkTypeDecl
 
     -- check local declaration type
     mapM_ (checkType env') lds
 
     -- check if local property is predicate
     mapM_ (checkPredicate env') lps
+    where
+        checkTypeDecl (qty@(QTyCon _ args), qdcons) = do
+            checkQTyConArg args
+            mapM_ (checkQDCon qty) qdcons
+
+        checkQTyConArg [] = return ()
+        checkQTyConArg (x : xs) =
+            if x `elem` xs
+            then throwError $ DuplicatedIdentifier x (locOf x)
+            else checkQTyConArg xs
+
+        checkQDCon (QTyCon _ args) (QDCon _ ts) = do
+            forM_ (fv ts) (\n ->
+                if n `Set.member` Set.fromList args
+                then return ()
+                else throwError $ NotInScope n (locOf n))
 
 checkProg :: Program -> TM ()
 checkProg (Program decls exprs defs stmts _) = do

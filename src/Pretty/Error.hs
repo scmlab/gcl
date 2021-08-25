@@ -72,8 +72,8 @@ instance Pretty TypeError where
       <+> "Type"
       <+> pretty n
       <+> "is undefined"
-  pretty (DuplicatedType n _) =
-    "Duplicated Type: "
-      <+> "Type"
+  pretty (DuplicatedIdentifier n _) =
+    "Duplicated Identifier: "
+      <+> "Identifier"
       <+> pretty n
       <+> "is duplicated"

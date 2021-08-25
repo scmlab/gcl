@@ -81,6 +81,22 @@ instance RenderSection TypeError where
     <+> render n
     <+> "is a let binding, not a variable"
     ]
+  renderSection (UndefinedType n loc) = Section
+    Red
+    [ Header "Undefined Type" (fromLoc loc)
+    , Paragraph
+    $ "Type"
+    <+> render n
+    <+> "is undefined"
+    ]
+  renderSection (DuplicatedIdentifier n loc) = Section
+    Red
+    [ Header "Duplicated Identifier" (fromLoc loc)
+    , Paragraph
+    $ "Identifier"
+    <+> render n
+    <+> "is duplicated"
+    ]
 
 instance RenderSection StructError where
   renderSection (MissingAssertion loc) = Section
