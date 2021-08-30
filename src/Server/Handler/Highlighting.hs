@@ -105,6 +105,8 @@ instance Collect Declaration' J.SemanticTokenAbsolute where
 instance Collect Declaration J.SemanticTokenAbsolute where
   collect (ConstDecl tok a) = toToken J.SttKeyword [] tok <> collect a
   collect (VarDecl   tok a) = toToken J.SttKeyword [] tok <> collect a
+  -- TODO: handle TypeDecl colloct
+  collect TypeDecl{}        = mempty
 
 instance Collect BlockDeclaration J.SemanticTokenAbsolute where
   collect (BlockDeclaration _tokA as _tokB) = toList as >>= collect
@@ -132,7 +134,7 @@ instance Collect BlockDecl J.SemanticTokenAbsolute where
   collect (Right a) = collect a
 
 --------------------------------------------------------------------------------
--- Stmt 
+-- Stmt
 
 instance Collect Stmt J.SemanticTokenAbsolute where
   collect = \case
@@ -185,7 +187,7 @@ instance Collect GdCmd J.SemanticTokenAbsolute where
     collect a <> toToken' J.SttMacro [] tok <> (bs >>= collect)
 
 --------------------------------------------------------------------------------
--- Expr 
+-- Expr
 
 instance Collect Expr J.SemanticTokenAbsolute where
   collect = \case
@@ -196,9 +198,9 @@ instance Collect Expr J.SemanticTokenAbsolute where
     Op    a     -> toToken' J.SttOperator [] a
     Chain a b c -> collect a <> toToken' J.SttOperator [] b <> collect c
     Arr a _ b _ -> collect a <> collect b
-    -- NOTE: sorting is need here, because: 
+    -- NOTE: sorting is need here, because:
     --  1. the client will ignore tokens that are out of order
-    --  2. `App` may create tokens that are out of order 
+    --  2. `App` may create tokens that are out of order
     --      (e.g. "1 +" will be parsed as `App + 1`)
     App a b     -> sort $ collect a <> collect b
     Quant tokA op names tokB a tokC b tokD ->
@@ -215,7 +217,7 @@ instance Collect Lit J.SemanticTokenAbsolute where
   collect = toToken' J.SttNumber []
 
 --------------------------------------------------------------------------------
--- Type 
+-- Type
 
 instance Collect EndpointOpen J.SemanticTokenAbsolute where
   collect (IncludingOpening tok a) = toToken J.SttKeyword [] tok <> collect a
@@ -242,4 +244,6 @@ instance Collect Type J.SemanticTokenAbsolute where
       <> collect b
   collect (TFunc a tok b) =
     collect a <> toToken J.SttOperator [] tok <> collect b
+  -- TODO: handle user defined type collect
+  collect TCon{}      = mempty
   collect (TVar name) = toToken' J.SttType [] name
