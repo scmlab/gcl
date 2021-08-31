@@ -42,6 +42,14 @@ instance Pretty Declaration where
       <> " }"
   pretty (LetDecl name args expr _) =
     "let " <> pretty name <> hsep (map pretty args) <> " = " <> pretty expr
+  pretty (TypeDecl qty qdcons _) =
+    "data " <> pretty qty <> "= " <> hsep (punctuate "| " (map pretty qdcons))
+
+instance Pretty QTyCon where
+  pretty (QTyCon n args) = pretty n <> hsep (map pretty args)
+
+instance Pretty QDCon where
+  pretty (QDCon cn ts) = pretty cn <> hsep (map pretty ts)
 
 --------------------------------------------------------------------------------
 

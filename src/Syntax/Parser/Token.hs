@@ -50,6 +50,9 @@ tokVar = "var"
 tokLet :: Text
 tokLet = "let"
 
+tokData :: Text
+tokData = "data"
+
 tokArray :: Text
 tokArray = "array"
 

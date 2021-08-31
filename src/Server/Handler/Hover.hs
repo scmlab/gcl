@@ -85,10 +85,10 @@ runHoverM (Program decls _ _ _ _) pos f = runReaderT (runReaderT f pos)
                                                      [declScope]
  where
   declScope :: Map Text HoverResult
-  declScope = case Type.runTM (foldM Type.inferDecl Map.empty decls) of
-    -- ignore type errors 
+  declScope = case Type.runTM (Type.declsToEnv decls) of
+    -- ignore type errors
     Left  _   -> Map.empty
-    Right env -> Map.mapKeys nameToText $ Map.map typeToHoverResult env
+    Right env -> Map.mapKeys nameToText $ Map.map typeToHoverResult (Type.localDecls env)
 
 typeToHoverResult :: Type -> HoverResult
 typeToHoverResult t = Result { resultHover = hover, resultType = t }
@@ -114,13 +114,15 @@ instance StabM HoverM Declaration HoverResult where
     VarDecl   a    _    c    _ -> (<>) <$> stabLocated a <*> stabLocated c
     LetDecl   name args body _ -> do
       name' <- stabLocated name
-      -- creates a local scope for arguments 
+      -- creates a local scope for arguments
       args' <- stabM (toArgs name args)
       let argsScope = Map.fromList $ zip (map nameToText args) args'
-      -- temporarily prepend this local scope to the scope list 
+      -- temporarily prepend this local scope to the scope list
       body' <- localScope argsScope $ stabLocated body
 
       return $ concat [name', args', body']
+    -- TODO: hover type declaration
+    TypeDecl {} -> return mempty
 
 instance StabM HoverM Expr HoverResult where
   stabM = \case
@@ -164,8 +166,8 @@ instance StabM HoverM Program HoverResult where
 
 --------------------------------------------------------------------------------
 
--- | A datatype for representing an argument of a function like definition 
-data Arg = Arg Name -- Name of the function  
+-- | A datatype for representing an argument of a function like definition
+data Arg = Arg Name -- Name of the function
                     Name -- Name of the argument
                          Int -- Index of the argument (starts from 0)
 

@@ -138,6 +138,9 @@ handleOp n op = case classify op of
 
 --------------------------------------------------------------------------------
 
+instance Render QTyCon where
+  render (QTyCon n args) = render n <+> horzE (map render args)
+
 -- | Type
 instance Render Type where
   render (TBase TInt  _) = "Int"
@@ -145,6 +148,7 @@ instance Render Type where
   render (TBase TChar _) = "Char"
   render (TFunc  a b _ ) = render a <+> "→" <+> render b
   render (TArray i b _ ) = "array" <+> render i <+> "of" <+> render b
+  render (TCon qty) = render qty
   render (TVar i _     ) = "TVar" <+> render i
 
 -- | Interval

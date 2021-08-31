@@ -1,5 +1,4 @@
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PartialTypeSignatures #-}
 
@@ -67,7 +66,7 @@ pProgram = do
 pDeclaration :: Parser Declaration
 pDeclaration = Lex.lineFold scn (parser p)
   where
-    p = (pConstDecl <|> pVarDecl)
+    p = (pConstDecl <|> pVarDecl <|> pTypeDecl)
         <* lift scn
         <?> "declaration"
 
@@ -92,6 +91,21 @@ pVarDecl =
   VarDecl
   <$> lexVar
   <*> pDeclType lowerName
+
+pTypeDecl :: ParserF Declaration
+pTypeDecl =
+  TypeDecl
+  <$> lexData
+  <*> pQTyCon
+  <*> lexEqual
+  <*> pSepBy lexGuardBar pQDCon
+
+pQTyCon :: ParserF QTyCon
+pQTyCon = QTyCon <$> pName <*> many pName
+
+pQDCon :: ParserF QDCon
+pQDCon = QDCon <$> pName <*> many pType'
+
 
 pBlockDecl :: ParserF BlockDecl
 pBlockDecl = lift $ Lex.lineFold scn (eitherP (try pBlockDeclType) pDeclBody ↓)
@@ -286,25 +300,27 @@ pType :: Parser Type
 pType = (↓) pType' scn <?> "type"
 
 pType' :: ParserF Type
-pType' = makeExprParser pType'Term [[InfixR pFunction]]
+pType' = makeExprParser pType'Term [[InfixR pTFunc]]
     <* (↑) (\sc' -> try sc' <|> sc) <?> "type"
+    where
+    pType'Term = choice [pTParen, pTArray, pTCon, pTBase, pTVar]
 
-pType'Term :: ParserF Type
-pType'Term = choice [pParensType, pArrayType, pBase, pTVar]
-
-pFunction :: ParserF (Type -> Type -> Type)
-pFunction = do
+pTFunc :: ParserF (Type -> Type -> Type)
+pTFunc = do
   arrow <- lexArrow
   return $ \t1 t2 -> TFunc t1 arrow t2
 
-pParensType :: ParserF Type
-pParensType = TParen <$> lexParenStart <*> pType' <*> lexParenEnd
+pTParen :: ParserF Type
+pTParen = TParen <$> lexParenStart <*> pType' <*> lexParenEnd
 
-pArrayType :: ParserF Type
-pArrayType = TArray <$> lexArray <*> pInterval <*> lexOf <*> pType'
+pTArray :: ParserF Type
+pTArray = TArray <$> lexArray <*> pInterval <*> lexOf <*> pType'
 
-pBase :: ParserF Type
-pBase =
+pTCon :: ParserF Type
+pTCon = TCon <$> pQTyCon
+
+pTBase :: ParserF Type
+pTBase =
   TBase
     <$> choice
       [ TInt . rangeOf <$> lexTypeInt,

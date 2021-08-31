@@ -51,6 +51,9 @@ instance PrettyWithLoc (Token "var") where
 instance PrettyWithLoc (Token "let") where
   prettyWithLoc (Token l r) = DocWithLoc (pretty tokLet) l r
 
+instance PrettyWithLoc (Token "data") where
+  prettyWithLoc (Token l r) = DocWithLoc (pretty tokData) l r
+
 instance PrettyWithLoc (Token "array") where
   prettyWithLoc (Token l r) = DocWithLoc (pretty tokArray) l r
 
@@ -147,7 +150,7 @@ instance Pretty Program where
 
 instance PrettyWithLoc Program where
   prettyWithLoc (Program decls stmts) =
-    mconcat (map prettyWithLoc decls) <> mconcat (map prettyWithLoc stmts)
+    prettyWithLoc decls <> prettyWithLoc stmts
 
 --------------------------------------------------------------------------------
 
@@ -183,7 +186,7 @@ instance Pretty DeclBody where
 instance PrettyWithLoc DeclBody where
   prettyWithLoc (DeclBody n args e b) =
     prettyWithLoc n
-    <> mconcat (map prettyWithLoc args)
+    <> prettyWithLoc args
     <> prettyWithLoc e
     <> prettyWithLoc b
 
@@ -195,8 +198,25 @@ instance PrettyWithLoc Declaration where
     prettyWithLoc con
       <> prettyWithLoc decl
   prettyWithLoc (VarDecl v decl) =
-    prettyWithLoc v 
+    prettyWithLoc v
     <> prettyWithLoc decl
+  prettyWithLoc (TypeDecl dat qty eq qdcons) =
+    prettyWithLoc dat
+    <> prettyWithLoc qty
+    <> prettyWithLoc eq
+    <> prettyWithLoc qdcons
+
+instance Pretty QTyCon where
+  pretty = toDoc . prettyWithLoc
+
+instance PrettyWithLoc QTyCon where
+  prettyWithLoc (QTyCon n args) = prettyWithLoc n <> prettyWithLoc args
+
+instance Pretty QDCon where
+  pretty = toDoc . prettyWithLoc
+
+instance PrettyWithLoc QDCon where
+  prettyWithLoc (QDCon n ts) = prettyWithLoc n <> prettyWithLoc ts
 
 instance Pretty BlockDeclType where
   pretty = toDoc . prettyWithLoc
@@ -212,7 +232,7 @@ instance Pretty BlockDeclaration where
 instance PrettyWithLoc BlockDeclaration where
   prettyWithLoc (BlockDeclaration l decls r) =
     prettyWithLoc l
-    <> mconcat (map prettyWithLoc decls)
+    <> prettyWithLoc decls
     <> prettyWithLoc r
 
 --------------------------------------------------------------------------------
@@ -265,23 +285,23 @@ instance PrettyWithLoc Stmt where
     prettyWithLoc l
       <> fromDoc (translateLoc 2 0 (locOf l) <--> translateLoc 0 (-2) (locOf r)) (pretty s)
       <> prettyWithLoc r
-  prettyWithLoc (Proof l anchors r) = 
-    prettyWithLoc l 
-      <> mconcat (map prettyWithLoc anchors)
+  prettyWithLoc (Proof l anchors r) =
+    prettyWithLoc l
+      <> prettyWithLoc anchors
       <> prettyWithLoc r
-  prettyWithLoc (Alloc p a n l es r) = 
+  prettyWithLoc (Alloc p a n l es r) =
     prettyWithLoc p
     <> prettyWithLoc a
     <> prettyWithLoc n
     <> prettyWithLoc l
     <> prettyWithLoc es
     <> prettyWithLoc r
-  prettyWithLoc (HLookup x a s e) = 
+  prettyWithLoc (HLookup x a s e) =
     prettyWithLoc x
     <> prettyWithLoc a
     <> prettyWithLoc s
     <> prettyWithLoc e
-  prettyWithLoc (HMutate s e1 a e2) = 
+  prettyWithLoc (HMutate s e1 a e2) =
     prettyWithLoc s
     <> prettyWithLoc e1
     <> prettyWithLoc a
@@ -295,7 +315,7 @@ instance PrettyWithLoc GdCmd where
   prettyWithLoc (GdCmd guard a body) =
     prettyWithLoc guard
       <> prettyWithLoc a
-      <> mconcat (map prettyWithLoc body)
+      <> prettyWithLoc body
 
 instance Pretty ProofAnchor where
   pretty = toDoc . prettyWithLoc
@@ -344,7 +364,7 @@ handleExpr (Quant open op xs m r n t close) =
   return $
     prettyWithLoc open
       <> prettyWithLoc op
-      <> mconcat (map prettyWithLoc xs)
+      <> prettyWithLoc xs
       <> prettyWithLoc m
       <> prettyWithLoc r
       <> prettyWithLoc n
@@ -396,6 +416,7 @@ instance PrettyWithLoc Type where
   prettyWithLoc (TFunc a l b) = prettyWithLoc a <> prettyWithLoc l <> prettyWithLoc b
   prettyWithLoc (TArray l a r b) =
     prettyWithLoc l <> prettyWithLoc a <> prettyWithLoc r <> prettyWithLoc b
+  prettyWithLoc (TCon c) = prettyWithLoc c
   prettyWithLoc (TVar i) = prettyWithLoc i
 
 --------------------------------------------------------------------------------

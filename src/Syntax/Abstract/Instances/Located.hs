@@ -12,6 +12,13 @@ instance Located Declaration where
   locOf (ConstDecl _ _ _ l) = l
   locOf (VarDecl _ _ _ l) = l
   locOf (LetDecl _ _ _ l) = l
+  locOf (TypeDecl _ _ l) = l
+
+instance Located QTyCon where
+  locOf (QTyCon l r) = l <--> r
+
+instance Located QDCon where
+  locOf (QDCon l r) = l <--> r
 
 instance Located Stmt where
   locOf (Skip l) = l
@@ -30,8 +37,8 @@ instance Located Stmt where
   locOf (Dispose _ l) = l
 
 instance Located GdCmd where
-  locOf (GdCmd _ _ l) = l 
-  
+  locOf (GdCmd _ _ l) = l
+
 instance Located Endpoint where
   locOf (Including e) = locOf e
   locOf (Excluding e) = locOf e
@@ -43,6 +50,7 @@ instance Located Type where
   locOf (TBase _ l) = l
   locOf (TArray _ _ l) = l
   locOf (TFunc _ _ l) = l
+  locOf (TCon l) = locOf l
   locOf (TVar _ l) = l
 
 instance Located Expr where

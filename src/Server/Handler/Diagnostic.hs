@@ -108,6 +108,18 @@ instance Collect TypeError Diagnostic where
       $   "Declaration"
       <+> pretty n
       <+> "is a let binding, not a variable"
+  collect (UndefinedType n loc) =
+    makeError loc "Undefined Type"
+      $ docToText
+      $ "Type"
+      <+> pretty n
+      <+> "is undefined"
+  collect (DuplicatedIdentifier n loc) =
+    makeError loc "Duplicated Identifier"
+      $ docToText
+      $ "Identifier"
+      <+> pretty n
+      <+> "is duplicated"
 
 instance Collect StructWarning Diagnostic where
   collect (MissingBound range) = makeWarning

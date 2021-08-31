@@ -12,8 +12,7 @@ import           Data.Loc                       ( locOf )
 import           Data.Loc.Range
 import qualified Data.Map                      as Map
 import           Data.Map                       ( Map )
-import           Data.Maybe                     ( mapMaybe
-                                                )
+import           Data.Maybe                     ( mapMaybe )
 import           Data.Text                      ( Text )
 import           Error
 import qualified Language.LSP.Types            as J
@@ -96,11 +95,12 @@ runGotoM (Program decls _ _ _ _) pos f = runReaderT (runReaderT f pos)
   declScope :: Map Text (Range -> LocationLink)
   declScope = Map.fromList (decls >>= mapMaybe declToLocationLink . splitDecl)
 
-  -- split a parallel declaration into many simpler declarations 
+  -- split a parallel declaration into many simpler declarations
   splitDecl :: Declaration -> [(Name, Declaration)]
   splitDecl decl@(ConstDecl names _ _ _) = [ (name, decl) | name <- names ]
-  splitDecl decl@(VarDecl   names _ _ _) = [ (name, decl) | name <- names ]
-  splitDecl decl@(LetDecl   name  _ _ _) = [(name, decl)]
+  splitDecl decl@(VarDecl names _ _ _) = [ (name, decl) | name <- names ]
+  splitDecl decl@(LetDecl name _ _ _) = [(name, decl)]
+  splitDecl decl@(TypeDecl (QTyCon name _) _ _) = [(name, decl)]
 
   -- convert a declaration (and its name) to a LocationLink (that is waiting for the caller's Range)
   declToLocationLink
@@ -128,11 +128,13 @@ instance StabM GotoM Declaration LocationLink where
     ConstDecl _ _    c _ -> stabLocated c
     VarDecl   _ _    c _ -> stabLocated c
     LetDecl   _ args c _ -> do
-      -- creates a local scope for arguments 
+      -- creates a local scope for arguments
       let argsScope = Map.fromList $ mapMaybe nameToLocationLink args
-      -- temporarily prepend this local scope to the scope list 
+      -- temporarily prepend this local scope to the scope list
 
       localScope argsScope $ stabM c
+    -- TODO : TypeDecl StabM
+    TypeDecl{} -> return mempty
 
 instance StabM GotoM Stmt LocationLink where
   stabM = \case
@@ -154,16 +156,16 @@ instance StabM GotoM Expr LocationLink where
     App a b _          -> (<>) <$> stabLocated a <*> stabLocated b
     Lam _ b _          -> stabLocated b
     Quant _ args c d _ -> do
-      -- creates a local scope for arguments 
+      -- creates a local scope for arguments
       let argsScope = Map.fromList $ mapMaybe nameToLocationLink args
-      -- temporarily prepend this local scope to the scope list 
+      -- temporarily prepend this local scope to the scope list
       localScope argsScope $ (<>) <$> stabLocated c <*> stabLocated d
     _ -> return []
 
 instance StabM GotoM Name LocationLink where
-  stabM name = do 
+  stabM name = do
     result <- lookupScopes (nameToText name)
-    case result of 
+    case result of
       Nothing             -> return []
       Just toLocationLink -> case fromLoc (locOf name) of
         Nothing          -> return []
