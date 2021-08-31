@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE RecordWildCards #-}
 module Test.TypeChecking where
 
 import           Data.Loc                       ( Loc(..) )
@@ -201,18 +202,18 @@ blockDeclarationTests = testGroup
     "{:\n\
         \  A, B : Int\
         \:}"
-    "[(A, Int), (B, Int)]"
+    "Enviornment[(A, Int), (B, Int)][][]"
   , testCase "block declaration 2" $ blockDeclarationCheck
     "{:\n\
         \  A, B : Int { A = 0 }\
         \:}"
-    "[(A, Int), (B, Int)]"
+    "Enviornment[(A, Int), (B, Int)][][]"
   , testCase "block declaration 3" $ blockDeclarationCheck
     "{:\n\
         \  A, B : Int\n\
         \    A = 0\n\
         \:}"
-    "[(A, Int), (B, Int)]"
+    "Enviornment[(A, Int), (B, Int)][][]"
   , testCase "block declaration 4" $ blockDeclarationCheck
     "{:\n\
         \  A, B : Int\n\
@@ -220,17 +221,18 @@ blockDeclarationTests = testGroup
         \  F : Int -> Int -> Int\n\
         \  P : Char -> Bool\n\
         \:}"
-    "[(A, Int), (B, Int), (F, Int → Int → Int), (P, Char → Bool)]"
+    "Enviornment[(A, Int), (B, Int), (F, Int → Int → Int), (P, Char → Bool)]\
+    \[][]"
   , testCase "block declaration 5" $ blockDeclarationCheck
     "{:\n\
         \   N = 5\n\
         \:}"
-    "[(N, Int)]"
+    "Enviornment[(N, Int)][][(N, 5)]"
   , testCase "block declaration 6" $ blockDeclarationCheck
     "{:\n\
         \    G i j = i + j\n\
         \:}"
-    "[(G, Int → Int → Int)]"
+    "Enviornment[(G, Int → Int → Int)][][(G, λ i → λ j → i + j)]"
   ]
 
 programTest :: TestTree
@@ -345,7 +347,6 @@ env = Enviornment
     , (name' "q"  , tbool)
     , (name' "r"  , tbool)
     ]
-  , localProps   = mempty
   , typeDecls    = mempty
   , localContext = mempty
   }
@@ -388,14 +389,14 @@ declarationCheck t1 t2 =
     @?= t2
 
 envCheck :: Text -> Assertion
-envCheck t = toText (localDecls env) @?= t
+envCheck t = toText env @?= t
 
 blockDeclarationCheck :: Text -> Text -> Assertion
 blockDeclarationCheck t1 t2 = toText wrap @?= t2
  where
   wrap = do
     ds <- runParser pBlockDeclaration t1
-    return . fmap localDecls $ check (const declsToEnv) mempty ds
+    return $ check (const declsToEnv) mempty ds
     --foldM
       --(\envM d -> case envM of
         --Left  err  -> return (Left err)
@@ -416,3 +417,10 @@ programCheck t1 = toText wrap @?= "()"
 
 instance (Pretty a, Pretty b) => Pretty (Map a b) where
   pretty m = pretty $ Map.toList m
+
+instance Pretty Enviornment where
+  pretty Enviornment {..} =
+    "Enviornment"
+      <> pretty localDecls
+      <> pretty typeDecls
+      <> pretty localContext

@@ -27,7 +27,9 @@ instance Pretty Declaration where
       <> hsep (punctuate ", " (map pretty names))
       <> ": "
       <> pretty t
-      <> "{ " <> pretty p <> " }"
+      <> "{ "
+      <> pretty p
+      <> " }"
   pretty (VarDecl names t Nothing _) =
     "var " <> hsep (punctuate ", " (map pretty names)) <> ": " <> pretty t
   pretty (VarDecl names t (Just p) _) =
@@ -35,18 +37,19 @@ instance Pretty Declaration where
       <> hsep (punctuate ", " (map pretty names))
       <> ": "
       <> pretty t
-      <> "{ " <> pretty p <> " }"
+      <> "{ "
+      <> pretty p
+      <> " }"
   pretty (LetDecl name args expr _) =
     "let " <> pretty name <> hsep (map pretty args) <> " = " <> pretty expr
-  pretty (TypeDecl (QTyCon n args) qdcons _) =
-    "data "
-    <> pretty n <> hsep (map pretty args)
-    <> "= "
-    <> hsep (punctuate "| " (map pretty qdcons))
+  pretty (TypeDecl qty qdcons _) =
+    "data " <> pretty qty <> "= " <> hsep (punctuate "| " (map pretty qdcons))
+
+instance Pretty QTyCon where
+  pretty (QTyCon n args) = pretty n <> hsep (map pretty args)
 
 instance Pretty QDCon where
-  pretty (QDCon cn ts) =
-    pretty cn <> hsep (map pretty ts)
+  pretty (QDCon cn ts) = pretty cn <> hsep (map pretty ts)
 
 --------------------------------------------------------------------------------
 

@@ -66,13 +66,11 @@ extend env (x, s) = case Map.lookup x env of
   Just _  -> throwError $ DuplicatedIdentifier x (locOf x)
 
 extendEnv :: Enviornment -> Enviornment -> TM Enviornment
-extendEnv (Enviornment lds1 lps1 tds1 lctx1) (Enviornment lds2 lps2 tds2 lctx2)
-  = do
+extendEnv (Enviornment lds1 tds1 lctx1) (Enviornment lds2 tds2 lctx2) =
+  do
       Enviornment
     <$>         lds1
     `extendMap` lds2
-    <*>         lps1
-    `extendMap` lps2
     <*>         tds1
     `extendMap` tds2
     <*>         lctx1
@@ -98,18 +96,17 @@ typeWithLoc l (TVar n _      ) = TVar n l
 
 data Enviornment = Enviornment
   { localDecls   :: Map Name Type
-  , localProps   :: Map Name Expr
   , typeDecls    :: Map Name (QTyCon, [QDCon])
   , localContext :: Map Name Expr
   }
   deriving (Eq, Show)
 
 instance Semigroup Enviornment where
-  (Enviornment lds1 lps1 tds1 lctx1) <> (Enviornment lds2 lps2 tds2 lctx2) =
-    Enviornment (lds1 <> lds2) (lps1 <> lps2) (tds1 <> tds2) (lctx1 <> lctx2)
+  (Enviornment lds1 tds1 lctx1) <> (Enviornment lds2 tds2 lctx2) =
+    Enviornment (lds1 <> lds2) (tds1 <> tds2) (lctx1 <> lctx2)
 
 instance Monoid Enviornment where
-  mempty = Enviornment mempty mempty mempty mempty
+  mempty = Enviornment mempty mempty mempty
 
 type Infer = RWST Enviornment [Constraint] FreshState (Except TypeError)
 type TM = StateT FreshState (Except TypeError)
@@ -287,12 +284,12 @@ checkStmt env (Assign ns es loc)
     length ns > length es
   = let extraVars = drop (length es) ns
     in  throwError $ NotEnoughExprsInAssigment (NE.fromList extraVars)
--- (locOf $ mergeRangesUnsafe (fromLocs $ map locOf extraVars))
+                                        -- (locOf $ mergeRangesUnsafe (fromLocs $ map locOf extraVars))
                                                loc
   | length ns < length es
   = let extraExprs = drop (length ns) es
     in  throwError $ TooManyExprsInAssigment (NE.fromList extraExprs)
--- (locOf $ mergeRangesUnsafe (fromLocs $ map locOf extraExprs))
+                                        -- (locOf $ mergeRangesUnsafe (fromLocs $ map locOf extraExprs))
                                              loc
   | otherwise
   = forM_ (zip ns es) (checkAssign env)
@@ -348,27 +345,12 @@ checkIsVarAssign declarations (Assign ns _ _) =
 checkIsVarAssign _ _ = return ()
 
 checkEnviornment :: Enviornment -> TM ()
-checkEnviornment env@(Enviornment lds lps tds lctx) = do
-    -- infer types of local context and add to the local declaration of the enviornment
-  env' <- Map.foldlWithKey
-    (\envM n expr -> do
-      env'          <- envM
-      (eType, subs) <- inferExpr' env' expr
-
-      let lds' = Map.map (subst subs) (Map.insert n eType (localDecls env'))
-      return $ env' { localDecls = lds' }
-    )
-    (pure env)
-    lctx
-
+checkEnviornment env = do
   -- check type declarations
-  forM_ tds checkTypeDecl
+  forM_ (typeDecls env) checkTypeDecl
 
   -- check local declaration type
-  mapM_ (checkType env')      lds
-
-  -- check if local property is predicate
-  mapM_ (checkPredicate env') lps
+  mapM_ (checkType env) (localDecls env)
  where
   checkTypeDecl (qty@(QTyCon _ args), qdcons) = do
     checkQTyConArg args
@@ -388,50 +370,52 @@ checkEnviornment env@(Enviornment lds lps tds lctx) = do
       )
 
 checkProg :: Program -> TM ()
-checkProg (Program decls exprs defs stmts _) = do
+checkProg (Program decls props defs stmts _) = do
   mapM_ (checkIsVarAssign decls) stmts
   env <- declsToEnv decls
   checkEnviornment env
-  mapM_ (checkExpr env)   exprs
+  mapM_ (checkExpr env)   props
   mapM_ (checkAssign env) (Map.toList defs)
   mapM_ (checkStmt env)   stmts
 
 declsToEnv :: [Declaration] -> TM Enviornment
 declsToEnv decls = do
   env <- foldl (<>) mempty <$> mapM typeDeclToEnv decls
-  foldM declToEnv env decls
+  foldM declToEnv env decls >>= inferLocalContext
  where
   typeDeclToEnv (TypeDecl qty@(QTyCon n _) qdcons _) = do
     ds <- foldM (\ds' (QDCon cn ts) -> ds' `extend` (cn, wrapQDCon cn ts))
                 mempty
                 qdcons
-    return $ Enviornment ds mempty (Map.singleton n (qty, qdcons)) mempty
+    return $ Enviornment ds (Map.singleton n (qty, qdcons)) mempty
    where
     wrapQDCon _  []       = TCon qty
     wrapQDCon cn (t : ts) = TFunc t (wrapQDCon cn ts) (cn <--> (t : ts))
   typeDeclToEnv _ = return mempty
 
-  declToEnv env (ConstDecl ns t p _) = foldM f env ns
+  declToEnv env (ConstDecl ns t _ _) = foldM f env ns
    where
-    f env' n =
-      env'
-        `extendEnv` Enviornment (Map.singleton n t)
-                                (maybe mempty (Map.singleton n) p)
-                                mempty
-                                mempty
+    f env' n = env' `extendEnv` Enviornment (Map.singleton n t) mempty mempty
 
-  declToEnv env (VarDecl ns t p _) = foldM f env ns
+  declToEnv env (VarDecl ns t _ _) = foldM f env ns
    where
-    f env' n =
-      env'
-        `extendEnv` Enviornment (Map.singleton n t)
-                                (maybe mempty (Map.singleton n) p)
-                                mempty
-                                mempty
+    f env' n = env' `extendEnv` Enviornment (Map.singleton n t) mempty mempty
   declToEnv env (LetDecl n args expr _) = return $ env
     { localContext = Map.insert n (wrapLam args expr) (localContext env)
     }
   declToEnv env _ = return env
+
+  inferLocalContext env = do
+    Map.foldlWithKey
+      (\envM n e -> do
+        env' <- envM
+        (eType, subs) <- inferExpr' env' e
+
+        lds <- Map.map (subst subs) <$> (localDecls env' `extend` (n, eType))
+        return $ env' { localDecls = lds }
+      )
+      (pure env)
+      (localContext env)
 
 runTM' :: TM a -> Except TypeError a
 runTM' p = evalStateT p initFreshState
