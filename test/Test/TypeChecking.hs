@@ -193,6 +193,8 @@ declarationTests = testGroup
   , testCase "var declaration" $ declarationCheck "var x : Bool" "[(x, Bool)]"
   , testCase "var declaration w/ prop"
     $ declarationCheck "var x : Bool { x = True }" "[(x, Bool)]"
+  , testCase "type declaration"
+    $ declarationCheck "data T a = Nil | Con a" "[(Con, a → T a), (Nil, T a)]"
   ]
 
 blockDeclarationTests :: TestTree
