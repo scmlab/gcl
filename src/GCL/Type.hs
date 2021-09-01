@@ -224,9 +224,11 @@ inferExpr = curry (fmap fst . uncurry inferExpr')
 lookupInferEnv :: Name -> Infer Type
 lookupInferEnv n = do
   env <- ask
-  maybe (throwError $ NotInScope n (locOf n))
-        (return . typeWithLoc (locOf n))
-        (Map.lookup n (localDecls env))
+  case Map.lookup n (localDecls env) of 
+    Nothing -> case Map.lookup n (localContext env) of 
+      Nothing -> throwError $ NotInScope n (locOf n)
+      Just expr -> infer expr
+    Just t -> return $ typeWithLoc (locOf n) t 
 
 freshVar :: Loc -> Infer Type
 freshVar l = do
