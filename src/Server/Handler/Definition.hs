@@ -1,7 +1,6 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE OverloadedStrings #-}
 
 module Server.Handler.Definition
   ( handler
@@ -89,7 +88,7 @@ instance HasScopes GotoM (Range -> LocationLink) where
     lift $ local (scope :) $ runReaderT p pos
 
 runGotoM :: Program -> Position -> GotoM a -> CmdM a
-runGotoM (Program decls _ _ _ _) pos f = runReaderT (runReaderT f pos)
+runGotoM (Program _ decls _ _ _ _) pos f = runReaderT (runReaderT f pos)
                                                     [declScope]
  where
   declScope :: Map Text (Range -> LocationLink)
@@ -100,7 +99,6 @@ runGotoM (Program decls _ _ _ _) pos f = runReaderT (runReaderT f pos)
   splitDecl decl@(ConstDecl names _ _ _) = [ (name, decl) | name <- names ]
   splitDecl decl@(VarDecl names _ _ _) = [ (name, decl) | name <- names ]
   splitDecl decl@(LetDecl name _ _ _) = [(name, decl)]
-  splitDecl decl@(TypeDecl (QTyCon name _) _ _) = [(name, decl)]
 
   -- convert a declaration (and its name) to a LocationLink (that is waiting for the caller's Range)
   declToLocationLink
@@ -120,7 +118,7 @@ runGotoM (Program decls _ _ _ _) pos f = runReaderT (runReaderT f pos)
     return (text, toLocationLink)
 
 instance StabM GotoM Program LocationLink where
-  stabM (Program decls _ _ stmts _) =
+  stabM (Program _ decls _ _ stmts _) =
     (<>) <$> stabLocated decls <*> stabLocated stmts
 
 instance StabM GotoM Declaration LocationLink where
@@ -134,7 +132,6 @@ instance StabM GotoM Declaration LocationLink where
 
       localScope argsScope $ stabM c
     -- TODO : TypeDecl StabM
-    TypeDecl{} -> return mempty
 
 instance StabM GotoM Stmt LocationLink where
   stabM = \case

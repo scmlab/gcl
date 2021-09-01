@@ -2,13 +2,15 @@
 
 module Syntax.Abstract.Types where
 
-import Data.Loc ( Loc )
-import Data.Map (Map)
-import Data.Text (Text)
-import GHC.Generics (Generic)
-import Syntax.Common ( Op, Name )
-import Prelude hiding (Ordering (..))
-import Data.Loc.Range ( Range )
+import           Data.Loc                       ( Loc )
+import           Data.Map                       ( Map )
+import           Data.Text                      ( Text )
+import           GHC.Generics                   ( Generic )
+import           Syntax.Common                  ( Op
+                                                , Name
+                                                )
+import           Prelude                 hiding ( Ordering(..) )
+import           Data.Loc.Range                 ( Range )
 
 --------------------------------------------------------------------------------
 
@@ -23,13 +25,15 @@ type TypeVar = Text
 -- | Program
 data Program
   = Program
-      [Declaration] -- constant and variable declarations
-      [Expr] -- global properties
-      Defns -- let bindings
-      [Stmt] -- main program
+      [TypeDeclaration] -- type declarations
+      [Declaration]     -- constant and variable declarations
+      [Expr]            -- global properties
+      Defns             -- let bindings
+      [Stmt]            -- main program
       Loc
   deriving (Eq, Show)
 
+--type Types = Map Name TypeDeclaration
 type Defns = Map Name Expr
 
 --------------------------------------------------------------------------------
@@ -39,11 +43,16 @@ data Declaration
   = ConstDecl [Name] Type (Maybe Expr) Loc
   | VarDecl [Name] Type (Maybe Expr) Loc
   | LetDecl Name [Name] Expr Loc
-  | TypeDecl QTyCon [QDCon] Loc
   deriving (Eq, Show)
 
-data QTyCon = QTyCon Name [Name] deriving (Eq, Show, Generic)
-data QDCon = QDCon Name [Type] deriving (Eq, Show)
+--data LetDeclaration = LetDecl Name [Name] Expr Loc
+data TypeDeclaration = TypeDecl QTyCon [QDCon] Loc
+  deriving (Eq, Show)
+
+data QTyCon = QTyCon Name [Name]
+  deriving (Eq, Show, Generic)
+data QDCon = QDCon Name [Type]
+  deriving (Eq, Show)
 
 --------------------------------------------------------------------------------
 
@@ -66,8 +75,10 @@ data Stmt
 
   deriving (Eq, Show)
 
-data GdCmd = GdCmd Expr [Stmt] Loc deriving (Eq, Show)
-data ProofAnchor = ProofAnchor Text Range deriving (Eq, Ord, Show)
+data GdCmd = GdCmd Expr [Stmt] Loc
+  deriving (Eq, Show)
+data ProofAnchor = ProofAnchor Text Range
+  deriving (Eq, Ord, Show)
 
 --------------------------------------------------------------------------------
 
@@ -75,7 +86,8 @@ data ProofAnchor = ProofAnchor Text Range deriving (Eq, Ord, Show)
 data Endpoint = Including Expr | Excluding Expr deriving (Eq, Show, Generic)
 
 -- | Interval
-data Interval = Interval Endpoint Endpoint Loc deriving (Eq, Show, Generic)
+data Interval = Interval Endpoint Endpoint Loc
+  deriving (Eq, Show, Generic)
 
 -- | Base Types
 data TBase = TInt | TBool | TChar

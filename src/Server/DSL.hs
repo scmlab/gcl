@@ -135,7 +135,7 @@ typeCheck p = case TypeChecking.runTM (TypeChecking.checkProg p) of
   Right v -> return v
 
 sweep :: A.Program -> CmdM ([PO], [Spec], [A.Expr], [StructWarning])
-sweep program@(A.Program _ globalProps _ _ _) = case WP.sweep program of
+sweep program@(A.Program _ _ globalProps _ _ _) = case WP.sweep program of
   Left  e                     -> throwError [StructError e]
   Right (pos, specs, warings) -> do
     return (List.sort pos, sortOn locOf specs, globalProps, warings)

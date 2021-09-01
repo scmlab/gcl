@@ -81,11 +81,11 @@ instance HasScopes HoverM HoverResult where
     lift $ local (scope :) $ runReaderT p pos
 
 runHoverM :: Program -> Position -> HoverM a -> CmdM a
-runHoverM (Program decls _ _ _ _) pos f = runReaderT (runReaderT f pos)
+runHoverM (Program tdecls decls _ _ _ _) pos f = runReaderT (runReaderT f pos)
                                                      [declScope]
  where
   declScope :: Map Text HoverResult
-  declScope = case Type.runTM (Type.declsToEnv decls) of
+  declScope = case Type.runTM (Type.declsToEnv tdecls decls) of
     -- ignore type errors
     Left  _   -> Map.empty
     Right env -> Map.mapKeys nameToText $ Map.map typeToHoverResult (Type.localDecls env)
@@ -122,7 +122,6 @@ instance StabM HoverM Declaration HoverResult where
 
       return $ concat [name', args', body']
     -- TODO: hover type declaration
-    TypeDecl {} -> return mempty
 
 instance StabM HoverM Expr HoverResult where
   stabM = \case
@@ -160,7 +159,7 @@ instance StabM HoverM Name HoverResult where
       Just hoverResult -> return [hoverResult]
 
 instance StabM HoverM Program HoverResult where
-  stabM (Program decls _ _ stmts _) =
+  stabM (Program _ decls _ _ stmts _) =
     (<>) <$> stabLocated decls <*> stabLocated stmts
 
 
