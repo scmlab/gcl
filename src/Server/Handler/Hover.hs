@@ -27,6 +27,8 @@ import           Language.LSP.Types      hiding ( Range )
 import           Pretty                         ( toText )
 import           Server.DSL
 import           Syntax.Common
+import Render
+import Data.Loc (locOf, Located)
 
 ignoreErrors :: Either [Error] (Maybe Hover) -> Maybe Hover
 ignoreErrors (Left  _errors  ) = Nothing
@@ -47,6 +49,9 @@ data HoverResult = Result
   , resultType  :: Type
   }
   deriving Show
+
+instance Render HoverResult where 
+  render (Result _ t) = "Hover " <+> render t
 
 --------------------------------------------------------------------------------
 
@@ -76,7 +81,7 @@ instance HasPosition HoverM where
 
 instance HasScopes HoverM HoverResult where
   askScopes = lift ask
-  localScope scope p = do
+  pushScope scope p = do
     pos <- ask
     lift $ local (scope :) $ runReaderT p pos
 
@@ -115,10 +120,10 @@ instance StabM HoverM Declaration HoverResult where
     LetDecl   name args body _ -> do
       name' <- stabLocated name
       -- creates a local scope for arguments
-      args' <- stabM (toArgs name args)
+      args' <- stabLocated (toArgs name args)
       let argsScope = Map.fromList $ zip (map nameToText args) args'
-      -- temporarily prepend this local scope to the scope list
-      body' <- localScope argsScope $ stabLocated body
+      -- temporarily prepend this local scope to the scope stack
+      body' <- pushScope argsScope $ stabLocated body
 
       return $ concat [name', args', body']
     -- TODO: hover type declaration
@@ -171,6 +176,8 @@ data Arg = Arg Name -- Name of the function
                     Name -- Name of the argument
                          Int -- Index of the argument (starts from 0)
 
+instance Located Arg where 
+  locOf (Arg _ arg _) = locOf arg 
 
 toArgs :: Name -> [Name] -> [Arg]
 toArgs func args = zipWith (Arg func) args [0 ..]

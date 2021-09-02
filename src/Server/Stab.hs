@@ -55,8 +55,8 @@ class HasPosition m where
 
 class HasScopes m a where
   askScopes :: m [Scope a]
-  -- temporarily prepend a local scope to the scope list 
-  localScope :: Scope a -> m b -> m b
+  -- temporarily prepend a local scope to the scope stack 
+  pushScope :: Scope a -> m b -> m b
 
 lookupScopes :: (HasScopes m a, Monad m) => Text -> m (Maybe a)
 lookupScopes name = do
@@ -109,6 +109,6 @@ stabbedLocated position node = case fromLoc (locOf node) of
 class Collect a b where
   collect :: a -> [b]
 
-instance Collect a b => Collect (Maybe a) b where 
+instance Collect a b => Collect (Maybe a) b where
   collect Nothing = []
   collect (Just x) = collect x

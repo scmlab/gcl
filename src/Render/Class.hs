@@ -67,10 +67,17 @@ instance Render Bool where
 instance Render (Doc ann) where
   render = textE . Text.renderStrict . Doc.layoutPretty Doc.defaultLayoutOptions
 
+instance (Render a) => Render (Maybe a) where
+  render Nothing = "Nothing"
+  render (Just a) = "Just" <+> render a
+
+instance (Render a, Render b) => Render (a, b) where
+  render (a, b) = "(" <+> render a <+> "," <+> render b <+> ")"
+
 -- seperated by commas
 -- instance Render a => Render [a] where
---   render = punctuateE "," . map render
-      -- "[" <> Inlines $ pure $ Horz (punctuate "," (map render xs)) <> "]"
+--   render xs = punctuateE "," . map render
+--       "[" <> Inlines $ pure $ Horz (punctuate "," (map render xs)) <> "]"
 
 renderManySepByComma :: Render a => [a] -> Inlines
 renderManySepByComma = punctuateE "," . map render

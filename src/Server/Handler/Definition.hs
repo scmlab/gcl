@@ -84,7 +84,7 @@ instance HasPosition GotoM where
 
 instance HasScopes GotoM (Range -> LocationLink) where
   askScopes = lift ask
-  localScope scope p = do
+  pushScope scope p = do
     pos <- ask
     lift $ local (scope :) $ runReaderT p pos
 
@@ -130,9 +130,9 @@ instance StabM GotoM Declaration LocationLink where
     LetDecl   _ args c _ -> do
       -- creates a local scope for arguments
       let argsScope = Map.fromList $ mapMaybe nameToLocationLink args
-      -- temporarily prepend this local scope to the scope list
+      -- temporarily prepend this local scope to the scope stack
 
-      localScope argsScope $ stabM c
+      pushScope argsScope $ stabM c
     -- TODO : TypeDecl StabM
     TypeDecl{} -> return mempty
 
@@ -158,8 +158,8 @@ instance StabM GotoM Expr LocationLink where
     Quant _ args c d _ -> do
       -- creates a local scope for arguments
       let argsScope = Map.fromList $ mapMaybe nameToLocationLink args
-      -- temporarily prepend this local scope to the scope list
-      localScope argsScope $ (<>) <$> stabLocated c <*> stabLocated d
+      -- temporarily prepend this local scope to the scope stack
+      pushScope argsScope $ (<>) <$> stabLocated c <*> stabLocated d
     _ -> return []
 
 instance StabM GotoM Name LocationLink where
