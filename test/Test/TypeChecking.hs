@@ -18,7 +18,7 @@ import           Test.Tasty.HUnit               ( testCase
                                                 )
 import           Control.Monad.Except           ( runExcept )
 import           GCL.Type                       ( TM
-                                                , Enviornment(..)
+                                                , Environment(..)
                                                 , inferExpr
                                                 , declsToEnv
                                                 , checkType
@@ -187,12 +187,12 @@ stmtTests = testGroup
 declarationTests :: TestTree
 declarationTests = testGroup
   "Check Declaration"
-  [ testCase "const declaration" $ declarationCheck "con C : Int" "Enviornment[(C, Int)][][]"
+  [ testCase "const declaration" $ declarationCheck "con C : Int" "Environment[(C, Int)][][]"
   , testCase "const declaration w/ prop"
-    $ declarationCheck "con C : Int { C > 0 }" "Enviornment[(C, Int)][][]"
-  , testCase "var declaration" $ declarationCheck "var x : Bool" "Enviornment[(x, Bool)][][]"
+    $ declarationCheck "con C : Int { C > 0 }" "Environment[(C, Int)][][]"
+  , testCase "var declaration" $ declarationCheck "var x : Bool" "Environment[(x, Bool)][][]"
   , testCase "var declaration w/ prop"
-    $ declarationCheck "var x : Bool { x = True }" "Enviornment[(x, Bool)][][]"
+    $ declarationCheck "var x : Bool { x = True }" "Environment[(x, Bool)][][]"
   --, testCase "type declaration"
     --  $ declarationCheck "data T a = Nil | Con a" "[(Con, a → T a), (Nil, T a)]"
   ]
@@ -204,18 +204,18 @@ blockDeclarationTests = testGroup
     "{:\n\
         \  A, B : Int\
         \:}"
-    "Enviornment[(A, Int), (B, Int)][][]"
+    "Environment[(A, Int), (B, Int)][][]"
   , testCase "block declaration 2" $ blockDeclarationCheck
     "{:\n\
         \  A, B : Int { A = 0 }\
         \:}"
-    "Enviornment[(A, Int), (B, Int)][][]"
+    "Environment[(A, Int), (B, Int)][][]"
   , testCase "block declaration 3" $ blockDeclarationCheck
     "{:\n\
         \  A, B : Int\n\
         \    A = 0\n\
         \:}"
-    "Enviornment[(A, Int), (B, Int)][][]"
+    "Environment[(A, Int), (B, Int)][][]"
   , testCase "block declaration 4" $ blockDeclarationCheck
     "{:\n\
         \  A, B : Int\n\
@@ -223,18 +223,18 @@ blockDeclarationTests = testGroup
         \  F : Int -> Int -> Int\n\
         \  P : Char -> Bool\n\
         \:}"
-    "Enviornment[(A, Int), (B, Int), (F, Int → Int → Int), (P, Char → Bool)]\
+    "Environment[(A, Int), (B, Int), (F, Int → Int → Int), (P, Char → Bool)]\
     \[][]"
   , testCase "block declaration 5" $ blockDeclarationCheck
     "{:\n\
         \   N = 5\n\
         \:}"
-    "Enviornment[(N, Int)][][(N, 5)]"
+    "Environment[(N, Int)][][(N, 5)]"
   , testCase "block declaration 6" $ blockDeclarationCheck
     "{:\n\
         \    G i j = i + j\n\
         \:}"
-    "Enviornment[(G, Int → Int → Int)][][(G, λ i → λ j → i + j)]"
+    "Environment[(G, Int → Int → Int)][][(G, λ i → λ j → i + j)]"
   ]
 
 programTest :: TestTree
@@ -329,8 +329,8 @@ var t = Var (Name t NoLoc) NoLoc
 name' :: Text -> Name
 name' t = Name t NoLoc
 
-env :: Enviornment
-env = Enviornment
+env :: Environment
+env = Environment
   { localDecls   = Map.fromList
     [ (name' "A"  , tint)
     , (name' "B"  , tint)
@@ -360,7 +360,7 @@ runParser p t = case runExcept . toAbstract <$> parseTest p t of
   Right (Left  loc ) -> Left [Others (show loc)]
   Right (Right expr) -> Right expr
 
-check :: (Enviornment -> a -> TM b) -> Enviornment -> a -> Either [Error] b
+check :: (Environment -> a -> TM b) -> Environment -> a -> Either [Error] b
 check checker env' e = case runExcept (evalStateT (checker env' e) 0) of
   Left  err -> Left [TypeError err]
   Right x   -> Right x
@@ -413,9 +413,9 @@ programCheck t1 = toText wrap @?= "()"
 instance (Pretty a, Pretty b) => Pretty (Map a b) where
   pretty m = pretty $ Map.toList m
 
-instance Pretty Enviornment where
-  pretty Enviornment {..} =
-    "Enviornment"
+instance Pretty Environment where
+  pretty Environment {..} =
+    "Environment"
       <> pretty localDecls
       <> pretty typeDecls
       <> pretty localContext
