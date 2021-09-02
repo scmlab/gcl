@@ -3,21 +3,18 @@
 {-# LANGUAGE FlexibleContexts #-}
 module GCL.Common where
 
-import           Control.Monad                  ( liftM2 )
-import           Control.Monad.RWS              ( RWST(..) )
-import           Control.Monad.State            ( StateT(..) )
-import           Data.Loc                       ( Loc(..) )
-import           Data.Map                       ( Map )
-import qualified Data.Map                      as Map
-import           Data.Set                       ( Set
-                                                , (\\)
-                                                )
-import qualified Data.Set                      as Set
-import           Data.Text                      ( Text )
-import qualified Data.Text                     as Text
-import qualified Syntax.Abstract               as A
-import qualified Syntax.Abstract.Util          as A
-import           Syntax.Common                  ( Name(..) )
+import Data.Text(Text)
+import qualified Data.Text as Text
+import Data.Loc ( Loc(..), Loc )
+import Control.Monad (liftM2)
+import Data.Map (Map)
+import Syntax.Common (Name(..))
+import Data.Set (Set, (\\))
+import qualified Data.Map as Map
+import qualified Data.Set as Set
+import qualified Syntax.Abstract as A
+import Control.Monad.RWS (RWST(..))
+import Control.Monad.State (StateT(..))
 
 -- Monad for generating fresh variable
 class Monad m => Fresh m where
@@ -93,8 +90,8 @@ instance Free A.Expr where
   fv (A.ArrIdx e1 e2 _    ) = fv e1 <> fv e2
   fv (A.ArrUpd e1 e2 e3 _ ) = fv e1 <> fv e2 <> fv e3
 
-instance Free A.Bindings where
-  fv = fv . A.bindingsToExpr
+-- instance Free A.Bindings where
+--   fv = fv . A.bindingsToExpr
 
 instance Free A.Mapping where
   fv mapping = Set.unions (map fv (Map.elems mapping))

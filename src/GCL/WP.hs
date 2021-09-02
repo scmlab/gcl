@@ -77,7 +77,7 @@ runWP
 runWP p decls = runExcept $ evalRWST p decls (0, 0, 0)
 
 sweep :: A.Program -> Either StructError ([PO], [Spec], [StructWarning])
-sweep (A.Program decls _ _ stmts _) = do
+sweep (A.Program _ decls _ _ stmts _) = do
   let scope = Map.mapKeys nameToText $ A.extractDeclarations decls
   (_, (pos, specs, warnings)) <- runWP (structProgram stmts) scope
   -- update Proof Obligations with corresponding Proof Anchors
@@ -86,7 +86,7 @@ sweep (A.Program decls _ _ stmts _) = do
   let proofAnchors = stmts >>= \case
         A.Proof anchors _ -> anchors
         _                 -> []
-  -- make a table of (#hash, range) from Proof Anchors 
+  -- make a table of (#hash, range) from Proof Anchors
   let table = Map.fromList
         $ map (\(A.ProofAnchor hash range) -> (hash, range)) proofAnchors
   let updatePO po = case Map.lookup (poAnchorHash po) table of
@@ -353,7 +353,7 @@ structGdcmdBnd inv bnd (A.GdCmd guard body _) = withFreshVar $ \oldbnd -> do
 wpStmts :: [A.Stmt] -> Pred -> WP Pred
 wpStmts = wpSegs . groupStmts
 
-  -- handels segments without a precondition. 
+  -- handels segments without a precondition.
   -- switches back to structSegs when seeing an assertion
 wpSegs :: [SegElm] -> Pred -> WP Pred
 wpSegs []                 post = return post
@@ -372,8 +372,8 @@ wpSegs (SAsrt (A.LoopInvariant p bd l) : segs) post = do
   return (Assertion p l) -- SCM: erasing bound information?
 wpSegs _ _ = error "Missing case in wpSegs"
 
-  -- "simple" version of wpStmts. 
-  -- no assertions and specs (in the outer level), 
+  -- "simple" version of wpStmts.
+  -- no assertions and specs (in the outer level),
   -- but may contain invariants in secondary run
 
 wpSStmts :: [A.Stmt] -> Pred -> WP Pred
@@ -515,7 +515,7 @@ sp (pre, _) (A.Assign xs es l) = do
   -- substitute "xs"s with fresh names in "pre"
   scope <- ask
   let pre' = Substitution.run scope xs freshVars (toExpr pre)
-  -- 
+  --
   let predicate = A.conjunct $ zipWith
         (\x e -> A.nameVar x `A.eqq` Substitution.run scope xs freshVars e)
         xs

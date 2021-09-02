@@ -13,8 +13,8 @@ import           Syntax.Abstract
 
 -- | Program
 instance Pretty Program where
-  pretty (Program decls _ _ stmts _) =
-    vsep $ map pretty decls ++ map pretty stmts
+  pretty (Program tdecls decls _ _ stmts _) =
+    vsep $ map pretty tdecls ++ map pretty decls ++ map pretty stmts
 
 --------------------------------------------------------------------------------
 
@@ -42,6 +42,8 @@ instance Pretty Declaration where
       <> " }"
   pretty (LetDecl name args expr _) =
     "let " <> pretty name <> hsep (map pretty args) <> " = " <> pretty expr
+
+instance Pretty TypeDeclaration where
   pretty (TypeDecl qty qdcons _) =
     "data " <> pretty qty <> "= " <> hsep (punctuate "| " (map pretty qdcons))
 

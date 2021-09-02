@@ -340,8 +340,6 @@ checkIsVarAssign declarations (Assign ns _ _) =
           VarDecl   n _ _ _ -> (n ++ vs, cs, ls)
           ConstDecl n _ _ _ -> (vs, n ++ cs, ls)
           LetDecl   n _ _ _ -> (vs, cs, n : ls)
-          -- TODO
-          TypeDecl{}        -> (vs, cs, ls)
 checkIsVarAssign _ _ = return ()
 
 checkEnviornment :: Enviornment -> TM ()
@@ -370,28 +368,21 @@ checkEnviornment env = do
       )
 
 checkProg :: Program -> TM ()
-checkProg (Program decls props defs stmts _) = do
+checkProg (Program tdecls decls props defs stmts _) = do
   mapM_ (checkIsVarAssign decls) stmts
-  env <- declsToEnv decls
+  env <- declsToEnv tdecls decls
   checkEnviornment env
   mapM_ (checkExpr env)   props
   mapM_ (checkAssign env) (Map.toList defs)
   mapM_ (checkStmt env)   stmts
 
-declsToEnv :: [Declaration] -> TM Enviornment
-declsToEnv decls = do
-  env <- foldl (<>) mempty <$> mapM typeDeclToEnv decls
+declsToEnv :: [TypeDeclaration] -> [Declaration] -> TM Enviornment
+declsToEnv tdecls decls = do
+  let env = foldMap typeDeclToEnv tdecls
   foldM declToEnv env decls >>= inferLocalContext
  where
   typeDeclToEnv (TypeDecl qty@(QTyCon n _) qdcons _) = do
-    ds <- foldM (\ds' (QDCon cn ts) -> ds' `extend` (cn, wrapQDCon cn ts))
-                mempty
-                qdcons
-    return $ Enviornment ds (Map.singleton n (qty, qdcons)) mempty
-   where
-    wrapQDCon _  []       = TCon qty
-    wrapQDCon cn (t : ts) = TFunc t (wrapQDCon cn ts) (cn <--> (t : ts))
-  typeDeclToEnv _ = return mempty
+    Enviornment mempty (Map.singleton n (qty, qdcons)) mempty
 
   declToEnv env (ConstDecl ns t _ _) = foldM f env ns
    where
@@ -403,7 +394,6 @@ declsToEnv decls = do
   declToEnv env (LetDecl n args expr _) = return $ env
     { localContext = Map.insert n (wrapLam args expr) (localContext env)
     }
-  declToEnv env _ = return env
 
   inferLocalContext env = do
     Map.foldlWithKey

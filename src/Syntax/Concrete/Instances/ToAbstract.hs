@@ -4,6 +4,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TupleSections #-}
 module Syntax.Concrete.Instances.ToAbstract where
 
 import Control.Monad.Except ( Except, throwError )
@@ -12,9 +13,11 @@ import Syntax.Concrete.Types
 import Syntax.Concrete.Instances.Located()
 import qualified Syntax.Abstract as A
 import qualified Syntax.Abstract.Operator as A
+import qualified Syntax.Abstract.Util as A
 import qualified Syntax.ConstExpr as ConstExpr
 import Syntax.Common (Name, Op(..))
 import Data.Loc.Range
+import Data.Either(partitionEithers)
 
 --------------------------------------------------------------------------------
 
@@ -32,26 +35,27 @@ instance ToAbstract a b => ToAbstract [a] [b] where
 
 -- | Program / Declaration / Statement
 instance ToAbstract Program A.Program where
-  toAbstract prog@(Program decls' stmts') = do
-    decls <- concat <$> toAbstract decls'
-    -- let declarations = ConstExpr.pickDeclarations decls
+  toAbstract prog@(Program ds stmts') = do
+    (tdecls, ds') <- foldl (<>) ([],[]) <$> toAbstract ds
+    let decls = ds' <> foldMap A.extractQDCons tdecls -- add constructors' type into declarations
     let letBindings = ConstExpr.pickLetBindings decls
     let (globProps, assertions) = ConstExpr.pickGlobals decls
     let pre = [A.Assert (A.conjunct assertions) NoLoc | not (null assertions)]
     stmts <- toAbstract stmts'
 
-    return $ A.Program decls globProps letBindings (pre ++ stmts) (locOf prog)
+    return $ A.Program tdecls decls globProps letBindings (pre ++ stmts) (locOf prog)
 
-instance ToAbstract Declaration A.Declaration where
-  toAbstract declaration = case declaration of
+instance ToAbstract Declaration (Either A.TypeDeclaration A.Declaration) where
+  toAbstract d = case d of
     ConstDecl _ decl -> do
-      (name, body, prop) <- toAbstract decl
-      return $ A.ConstDecl name body prop (locOf declaration)
+        (name, body, prop) <- toAbstract decl
+        return . Right $ A.ConstDecl name body prop (locOf d)
     VarDecl _ decl -> do
-      (name, body, prop) <- toAbstract decl
-      return $ A.VarDecl name body prop (locOf declaration)
-    TypeDecl _ tycon _ cons  ->
-        A.TypeDecl <$> toAbstract tycon <*> toAbstract (fromSepBy cons) <*> pure (locOf declaration)
+        (name, body, prop) <- toAbstract decl
+        return . Right $ A.VarDecl name body prop (locOf d)
+    TypeDecl _ tycon _ cons -> do
+        Left <$> (A.TypeDecl <$> toAbstract tycon <*> toAbstract (fromSepBy cons) <*> pure (locOf d))
+
 
 instance ToAbstract BlockDeclaration [A.Declaration] where
   toAbstract (BlockDeclaration _ decls _) = toAbstract decls
@@ -121,9 +125,9 @@ instance ToAbstract BlockDecl A.Declaration where
   toAbstract (Left decl) = toAbstract decl
   toAbstract (Right decl) = toAbstract decl
 
-instance ToAbstract Declaration' [A.Declaration] where
-  toAbstract (Left d) = (:[]) <$> toAbstract d
-  toAbstract (Right bd) = toAbstract bd
+instance ToAbstract Declaration' ([A.TypeDeclaration], [A.Declaration]) where
+  toAbstract (Left d) = partitionEithers . (:[]) <$> toAbstract d
+  toAbstract (Right bd) = ([],) <$> toAbstract bd
 
 --------------------------------------------------------------------------------
 
