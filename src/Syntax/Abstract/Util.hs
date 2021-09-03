@@ -1,7 +1,7 @@
 module Syntax.Abstract.Util where
 
 import Syntax.Abstract
-    ( Expr(Lam), GdCmd(..), Stmt, Declaration(..), TypeDeclaration(..), QDCon(..), Bindings (..), Type (..))
+    ( Expr(Lam), GdCmd(..), Stmt, Declaration(..), Defns, LetDeclaration(..), TypeDeclaration(..), QDCon(..), Bindings (..), Type (..))
 import Syntax.Common (Name)
 import Data.Loc ((<-->), locOf)
 import Data.Map (Map)
@@ -10,11 +10,8 @@ import qualified Data.Map as Map
 extractAssertion :: Declaration -> Maybe Expr
 extractAssertion (ConstDecl _ _ e _) = e
 extractAssertion (VarDecl _ _ e _) = e
-extractAssertion LetDecl {} = Nothing
 
-extractLetBinding :: Declaration -> Maybe (Name, Expr)
-extractLetBinding ConstDecl {} = Nothing
-extractLetBinding VarDecl {} = Nothing
+extractLetBinding :: LetDeclaration -> Maybe (Name, Expr)
 extractLetBinding (LetDecl name args expr _) = Just (name, wrapLam args expr)
 -- TODO:
 
@@ -55,9 +52,10 @@ assignBindingToExpr _ = Nothing
 extractDeclaration :: Declaration -> Map Name (Maybe Expr)
 extractDeclaration (ConstDecl ns _ _ _) = Map.fromList (zip ns (repeat Nothing))
 extractDeclaration (VarDecl ns _ _ _) = Map.fromList (zip ns (repeat Nothing))
-extractDeclaration (LetDecl n args body _) = Map.singleton n (Just (wrapLam args body))
+--extractDeclaration (LetDecl n args body _) = Map.singleton n (Just (wrapLam args body))
+
 -- extract type constructor to env
 --extractDeclaration (TypeDecl _ cons _) = Map.fromList $ map (\(QDCon n _) -> (n, Nothing)) cons
 
-extractDeclarations :: [Declaration] -> Map Name (Maybe Expr)
-extractDeclarations = foldl (\m decl -> m `Map.union` extractDeclaration decl) mempty
+extractDeclarations :: [Declaration] -> Defns -> Map Name (Maybe Expr)
+extractDeclarations decls defns = foldMap extractDeclaration decls <> Map.map Just defns

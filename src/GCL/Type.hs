@@ -22,7 +22,7 @@ import           GCL.Common
 import           Control.Monad.State            ( StateT(..)
                                                 , evalStateT
                                                 )
-import           Syntax.Abstract.Util           ( wrapLam, bindingsToExpr )
+import           Syntax.Abstract.Util           ( bindingsToExpr )
 
 data TypeError
   = NotInScope Name Loc
@@ -323,21 +323,17 @@ checkStmt env (Dispose e _) = checkIsType env e (tInt NoLoc)
 -- NOTE : should this be check here?
 checkIsVarAssign :: [Declaration] -> Stmt -> TM ()
 checkIsVarAssign declarations (Assign ns _ _) =
-  let (_, cs, ls) = splitDecls declarations
+  let (_, cs) = splitDecls declarations
   in  forM_
         ns
-        (\n -> if n `elem` cs
-          then throwError $ AssignToConst n (locOf n)
-          else when (n `elem` ls) $ throwError $ AssignToLet n (locOf n)
-        )
+        (\n -> when (n `elem` cs) $ throwError $ AssignToConst n (locOf n))
  where
-  splitDecls [] = ([], [], [])
+  splitDecls [] = ([], [])
   splitDecls (d : ds) =
-    let (vs, cs, ls) = splitDecls ds
+    let (vs, cs) = splitDecls ds
     in  case d of
-          VarDecl   n _ _ _ -> (n ++ vs, cs, ls)
-          ConstDecl n _ _ _ -> (vs, n ++ cs, ls)
-          LetDecl   n _ _ _ -> (vs, cs, n : ls)
+          VarDecl   n _ _ _ -> (n ++ vs, cs)
+          ConstDecl n _ _ _ -> (vs, n ++ cs)
 checkIsVarAssign _ _ = return ()
 
 checkEnviornment :: Enviornment -> TM ()
@@ -366,21 +362,23 @@ checkEnviornment env = do
       )
 
 checkProg :: Program -> TM ()
-checkProg (Program tdecls decls props defs stmts _) = do
+checkProg (Program tdecls decls props defns stmts _) = do
   mapM_ (checkIsVarAssign decls) stmts
-  env <- declsToEnv tdecls decls
+  env <- declsToEnv tdecls decls defns
   checkEnviornment env
   mapM_ (checkExpr env)   props
-  mapM_ (checkAssign env) (Map.toList defs)
   mapM_ (checkStmt env)   stmts
 
-declsToEnv :: [TypeDeclaration] -> [Declaration] -> TM Enviornment
-declsToEnv tdecls decls = do
-  let env = foldMap typeDeclToEnv tdecls
+declsToEnv :: [TypeDeclaration] -> [Declaration] -> Defns -> TM Enviornment
+declsToEnv tdecls decls defns = do
+  -- add type declaration and defns to enviornment
+  let env = (foldMap typeDeclToEnv tdecls) {localContext = defns}
+
+  -- add var const declaration into enviornment, add type inference result of defns into enviornment
   foldM declToEnv env decls >>= inferLocalContext
  where
   typeDeclToEnv (TypeDecl qty@(QTyCon n _) qdcons _) = do
-    Enviornment mempty (Map.singleton n (qty, qdcons)) mempty
+    mempty {typeDecls = Map.singleton n (qty, qdcons)}
 
   declToEnv env (ConstDecl ns t _ _) = foldM f env ns
    where
@@ -389,9 +387,6 @@ declsToEnv tdecls decls = do
   declToEnv env (VarDecl ns t _ _) = foldM f env ns
    where
     f env' n = env' `extendEnv` Enviornment (Map.singleton n t) mempty mempty
-  declToEnv env (LetDecl n args expr _) = return $ env
-    { localContext = Map.insert n (wrapLam args expr) (localContext env)
-    }
 
   inferLocalContext env = do
     Map.foldlWithKey

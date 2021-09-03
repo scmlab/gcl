@@ -46,6 +46,7 @@ import           Syntax.Parser                  ( runParse
                                                 , pDeclaration
                                                 , pBlockDeclaration
                                                 )
+import           Syntax.ConstExpr               ( pickLetBindings )
 import           Pretty                         ( Pretty(pretty)
                                                 , toText
                                                 , toByteString
@@ -386,7 +387,7 @@ declarationCheck t1 t2 =
   toText
       (
         runParser pDeclaration t1 >>=
-            check (\_ -> uncurry declsToEnv . partitionEithers . (:[])) mempty
+            fmap localDecls . check (\_ -> flip (uncurry declsToEnv) mempty . partitionEithers . (:[])) mempty
       )
     @?= t2
 
@@ -397,8 +398,8 @@ blockDeclarationCheck :: Text -> Text -> Assertion
 blockDeclarationCheck t1 t2 = toText wrap @?= t2
  where
   wrap = do
-    ds <- runParser pBlockDeclaration t1
-    return $ check (\_ -> declsToEnv []) mempty ds
+    (ds, defs) <- runParser pBlockDeclaration t1
+    return $ check (\_ -> flip (declsToEnv []) (pickLetBindings defs)) mempty ds
 
 programCheck :: Text -> Assertion
 programCheck t1 = toText wrap @?= "()"

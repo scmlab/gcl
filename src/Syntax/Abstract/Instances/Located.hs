@@ -11,6 +11,8 @@ instance Located Program where
 instance Located Declaration where
   locOf (ConstDecl _ _ _ l) = l
   locOf (VarDecl _ _ _ l) = l
+
+instance Located LetDeclaration where
   locOf (LetDecl _ _ _ l) = l
 
 instance Located TypeDeclaration where

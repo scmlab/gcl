@@ -81,11 +81,11 @@ instance HasScopes HoverM HoverResult where
     lift $ local (scope :) $ runReaderT p pos
 
 runHoverM :: Program -> Position -> HoverM a -> CmdM a
-runHoverM (Program tdecls decls _ _ _ _) pos f = runReaderT (runReaderT f pos)
+runHoverM (Program tdecls decls _ defns _ _) pos f = runReaderT (runReaderT f pos)
                                                      [declScope]
  where
   declScope :: Map Text HoverResult
-  declScope = case Type.runTM (Type.declsToEnv tdecls decls) of
+  declScope = case Type.runTM (Type.declsToEnv tdecls decls defns) of
     -- ignore type errors
     Left  _   -> Map.empty
     Right env -> Map.mapKeys nameToText $ Map.map typeToHoverResult (Type.localDecls env)
@@ -112,7 +112,9 @@ instance StabM HoverM Declaration HoverResult where
   stabM = \case
     ConstDecl a    _    c    _ -> (<>) <$> stabLocated a <*> stabLocated c
     VarDecl   a    _    c    _ -> (<>) <$> stabLocated a <*> stabLocated c
-    LetDecl   name args body _ -> do
+
+instance StabM HoverM LetDeclaration HoverResult where
+  stabM (LetDecl   name args body _) = do
       name' <- stabLocated name
       -- creates a local scope for arguments
       args' <- stabM (toArgs name args)

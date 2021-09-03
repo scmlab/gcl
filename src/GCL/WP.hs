@@ -77,8 +77,8 @@ runWP
 runWP p decls = runExcept $ evalRWST p decls (0, 0, 0)
 
 sweep :: A.Program -> Either StructError ([PO], [Spec], [StructWarning])
-sweep (A.Program _ decls _ _ stmts _) = do
-  let scope = Map.mapKeys nameToText $ A.extractDeclarations decls
+sweep (A.Program _ decls _ defns stmts _) = do
+  let scope = Map.mapKeys nameToText $ A.extractDeclarations decls defns
   (_, (pos, specs, warnings)) <- runWP (structProgram stmts) scope
   -- update Proof Obligations with corresponding Proof Anchors
 
