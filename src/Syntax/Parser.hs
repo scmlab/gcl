@@ -4,24 +4,45 @@
 
 module Syntax.Parser where
 
-import Control.Applicative.Combinators (choice, eitherP, many, optional, sepBy1, (<|>), manyTill, some)
-import Control.Monad (void)
-import Control.Monad.Combinators.Expr (Operator (..), makeExprParser)
-import Control.Monad.Trans (lift)
-import Data.Data (Proxy (Proxy))
-import Data.Loc (Located (locOf))
-import Data.Maybe (isJust)
-import qualified Data.Ord as Ord
-import Data.Text (Text)
-import Syntax.Common (Name (..), ChainOp, ArithOp)
-import Syntax.Concrete
-import Syntax.Parser.Lexer
-import Syntax.Parser.Util
-import Text.Megaparsec (MonadParsec (..), Pos, anySingle, parse, tokensToChunk, (<?>), manyTill_)
-import Text.Megaparsec.Char (eol)
-import qualified Text.Megaparsec.Char.Lexer as Lex
-import Data.Bifunctor (second)
-import Data.Loc.Range (rangeOf)
+import           Control.Applicative.Combinators
+                                                ( choice
+                                                , eitherP
+                                                , many
+                                                , optional
+                                                , sepBy1
+                                                , (<|>)
+                                                , manyTill
+                                                , some
+                                                )
+import           Control.Monad                  ( void )
+import           Control.Monad.Combinators.Expr ( Operator(..)
+                                                , makeExprParser
+                                                )
+import           Control.Monad.Trans            ( lift )
+import           Data.Data                      ( Proxy(Proxy) )
+import           Data.Loc                       ( Located(locOf) )
+import           Data.Maybe                     ( isJust )
+import qualified Data.Ord                      as Ord
+import           Data.Text                      ( Text )
+import           Syntax.Common                  ( Name(..)
+                                                , ChainOp
+                                                , ArithOp
+                                                )
+import           Syntax.Concrete
+import           Syntax.Parser.Lexer
+import           Syntax.Parser.Util
+import           Text.Megaparsec                ( MonadParsec(..)
+                                                , Pos
+                                                , anySingle
+                                                , parse
+                                                , tokensToChunk
+                                                , (<?>)
+                                                , manyTill_
+                                                )
+import           Text.Megaparsec.Char           ( eol )
+import qualified Text.Megaparsec.Char.Lexer    as Lex
+import           Data.Bifunctor                 ( second )
+import           Data.Loc.Range                 ( rangeOf )
 
 -- The monad binding of ParserF will insert space consumer or indent guard inbetween,
 -- which sould be convenient for handling linefold indentation.
@@ -49,10 +70,9 @@ type ParserF = LexerF
 ------------------------------------------
 
 runParse :: Parser a -> FilePath -> Text -> Either [SyntacticError] a
-runParse p filepath s =
-  case parse p filepath s of
-    Left e -> Left (fromParseErrorBundle e)
-    Right x -> Right x
+runParse p filepath s = case parse p filepath s of
+  Left  e -> Left (fromParseErrorBundle e)
+  Right x -> Right x
 
 pProgram :: Parser Program
 pProgram = do
@@ -65,40 +85,25 @@ pProgram = do
 
 pDeclaration :: Parser Declaration
 pDeclaration = Lex.lineFold scn (parser p)
-  where
-    p = (pConstDecl <|> pVarDecl <|> pTypeDecl)
-        <* lift scn
-        <?> "declaration"
+ where
+  p = (pConstDecl <|> pVarDecl <|> pTypeDecl) <* lift scn <?> "declaration"
 
 pBlockDeclaration :: Parser BlockDeclaration
 pBlockDeclaration = (↓) pBlockDeclaration' scn
 
 pBlockDeclaration' :: ParserF BlockDeclaration
 pBlockDeclaration' =
-  BlockDeclaration
-  <$> lexDeclStart
-  <*> pIndentBlock pBlockDecl
-  <*> lexDeclEnd
+  BlockDeclaration <$> lexDeclStart <*> pIndentBlock pBlockDecl <*> lexDeclEnd
 
 pConstDecl :: ParserF Declaration
-pConstDecl =
-  ConstDecl
-  <$> lexCon
-  <*> pDeclType pName
+pConstDecl = ConstDecl <$> lexCon <*> pDeclType pName
 
 pVarDecl :: ParserF Declaration
-pVarDecl =
-  VarDecl
-  <$> lexVar
-  <*> pDeclType lowerName
+pVarDecl = VarDecl <$> lexVar <*> pDeclType lowerName
 
 pTypeDecl :: ParserF Declaration
 pTypeDecl =
-  TypeDecl
-  <$> lexData
-  <*> pQTyCon
-  <*> lexEqual
-  <*> pSepBy lexGuardBar pQDCon
+  TypeDecl <$> lexData <*> pQTyCon <*> lexEqual <*> pSepBy lexGuardBar pQDCon
 
 pQTyCon :: ParserF QTyCon
 pQTyCon = QTyCon <$> pName <*> many pName
@@ -111,41 +116,26 @@ pBlockDecl :: ParserF BlockDecl
 pBlockDecl = lift $ Lex.lineFold scn (eitherP (try pBlockDeclType) pDeclBody ↓)
 
 pDeclBase :: ParserF Name -> ParserF DeclBase
-pDeclBase name =
-  DeclBase
-  <$> pList name
-  <*> lexColon
-  <*> pType'
+pDeclBase name = DeclBase <$> pList name <*> lexColon <*> pType'
 
 pDeclProp :: ParserF DeclProp
-pDeclProp =
-  DeclProp
-  <$> lexBraceStart
-  <*> pExpr'
-  <*> lexBraceEnd
+pDeclProp = DeclProp <$> lexBraceStart <*> pExpr' <*> lexBraceEnd
 
 pDeclType :: ParserF Name -> ParserF DeclType
-pDeclType name =
-  DeclType
-  <$> pDeclBase name
-  <*> optional pDeclProp
+pDeclType name = DeclType <$> pDeclBase name <*> optional pDeclProp
 
 pDeclBody :: ParserF DeclBody
-pDeclBody =
-  DeclBody
-  <$> pName
-  <*> many lowerName
-  <*> lexEqual
-  <*> pExpr'
+pDeclBody = DeclBody <$> pName <*> many lowerName <*> lexEqual <*> pExpr'
 
 pBlockDeclProp :: ParserF BlockDeclProp
 pBlockDeclProp = eitherP pDeclProp pExpr'
 
 pBlockDeclType :: ParserF BlockDeclType
-pBlockDeclType = do
-  BlockDeclType
-  <$> pDeclBase pName
-  <*> optional pBlockDeclProp
+pBlockDeclType =
+  do
+      BlockDeclType
+    <$> pDeclBase pName
+    <*> optional pBlockDeclProp
 
 ------------------------------------------
 -- parse Stmt
@@ -163,23 +153,23 @@ pStmt = Lex.lineFold scn (pStmt' ↓) <?> "statement"
 pStmt' :: ParserF Stmt
 pStmt' =
   choice
-    [ pSkip,
-      pProof,
-      pAbort,
-      try pAssert,
-      pLoopInvariant,
-      try pAssign,
-      try pAAssign,
-      try pAlloc,
-      try pHLookup,
-      pHMutate,
-      pDispose,
-      pDo,
-      pIf,
-      pSpecQM,
-      pSpec
-    ]
-    <* lift sc
+      [ pSkip
+      , pProof
+      , pAbort
+      , try pAssert
+      , pLoopInvariant
+      , try pAssign
+      , try pAAssign
+      , try pAlloc
+      , try pHLookup
+      , pHMutate
+      , pDispose
+      , pDo
+      , pIf
+      , pSpecQM
+      , pSpec
+      ]
+    <*  lift sc
     <?> "statement"
 
 pSkip :: ParserF Stmt
@@ -192,7 +182,14 @@ pAssign :: ParserF Stmt
 pAssign = Assign <$> pList lowerName <*> lexAssign <*> pList pExpr'
 
 pAAssign :: ParserF Stmt
-pAAssign = AAssign <$> lowerName <*> lexBracketStart <*> pExpr' <*> lexBracketEnd <*> lexAssign <*> pExpr'
+pAAssign =
+  AAssign
+    <$> lowerName
+    <*> lexBracketStart
+    <*> pExpr'
+    <*> lexBracketEnd
+    <*> lexAssign
+    <*> pExpr'
 
 pAssert :: ParserF Stmt
 pAssert = Assert <$> lexBraceStart <*> pExpr' <*> lexBraceEnd
@@ -209,25 +206,18 @@ pLoopInvariant =
     <*> lexBraceEnd
 
 pDo :: ParserF Stmt
-pDo =
-  Do
-  <$> lexDo
-  <*> pIndentSepBy pGdCmd lexGuardBar
-  <*> lexOd
+pDo = Do <$> lexDo <*> pIndentSepBy pGdCmd lexGuardBar <*> lexOd
 
 pIf :: ParserF Stmt
-pIf = do
-  If
-  <$> lexIf
-  <*> pIndentSepBy pGdCmd lexGuardBar
-  <*> lexFi
+pIf =
+  do
+      If
+    <$> lexIf
+    <*> pIndentSepBy pGdCmd lexGuardBar
+    <*> lexFi
 
 pGdCmd :: ParserF GdCmd
-pGdCmd =
-  GdCmd
-  <$> pExpr'
-  <*> lexArrow
-  <*> pIndentBlock (lift pStmt)
+pGdCmd = GdCmd <$> pExpr' <*> lexArrow <*> pIndentBlock (lift pStmt)
 
 pSpecQM :: ParserF Stmt
 pSpecQM = SpecQM . rangeOf <$> lexQM
@@ -241,56 +231,38 @@ pProofAnchor :: ParserF ProofAnchor
 pProofAnchor = uncurry ProofAnchor <$> lexProofAnchor
 
 pProof :: ParserF Stmt
-pProof = Proof
-          <$> lexProofStart
-          <*> pProofAnchorsOrProofEnd
-          <*> lexProofEnd
-  where
-    pProofAnchorsOrProofEnd :: ParserF [ProofAnchor]
-    pProofAnchorsOrProofEnd = do
-      let anchorOrEnd = choice
-                          [ lexProofEnd >> return False
-                          , pProofAnchor >> return True
-                          ]
-      (_, continue) <- manyTill_ anySingle (lookAhead anchorOrEnd)
-      if continue
-        then do
-            x <- pProofAnchor
-            xs <- pProofAnchorsOrProofEnd
-            return (x:xs)
-        else return []
+pProof = Proof <$> lexProofStart <*> pProofAnchorsOrProofEnd <*> lexProofEnd
+ where
+  pProofAnchorsOrProofEnd :: ParserF [ProofAnchor]
+  pProofAnchorsOrProofEnd = do
+    let anchorOrEnd =
+          choice [lexProofEnd >> return False, pProofAnchor >> return True]
+    (_, continue) <- manyTill_ anySingle (lookAhead anchorOrEnd)
+    if continue
+      then do
+        x  <- pProofAnchor
+        xs <- pProofAnchorsOrProofEnd
+        return (x : xs)
+      else return []
 
 pAlloc :: ParserF Stmt
 pAlloc =
   Alloc
-  <$> lowerName
-  <*> lexAssign
-  <*> lexNew
-  <*> lexParenStart
-  <*> pList pExpr'
-  <*> lexParenEnd
+    <$> lowerName
+    <*> lexAssign
+    <*> lexNew
+    <*> lexParenStart
+    <*> pList pExpr'
+    <*> lexParenEnd
 
 pHLookup :: ParserF Stmt
-pHLookup =
-  HLookup
-  <$> lowerName
-  <*> lexAssign
-  <*> lexStar
-  <*> pExpr'
+pHLookup = HLookup <$> lowerName <*> lexAssign <*> lexStar <*> pExpr'
 
 pHMutate :: ParserF Stmt
-pHMutate =
-  HMutate
-  <$> lexStar
-  <*> pExpr'
-  <*> lexAssign
-  <*> pExpr'
+pHMutate = HMutate <$> lexStar <*> pExpr' <*> lexAssign <*> pExpr'
 
 pDispose :: ParserF Stmt
-pDispose =
-  Dispose
-  <$> lexDispose
-  <*> pExpr'
+pDispose = Dispose <$> lexDispose <*> pExpr'
 
 ------------------------------------------
 -- parse Type
@@ -300,10 +272,11 @@ pType :: Parser Type
 pType = (↓) pType' scn <?> "type"
 
 pType' :: ParserF Type
-pType' = makeExprParser pType'Term [[InfixR pTFunc]]
-    <* (↑) (\sc' -> try sc' <|> sc) <?> "type"
-    where
-    pType'Term = choice [pTParen, pTArray, pTCon, pTBase, pTVar]
+pType' =
+  makeExprParser pType'Term [[InfixR pTFunc]]
+    <*  (↑) (\sc' -> try sc' <|> sc)
+    <?> "type"
+  where pType'Term = choice [pTParen, pTArray, pTBase, try pTVar, pTCon]
 
 pTFunc :: ParserF (Type -> Type -> Type)
 pTFunc = do
@@ -320,16 +293,14 @@ pTCon :: ParserF Type
 pTCon = TCon <$> pQTyCon
 
 pTBase :: ParserF Type
-pTBase =
-  TBase
-    <$> choice
-      [ TInt . rangeOf <$> lexTypeInt,
-        TBool . rangeOf <$> lexTypeBool,
-        TChar . rangeOf <$> lexTypeChar
-      ]
+pTBase = TBase <$> choice
+  [ TInt . rangeOf <$> lexTypeInt
+  , TBool . rangeOf <$> lexTypeBool
+  , TChar . rangeOf <$> lexTypeChar
+  ]
 
 pTVar :: ParserF Type
-pTVar = TVar <$> upperName
+pTVar = TVar <$> pName
 
 pInterval :: ParserF Interval
 pInterval = Interval <$> pEndpointOpen <*> lexRange <*> pEndpointClose
@@ -337,12 +308,12 @@ pInterval = Interval <$> pEndpointOpen <*> lexRange <*> pEndpointClose
 pEndpointOpen :: ParserF EndpointOpen
 pEndpointOpen =
   (IncludingOpening <$> lexBracketStart <*> pExpr')
-  <|> (ExcludingOpening <$> lexParenStart <*> pExpr')
+    <|> (ExcludingOpening <$> lexParenStart <*> pExpr')
 
 pEndpointClose :: ParserF EndpointClose
 pEndpointClose =
   try (IncludingClosing <$> pExpr' <*> lexBracketEnd)
-  <|> (ExcludingClosing <$> pExpr' <*> lexParenEnd)
+    <|> (ExcludingClosing <$> pExpr' <*> lexParenEnd)
 
 ------------------------------------------
 -- parse Expr
@@ -352,23 +323,24 @@ pExpr :: Parser Expr
 pExpr = (↓) pExpr' scn <?> "expression"
 
 pExpr' :: ParserF Expr
-pExpr' = makeExprParser pExprArith chainOpTable <* (↑) (\sc' -> try sc' <|> sc) <?> "expression"
+pExpr' =
+  makeExprParser pExprArith chainOpTable
+    <*  (↑) (\sc' -> try sc' <|> sc)
+    <?> "expression"
 
 chainOpTable :: [[Operator ParserF Expr]]
 chainOpTable =
-  [
-    [InfixL . pChain $ lexEQ],
-    [
-      InfixL . pChain . choice $ [lexNEQ, lexNEQU],
-      InfixL . pChain $ lexLT,
-      InfixL . pChain . choice $ [lexLTE, lexLTEU],
-      InfixL . pChain $ lexGT,
-      InfixL . pChain . choice $ [lexGTE, lexGTEU]
-    ],
-    [InfixL . pBinary . choice $ [lexConj, lexConjU]],
-    [InfixL . pBinary . choice $ [lexDisj, lexDisjU]],
-    [InfixL . pBinary . choice $ [lexImpl, lexImplU]],
-    [InfixL . pChain $ lexEQProp, InfixL . pChain $ lexEQPropU]
+  [ [InfixL . pChain $ lexEQ]
+  , [ InfixL . pChain . choice $ [lexNEQ, lexNEQU]
+    , InfixL . pChain $ lexLT
+    , InfixL . pChain . choice $ [lexLTE, lexLTEU]
+    , InfixL . pChain $ lexGT
+    , InfixL . pChain . choice $ [lexGTE, lexGTEU]
+    ]
+  , [InfixL . pBinary . choice $ [lexConj, lexConjU]]
+  , [InfixL . pBinary . choice $ [lexDisj, lexDisjU]]
+  , [InfixL . pBinary . choice $ [lexImpl, lexImplU]]
+  , [InfixL . pChain $ lexEQProp, InfixL . pChain $ lexEQPropU]
   ]
 
 pExprArith :: ParserF Expr
@@ -376,13 +348,13 @@ pExprArith = makeExprParser pTerm arithTable <* (↑) (\sc' -> try sc' <|> sc)
 
 arithTable :: [[Operator ParserF Expr]]
 arithTable =
-  [ [Postfix pApp],
-    [InfixN (pBinary lexExp)],
-    [InfixN (pBinary lexMax), InfixN (pBinary lexMin)],
-    [InfixL (pBinary lexMod)],
-    [InfixL (pBinary lexMul), InfixL (pBinary lexDiv)],
-    [InfixL (pBinary lexAdd), InfixL (pBinary lexSub)],
-    [Prefix . pUnary . choice $ [lexNeg, lexNegU]]
+  [ [Postfix pApp]
+  , [InfixN (pBinary lexExp)]
+  , [InfixN (pBinary lexMax), InfixN (pBinary lexMin)]
+  , [InfixL (pBinary lexMod)]
+  , [InfixL (pBinary lexMul), InfixL (pBinary lexDiv)]
+  , [InfixL (pBinary lexAdd), InfixL (pBinary lexSub)]
+  , [Prefix . pUnary . choice $ [lexNeg, lexNegU]]
   ]
 
 -- pTerm :: ParserF Expr
@@ -399,16 +371,16 @@ pParen = Paren <$> lexParenStart <*> pExpr' <*> lexParenEnd
 pArray :: ParserF Expr
 pArray = do
   arr <- choice [pParen, pVar, pConst]
-  is <- some $ do
+  is  <- some $ do
     bs <- lexBracketStart
-    i <- pExprArith
+    i  <- pExprArith
     be <- lexBracketEnd
     return (bs, i, be)
   return $ pArrayHelper arr is
-  where
-    pArrayHelper :: Expr -> [(Token "[", Expr, Token "]")] -> Expr
-    pArrayHelper a [] = a
-    pArrayHelper a ((bs, i, be):is) = pArrayHelper (Arr a bs i be) is
+ where
+  pArrayHelper :: Expr -> [(Token "[", Expr, Token "]")] -> Expr
+  pArrayHelper a []                 = a
+  pArrayHelper a ((bs, i, be) : is) = pArrayHelper (Arr a bs i be) is
 
 pLit :: ParserF Expr
 pLit = Lit <$> lexLits
@@ -422,17 +394,17 @@ pConst = Const <$> pName
 pQuant :: ParserF Expr
 pQuant =
   Quant
-  <$> lexQuantStarts
-  <*> pQuantOp
-  <*> pQuantNames
-  <*> lexColon
-  <*> pExpr'
-  <*> lexColon
-  <*> pExpr'
-  <*> lexQuantEnds
-  where
-    pQuantOp = choice [Left <$> lexOps, Right <$> pTerm]
-    pQuantNames = sepBy1 lowerName . try . (↑) $ id
+    <$> lexQuantStarts
+    <*> pQuantOp
+    <*> pQuantNames
+    <*> lexColon
+    <*> pExpr'
+    <*> lexColon
+    <*> pExpr'
+    <*> lexQuantEnds
+ where
+  pQuantOp    = choice [Left <$> lexOps, Right <$> pTerm]
+  pQuantNames = sepBy1 lowerName . try . (↑) $ id
 
 pApp :: ParserF (Expr -> Expr)
 pApp = do
@@ -471,10 +443,7 @@ upperName = uncurry Name . second locOf <$> lexUpper
 lowerName :: ParserF Name
 lowerName = uncurry Name . second locOf <$> lexLower
 
-pSepBy ::
-  ParserF (Token sep) ->
-  ParserF a ->
-  ParserF (SepBy sep a)
+pSepBy :: ParserF (Token sep) -> ParserF a -> ParserF (SepBy sep a)
 pSepBy delim p = do
   x <- p
   let f = return (Head x)
@@ -497,50 +466,56 @@ pList = pSepBy lexComma
 --  ...
 --    end
 --
-pBlock ::
-  ParserF s ->                      -- start parser
-  ParserF a ->                      -- parser inbetween
-  ParserF e ->                      -- end parser
-  ParserF (s, [a], e)
+pBlock
+  :: ParserF s
+  ->                      -- start parser
+     ParserF a
+  ->                      -- parser inbetween
+     ParserF e
+  ->                      -- end parser
+     ParserF (s, [a], e)
 pBlock start p end = do
   ts <- lift start'                        -- release linefold restriction
-  t <- lift $ manyTill p' (lookAhead end') -- release linefold restriction
+  t  <- lift $ manyTill p' (lookAhead end') -- release linefold restriction
   te <- end
   return (ts, t, te)
-  where
-    p' = (↓) p sc
-    start' = (↓) start sc
-    end' = (↓) end sc
+ where
+  p'     = (↓) p sc
+  start' = (↓) start sc
+  end'   = (↓) end sc
 
 -- parse indentblock with delim
-pIndentSepBy ::
-  ParserF a ->                      -- parser to be indented
-  ParserF (Token sep) ->            -- delim parser
-  ParserF (SepBy sep a)
+pIndentSepBy
+  :: ParserF a
+  ->                      -- parser to be indented
+     ParserF (Token sep)
+  ->            -- delim parser
+     ParserF (SepBy sep a)
 pIndentSepBy p delim = do
   gdPos <- Lex.indentLevel
-  x <- p
+  x     <- p
   let g = do
         delimPos <- Lex.indentLevel
         if compare delimPos gdPos == Ord.LT
           then Delim x <$> lift (delim' gdPos) <*> parseP gdPos delimPos
           else Lex.incorrectIndent Ord.LT gdPos delimPos
   try g <|> return (Head x)
-  where
+ where
     -- make sure parser after delim start at the same position
-    delim' pos = (↓) delim (void $ Lex.indentGuard sc Ord.EQ pos)
+  delim' pos = (↓) delim (void $ Lex.indentGuard sc Ord.EQ pos)
 
-    parseP gdPos delimPos = do
-      x <- p
-      let g = do
-            -- make sure the delim parser start at the same position
-            lift . void $ Lex.indentGuard scn Ord.EQ delimPos
-            Delim x <$> lift (delim' gdPos) <*> parseP gdPos delimPos
-      try g <|> return (Head x)
+  parseP gdPos delimPos = do
+    x <- p
+    let g = do
+          -- make sure the delim parser start at the same position
+          lift . void $ Lex.indentGuard scn Ord.EQ delimPos
+          Delim x <$> lift (delim' gdPos) <*> parseP gdPos delimPos
+    try g <|> return (Head x)
 
-pIndentBlock ::
-  ParserF a ->                      -- parser to be indented
-  ParserF [a]
+pIndentBlock
+  :: ParserF a
+  ->                      -- parser to be indented
+     ParserF [a]
 pIndentBlock p = do
   pos <- Lex.indentLevel
   mp0 <- optional . try . lift $ p'
@@ -548,7 +523,7 @@ pIndentBlock p = do
   case mp0 of
     Just p0 -> do
       isEol <- optional . try $ eol
-      done <- isJust <$> optional eof
+      done  <- isJust <$> optional eof
       case (isEol, done) of
         (Just _, False) -> do
           ps <- lift $ indentedItems pos scn p'
@@ -556,25 +531,18 @@ pIndentBlock p = do
         _ -> do
           return [p0]                          -- eof or no newline => only one indented element
     Nothing -> return []
-  where
-    p' = (↓) p sc                             -- make sure p doesn't parse newline
+  where p' = (↓) p sc                             -- make sure p doesn't parse newline
 
 -- copied from Text.Megaparsec.Char.Lexer
-indentedItems ::
-  (MonadParsec e s m) =>
-  Pos ->
-  m () ->
-  m b ->
-  m [b]
+indentedItems :: (MonadParsec e s m) => Pos -> m () -> m b -> m [b]
 indentedItems lvl sc' p = go
-  where
-    go = do
-      sc'
-      pos <- Lex.indentLevel
-      done <- isJust <$> optional eof
-      if done
-        then return []
-        else
-          if pos == lvl
-          then try ((:) <$> p <*> go) <|> return []
-          else return []
+ where
+  go = do
+    sc'
+    pos  <- Lex.indentLevel
+    done <- isJust <$> optional eof
+    if done
+      then return []
+      else if pos == lvl
+        then try ((:) <$> p <*> go) <|> return []
+        else return []

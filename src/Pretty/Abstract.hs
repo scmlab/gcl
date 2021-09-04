@@ -53,8 +53,10 @@ instance Pretty QTyCon where
   pretty (QTyCon n args) = pretty n <+> hsep (map pretty args)
 
 instance Pretty QDCon where
-  pretty (QDCon cn ts) = pretty cn <+> hsep (map pretty ts)
-
+  pretty (QDCon cn ts) = pretty cn <+> hsep (map wrap ts)
+   where
+    wrap t@TBase{} = pretty t
+    wrap t         = "(" <> pretty t <> ")"
 --------------------------------------------------------------------------------
 
 -- | Stmt

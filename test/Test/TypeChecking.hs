@@ -23,6 +23,7 @@ import           GCL.Type                       ( TM
                                                 , declsToEnv
                                                 , checkType
                                                 , checkStmt
+                                                , checkEnviornment
                                                 , checkProg
                                                 , runTM
                                                 )
@@ -199,7 +200,7 @@ declarationTests = testGroup
     $ declarationCheck "var x : Bool { x = True }" "Enviornment[(x, Bool)][][]"
   , testCase "type declaration" $ declarationCheck
     "data T a = Nil | Con a"
-    "Enviornment[(Con, a → T a), (Nil, T a)][(T, (T a, [Nil , Con a]))][]"
+    "Enviornment[(Con, TVar a → T a), (Nil, T a)][(T, (T a, [Nil , Con (TVar a)]))][]"
   ]
 
 blockDeclarationTests :: TestTree
@@ -390,7 +391,14 @@ declarationCheck t1 t2 = toText wrap @?= t2
   wrap = do
     (tds, ds) <- partitionEithers . (: []) <$> runParser pDeclaration t1
     let ds' = ds <> foldMap extractQDCons tds
-    return $ check (\_ d -> declsToEnv tds d mempty) mempty ds'
+    return $ check
+      (\_ ds'' -> do
+        env' <- declsToEnv tds ds'' mempty
+        checkEnviornment env'
+        return env'
+      )
+      mempty
+      ds'
 
 envCheck :: Text -> Assertion
 envCheck t = toText env @?= t
