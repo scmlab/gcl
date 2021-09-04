@@ -50,10 +50,10 @@ instance Pretty TypeDeclaration where
     "data " <> pretty qty <> "= " <> hsep (punctuate "| " (map pretty qdcons))
 
 instance Pretty QTyCon where
-  pretty (QTyCon n args) = pretty n <> hsep (map pretty args)
+  pretty (QTyCon n args) = pretty n <+> hsep (map pretty args)
 
 instance Pretty QDCon where
-  pretty (QDCon cn ts) = pretty cn <> hsep (map pretty ts)
+  pretty (QDCon cn ts) = pretty cn <+> hsep (map pretty ts)
 
 --------------------------------------------------------------------------------
 

@@ -34,6 +34,7 @@ import           Syntax.Abstract                ( Lit(..)
                                                 , Interval(..)
                                                 , Endpoint(..)
                                                 )
+import           Syntax.Abstract.Util           ( extractQDCons )
 import           Syntax.Common                  ( Name(Name)
                                                 , Op
                                                 )
@@ -188,14 +189,17 @@ stmtTests = testGroup
 declarationTests :: TestTree
 declarationTests = testGroup
   "Check Declaration"
-  [ testCase "const declaration" $ declarationCheck "con C : Int" "[(C, Int)]"
+  [ testCase "const declaration"
+    $ declarationCheck "con C : Int" "Enviornment[(C, Int)][][]"
   , testCase "const declaration w/ prop"
-    $ declarationCheck "con C : Int { C > 0 }" "[(C, Int)]"
-  , testCase "var declaration" $ declarationCheck "var x : Bool" "[(x, Bool)]"
+    $ declarationCheck "con C : Int { C > 0 }" "Enviornment[(C, Int)][][]"
+  , testCase "var declaration"
+    $ declarationCheck "var x : Bool" "Enviornment[(x, Bool)][][]"
   , testCase "var declaration w/ prop"
-    $ declarationCheck "var x : Bool { x = True }" "[(x, Bool)]"
-  --, testCase "type declaration"
-    --  $ declarationCheck "data T a = Nil | Con a" "[(Con, a → T a), (Nil, T a)]"
+    $ declarationCheck "var x : Bool { x = True }" "Enviornment[(x, Bool)][][]"
+  , testCase "type declaration" $ declarationCheck
+    "data T a = Nil | Con a"
+    "Enviornment[(Con, a → T a), (Nil, T a)][(T, (T a, [Nil , Con a]))][]"
   ]
 
 blockDeclarationTests :: TestTree
@@ -224,8 +228,7 @@ blockDeclarationTests = testGroup
         \  F : Int -> Int -> Int\n\
         \  P : Char -> Bool\n\
         \:}"
-    "Enviornment[(A, Int), (B, Int), (F, Int → Int → Int), (P, Char → Bool)]\
-    \[][]"
+    "Enviornment[(A, Int), (B, Int), (F, Int → Int → Int), (P, Char → Bool)][][]"
   , testCase "block declaration 5" $ blockDeclarationCheck
     "{:\n\
         \   N = 5\n\
@@ -354,8 +357,7 @@ env = Enviornment
   , localContext = mempty
   }
 
-runParser
-  :: ToAbstract a b => Parser a -> Text -> Either [Error] b
+runParser :: ToAbstract a b => Parser a -> Text -> Either [Error] b
 runParser p t = case runExcept . toAbstract <$> parseTest p t of
   Left  errs         -> Left $ map SyntacticError errs
   Right (Left  loc ) -> Left [Others (show loc)]
@@ -383,13 +385,12 @@ stmtCheck' t = stmtCheck t "()"
 
 
 declarationCheck :: Text -> Text -> Assertion
-declarationCheck t1 t2 =
-  toText
-      (
-        runParser pDeclaration t1 >>=
-            fmap localDecls . check (\_ -> flip (uncurry declsToEnv) mempty . partitionEithers . (:[])) mempty
-      )
-    @?= t2
+declarationCheck t1 t2 = toText wrap @?= t2
+ where
+  wrap = do
+    (tds, ds) <- partitionEithers . (: []) <$> runParser pDeclaration t1
+    let ds' = ds <> foldMap extractQDCons tds
+    return $ check (\_ d -> declsToEnv tds d mempty) mempty ds'
 
 envCheck :: Text -> Assertion
 envCheck t = toText env @?= t
