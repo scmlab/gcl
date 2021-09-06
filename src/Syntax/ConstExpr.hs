@@ -33,5 +33,5 @@ pickGlobals :: [Declaration] -> ([Expr], [Expr])
 pickGlobals = partition (constExpr []) . mapMaybe extractAssertion
 
 -- extract let bindings in declarations
-pickLetBindings :: [Declaration] -> Defns
+pickLetBindings :: [LetDeclaration] -> Defns
 pickLetBindings = Map.fromList . mapMaybe extractLetBinding

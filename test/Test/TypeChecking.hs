@@ -23,6 +23,7 @@ import           GCL.Type                       ( TM
                                                 , declsToEnv
                                                 , checkType
                                                 , checkStmt
+                                                , checkEnvironment
                                                 , checkProg
                                                 , runTM
                                                 )
@@ -34,6 +35,7 @@ import           Syntax.Abstract                ( Lit(..)
                                                 , Interval(..)
                                                 , Endpoint(..)
                                                 )
+import           Syntax.Abstract.Util           ( extractQDCons )
 import           Syntax.Common                  ( Name(Name)
                                                 , Op
                                                 )
@@ -46,6 +48,7 @@ import           Syntax.Parser                  ( runParse
                                                 , pDeclaration
                                                 , pBlockDeclaration
                                                 )
+import           Syntax.ConstExpr               ( pickLetBindings )
 import           Pretty                         ( Pretty(pretty)
                                                 , toText
                                                 , toByteString
@@ -187,14 +190,17 @@ stmtTests = testGroup
 declarationTests :: TestTree
 declarationTests = testGroup
   "Check Declaration"
-  [ testCase "const declaration" $ declarationCheck "con C : Int" "Environment[(C, Int)][][]"
+  [ testCase "const declaration"
+    $ declarationCheck "con C : Int" "Environment[(C, Int)][][]"
   , testCase "const declaration w/ prop"
     $ declarationCheck "con C : Int { C > 0 }" "Environment[(C, Int)][][]"
-  , testCase "var declaration" $ declarationCheck "var x : Bool" "Environment[(x, Bool)][][]"
+  , testCase "var declaration"
+    $ declarationCheck "var x : Bool" "Environment[(x, Bool)][][]"
   , testCase "var declaration w/ prop"
     $ declarationCheck "var x : Bool { x = True }" "Environment[(x, Bool)][][]"
-  --, testCase "type declaration"
-    --  $ declarationCheck "data T a = Nil | Con a" "[(Con, a → T a), (Nil, T a)]"
+  , testCase "type declaration" $ declarationCheck
+    "data T a = Nil | Con a"
+    "Environment[(Con, TVar a → T a), (Nil, T a)][(T, (T a, [Nil , Con (TVar a)]))][]"
   ]
 
 blockDeclarationTests :: TestTree
@@ -223,8 +229,7 @@ blockDeclarationTests = testGroup
         \  F : Int -> Int -> Int\n\
         \  P : Char -> Bool\n\
         \:}"
-    "Environment[(A, Int), (B, Int), (F, Int → Int → Int), (P, Char → Bool)]\
-    \[][]"
+    "Environment[(A, Int), (B, Int), (F, Int → Int → Int), (P, Char → Bool)][][]"
   , testCase "block declaration 5" $ blockDeclarationCheck
     "{:\n\
         \   N = 5\n\
@@ -353,8 +358,7 @@ env = Environment
   , localContext = mempty
   }
 
-runParser
-  :: ToAbstract a b => Parser a -> Text -> Either [Error] b
+runParser :: ToAbstract a b => Parser a -> Text -> Either [Error] b
 runParser p t = case runExcept . toAbstract <$> parseTest p t of
   Left  errs         -> Left $ map SyntacticError errs
   Right (Left  loc ) -> Left [Others (show loc)]
@@ -382,13 +386,19 @@ stmtCheck' t = stmtCheck t "()"
 
 
 declarationCheck :: Text -> Text -> Assertion
-declarationCheck t1 t2 =
-  toText
-      (
-        runParser pDeclaration t1 >>=
-            check (\_ -> uncurry declsToEnv . partitionEithers . (:[])) mempty
+declarationCheck t1 t2 = toText wrap @?= t2
+ where
+  wrap = do
+    (tds, ds) <- partitionEithers . (: []) <$> runParser pDeclaration t1
+    let ds' = ds <> foldMap extractQDCons tds
+    return $ check
+      (\_ ds'' -> do
+        env' <- declsToEnv tds ds'' mempty
+        checkEnvironment env'
+        return env'
       )
-    @?= t2
+      mempty
+      ds'
 
 envCheck :: Text -> Assertion
 envCheck t = toText env @?= t
@@ -397,8 +407,8 @@ blockDeclarationCheck :: Text -> Text -> Assertion
 blockDeclarationCheck t1 t2 = toText wrap @?= t2
  where
   wrap = do
-    ds <- runParser pBlockDeclaration t1
-    return $ check (\_ -> declsToEnv []) mempty ds
+    (ds, defs) <- runParser pBlockDeclaration t1
+    return $ check (\_ -> flip (declsToEnv []) (pickLetBindings defs)) mempty ds
 
 programCheck :: Text -> Assertion
 programCheck t1 = toText wrap @?= "()"

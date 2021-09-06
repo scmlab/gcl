@@ -40,6 +40,8 @@ instance Pretty Declaration where
       <> "{ "
       <> pretty p
       <> " }"
+
+instance Pretty LetDeclaration where
   pretty (LetDecl name args expr _) =
     "let " <> pretty name <> hsep (map pretty args) <> " = " <> pretty expr
 
@@ -48,11 +50,13 @@ instance Pretty TypeDeclaration where
     "data " <> pretty qty <> "= " <> hsep (punctuate "| " (map pretty qdcons))
 
 instance Pretty QTyCon where
-  pretty (QTyCon n args) = pretty n <> hsep (map pretty args)
+  pretty (QTyCon n args) = pretty n <+> hsep (map pretty args)
 
 instance Pretty QDCon where
-  pretty (QDCon cn ts) = pretty cn <> hsep (map pretty ts)
-
+  pretty (QDCon cn ts) = pretty cn <+> hsep (map wrap ts)
+   where
+    wrap t@TBase{} = pretty t
+    wrap t         = "(" <> pretty t <> ")"
 --------------------------------------------------------------------------------
 
 -- | Stmt

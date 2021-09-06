@@ -36,9 +36,9 @@ instance ToAbstract a b => ToAbstract [a] [b] where
 -- | Program / Declaration / Statement
 instance ToAbstract Program A.Program where
   toAbstract prog@(Program ds stmts') = do
-    (tdecls, ds') <- foldl (<>) ([],[]) <$> toAbstract ds
+    (tdecls, ds', lds) <- foldl (<>) ([],[],[]) <$> toAbstract ds
     let decls = ds' <> foldMap A.extractQDCons tdecls -- add constructors' type into declarations
-    let letBindings = ConstExpr.pickLetBindings decls
+    let letBindings = ConstExpr.pickLetBindings lds
     let (globProps, assertions) = ConstExpr.pickGlobals decls
     let pre = [A.Assert (A.conjunct assertions) NoLoc | not (null assertions)]
     stmts <- toAbstract stmts'
@@ -57,8 +57,8 @@ instance ToAbstract Declaration (Either A.TypeDeclaration A.Declaration) where
         Left <$> (A.TypeDecl <$> toAbstract tycon <*> toAbstract (fromSepBy cons) <*> pure (locOf d))
 
 
-instance ToAbstract BlockDeclaration [A.Declaration] where
-  toAbstract (BlockDeclaration _ decls _) = toAbstract decls
+instance ToAbstract BlockDeclaration ([A.Declaration], [A.LetDeclaration]) where
+  toAbstract (BlockDeclaration _ decls _) = partitionEithers <$> toAbstract decls
 
 instance ToAbstract QTyCon A.QTyCon where
     toAbstract (QTyCon n ns) = pure $ A.QTyCon n ns
@@ -111,7 +111,7 @@ instance ToAbstract BlockDeclProp A.Expr where
   toAbstract (Left prop) = toAbstract prop
   toAbstract (Right prop) = toAbstract prop
 
-instance ToAbstract DeclBody A.Declaration where
+instance ToAbstract DeclBody A.LetDeclaration where
   toAbstract d@(DeclBody n args _ b) = do
     A.LetDecl n args <$> toAbstract b <*> pure (locOf d)
 
@@ -121,13 +121,13 @@ instance ToAbstract BlockDeclType A.Declaration where
     A.ConstDecl ns t <$> toAbstract prop <*> pure (locOf d)
 
 -- One BlockDecl can be parse into a ConstDecl or a ConstDecl and a LetDecl
-instance ToAbstract BlockDecl A.Declaration where
-  toAbstract (Left decl) = toAbstract decl
-  toAbstract (Right decl) = toAbstract decl
+instance ToAbstract BlockDecl (Either A.Declaration A.LetDeclaration) where
+  toAbstract (Left decl) = Left <$> toAbstract decl
+  toAbstract (Right decl) = Right <$> toAbstract decl
 
-instance ToAbstract Declaration' ([A.TypeDeclaration], [A.Declaration]) where
-  toAbstract (Left d) = partitionEithers . (:[]) <$> toAbstract d
-  toAbstract (Right bd) = ([],) <$> toAbstract bd
+instance ToAbstract Declaration' ([A.TypeDeclaration], [A.Declaration], [A.LetDeclaration]) where
+  toAbstract (Left d) = uncurry (,, []) . partitionEithers . (:[]) <$> toAbstract d
+  toAbstract (Right bd) = uncurry ([],,) <$> toAbstract bd
 
 --------------------------------------------------------------------------------
 

@@ -43,10 +43,11 @@ type Defns = Map Name Expr
 data Declaration
   = ConstDecl [Name] Type (Maybe Expr) Loc
   | VarDecl [Name] Type (Maybe Expr) Loc
-  | LetDecl Name [Name] Expr Loc
   deriving (Eq, Show)
 
---data LetDeclaration = LetDecl Name [Name] Expr Loc
+data LetDeclaration = LetDecl Name [Name] Expr Loc
+  deriving (Eq, Show)
+
 data TypeDeclaration = TypeDecl QTyCon [QDCon] Loc
   deriving (Eq, Show)
 
