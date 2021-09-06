@@ -55,25 +55,6 @@ instance Render HoverResult where
 
 --------------------------------------------------------------------------------
 
--- -- | A "Scope" is a mapping of names and HoverResults
--- type Scope = Map Text HoverResult
-
--- -- | See if a name is in the scope
--- lookupScope :: Scope -> Name -> Maybe HoverResult
--- lookupScope scope name = Map.lookup (nameToText name) scope
-
--- -- | See if a name is in a series of scopes (from local to global)
--- -- | Return the first result (which should be the most local target)
--- lookupScopes :: [Scope] -> Name -> Maybe HoverResult
--- lookupScopes scopes name = foldl findFirst Nothing scopes
---  where
---   findFirst :: Maybe HoverResult -> Scope -> Maybe HoverResult
---   findFirst (Just found) _     = Just found
---   findFirst Nothing      scope = lookupScope scope name
-
-
---------------------------------------------------------------------------------
-
 type HoverM = ReaderT Position (ReaderT [Scope HoverResult] CmdM)
 
 instance HasPosition HoverM where
@@ -169,7 +150,6 @@ instance StabM HoverM Program HoverResult where
   stabM (Program _ decls _ _ stmts _) =
     (<>) <$> stabLocated decls <*> stabLocated stmts
 
-
 --------------------------------------------------------------------------------
 
 -- | A datatype for representing an argument of a function like definition
@@ -190,12 +170,6 @@ instance StabM HoverM Arg HoverResult where
       Nothing -> return []
       Just (Result _ t) ->
         return $ map typeToHoverResult $ maybeToList $ locateArgType t index
-
-    -- scopes <- askScopes
-    -- case lookupScopes scopes func of
-    --   Nothing -> return []
-    --   Just (Result _ t) ->
-    --     return $ map typeToHoverResult $ maybeToList $ locateArgType t index
 
    where
       -- given the type of a function and the index of one of its argument

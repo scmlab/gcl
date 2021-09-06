@@ -94,6 +94,7 @@ instance Collect AsName J.SemanticTokenAbsolute where
   collect (AsName a) = toToken' J.SttFunction [] a
 
 --------------------------------------------------------------------------------
+-- Program 
 
 instance Collect Program J.SemanticTokenAbsolute where
   collect (Program as bs) = (as >>= collect) <> (bs >>= collect)
@@ -105,8 +106,13 @@ instance Collect Declaration' J.SemanticTokenAbsolute where
 instance Collect Declaration J.SemanticTokenAbsolute where
   collect (ConstDecl tok a) = toToken J.SttKeyword [] tok <> collect a
   collect (VarDecl   tok a) = toToken J.SttKeyword [] tok <> collect a
-  -- TODO: handle TypeDecl colloct
-  collect TypeDecl{}        = mempty
+  collect (TypeDecl tokData a _tokDef bs) =
+    toToken J.SttKeyword [] tokData
+      <> toToken' J.SttType [] a
+      <> (toList bs >>= collect)
+
+instance Collect QDCon J.SemanticTokenAbsolute where
+  collect (QDCon name types) = collect (AsName name) <> (types >>= collect)
 
 instance Collect BlockDeclaration J.SemanticTokenAbsolute where
   collect (BlockDeclaration _tokA as _tokB) = toList as >>= collect
@@ -191,18 +197,20 @@ instance Collect GdCmd J.SemanticTokenAbsolute where
 
 instance Collect Expr J.SemanticTokenAbsolute where
   collect = \case
-    Paren _ a _ -> collect a
-    Lit   a     -> collect a
-    Var   a     -> collect (AsVariable a)
-    Const a     -> collect (AsVariable a)
-    Op    a     -> toToken' J.SttOperator [] a
-    Chain a b c -> collect a <> toToken' J.SttOperator [] b <> collect c
-    Arr a _ b _ -> collect a <> collect b
+    Paren _ a _     -> collect a
+    Lit   a         -> collect a
+    Var   a         -> collect (AsVariable a)
+    Const a         -> collect (AsVariable a)
+    Op    a         -> toToken' J.SttOperator [] a
+    Chain a b c     -> collect a <> toToken' J.SttOperator [] b <> collect c
+    Arr a _ b _     -> collect a <> collect b
     -- NOTE: sorting is need here, because:
     --  1. the client will ignore tokens that are out of order
     --  2. `App` may create tokens that are out of order
     --      (e.g. "1 +" will be parsed as `App + 1`)
-    App a b     -> sort $ collect a <> collect b
+    App a@App{}   b -> sort $ collect a <> collect b
+    App (Const a) b -> sort $ collect (AsName a) <> collect b
+    App a         b -> sort $ collect a <> collect b
     Quant tokA op names tokB a tokC b tokD ->
       toToken' J.SttKeyword [] tokA
         <> toToken' J.SttOperator [] op
