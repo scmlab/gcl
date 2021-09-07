@@ -299,8 +299,9 @@ pTBase = TBase <$> choice
   , TChar . rangeOf <$> lexTypeChar
   ]
 
+-- distinguish with pTCon
 pTVar :: ParserF Type
-pTVar = TVar <$> pName
+pTVar = TVar <$> pName <* notFollowedBy pName
 
 pInterval :: ParserF Interval
 pInterval = Interval <$> pEndpointOpen <*> lexRange <*> pEndpointClose
