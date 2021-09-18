@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 232f997692ae8e904b2026db6cbf7a5974da7a0236dae06e8948646c768237cb
+-- hash: ba699cd924383a86efc71f4f016411f6c528b4c343bcbad1cb377dfb71124df6
 
 name:           gcl
 version:        0.1.0.0
@@ -82,6 +82,7 @@ library
       Syntax.ConstExpr
       Syntax.Parser
       Syntax.Parser.Lexer
+      Syntax.Parser.TH
       Syntax.Parser.Token
       Syntax.Parser.TokenStream
       Syntax.Parser.Util
@@ -110,6 +111,7 @@ library
     , random
     , regex-applicative
     , srcloc
+    , template-haskell
     , text
     , transformers
     , vector
@@ -143,6 +145,7 @@ executable gcl
     , random
     , regex-applicative
     , srcloc
+    , template-haskell
     , text
     , transformers
     , vector
@@ -220,6 +223,7 @@ test-suite gcl-test
       Syntax.ConstExpr
       Syntax.Parser
       Syntax.Parser.Lexer
+      Syntax.Parser.TH
       Syntax.Parser.Token
       Syntax.Parser.TokenStream
       Syntax.Parser.Util
@@ -252,6 +256,7 @@ test-suite gcl-test
     , tasty-golden
     , tasty-hunit
     , tasty-quickcheck
+    , template-haskell
     , text
     , transformers
     , vector
