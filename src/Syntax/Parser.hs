@@ -25,8 +25,8 @@ import           Data.Maybe                     ( isJust )
 import qualified Data.Ord                      as Ord
 import           Data.Text                      ( Text )
 import           Syntax.Common                  ( Name(..)
+                                                , Op(..)
                                                 , ChainOp
-                                                , ArithOp
                                                 )
 import           Syntax.Concrete
 import           Syntax.Parser.Lexer
@@ -331,17 +331,19 @@ pExpr' =
 
 chainOpTable :: [[Operator ParserF Expr]]
 chainOpTable =
-  [ [InfixL . pChain $ lexEQ]
-  , [ InfixL . pChain . choice $ [lexNEQ, lexNEQU]
-    , InfixL . pChain $ lexLT
-    , InfixL . pChain . choice $ [lexLTE, lexLTEU]
-    , InfixL . pChain $ lexGT
-    , InfixL . pChain . choice $ [lexGTE, lexGTEU]
+  [ [InfixL . pBinary . fmap ChainOp $ lexEQ]
+  , [ InfixL . pBinary . fmap ChainOp . choice $ [lexNEQ, lexNEQU]
+    , InfixL . pBinary . fmap ChainOp $ lexLT
+    , InfixL . pBinary . fmap ChainOp . choice $ [lexLTE, lexLTEU]
+    , InfixL . pBinary . fmap ChainOp $ lexGT
+    , InfixL . pBinary . fmap ChainOp . choice $ [lexGTE, lexGTEU]
     ]
-  , [InfixL . pBinary . choice $ [lexConj, lexConjU]]
-  , [InfixL . pBinary . choice $ [lexDisj, lexDisjU]]
-  , [InfixL . pBinary . choice $ [lexImpl, lexImplU]]
-  , [InfixL . pChain $ lexEQProp, InfixL . pChain $ lexEQPropU]
+  , [InfixL . pBinary . fmap ArithOp . choice $ [lexConj, lexConjU]]
+  , [InfixL . pBinary . fmap ArithOp . choice $ [lexDisj, lexDisjU]]
+  , [InfixL . pBinary . fmap ArithOp . choice $ [lexImpl, lexImplU]]
+  , [ InfixL . pBinary . fmap ChainOp $ lexEQProp
+    , InfixL . pBinary . fmap ChainOp $ lexEQPropU
+    ]
   ]
 
 pExprArith :: ParserF Expr
@@ -350,12 +352,18 @@ pExprArith = makeExprParser pTerm arithTable <* (↑) (\sc' -> try sc' <|> sc)
 arithTable :: [[Operator ParserF Expr]]
 arithTable =
   [ [Postfix pApp]
-  , [InfixN (pBinary lexExp)]
-  , [InfixN (pBinary lexMax), InfixN (pBinary lexMin)]
-  , [InfixL (pBinary lexMod)]
-  , [InfixL (pBinary lexMul), InfixL (pBinary lexDiv)]
-  , [InfixL (pBinary lexAdd), InfixL (pBinary lexSub)]
-  , [Prefix . pUnary . choice $ [lexNeg, lexNegU]]
+  , [InfixN . pBinary . fmap ArithOp $ lexExp]
+  , [ InfixN . pBinary . fmap ArithOp $ lexMax
+    , InfixN . pBinary . fmap ArithOp $ lexMin
+    ]
+  , [InfixL . pBinary . fmap ArithOp $ lexMod]
+  , [ InfixL . pBinary . fmap ArithOp $ lexMul
+    , InfixL . pBinary . fmap ArithOp $ lexDiv
+    ]
+  , [ InfixL . pBinary . fmap ArithOp $ lexAdd
+    , InfixL . pBinary . fmap ArithOp $ lexSub
+    ]
+  , [Prefix . pUnary . fmap ArithOp . choice $ [lexNeg, lexNegU]]
   ]
 
 -- pTerm :: ParserF Expr
@@ -419,13 +427,13 @@ pChain m = do
   op <- try (notFollowedBySymbol m)
   return $ \x y -> Chain x op y
 
-pBinary :: ParserF ArithOp -> ParserF (Expr -> Expr -> Expr)
+pBinary :: ParserF Op -> ParserF (Expr -> Expr -> Expr)
 pBinary m = do
   -- NOTE: operator cannot be followed by any symbol
   op <- try (notFollowedBySymbol m)
   return $ \x y -> App (App (Op op) x) y
 
-pUnary :: ParserF ArithOp -> ParserF (Expr -> Expr)
+pUnary :: ParserF Op -> ParserF (Expr -> Expr)
 pUnary m = do
   -- NOTE: operator cannot be followed by any symbol
   op <- try (notFollowedBySymbol m)

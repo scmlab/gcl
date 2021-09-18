@@ -1,6 +1,8 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
 
+module Syntax.Parser.TH where
+
 import           Language.Haskell.TH
 import           Language.Haskell.TH.Syntax
 import           Data.Text                      ( Text )
