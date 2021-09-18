@@ -42,8 +42,6 @@ handleExpr n (Var   x l) = return $ tempHandleLoc l $ renderPrec n x
 handleExpr n (Const x l) = return $ tempHandleLoc l $ renderPrec n x
 handleExpr n (Lit   x l) = return $ tempHandleLoc l $ renderPrec n x
 handleExpr n (Op x     ) = handleOp n x
-handleExpr n (Chain a op b _) =
-  return $ renderPrec n a <+> render op <+> renderPrec n b
 handleExpr n (App (App (Op op@(ChainOp _)) p _) q _) = do
   return $ renderPrec n p <+> render op <+> renderPrec n q
 handleExpr n (App p q _) = do

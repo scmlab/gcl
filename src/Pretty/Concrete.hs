@@ -320,8 +320,6 @@ handleExpr (Var   x) = return $ prettyWithLoc x
 handleExpr (Const x) = return $ prettyWithLoc x
 handleExpr (Lit   x) = return $ prettyWithLoc x
 handleExpr (Op    x) = handleOp x
-handleExpr (Chain x op y) =
-  return $ prettyWithLoc x <> prettyWithLoc op <> prettyWithLoc y
 handleExpr (Arr arr l i r) =
   return
     $  prettyWithLoc arr

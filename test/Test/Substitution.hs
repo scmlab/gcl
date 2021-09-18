@@ -54,7 +54,7 @@ letBindings = testGroup
             return (Right (VList trees))
 
 
--- Tree-like structure for representing the transition from one Expn to the next 
+-- Tree-like structure for representing the transition from one Expn to the next
 data Tree = Node Inlines -- BEFORE + MAPPING (before pressing any "buttons")
                          (Map Inlines [Tree]) -- transitions
 
@@ -86,7 +86,7 @@ toTree (EXPN before after inBefore inAfter) = Node before (toBefore <> toAfter)
   toAfter = Map.singleton (before <> " ===> " <> after) (map toTree inAfter)
 
 --------------------------------------------------------------------------------
--- | Typeclass for extracting `Expand` from the syntax tree 
+-- | Typeclass for extracting `Expand` from the syntax tree
 
 -- like `Expand`, but augmented with "buttons" in "before" and "after"
 data EXPN = EXPN
@@ -117,7 +117,7 @@ instance ExtractExpand Pred where
 
 instance ExtractExpand Expr where
   extractExpand = \case
-    Chain x _ y _   -> extractExpand x <> extractExpand y
+    --Chain x _ y _   -> extractExpand x <> extractExpand y
     App x y _       -> extractExpand x <> extractExpand y
     Lam _ x _       -> extractExpand x
     Quant x _ y z _ -> extractExpand x <> extractExpand y <> extractExpand z

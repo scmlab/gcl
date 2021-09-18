@@ -26,7 +26,6 @@ import qualified Data.Ord                      as Ord
 import           Data.Text                      ( Text )
 import           Syntax.Common                  ( Name(..)
                                                 , Op(..)
-                                                , ChainOp
                                                 )
 import           Syntax.Concrete
 import           Syntax.Parser.Lexer
@@ -420,12 +419,6 @@ pApp = do
   terms <- many pTerm
   return $ \func -> do
     foldl App func terms
-
-pChain :: ParserF ChainOp -> ParserF (Expr -> Expr -> Expr)
-pChain m = do
-  -- NOTE: operator cannot be followed by any symbol
-  op <- try (notFollowedBySymbol m)
-  return $ \x y -> Chain x op y
 
 pBinary :: ParserF Op -> ParserF (Expr -> Expr -> Expr)
 pBinary m = do

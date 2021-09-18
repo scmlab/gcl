@@ -1,13 +1,15 @@
 module Syntax.Concrete.Instances.Located where
 
-import Syntax.Concrete.Types
-import Syntax.Common ()
-import Data.Loc (Located (locOf), (<-->))
+import           Syntax.Concrete.Types
+import           Syntax.Common                  ( )
+import           Data.Loc                       ( Located(locOf)
+                                                , (<-->)
+                                                )
 
 --------------------------------------------------------------------------------
 
 instance Located a => Located (SepBy sep a) where
-  locOf (Head a) = locOf a
+  locOf (Head a      ) = locOf a
   locOf (Delim a _ as) = a <--> locOf as
 
 --------------------------------------------------------------------------------
@@ -16,12 +18,12 @@ instance Located Program where
   locOf (Program a b) = a <--> b
 
 instance Located Declaration where
-  locOf (ConstDecl l r) = l <--> r
-  locOf (VarDecl l r) = l <--> r
+  locOf (ConstDecl l r   ) = l <--> r
+  locOf (VarDecl   l r   ) = l <--> r
   locOf (TypeDecl l _ _ r) = l <--> r
 
 instance Located QTyCon where
-  locOf (QTyCon l r) =  l <--> r
+  locOf (QTyCon l r) = l <--> r
 
 instance Located QDCon where
   locOf (QDCon l r) = l <--> r
@@ -47,21 +49,21 @@ instance Located BlockDeclType where
 -------------------------------------------------------------------------------
 
 instance Located Stmt where
-  locOf (Skip l) = locOf l
-  locOf (Abort l) = locOf l
-  locOf (Assign l _ r) = l <--> r
-  locOf (AAssign l _ _ _ _ r) = l <--> r
-  locOf (Assert l _ r) = l <--> r
+  locOf (Skip  l                    ) = locOf l
+  locOf (Abort l                    ) = locOf l
+  locOf (Assign l _ r               ) = l <--> r
+  locOf (AAssign l _ _ _ _ r        ) = l <--> r
+  locOf (Assert l _ r               ) = l <--> r
   locOf (LoopInvariant l _ _ _ _ _ r) = l <--> r
-  locOf (Do l _ r) = l <--> r
-  locOf (If l _ r) = l <--> r
-  locOf (SpecQM l) = locOf l
-  locOf (Spec l _ r) = l <--> r
-  locOf (Proof l _ r) = l <--> r
-  locOf (Alloc l _ _ _ _ r) = l <--> r
-  locOf (HLookup l _ _ r) = l <--> r
-  locOf (HMutate l _ _ r) = l <--> r
-  locOf (Dispose l r) = l <--> r
+  locOf (Do l _ r                   ) = l <--> r
+  locOf (If l _ r                   ) = l <--> r
+  locOf (SpecQM l                   ) = locOf l
+  locOf (Spec  l _ r                ) = l <--> r
+  locOf (Proof l _ r                ) = l <--> r
+  locOf (Alloc l _ _ _ _ r          ) = l <--> r
+  locOf (HLookup l _ _ r            ) = l <--> r
+  locOf (HMutate l _ _ r            ) = l <--> r
+  locOf (Dispose l r                ) = l <--> r
 
 --------------------------------------------------------------------------------
 
@@ -77,34 +79,33 @@ instance Located Interval where
   locOf (Interval l _ r) = l <--> r
 
 instance Located TBase where
-  locOf (TInt l) = locOf l
+  locOf (TInt  l) = locOf l
   locOf (TBool l) = locOf l
   locOf (TChar l) = locOf l
 
 instance Located Type where
-  locOf (TParen l _ r) = l <--> r
-  locOf (TBase a) = locOf a
+  locOf (TParen l _ r  ) = l <--> r
+  locOf (TBase a       ) = locOf a
   locOf (TArray l _ _ r) = l <--> r
-  locOf (TFunc l _ r) = l <--> r
-  locOf (TCon l) = locOf l
-  locOf (TVar x) = locOf x
+  locOf (TFunc l _ r   ) = l <--> r
+  locOf (TCon l        ) = locOf l
+  locOf (TVar x        ) = locOf x
 
 --------------------------------------------------------------------------------
 
 instance Located Expr where
-  locOf (Paren l _ r) = l <--> r
-  locOf (Lit x) = locOf x
-  locOf (Var x) = locOf x
-  locOf (Const x) = locOf x
-  locOf (Op x) = locOf x
-  locOf (Chain e1 op e2) = e1 <--> op <--> e2
-  locOf (Arr l _ _ r) = l <--> r
-  locOf (App x y) = x <--> y
+  locOf (Paren l _ r          ) = l <--> r
+  locOf (Lit   x              ) = locOf x
+  locOf (Var   x              ) = locOf x
+  locOf (Const x              ) = locOf x
+  locOf (Op    x              ) = locOf x
+  locOf (Arr l _ _ r          ) = l <--> r
+  locOf (App x y              ) = x <--> y
   locOf (Quant l _ _ _ _ _ _ r) = l <--> r
 
 --------------------------------------------------------------------------------
 
 instance Located Lit where
-  locOf (LitInt _ l) = locOf l
+  locOf (LitInt  _ l) = locOf l
   locOf (LitBool _ l) = locOf l
   locOf (LitChar _ l) = locOf l

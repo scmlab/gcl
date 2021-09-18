@@ -21,9 +21,7 @@ import qualified Syntax.Abstract               as A
 import qualified Syntax.Abstract.Operator      as A
 import qualified Syntax.Abstract.Util          as A
 import qualified Syntax.ConstExpr              as ConstExpr
-import           Syntax.Common                  ( Name
-                                                , Op(..)
-                                                )
+import           Syntax.Common                  ( Name )
 import           Data.Loc.Range
 import           Data.Either                    ( partitionEithers )
 
@@ -208,9 +206,6 @@ instance ToAbstract Expr A.Expr where
     Var   a     -> pure $ A.Var a (locOf x)
     Const a     -> pure $ A.Const a (locOf x)
     Op    a     -> pure $ A.Op a
-    Chain a op b ->
-      A.Chain <$> toAbstract a <*> pure (ChainOp op) <*> toAbstract b <*> pure
-        (locOf x)
     Arr arr _ i _ ->
       A.ArrIdx <$> toAbstract arr <*> toAbstract i <*> pure (locOf x)
     App a b -> A.App <$> toAbstract a <*> toAbstract b <*> pure (locOf x)

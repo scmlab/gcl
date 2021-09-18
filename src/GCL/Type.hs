@@ -131,34 +131,10 @@ inferInEnv l m = do
   local scope m
 
 infer :: Expr -> Infer Type
-infer (Lit   lit l     ) = return (litTypes lit l)
-infer (Var   x   _     ) = lookupInferEnv x
-infer (Const c   _     ) = lookupInferEnv c
-infer (Op o            ) = inferOpTypes o
-infer (Chain a op b loc) = do
-  ta  <- infer a
-  top <- inferOpTypes op
-  tb  <- infer b
-
-  case (a, b) of
-    (Chain _ _ l _, Chain r _ _ _) -> do
-      tl <- infer l
-      tr <- infer r
-      -- check type of `l op r` is bool
-      unify
-        top
-        (TFunc tl (TFunc tr (TBase TBool (locOf op)) (locOf r)) (l <--> r))
-    (Chain _ _ l _, _) -> do
-      tl <- infer l
-      unify
-        top
-        (TFunc tl (TFunc tb (TBase TBool (locOf op)) (locOf b)) (l <--> b))
-    -- this case also subsumes (_, Chain r _ _ _), which is fine since Chain is left-associative
-    (_, _) -> do
-      unify
-        top
-        (TFunc ta (TFunc tb (TBase TBool (locOf op)) (locOf b)) (a <--> b))
-  return (TBase TBool loc)
+infer (Lit   lit l) = return (litTypes lit l)
+infer (Var   x   _) = lookupInferEnv x
+infer (Const c   _) = lookupInferEnv c
+infer (Op o       ) = inferOpTypes o
 infer (App (App (Op op@(ChainOp _)) e1 _) e2 _) = do
   top <- inferOpTypes op
 
@@ -306,12 +282,12 @@ checkStmt env (Assign ns es loc)
     length ns > length es
   = let extraVars = drop (length es) ns
     in  throwError $ NotEnoughExprsInAssigment (NE.fromList extraVars)
-                                                                                                                                    -- (locOf $ mergeRangesUnsafe (fromLocs $ map locOf extraVars))
+                                                                                                                                        -- (locOf $ mergeRangesUnsafe (fromLocs $ map locOf extraVars))
                                                loc
   | length ns < length es
   = let extraExprs = drop (length ns) es
     in  throwError $ TooManyExprsInAssigment (NE.fromList extraExprs)
-                                                                                                                                    -- (locOf $ mergeRangesUnsafe (fromLocs $ map locOf extraExprs))
+                                                                                                                                        -- (locOf $ mergeRangesUnsafe (fromLocs $ map locOf extraExprs))
                                              loc
   | otherwise
   = forM_ (zip ns es) (checkAssign env)

@@ -27,8 +27,10 @@ import           Language.LSP.Types      hiding ( Range )
 import           Pretty                         ( toText )
 import           Server.DSL
 import           Syntax.Common
-import Render
-import Data.Loc (locOf, Located)
+import           Render
+import           Data.Loc                       ( locOf
+                                                , Located
+                                                )
 
 ignoreErrors :: Either [Error] (Maybe Hover) -> Maybe Hover
 ignoreErrors (Left  _errors  ) = Nothing
@@ -50,7 +52,7 @@ data HoverResult = Result
   }
   deriving Show
 
-instance Render HoverResult where 
+instance Render HoverResult where
   render (Result _ t) = "Hover " <+> render t
 
 --------------------------------------------------------------------------------
@@ -86,14 +88,16 @@ instance HasScopes HoverM HoverResult where
     lift $ local (scope :) $ runReaderT p pos
 
 runHoverM :: Program -> Position -> HoverM a -> CmdM a
-runHoverM (Program tdecls decls _ defns _ _) pos f = runReaderT (runReaderT f pos)
-                                                     [declScope]
+runHoverM (Program tdecls decls _ defns _ _) pos f = runReaderT
+  (runReaderT f pos)
+  [declScope]
  where
   declScope :: Map Text HoverResult
   declScope = case Type.runTM (Type.declsToEnv tdecls decls defns) of
     -- ignore type errors
-    Left  _   -> Map.empty
-    Right env -> Map.mapKeys nameToText $ Map.map typeToHoverResult (Type.localDecls env)
+    Left _ -> Map.empty
+    Right env ->
+      Map.mapKeys nameToText $ Map.map typeToHoverResult (Type.localDecls env)
 
 typeToHoverResult :: Type -> HoverResult
 typeToHoverResult t = Result { resultHover = hover, resultType = t }
@@ -115,29 +119,29 @@ instance StabM HoverM GdCmd HoverResult where
 
 instance StabM HoverM Declaration HoverResult where
   stabM = \case
-    ConstDecl a    _    c    _ -> (<>) <$> stabLocated a <*> stabLocated c
-    VarDecl   a    _    c    _ -> (<>) <$> stabLocated a <*> stabLocated c
+    ConstDecl a _ c _ -> (<>) <$> stabLocated a <*> stabLocated c
+    VarDecl   a _ c _ -> (<>) <$> stabLocated a <*> stabLocated c
 
 instance StabM HoverM LetDeclaration HoverResult where
-  stabM (LetDecl   name args body _) = do
-      name' <- stabLocated name
-      -- creates a local scope for arguments
-      args' <- stabLocated (toArgs name args)
-      let argsScope = Map.fromList $ zip (map nameToText args) args'
-      -- temporarily prepend this local scope to the scope stack
-      body' <- pushScope argsScope $ stabLocated body
+  stabM (LetDecl name args body _) = do
+    name' <- stabLocated name
+    -- creates a local scope for arguments
+    args' <- stabLocated (toArgs name args)
+    let argsScope = Map.fromList $ zip (map nameToText args) args'
+    -- temporarily prepend this local scope to the scope stack
+    body' <- pushScope argsScope $ stabLocated body
 
-      return $ concat [name', args', body']
+    return $ concat [name', args', body']
     -- TODO: hover type declaration
 
 instance StabM HoverM Expr HoverResult where
   stabM = \case
     -- Paren a _      -> stabLocated a
-    Var   a _      -> stabLocated a
-    Const a _      -> stabLocated a
-    Op op          -> stabLocated op
-    Chain a op c _ -> do
-      concat <$> sequence [stabLocated a, stabLocated op, stabLocated c]
+    Var   a _ -> stabLocated a
+    Const a _ -> stabLocated a
+    Op op     -> stabLocated op
+    --Chain a op c _ -> do
+      --concat <$> sequence [stabLocated a, stabLocated op, stabLocated c]
     App a b _ -> (<>) <$> stabLocated a <*> stabLocated b
     Lam _ b _ -> stabLocated b
     Quant op _ c d _ ->
@@ -177,8 +181,8 @@ data Arg = Arg Name -- Name of the function
                     Name -- Name of the argument
                          Int -- Index of the argument (starts from 0)
 
-instance Located Arg where 
-  locOf (Arg _ arg _) = locOf arg 
+instance Located Arg where
+  locOf (Arg _ arg _) = locOf arg
 
 toArgs :: Name -> [Name] -> [Arg]
 toArgs func args = zipWith (Arg func) args [0 ..]

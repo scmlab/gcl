@@ -7,7 +7,9 @@ module Server.Handler.Definition
   ) where
 
 import           Control.Monad.Reader
-import           Data.Loc                       ( Located, locOf )
+import           Data.Loc                       ( Located
+                                                , locOf
+                                                )
 import           Data.Loc.Range
 import qualified Data.Map                      as Map
 import           Data.Map                       ( Map )
@@ -89,16 +91,18 @@ instance HasScopes GotoM (Range -> LocationLink) where
 
 runGotoM :: Program -> Position -> GotoM a -> CmdM a
 runGotoM (Program _ decls _ defns _ _) pos f = runReaderT (runReaderT f pos)
-                                                    [declScope]
+                                                          [declScope]
  where
   declScope :: Map Text (Range -> LocationLink)
   declScope =
-    Map.fromList . concatMap (mapMaybe declToLocationLink) $ (map splitDecl decls, Map.toList defns)
+    Map.fromList
+      . concatMap (mapMaybe declToLocationLink)
+      $ (map splitDecl decls, Map.toList defns)
 
   -- split a parallel declaration into many simpler declarations
   splitDecl :: Declaration -> [(Name, Declaration)]
   splitDecl decl@(ConstDecl names _ _ _) = [ (name, decl) | name <- names ]
-  splitDecl decl@(VarDecl names _ _ _) = [ (name, decl) | name <- names ]
+  splitDecl decl@(VarDecl   names _ _ _) = [ (name, decl) | name <- names ]
 
   -- convert a declaration (and its name) to a LocationLink (that is waiting for the caller's Range)
   declToLocationLink
@@ -123,16 +127,16 @@ instance StabM GotoM Program LocationLink where
 
 instance StabM GotoM Declaration LocationLink where
   stabM = \case
-    ConstDecl _ _    c _ -> stabLocated c
-    VarDecl   _ _    c _ -> stabLocated c
+    ConstDecl _ _ c _ -> stabLocated c
+    VarDecl   _ _ c _ -> stabLocated c
 
 instance StabM GotoM LetDeclaration LocationLink where
-    stabM (LetDecl   _ args c _) = do
-      -- creates a local scope for arguments
-      let argsScope = Map.fromList $ mapMaybe nameToLocationLink args
-      -- temporarily prepend this local scope to the scope stack
+  stabM (LetDecl _ args c _) = do
+    -- creates a local scope for arguments
+    let argsScope = Map.fromList $ mapMaybe nameToLocationLink args
+    -- temporarily prepend this local scope to the scope stack
 
-      pushScope argsScope $ stabM c
+    pushScope argsScope $ stabM c
     -- TODO : TypeDecl StabM
 
 instance StabM GotoM Stmt LocationLink where
@@ -151,7 +155,7 @@ instance StabM GotoM Expr LocationLink where
   stabM = \case
     Var   a _          -> stabLocated a
     Const a _          -> stabLocated a
-    Chain a _ c _      -> (<>) <$> stabLocated a <*> stabLocated c
+    --Chain a _ c _      -> (<>) <$> stabLocated a <*> stabLocated c
     App a b _          -> (<>) <$> stabLocated a <*> stabLocated b
     Lam _ b _          -> stabLocated b
     Quant _ args c d _ -> do

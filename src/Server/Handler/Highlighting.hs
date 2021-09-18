@@ -196,7 +196,7 @@ instance Collect Expr J.SemanticTokenAbsolute where
     Var   a     -> collect (AsVariable a)
     Const a     -> collect (AsVariable a)
     Op    a     -> toToken' J.SttOperator [] a
-    Chain a b c -> collect a <> toToken' J.SttOperator [] b <> collect c
+    --Chain a b c -> collect a <> toToken' J.SttOperator [] b <> collect c
     Arr a _ b _ -> collect a <> collect b
     -- NOTE: sorting is need here, because:
     --  1. the client will ignore tokens that are out of order
