@@ -11,7 +11,7 @@ import Data.Loc.Range
 import Data.Text (Text)
 import GHC.Base (Symbol)
 import GHC.Generics (Generic)
-import Syntax.Common (ArithOp, ChainOp, Name, Op)
+import Syntax.Common (Name, Op)
 import Prelude hiding (Ordering (..))
 import Data.Loc (Located (locOf), Pos, Loc (Loc))
 
@@ -140,8 +140,7 @@ data Expr
   | Lit Lit
   | Var Name
   | Const Name
-  | Op ArithOp
-  | Chain Expr ChainOp Expr -- Left Associative
+  | Op Op
   | Arr Expr (Token "[") Expr (Token "]")
   | App Expr Expr
   | Quant

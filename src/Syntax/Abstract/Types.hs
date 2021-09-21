@@ -24,14 +24,12 @@ type TypeVar = Text
 --------------------------------------------------------------------------------
 
 -- | Program
-data Program
-  = Program
-      [TypeDeclaration] -- type declarations
-      [Declaration]     -- constant and variable declarations
-      [Expr]            -- global properties
-      Defns             -- let bindings
-      [Stmt]            -- main program
-      Loc
+data Program = Program [TypeDeclaration] -- type declarations
+                                         [Declaration]     -- constant and variable declarations
+                                                       [Expr]            -- global properties
+                                                              Defns             -- let bindings
+                                                                    [Stmt]            -- main program
+                                                                           Loc
   deriving (Eq, Show)
 
 --type Types = Map Name TypeDeclaration
@@ -112,7 +110,6 @@ data Expr
   | Var Name Loc
   | Const Name Loc
   | Op Op
-  | Chain Expr Op Expr Loc
   | App Expr Expr Loc
   | Lam Name Expr Loc
   | Quant Expr [Name] Expr Expr Loc

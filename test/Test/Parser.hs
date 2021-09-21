@@ -136,6 +136,7 @@ type' = testGroup
   , testCase "array 1" $ run "array [0 .. N  )   of    Int"
   , testCase "array 2" $ run "array (   0   ..  N   ] of Int"
   , testCase "array 3" $ run "array [  0 .. N  ] of     Int"
+  , testCase "type decl" $ run "List a"
   ]
   where run = parserIso (scn >> pType)
 
@@ -160,7 +161,8 @@ declaration = testGroup
   , testCase "constant keyword collision 2" $ run "con Trueu : Int"
   , testCase "constant keyword collision 3" $ run "con Intt : Int"
   , testCase "constant keyword collision 4" $ run "con Boola : Int"
-  , testCase "type declaration" $ run "data List a = Nil | Con a"
+  , testCase "type declaration 1" $ run "data List a = Nil | Con a"
+  , testCase "type declaration 2" $ run "data List a = Node (List a)"
   , testCase "block declaration 1"
     $ runBlock "{:\n\
         \   A, B : Int\n\
