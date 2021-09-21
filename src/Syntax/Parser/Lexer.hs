@@ -46,7 +46,7 @@ skipBlockComment = Lex.skipBlockComment tokBlockCommentStart tokBlockCommentEnd
 -- wrapper of tokens
 
 lexeme :: Lexer a -> LexerF (a, Range)
-lexeme p = (↑) (\sc' -> Lex.lexeme (try sc' <|> sc) . getRange $ p)
+lexeme p = ParseFunc (\sc' -> Lex.lexeme (try sc' <|> sc) . getRange $ p)
 
 symbol :: Text -> LexerF (Token a)
 symbol t = do
@@ -422,7 +422,7 @@ withRange p = do
 
 -- NOTE : make sure no space consumed after parser m
 notFollowedBySymbol :: LexerF a -> LexerF a
-notFollowedBySymbol m = ParseFunc (\sc' -> (↓) m (return ()) <* notFollowedBy (satisfy isSymbol) <* sc')
+notFollowedBySymbol m = ParseFunc (\sc' -> unParseFunc m (return ()) <* notFollowedBy (satisfy isSymbol) <* sc')
 
 withPredicate :: (a -> Bool) -> Lexer a -> Lexer a
 withPredicate f p = do

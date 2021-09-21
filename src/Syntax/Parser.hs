@@ -83,12 +83,12 @@ pProgram = do
 ------------------------------------------
 
 pDeclaration :: Parser Declaration
-pDeclaration = Lex.lineFold scn (parser p)
+pDeclaration = Lex.lineFold scn (unParseFunc p)
  where
   p = (pConstDecl <|> pVarDecl <|> pTypeDecl) <* lift scn <?> "declaration"
 
 pBlockDeclaration :: Parser BlockDeclaration
-pBlockDeclaration = (↓) pBlockDeclaration' scn
+pBlockDeclaration = unParseFunc pBlockDeclaration' scn
 
 pBlockDeclaration' :: ParserF BlockDeclaration
 pBlockDeclaration' =
@@ -112,7 +112,7 @@ pQDCon = QDCon <$> pName <*> many pType'
 
 
 pBlockDecl :: ParserF BlockDecl
-pBlockDecl = lift $ Lex.lineFold scn (eitherP (try pBlockDeclType) pDeclBody ↓)
+pBlockDecl = lift $ Lex.lineFold scn (unParseFunc (eitherP (try pBlockDeclType) pDeclBody))
 
 pDeclBase :: ParserF Name -> ParserF DeclBase
 pDeclBase name = DeclBase <$> pList name <*> lexColon <*> pType'
@@ -141,13 +141,13 @@ pBlockDeclType =
 ------------------------------------------
 
 pStmts :: Parser [Stmt]
-pStmts = (↓) (pIndentBlock (lift pStmt)) scn <|> return []
+pStmts = unParseFunc (pIndentBlock (lift pStmt)) scn <|> return []
 -- pStmts = many (pStmt <* scn)
 
 
 -- NOTE :: this function doesn't consume newline after finish parsing the statement
 pStmt :: Parser Stmt
-pStmt = Lex.lineFold scn (pStmt' ↓) <?> "statement"
+pStmt = Lex.lineFold scn (unParseFunc pStmt') <?> "statement"
 
 pStmt' :: ParserF Stmt
 pStmt' =
@@ -268,12 +268,12 @@ pDispose = Dispose <$> lexDispose <*> pExpr'
 ------------------------------------------
 
 pType :: Parser Type
-pType = (↓) pType' scn <?> "type"
+pType = unParseFunc pType' scn <?> "type"
 
 pType' :: ParserF Type
 pType' =
   makeExprParser pType'Term [[InfixR pTFunc]]
-    <*  (↑) (\sc' -> try sc' <|> sc)
+    <*  ParseFunc (\sc' -> try sc' <|> sc)
     <?> "type"
   where pType'Term = choice [pTParen, pTArray, pTBase, try pTVar, pTCon]
 
@@ -320,12 +320,12 @@ pEndpointClose =
 ------------------------------------------
 
 pExpr :: Parser Expr
-pExpr = (↓) pExpr' scn <?> "expression"
+pExpr = unParseFunc pExpr' scn <?> "expression"
 
 pExpr' :: ParserF Expr
 pExpr' =
   makeExprParser pExprArith chainOpTable
-    <*  (↑) (\sc' -> try sc' <|> sc)
+    <*  ParseFunc (\sc' -> try sc' <|> sc)
     <?> "expression"
 
 chainOpTable :: [[Operator ParserF Expr]]
@@ -346,7 +346,7 @@ chainOpTable =
   ]
 
 pExprArith :: ParserF Expr
-pExprArith = makeExprParser pTerm arithTable <* (↑) (\sc' -> try sc' <|> sc)
+pExprArith = makeExprParser pTerm arithTable <* ParseFunc (\sc' -> try sc' <|> sc)
 
 arithTable :: [[Operator ParserF Expr]]
 arithTable =
@@ -412,7 +412,7 @@ pQuant =
     <*> lexQuantEnds
  where
   pQuantOp    = choice [Left <$> lexOps, Right <$> pTerm]
-  pQuantNames = sepBy1 lowerName . try . (↑) $ id
+  pQuantNames = sepBy1 lowerName . try . ParseFunc $ id
 
 pApp :: ParserF (Expr -> Expr)
 pApp = do
@@ -482,9 +482,9 @@ pBlock start p end = do
   te <- end
   return (ts, t, te)
  where
-  p'     = (↓) p sc
-  start' = (↓) start sc
-  end'   = (↓) end sc
+  p'     = unParseFunc p sc
+  start' = unParseFunc start sc
+  end'   = unParseFunc end sc
 
 -- parse indentblock with delim
 pIndentSepBy
@@ -504,7 +504,7 @@ pIndentSepBy p delim = do
   try g <|> return (Head x)
  where
     -- make sure parser after delim start at the same position
-  delim' pos = (↓) delim (void $ Lex.indentGuard sc Ord.EQ pos)
+  delim' pos = unParseFunc delim (void $ Lex.indentGuard sc Ord.EQ pos)
 
   parseP gdPos delimPos = do
     x <- p
@@ -533,7 +533,7 @@ pIndentBlock p = do
         _ -> do
           return [p0]                          -- eof or no newline => only one indented element
     Nothing -> return []
-  where p' = (↓) p sc                             -- make sure p doesn't parse newline
+  where p' = unParseFunc p sc                             -- make sure p doesn't parse newline
 
 -- copied from Text.Megaparsec.Char.Lexer
 indentedItems :: (MonadParsec e s m) => Pos -> m () -> m b -> m [b]
