@@ -43,7 +43,7 @@ import           Syntax.Parser                  ( runParse
                                                 , pExpr
                                                 , pProgram
                                                 , Parser
-                                                , pStmt
+                                                , pStmts
                                                 , pType
                                                 , pDeclaration
                                                 , pBlockDeclaration
@@ -379,10 +379,11 @@ typeCheck' :: Text -> Assertion
 typeCheck' t = typeCheck t "()"
 
 stmtCheck :: Text -> Text -> Assertion
-stmtCheck t1 t2 = toText (runParser pStmt t1 >>= check checkStmt env) @?= t2
+stmtCheck t1 t2 =
+  toText (runParser pStmts t1 >>= check (mapM . checkStmt) env) @?= t2
 
 stmtCheck' :: Text -> Assertion
-stmtCheck' t = stmtCheck t "()"
+stmtCheck' t = stmtCheck t "[()]"
 
 
 declarationCheck :: Text -> Text -> Assertion

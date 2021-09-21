@@ -50,11 +50,11 @@ import           Data.Loc.Range                 ( rangeOf )
 -- under ParserF monad. For the sake of need not bother handling indentation for linefold,
 -- which should be left for top level parsers to handle.
 
--- Hence, the Parser monad is only restricted to top level parsers
--- (e.g. pProgram, pDeclaration, pBlockDeclaration, pStmts, pStmt, pExpr, pType ...)
+-- Hence, the Parser monad is only restricted to toppest level parsers
+-- (e.g. pProgram, pDeclaration, pBlockDeclaration, pStmt, pStmts, pExpr, pType ...)
 
 -- In some case, we may want to release the restriction of linefold under the ParserF monad,
--- which can be achieve by `lift p` (p : Parser a), see `pBlock` for example.
+-- which can be achieve by `lift p` (p : Parser a), see `pBlockText` for example.
 
 -- While we may want to do the opposite way under Parser monad in order to
 -- specify the space consumer that we wanted to use, which can be achive by using the
@@ -76,7 +76,11 @@ runParse p filepath s = case parse p filepath s of
 pProgram :: Parser Program
 pProgram = do
   scn
-  Program <$> many (eitherP pDeclaration pBlockDeclaration) <*> pStmts <* eof
+  parser (pProgram' <* eof) scn
+
+pProgram' :: ParserF Program
+pProgram' =
+  Program <$> many (eitherP pDeclaration' pBlockDeclaration') <*> pStmts'
 
 ------------------------------------------
 -- parse Declaration
@@ -87,8 +91,11 @@ pDeclaration = Lex.lineFold scn (parser p)
  where
   p = (pConstDecl <|> pVarDecl <|> pTypeDecl) <* lift scn <?> "declaration"
 
+pDeclaration' :: ParserF Declaration
+pDeclaration' = lift pDeclaration
+
 pBlockDeclaration :: Parser BlockDeclaration
-pBlockDeclaration = (↓) pBlockDeclaration' scn
+pBlockDeclaration = parser pBlockDeclaration' scn
 
 pBlockDeclaration' :: ParserF BlockDeclaration
 pBlockDeclaration' =
@@ -141,13 +148,15 @@ pBlockDeclType =
 ------------------------------------------
 
 pStmts :: Parser [Stmt]
-pStmts = (↓) (pIndentBlock (lift pStmt)) scn <|> return []
--- pStmts = many (pStmt <* scn)
+pStmts = (↓) pStmts' scn <|> return []
+---- pStmts = many (pStmt <* scn)
 
+pStmts' :: ParserF [Stmt]
+pStmts' = pIndentBlock (lift pStmt)
 
 -- NOTE :: this function doesn't consume newline after finish parsing the statement
 pStmt :: Parser Stmt
-pStmt = Lex.lineFold scn (pStmt' ↓) <?> "statement"
+pStmt = Lex.lineFold scn (parser pStmt') <?> "statement"
 
 pStmt' :: ParserF Stmt
 pStmt' =
@@ -168,7 +177,6 @@ pStmt' =
       , pSpecQM
       , pSpec
       ]
-    <*  lift sc
     <?> "statement"
 
 pSkip :: ParserF Stmt
@@ -216,14 +224,14 @@ pIf =
     <*> lexFi
 
 pGdCmd :: ParserF GdCmd
-pGdCmd = GdCmd <$> pExpr' <*> lexArrow <*> pIndentBlock (lift pStmt)
+pGdCmd = GdCmd <$> pExpr' <*> lexArrow <*> pStmts'
 
 pSpecQM :: ParserF Stmt
 pSpecQM = SpecQM . rangeOf <$> lexQM
 
 pSpec :: ParserF Stmt
 pSpec = do
-  (ts, t, te) <- pBlock lexSpecStart anySingle lexSpecEnd
+  (ts, t, te) <- pBlockText lexSpecStart anySingle lexSpecEnd
   return $ Spec ts (tokensToChunk (Proxy :: Proxy Text) t) te
 
 pProofAnchor :: ParserF ProofAnchor
@@ -272,10 +280,10 @@ pType = (↓) pType' scn <?> "type"
 
 pType' :: ParserF Type
 pType' =
-  makeExprParser pType'Term [[InfixR pTFunc]]
+  makeExprParser pTypeTerm [[InfixR pTFunc]]
     <*  (↑) (\sc' -> try sc' <|> sc)
     <?> "type"
-  where pType'Term = choice [pTParen, pTArray, pTBase, try pTVar, pTCon]
+  where pTypeTerm = choice [pTParen, pTArray, pTBase, try pTVar, pTCon]
 
 pTFunc :: ParserF (Type -> Type -> Type)
 pTFunc = do
@@ -468,7 +476,7 @@ pList = pSepBy lexComma
 --  ...
 --    end
 --
-pBlock
+pBlockText
   :: ParserF s
   ->                      -- start parser
      ParserF a
@@ -476,7 +484,7 @@ pBlock
      ParserF e
   ->                      -- end parser
      ParserF (s, [a], e)
-pBlock start p end = do
+pBlockText start p end = do
   ts <- lift start'                        -- release linefold restriction
   t  <- lift $ manyTill p' (lookAhead end') -- release linefold restriction
   te <- end
