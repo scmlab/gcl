@@ -91,13 +91,23 @@ data DeclBase = DeclBase (SepBy "," Name) (Token ":") Type deriving (Eq, Show)
 
 data DeclProp = DeclProp (Token "{") Expr (Token "}") deriving (Eq, Show)
 data DeclType = DeclType DeclBase (Maybe DeclProp) deriving (Eq, Show)
-data DeclBody = DeclBody Name [Name] (Token "=") Expr deriving (Eq, Show)
+data DeclBody = DeclBody Name [Pattern] (Token "=") Expr deriving (Eq, Show)
 
 type BlockDeclProp = Either DeclProp Expr
 data BlockDeclType = BlockDeclType DeclBase (Maybe BlockDeclProp) deriving (Eq, Show)
 type BlockDecl = Either BlockDeclType DeclBody
 
 type Declaration' = Either Declaration BlockDeclaration
+
+--------------------------------------------------------------------------------
+-- | Pattern matching 
+
+data Pattern 
+  = PattParen (Token "(") Pattern (Token ")") -- pattern wrapped inside a pair of parenthesis
+  | PattBinder Name -- binder
+  | PattWildcard (Token "_") -- matches anything 
+  | PattConstructor Name [Pattern] -- destructs a constructor
+  deriving (Eq, Show)
 
 --------------------------------------------------------------------------------
 

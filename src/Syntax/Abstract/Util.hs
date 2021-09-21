@@ -1,16 +1,6 @@
 module Syntax.Abstract.Util where
 
-import           Syntax.Abstract                ( Expr(Lam)
-                                                , GdCmd(..)
-                                                , Stmt
-                                                , Declaration(..)
-                                                , Defns
-                                                , LetDeclaration(..)
-                                                , TypeDeclaration(..)
-                                                , QDCon(..)
-                                                , Bindings(..)
-                                                , Type(..)
-                                                )
+import           Syntax.Abstract                
 import           Syntax.Common                  ( Name )
 import           Data.Loc                       ( (<-->)
                                                 , locOf

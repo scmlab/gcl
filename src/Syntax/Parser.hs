@@ -5,13 +5,13 @@
 module Syntax.Parser where
 
 import           Control.Applicative.Combinators
-                                                ( choice
+                                                ( (<|>)
+                                                , choice
                                                 , eitherP
                                                 , many
+                                                , manyTill
                                                 , optional
                                                 , sepBy1
-                                                , (<|>)
-                                                , manyTill
                                                 , some
                                                 )
 import           Control.Monad                  ( void )
@@ -19,8 +19,10 @@ import           Control.Monad.Combinators.Expr ( Operator(..)
                                                 , makeExprParser
                                                 )
 import           Control.Monad.Trans            ( lift )
+import           Data.Bifunctor                 ( second )
 import           Data.Data                      ( Proxy(Proxy) )
 import           Data.Loc                       ( Located(locOf) )
+import           Data.Loc.Range                 ( rangeOf )
 import           Data.Maybe                     ( isJust )
 import qualified Data.Ord                      as Ord
 import           Data.Text                      ( Text )
@@ -30,18 +32,16 @@ import           Syntax.Common                  ( Name(..)
 import           Syntax.Concrete
 import           Syntax.Parser.Lexer
 import           Syntax.Parser.Util
-import           Text.Megaparsec                ( MonadParsec(..)
+import           Text.Megaparsec                ( (<?>)
+                                                , MonadParsec(..)
                                                 , Pos
                                                 , anySingle
+                                                , manyTill_
                                                 , parse
                                                 , tokensToChunk
-                                                , (<?>)
-                                                , manyTill_
                                                 )
 import           Text.Megaparsec.Char           ( eol )
 import qualified Text.Megaparsec.Char.Lexer    as Lex
-import           Data.Bifunctor                 ( second )
-import           Data.Loc.Range                 ( rangeOf )
 
 -- The monad binding of ParserF will insert space consumer or indent guard inbetween,
 -- which sould be convenient for handling linefold indentation.
@@ -88,11 +88,9 @@ pDeclaration = Lex.lineFold scn (unParseFunc p)
   p = (pConstDecl <|> pVarDecl <|> pTypeDecl) <* lift scn <?> "declaration"
 
 pBlockDeclaration :: Parser BlockDeclaration
-pBlockDeclaration = unParseFunc pBlockDeclaration' scn
-
-pBlockDeclaration' :: ParserF BlockDeclaration
-pBlockDeclaration' =
-  BlockDeclaration <$> lexDeclStart <*> pIndentBlock pBlockDecl <*> lexDeclEnd
+pBlockDeclaration = unParseFunc
+  (BlockDeclaration <$> lexDeclStart <*> pIndentBlock pBlockDecl <*> lexDeclEnd)
+  scn
 
 pConstDecl :: ParserF Declaration
 pConstDecl = ConstDecl <$> lexCon <*> pDeclType pName
@@ -112,7 +110,8 @@ pQDCon = QDCon <$> pName <*> many pType'
 
 
 pBlockDecl :: ParserF BlockDecl
-pBlockDecl = lift $ Lex.lineFold scn (unParseFunc (eitherP (try pBlockDeclType) pDeclBody))
+pBlockDecl =
+  lift $ Lex.lineFold scn (unParseFunc (eitherP (try pBlockDeclType) pDeclBody))
 
 pDeclBase :: ParserF Name -> ParserF DeclBase
 pDeclBase name = DeclBase <$> pList name <*> lexColon <*> pType'
@@ -124,7 +123,7 @@ pDeclType :: ParserF Name -> ParserF DeclType
 pDeclType name = DeclType <$> pDeclBase name <*> optional pDeclProp
 
 pDeclBody :: ParserF DeclBody
-pDeclBody = DeclBody <$> pName <*> many lowerName <*> lexEqual <*> pExpr'
+pDeclBody = DeclBody <$> pName <*> many pPattern <*> lexEqual <*> pExpr'
 
 pBlockDeclProp :: ParserF BlockDeclProp
 pBlockDeclProp = eitherP pDeclProp pExpr'
@@ -135,6 +134,18 @@ pBlockDeclType =
       BlockDeclType
     <$> pDeclBase pName
     <*> optional pBlockDeclProp
+
+------------------------------------------
+-- Pattern matching
+------------------------------------------
+
+pPattern :: ParserF Pattern 
+pPattern = choice [
+    PattParen <$> lexParenStart <*> pPattern <*> lexParenEnd,
+    PattWildcard <$> lexUnderscore,
+    PattBinder <$> lowerName, 
+    PattConstructor <$> upperName <*> many pPattern
+  ] 
 
 ------------------------------------------
 -- parse Stmt
@@ -346,7 +357,8 @@ chainOpTable =
   ]
 
 pExprArith :: ParserF Expr
-pExprArith = makeExprParser pTerm arithTable <* ParseFunc (\sc' -> try sc' <|> sc)
+pExprArith =
+  makeExprParser pTerm arithTable <* ParseFunc (\sc' -> try sc' <|> sc)
 
 arithTable :: [[Operator ParserF Expr]]
 arithTable =

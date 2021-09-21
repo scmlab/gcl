@@ -7,17 +7,17 @@ module Pretty.Concrete where
 
 -- import Syntax.Parser.Lexer (Tok (..))
 
-import           Data.Loc                       ( locOf
-                                                , (<-->)
+import           Data.Loc                       ( (<-->)
+                                                , locOf
                                                 )
 import           Data.Loc.Util                  ( translateLoc )
 import           Data.Text.Prettyprint.Doc      ( Pretty(pretty) )
+import           Prelude                 hiding ( Ordering(..) )
+import           Pretty.Common                  ( )
 import           Pretty.Util
 import           Pretty.Variadic
-import           Pretty.Common                  ( )
 import           Syntax.Common
 import           Syntax.Concrete
-import           Prelude                 hiding ( Ordering(..) )
 import           Syntax.Parser.Token
 
 --------------------------------------------------------------------------------
@@ -82,6 +82,9 @@ instance PrettyWithLoc (Token "→") where
 
 instance PrettyWithLoc (Token "*") where
   prettyWithLoc (Token l r) = DocWithLoc (pretty tokStar) l r
+
+instance PrettyWithLoc (Token "_") where
+  prettyWithLoc (Token l r) = DocWithLoc (pretty tokUnderscore) l r
 
 instance PrettyWithLoc (Token "=") where
   prettyWithLoc (Token l r) = DocWithLoc (pretty tokEQ) l r
@@ -222,6 +225,17 @@ instance Pretty BlockDeclaration where
 instance PrettyWithLoc BlockDeclaration where
   prettyWithLoc (BlockDeclaration l decls r) =
     prettyWithLoc l <> prettyWithLoc decls <> prettyWithLoc r
+
+--------------------------------------------------------------------------------
+-- | Pattern matching
+
+instance PrettyWithLoc Pattern where
+  prettyWithLoc (PattParen l patt r) =
+    prettyWithLoc l <> prettyWithLoc patt <> prettyWithLoc r
+  prettyWithLoc (PattBinder   binder        ) = prettyWithLoc binder
+  prettyWithLoc (PattWildcard tokUnderscore') = prettyWithLoc tokUnderscore'
+  prettyWithLoc (PattConstructor name fields) =
+    prettyWithLoc name <> prettyWithLoc fields
 
 --------------------------------------------------------------------------------
 -- | Literals

@@ -137,8 +137,9 @@ instance ToAbstract BlockDeclProp A.Expr where
   toAbstract (Right prop) = toAbstract prop
 
 instance ToAbstract DeclBody A.LetDeclaration where
-  toAbstract d@(DeclBody n args _ b) = do
-    A.LetDecl n args <$> toAbstract b <*> pure (locOf d)
+  toAbstract d@(DeclBody n patterns _ b) = do
+    -- TODO: introduce Pattern to the AST
+    A.LetDecl n [] <$> toAbstract b <*> pure (locOf d)
 
 instance ToAbstract BlockDeclType A.Declaration where
   toAbstract d@(BlockDeclType decl prop) = do

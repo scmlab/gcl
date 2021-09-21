@@ -55,6 +55,15 @@ data QDCon = QDCon Name [Type]
   deriving (Eq, Show)
 
 --------------------------------------------------------------------------------
+-- | Pattern matching
+
+data Pattern 
+  = PattBinder Name -- binder
+  | PattWildcard Range -- matches anything 
+  | PattConstructor Name Pattern -- destructs a constructor
+  deriving (Eq, Show)
+
+--------------------------------------------------------------------------------
 
 data Stmt
   = Skip Loc

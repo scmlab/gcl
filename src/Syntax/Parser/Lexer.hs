@@ -119,6 +119,9 @@ lexStar = symbol tokStar
 lexEqual :: LexerF (Token tokEQ)
 lexEqual = symbol tokEQ
 
+lexUnderscore :: LexerF (Token tokUnderscore)
+lexUnderscore = symbol tokUnderscore 
+
 ------------------------------------------
 -- delimiters
 ------------------------------------------

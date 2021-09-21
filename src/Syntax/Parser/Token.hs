@@ -80,6 +80,9 @@ tokArrowU = "→"
 tokStar :: Text
 tokStar = "*"
 
+tokUnderscore :: Text
+tokUnderscore = "_"
+
 ------------------------------------------
 -- delimiters
 ------------------------------------------
