@@ -53,5 +53,5 @@ extractDeclaration (VarDecl ns _ _ _) = Map.fromList (zip ns (repeat Nothing))
 --extractDeclaration (TypeDecl _ cons _) = Map.fromList $ map (\(QDCon n _) -> (n, Nothing)) cons
 
 extractDeclarations :: [Declaration] -> Defns -> Map Name (Maybe Expr)
-extractDeclarations decls defns =
-  foldMap extractDeclaration decls <> Map.map Just (defnValues defns)
+extractDeclarations decls (Defns _ funcDefns) =
+  foldMap extractDeclaration decls <> Map.map Just funcDefns

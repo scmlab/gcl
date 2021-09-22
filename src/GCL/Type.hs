@@ -370,9 +370,9 @@ checkProg (Program defns decls props stmts _) = do
   mapM_ (checkStmt env) stmts
 
 defnsAndDeclsToEnv :: Defns -> [Declaration] -> TM Environment
-defnsAndDeclsToEnv (Defns typeDefns valueDefns) decls = do
+defnsAndDeclsToEnv (Defns typeDefns funcDefns) decls = do
   -- add type declaration and defns to enviornment
-  let env = (foldMap typeDeclToEnv typeDefns) { localContext = valueDefns }
+  let env = (foldMap typeDeclToEnv typeDefns) { localContext = funcDefns }
 
   -- add var const declaration into enviornment, add type inference result of defns into enviornment
   foldM declToEnv env decls >>= inferLocalContext

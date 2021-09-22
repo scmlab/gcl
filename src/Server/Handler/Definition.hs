@@ -89,15 +89,16 @@ instance HasScopes GotoM (Range -> LocationLink) where
     pos <- ask
     lift $ local (scope :) $ runReaderT p pos
 
+-- TODO: handle type definitions
 runGotoM :: Program -> Position -> GotoM a -> CmdM a
-runGotoM (Program defns decls _ _ _) pos f = runReaderT (runReaderT f pos)
+runGotoM (Program (Defns _typeDefns funcDefns) decls _ _ _) pos f = runReaderT (runReaderT f pos)
                                                           [declScope]
  where
   declScope :: Map Text (Range -> LocationLink)
   declScope =
     Map.fromList
       . concatMap (mapMaybe declToLocationLink)
-      $ (map splitDecl decls, Map.toList (defnValues defns))
+      $ (map splitDecl decls, Map.toList funcDefns)
 
   -- split a parallel declaration into many simpler declarations
   splitDecl :: Declaration -> [(Name, Declaration)]
@@ -130,8 +131,8 @@ instance StabM GotoM Declaration LocationLink where
     ConstDecl _ _ c _ -> stabLocated c
     VarDecl   _ _ c _ -> stabLocated c
 
-instance StabM GotoM LetDeclaration LocationLink where
-  stabM (LetDecl _ args c _) = do
+instance StabM GotoM FuncDefn LocationLink where
+  stabM (FuncDefn _ args c _) = do
     -- creates a local scope for arguments
     let argsScope = Map.fromList $ mapMaybe nameToLocationLink args
     -- temporarily prepend this local scope to the scope stack

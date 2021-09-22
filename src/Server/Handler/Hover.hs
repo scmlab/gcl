@@ -102,8 +102,8 @@ instance StabM HoverM Declaration HoverResult where
     ConstDecl a _ c _ -> (<>) <$> stabLocated a <*> stabLocated c
     VarDecl   a _ c _ -> (<>) <$> stabLocated a <*> stabLocated c
 
-instance StabM HoverM LetDeclaration HoverResult where
-  stabM (LetDecl name args body _) = do
+instance StabM HoverM FuncDefn HoverResult where
+  stabM (FuncDefn name args body _) = do
     name' <- stabLocated name
     -- creates a local scope for arguments
     args' <- stabLocated (toArgs name args)

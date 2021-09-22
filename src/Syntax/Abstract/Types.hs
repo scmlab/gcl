@@ -34,10 +34,13 @@ data Program = Program Defns       -- let bindings
 --------------------------------------------------------------------------------
 -- | Definitions (the functional language part)
 
-data Defns = Defns
-  { defnTypes  :: [TypeDeclaration]
-  , defnValues :: Map Name Expr
-  }
+data Defns = Defns [TypeDeclaration] (Map Name Expr)
+  deriving (Eq, Show)
+
+data FuncDefn = FuncDefn Name [Name] Expr Loc
+  deriving (Eq, Show)
+
+data TypeDeclaration = TypeDecl QTyCon [QDCon] Loc
   deriving (Eq, Show)
 
 --------------------------------------------------------------------------------
@@ -46,12 +49,6 @@ data Defns = Defns
 data Declaration
   = ConstDecl [Name] Type (Maybe Expr) Loc
   | VarDecl [Name] Type (Maybe Expr) Loc
-  deriving (Eq, Show)
-
-data LetDeclaration = LetDecl Name [Name] Expr Loc
-  deriving (Eq, Show)
-
-data TypeDeclaration = TypeDecl QTyCon [QDCon] Loc
   deriving (Eq, Show)
 
 data QTyCon = QTyCon Name [Name]

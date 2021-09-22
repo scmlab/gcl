@@ -69,7 +69,7 @@ instance ToAbstract Declaration (Either A.TypeDeclaration A.Declaration) where
             )
 
 
-instance ToAbstract BlockDeclaration ([A.Declaration], [A.LetDeclaration]) where
+instance ToAbstract BlockDeclaration ([A.Declaration], [A.FuncDefn]) where
   toAbstract (BlockDeclaration _ decls _) =
     partitionEithers <$> toAbstract decls
 
@@ -131,9 +131,9 @@ instance ToAbstract BlockDeclProp A.Expr where
   toAbstract (Left  prop) = toAbstract prop
   toAbstract (Right prop) = toAbstract prop
 
-instance ToAbstract DeclBody A.LetDeclaration where
+instance ToAbstract DeclBody A.FuncDefn where
   toAbstract d@(DeclBody n args _ b) = do
-    A.LetDecl n args <$> toAbstract b <*> pure (locOf d)
+    A.FuncDefn n args <$> toAbstract b <*> pure (locOf d)
 
 instance ToAbstract BlockDeclType A.Declaration where
   toAbstract d@(BlockDeclType decl prop) = do
@@ -141,11 +141,11 @@ instance ToAbstract BlockDeclType A.Declaration where
     A.ConstDecl ns t <$> toAbstract prop <*> pure (locOf d)
 
 -- One BlockDecl can be parse into a ConstDecl or a ConstDecl and a LetDecl
-instance ToAbstract BlockDecl (Either A.Declaration A.LetDeclaration) where
+instance ToAbstract BlockDecl (Either A.Declaration A.FuncDefn) where
   toAbstract (Left  decl) = Left <$> toAbstract decl
   toAbstract (Right decl) = Right <$> toAbstract decl
 
-instance ToAbstract Declaration' ([A.TypeDeclaration], [A.Declaration], [A.LetDeclaration]) where
+instance ToAbstract Declaration' ([A.TypeDeclaration], [A.Declaration], [A.FuncDefn]) where
   toAbstract (Left d) =
     uncurry (, , []) . partitionEithers . (: []) <$> toAbstract d
   toAbstract (Right bd) = uncurry ([], , ) <$> toAbstract bd

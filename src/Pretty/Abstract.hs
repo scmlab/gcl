@@ -41,8 +41,8 @@ instance Pretty Declaration where
       <> pretty p
       <> " }"
 
-instance Pretty LetDeclaration where
-  pretty (LetDecl name args expr _) =
+instance Pretty FuncDefn where
+  pretty (FuncDefn name args expr _) =
     "let " <> pretty name <> hsep (map pretty args) <> " = " <> pretty expr
 
 instance Pretty TypeDeclaration where
