@@ -409,11 +409,8 @@ blockDeclarationCheck t1 t2 = toText wrap @?= t2
  where
   wrap = do
     (ds, defs) <- runParser pBlockDeclaration t1
-    let typeDefns = []
-    return $ check
-      (\_ decls -> defnsAndDeclsToEnv (pickLetBindings typeDefns defs) decls)
-      mempty
-      ds
+    let defns = Defns [] (pickLetBindings defs)
+    return $ check (\_ decls -> defnsAndDeclsToEnv defns decls) mempty ds
 
 programCheck :: Text -> Assertion
 programCheck t1 = toText wrap @?= "()"

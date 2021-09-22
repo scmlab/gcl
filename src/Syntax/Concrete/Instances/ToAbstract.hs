@@ -42,9 +42,9 @@ instance ToAbstract a b => ToAbstract [a] [b] where
 -- | Program / Declaration / Statement
 instance ToAbstract Program A.Program where
   toAbstract prog@(Program ds stmts') = do
-    (tdecls, ds', lds) <- foldl (<>) ([], [], []) <$> toAbstract ds
-    let decls                   = ds' <> foldMap A.extractQDCons tdecls -- add constructors' type into declarations
-    let defns                   = ConstExpr.pickLetBindings tdecls lds
+    (typeDefns, ds', lds) <- foldl (<>) ([], [], []) <$> toAbstract ds
+    let decls                   = ds' <> foldMap A.extractQDCons typeDefns -- add constructors' type into declarations
+    let defns                   = A.Defns typeDefns (ConstExpr.pickLetBindings lds)
     let (globProps, assertions) = ConstExpr.pickGlobals decls
     let pre =
           [ A.Assert (A.conjunct assertions) NoLoc | not (null assertions) ]

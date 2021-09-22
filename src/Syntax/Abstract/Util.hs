@@ -12,10 +12,6 @@ extractAssertion :: Declaration -> Maybe Expr
 extractAssertion (ConstDecl _ _ e _) = e
 extractAssertion (VarDecl   _ _ e _) = e
 
-extractLetBinding :: LetDeclaration -> (Name, Expr)
-extractLetBinding (LetDecl name args expr _) = (name, wrapLam args expr)
--- TODO:
-
 extractQDCons :: TypeDeclaration -> [Declaration]
 extractQDCons (TypeDecl qty qdcons _) = map wrap qdcons
  where
