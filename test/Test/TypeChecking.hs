@@ -3,60 +3,61 @@
 {-# LANGUAGE RecordWildCards #-}
 module Test.TypeChecking where
 
+import           Control.Monad.Except           ( runExcept )
+import           Control.Monad.State            ( evalStateT )
+import           Data.Either                    ( partitionEithers )
 import           Data.Loc                       ( Loc(..) )
 import qualified Data.Map                      as Map
+import           Data.Map                       ( Map )
 import           Data.Text                      ( Text )
-import           Test.Tasty                     ( TestTree
-                                                , testGroup
-                                                )
-import           Test.Util                      ( parseTest
-                                                , runGoldenTest
-                                                )
-import           Test.Tasty.HUnit               ( testCase
-                                                , (@?=)
-                                                , Assertion
-                                                )
-import           Control.Monad.Except           ( runExcept )
-import           GCL.Type                       ( TM
-                                                , Environment(..)
-                                                , inferExpr
-                                                , declsToEnv
-                                                , checkType
-                                                , checkStmt
+import           Error                          ( Error(..) )
+import           GCL.Type                       ( Environment(..)
+                                                , TM
                                                 , checkEnvironment
                                                 , checkProg
+                                                , checkStmt
+                                                , checkType
+                                                , defnsAndDeclsToEnv
+                                                , inferExpr
                                                 , runTM
                                                 )
-import           Syntax.Concrete                ( ToAbstract(toAbstract) )
-import           Syntax.Abstract                ( Lit(..)
+import           Pretty                         ( Pretty(pretty)
+                                                , toByteString
+                                                , toText
+                                                )
+import           Syntax.Abstract                ( Defns(Defns)
+                                                , Endpoint(..)
                                                 , Expr(..)
-                                                , Type(..)
-                                                , TBase(..)
                                                 , Interval(..)
-                                                , Endpoint(..), Defns (Defns)
+                                                , Lit(..)
+                                                , TBase(..)
+                                                , Type(..)
                                                 )
 import           Syntax.Abstract.Util           ( extractQDCons )
 import           Syntax.Common                  ( Name(Name)
                                                 , Op
                                                 )
-import           Syntax.Parser                  ( runParse
+import           Syntax.Concrete                ( ToAbstract(toAbstract) )
+import           Syntax.ConstExpr               ( pickLetBindings )
+import           Syntax.Parser                  ( Parser
+                                                , pBlockDeclaration
+                                                , pDeclaration
                                                 , pExpr
                                                 , pProgram
-                                                , Parser
                                                 , pStmt
                                                 , pType
-                                                , pDeclaration
-                                                , pBlockDeclaration
+                                                , runParse
                                                 )
-import           Syntax.ConstExpr               ( pickLetBindings )
-import           Pretty                         ( Pretty(pretty)
-                                                , toText
-                                                , toByteString
+import           Test.Tasty                     ( TestTree
+                                                , testGroup
                                                 )
-import           Error                          ( Error(..) )
-import           Data.Map                       ( Map )
-import           Data.Either                    ( partitionEithers )
-import           Control.Monad.State            ( evalStateT )
+import           Test.Tasty.HUnit               ( (@?=)
+                                                , Assertion
+                                                , testCase
+                                                )
+import           Test.Util                      ( parseTest
+                                                , runGoldenTest
+                                                )
 
 tests :: TestTree
 tests = testGroup
@@ -392,8 +393,8 @@ declarationCheck t1 t2 = toText wrap @?= t2
     (typeDefns, ds) <- partitionEithers . (: []) <$> runParser pDeclaration t1
     let ds' = ds <> foldMap extractQDCons typeDefns
     return $ check
-      (\_ ds'' -> do
-        env' <- declsToEnv typeDefns ds'' (Defns typeDefns mempty)
+      (\_ decls -> do
+        env' <- defnsAndDeclsToEnv (Defns typeDefns mempty) decls
         checkEnvironment env'
         return env'
       )
@@ -409,7 +410,10 @@ blockDeclarationCheck t1 t2 = toText wrap @?= t2
   wrap = do
     (ds, defs) <- runParser pBlockDeclaration t1
     let typeDefns = []
-    return $ check (\_ -> flip (declsToEnv typeDefns) (pickLetBindings typeDefns defs)) mempty ds
+    return $ check
+      (\_ decls -> defnsAndDeclsToEnv (pickLetBindings typeDefns defs) decls)
+      mempty
+      ds
 
 programCheck :: Text -> Assertion
 programCheck t1 = toText wrap @?= "()"

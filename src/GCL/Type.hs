@@ -224,7 +224,7 @@ lookupInferEnv n = do
   env <- ask
   case Map.lookup n (localDecls env) of
     Nothing -> case Map.lookup n (localContext env) of
-      Nothing -> throwError $ NotInScope n (locOf n)
+      Nothing   -> throwError $ NotInScope n (locOf n)
       Just expr -> infer expr
     Just t -> return $ typeWithLoc (locOf n) t
 
@@ -282,12 +282,12 @@ checkStmt env (Assign ns es loc)
     length ns > length es
   = let extraVars = drop (length es) ns
     in  throwError $ NotEnoughExprsInAssigment (NE.fromList extraVars)
-                                                                                                                                        -- (locOf $ mergeRangesUnsafe (fromLocs $ map locOf extraVars))
+                                                                                                                                            -- (locOf $ mergeRangesUnsafe (fromLocs $ map locOf extraVars))
                                                loc
   | length ns < length es
   = let extraExprs = drop (length ns) es
     in  throwError $ TooManyExprsInAssigment (NE.fromList extraExprs)
-                                                                                                                                        -- (locOf $ mergeRangesUnsafe (fromLocs $ map locOf extraExprs))
+                                                                                                                                            -- (locOf $ mergeRangesUnsafe (fromLocs $ map locOf extraExprs))
                                              loc
   | otherwise
   = forM_ (zip ns es) (checkAssign env)
@@ -364,15 +364,15 @@ checkEnvironment env = do
 checkProg :: Program -> TM ()
 checkProg (Program defns decls props stmts _) = do
   mapM_ (checkIsVarAssign decls) stmts
-  env <- declsToEnv (defnTypes defns) decls defns
+  env <- defnsAndDeclsToEnv defns decls
   checkEnvironment env
   mapM_ (checkExpr env) props
   mapM_ (checkStmt env) stmts
 
-declsToEnv :: [TypeDeclaration] -> [Declaration] -> Defns -> TM Environment
-declsToEnv tdecls decls defns = do
+defnsAndDeclsToEnv :: Defns -> [Declaration] -> TM Environment
+defnsAndDeclsToEnv (Defns typeDefns valueDefns) decls = do
   -- add type declaration and defns to enviornment
-  let env = (foldMap typeDeclToEnv tdecls) { localContext = defnValues defns }
+  let env = (foldMap typeDeclToEnv typeDefns) { localContext = valueDefns }
 
   -- add var const declaration into enviornment, add type inference result of defns into enviornment
   foldM declToEnv env decls >>= inferLocalContext
