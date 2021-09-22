@@ -99,10 +99,6 @@ instance Collect AsName J.SemanticTokenAbsolute where
 instance Collect Program J.SemanticTokenAbsolute where
   collect (Program as bs) = (as >>= collect) <> (bs >>= collect)
 
-instance Collect Declaration' J.SemanticTokenAbsolute where
-  collect (Left  a) = collect a
-  collect (Right a) = collect a
-
 instance Collect Declaration J.SemanticTokenAbsolute where
   collect (ConstDecl tok a) = toToken J.SttKeyword [] tok <> collect a
   collect (VarDecl   tok a) = toToken J.SttKeyword [] tok <> collect a
@@ -131,14 +127,8 @@ instance Collect DeclBody J.SemanticTokenAbsolute where
       <> (bs >>= collect . AsVariable)
       <> collect c
 
-instance Collect BlockDeclProp J.SemanticTokenAbsolute where
-  collect (Left  a) = collect a
-  collect (Right a) = collect a
 instance Collect BlockDeclType J.SemanticTokenAbsolute where
   collect (BlockDeclType a b) = collect a <> collect b
-instance Collect BlockDecl J.SemanticTokenAbsolute where
-  collect (Left  a) = collect a
-  collect (Right a) = collect a
 
 --------------------------------------------------------------------------------
 -- Stmt

@@ -47,7 +47,7 @@ data SepBy (sep :: Symbol) a = Head a | Delim a (Token sep) (SepBy sep a)
 -- | Program / Declaration / Statement
 data Program
   = Program
-      [Declaration'] -- constant and variable declarations
+      [Either Declaration BlockDeclaration] -- constant and variable declarations
       [Stmt] -- main program
   deriving (Eq, Show)
 
@@ -95,8 +95,6 @@ data DeclBody = DeclBody Name [Name] (Token "=") Expr deriving (Eq, Show)
 type BlockDeclProp = Either DeclProp Expr
 data BlockDeclType = BlockDeclType DeclBase (Maybe BlockDeclProp) deriving (Eq, Show)
 type BlockDecl = Either BlockDeclType DeclBody
-
-type Declaration' = Either Declaration BlockDeclaration
 
 --------------------------------------------------------------------------------
 

@@ -141,7 +141,7 @@ instance ToAbstract BlockDecl (Either A.Declaration A.FuncDefn) where
   toAbstract (Left  decl) = Left <$> toAbstract decl
   toAbstract (Right decl) = Right <$> toAbstract decl
 
-instance ToAbstract Declaration' ([A.TypeDefn], [A.Declaration], [A.FuncDefn]) where
+instance ToAbstract (Either Declaration BlockDeclaration) ([A.TypeDefn], [A.Declaration], [A.FuncDefn]) where
   toAbstract (Left d) =
     uncurry (, , []) . partitionEithers . (: []) <$> toAbstract d
   toAbstract (Right bd) = uncurry ([], , ) <$> toAbstract bd

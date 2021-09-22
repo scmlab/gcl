@@ -112,3 +112,7 @@ class Collect a b where
 instance Collect a b => Collect (Maybe a) b where
   collect Nothing = []
   collect (Just x) = collect x
+
+instance (Collect a x, Collect b x) => Collect (Either a b) x where
+  collect (Left  a) = collect a
+  collect (Right a) = collect a
