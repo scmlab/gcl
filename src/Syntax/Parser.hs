@@ -176,6 +176,7 @@ pStmt' =
       , pIf
       , pSpecQM
       , pSpec
+      , pBlock
       ]
     <?> "statement"
 

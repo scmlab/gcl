@@ -242,6 +242,8 @@ statement = testGroup
   , testCase "hlookup" $ run "x := *e"
   , testCase "hmutate" $ run "*e1 := e2"
   , testCase "dispose" $ run "dispose e"
+  , testCase "block 1" $ run "|[]|"
+  , testCase "block 2" $ run "|[ x := y ]|"
   ]
   where run = parserIso pStmt
 
@@ -288,6 +290,7 @@ golden = testGroup
   , parserGolden ""          "spec"     "spec.gcl"
   , parserGolden "examples/" "gcd"      "gcd.gcl"
   , parserGolden "examples/" "proof"    "proof.gcl"
+  , parserGolden "examples/" "block"    "block.gcl"
   ]
 
 parserGolden :: String -> FilePath -> FilePath -> TestTree
