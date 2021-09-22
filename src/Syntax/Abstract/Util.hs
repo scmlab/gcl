@@ -5,8 +5,11 @@ import           Data.Loc                       ( (<-->)
                                                 )
 import           Data.Map                       ( Map )
 import qualified Data.Map                      as Map
+import           Data.Text                      ( Text )
 import           Syntax.Abstract
-import           Syntax.Common                  ( Name )
+import           Syntax.Common                  ( Name
+                                                , nameToText
+                                                )
 
 extractAssertion :: Declaration -> Maybe Expr
 extractAssertion (ConstDecl _ _ e _) = e
@@ -43,15 +46,20 @@ assignBindingToExpr :: Bindings -> Maybe Expr
 assignBindingToExpr (AssignBinding e) = Just e
 assignBindingToExpr _                 = Nothing
 
-extractDeclaration :: Declaration -> Map Name (Maybe Expr)
-extractDeclaration (ConstDecl ns _ _ _) =
-  Map.fromList (zip ns (repeat Nothing))
-extractDeclaration (VarDecl ns _ _ _) = Map.fromList (zip ns (repeat Nothing))
---extractDeclaration (LetDecl n args body _) = Map.singleton n (Just (wrapLam args body))
+-- function definition           => Just Expr 
+-- constant/variable declaration => Nothing 
+programToScopeForSubstitution
+  :: Program -> Map Text (Maybe Expr)
+programToScopeForSubstitution (Program (Defns _ funcDefns) decls _ _ _) =
+  Map.mapKeys nameToText
+    $  foldMap extractDeclaration decls
+    <> Map.map Just funcDefns
+ where
+  extractDeclaration :: Declaration -> Map Name (Maybe Expr)
+  extractDeclaration (ConstDecl names _ _ _) =
+    Map.fromList (zip names (repeat Nothing))
+  extractDeclaration (VarDecl names _ _ _) =
+    Map.fromList (zip names (repeat Nothing))
 
--- extract type constructor to env
---extractDeclaration (TypeDefn _ cons _) = Map.fromList $ map (\(QDCon n _) -> (n, Nothing)) cons
 
-extractDeclarations :: [Declaration] -> Defns -> Map Name (Maybe Expr)
-extractDeclarations decls (Defns _ funcDefns) =
-  foldMap extractDeclaration decls <> Map.map Just funcDefns
+    --extractDeclaration (LetDecl n args body _) = Map.singleton n (Just (wrapLam args body))
