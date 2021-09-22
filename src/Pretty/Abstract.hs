@@ -13,8 +13,8 @@ import           Syntax.Abstract
 
 -- | Program
 instance Pretty Program where
-  pretty (Program tdecls decls _ _ stmts _) =
-    vsep $ map pretty tdecls ++ map pretty decls ++ map pretty stmts
+  pretty (Program _ decls props stmts _) =
+    vsep $ map pretty decls ++ map pretty props ++ map pretty stmts
 
 --------------------------------------------------------------------------------
 

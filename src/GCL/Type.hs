@@ -362,9 +362,9 @@ checkEnvironment env = do
       )
 
 checkProg :: Program -> TM ()
-checkProg (Program tdecls decls props defns stmts _) = do
+checkProg (Program defns decls props stmts _) = do
   mapM_ (checkIsVarAssign decls) stmts
-  env <- declsToEnv tdecls decls defns
+  env <- declsToEnv (defnTypes defns) decls defns
   checkEnvironment env
   mapM_ (checkExpr env) props
   mapM_ (checkStmt env) stmts
@@ -372,7 +372,7 @@ checkProg (Program tdecls decls props defns stmts _) = do
 declsToEnv :: [TypeDeclaration] -> [Declaration] -> Defns -> TM Environment
 declsToEnv tdecls decls defns = do
   -- add type declaration and defns to enviornment
-  let env = (foldMap typeDeclToEnv tdecls) { localContext = defns }
+  let env = (foldMap typeDeclToEnv tdecls) { localContext = defnValues defns }
 
   -- add var const declaration into enviornment, add type inference result of defns into enviornment
   foldM declToEnv env decls >>= inferLocalContext

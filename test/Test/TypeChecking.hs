@@ -33,7 +33,7 @@ import           Syntax.Abstract                ( Lit(..)
                                                 , Type(..)
                                                 , TBase(..)
                                                 , Interval(..)
-                                                , Endpoint(..)
+                                                , Endpoint(..), Defns (Defns)
                                                 )
 import           Syntax.Abstract.Util           ( extractQDCons )
 import           Syntax.Common                  ( Name(Name)
@@ -389,11 +389,11 @@ declarationCheck :: Text -> Text -> Assertion
 declarationCheck t1 t2 = toText wrap @?= t2
  where
   wrap = do
-    (tds, ds) <- partitionEithers . (: []) <$> runParser pDeclaration t1
-    let ds' = ds <> foldMap extractQDCons tds
+    (typeDefns, ds) <- partitionEithers . (: []) <$> runParser pDeclaration t1
+    let ds' = ds <> foldMap extractQDCons typeDefns
     return $ check
       (\_ ds'' -> do
-        env' <- declsToEnv tds ds'' mempty
+        env' <- declsToEnv typeDefns ds'' (Defns typeDefns mempty)
         checkEnvironment env'
         return env'
       )
@@ -408,7 +408,8 @@ blockDeclarationCheck t1 t2 = toText wrap @?= t2
  where
   wrap = do
     (ds, defs) <- runParser pBlockDeclaration t1
-    return $ check (\_ -> flip (declsToEnv []) (pickLetBindings defs)) mempty ds
+    let typeDefns = []
+    return $ check (\_ -> flip (declsToEnv typeDefns) (pickLetBindings typeDefns defs)) mempty ds
 
 programCheck :: Text -> Assertion
 programCheck t1 = toText wrap @?= "()"

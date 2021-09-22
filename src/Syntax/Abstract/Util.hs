@@ -1,22 +1,12 @@
 module Syntax.Abstract.Util where
 
-import           Syntax.Abstract                ( Expr(Lam)
-                                                , GdCmd(..)
-                                                , Stmt
-                                                , Declaration(..)
-                                                , Defns
-                                                , LetDeclaration(..)
-                                                , TypeDeclaration(..)
-                                                , QDCon(..)
-                                                , Bindings(..)
-                                                , Type(..)
-                                                )
-import           Syntax.Common                  ( Name )
 import           Data.Loc                       ( (<-->)
                                                 , locOf
                                                 )
 import           Data.Map                       ( Map )
 import qualified Data.Map                      as Map
+import           Syntax.Abstract
+import           Syntax.Common                  ( Name )
 
 extractAssertion :: Declaration -> Maybe Expr
 extractAssertion (ConstDecl _ _ e _) = e
@@ -68,4 +58,4 @@ extractDeclaration (VarDecl ns _ _ _) = Map.fromList (zip ns (repeat Nothing))
 
 extractDeclarations :: [Declaration] -> Defns -> Map Name (Maybe Expr)
 extractDeclarations decls defns =
-  foldMap extractDeclaration decls <> Map.map Just defns
+  foldMap extractDeclaration decls <> Map.map Just (defnValues defns)

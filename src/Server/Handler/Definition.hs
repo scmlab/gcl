@@ -90,14 +90,14 @@ instance HasScopes GotoM (Range -> LocationLink) where
     lift $ local (scope :) $ runReaderT p pos
 
 runGotoM :: Program -> Position -> GotoM a -> CmdM a
-runGotoM (Program _ decls _ defns _ _) pos f = runReaderT (runReaderT f pos)
+runGotoM (Program defns decls _ _ _) pos f = runReaderT (runReaderT f pos)
                                                           [declScope]
  where
   declScope :: Map Text (Range -> LocationLink)
   declScope =
     Map.fromList
       . concatMap (mapMaybe declToLocationLink)
-      $ (map splitDecl decls, Map.toList defns)
+      $ (map splitDecl decls, Map.toList (defnValues defns))
 
   -- split a parallel declaration into many simpler declarations
   splitDecl :: Declaration -> [(Name, Declaration)]
@@ -122,7 +122,7 @@ runGotoM (Program _ decls _ defns _ _) pos f = runReaderT (runReaderT f pos)
     return (text, toLocationLink)
 
 instance StabM GotoM Program LocationLink where
-  stabM (Program _ decls _ _ stmts _) =
+  stabM (Program _ decls _ stmts _) =
     (<>) <$> stabLocated decls <*> stabLocated stmts
 
 instance StabM GotoM Declaration LocationLink where

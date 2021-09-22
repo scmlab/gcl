@@ -6,7 +6,7 @@ import           Syntax.Abstract.Types
 import           Prelude                 hiding ( Ordering(..) )
 
 instance Located Program where
-  locOf (Program _ _ _ _ _ l) = l
+  locOf (Program _ _ _ _ l) = l
 
 instance Located Declaration where
   locOf (ConstDecl _ _ _ l) = l

@@ -22,18 +22,23 @@ type Var = Text
 type TypeVar = Text
 
 --------------------------------------------------------------------------------
-
 -- | Program
-data Program = Program [TypeDeclaration] -- type declarations
-                                         [Declaration]     -- constant and variable declarations
-                                                       [Expr]            -- global properties
-                                                              Defns             -- let bindings
-                                                                    [Stmt]            -- main program
-                                                                           Loc
+
+data Program = Program Defns       -- let bindings
+                             [Declaration]     -- constant and variable declarations
+                                           [Expr]            -- global properties
+                                                  [Stmt]            -- main program
+                                                         Loc
   deriving (Eq, Show)
 
---type Types = Map Name TypeDeclaration
-type Defns = Map Name Expr
+--------------------------------------------------------------------------------
+-- | Definitions (the functional language part)
+
+data Defns = Defns
+  { defnTypes  :: [TypeDeclaration]
+  , defnValues :: Map Name Expr
+  }
+  deriving (Eq, Show)
 
 --------------------------------------------------------------------------------
 

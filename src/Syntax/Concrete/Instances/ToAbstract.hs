@@ -10,20 +10,20 @@ module Syntax.Concrete.Instances.ToAbstract where
 import           Control.Monad.Except           ( Except
                                                 , throwError
                                                 )
-import           Data.Loc                       ( Loc(..)
-                                                , (<-->)
+import           Data.Either                    ( partitionEithers )
+import           Data.Loc                       ( (<-->)
+                                                , Loc(..)
                                                 , Located(locOf)
                                                 )
-import           Syntax.Concrete.Types
-import           Syntax.Concrete.Instances.Located
-                                                ( )
+import           Data.Loc.Range
 import qualified Syntax.Abstract               as A
 import qualified Syntax.Abstract.Operator      as A
 import qualified Syntax.Abstract.Util          as A
-import qualified Syntax.ConstExpr              as ConstExpr
 import           Syntax.Common                  ( Name )
-import           Data.Loc.Range
-import           Data.Either                    ( partitionEithers )
+import           Syntax.Concrete.Instances.Located
+                                                ( )
+import           Syntax.Concrete.Types
+import qualified Syntax.ConstExpr              as ConstExpr
 
 --------------------------------------------------------------------------------
 
@@ -44,18 +44,13 @@ instance ToAbstract Program A.Program where
   toAbstract prog@(Program ds stmts') = do
     (tdecls, ds', lds) <- foldl (<>) ([], [], []) <$> toAbstract ds
     let decls                   = ds' <> foldMap A.extractQDCons tdecls -- add constructors' type into declarations
-    let letBindings             = ConstExpr.pickLetBindings lds
+    let defns                   = ConstExpr.pickLetBindings tdecls lds
     let (globProps, assertions) = ConstExpr.pickGlobals decls
     let pre =
           [ A.Assert (A.conjunct assertions) NoLoc | not (null assertions) ]
     stmts <- toAbstract stmts'
 
-    return $ A.Program tdecls
-                       decls
-                       globProps
-                       letBindings
-                       (pre ++ stmts)
-                       (locOf prog)
+    return $ A.Program defns decls globProps  (pre ++ stmts) (locOf prog)
 
 instance ToAbstract Declaration (Either A.TypeDeclaration A.Declaration) where
   toAbstract d = case d of
