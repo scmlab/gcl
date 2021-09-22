@@ -34,13 +34,15 @@ data Program = Program Defns       -- let bindings
 --------------------------------------------------------------------------------
 -- | Definitions (the functional language part)
 
-data Defns = Defns [TypeDeclaration] (Map Name Expr)
+data Defns = Defns [TypeDefn] (Map Name Expr)
   deriving (Eq, Show)
 
+-- function definition
 data FuncDefn = FuncDefn Name [Name] Expr Loc
   deriving (Eq, Show)
 
-data TypeDeclaration = TypeDecl QTyCon [QDCon] Loc
+-- type definition
+data TypeDefn = TypeDefn QTyCon [QDCon] Loc
   deriving (Eq, Show)
 
 --------------------------------------------------------------------------------

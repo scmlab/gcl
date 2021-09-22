@@ -138,7 +138,7 @@ instance StabM GotoM FuncDefn LocationLink where
     -- temporarily prepend this local scope to the scope stack
 
     pushScope argsScope $ stabM c
-    -- TODO : TypeDecl StabM
+    -- TODO : TypeDefn StabM
 
 instance StabM GotoM Stmt LocationLink where
   stabM = \case

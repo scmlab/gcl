@@ -15,8 +15,8 @@ instance Located Declaration where
 instance Located FuncDefn where
   locOf (FuncDefn _ _ _ l) = l
 
-instance Located TypeDeclaration where
-  locOf (TypeDecl _ _ l) = l
+instance Located TypeDefn where
+  locOf (TypeDefn _ _ l) = l
 
 instance Located QTyCon where
   locOf (QTyCon l r) = l <--> r

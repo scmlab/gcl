@@ -20,7 +20,7 @@ instance Located Program where
 instance Located Declaration where
   locOf (ConstDecl l r   ) = l <--> r
   locOf (VarDecl   l r   ) = l <--> r
-  locOf (TypeDecl l _ _ r) = l <--> r
+  locOf (TypeDefn l _ _ r) = l <--> r
 
 instance Located QTyCon where
   locOf (QTyCon l r) = l <--> r

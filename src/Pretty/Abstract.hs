@@ -45,8 +45,8 @@ instance Pretty FuncDefn where
   pretty (FuncDefn name args expr _) =
     "let " <> pretty name <> hsep (map pretty args) <> " = " <> pretty expr
 
-instance Pretty TypeDeclaration where
-  pretty (TypeDecl qty qdcons _) =
+instance Pretty TypeDefn where
+  pretty (TypeDefn qty qdcons _) =
     "data " <> pretty qty <> "= " <> hsep (punctuate "| " (map pretty qdcons))
 
 instance Pretty QTyCon where

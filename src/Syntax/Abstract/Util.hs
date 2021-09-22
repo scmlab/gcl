@@ -12,8 +12,8 @@ extractAssertion :: Declaration -> Maybe Expr
 extractAssertion (ConstDecl _ _ e _) = e
 extractAssertion (VarDecl   _ _ e _) = e
 
-extractQDCons :: TypeDeclaration -> [Declaration]
-extractQDCons (TypeDecl qty qdcons _) = map wrap qdcons
+extractQDCons :: TypeDefn -> [Declaration]
+extractQDCons (TypeDefn qty qdcons _) = map wrap qdcons
  where
   wrap (QDCon cn ts) =
     ConstDecl [cn] (wrapTFunc ts (TCon qty)) Nothing (locOf cn)
@@ -50,7 +50,7 @@ extractDeclaration (VarDecl ns _ _ _) = Map.fromList (zip ns (repeat Nothing))
 --extractDeclaration (LetDecl n args body _) = Map.singleton n (Just (wrapLam args body))
 
 -- extract type constructor to env
---extractDeclaration (TypeDecl _ cons _) = Map.fromList $ map (\(QDCon n _) -> (n, Nothing)) cons
+--extractDeclaration (TypeDefn _ cons _) = Map.fromList $ map (\(QDCon n _) -> (n, Nothing)) cons
 
 extractDeclarations :: [Declaration] -> Defns -> Map Name (Maybe Expr)
 extractDeclarations decls (Defns _ funcDefns) =

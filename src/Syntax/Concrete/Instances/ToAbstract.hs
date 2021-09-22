@@ -52,7 +52,7 @@ instance ToAbstract Program A.Program where
 
     return $ A.Program defns decls globProps  (pre ++ stmts) (locOf prog)
 
-instance ToAbstract Declaration (Either A.TypeDeclaration A.Declaration) where
+instance ToAbstract Declaration (Either A.TypeDefn A.Declaration) where
   toAbstract d = case d of
     ConstDecl _ decl -> do
       (name, body, prop) <- toAbstract decl
@@ -60,9 +60,9 @@ instance ToAbstract Declaration (Either A.TypeDeclaration A.Declaration) where
     VarDecl _ decl -> do
       (name, body, prop) <- toAbstract decl
       return . Right $ A.VarDecl name body prop (locOf d)
-    TypeDecl _ tycon _ cons -> do
+    TypeDefn _ tycon _ cons -> do
       Left
-        <$> (   A.TypeDecl
+        <$> (   A.TypeDefn
             <$> toAbstract tycon
             <*> toAbstract (fromSepBy cons)
             <*> pure (locOf d)
@@ -145,7 +145,7 @@ instance ToAbstract BlockDecl (Either A.Declaration A.FuncDefn) where
   toAbstract (Left  decl) = Left <$> toAbstract decl
   toAbstract (Right decl) = Right <$> toAbstract decl
 
-instance ToAbstract Declaration' ([A.TypeDeclaration], [A.Declaration], [A.FuncDefn]) where
+instance ToAbstract Declaration' ([A.TypeDefn], [A.Declaration], [A.FuncDefn]) where
   toAbstract (Left d) =
     uncurry (, , []) . partitionEithers . (: []) <$> toAbstract d
   toAbstract (Right bd) = uncurry ([], , ) <$> toAbstract bd

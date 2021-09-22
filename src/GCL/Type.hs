@@ -339,12 +339,12 @@ checkIsVarAssign _ _ = return ()
 checkEnvironment :: Environment -> TM ()
 checkEnvironment env = do
   -- check type declarations
-  forM_ (typeDecls env) checkTypeDecl
+  forM_ (typeDecls env) checkTypeDefn
 
   -- check local declaration type
   mapM_ (checkType env) (localDecls env)
  where
-  checkTypeDecl (qty@(QTyCon _ args), qdcons) = do
+  checkTypeDefn (qty@(QTyCon _ args), qdcons) = do
     checkQTyConArg args
     mapM_ (checkQDCon qty) qdcons
 
@@ -377,7 +377,7 @@ defnsAndDeclsToEnv (Defns typeDefns funcDefns) decls = do
   -- add var const declaration into enviornment, add type inference result of defns into enviornment
   foldM declToEnv env decls >>= inferLocalContext
  where
-  typeDeclToEnv (TypeDecl qty@(QTyCon n _) qdcons _) = do
+  typeDeclToEnv (TypeDefn qty@(QTyCon n _) qdcons _) = do
     mempty { typeDecls = Map.singleton n (qty, qdcons) }
 
   declToEnv env (ConstDecl ns t _ _) = foldM f env ns

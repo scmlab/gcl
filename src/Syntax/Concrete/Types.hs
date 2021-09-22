@@ -55,7 +55,7 @@ data Declaration
   = ConstDecl (Token "con") DeclType
   | VarDecl (Token "var") DeclType
   -- data T a1 a2 ... = K1 v1 v2 ... | K2 u1 u2 ...
-  | TypeDecl (Token "data") QTyCon (Token "=") (SepBy "|" QDCon)
+  | TypeDefn (Token "data") QTyCon (Token "=") (SepBy "|" QDCon)
   deriving (Eq, Show)
 
 data BlockDeclaration = BlockDeclaration (Token "{:") [BlockDecl] (Token ":}") deriving (Eq, Show)

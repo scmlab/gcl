@@ -191,7 +191,7 @@ instance Pretty Declaration where
 instance PrettyWithLoc Declaration where
   prettyWithLoc (ConstDecl con decl) = prettyWithLoc con <> prettyWithLoc decl
   prettyWithLoc (VarDecl   v   decl) = prettyWithLoc v <> prettyWithLoc decl
-  prettyWithLoc (TypeDecl dat qty eq qdcons) =
+  prettyWithLoc (TypeDefn dat qty eq qdcons) =
     prettyWithLoc dat
       <> prettyWithLoc qty
       <> prettyWithLoc eq

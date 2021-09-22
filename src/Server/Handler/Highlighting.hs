@@ -106,7 +106,7 @@ instance Collect Declaration' J.SemanticTokenAbsolute where
 instance Collect Declaration J.SemanticTokenAbsolute where
   collect (ConstDecl tok a) = toToken J.SttKeyword [] tok <> collect a
   collect (VarDecl   tok a) = toToken J.SttKeyword [] tok <> collect a
-  collect (TypeDecl tokData a _tokDef bs) =
+  collect (TypeDefn tokData a _tokDef bs) =
     toToken J.SttKeyword [] tokData
       <> toToken' J.SttType [] a
       <> (toList bs >>= collect)
