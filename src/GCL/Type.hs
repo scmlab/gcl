@@ -91,7 +91,7 @@ typeWithLoc :: Loc -> Type -> Type
 typeWithLoc l (TBase b _     ) = TBase b l
 typeWithLoc l (TArray i  t  _) = TArray i t l
 typeWithLoc l (TFunc  t1 t2 _) = TFunc t1 t2 l
-typeWithLoc _ (TCon c        ) = TCon c
+typeWithLoc l (TCon   n  b  _) = TCon n b l
 typeWithLoc l (TVar n _      ) = TVar n l
 
 ------------------------------------------
@@ -100,7 +100,7 @@ typeWithLoc l (TVar n _      ) = TVar n l
 
 data Environment = Environment
   { envLocalDefns   :: Map Name Type
-  , envTypeDefns    :: Map Name (QTyCon, [QDCon])
+  , envTypeDefns    :: Map Name ([Name], [TypeDefnCtor])
   , envLocalContext :: Map Name Expr
   }
   deriving (Eq, Show)
@@ -126,8 +126,8 @@ unify x y = tell [(x, y)]
 
 inferInEnv :: [(Name, Type)] -> Infer Type -> Infer Type
 inferInEnv l m = do
-  let scope =
-        \env -> env { envLocalDefns = Map.fromList l `Map.union` envLocalDefns env }
+  let scope = \env ->
+        env { envLocalDefns = Map.fromList l `Map.union` envLocalDefns env }
   local scope m
 
 infer :: Expr -> Infer Type
@@ -259,8 +259,8 @@ checkType env (TArray (Interval e1 e2 _) t _) = do
  where
   getEndpointExpr (Including e) = e
   getEndpointExpr (Excluding e) = e
-checkType env (  TFunc t1 t2 _    ) = checkType env t1 >> checkType env t2
-checkType env t@(TCon (QTyCon n _)) = do
+checkType env (  TFunc t1 t2 _) = checkType env t1 >> checkType env t2
+checkType env t@(TCon  n  _  _) = do
   maybe (throwError $ UndefinedType n (locOf t))
         (\_ -> return ())
         (Map.lookup n (envTypeDefns env))
@@ -282,12 +282,12 @@ checkStmt env (Assign ns es loc)
     length ns > length es
   = let extraVars = drop (length es) ns
     in  throwError $ NotEnoughExprsInAssigment (NE.fromList extraVars)
-                                                                                                                                            -- (locOf $ mergeRangesUnsafe (fromLocs $ map locOf extraVars))
+                                                                                                                                                    -- (locOf $ mergeRangesUnsafe (fromLocs $ map locOf extraVars))
                                                loc
   | length ns < length es
   = let extraExprs = drop (length ns) es
     in  throwError $ TooManyExprsInAssigment (NE.fromList extraExprs)
-                                                                                                                                            -- (locOf $ mergeRangesUnsafe (fromLocs $ map locOf extraExprs))
+                                                                                                                                                    -- (locOf $ mergeRangesUnsafe (fromLocs $ map locOf extraExprs))
                                              loc
   | otherwise
   = forM_ (zip ns es) (checkAssign env)
@@ -344,19 +344,19 @@ checkEnvironment env = do
   -- check local declaration type
   mapM_ (checkType env) (envLocalDefns env)
  where
-  checkTypeDefn (qty@(QTyCon _ args), qdcons) = do
-    checkQTyConArg args
-    mapM_ (checkQDCon qty) qdcons
+  checkTypeDefn (binders, qdcons) = do
+    checkQTyConArg binders
+    mapM_ (checkTypeDefnCtor binders) qdcons
 
   checkQTyConArg []       = return ()
   checkQTyConArg (x : xs) = if x `elem` xs
     then throwError $ DuplicatedIdentifier x (locOf x)
     else checkQTyConArg xs
 
-  checkQDCon (QTyCon _ args) (QDCon _ ts) = do
+  checkTypeDefnCtor binders (TypeDefnCtor _ ts) = do
     forM_
       (fv ts)
-      (\n -> if n `Set.member` Set.fromList args
+      (\n -> if n `Set.member` Set.fromList binders
         then return ()
         else throwError $ NotInScope n (locOf n)
       )
@@ -377,8 +377,8 @@ defnsAndDeclsToEnv (Defns typeDefns funcDefns) decls = do
   -- add var const declaration into enviornment, add type inference result of defns into enviornment
   foldM declToEnv env decls >>= inferLocalContext
  where
-  typeDeclToEnv (TypeDefn qty@(QTyCon n _) qdcons _) = do
-    mempty { envTypeDefns = Map.singleton n (qty, qdcons) }
+  typeDeclToEnv (TypeDefn name binders qdcons _) = do
+    mempty { envTypeDefns = Map.singleton name (binders, qdcons) }
 
   declToEnv env (ConstDecl ns t _ _) = foldM f env ns
    where

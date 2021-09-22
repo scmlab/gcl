@@ -191,23 +191,18 @@ instance Pretty Declaration where
 instance PrettyWithLoc Declaration where
   prettyWithLoc (ConstDecl con decl) = prettyWithLoc con <> prettyWithLoc decl
   prettyWithLoc (VarDecl   v   decl) = prettyWithLoc v <> prettyWithLoc decl
-  prettyWithLoc (TypeDefn dat qty eq qdcons) =
+  prettyWithLoc (TypeDefn dat name binders eq qdcons) =
     prettyWithLoc dat
-      <> prettyWithLoc qty
+      <> prettyWithLoc name
+      <> prettyWithLoc binders
       <> prettyWithLoc eq
       <> prettyWithLoc qdcons
 
-instance Pretty QTyCon where
+instance Pretty TypeDefnCtor where
   pretty = toDoc . prettyWithLoc
 
-instance PrettyWithLoc QTyCon where
-  prettyWithLoc (QTyCon n args) = prettyWithLoc n <> prettyWithLoc args
-
-instance Pretty QDCon where
-  pretty = toDoc . prettyWithLoc
-
-instance PrettyWithLoc QDCon where
-  prettyWithLoc (QDCon n ts) = prettyWithLoc n <> prettyWithLoc ts
+instance PrettyWithLoc TypeDefnCtor where
+  prettyWithLoc (TypeDefnCtor n ts) = prettyWithLoc n <> prettyWithLoc ts
 
 instance Pretty BlockDeclType where
   pretty = toDoc . prettyWithLoc
@@ -380,7 +375,7 @@ instance PrettyWithLoc Type where
     prettyWithLoc a <> prettyWithLoc l <> prettyWithLoc b
   prettyWithLoc (TArray l a r b) =
     prettyWithLoc l <> prettyWithLoc a <> prettyWithLoc r <> prettyWithLoc b
-  prettyWithLoc (TCon c) = prettyWithLoc c
+  prettyWithLoc (TCon a b) = prettyWithLoc a <> prettyWithLoc b
   prettyWithLoc (TVar i) = prettyWithLoc i
 
 --------------------------------------------------------------------------------

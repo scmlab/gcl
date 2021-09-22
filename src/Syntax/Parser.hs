@@ -102,13 +102,10 @@ pVarDecl = VarDecl <$> lexVar <*> pDeclType lowerName
 
 pTypeDefn :: ParserF Declaration
 pTypeDefn =
-  TypeDefn <$> lexData <*> pQTyCon <*> lexEqual <*> pSepBy lexGuardBar pQDCon
+  TypeDefn <$> lexData <*> pName <*> many pName <*> lexEqual <*> pSepBy lexGuardBar pTypeDefnCtor
 
-pQTyCon :: ParserF QTyCon
-pQTyCon = QTyCon <$> pName <*> many pName
-
-pQDCon :: ParserF QDCon
-pQDCon = QDCon <$> pName <*> many pType'
+pTypeDefnCtor :: ParserF TypeDefnCtor
+pTypeDefnCtor = TypeDefnCtor <$> pName <*> many pType'
 
 
 pBlockDecl :: ParserF BlockDecl
@@ -289,7 +286,7 @@ pTArray :: ParserF Type
 pTArray = TArray <$> lexArray <*> pInterval <*> lexOf <*> pType'
 
 pTCon :: ParserF Type
-pTCon = TCon <$> pQTyCon
+pTCon = TCon <$> pName <*> many pName
 
 pTBase :: ParserF Type
 pTBase = TBase <$> choice

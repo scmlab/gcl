@@ -33,7 +33,7 @@ import           Syntax.Abstract                ( Defns(Defns)
                                                 , TBase(..)
                                                 , Type(..)
                                                 )
-import           Syntax.Abstract.Util           ( extractQDCons )
+import           Syntax.Abstract.Util           ( extractTypeDefnCtors )
 import           Syntax.Common                  ( Name(Name)
                                                 , Op
                                                 )
@@ -201,7 +201,7 @@ declarationTests = testGroup
     $ declarationCheck "var x : Bool { x = True }" "Environment[(x, Bool)][][]"
   , testCase "type declaration" $ declarationCheck
     "data T a = Nil | Con a"
-    "Environment[(Con, TVar a → T a), (Nil, T a)][(T, (T a, [Nil , Con (TVar a)]))][]"
+    "Environment[(Con, TVar a → T a), (Nil, T a)][(T, ([a], [Nil , Con (TVar a)]))][]"
   ]
 
 blockDeclarationTests :: TestTree
@@ -391,7 +391,7 @@ declarationCheck t1 t2 = toText wrap @?= t2
  where
   wrap = do
     (typeDefns, ds) <- partitionEithers . (: []) <$> runParser pDeclaration t1
-    let ds' = ds <> foldMap extractQDCons typeDefns
+    let ds' = ds <> foldMap extractTypeDefnCtors typeDefns
     return $ check
       (\_ decls -> do
         env' <- defnsAndDeclsToEnv (Defns typeDefns mempty) decls

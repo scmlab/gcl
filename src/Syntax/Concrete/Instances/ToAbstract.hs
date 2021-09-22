@@ -43,14 +43,14 @@ instance ToAbstract a b => ToAbstract [a] [b] where
 instance ToAbstract Program A.Program where
   toAbstract prog@(Program ds stmts') = do
     (typeDefns, ds', lds) <- foldl (<>) ([], [], []) <$> toAbstract ds
-    let decls                   = ds' <> foldMap A.extractQDCons typeDefns -- add constructors' type into declarations
-    let defns                   = A.Defns typeDefns (ConstExpr.pickLetBindings lds)
+    let decls = ds' <> foldMap A.extractTypeDefnCtors typeDefns -- add constructors' type into declarations
+    let defns = A.Defns typeDefns (ConstExpr.pickLetBindings lds)
     let (globProps, assertions) = ConstExpr.pickGlobals decls
     let pre =
           [ A.Assert (A.conjunct assertions) NoLoc | not (null assertions) ]
     stmts <- toAbstract stmts'
 
-    return $ A.Program defns decls globProps  (pre ++ stmts) (locOf prog)
+    return $ A.Program defns decls globProps (pre ++ stmts) (locOf prog)
 
 instance ToAbstract Declaration (Either A.TypeDefn A.Declaration) where
   toAbstract d = case d of
@@ -60,12 +60,10 @@ instance ToAbstract Declaration (Either A.TypeDefn A.Declaration) where
     VarDecl _ decl -> do
       (name, body, prop) <- toAbstract decl
       return . Right $ A.VarDecl name body prop (locOf d)
-    TypeDefn _ tycon _ cons -> do
+    TypeDefn _ name binders _ cons -> do
       Left
-        <$> (   A.TypeDefn
-            <$> toAbstract tycon
-            <*> toAbstract (fromSepBy cons)
-            <*> pure (locOf d)
+        <$> (A.TypeDefn name binders <$> toAbstract (fromSepBy cons) <*> pure
+              (locOf d)
             )
 
 
@@ -73,11 +71,8 @@ instance ToAbstract BlockDeclaration ([A.Declaration], [A.FuncDefn]) where
   toAbstract (BlockDeclaration _ decls _) =
     partitionEithers <$> toAbstract decls
 
-instance ToAbstract QTyCon A.QTyCon where
-  toAbstract (QTyCon n ns) = pure $ A.QTyCon n ns
-
-instance ToAbstract QDCon A.QDCon where
-  toAbstract (QDCon c ts) = A.QDCon c <$> toAbstract ts
+instance ToAbstract TypeDefnCtor A.TypeDefnCtor where
+  toAbstract (TypeDefnCtor c ts) = A.TypeDefnCtor c <$> toAbstract ts
 
 instance ToAbstract Stmt A.Stmt where
   toAbstract stmt = case stmt of
@@ -180,15 +175,15 @@ instance ToAbstract Type A.Type where
       A.TArray <$> toAbstract a <*> toAbstract b <*> pure (locOf t)
     (TFunc a _ b) ->
       A.TFunc <$> toAbstract a <*> toAbstract b <*> pure (locOf t)
-    (TCon a      ) -> A.TCon <$> toAbstract a
-    (TVar a      ) -> pure $ A.TVar a (locOf t)
+    (TCon a b) -> return $ A.TCon a b (a <--> b)
+    (TVar a) -> pure $ A.TVar a (locOf t)
     (TParen _ a _) -> do
       t' <- toAbstract a
       case t' of
         A.TBase a' _     -> pure $ A.TBase a' (locOf t)
         A.TArray a' b' _ -> pure $ A.TArray a' b' (locOf t)
         A.TFunc  a' b' _ -> pure $ A.TFunc a' b' (locOf t)
-        A.TCon a'        -> pure $ A.TCon a'
+        A.TCon   a' b' _ -> pure $ A.TCon a' b' (locOf t)
         A.TVar a' _      -> pure $ A.TVar a' (locOf t)
 
 --------------------------------------------------------------------------------

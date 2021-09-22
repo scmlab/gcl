@@ -42,7 +42,10 @@ data FuncDefn = FuncDefn Name [Name] Expr Loc
   deriving (Eq, Show)
 
 -- type definition
-data TypeDefn = TypeDefn QTyCon [QDCon] Loc
+data TypeDefn = TypeDefn Name [Name] [TypeDefnCtor] Loc
+  deriving (Eq, Show)
+
+data TypeDefnCtor = TypeDefnCtor Name [Type]
   deriving (Eq, Show)
 
 --------------------------------------------------------------------------------
@@ -51,11 +54,6 @@ data TypeDefn = TypeDefn QTyCon [QDCon] Loc
 data Declaration
   = ConstDecl [Name] Type (Maybe Expr) Loc
   | VarDecl [Name] Type (Maybe Expr) Loc
-  deriving (Eq, Show)
-
-data QTyCon = QTyCon Name [Name]
-  deriving (Eq, Show, Generic)
-data QDCon = QDCon Name [Type]
   deriving (Eq, Show)
 
 --------------------------------------------------------------------------------
@@ -102,7 +100,7 @@ data Type
   = TBase TBase Loc
   | TArray Interval Type Loc
   | TFunc Type Type Loc
-  | TCon QTyCon
+  | TCon Name [Name] Loc
   | TVar Name Loc
   deriving (Eq, Show, Generic)
 

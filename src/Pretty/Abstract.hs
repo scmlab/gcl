@@ -46,14 +46,12 @@ instance Pretty FuncDefn where
     "let " <> pretty name <> hsep (map pretty args) <> " = " <> pretty expr
 
 instance Pretty TypeDefn where
-  pretty (TypeDefn qty qdcons _) =
-    "data " <> pretty qty <> "= " <> hsep (punctuate "| " (map pretty qdcons))
+  pretty (TypeDefn name binders qdcons _) =
+    "data " <> pretty name <+> hsep (map pretty binders) <> "= " <> hsep
+      (punctuate "| " (map pretty qdcons))
 
-instance Pretty QTyCon where
-  pretty (QTyCon n args) = pretty n <+> hsep (map pretty args)
-
-instance Pretty QDCon where
-  pretty (QDCon cn ts) = pretty cn <+> hsep (map wrap ts)
+instance Pretty TypeDefnCtor where
+  pretty (TypeDefnCtor cn ts) = pretty cn <+> hsep (map wrap ts)
    where
     wrap t@TBase{} = pretty t
     wrap t         = "(" <> pretty t <> ")"

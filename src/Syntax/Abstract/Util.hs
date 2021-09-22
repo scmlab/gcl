@@ -1,6 +1,7 @@
 module Syntax.Abstract.Util where
 
 import           Data.Loc                       ( (<-->)
+                                                , Located(locOfList)
                                                 , locOf
                                                 )
 import           Data.Map                       ( Map )
@@ -15,11 +16,14 @@ extractAssertion :: Declaration -> Maybe Expr
 extractAssertion (ConstDecl _ _ e _) = e
 extractAssertion (VarDecl   _ _ e _) = e
 
-extractQDCons :: TypeDefn -> [Declaration]
-extractQDCons (TypeDefn qty qdcons _) = map wrap qdcons
+extractTypeDefnCtors :: TypeDefn -> [Declaration]
+extractTypeDefnCtors (TypeDefn name binders qdcons _) = map wrap qdcons
  where
-  wrap (QDCon cn ts) =
-    ConstDecl [cn] (wrapTFunc ts (TCon qty)) Nothing (locOf cn)
+  wrap (TypeDefnCtor cn ts) = ConstDecl
+    [cn]
+    (wrapTFunc ts (TCon name binders (locOf name <--> locOfList binders)))
+    Nothing
+    (locOf cn)
 
 wrapTFunc :: [Type] -> Type -> Type
 wrapTFunc []       t  = t
@@ -38,8 +42,7 @@ wrapLam (x : xs) body = let b = wrapLam xs body in Lam x b (x <--> b)
 
 -- function definition           => Just Expr 
 -- constant/variable declaration => Nothing 
-programToScopeForSubstitution
-  :: Program -> Map Text (Maybe Expr)
+programToScopeForSubstitution :: Program -> Map Text (Maybe Expr)
 programToScopeForSubstitution (Program (Defns _ funcDefns) decls _ _ _) =
   Map.mapKeys nameToText
     $  foldMap extractDeclaration decls

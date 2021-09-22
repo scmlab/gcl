@@ -3,8 +3,6 @@ module Syntax.Abstract.Instances.Json where
 import Syntax.Abstract.Types
 import Data.Aeson ( FromJSON, ToJSON )
 
-instance ToJSON QTyCon
-
 instance ToJSON Endpoint
 instance ToJSON Interval
 instance ToJSON TBase

@@ -3,22 +3,20 @@
 {-# LANGUAGE FlexibleContexts #-}
 module GCL.Common where
 
-import           Data.Text                      ( Text )
-import qualified Data.Text                     as Text
-import           Data.Loc                       ( Loc(..)
-                                                , Loc
-                                                )
 import           Control.Monad                  ( liftM2 )
+import           Control.Monad.RWS              ( RWST(..) )
+import           Control.Monad.State            ( StateT(..) )
+import           Data.Loc                       ( Loc(..) )
 import           Data.Map                       ( Map )
-import           Syntax.Common                  ( Name(..) )
+import qualified Data.Map                      as Map
 import           Data.Set                       ( Set
                                                 , (\\)
                                                 )
-import qualified Data.Map                      as Map
 import qualified Data.Set                      as Set
+import           Data.Text                      ( Text )
+import qualified Data.Text                     as Text
 import qualified Syntax.Abstract               as A
-import           Control.Monad.RWS              ( RWST(..) )
-import           Control.Monad.State            ( StateT(..) )
+import           Syntax.Common                  ( Name(..) )
 
 -- Monad for generating fresh variable
 class Monad m => Fresh m where
@@ -73,11 +71,11 @@ instance Free a => Free [a] where
   fv l = foldMap fv l
 
 instance Free A.Type where
-  fv (A.TBase _ _           ) = mempty
-  fv (A.TArray _  t  _      ) = fv t
-  fv (A.TFunc  t1 t2 _      ) = fv t1 <> fv t2
-  fv (A.TCon (A.QTyCon _ ns)) = Set.fromList ns
-  fv (A.TVar x _            ) = Set.singleton x
+  fv (A.TBase _ _     ) = mempty
+  fv (A.TArray _  t  _) = fv t
+  fv (A.TFunc  t1 t2 _) = fv t1 <> fv t2
+  fv (A.TCon   _  ns _) = Set.fromList ns
+  fv (A.TVar x _      ) = Set.singleton x
 
 instance Free A.Expr where
   fv (A.Var   x _  ) = Set.singleton x

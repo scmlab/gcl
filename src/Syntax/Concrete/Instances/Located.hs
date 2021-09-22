@@ -1,10 +1,10 @@
 module Syntax.Concrete.Instances.Located where
 
-import           Syntax.Concrete.Types
-import           Syntax.Common                  ( )
-import           Data.Loc                       ( Located(locOf)
-                                                , (<-->)
+import           Data.Loc                       ( (<-->)
+                                                , Located(locOf)
                                                 )
+import           Syntax.Common                  ( )
+import           Syntax.Concrete.Types
 
 --------------------------------------------------------------------------------
 
@@ -18,15 +18,12 @@ instance Located Program where
   locOf (Program a b) = a <--> b
 
 instance Located Declaration where
-  locOf (ConstDecl l r   ) = l <--> r
-  locOf (VarDecl   l r   ) = l <--> r
-  locOf (TypeDefn l _ _ r) = l <--> r
+  locOf (ConstDecl l r     ) = l <--> r
+  locOf (VarDecl   l r     ) = l <--> r
+  locOf (TypeDefn l _ _ _ r) = l <--> r
 
-instance Located QTyCon where
-  locOf (QTyCon l r) = l <--> r
-
-instance Located QDCon where
-  locOf (QDCon l r) = l <--> r
+instance Located TypeDefnCtor where
+  locOf (TypeDefnCtor l r) = l <--> r
 
 instance Located BlockDeclaration where
   locOf (BlockDeclaration l _ r) = l <--> r
@@ -88,7 +85,7 @@ instance Located Type where
   locOf (TBase a       ) = locOf a
   locOf (TArray l _ _ r) = l <--> r
   locOf (TFunc l _ r   ) = l <--> r
-  locOf (TCon l        ) = locOf l
+  locOf (TCon l r      ) = l <--> r
   locOf (TVar x        ) = locOf x
 
 --------------------------------------------------------------------------------
