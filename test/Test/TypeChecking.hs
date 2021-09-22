@@ -33,12 +33,11 @@ import           Syntax.Abstract                ( Defns(Defns)
                                                 , TBase(..)
                                                 , Type(..)
                                                 )
-import           Syntax.Abstract.Util           ( extractTypeDefnCtors )
+import           Syntax.Abstract.Util           ( extractTypeDefnCtors, collectFuncDefns )
 import           Syntax.Common                  ( Name(Name)
                                                 , Op
                                                 )
 import           Syntax.Concrete                ( ToAbstract(toAbstract) )
-import           Syntax.ConstExpr               ( pickLetBindings )
 import           Syntax.Parser                  ( Parser
                                                 , pBlockDeclaration
                                                 , pDeclaration
@@ -58,6 +57,7 @@ import           Test.Tasty.HUnit               ( (@?=)
 import           Test.Util                      ( parseTest
                                                 , runGoldenTest
                                                 )
+import qualified Syntax.Abstract.Util as A
 
 tests :: TestTree
 tests = testGroup
@@ -394,7 +394,7 @@ declarationCheck t1 t2 = toText wrap @?= t2
     let ds' = ds <> foldMap extractTypeDefnCtors typeDefns
     return $ check
       (\_ decls -> do
-        env' <- defnsAndDeclsToEnv (Defns typeDefns mempty) decls
+        env' <- defnsAndDeclsToEnv (Defns (A.collectTypeDefns typeDefns) mempty) decls
         checkEnvironment env'
         return env'
       )
@@ -409,7 +409,7 @@ blockDeclarationCheck t1 t2 = toText wrap @?= t2
  where
   wrap = do
     (ds, defs) <- runParser pBlockDeclaration t1
-    let defns = Defns [] (pickLetBindings defs)
+    let defns = Defns mempty (collectFuncDefns defs)
     return $ check (\_ decls -> defnsAndDeclsToEnv defns decls) mempty ds
 
 programCheck :: Text -> Assertion

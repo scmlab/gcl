@@ -54,5 +54,8 @@ programToScopeForSubstitution (Program (Defns _ funcDefns) decls _ _ _) =
   extractDeclaration (VarDecl names _ _ _) =
     Map.fromList (zip names (repeat Nothing))
 
+collectFuncDefns :: [FuncDefn] -> Map Name Expr
+collectFuncDefns = Map.fromList . map (\(FuncDefn name args expr _) -> (name, wrapLam args expr))
 
-    --extractDeclaration (LetDecl n args body _) = Map.singleton n (Just (wrapLam args body))
+collectTypeDefns :: [TypeDefn] -> Map Name TypeDefn
+collectTypeDefns = Map.fromList . map (\x@(TypeDefn name _ _ _) -> (name, x))

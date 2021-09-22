@@ -34,7 +34,7 @@ data Program = Program Defns       -- let bindings
 --------------------------------------------------------------------------------
 -- | Definitions (the functional language part)
 
-data Defns = Defns [TypeDefn] (Map Name Expr)
+data Defns = Defns (Map Name TypeDefn) (Map Name Expr)
   deriving (Eq, Show)
 
 -- function definition

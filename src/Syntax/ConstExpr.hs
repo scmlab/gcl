@@ -3,13 +3,10 @@
 module Syntax.ConstExpr where
 
 import           Data.List                      ( partition )
-import qualified Data.Map                      as Map
 import           Data.Maybe                     ( mapMaybe )
 import           Syntax.Abstract
-import           Syntax.Abstract.Util           ( extractAssertion, wrapLam
-                                                )
+import           Syntax.Abstract.Util           ( extractAssertion )
 import           Syntax.Common
-import Data.Map (Map)
 
 constExpr :: [Name] -> Expr -> Bool
 constExpr _     (Lit   _ _  ) = True
@@ -31,10 +28,3 @@ constExpr bvars (ArrUpd e1 e2 e3 _) =
 -- extract assertions from declarations
 pickGlobals :: [Declaration] -> ([Expr], [Expr])
 pickGlobals = partition (constExpr []) . mapMaybe extractAssertion
-
--- extract let bindings in declarations
-pickLetBindings :: [FuncDefn] -> Map Name Expr
-pickLetBindings = Map.fromList . map extractLetBinding
-  where 
-    extractLetBinding :: FuncDefn -> (Name, Expr)
-    extractLetBinding (FuncDefn name args expr _) = (name, wrapLam args expr)

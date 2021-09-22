@@ -44,7 +44,8 @@ instance ToAbstract Program A.Program where
   toAbstract prog@(Program ds stmts') = do
     (typeDefns, ds', lds) <- foldl (<>) ([], [], []) <$> toAbstract ds
     let decls = ds' <> foldMap A.extractTypeDefnCtors typeDefns -- add constructors' type into declarations
-    let defns = A.Defns typeDefns (ConstExpr.pickLetBindings lds)
+    let defns =
+          A.Defns (A.collectTypeDefns typeDefns) (A.collectFuncDefns lds)
     let (globProps, assertions) = ConstExpr.pickGlobals decls
     let pre =
           [ A.Assert (A.conjunct assertions) NoLoc | not (null assertions) ]
@@ -175,8 +176,8 @@ instance ToAbstract Type A.Type where
       A.TArray <$> toAbstract a <*> toAbstract b <*> pure (locOf t)
     (TFunc a _ b) ->
       A.TFunc <$> toAbstract a <*> toAbstract b <*> pure (locOf t)
-    (TCon a b) -> return $ A.TCon a b (a <--> b)
-    (TVar a) -> pure $ A.TVar a (locOf t)
+    (TCon a b    ) -> return $ A.TCon a b (a <--> b)
+    (TVar a      ) -> pure $ A.TVar a (locOf t)
     (TParen _ a _) -> do
       t' <- toAbstract a
       case t' of
