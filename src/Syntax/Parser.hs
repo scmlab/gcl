@@ -271,6 +271,9 @@ pHMutate = HMutate <$> lexStar <*> pExpr' <*> lexAssign <*> pExpr'
 pDispose :: ParserF Stmt
 pDispose = Dispose <$> lexDispose <*> pExpr'
 
+pBlock :: ParserF Stmt
+pBlock = Block <$> lexBlockStart <*> pProgram' <*> lexBlockEnd
+
 ------------------------------------------
 -- parse Type
 ------------------------------------------

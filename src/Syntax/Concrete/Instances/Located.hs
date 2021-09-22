@@ -64,6 +64,7 @@ instance Located Stmt where
   locOf (HLookup l _ _ r            ) = l <--> r
   locOf (HMutate l _ _ r            ) = l <--> r
   locOf (Dispose l r                ) = l <--> r
+  locOf (Block l _ r                ) = l <--> r
 
 --------------------------------------------------------------------------------
 

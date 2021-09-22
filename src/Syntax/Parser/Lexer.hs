@@ -4,30 +4,67 @@
 
 module Syntax.Parser.Lexer where
 
-import Control.Applicative.Combinators (choice, many, skipMany, some, (<|>))
-import Control.Monad (void)
-import Data.Char (isAlpha, isAlphaNum, isSpace, isSymbol)
-import Data.Loc (Loc (..), Located (..), Pos, (<-->))
-import Data.Loc.Range (Range (Range), Ranged (rangeOf))
-import Data.Proxy (Proxy (Proxy))
-import Data.Text (Text)
-import Data.Void (Void)
-import Syntax.Common
-import Syntax.Concrete (Lit (..), Token (..))
-import Syntax.Parser.Token
-import Syntax.Parser.Util
-import Text.Megaparsec (MonadParsec (notFollowedBy, tokens, try), Parsec, Stream (tokensToChunk), getOffset, getSourcePos, satisfy, setOffset, (<?>))
-import Text.Megaparsec.Char (alphaNumChar, char, lowerChar, space1, string, upperChar)
-import qualified Text.Megaparsec.Char.Lexer as Lex
-import Data.Bifunctor (second)
-import qualified Data.Text as Text
+import           Control.Applicative.Combinators
+                                                ( choice
+                                                , many
+                                                , skipMany
+                                                , some
+                                                , (<|>)
+                                                )
+import           Control.Monad                  ( void )
+import           Data.Char                      ( isAlpha
+                                                , isAlphaNum
+                                                , isSpace
+                                                , isSymbol
+                                                )
+import           Data.Loc                       ( Loc(..)
+                                                , Located(..)
+                                                , Pos
+                                                , (<-->)
+                                                )
+import           Data.Loc.Range                 ( Range(Range)
+                                                , Ranged(rangeOf)
+                                                )
+import           Data.Proxy                     ( Proxy(Proxy) )
+import           Data.Text                      ( Text )
+import           Data.Void                      ( Void )
+import           Syntax.Common
+import           Syntax.Concrete                ( Lit(..)
+                                                , Token(..)
+                                                )
+import           Syntax.Parser.Token
+import           Syntax.Parser.Util
+import           Text.Megaparsec                ( MonadParsec
+                                                  ( notFollowedBy
+                                                  , tokens
+                                                  , try
+                                                  )
+                                                , Parsec
+                                                , Stream(tokensToChunk)
+                                                , getOffset
+                                                , getSourcePos
+                                                , satisfy
+                                                , setOffset
+                                                , (<?>)
+                                                )
+import           Text.Megaparsec.Char           ( alphaNumChar
+                                                , char
+                                                , lowerChar
+                                                , space1
+                                                , string
+                                                , upperChar
+                                                )
+import qualified Text.Megaparsec.Char.Lexer    as Lex
+import           Data.Bifunctor                 ( second )
+import qualified Data.Text                     as Text
 
 type Lexer = Parsec Void Text
 
 type LexerF = ParseFunc Lexer
 
 spaceNotNewline :: Lexer Char
-spaceNotNewline = satisfy (\t -> isSpace t && t /= '\n' && t /= '\r' && t /= '\f' && t /= '\v')
+spaceNotNewline =
+  satisfy (\t -> isSpace t && t /= '\n' && t /= '\r' && t /= '\f' && t /= '\v')
 
 scn :: Lexer ()
 scn = Lex.space space1 skipLineComment skipBlockComment
@@ -163,10 +200,12 @@ lexBraceEnd :: LexerF (Token tokBraceEnd)
 lexBraceEnd = symbol tokBraceEnd
 
 lexQuantStarts :: LexerF (Either (Token tokQuantStarts) (Token tokQuantStartU))
-lexQuantStarts = choice [Left <$> symbol tokQuantStarts, Right <$> symbol tokQuantStartU]
+lexQuantStarts =
+  choice [Left <$> symbol tokQuantStarts, Right <$> symbol tokQuantStartU]
 
 lexQuantEnds :: LexerF (Either (Token tokQuantEnds) (Token tokQuantEndU))
-lexQuantEnds = choice [Left <$> symbol tokQuantEnds, Right <$> symbol tokQuantEndU]
+lexQuantEnds =
+  choice [Left <$> symbol tokQuantEnds, Right <$> symbol tokQuantEndU]
 
 lexProofStart :: LexerF (Token tokProofStart)
 lexProofStart = symbol tokProofStart
@@ -179,7 +218,7 @@ lexProofEnd = symbol tokProofEnd
 -- the range coverts the whole thing, but the text includes only the alphanum part (that is, without prefix '#')
 lexProofAnchor :: LexerF (Text, Range)
 lexProofAnchor = lexeme $ do
-  _ <- char '#'
+  _    <- char '#'
   hash <- many . satisfy $ isAlphaNum
   return $ Text.pack hash
 
@@ -191,6 +230,12 @@ lexDeclStart = symbol tokDeclStart
 
 lexDeclEnd :: LexerF (Token tokDeclEnd)
 lexDeclEnd = symbol tokDeclEnd
+
+lexBlockStart :: LexerF (Token tokBlockStart)
+lexBlockStart = symbol tokBlockStart
+
+lexBlockEnd :: LexerF (Token tokBlockEnd)
+lexBlockEnd = symbol tokBlockEnd
 
 ------------------------------------------
 -- Operators
@@ -294,55 +339,48 @@ lexHash :: LexerF ArithOp
 lexHash = Hash . locOf <$> symbol tokHash
 
 lexChainOps :: LexerF ChainOp
-lexChainOps =
-  choice
-    [ lexEQProp,
-      lexEQPropU,
-      lexEQ,
-      lexNEQ,
-      lexNEQU,
-      lexGT,
-      lexGTE,
-      lexGTEU,
-      lexLT,
-      lexLTE,
-      lexLTEU
-    ]
+lexChainOps = choice
+  [ lexEQProp
+  , lexEQPropU
+  , lexEQ
+  , lexNEQ
+  , lexNEQU
+  , lexGT
+  , lexGTE
+  , lexGTEU
+  , lexLT
+  , lexLTE
+  , lexLTEU
+  ]
 
 lexArithOps :: LexerF ArithOp
-lexArithOps =
-  choice
-    [ lexImpl,
-      lexImplU,
-      lexConj,
-      lexConjU,
-      lexDisj,
-      lexDisjU,
-      lexNeg,
-      lexNegU,
-      lexAdd,
-      lexSub,
-      lexMul,
-      lexDiv,
-      lexMod,
-      lexMax,
-      lexMin,
-      lexExp,
-      lexSum,
-      lexPi,
-      lexForall,
-      lexExists,
-      lexHash
-
-    ]
+lexArithOps = choice
+  [ lexImpl
+  , lexImplU
+  , lexConj
+  , lexConjU
+  , lexDisj
+  , lexDisjU
+  , lexNeg
+  , lexNegU
+  , lexAdd
+  , lexSub
+  , lexMul
+  , lexDiv
+  , lexMod
+  , lexMax
+  , lexMin
+  , lexExp
+  , lexSum
+  , lexPi
+  , lexForall
+  , lexExists
+  , lexHash
+  ]
 
 lexOps :: LexerF Op
 lexOps =
-  choice
-    [ ChainOp <$> lexChainOps,
-      ArithOp <$> lexArithOps
-    ]
-    <?> "operators"
+  choice [ChainOp <$> lexChainOps, ArithOp <$> lexArithOps] <?> "operators"
 
 ------------------------------------------
 -- literals
@@ -350,21 +388,25 @@ lexOps =
 
 lexUpper :: LexerF (Text, Range)
 lexUpper = lexeme . try . withPredicate notUpperKeywords $ do
-  x <- upperChar
+  x  <- upperChar
   xs <- many . satisfy $ (\c -> isAlphaNum c || c == '_' || c == '\'')
   return $ tokensToChunk (Proxy :: Proxy Text) (x : xs)
 
 lexLower :: LexerF (Text, Range)
 lexLower = lexeme . try . withPredicate notLowerKeywords $ do
-  x <- lowerChar
+  x  <- lowerChar
   xs <- many . satisfy $ (\c -> isAlphaNum c || c == '_' || c == '\'')
   return $ tokensToChunk (Proxy :: Proxy Text) (x : xs)
 
 lexText :: LexerF (Text, Range)
-lexText = lexeme . try . withPredicate (\t -> notUpperKeywords t && notLowerKeywords t) $ do
-  x <- satisfy isAlpha
-  xs <- many . satisfy $ (\c -> isAlphaNum c || c == '_' || c == '\'')
-  return $ tokensToChunk (Proxy :: Proxy Text) (x : xs)
+lexText =
+  lexeme
+    . try
+    . withPredicate (\t -> notUpperKeywords t && notLowerKeywords t)
+    $ do
+        x  <- satisfy isAlpha
+        xs <- many . satisfy $ (\c -> isAlphaNum c || c == '_' || c == '\'')
+        return $ tokensToChunk (Proxy :: Proxy Text) (x : xs)
 
 lexTrue :: LexerF Lit
 lexTrue = LitBool True . rangeOf <$> symbol tokTrue
@@ -376,7 +418,8 @@ lexInt :: LexerF Lit
 lexInt = uncurry LitInt . second rangeOf <$> lexeme Lex.decimal
 
 lexChar :: LexerF Lit
-lexChar = uncurry LitChar . second rangeOf <$> lexeme (char '\'' *> Lex.charLiteral <* char '\'')
+lexChar = uncurry LitChar . second rangeOf <$> lexeme
+  (char '\'' *> Lex.charLiteral <* char '\'')
 
 lexLits :: LexerF Lit
 lexLits = choice [lexTrue, lexFalse, lexInt, lexChar] <?> "literals"
@@ -397,32 +440,33 @@ lexTypeChar = symbol tokTypeChar
 getLoc :: Lexer a -> Lexer (a, Loc)
 getLoc m = do
   start <- getCurPos
-  x <- m
-  end <- getEndPos
+  x     <- m
+  end   <- getEndPos
   return (x, Loc start end)
 
 getRange :: Lexer a -> Lexer (a, Range)
 getRange m = do
   start <- getCurPos
-  x <- m
-  end <- getEndPos
+  x     <- m
+  end   <- getEndPos
   return (x, Range start end)
 
 withLoc :: Located a => Lexer a -> Lexer (a, Loc)
 withLoc p = do
-  x <- p
+  x   <- p
   loc <- locOf <$> p
   return (x, loc)
 
 withRange :: Ranged a => Lexer a -> Lexer (a, Range)
 withRange p = do
-  x <- p
+  x     <- p
   range <- rangeOf <$> p
   return (x, range)
 
 -- NOTE : make sure no space consumed after parser m
 notFollowedBySymbol :: LexerF a -> LexerF a
-notFollowedBySymbol m = ParseFunc (\sc' -> (↓) m (return ()) <* notFollowedBy (satisfy isSymbol) <* sc')
+notFollowedBySymbol m = ParseFunc
+  (\sc' -> (↓) m (return ()) <* notFollowedBy (satisfy isSymbol) <* sc')
 
 withPredicate :: (a -> Bool) -> Lexer a -> Lexer a
 withPredicate f p = do

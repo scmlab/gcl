@@ -24,7 +24,7 @@ import           GCL.Type                       ( TM
                                                 , checkType
                                                 , checkStmt
                                                 , checkEnvironment
-                                                , checkProg
+                                                , checkProgram
                                                 , runTM
                                                 )
 import           Syntax.Concrete                ( ToAbstract(toAbstract) )
@@ -273,7 +273,7 @@ typeCheckFile dirName =
               Left  errors -> Left (map SyntacticError errors)
               Right ast    -> case runExcept (toAbstract ast) of
                 Left  _    -> Left [Others "Should dig hole"]
-                Right prog -> case runTM (checkProg prog) of
+                Right prog -> case runTM (checkProgram prog) of
                   Left  errors -> Left [TypeError errors]
                   Right val    -> Right val
         return $ toByteString result
@@ -285,7 +285,7 @@ fileCheck (filepath, source) = toText result
     Left  errors -> Left (map SyntacticError errors)
     Right ast    -> case runExcept (toAbstract ast) of
       Left  _    -> Left [Others "Should dig hole"]
-      Right prog -> case runTM (checkProg prog) of
+      Right prog -> case runTM (checkProgram prog) of
         Left  errors -> Left [TypeError errors]
         Right val    -> Right val
 
@@ -417,7 +417,7 @@ programCheck t1 = toText wrap @?= "()"
     -- wrap :: Either Error ()
   wrap = do
     prog <- runParser pProgram t1
-    case runTM (checkProg prog) of
+    case runTM (checkProgram prog) of
       Left  err -> Left [TypeError err]
       Right x   -> Right x
 

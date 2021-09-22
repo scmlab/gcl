@@ -224,7 +224,7 @@ lookupInferEnv n = do
   env <- ask
   case Map.lookup n (localDecls env) of
     Nothing -> case Map.lookup n (localContext env) of
-      Nothing -> throwError $ NotInScope n (locOf n)
+      Nothing   -> throwError $ NotInScope n (locOf n)
       Just expr -> infer expr
     Just t -> return $ typeWithLoc (locOf n) t
 
@@ -282,12 +282,12 @@ checkStmt env (Assign ns es loc)
     length ns > length es
   = let extraVars = drop (length es) ns
     in  throwError $ NotEnoughExprsInAssigment (NE.fromList extraVars)
-                                                                                                                                        -- (locOf $ mergeRangesUnsafe (fromLocs $ map locOf extraVars))
+                                                                                                                                                -- (locOf $ mergeRangesUnsafe (fromLocs $ map locOf extraVars))
                                                loc
   | length ns < length es
   = let extraExprs = drop (length ns) es
     in  throwError $ TooManyExprsInAssigment (NE.fromList extraExprs)
-                                                                                                                                        -- (locOf $ mergeRangesUnsafe (fromLocs $ map locOf extraExprs))
+                                                                                                                                                -- (locOf $ mergeRangesUnsafe (fromLocs $ map locOf extraExprs))
                                              loc
   | otherwise
   = forM_ (zip ns es) (checkAssign env)
@@ -319,6 +319,7 @@ checkStmt env (HMutate e1 e2 _) = do
   checkIsType env e1 (tInt NoLoc)
   checkIsType env e2 (tInt NoLoc)
 checkStmt env (Dispose e _) = checkIsType env e (tInt NoLoc)
+checkStmt env (Block   p _) = checkProg env p
 
 -- NOTE : should this be check here?
 checkIsVarAssign :: [Declaration] -> Stmt -> TM ()
@@ -361,13 +362,13 @@ checkEnvironment env = do
         else throwError $ NotInScope n (locOf n)
       )
 
-checkProg :: Program -> TM ()
-checkProg (Program tdecls decls props defns stmts _) = do
+checkProg :: Environment -> Program -> TM ()
+checkProg env (Program tdecls decls props defns stmts _) = do
   mapM_ (checkIsVarAssign decls) stmts
-  env <- declsToEnv tdecls decls defns
-  checkEnvironment env
-  mapM_ (checkExpr env) props
-  mapM_ (checkStmt env) stmts
+  env' <- extendEnv env =<< declsToEnv tdecls decls defns
+  checkEnvironment env'
+  mapM_ (checkExpr env') props
+  mapM_ (checkStmt env') stmts
 
 declsToEnv :: [TypeDeclaration] -> [Declaration] -> Defns -> TM Environment
 declsToEnv tdecls decls defns = do
@@ -400,6 +401,9 @@ declsToEnv tdecls decls defns = do
       )
       (pure env)
       (localContext env)
+
+checkProgram :: Program -> TM ()
+checkProgram = checkProg mempty
 
 runTM' :: TM a -> Except TypeError a
 runTM' p = evalStateT p initFreshState

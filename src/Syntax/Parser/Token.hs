@@ -2,7 +2,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Syntax.Parser.Token where
 
-import Data.Text (Text)
+import           Data.Text                      ( Text )
 
 ------------------------------------------
 -- tokens
@@ -150,6 +150,12 @@ tokDeclStart = "{:"
 tokDeclEnd :: Text
 tokDeclEnd = ":}"
 
+tokBlockStart :: Text
+tokBlockStart = "|["
+
+tokBlockEnd :: Text
+tokBlockEnd = "]|"
+
 ------------------------------------------
 -- Operators
 ------------------------------------------
@@ -209,7 +215,7 @@ tokNeg :: Text
 tokNeg = "~"
 
 tokNegU :: Text
-tokNegU =  "¬"
+tokNegU = "¬"
 
 tokAdd :: Text
 tokAdd = "+"
@@ -285,7 +291,22 @@ notUpperKeywords :: Text -> Bool
 notUpperKeywords t = t `notElem` upperKeywords
 
 lowerKeywords :: [Text]
-lowerKeywords = [tokSkip, tokAbort, tokIf, tokFi, tokDo, tokOd, tokBnd, tokCon, tokVar, tokLet, tokArray, tokOf, tokNew, tokDispose]
+lowerKeywords =
+  [ tokSkip
+  , tokAbort
+  , tokIf
+  , tokFi
+  , tokDo
+  , tokOd
+  , tokBnd
+  , tokCon
+  , tokVar
+  , tokLet
+  , tokArray
+  , tokOf
+  , tokNew
+  , tokDispose
+  ]
 
 upperKeywords :: [Text]
 upperKeywords = [tokTypeInt, tokTypeBool, tokTypeChar, tokTrue, tokFalse]
