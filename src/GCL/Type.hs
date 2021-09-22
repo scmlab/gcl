@@ -99,9 +99,9 @@ typeWithLoc l (TVar n _      ) = TVar n l
 ------------------------------------------
 
 data Environment = Environment
-  { localDecls   :: Map Name Type
-  , typeDecls    :: Map Name (QTyCon, [QDCon])
-  , localContext :: Map Name Expr
+  { envLocalDefns   :: Map Name Type
+  , envTypeDefns    :: Map Name (QTyCon, [QDCon])
+  , envLocalContext :: Map Name Expr
   }
   deriving (Eq, Show)
 
@@ -127,7 +127,7 @@ unify x y = tell [(x, y)]
 inferInEnv :: [(Name, Type)] -> Infer Type -> Infer Type
 inferInEnv l m = do
   let scope =
-        \env -> env { localDecls = Map.fromList l `Map.union` localDecls env }
+        \env -> env { envLocalDefns = Map.fromList l `Map.union` envLocalDefns env }
   local scope m
 
 infer :: Expr -> Infer Type
@@ -222,8 +222,8 @@ inferExpr = curry (fmap fst . uncurry inferExpr')
 lookupInferEnv :: Name -> Infer Type
 lookupInferEnv n = do
   env <- ask
-  case Map.lookup n (localDecls env) of
-    Nothing -> case Map.lookup n (localContext env) of
+  case Map.lookup n (envLocalDefns env) of
+    Nothing -> case Map.lookup n (envLocalContext env) of
       Nothing   -> throwError $ NotInScope n (locOf n)
       Just expr -> infer expr
     Just t -> return $ typeWithLoc (locOf n) t
@@ -237,7 +237,7 @@ freshVar l = do
 ------------------------------------------
 
 checkAssign :: Environment -> (Name, Expr) -> TM ()
-checkAssign env (n, expr) = case Map.lookup n (localDecls env) of
+checkAssign env (n, expr) = case Map.lookup n (envLocalDefns env) of
   Nothing -> throwError $ NotInScope n (locOf n)
   Just t  -> do
     checkIsType env expr t
@@ -263,7 +263,7 @@ checkType env (  TFunc t1 t2 _    ) = checkType env t1 >> checkType env t2
 checkType env t@(TCon (QTyCon n _)) = do
   maybe (throwError $ UndefinedType n (locOf t))
         (\_ -> return ())
-        (Map.lookup n (typeDecls env))
+        (Map.lookup n (envTypeDefns env))
 checkType _ (TVar _ _) = return ()
 
 checkExpr :: Environment -> Expr -> TM ()
@@ -307,11 +307,11 @@ checkStmt env (Do    gdcmds _) = mapM_ (checkGdCmd env) gdcmds
 checkStmt env (If    gdcmds _) = mapM_ (checkGdCmd env) gdcmds
 checkStmt _   (Spec  _      _) = return ()
 checkStmt _   (Proof _      _) = return ()
-checkStmt env (Alloc x es l  ) = case Map.lookup x (localDecls env) of
+checkStmt env (Alloc x es l  ) = case Map.lookup x (envLocalDefns env) of
   Nothing             -> throwError $ NotInScope x (locOf x)
   Just (TBase TInt _) -> mapM_ (\e -> checkIsType env e (tInt NoLoc)) es
   Just t              -> throwError (UnifyFailed t (tInt NoLoc) l)
-checkStmt env (HLookup x e l) = case Map.lookup x (localDecls env) of
+checkStmt env (HLookup x e l) = case Map.lookup x (envLocalDefns env) of
   Nothing             -> throwError $ NotInScope x (locOf x)
   Just (TBase TInt _) -> checkIsType env e (tInt NoLoc)
   Just t              -> throwError (UnifyFailed t (tInt NoLoc) l)
@@ -339,10 +339,10 @@ checkIsVarAssign _ _ = return ()
 checkEnvironment :: Environment -> TM ()
 checkEnvironment env = do
   -- check type declarations
-  forM_ (typeDecls env) checkTypeDefn
+  forM_ (envTypeDefns env) checkTypeDefn
 
   -- check local declaration type
-  mapM_ (checkType env) (localDecls env)
+  mapM_ (checkType env) (envLocalDefns env)
  where
   checkTypeDefn (qty@(QTyCon _ args), qdcons) = do
     checkQTyConArg args
@@ -372,13 +372,13 @@ checkProg (Program defns decls props stmts _) = do
 defnsAndDeclsToEnv :: Defns -> [Declaration] -> TM Environment
 defnsAndDeclsToEnv (Defns typeDefns funcDefns) decls = do
   -- add type declaration and defns to enviornment
-  let env = (foldMap typeDeclToEnv typeDefns) { localContext = funcDefns }
+  let env = (foldMap typeDeclToEnv typeDefns) { envLocalContext = funcDefns }
 
   -- add var const declaration into enviornment, add type inference result of defns into enviornment
   foldM declToEnv env decls >>= inferLocalContext
  where
   typeDeclToEnv (TypeDefn qty@(QTyCon n _) qdcons _) = do
-    mempty { typeDecls = Map.singleton n (qty, qdcons) }
+    mempty { envTypeDefns = Map.singleton n (qty, qdcons) }
 
   declToEnv env (ConstDecl ns t _ _) = foldM f env ns
    where
@@ -395,11 +395,11 @@ defnsAndDeclsToEnv (Defns typeDefns funcDefns) decls = do
         (eType, subs) <- inferExpr' env' e
 
         lds           <-
-          Map.map (subst subs) <$> (localDecls env' `extendType` (n, eType))
-        return $ env' { localDecls = lds }
+          Map.map (subst subs) <$> (envLocalDefns env' `extendType` (n, eType))
+        return $ env' { envLocalDefns = lds }
       )
       (pure env)
-      (localContext env)
+      (envLocalContext env)
 
 runTM' :: TM a -> Except TypeError a
 runTM' p = evalStateT p initFreshState

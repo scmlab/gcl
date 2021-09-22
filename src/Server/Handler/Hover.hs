@@ -77,7 +77,7 @@ runHoverM (Program defns decls _ _ _) pos f = runReaderT (runReaderT f pos)
     -- ignore type errors
     Left _ -> Map.empty
     Right env ->
-      Map.mapKeys nameToText $ Map.map typeToHoverResult (Type.localDecls env)
+      Map.mapKeys nameToText $ Map.map typeToHoverResult (Type.envLocalDefns env)
 
 typeToHoverResult :: Type -> HoverResult
 typeToHoverResult t = Result { resultHover = hover, resultType = t }

@@ -337,7 +337,7 @@ name' t = Name t NoLoc
 
 env :: Environment
 env = Environment
-  { localDecls   = Map.fromList
+  { envLocalDefns   = Map.fromList
     [ (name' "A"  , tint)
     , (name' "B"  , tint)
     , (name' "N"  , tint)
@@ -355,8 +355,8 @@ env = Environment
     , (name' "q"  , tbool)
     , (name' "r"  , tbool)
     ]
-  , typeDecls    = mempty
-  , localContext = mempty
+  , envTypeDefns    = mempty
+  , envLocalContext = mempty
   }
 
 runParser :: ToAbstract a b => Parser a -> Text -> Either [Error] b
@@ -428,6 +428,6 @@ instance (Pretty a, Pretty b) => Pretty (Map a b) where
 instance Pretty Environment where
   pretty Environment {..} =
     "Environment"
-      <> pretty localDecls
-      <> pretty typeDecls
-      <> pretty localContext
+      <> pretty envLocalDefns
+      <> pretty envTypeDefns
+      <> pretty envLocalContext
