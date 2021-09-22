@@ -45,7 +45,7 @@ instance ToAbstract Program A.Program where
     (tdecls, ds', lds) <- foldl (<>) ([], [], []) <$> toAbstract ds
     let decls                   = ds' <> foldMap A.extractQDCons tdecls -- add constructors' type into declarations
     let letBindings             = ConstExpr.pickLetBindings lds
-    let (globProps, assertions) = ConstExpr.pickGlobals decls
+    let (globProps, assertions) = ConstExpr.seperateAssertions decls
     let pre =
           [ A.Assert (A.conjunct assertions) NoLoc | not (null assertions) ]
     stmts <- toAbstract stmts'

@@ -57,11 +57,11 @@ data QDCon = QDCon Name [Type]
 --------------------------------------------------------------------------------
 -- | Pattern matching
 
-data Pattern 
+data Pattern
   = PattBinder Name -- binder
   | PattWildcard Range -- matches anything 
-  | PattConstructor Name Pattern -- destructs a constructor
-  deriving (Eq, Show)
+  | PattConstructor Name [Pattern] -- destructs a constructor
+  deriving (Eq, Show, Generic)
 
 --------------------------------------------------------------------------------
 
@@ -130,6 +130,10 @@ data Expr
   | Expand Expr Expr
   | ArrIdx Expr Expr Loc
   | ArrUpd Expr Expr Expr Loc
+  | CaseOf
+      Expr              -- case expr of 
+      [(Pattern, Expr)] -- pattern -> expr 
+      Loc
   deriving (Eq, Show, Generic)
 
 type QuantOp' = Either Op Expr

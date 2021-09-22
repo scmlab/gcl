@@ -1,9 +1,9 @@
 module Syntax.Abstract.Instances.Located where
 
 import           Data.Loc
-import           Syntax.Common                  ( )
-import           Syntax.Abstract.Types
 import           Prelude                 hiding ( Ordering(..) )
+import           Syntax.Abstract.Types
+import           Syntax.Common                  ( )
 
 instance Located Program where
   locOf (Program _ _ _ _ _ l) = l
@@ -69,6 +69,7 @@ instance Located Expr where
   locOf (Expand es _    ) = locOf es
   locOf (ArrIdx _ _ l   ) = l
   locOf (ArrUpd _ _ _ l ) = l
+  locOf (CaseOf _ _ l   ) = l
 
 instance Located Lit where
   locOf _ = NoLoc

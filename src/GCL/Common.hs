@@ -3,22 +3,20 @@
 {-# LANGUAGE FlexibleContexts #-}
 module GCL.Common where
 
-import           Data.Text                      ( Text )
-import qualified Data.Text                     as Text
-import           Data.Loc                       ( Loc(..)
-                                                , Loc
-                                                )
 import           Control.Monad                  ( liftM2 )
+import           Control.Monad.RWS              ( RWST(..) )
+import           Control.Monad.State            ( StateT(..) )
+import           Data.Loc                       ( Loc(..) )
 import           Data.Map                       ( Map )
-import           Syntax.Common                  ( Name(..) )
+import qualified Data.Map                      as Map
 import           Data.Set                       ( Set
                                                 , (\\)
                                                 )
-import qualified Data.Map                      as Map
 import qualified Data.Set                      as Set
+import           Data.Text                      ( Text )
+import qualified Data.Text                     as Text
 import qualified Syntax.Abstract               as A
-import           Control.Monad.RWS              ( RWST(..) )
-import           Control.Monad.State            ( StateT(..) )
+import           Syntax.Common                  ( Name(..) )
 
 -- Monad for generating fresh variable
 class Monad m => Fresh m where
@@ -88,13 +86,11 @@ instance Free A.Expr where
   fv (A.Lam x  e  _) = fv e \\ Set.singleton x
   fv (A.Quant op xs range term _) =
     (fv op <> fv range <> fv term) \\ Set.fromList xs
-  fv (A.Subst _ set _    ) = set
-  fv (A.Expand _ after   ) = fv after
-  fv (A.ArrIdx e1 e2 _   ) = fv e1 <> fv e2
-  fv (A.ArrUpd e1 e2 e3 _) = fv e1 <> fv e2 <> fv e3
-
--- instance Free A.Bindings where
---   fv = fv . A.bindingsToExpr
+  fv (A.Subst _ set _          ) = set
+  fv (A.Expand _ after         ) = fv after
+  fv (A.ArrIdx e1 e2 _         ) = fv e1 <> fv e2
+  fv (A.ArrUpd e1 e2 e3 _      ) = fv e1 <> fv e2 <> fv e3
+  fv (A.CaseOf _ cases _) = fv (map snd cases)
 
 instance Free A.Mapping where
   fv mapping = Set.unions (map fv (Map.elems mapping))
