@@ -36,16 +36,6 @@ wrapLam :: [Name] -> Expr -> Expr
 wrapLam []       body = body
 wrapLam (x : xs) body = let b = wrapLam xs body in Lam x b (x <--> b)
 
-bindingsToExpr :: Bindings -> Expr
-bindingsToExpr (AssignBinding e) = e
-bindingsToExpr (LetBinding    e) = e
-bindingsToExpr (BetaBinding   e) = e
-bindingsToExpr (AlphaBinding  e) = e
-
-assignBindingToExpr :: Bindings -> Maybe Expr
-assignBindingToExpr (AssignBinding e) = Just e
-assignBindingToExpr _                 = Nothing
-
 -- function definition           => Just Expr 
 -- constant/variable declaration => Nothing 
 programToScopeForSubstitution
