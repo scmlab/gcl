@@ -185,6 +185,8 @@ instance Collect Stmt J.SemanticTokenAbsolute where
         <> toToken' J.SttKeyword [] tok
         <> collect b
     Dispose tok a -> toToken' J.SttKeyword [] tok <> collect a
+    -- TODO:
+    Block{}       -> []
 
 instance Collect GdCmd J.SemanticTokenAbsolute where
   collect (GdCmd a tok bs) =

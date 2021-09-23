@@ -74,6 +74,7 @@ data Stmt
   | HLookup Name Expr Loc      --  x := *e
   | HMutate Expr Expr Loc      --  *e1 := e2
   | Dispose Expr Loc           --  dispose e
+  | Block Program Loc
 
   deriving (Eq, Show)
 
@@ -117,9 +118,9 @@ data Expr
   | Quant Expr [Name] Expr Expr Loc
   | Subst Expr -- expression to be substituted
     (Set Name) -- free variables in that expression
-               -- NOTE, the expression may be some definition like "P", 
+               -- NOTE, the expression may be some definition like "P",
               --  in that case, the free variables should be that of after it's been expanded
-    Mapping -- mapping of substitution to be displayed to users 
+    Mapping -- mapping of substitution to be displayed to users
   | Expand Expr Expr
   | ArrIdx Expr Expr Loc
   | ArrUpd Expr Expr Expr Loc

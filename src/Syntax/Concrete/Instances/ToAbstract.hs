@@ -98,6 +98,7 @@ instance ToAbstract Stmt A.Stmt where
     HMutate _ e1 _ e2 ->
       A.HMutate <$> toAbstract e1 <*> toAbstract e2 <*> pure (locOf stmt)
     Dispose _ e -> A.Dispose <$> toAbstract e <*> pure (locOf stmt)
+    Block _ p _ -> A.Block <$> toAbstract p <*> pure (locOf stmt)
 
 instance ToAbstract GdCmd A.GdCmd where
   toAbstract (GdCmd a _ b) =
