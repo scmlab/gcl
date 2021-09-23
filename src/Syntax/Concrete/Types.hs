@@ -79,6 +79,7 @@ data Stmt
   | HLookup Name (Token ":=") (Token "*") Expr
   | HMutate (Token "*") Expr (Token ":=") Expr
   | Dispose (Token "dispose") Expr
+  | Block (Token "|[") Program (Token "]|")
   deriving (Eq, Show)
 
 data GdCmd = GdCmd Expr TokArrows [Stmt] deriving (Eq, Show)

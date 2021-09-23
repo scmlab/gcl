@@ -144,6 +144,11 @@ instance PrettyWithLoc (Token "{:") where
 instance PrettyWithLoc (Token ":}") where
   prettyWithLoc (Token l r) = DocWithLoc (pretty tokDeclEnd) l r
 
+instance PrettyWithLoc (Token "|[") where
+  prettyWithLoc (Token l r) = DocWithLoc (pretty tokBlockStart) l r
+
+instance PrettyWithLoc (Token "]|") where
+  prettyWithLoc (Token l r) = DocWithLoc (pretty tokBlockEnd) l r
 --------------------------------------------------------------------------------
 
 -- | Program
@@ -287,6 +292,8 @@ instance PrettyWithLoc Stmt where
   prettyWithLoc (HMutate s e1 a e2) =
     prettyWithLoc s <> prettyWithLoc e1 <> prettyWithLoc a <> prettyWithLoc e2
   prettyWithLoc (Dispose l e) = prettyWithLoc l <> prettyWithLoc e
+  prettyWithLoc (Block l p r) =
+    prettyWithLoc l <> prettyWithLoc p <> prettyWithLoc r
 
 instance Pretty GdCmd where
   pretty = toDoc . prettyWithLoc

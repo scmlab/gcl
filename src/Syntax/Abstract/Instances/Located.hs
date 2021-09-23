@@ -39,6 +39,7 @@ instance Located Stmt where
   locOf (HLookup _ _ l      ) = l
   locOf (HMutate _ _ l      ) = l
   locOf (Dispose _ l        ) = l
+  locOf (Block   _ l        ) = l
 
 instance Located GdCmd where
   locOf (GdCmd _ _ l) = l

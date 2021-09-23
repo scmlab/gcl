@@ -1,0 +1,9 @@
+var x : Int
+var y : Int
+
+|[]|
+|[
+    var x : Int
+]|
+
+{ True }

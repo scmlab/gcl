@@ -130,7 +130,7 @@ refine source range = do
     return $ find (withinRange range) specs
 
 typeCheck :: A.Program -> CmdM ()
-typeCheck p = case TypeChecking.runTM (TypeChecking.checkProg p) of
+typeCheck p = case TypeChecking.runTM (TypeChecking.checkProgram p) of
   Left  e -> throwError [TypeError e]
   Right v -> return v
 
@@ -155,7 +155,7 @@ parseProgram source = do
   concrete <- parse pProgram source
   case runExcept (toAbstract concrete) of
     Left  (Range start end) -> digHole (Range start end) >>= parseProgram
-    Right program         -> return program
+    Right program           -> return program
 
 --------------------------------------------------------------------------------
 
