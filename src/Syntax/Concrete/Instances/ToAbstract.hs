@@ -43,9 +43,16 @@ instance ToAbstract a b => ToAbstract [a] [b] where
 
 instance ToAbstract Program A.Program where
   toAbstract prog@(Program ds stmts') = do
-    (typeDefns, ds', lds) <- foldl (<>) ([], [], []) <$> toAbstract ds
-    let decls = ds' <> foldMap A.extractTypeDefnCtors typeDefns -- add constructors' type into declarations
-    let defns = A.Defns (A.collectTypeDefns typeDefns) (A.collectFuncDefns lds)
+    (originalDecls, typeDefns, funcDefnSigs, fundDefns) <- foldl (<>) ([], [], [], [])
+      <$> toAbstract ds
+
+    let funcDefnSigsAsConstDecl = foldMap A.funcDefnSigsToConstDecl funcDefnSigs 
+    let typeDefnsAsConstDecl = foldMap A.typeDefnsToConstDecl typeDefns 
+    let decls = originalDecls 
+                    <> funcDefnSigsAsConstDecl -- add type of functions into declarations
+                    <> typeDefnsAsConstDecl -- add type of constructors' into declarations
+    let defns =
+          A.Defns (A.collectTypeDefns typeDefns) (A.collectFuncDefns fundDefns)
     let (globProps, assertions) = ConstExpr.pickGlobals decls
     let pre =
           [ A.Assert (A.conjunct assertions) NoLoc | not (null assertions) ]
@@ -53,27 +60,28 @@ instance ToAbstract Program A.Program where
 
     return $ A.Program defns decls globProps (pre ++ stmts) (locOf prog)
 
-instance ToAbstract (Either Declaration DefinitionBlock) ([A.TypeDefn], [A.Declaration], [A.FuncDefn]) where
+instance ToAbstract (Either Declaration DefinitionBlock) ([A.Declaration], [A.TypeDefn], [A.FuncDefnTypeSig], [A.FuncDefn]) where
   toAbstract (Left d) = do
     d' <- toAbstract d
     case d' of
-      Left  td -> return ([td], [], [])
-      Right de -> return ([], [de], [])
-  toAbstract (Right bd) = do
-    (des, fds) <- toAbstract bd
-    return ([], des, fds)
+      Left  td -> return ([], [td], [], [])
+      Right de -> return ([de], [], [], [])
+  toAbstract (Right defnBlock) = do
+    (sigs, funcs) <- toAbstract defnBlock
+    return ([], [], sigs, funcs)
 
 --------------------------------------------------------------------------------
 -- | Definition 
 
-instance ToAbstract DefinitionBlock ([A.Declaration], [A.FuncDefn]) where
+instance ToAbstract DefinitionBlock ([A.FuncDefnTypeSig], [A.FuncDefn]) where
   toAbstract (DefinitionBlock _ decls _) =
     partitionEithers <$> toAbstract decls
 
-instance ToAbstract Definition (Either A.Declaration A.FuncDefn) where
+instance ToAbstract Definition (Either A.FuncDefnTypeSig A.FuncDefn) where
   toAbstract (FuncDefnTypeSig decl prop) = do
     (ns, t) <- toAbstract decl
-    Left <$> (A.ConstDecl ns t <$> toAbstract prop <*> pure (decl <--> prop))
+    Left
+      <$> (A.FuncDefnTypeSig ns t <$> toAbstract prop <*> pure (decl <--> prop))
   toAbstract (FuncDefn decl) = Right <$> toAbstract decl
 
 -- instance ToAbstract TypeDefn A.TypeDefn where

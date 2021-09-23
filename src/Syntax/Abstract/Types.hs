@@ -42,7 +42,7 @@ data FuncDefn = FuncDefn Name [Name] Expr Loc
   deriving (Eq, Show)
 
 -- type signature of function definition
-data FuncDefnTypeSig = FuncDefnTypeSig Name Type Loc
+data FuncDefnTypeSig = FuncDefnTypeSig [Name] Type (Maybe Expr) Loc
   deriving (Eq, Show)
 
 -- type definition

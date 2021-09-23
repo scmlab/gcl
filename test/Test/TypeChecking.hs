@@ -29,7 +29,7 @@ import           Syntax.Abstract                ( Defns(Defns)
                                                 , TBase(..)
                                                 , Type(..)
                                                 )
-import           Syntax.Abstract.Util           ( extractTypeDefnCtors, collectFuncDefns )
+import           Syntax.Abstract.Util           
 import           Syntax.Common                  ( Name(Name)
                                                 , Op
                                                 )
@@ -389,7 +389,7 @@ declarationCheck t1 t2 = toText wrap @?= t2
  where
   wrap = do
     (typeDefns, ds) <- partitionEithers . (: []) <$> runParser pDeclaration t1
-    let ds' = ds <> foldMap extractTypeDefnCtors typeDefns
+    let ds' = ds <> foldMap typeDefnsToConstDecl typeDefns
     return $ check
       (\_ decls -> do
         env' <- defnsAndDeclsToEnv (Defns (A.collectTypeDefns typeDefns) mempty) decls
@@ -406,9 +406,10 @@ blockDeclarationCheck :: Text -> Text -> Assertion
 blockDeclarationCheck t1 t2 = toText wrap @?= t2
  where
   wrap = do
-    (ds, defs) <- runParser pDefinitionBlock t1
+    (funcDefnSigs, defs) <- runParser pDefinitionBlock t1
+    let decls = foldMap A.funcDefnSigsToConstDecl funcDefnSigs 
     let defns = Defns mempty (collectFuncDefns defs)
-    return $ check (\_ decls -> defnsAndDeclsToEnv defns decls) mempty ds
+    return $ check (\_ decls' -> defnsAndDeclsToEnv defns decls') mempty decls
 
 programCheck :: Text -> Assertion
 programCheck t1 = toText wrap @?= "()"

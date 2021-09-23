@@ -16,8 +16,12 @@ extractAssertion :: Declaration -> Maybe Expr
 extractAssertion (ConstDecl _ _ e _) = e
 extractAssertion (VarDecl   _ _ e _) = e
 
-extractTypeDefnCtors :: TypeDefn -> [Declaration]
-extractTypeDefnCtors (TypeDefn name binders qdcons _) = map wrap qdcons
+funcDefnSigsToConstDecl :: FuncDefnTypeSig -> [Declaration]
+funcDefnSigsToConstDecl (FuncDefnTypeSig names t prop loc) =
+  [ConstDecl names t prop loc]
+
+typeDefnsToConstDecl :: TypeDefn -> [Declaration]
+typeDefnsToConstDecl (TypeDefn name binders qdcons _) = map wrap qdcons
  where
   wrap (TypeDefnCtor cn ts) = ConstDecl
     [cn]
