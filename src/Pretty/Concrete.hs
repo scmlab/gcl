@@ -166,7 +166,7 @@ instance PrettyWithLoc DefinitionBlock where
     prettyWithLoc l <> prettyWithLoc decls <> prettyWithLoc r
 
 instance PrettyWithLoc Definition where
-  prettyWithLoc (TypeDefn decl prop ) =
+  prettyWithLoc (FuncDefnType decl prop) =
     prettyWithLoc decl <> maybe Empty prettyWithLoc prop
   prettyWithLoc (FuncDefn x) = prettyWithLoc x
 

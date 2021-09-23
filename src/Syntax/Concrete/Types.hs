@@ -56,7 +56,7 @@ data Program
 
 data DefinitionBlock = DefinitionBlock (Token "{:") [Definition] (Token ":}") deriving (Eq, Show)
 data Definition 
-  = TypeDefn DeclBase (Maybe BlockDeclProp)
+  = FuncDefnType DeclBase (Maybe BlockDeclProp)
   | FuncDefn DeclBody
   deriving (Eq, Show)
 

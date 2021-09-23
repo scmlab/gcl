@@ -132,7 +132,7 @@ instance ToAbstract DeclBody A.FuncDefn where
     A.FuncDefn n args <$> toAbstract b <*> pure (locOf d)
 
 instance ToAbstract Definition (Either A.Declaration A.FuncDefn) where
-  toAbstract (TypeDefn decl prop) =  do
+  toAbstract (FuncDefnType decl prop) =  do
     (ns, t) <- toAbstract decl
     Left <$> (A.ConstDecl ns t <$> toAbstract prop <*> pure (decl <--> prop))
   toAbstract (FuncDefn decl) = Right <$> toAbstract decl

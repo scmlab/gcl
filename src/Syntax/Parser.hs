@@ -116,7 +116,7 @@ pDefinition = lift $ Lex.lineFold
   scn
   (unParseFunc
     (choice
-      [ try $ TypeDefn <$> pDeclBase pName <*> optional pDefinitionProp
+      [ try $ FuncDefnType <$> pDeclBase pName <*> optional pDefinitionProp
       , FuncDefn <$> pDeclBody
       ]
     )
