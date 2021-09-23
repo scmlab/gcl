@@ -76,7 +76,7 @@ runParse p filepath s = case parse p filepath s of
 pProgram :: Parser Program
 pProgram = do
   scn
-  Program <$> many (eitherP pDeclaration pDefinitions) <*> pStmts <* eof
+  Program <$> many (eitherP pDeclaration pDefinitionBlock) <*> pStmts <* eof
 
 ------------------------------------------
 -- parse Declaration
@@ -87,12 +87,10 @@ pDeclaration = Lex.lineFold scn (unParseFunc p)
  where
   p = (pConstDecl <|> pVarDecl <|> pTYPEDEFN) <* lift scn <?> "declaration"
 
-pDefinitions :: Parser Definitions
-pDefinitions = unParseFunc pDefinitions' scn
-
-pDefinitions' :: ParserF Definitions
-pDefinitions' =
-  Definitions <$> lexDeclStart <*> pIndentBlock pDefinition <*> lexDeclEnd
+pDefinitionBlock :: Parser DefinitionBlock
+pDefinitionBlock = unParseFunc
+  (DefinitionBlock <$> lexDeclStart <*> pIndentBlock pDefinition <*> lexDeclEnd)
+  scn
 
 pConstDecl :: ParserF Declaration
 pConstDecl = ConstDecl <$> lexCon <*> pDeclType pName
@@ -116,7 +114,13 @@ pTypeDefnCtor = TypeDefnCtor <$> pName <*> many pType'
 pDefinition :: ParserF Definition
 pDefinition = lift $ Lex.lineFold
   scn
-  (unParseFunc (choice [TypeDefn <$> try pDefinitionType, FuncDefn <$> pDeclBody]))
+  (unParseFunc
+    (choice
+      [ try $ TypeDefn <$> pDeclBase pName <*> optional pDefinitionProp
+      , FuncDefn <$> pDeclBody
+      ]
+    )
+  )
 
 pDeclBase :: ParserF Name -> ParserF DeclBase
 pDeclBase name = DeclBase <$> pList name <*> lexColon <*> pType'
@@ -132,13 +136,6 @@ pDeclBody = DeclBody <$> pName <*> many lowerName <*> lexEqual <*> pExpr'
 
 pDefinitionProp :: ParserF BlockDeclProp
 pDefinitionProp = eitherP pDeclProp pExpr'
-
-pDefinitionType :: ParserF BlockDeclType
-pDefinitionType =
-  do
-      BlockDeclType
-    <$> pDeclBase pName
-    <*> optional pDefinitionProp
 
 ------------------------------------------
 -- parse Stmt

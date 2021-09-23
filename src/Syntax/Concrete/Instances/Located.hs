@@ -25,8 +25,8 @@ instance Located Declaration where
 instance Located TypeDefnCtor where
   locOf (TypeDefnCtor l r) = l <--> r
 
-instance Located Definitions where
-  locOf (Definitions l _ r) = l <--> r
+instance Located DefinitionBlock where
+  locOf (DefinitionBlock l _ r) = l <--> r
 
 instance Located DeclBase where
   locOf (DeclBase l _ r) = l <--> r
@@ -39,9 +39,6 @@ instance Located DeclBody where
 
 instance Located DeclType where
   locOf (DeclType l r) = l <--> r
-
-instance Located BlockDeclType where
-  locOf (BlockDeclType l r) = l <--> r
 
 -------------------------------------------------------------------------------
 

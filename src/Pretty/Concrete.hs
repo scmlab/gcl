@@ -158,15 +158,16 @@ instance PrettyWithLoc Program where
 
 -- | Definition 
 
-instance Pretty Definitions where
+instance Pretty DefinitionBlock where
   pretty = toDoc . prettyWithLoc
 
-instance PrettyWithLoc Definitions where
-  prettyWithLoc (Definitions l decls r) =
+instance PrettyWithLoc DefinitionBlock where
+  prettyWithLoc (DefinitionBlock l decls r) =
     prettyWithLoc l <> prettyWithLoc decls <> prettyWithLoc r
 
 instance PrettyWithLoc Definition where
-  prettyWithLoc (TypeDefn x) = prettyWithLoc x
+  prettyWithLoc (TypeDefn decl prop ) =
+    prettyWithLoc decl <> maybe Empty prettyWithLoc prop
   prettyWithLoc (FuncDefn x) = prettyWithLoc x
 
 --------------------------------------------------------------------------------
@@ -218,13 +219,6 @@ instance Pretty TypeDefnCtor where
 
 instance PrettyWithLoc TypeDefnCtor where
   prettyWithLoc (TypeDefnCtor n ts) = prettyWithLoc n <> prettyWithLoc ts
-
-instance Pretty BlockDeclType where
-  pretty = toDoc . prettyWithLoc
-
-instance PrettyWithLoc BlockDeclType where
-  prettyWithLoc (BlockDeclType decl prop) =
-    prettyWithLoc decl <> maybe Empty prettyWithLoc prop
 
 --------------------------------------------------------------------------------
 -- | Literals

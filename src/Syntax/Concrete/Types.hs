@@ -47,21 +47,20 @@ data SepBy (sep :: Symbol) a = Head a | Delim a (Token sep) (SepBy sep a)
 -- | Program
 data Program
   = Program
-      [Either Declaration Definitions] -- constant and variable declarations
+      [Either Declaration DefinitionBlock] -- constant and variable declarations
       [Stmt] -- main program
   deriving (Eq, Show)
 
 --------------------------------------------------------------------------------
 -- | Definitions 
 
-data Definitions = Definitions (Token "{:") [Definition] (Token ":}") deriving (Eq, Show)
+data DefinitionBlock = DefinitionBlock (Token "{:") [Definition] (Token ":}") deriving (Eq, Show)
 data Definition 
-  = TypeDefn BlockDeclType
+  = TypeDefn DeclBase (Maybe BlockDeclProp)
   | FuncDefn DeclBody
   deriving (Eq, Show)
 
 type BlockDeclProp = Either DeclProp Expr
-data BlockDeclType = BlockDeclType DeclBase (Maybe BlockDeclProp) deriving (Eq, Show)
 
 --------------------------------------------------------------------------------
 -- | Declaration 

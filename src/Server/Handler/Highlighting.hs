@@ -102,11 +102,11 @@ instance Collect Program J.SemanticTokenAbsolute where
 --------------------------------------------------------------------------------
 -- Definition  
 
-instance Collect Definitions J.SemanticTokenAbsolute where
-  collect (Definitions _tokA as _tokB) = toList as >>= collect
+instance Collect DefinitionBlock J.SemanticTokenAbsolute where
+  collect (DefinitionBlock _tokA as _tokB) = toList as >>= collect
 
 instance Collect Definition J.SemanticTokenAbsolute where
-  collect (TypeDefn x) = collect x
+  collect (TypeDefn a b) = collect a <> collect b 
   collect (FuncDefn x) = collect x
 
 --------------------------------------------------------------------------------
@@ -136,9 +136,6 @@ instance Collect DeclBody J.SemanticTokenAbsolute where
     toToken' J.SttFunction [J.StmDeclaration] a
       <> (bs >>= collect . AsVariable)
       <> collect c
-
-instance Collect BlockDeclType J.SemanticTokenAbsolute where
-  collect (BlockDeclType a b) = collect a <> collect b
 
 --------------------------------------------------------------------------------
 -- Stmt
