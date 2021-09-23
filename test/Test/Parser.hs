@@ -15,7 +15,7 @@ import           Syntax.Parser                  ( Parser
                                                 , pDeclaration
                                                 , pType
                                                 , pExpr
-                                                , pBlockDeclaration
+                                                , pDefinitions
                                                 , pStmt
                                                 )
 import           Syntax.Parser.Lexer            ( scn )
@@ -212,7 +212,7 @@ declaration = testGroup
   ]
  where
   run      = parserIso pDeclaration
-  runBlock = parserIso pBlockDeclaration
+  runBlock = parserIso pDefinitions
 
 --------------------------------------------------------------------------------
 

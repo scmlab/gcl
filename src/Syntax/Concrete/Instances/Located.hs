@@ -20,13 +20,13 @@ instance Located Program where
 instance Located Declaration where
   locOf (ConstDecl l r     ) = l <--> r
   locOf (VarDecl   l r     ) = l <--> r
-  locOf (TypeDefn l _ _ _ r) = l <--> r
+  locOf (TYPEDEFN l _ _ _ r) = l <--> r
 
 instance Located TypeDefnCtor where
   locOf (TypeDefnCtor l r) = l <--> r
 
-instance Located BlockDeclaration where
-  locOf (BlockDeclaration l _ r) = l <--> r
+instance Located Definitions where
+  locOf (Definitions l _ r) = l <--> r
 
 instance Located DeclBase where
   locOf (DeclBase l _ r) = l <--> r

@@ -7,17 +7,17 @@ module Pretty.Concrete where
 
 -- import Syntax.Parser.Lexer (Tok (..))
 
-import           Data.Loc                       ( locOf
-                                                , (<-->)
+import           Data.Loc                       ( (<-->)
+                                                , locOf
                                                 )
 import           Data.Loc.Util                  ( translateLoc )
 import           Data.Text.Prettyprint.Doc      ( Pretty(pretty) )
+import           Prelude                 hiding ( Ordering(..) )
+import           Pretty.Common                  ( )
 import           Pretty.Util
 import           Pretty.Variadic
-import           Pretty.Common                  ( )
 import           Syntax.Common
 import           Syntax.Concrete
-import           Prelude                 hiding ( Ordering(..) )
 import           Syntax.Parser.Token
 
 --------------------------------------------------------------------------------
@@ -156,6 +156,21 @@ instance PrettyWithLoc Program where
 
 --------------------------------------------------------------------------------
 
+-- | Definition 
+
+instance Pretty Definitions where
+  pretty = toDoc . prettyWithLoc
+
+instance PrettyWithLoc Definitions where
+  prettyWithLoc (Definitions l decls r) =
+    prettyWithLoc l <> prettyWithLoc decls <> prettyWithLoc r
+
+instance PrettyWithLoc Definition where
+  prettyWithLoc (TypeDefn x) = prettyWithLoc x
+  prettyWithLoc (FuncDefn x) = prettyWithLoc x
+
+--------------------------------------------------------------------------------
+
 -- | Declaration
 instance Pretty DeclBase where
   pretty = toDoc . prettyWithLoc
@@ -191,7 +206,7 @@ instance Pretty Declaration where
 instance PrettyWithLoc Declaration where
   prettyWithLoc (ConstDecl con decl) = prettyWithLoc con <> prettyWithLoc decl
   prettyWithLoc (VarDecl   v   decl) = prettyWithLoc v <> prettyWithLoc decl
-  prettyWithLoc (TypeDefn dat name binders eq qdcons) =
+  prettyWithLoc (TYPEDEFN dat name binders eq qdcons) =
     prettyWithLoc dat
       <> prettyWithLoc name
       <> prettyWithLoc binders
@@ -210,13 +225,6 @@ instance Pretty BlockDeclType where
 instance PrettyWithLoc BlockDeclType where
   prettyWithLoc (BlockDeclType decl prop) =
     prettyWithLoc decl <> maybe Empty prettyWithLoc prop
-
-instance Pretty BlockDeclaration where
-  pretty = toDoc . prettyWithLoc
-
-instance PrettyWithLoc BlockDeclaration where
-  prettyWithLoc (BlockDeclaration l decls r) =
-    prettyWithLoc l <> prettyWithLoc decls <> prettyWithLoc r
 
 --------------------------------------------------------------------------------
 -- | Literals
@@ -376,7 +384,7 @@ instance PrettyWithLoc Type where
   prettyWithLoc (TArray l a r b) =
     prettyWithLoc l <> prettyWithLoc a <> prettyWithLoc r <> prettyWithLoc b
   prettyWithLoc (TCon a b) = prettyWithLoc a <> prettyWithLoc b
-  prettyWithLoc (TVar i) = prettyWithLoc i
+  prettyWithLoc (TVar i  ) = prettyWithLoc i
 
 --------------------------------------------------------------------------------
 

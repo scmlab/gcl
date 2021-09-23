@@ -39,7 +39,7 @@ import           Syntax.Common                  ( Name(Name)
                                                 )
 import           Syntax.Concrete                ( ToAbstract(toAbstract) )
 import           Syntax.Parser                  ( Parser
-                                                , pBlockDeclaration
+                                                , pDefinitions
                                                 , pDeclaration
                                                 , pExpr
                                                 , pProgram
@@ -408,7 +408,7 @@ blockDeclarationCheck :: Text -> Text -> Assertion
 blockDeclarationCheck t1 t2 = toText wrap @?= t2
  where
   wrap = do
-    (ds, defs) <- runParser pBlockDeclaration t1
+    (ds, defs) <- runParser pDefinitions t1
     let defns = Defns mempty (collectFuncDefns defs)
     return $ check (\_ decls -> defnsAndDeclsToEnv defns decls) mempty ds
 

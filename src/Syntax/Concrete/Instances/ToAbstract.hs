@@ -61,15 +61,15 @@ instance ToAbstract Declaration (Either A.TypeDefn A.Declaration) where
     VarDecl _ decl -> do
       (name, body, prop) <- toAbstract decl
       return . Right $ A.VarDecl name body prop (locOf d)
-    TypeDefn _ name binders _ cons -> do
+    TYPEDEFN _ name binders _ cons -> do
       Left
         <$> (A.TypeDefn name binders <$> toAbstract (fromSepBy cons) <*> pure
               (locOf d)
             )
 
 
-instance ToAbstract BlockDeclaration ([A.Declaration], [A.FuncDefn]) where
-  toAbstract (BlockDeclaration _ decls _) =
+instance ToAbstract Definitions ([A.Declaration], [A.FuncDefn]) where
+  toAbstract (Definitions _ decls _) =
     partitionEithers <$> toAbstract decls
 
 instance ToAbstract TypeDefnCtor A.TypeDefnCtor where
@@ -137,11 +137,11 @@ instance ToAbstract BlockDeclType A.Declaration where
     A.ConstDecl ns t <$> toAbstract prop <*> pure (locOf d)
 
 -- One BlockDecl can be parse into a ConstDecl or a ConstDecl and a LetDecl
-instance ToAbstract BlockDecl (Either A.Declaration A.FuncDefn) where
-  toAbstract (Left  decl) = Left <$> toAbstract decl
-  toAbstract (Right decl) = Right <$> toAbstract decl
+instance ToAbstract Definition (Either A.Declaration A.FuncDefn) where
+  toAbstract (TypeDefn  decl) = Left <$> toAbstract decl
+  toAbstract (FuncDefn decl) = Right <$> toAbstract decl
 
-instance ToAbstract (Either Declaration BlockDeclaration) ([A.TypeDefn], [A.Declaration], [A.FuncDefn]) where
+instance ToAbstract (Either Declaration Definitions) ([A.TypeDefn], [A.Declaration], [A.FuncDefn]) where
   toAbstract (Left d) =
     uncurry (, , []) . partitionEithers . (: []) <$> toAbstract d
   toAbstract (Right bd) = uncurry ([], , ) <$> toAbstract bd
