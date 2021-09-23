@@ -20,8 +20,8 @@ funcDefnSigsToConstDecl :: FuncDefnTypeSig -> [Declaration]
 funcDefnSigsToConstDecl (FuncDefnTypeSig names t prop loc) =
   [ConstDecl names t prop loc]
 
-typeDefnsToConstDecl :: TypeDefn -> [Declaration]
-typeDefnsToConstDecl (TypeDefn name binders qdcons _) = map wrap qdcons
+typeDefnCtorsToConstDecl :: TypeDefn -> [Declaration]
+typeDefnCtorsToConstDecl (TypeDefn name binders qdcons _) = map wrap qdcons
  where
   wrap (TypeDefnCtor cn ts) = ConstDecl
     [cn]

@@ -1,39 +1,39 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Test.Parser where
+import           Data.Text                      ( Text )
+import qualified Data.Text                     as Text
+import           Data.Text.Prettyprint.Doc      ( Pretty )
+import           Pretty                         ( toByteString
+                                                , toText
+                                                )
+import           Syntax.Parser                  ( Parser
+                                                , pDeclaration
+                                                , pDefinitionBlock
+                                                , pExpr
+                                                , pProgram
+                                                , pStmt
+                                                , pType
+                                                , runParse
+                                                )
+import           Syntax.Parser.Lexer            ( scn )
+import           Test.Tasty                     ( TestTree
+                                                , testGroup
+                                                )
+import           Test.Tasty.HUnit               ( (@?=)
+                                                , Assertion
+                                                , testCase
+                                                )
 import           Test.Util                      ( parseTest
                                                 , removeTrailingWhitespace
                                                 , runGoldenTest
                                                 )
-import           Test.Tasty                     ( TestTree
-                                                , testGroup
-                                                )
-import           Data.Text.Prettyprint.Doc      ( Pretty )
-import           Syntax.Parser                  ( Parser
-                                                , runParse
-                                                , pProgram
-                                                , pDeclaration
-                                                , pType
-                                                , pExpr
-                                                , pDefinitionBlock
-                                                , pStmt
-                                                )
-import           Syntax.Parser.Lexer            ( scn )
-import           Data.Text                      ( Text )
-import           Test.Tasty.HUnit               ( Assertion
-                                                , testCase
-                                                , (@?=)
-                                                )
-import           Pretty                         ( toText
-                                                , toByteString
-                                                )
-import qualified Data.Text                     as Text
 
 
 tests :: TestTree
 tests = testGroup
   "Parser"
-  [expression, type', declaration, statement, parseError, golden]
+  [expression, type', definition, declaration, statement, parseError, golden]
 
 --------------------------------------------------------------------------------
 
@@ -141,6 +141,61 @@ type' = testGroup
   where run = parserIso (scn >> pType)
 
 --------------------------------------------------------------------------------
+-- | Definition
+definition :: TestTree
+definition = testGroup
+  "Definitions"
+  [ testCase "type definition 1" $ run "{:\ndata List a = Nil | Con a\n:}"
+  , testCase "type definition 2" $ run "{:\ndata List a = Node (List a)\n:}"
+  , testCase "block declaration 1"
+    $ run "{:\n\
+        \   A, B : Int\n\
+        \:}"
+  , testCase "block declaration 1"
+    $ run "{:\n\
+        \   A, B : Int\n\
+        \     A > 0\n\
+        \:}"
+  , testCase "block declaration 1"
+    $ run "{:\n\
+        \   A, B : Int {A > 0}\n\
+        \:}"
+  , testCase "block declaration 2"
+    $ run "{:\n\
+        \   A, B : Int\n\
+        \     {A > 0}\n\
+        \:}"
+  , testCase "block declaration 3"
+    $ run
+        "{:\n\
+        \   A, B : Int\n\
+        \     {A > 0}\n\
+        \   F : Int -> Int -> Int\n\
+        \:}"
+  , testCase "block declaration 4"
+    $ run
+        "{:\n\
+        \   A, B : Int\n\
+        \     {A > 0}\n\
+        \   A = 1\n\
+        \   F : Int -> Int -> Int\n\
+        \   F x y = x\n\
+        \:}"
+  , testCase "block declaration 5"
+    $ run "{:\n\
+        \   A = 5\n\
+        \   F a b = a + b\n\
+        \:}"
+  , testCase "block declaration 6"
+    $ run
+        "{:\n\
+        \   A = 5\n\
+        \   F a b = a + b\n\
+        \   B, C : Int\n\
+        \:}"
+  ]
+  where run = parserIso pDefinitionBlock
+--------------------------------------------------------------------------------
 
 -- | Declaration
 declaration :: TestTree
@@ -161,58 +216,8 @@ declaration = testGroup
   , testCase "constant keyword collision 2" $ run "con Trueu : Int"
   , testCase "constant keyword collision 3" $ run "con Intt : Int"
   , testCase "constant keyword collision 4" $ run "con Boola : Int"
-  , testCase "type declaration 1" $ run "data List a = Nil | Con a"
-  , testCase "type declaration 2" $ run "data List a = Node (List a)"
-  , testCase "block declaration 1"
-    $ runBlock "{:\n\
-        \   A, B : Int\n\
-        \:}"
-  , testCase "block declaration 1" $ runBlock
-    "{:\n\
-        \   A, B : Int\n\
-        \     A > 0\n\
-        \:}"
-  , testCase "block declaration 1"
-    $ runBlock "{:\n\
-        \   A, B : Int {A > 0}\n\
-        \:}"
-  , testCase "block declaration 2" $ runBlock
-    "{:\n\
-        \   A, B : Int\n\
-        \     {A > 0}\n\
-        \:}"
-  , testCase "block declaration 3"
-    $ runBlock
-        "{:\n\
-        \   A, B : Int\n\
-        \     {A > 0}\n\
-        \   F : Int -> Int -> Int\n\
-        \:}"
-  , testCase "block declaration 4"
-    $ runBlock
-        "{:\n\
-        \   A, B : Int\n\
-        \     {A > 0}\n\
-        \   A = 1\n\
-        \   F : Int -> Int -> Int\n\
-        \   F x y = x\n\
-        \:}"
-  , testCase "block declaration 5" $ runBlock
-    "{:\n\
-        \   A = 5\n\
-        \   F a b = a + b\n\
-        \:}"
-  , testCase "block declaration 6"
-    $ runBlock
-        "{:\n\
-        \   A = 5\n\
-        \   F a b = a + b\n\
-        \   B, C : Int\n\
-        \:}"
   ]
- where
-  run      = parserIso pDeclaration
-  runBlock = parserIso pDefinitionBlock
+  where run = parserIso pDeclaration
 
 --------------------------------------------------------------------------------
 

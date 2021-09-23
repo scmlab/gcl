@@ -89,7 +89,7 @@ pProgram' =
 pDeclaration :: Parser Declaration
 pDeclaration = Lex.lineFold scn (unParseFunc p)
  where
-  p = (pConstDecl <|> pVarDecl <|> pTYPEDEFN) <* lift scn <?> "declaration"
+  p = (pConstDecl <|> pVarDecl) <* lift scn <?> "declaration"
 
 pDeclaration' :: ParserF Declaration
 pDeclaration' = lift pDeclaration
@@ -107,9 +107,9 @@ pConstDecl = ConstDecl <$> lexCon <*> pDeclType pName
 pVarDecl :: ParserF Declaration
 pVarDecl = VarDecl <$> lexVar <*> pDeclType lowerName
 
-pTYPEDEFN :: ParserF Declaration
-pTYPEDEFN =
-  TYPEDEFN
+pTypeDefn :: ParserF Definition
+pTypeDefn =
+  TypeDefn
     <$> lexData
     <*> pName
     <*> many pName
@@ -126,6 +126,7 @@ pDefinition = lift $ Lex.lineFold
   (unParseFunc
     (choice
       [ try $ FuncDefnTypeSig <$> pDeclBase pName <*> optional pDefinitionProp
+      , pTypeDefn
       , FuncDefn <$> pDeclBody
       ]
     )

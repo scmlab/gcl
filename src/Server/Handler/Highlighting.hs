@@ -106,6 +106,11 @@ instance Collect DefinitionBlock J.SemanticTokenAbsolute where
   collect (DefinitionBlock _tokA as _tokB) = toList as >>= collect
 
 instance Collect Definition J.SemanticTokenAbsolute where
+  collect (TypeDefn tokData name binders _tokDef bs) =
+    toToken J.SttKeyword [] tokData
+      <> toToken' J.SttType [] name
+      <> toToken' J.SttParameter [] binders
+      <> (toList bs >>= collect)
   collect (FuncDefnTypeSig a b) = collect a <> collect b 
   collect (FuncDefn x) = collect x
 
@@ -115,11 +120,6 @@ instance Collect Definition J.SemanticTokenAbsolute where
 instance Collect Declaration J.SemanticTokenAbsolute where
   collect (ConstDecl tok a) = toToken J.SttKeyword [] tok <> collect a
   collect (VarDecl   tok a) = toToken J.SttKeyword [] tok <> collect a
-  collect (TYPEDEFN tokData name binders _tokDef bs) =
-    toToken J.SttKeyword [] tokData
-      <> toToken' J.SttType [] name
-      <> toToken' J.SttParameter [] binders
-      <> (toList bs >>= collect)
 
 instance Collect TypeDefnCtor J.SemanticTokenAbsolute where
   collect (TypeDefnCtor name types) = collect (AsName name) <> (types >>= collect)

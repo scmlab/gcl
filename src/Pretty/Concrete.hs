@@ -171,6 +171,12 @@ instance PrettyWithLoc DefinitionBlock where
     prettyWithLoc l <> prettyWithLoc decls <> prettyWithLoc r
 
 instance PrettyWithLoc Definition where
+  prettyWithLoc (TypeDefn dat name binders eq qdcons) =
+    prettyWithLoc dat
+      <> prettyWithLoc name
+      <> prettyWithLoc binders
+      <> prettyWithLoc eq
+      <> prettyWithLoc qdcons
   prettyWithLoc (FuncDefnTypeSig base prop) =
     prettyWithLoc base <> maybe Empty prettyWithLoc prop
   prettyWithLoc (FuncDefn x) = prettyWithLoc x
@@ -212,12 +218,6 @@ instance Pretty Declaration where
 instance PrettyWithLoc Declaration where
   prettyWithLoc (ConstDecl con decl) = prettyWithLoc con <> prettyWithLoc decl
   prettyWithLoc (VarDecl   v   decl) = prettyWithLoc v <> prettyWithLoc decl
-  prettyWithLoc (TYPEDEFN dat name binders eq qdcons) =
-    prettyWithLoc dat
-      <> prettyWithLoc name
-      <> prettyWithLoc binders
-      <> prettyWithLoc eq
-      <> prettyWithLoc qdcons
 
 instance Pretty TypeDefnCtor where
   pretty = toDoc . prettyWithLoc

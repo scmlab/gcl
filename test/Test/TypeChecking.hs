@@ -5,7 +5,6 @@ module Test.TypeChecking where
 
 import           Control.Monad.Except           ( runExcept )
 import           Control.Monad.State            ( evalStateT )
-import           Data.Either                    ( partitionEithers )
 import           Data.Loc                       ( Loc(..) )
 import qualified Data.Map                      as Map
 import           Data.Map                       ( Map )
@@ -15,7 +14,11 @@ import           GCL.Type                       ( Environment(..)
                                                 , TM
                                                 , checkEnvironment
                                                 , checkProgram
-                                                , runTM, inferExpr, checkType, checkStmt, defnsAndDeclsToEnv
+                                                , checkStmt
+                                                , checkType
+                                                , defnsAndDeclsToEnv
+                                                , inferExpr
+                                                , runTM
                                                 )
 import           Pretty                         ( Pretty(pretty)
                                                 , toByteString
@@ -29,17 +32,17 @@ import           Syntax.Abstract                ( Defns(Defns)
                                                 , TBase(..)
                                                 , Type(..)
                                                 )
-import           Syntax.Abstract.Util           
+import           Syntax.Abstract.Util
+import qualified Syntax.Abstract.Util          as A
 import           Syntax.Common                  ( Name(Name)
                                                 , Op
                                                 )
 import           Syntax.Concrete                ( ToAbstract(toAbstract) )
 import           Syntax.Parser                  ( Parser
-                                                , pDefinitionBlock
                                                 , pDeclaration
+                                                , pDefinitionBlock
                                                 , pExpr
                                                 , pProgram
-                                                , Parser
                                                 , pStmts
                                                 , pType
                                                 , runParse
@@ -54,7 +57,6 @@ import           Test.Tasty.HUnit               ( (@?=)
 import           Test.Util                      ( parseTest
                                                 , runGoldenTest
                                                 )
-import qualified Syntax.Abstract.Util as A
 
 tests :: TestTree
 tests = testGroup
@@ -63,7 +65,7 @@ tests = testGroup
   , typeTests
   , stmtTests
   , declarationTests
-  , blockDeclarationTests
+  , definitionTests
   , fileTests
   ]
 
@@ -196,31 +198,31 @@ declarationTests = testGroup
     $ declarationCheck "var x : Bool" "Environment[(x, Bool)][][]"
   , testCase "var declaration w/ prop"
     $ declarationCheck "var x : Bool { x = True }" "Environment[(x, Bool)][][]"
-  , testCase "type declaration" $ declarationCheck
-    "data T a = Nil | Con a"
-    "Environment[(Con, TVar a → T a), (Nil, T a)][(T, ([a], [Nil , Con (TVar a)]))][]"
   ]
 
-blockDeclarationTests :: TestTree
-blockDeclarationTests = testGroup
+definitionTests :: TestTree
+definitionTests = testGroup
   ""
-  [ testCase "block declaration 1" $ blockDeclarationCheck
+  [ testCase "type definition" $ blockDeclarationCheck
+    "{:\ndata T a = Nil | Con a\n:}"
+    "Environment[(Con, TVar a → T a), (Nil, T a)][(T, ([a], [Nil , Con (TVar a)]))][]"
+  , testCase "definition 1" $ blockDeclarationCheck
     "{:\n\
         \  A, B : Int\
         \:}"
     "Environment[(A, Int), (B, Int)][][]"
-  , testCase "block declaration 2" $ blockDeclarationCheck
+  , testCase "definition 2" $ blockDeclarationCheck
     "{:\n\
         \  A, B : Int { A = 0 }\
         \:}"
     "Environment[(A, Int), (B, Int)][][]"
-  , testCase "block declaration 3" $ blockDeclarationCheck
+  , testCase "definition 3" $ blockDeclarationCheck
     "{:\n\
         \  A, B : Int\n\
         \    A = 0\n\
         \:}"
     "Environment[(A, Int), (B, Int)][][]"
-  , testCase "block declaration 4" $ blockDeclarationCheck
+  , testCase "definition 4" $ blockDeclarationCheck
     "{:\n\
         \  A, B : Int\n\
         \    A = 0\n\
@@ -228,12 +230,12 @@ blockDeclarationTests = testGroup
         \  P : Char -> Bool\n\
         \:}"
     "Environment[(A, Int), (B, Int), (F, Int → Int → Int), (P, Char → Bool)][][]"
-  , testCase "block declaration 5" $ blockDeclarationCheck
+  , testCase "definition 5" $ blockDeclarationCheck
     "{:\n\
         \   N = 5\n\
         \:}"
     "Environment[(N, Int)][][(N, 5)]"
-  , testCase "block declaration 6" $ blockDeclarationCheck
+  , testCase "definition 6" $ blockDeclarationCheck
     "{:\n\
         \    G i j = i + j\n\
         \:}"
@@ -388,16 +390,16 @@ declarationCheck :: Text -> Text -> Assertion
 declarationCheck t1 t2 = toText wrap @?= t2
  where
   wrap = do
-    (typeDefns, ds) <- partitionEithers . (: []) <$> runParser pDeclaration t1
-    let ds' = ds <> foldMap typeDefnsToConstDecl typeDefns
+    decl <- runParser pDeclaration t1
+    let decls = [decl]
     return $ check
-      (\_ decls -> do
-        env' <- defnsAndDeclsToEnv (Defns (A.collectTypeDefns typeDefns) mempty) decls
+      (\_ decls' -> do
+        env' <- defnsAndDeclsToEnv (Defns mempty mempty) decls'
         checkEnvironment env'
         return env'
       )
       mempty
-      ds'
+      decls
 
 envCheck :: Text -> Assertion
 envCheck t = toText env @?= t
@@ -406,9 +408,11 @@ blockDeclarationCheck :: Text -> Text -> Assertion
 blockDeclarationCheck t1 t2 = toText wrap @?= t2
  where
   wrap = do
-    (funcDefnSigs, defs) <- runParser pDefinitionBlock t1
-    let decls = foldMap A.funcDefnSigsToConstDecl funcDefnSigs 
-    let defns = Defns mempty (collectFuncDefns defs)
+    (typeDefns, (funcDefnSigs, defs)) <- runParser pDefinitionBlock t1
+    let decls =
+          foldMap A.funcDefnSigsToConstDecl funcDefnSigs
+            <> foldMap A.typeDefnCtorsToConstDecl typeDefns
+    let defns = Defns (collectTypeDefns typeDefns) (collectFuncDefns defs)
     return $ check (\_ decls' -> defnsAndDeclsToEnv defns decls') mempty decls
 
 programCheck :: Text -> Assertion

@@ -56,7 +56,9 @@ data Program
 
 data DefinitionBlock = DefinitionBlock (Token "{:") [Definition] (Token ":}") deriving (Eq, Show)
 data Definition 
-  = FuncDefnTypeSig DeclBase (Maybe BlockDeclProp)
+  = -- data T a1 a2 ... = K1 v1 v2 ... | K2 u1 u2 ...
+    TypeDefn (Token "data") Name [Name] (Token "=") (SepBy "|" TypeDefnCtor)
+  | FuncDefnTypeSig DeclBase (Maybe BlockDeclProp)
   | FuncDefn DeclBody
   deriving (Eq, Show)
 
@@ -70,8 +72,6 @@ data TypeDefnCtor = TypeDefnCtor Name [Type] deriving (Eq, Show)
 data Declaration
   = ConstDecl (Token "con") DeclType
   | VarDecl (Token "var") DeclType
-  -- data T a1 a2 ... = K1 v1 v2 ... | K2 u1 u2 ...
-  | TYPEDEFN (Token "data") Name [Name] (Token "=") (SepBy "|" TypeDefnCtor)
   deriving (Eq, Show)
 
 
