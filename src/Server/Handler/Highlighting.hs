@@ -106,7 +106,7 @@ instance Collect DefinitionBlock J.SemanticTokenAbsolute where
   collect (DefinitionBlock _tokA as _tokB) = toList as >>= collect
 
 instance Collect Definition J.SemanticTokenAbsolute where
-  collect (FuncDefnType a b) = collect a <> collect b 
+  collect (FuncDefnTypeSig a b) = collect a <> collect b 
   collect (FuncDefn x) = collect x
 
 --------------------------------------------------------------------------------

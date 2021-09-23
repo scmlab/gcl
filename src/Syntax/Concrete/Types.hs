@@ -56,11 +56,13 @@ data Program
 
 data DefinitionBlock = DefinitionBlock (Token "{:") [Definition] (Token ":}") deriving (Eq, Show)
 data Definition 
-  = FuncDefnType DeclBase (Maybe BlockDeclProp)
+  = FuncDefnTypeSig DeclBase (Maybe BlockDeclProp)
   | FuncDefn DeclBody
   deriving (Eq, Show)
 
 type BlockDeclProp = Either DeclProp Expr
+
+data TypeDefnCtor = TypeDefnCtor Name [Type] deriving (Eq, Show)
 
 --------------------------------------------------------------------------------
 -- | Declaration 
@@ -72,7 +74,6 @@ data Declaration
   | TYPEDEFN (Token "data") Name [Name] (Token "=") (SepBy "|" TypeDefnCtor)
   deriving (Eq, Show)
 
-data TypeDefnCtor = TypeDefnCtor Name [Type] deriving (Eq, Show)
 
 data Stmt
   = Skip Range

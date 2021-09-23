@@ -4,7 +4,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE TupleSections #-}
+
 module Syntax.Concrete.Instances.ToAbstract where
 
 import           Control.Monad.Except           ( Except
@@ -37,21 +37,53 @@ instance ToAbstract a b => ToAbstract (Maybe a) (Maybe b) where
 
 instance ToAbstract a b => ToAbstract [a] [b] where
   toAbstract = mapM toAbstract
---------------------------------------------------------------------------------
 
--- | Program / Declaration / Statement
+--------------------------------------------------------------------------------
+-- | Program
+
 instance ToAbstract Program A.Program where
   toAbstract prog@(Program ds stmts') = do
     (typeDefns, ds', lds) <- foldl (<>) ([], [], []) <$> toAbstract ds
     let decls = ds' <> foldMap A.extractTypeDefnCtors typeDefns -- add constructors' type into declarations
-    let defns =
-          A.Defns (A.collectTypeDefns typeDefns) (A.collectFuncDefns lds)
+    let defns = A.Defns (A.collectTypeDefns typeDefns) (A.collectFuncDefns lds)
     let (globProps, assertions) = ConstExpr.pickGlobals decls
     let pre =
           [ A.Assert (A.conjunct assertions) NoLoc | not (null assertions) ]
     stmts <- toAbstract stmts'
 
     return $ A.Program defns decls globProps (pre ++ stmts) (locOf prog)
+
+instance ToAbstract (Either Declaration DefinitionBlock) ([A.TypeDefn], [A.Declaration], [A.FuncDefn]) where
+  toAbstract (Left d) = do
+    d' <- toAbstract d
+    case d' of
+      Left  td -> return ([td], [], [])
+      Right de -> return ([], [de], [])
+  toAbstract (Right bd) = do
+    (des, fds) <- toAbstract bd
+    return ([], des, fds)
+
+--------------------------------------------------------------------------------
+-- | Definition 
+
+instance ToAbstract DefinitionBlock ([A.Declaration], [A.FuncDefn]) where
+  toAbstract (DefinitionBlock _ decls _) =
+    partitionEithers <$> toAbstract decls
+
+instance ToAbstract Definition (Either A.Declaration A.FuncDefn) where
+  toAbstract (FuncDefnTypeSig decl prop) = do
+    (ns, t) <- toAbstract decl
+    Left <$> (A.ConstDecl ns t <$> toAbstract prop <*> pure (decl <--> prop))
+  toAbstract (FuncDefn decl) = Right <$> toAbstract decl
+
+-- instance ToAbstract TypeDefn A.TypeDefn where
+--   toAbstract (TypeDefn name binders _ ctors) = A.TypeDefnCtor c <$> toAbstract ts
+
+instance ToAbstract TypeDefnCtor A.TypeDefnCtor where
+  toAbstract (TypeDefnCtor c ts) = A.TypeDefnCtor c <$> toAbstract ts
+
+--------------------------------------------------------------------------------
+-- | Declaraion
 
 instance ToAbstract Declaration (Either A.TypeDefn A.Declaration) where
   toAbstract d = case d of
@@ -67,13 +99,8 @@ instance ToAbstract Declaration (Either A.TypeDefn A.Declaration) where
               (locOf d)
             )
 
-
-instance ToAbstract DefinitionBlock ([A.Declaration], [A.FuncDefn]) where
-  toAbstract (DefinitionBlock _ decls _) =
-    partitionEithers <$> toAbstract decls
-
-instance ToAbstract TypeDefnCtor A.TypeDefnCtor where
-  toAbstract (TypeDefnCtor c ts) = A.TypeDefnCtor c <$> toAbstract ts
+--------------------------------------------------------------------------------
+-- | Statement 
 
 instance ToAbstract Stmt A.Stmt where
   toAbstract stmt = case stmt of
@@ -131,17 +158,6 @@ instance ToAbstract BlockDeclProp A.Expr where
 instance ToAbstract DeclBody A.FuncDefn where
   toAbstract d@(DeclBody n args _ b) = do
     A.FuncDefn n args <$> toAbstract b <*> pure (locOf d)
-
-instance ToAbstract Definition (Either A.Declaration A.FuncDefn) where
-  toAbstract (FuncDefnType decl prop) =  do
-    (ns, t) <- toAbstract decl
-    Left <$> (A.ConstDecl ns t <$> toAbstract prop <*> pure (decl <--> prop))
-  toAbstract (FuncDefn decl) = Right <$> toAbstract decl
-
-instance ToAbstract (Either Declaration DefinitionBlock) ([A.TypeDefn], [A.Declaration], [A.FuncDefn]) where
-  toAbstract (Left d) =
-    uncurry (, , []) . partitionEithers . (: []) <$> toAbstract d
-  toAbstract (Right bd) = uncurry ([], , ) <$> toAbstract bd
 
 --------------------------------------------------------------------------------
 

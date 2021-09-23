@@ -41,10 +41,15 @@ data Defns = Defns (Map Name TypeDefn) (Map Name Expr)
 data FuncDefn = FuncDefn Name [Name] Expr Loc
   deriving (Eq, Show)
 
+-- type signature of function definition
+data FuncDefnTypeSig = FuncDefnTypeSig Name Type Loc
+  deriving (Eq, Show)
+
 -- type definition
 data TypeDefn = TypeDefn Name [Name] [TypeDefnCtor] Loc
   deriving (Eq, Show)
 
+-- constructor of type definition
 data TypeDefnCtor = TypeDefnCtor Name [Type]
   deriving (Eq, Show)
 
