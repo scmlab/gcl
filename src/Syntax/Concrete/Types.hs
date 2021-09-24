@@ -58,11 +58,9 @@ data DefinitionBlock = DefinitionBlock (Token "{:") [Definition] (Token ":}") de
 data Definition 
   = -- data T a1 a2 ... = K1 v1 v2 ... | K2 u1 u2 ...
     TypeDefn (Token "data") Name [Name] (Token "=") (SepBy "|" TypeDefnCtor)
-  | FuncDefnTypeSig DeclBase (Maybe BlockDeclProp)
+  | FuncDefnTypeSig DeclBase (Maybe DeclProp)
   | FuncDefn DeclBody
   deriving (Eq, Show)
-
-type BlockDeclProp = Either DeclProp Expr
 
 data TypeDefnCtor = TypeDefnCtor Name [Type] deriving (Eq, Show)
 

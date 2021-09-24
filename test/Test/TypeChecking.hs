@@ -216,16 +216,9 @@ definitionTests = testGroup
         \  A, B : Int { A = 0 }\
         \:}"
     "Environment[(A, Int), (B, Int)][][]"
-  , testCase "definition 3" $ blockDeclarationCheck
-    "{:\n\
-        \  A, B : Int\n\
-        \    A = 0\n\
-        \:}"
-    "Environment[(A, Int), (B, Int)][][]"
   , testCase "definition 4" $ blockDeclarationCheck
     "{:\n\
-        \  A, B : Int\n\
-        \    A = 0\n\
+        \  A, B : Int { A = 0 }\n\
         \  F : Int -> Int -> Int\n\
         \  P : Char -> Bool\n\
         \:}"

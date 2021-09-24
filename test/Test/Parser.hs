@@ -147,32 +147,27 @@ definition = testGroup
   "Definitions"
   [ testCase "type definition 1" $ run "{:\ndata List a = Nil | Con a\n:}"
   , testCase "type definition 2" $ run "{:\ndata List a = Node (List a)\n:}"
-  , testCase "block declaration 1"
+  , testCase "definition 1"
     $ run "{:\n\
         \   A, B : Int\n\
         \:}"
-  , testCase "block declaration 1"
-    $ run "{:\n\
-        \   A, B : Int\n\
-        \     A > 0\n\
-        \:}"
-  , testCase "block declaration 1"
+  , testCase "definition (with prop) 1"
     $ run "{:\n\
         \   A, B : Int {A > 0}\n\
         \:}"
-  , testCase "block declaration 2"
+  , testCase "definition (with prop) 2"
     $ run "{:\n\
         \   A, B : Int\n\
         \     {A > 0}\n\
         \:}"
-  , testCase "block declaration 3"
+  , testCase "definition 3"
     $ run
         "{:\n\
         \   A, B : Int\n\
         \     {A > 0}\n\
         \   F : Int -> Int -> Int\n\
         \:}"
-  , testCase "block declaration 4"
+  , testCase "definition 4"
     $ run
         "{:\n\
         \   A, B : Int\n\
@@ -181,12 +176,12 @@ definition = testGroup
         \   F : Int -> Int -> Int\n\
         \   F x y = x\n\
         \:}"
-  , testCase "block declaration 5"
+  , testCase "definition 5"
     $ run "{:\n\
         \   A = 5\n\
         \   F a b = a + b\n\
         \:}"
-  , testCase "block declaration 6"
+  , testCase "definition 6"
     $ run
         "{:\n\
         \   A = 5\n\

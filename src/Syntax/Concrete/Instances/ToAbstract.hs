@@ -159,10 +159,6 @@ instance ToAbstract DeclType ([Name], A.Type, Maybe A.Expr) where
     e       <- toAbstract prop
     return (ns, t, e)
 
-instance ToAbstract BlockDeclProp A.Expr where
-  toAbstract (Left  prop) = toAbstract prop
-  toAbstract (Right prop) = toAbstract prop
-
 instance ToAbstract DeclBody A.FuncDefn where
   toAbstract d@(DeclBody n args _ b) = do
     A.FuncDefn n args <$> toAbstract b <*> pure (locOf d)
