@@ -42,8 +42,10 @@ instance Pretty Declaration where
       <> " }"
 
 instance Pretty FuncDefn where
-  pretty (FuncDefn name args expr _) =
-    "let " <> pretty name <> hsep (map pretty args) <> " = " <> pretty expr
+  pretty (FuncDefn name clauses _) = 
+    vsep (map f clauses)
+    where 
+      f (args, body) = pretty name <> hsep (map pretty args) <> " = " <> pretty body 
 
 instance Pretty TypeDefn where
   pretty (TypeDefn name binders qdcons _) =

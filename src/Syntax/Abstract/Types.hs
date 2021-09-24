@@ -24,10 +24,10 @@ type TypeVar = Text
 -- | Program
 
 data Program = Program Definitions       -- definitions (the functional language part)
-                             [Declaration]     -- constant and variable declarations
-                                           [Expr]            -- global properties
-                                                  [Stmt]            -- main program
-                                                         Loc
+                                   [Declaration]     -- constant and variable declarations
+                                                 [Expr]            -- global properties
+                                                        [Stmt]            -- main program
+                                                               Loc
   deriving (Eq, Show)
 
 --------------------------------------------------------------------------------
@@ -36,18 +36,23 @@ data Program = Program Definitions       -- definitions (the functional language
 data Definitions = Definitions
   { defnTypes    :: Map Name TypeDefn
   , defnFuncSigs :: Map Name FuncDefnSig
-  , defnFuncs    :: Map Name Expr
+  , defnFuncs    :: Map Name [Expr]
   }
   deriving (Eq, Show)
 
 instance Semigroup Definitions where
-  Definitions a b c <> Definitions d e f = Definitions (a <> d) (b <> e) (c <> f)
+  Definitions a b c <> Definitions d e f =
+    Definitions (a <> d) (b <> e) (c <> f)
 
 instance Monoid Definitions where
   mempty = Definitions mempty mempty mempty
 
 -- function definition
-data FuncDefn = FuncDefn Name [Name] Expr Loc
+data FuncDefn = FuncDefn
+  { funcName :: Name
+  , funcClauses :: [([Name], Expr)]
+  , funcLoc  :: Loc
+  }
   deriving (Eq, Show)
 
 -- type signature of function definition

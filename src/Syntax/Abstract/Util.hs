@@ -6,6 +6,7 @@ import           Data.Loc                       ( (<-->)
                                                 )
 import           Data.Map                       ( Map )
 import qualified Data.Map                      as Map
+import qualified Data.Maybe                    as Maybe
 import           Data.Text                      ( Text )
 import           Syntax.Abstract
 import           Syntax.Common                  ( Name
@@ -46,11 +47,13 @@ wrapLam (x : xs) body = let b = wrapLam xs body in Lam x b (x <--> b)
 
 -- function definition           => Just Expr 
 -- constant/variable declaration => Nothing 
+
+-- TODO: 
 programToScopeForSubstitution :: Program -> Map Text (Maybe Expr)
 programToScopeForSubstitution (Program defns decls _ _ _) =
-  Map.mapKeys nameToText
-    $  foldMap extractDeclaration decls
-    <> Map.map Just (defnFuncs defns)
+  Map.mapKeys nameToText $ foldMap extractDeclaration decls <> Map.map
+    Maybe.listToMaybe
+    (defnFuncs defns)
  where
   extractDeclaration :: Declaration -> Map Name (Maybe Expr)
   extractDeclaration (ConstDecl names _ _ _) =
@@ -58,15 +61,9 @@ programToScopeForSubstitution (Program defns decls _ _ _) =
   extractDeclaration (VarDecl names _ _ _) =
     Map.fromList (zip names (repeat Nothing))
 
-
-
-collectFuncDefnSig :: [FuncDefnSig] -> Map Name FuncDefnSig
-collectFuncDefnSig = Map.fromList . map (\x@(FuncDefnSig name _ _ _) -> (name, x))
-
-collectTypeDefns :: [TypeDefn] -> Map Name TypeDefn
-collectTypeDefns = Map.fromList . map (\x@(TypeDefn name _ _ _) -> (name, x))
-
-
-collectFuncDefns :: [FuncDefn] -> Map Name Expr
-collectFuncDefns =
-  Map.fromList . map (\(FuncDefn name args expr _) -> (name, wrapLam args expr))
+collectFuncDefns :: [FuncDefn] -> Map Name [Expr]
+collectFuncDefns = Map.fromListWith mergeFuncDefnsOfTheSameName
+  . map (\(FuncDefn name clauses _) -> (name, map (uncurry wrapLam) clauses))
+ where
+  mergeFuncDefnsOfTheSameName :: [Expr] -> [Expr] -> [Expr]
+  mergeFuncDefnsOfTheSameName = (<>)

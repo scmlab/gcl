@@ -132,13 +132,14 @@ instance StabM GotoM Declaration LocationLink where
     VarDecl   _ _ c _ -> stabLocated c
 
 instance StabM GotoM FuncDefn LocationLink where
-  stabM (FuncDefn _ args c _) = do
-    -- creates a local scope for arguments
-    let argsScope = Map.fromList $ mapMaybe nameToLocationLink args
-    -- temporarily prepend this local scope to the scope stack
+  stabM (FuncDefn _ clauses _) = do
+    results <- forM clauses $ \(args, body) -> do 
+      -- creates a local scope for arguments
+      let argsScope = Map.fromList $ mapMaybe nameToLocationLink args
+      -- temporarily prepend this local scope to the scope stack
+      pushScope argsScope $ stabM body
 
-    pushScope argsScope $ stabM c
-    -- TODO : TypeDefn StabM
+    return $ concat results 
 
 instance StabM GotoM Stmt LocationLink where
   stabM = \case

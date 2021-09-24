@@ -16,6 +16,7 @@ import qualified Data.List.NonEmpty            as NE
 import           Data.Loc
 import           Data.Map                       ( Map )
 import qualified Data.Map                      as Map
+import qualified Data.Maybe                    as Maybe
 import qualified Data.Set                      as Set
 import           GCL.Common
 import           GHC.Generics                   ( Generic )
@@ -101,7 +102,7 @@ typeWithLoc l (TVar n _      ) = TVar n l
 data Environment = Environment
   { envLocalDefns   :: Map Name Type
   , envTypeDefns    :: Map Name ([Name], [TypeDefnCtor])
-  , envLocalContext :: Map Name Expr
+  , envLocalContext :: Map Name [Expr]
   }
   deriving (Eq, Show)
 
@@ -225,7 +226,8 @@ lookupInferEnv n = do
   case Map.lookup n (envLocalDefns env) of
     Nothing -> case Map.lookup n (envLocalContext env) of
       Nothing   -> throwError $ NotInScope n (locOf n)
-      Just expr -> infer expr
+      Just [] -> throwError $ NotInScope n (locOf n) -- when there are no clauses in a function 
+      Just (expr: _) -> infer expr
     Just t -> return $ typeWithLoc (locOf n) t
 
 freshVar :: Loc -> Infer Type
@@ -282,14 +284,14 @@ checkStmt env (Assign ns es loc)
     length ns > length es
   = let extraVars = drop (length es) ns
     in  throwError $ NotEnoughExprsInAssigment (NE.fromList extraVars)
+                                                                                                                                                        -- (locOf $ mergeRangesUnsafe (fromLocs $ map locOf extraVars))
                                                                                                                                                     -- (locOf $ mergeRangesUnsafe (fromLocs $ map locOf extraVars))
-                                                                                                                                                -- (locOf $ mergeRangesUnsafe (fromLocs $ map locOf extraVars))
                                                loc
   | length ns < length es
   = let extraExprs = drop (length ns) es
     in  throwError $ TooManyExprsInAssigment (NE.fromList extraExprs)
+                                                                                                                                                        -- (locOf $ mergeRangesUnsafe (fromLocs $ map locOf extraExprs))
                                                                                                                                                     -- (locOf $ mergeRangesUnsafe (fromLocs $ map locOf extraExprs))
-                                                                                                                                                -- (locOf $ mergeRangesUnsafe (fromLocs $ map locOf extraExprs))
                                              loc
   | otherwise
   = forM_ (zip ns es) (checkAssign env)
@@ -375,7 +377,9 @@ checkProg env (Program defns decls props stmts _) = do
 defnsAndDeclsToEnv :: Definitions -> [Declaration] -> TM Environment
 defnsAndDeclsToEnv defns decls = do
   -- add type declaration and defns to enviornment
-  let env = (foldMap typeDeclToEnv (defnTypes defns)) { envLocalContext = defnFuncs defns }
+  let env = (foldMap typeDeclToEnv (defnTypes defns))
+        { envLocalContext = defnFuncs defns
+        }
 
   -- add var const declaration into enviornment, add type inference result of defns into enviornment
   foldM declToEnv env decls >>= inferLocalContext
@@ -393,13 +397,18 @@ defnsAndDeclsToEnv defns decls = do
 
   inferLocalContext env = do
     Map.foldlWithKey
-      (\envM n e -> do
-        env'          <- envM
-        (eType, subs) <- inferExpr' env' e
-
-        lds           <-
-          Map.map (subst subs) <$> (envLocalDefns env' `extendType` (n, eType))
-        return $ env' { envLocalDefns = lds }
+      (\envM name exprs -> do
+        env' <- envM
+        -- banacorn: there maybe be more than one clauses in the definition of a function 
+        -- we use the first clause to infer the type of the function 
+        case Maybe.listToMaybe exprs of
+          Nothing   -> return env'
+          Just expr -> do
+            (eType, subs) <- inferExpr' env' expr
+            lds           <-
+              Map.map (subst subs)
+                <$> (envLocalDefns env' `extendType` (name, eType))
+            return $ env' { envLocalDefns = lds }
       )
       (pure env)
       (envLocalContext env)

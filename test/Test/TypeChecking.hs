@@ -218,13 +218,14 @@ definitionTests = testGroup
   , testCase "definition 5" $ blockDeclarationCheck
     "{:\n\
         \   N = 5\n\
+        \   N = 6\n\
         \:}"
-    "Environment[(N, Int)][][(N, 5)]"
+    "Environment[(N, Int)][][(N, [6, 5])]"
   , testCase "definition 6" $ blockDeclarationCheck
     "{:\n\
         \    G i j = i + j\n\
         \:}"
-    "Environment[(G, Int → Int → Int)][][(G, λ i → λ j → i + j)]"
+    "Environment[(G, Int → Int → Int)][][(G, [λ i → λ j → i + j])]"
   ]
 
 programTest :: TestTree

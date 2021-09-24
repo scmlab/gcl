@@ -17,6 +17,7 @@ import           Data.Loc                       ( (<-->)
                                                 , Located(locOf)
                                                 )
 import           Data.Loc.Range
+import qualified Data.Map                      as Map
 import qualified Syntax.Abstract               as A
 import qualified Syntax.Abstract.Operator      as A
 import qualified Syntax.Abstract.Util          as A
@@ -78,9 +79,20 @@ instance ToAbstract DefinitionBlock A.Definitions where
   toAbstract (DefinitionBlock _ decls _) = do
     (typeDefns, (funcDefnSigs, funcDefns)) <-
       second partitionEithers . partitionEithers <$> toAbstract decls
-    return $ A.Definitions (collectTypeDefns typeDefns)
-                           (collectFuncDefnSig (concat funcDefnSigs))
-                           (collectFuncDefns funcDefns)
+
+    -- invariant: there should be only ONE TypeDefn of the same name 
+    let defnTypes =
+          Map.fromList $ map (\x@(A.TypeDefn name _ _ _) -> (name, x)) typeDefns
+    -- invariant: there should be only ONE FuncDefnSig of the same name 
+    let defnFuncSigs = Map.fromList $ map
+          (\x@(A.FuncDefnSig name _ _ _) -> (name, x))
+          (concat funcDefnSigs)
+
+
+    return $ A.Definitions { A.defnTypes    = defnTypes
+                           , A.defnFuncSigs = defnFuncSigs
+                           , A.defnFuncs    = collectFuncDefns funcDefns
+                           }
 
 instance ToAbstract Definition (Either A.TypeDefn (Either [A.FuncDefnSig] A.FuncDefn)) where
   toAbstract (TypeDefn tok name binders _ cons) = do
@@ -168,8 +180,9 @@ instance ToAbstract DeclType ([Name], A.Type, Maybe A.Expr) where
     return (ns, t, e)
 
 instance ToAbstract DeclBody A.FuncDefn where
-  toAbstract d@(DeclBody n args _ b) = do
-    A.FuncDefn n args <$> toAbstract b <*> pure (locOf d)
+  toAbstract d@(DeclBody n args _ body) = do
+    body' <- toAbstract body
+    return $ A.FuncDefn n [(args, body')] (locOf d)
 
 --------------------------------------------------------------------------------
 
