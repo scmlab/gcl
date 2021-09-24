@@ -387,7 +387,7 @@ declarationCheck t1 t2 = toText wrap @?= t2
     let decls = [decl]
     return $ check
       (\_ decls' -> do
-        env' <- defnsAndDeclsToEnv (Defns mempty mempty) decls'
+        env' <- defnsAndDeclsToEnv (Defns mempty mempty mempty) decls'
         checkEnvironment env'
         return env'
       )
@@ -401,11 +401,11 @@ blockDeclarationCheck :: Text -> Text -> Assertion
 blockDeclarationCheck t1 t2 = toText wrap @?= t2
  where
   wrap = do
-    (typeDefns, (funcDefnSigs, defs)) <- runParser pDefinitionBlock t1
+    (typeDefns, (funcTypeSigs, defs)) <- runParser pDefinitionBlock t1
     let decls =
-          foldMap A.funcDefnSigsToConstDecl funcDefnSigs
+          foldMap A.funcDefnSigsToConstDecl (concat funcTypeSigs)
             <> foldMap A.typeDefnCtorsToConstDecl typeDefns
-    let defns = Defns (collectTypeDefns typeDefns) (collectFuncDefns defs)
+    let defns = Defns (collectFuncDefnSig (concat funcTypeSigs)) (collectTypeDefns typeDefns) (collectFuncDefns defs)
     return $ check (\_ decls' -> defnsAndDeclsToEnv defns decls') mempty decls
 
 programCheck :: Text -> Assertion

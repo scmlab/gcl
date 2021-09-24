@@ -34,7 +34,7 @@ data Program = Program Defns       -- let bindings
 --------------------------------------------------------------------------------
 -- | Definitions (the functional language part)
 
-data Defns = Defns (Map Name TypeDefn) (Map Name Expr)
+data Defns = Defns (Map Name FuncDefnSig) (Map Name TypeDefn) (Map Name Expr)
   deriving (Eq, Show)
 
 -- function definition
@@ -42,7 +42,7 @@ data FuncDefn = FuncDefn Name [Name] Expr Loc
   deriving (Eq, Show)
 
 -- type signature of function definition
-data FuncDefnTypeSig = FuncDefnTypeSig [Name] Type (Maybe Expr) Loc
+data FuncDefnSig = FuncDefnSig Name Type (Maybe Expr) Loc
   deriving (Eq, Show)
 
 -- type definition

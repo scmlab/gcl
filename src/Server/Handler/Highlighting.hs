@@ -111,7 +111,7 @@ instance Collect Definition J.SemanticTokenAbsolute where
       <> toToken' J.SttType [] name
       <> toToken' J.SttParameter [] binders
       <> (toList bs >>= collect)
-  collect (FuncDefnTypeSig a b) = collect a <> collect b 
+  collect (FuncDefnSig a b) = collect a <> collect b 
   collect (FuncDefn x) = collect x
 
 --------------------------------------------------------------------------------

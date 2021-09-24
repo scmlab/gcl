@@ -16,9 +16,9 @@ extractAssertion :: Declaration -> Maybe Expr
 extractAssertion (ConstDecl _ _ e _) = e
 extractAssertion (VarDecl   _ _ e _) = e
 
-funcDefnSigsToConstDecl :: FuncDefnTypeSig -> [Declaration]
-funcDefnSigsToConstDecl (FuncDefnTypeSig names t prop loc) =
-  [ConstDecl names t prop loc]
+funcDefnSigsToConstDecl :: FuncDefnSig -> [Declaration]
+funcDefnSigsToConstDecl (FuncDefnSig name t prop loc) =
+  [ConstDecl [name] t prop loc]
 
 typeDefnCtorsToConstDecl :: TypeDefn -> [Declaration]
 typeDefnCtorsToConstDecl (TypeDefn name binders qdcons _) = map wrap qdcons
@@ -47,7 +47,7 @@ wrapLam (x : xs) body = let b = wrapLam xs body in Lam x b (x <--> b)
 -- function definition           => Just Expr 
 -- constant/variable declaration => Nothing 
 programToScopeForSubstitution :: Program -> Map Text (Maybe Expr)
-programToScopeForSubstitution (Program (Defns _ funcDefns) decls _ _ _) =
+programToScopeForSubstitution (Program (Defns _ _ funcDefns) decls _ _ _) =
   Map.mapKeys nameToText
     $  foldMap extractDeclaration decls
     <> Map.map Just funcDefns
@@ -58,9 +58,15 @@ programToScopeForSubstitution (Program (Defns _ funcDefns) decls _ _ _) =
   extractDeclaration (VarDecl names _ _ _) =
     Map.fromList (zip names (repeat Nothing))
 
-collectFuncDefns :: [FuncDefn] -> Map Name Expr
-collectFuncDefns =
-  Map.fromList . map (\(FuncDefn name args expr _) -> (name, wrapLam args expr))
+
+
+collectFuncDefnSig :: [FuncDefnSig] -> Map Name FuncDefnSig
+collectFuncDefnSig = Map.fromList . map (\x@(FuncDefnSig name _ _ _) -> (name, x))
 
 collectTypeDefns :: [TypeDefn] -> Map Name TypeDefn
 collectTypeDefns = Map.fromList . map (\x@(TypeDefn name _ _ _) -> (name, x))
+
+
+collectFuncDefns :: [FuncDefn] -> Map Name Expr
+collectFuncDefns =
+  Map.fromList . map (\(FuncDefn name args expr _) -> (name, wrapLam args expr))

@@ -58,7 +58,9 @@ data DefinitionBlock = DefinitionBlock (Token "{:") [Definition] (Token ":}") de
 data Definition 
   = -- data T a1 a2 ... = K1 v1 v2 ... | K2 u1 u2 ...
     TypeDefn (Token "data") Name [Name] (Token "=") (SepBy "|" TypeDefnCtor)
-  | FuncDefnTypeSig DeclBase (Maybe DeclProp)
+    -- f : A -> B { Prop }
+  | FuncDefnSig DeclBase (Maybe DeclProp)
+    -- f a = a 
   | FuncDefn DeclBody
   deriving (Eq, Show)
 
@@ -72,6 +74,17 @@ data Declaration
   | VarDecl (Token "var") DeclType
   deriving (Eq, Show)
 
+--------------------------------------------------------------------------------
+
+-- Low level Declaration wrapper, and synonym types
+data DeclBase = DeclBase (SepBy "," Name) (Token ":") Type deriving (Eq, Show)
+
+data DeclProp = DeclProp (Token "{") Expr (Token "}") deriving (Eq, Show)
+data DeclType = DeclType DeclBase (Maybe DeclProp) deriving (Eq, Show)
+data DeclBody = DeclBody Name [Name] (Token "=") Expr deriving (Eq, Show)
+
+--------------------------------------------------------------------------------
+-- | Statements 
 
 data Stmt
   = Skip Range
@@ -97,14 +110,6 @@ data ProofAnchor = ProofAnchor Text Range deriving (Eq, Show)
 
 --------------------------------------------------------------------------------
 
--- Low level Declaration wrapper, and synonym types
-data DeclBase = DeclBase (SepBy "," Name) (Token ":") Type deriving (Eq, Show)
-
-data DeclProp = DeclProp (Token "{") Expr (Token "}") deriving (Eq, Show)
-data DeclType = DeclType DeclBase (Maybe DeclProp) deriving (Eq, Show)
-data DeclBody = DeclBody Name [Name] (Token "=") Expr deriving (Eq, Show)
-
---------------------------------------------------------------------------------
 
 -- | Endpoint
 data EndpointOpen

@@ -54,8 +54,9 @@ instance ToAbstract Program A.Program where
           originalDecls
             <> funcDefnSigsAsConstDecl -- add type of functions into declarations
             <> typeDefnCtorAsConstDecl -- add type of constructors' into declarations
-    let defns =
-          A.Defns (A.collectTypeDefns typeDefns) (A.collectFuncDefns fundDefns)
+    let defns = A.Defns (A.collectFuncDefnSig funcDefnSigs)
+                        (A.collectTypeDefns typeDefns)
+                        (A.collectFuncDefns fundDefns)
     let (globProps, assertions) = ConstExpr.pickGlobals decls
     let pre =
           [ A.Assert (A.conjunct assertions) NoLoc | not (null assertions) ]
@@ -63,32 +64,30 @@ instance ToAbstract Program A.Program where
 
     return $ A.Program defns decls globProps (pre ++ stmts) (locOf prog)
 
-instance ToAbstract (Either Declaration DefinitionBlock) ([A.Declaration], [A.TypeDefn], [A.FuncDefnTypeSig], [A.FuncDefn]) where
+instance ToAbstract (Either Declaration DefinitionBlock) ([A.Declaration], [A.TypeDefn], [A.FuncDefnSig], [A.FuncDefn]) where
   toAbstract (Left d) = do
     decls <- toAbstract d
     return ([decls], [], [], [])
   toAbstract (Right defnBlock) = do
     (types, (sigs, funcs)) <- toAbstract defnBlock
-    return ([], types, sigs, funcs)
+    return ([], types, concat sigs, funcs)
 
 --------------------------------------------------------------------------------
 -- | Definition 
 
-instance ToAbstract DefinitionBlock ([A.TypeDefn], ([A.FuncDefnTypeSig], [A.FuncDefn])) where
+instance ToAbstract DefinitionBlock ([A.TypeDefn], ([[A.FuncDefnSig]], [A.FuncDefn])) where
   toAbstract (DefinitionBlock _ decls _) =
     second partitionEithers . partitionEithers <$> toAbstract decls
 
-instance ToAbstract Definition (Either A.TypeDefn (Either A.FuncDefnTypeSig A.FuncDefn)) where
+instance ToAbstract Definition (Either A.TypeDefn (Either [A.FuncDefnSig] A.FuncDefn)) where
   toAbstract (TypeDefn tok name binders _ cons) = do
     Left
       <$> (A.TypeDefn name binders <$> toAbstract (fromSepBy cons) <*> pure
             (tok <--> cons)
           )
-  toAbstract (FuncDefnTypeSig decl prop) = do
-    (ns, t) <- toAbstract decl
-    Right
-      .   Left
-      <$> (A.FuncDefnTypeSig ns t <$> toAbstract prop <*> pure (decl <--> prop))
+  toAbstract (FuncDefnSig decl prop) = do
+    (names, typ) <- toAbstract decl
+    Right . Left <$> mapM (\name -> A.FuncDefnSig name typ <$> toAbstract prop <*> pure (decl <--> prop)) names
   toAbstract (FuncDefn decl) = Right . Right <$> toAbstract decl
 
 

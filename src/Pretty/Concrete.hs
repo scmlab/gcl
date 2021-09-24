@@ -177,7 +177,7 @@ instance PrettyWithLoc Definition where
       <> prettyWithLoc binders
       <> prettyWithLoc eq
       <> prettyWithLoc qdcons
-  prettyWithLoc (FuncDefnTypeSig base prop) =
+  prettyWithLoc (FuncDefnSig base prop) =
     prettyWithLoc base <> maybe Empty prettyWithLoc prop
   prettyWithLoc (FuncDefn x) = prettyWithLoc x
 

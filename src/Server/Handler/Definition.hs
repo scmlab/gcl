@@ -91,7 +91,7 @@ instance HasScopes GotoM (Range -> LocationLink) where
 
 -- TODO: handle type definitions
 runGotoM :: Program -> Position -> GotoM a -> CmdM a
-runGotoM (Program (Defns _typeDefns funcDefns) decls _ _ _) pos f = runReaderT (runReaderT f pos)
+runGotoM (Program (Defns _funcTypeSigs _typeDefns funcDefns) decls _ _ _) pos f = runReaderT (runReaderT f pos)
                                                           [declScope]
  where
   declScope :: Map Text (Range -> LocationLink)
