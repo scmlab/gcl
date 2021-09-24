@@ -47,10 +47,10 @@ wrapLam (x : xs) body = let b = wrapLam xs body in Lam x b (x <--> b)
 -- function definition           => Just Expr 
 -- constant/variable declaration => Nothing 
 programToScopeForSubstitution :: Program -> Map Text (Maybe Expr)
-programToScopeForSubstitution (Program (Defns _ _ funcDefns) decls _ _ _) =
+programToScopeForSubstitution (Program defns decls _ _ _) =
   Map.mapKeys nameToText
     $  foldMap extractDeclaration decls
-    <> Map.map Just funcDefns
+    <> Map.map Just (defnFuncs defns)
  where
   extractDeclaration :: Declaration -> Map Name (Maybe Expr)
   extractDeclaration (ConstDecl names _ _ _) =

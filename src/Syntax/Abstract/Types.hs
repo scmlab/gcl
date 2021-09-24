@@ -12,7 +12,6 @@ import           Prelude                 hiding ( Ordering(..) )
 import           Syntax.Common                  ( Name
                                                 , Op
                                                 )
-
 --------------------------------------------------------------------------------
 
 type Const = Text
@@ -24,7 +23,7 @@ type TypeVar = Text
 --------------------------------------------------------------------------------
 -- | Program
 
-data Program = Program Defns       -- let bindings
+data Program = Program Definitions       -- definitions (the functional language part)
                              [Declaration]     -- constant and variable declarations
                                            [Expr]            -- global properties
                                                   [Stmt]            -- main program
@@ -34,8 +33,18 @@ data Program = Program Defns       -- let bindings
 --------------------------------------------------------------------------------
 -- | Definitions (the functional language part)
 
-data Defns = Defns (Map Name FuncDefnSig) (Map Name TypeDefn) (Map Name Expr)
+data Definitions = Definitions
+  { defnTypes    :: Map Name TypeDefn
+  , defnFuncSigs :: Map Name FuncDefnSig
+  , defnFuncs    :: Map Name Expr
+  }
   deriving (Eq, Show)
+
+instance Semigroup Definitions where
+  Definitions a b c <> Definitions d e f = Definitions (a <> d) (b <> e) (c <> f)
+
+instance Monoid Definitions where
+  mempty = Definitions mempty mempty mempty
 
 -- function definition
 data FuncDefn = FuncDefn Name [Name] Expr Loc

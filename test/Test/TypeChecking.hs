@@ -24,15 +24,7 @@ import           Pretty                         ( Pretty(pretty)
                                                 , toByteString
                                                 , toText
                                                 )
-import           Syntax.Abstract                ( Defns(Defns)
-                                                , Endpoint(..)
-                                                , Expr(..)
-                                                , Interval(..)
-                                                , Lit(..)
-                                                , TBase(..)
-                                                , Type(..)
-                                                )
-import           Syntax.Abstract.Util
+import           Syntax.Abstract
 import qualified Syntax.Abstract.Util          as A
 import           Syntax.Common                  ( Name(Name)
                                                 , Op
@@ -387,7 +379,7 @@ declarationCheck t1 t2 = toText wrap @?= t2
     let decls = [decl]
     return $ check
       (\_ decls' -> do
-        env' <- defnsAndDeclsToEnv (Defns mempty mempty mempty) decls'
+        env' <- defnsAndDeclsToEnv mempty decls'
         checkEnvironment env'
         return env'
       )
@@ -401,11 +393,10 @@ blockDeclarationCheck :: Text -> Text -> Assertion
 blockDeclarationCheck t1 t2 = toText wrap @?= t2
  where
   wrap = do
-    (typeDefns, (funcTypeSigs, defs)) <- runParser pDefinitionBlock t1
+    defns <- runParser pDefinitionBlock t1
     let decls =
-          foldMap A.funcDefnSigsToConstDecl (concat funcTypeSigs)
-            <> foldMap A.typeDefnCtorsToConstDecl typeDefns
-    let defns = Defns (collectFuncDefnSig (concat funcTypeSigs)) (collectTypeDefns typeDefns) (collectFuncDefns defs)
+          foldMap A.funcDefnSigsToConstDecl (defnFuncSigs defns)
+            <> foldMap A.typeDefnCtorsToConstDecl (defnTypes defns)
     return $ check (\_ decls' -> defnsAndDeclsToEnv defns decls') mempty decls
 
 programCheck :: Text -> Assertion
