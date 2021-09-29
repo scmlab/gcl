@@ -76,17 +76,15 @@ pProgram :: Parser Program
 pProgram = do
   scn
   parser pProgram' scn
-  where
-    pProgram' = Program <$> pDeclarations' <*> pStmts' <* eof
+  where pProgram' = Program <$> pDeclarations' <*> pStmts' <* eof
 
 ------------------------------------------
 -- parse Declaration
 ------------------------------------------
 
-pDeclarations' :: ParserF [Declaration'] 
+pDeclarations' :: ParserF [Declaration']
 pDeclarations' = pIndentBlock (eitherP pDeclaration' pBlockDeclaration')
-  where
-    pDeclaration' = lift pDeclaration
+  where pDeclaration' = lift pDeclaration
 
 pDeclaration :: Parser Declaration
 pDeclaration = Lex.lineFold scn (parser p)
@@ -109,16 +107,18 @@ pVarDecl = VarDecl <$> lexVar <*> pDeclType lowerName
 pTypeDecl :: ParserF Declaration
 pTypeDecl =
   TypeDecl <$> lexData <*> pQTyCon <*> lexEqual <*> pSepBy lexGuardBar pQDCon
+  where pQDCon = QDCon <$> pName <*> many pType'
 
 pQTyCon :: ParserF QTyCon
 pQTyCon = QTyCon <$> pName <*> many pName
 
-pQDCon :: ParserF QDCon
-pQDCon = QDCon <$> pName <*> many pType'
-
-
 pBlockDecl :: ParserF BlockDecl
 pBlockDecl = lift $ Lex.lineFold scn (eitherP (try pBlockDeclType) pDeclBody ↓)
+ where
+  pBlockDeclType =
+    BlockDeclType <$> pDeclBase pName <*> optional pBlockDeclProp
+  pBlockDeclProp = eitherP pDeclProp pExpr'
+  pDeclBody      = DeclBody <$> pName <*> many lowerName <*> lexEqual <*> pExpr'
 
 pDeclBase :: ParserF Name -> ParserF DeclBase
 pDeclBase name = DeclBase <$> pList name <*> lexColon <*> pType'
@@ -129,19 +129,6 @@ pDeclProp = DeclProp <$> lexBraceStart <*> pExpr' <*> lexBraceEnd
 pDeclType :: ParserF Name -> ParserF DeclType
 pDeclType name = DeclType <$> pDeclBase name <*> optional pDeclProp
 
-pDeclBody :: ParserF DeclBody
-pDeclBody = DeclBody <$> pName <*> many lowerName <*> lexEqual <*> pExpr'
-
-pBlockDeclProp :: ParserF BlockDeclProp
-pBlockDeclProp = eitherP pDeclProp pExpr'
-
-pBlockDeclType :: ParserF BlockDeclType
-pBlockDeclType =
-  do
-      BlockDeclType
-    <$> pDeclBase pName
-    <*> optional pBlockDeclProp
-
 ------------------------------------------
 -- parse Stmt
 ------------------------------------------
@@ -150,8 +137,8 @@ pStmts :: Parser [Stmt]
 pStmts = parser pStmts' scn
   -- (↓) (pIndentBlock (lift pStmt)) scn <|> return []
 
-pStmts' :: ParserF [Stmt] 
-pStmts' = pIndentBlock (lift pStmt) 
+pStmts' :: ParserF [Stmt]
+pStmts' = pIndentBlock (lift pStmt)
 
 -- NOTE :: this function doesn't consume newline after finish parsing the statement
 pStmt :: Parser Stmt
