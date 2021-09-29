@@ -391,8 +391,8 @@ lexUpperNameF =
     .   lexeme
     .   try
     .   withPredicate notUpperKeywords
-    .   lexTextWithHd
-    =<< upperChar
+    $   upperChar
+    >>= lexTextWithHd
 
 -- name start with lowercase letter which is not a keyword
 lexLowerNameF :: LexerF Name
@@ -401,8 +401,8 @@ lexLowerNameF =
     .   lexeme
     .   try
     .   withPredicate notLowerKeywords
-    .   lexTextWithHd
-    =<< lowerChar
+    $   lowerChar
+    >>= lexTextWithHd
 
 -- name which is not a keyword
 lexNameF :: LexerF Name
@@ -411,12 +411,12 @@ lexNameF =
     .   lexeme
     .   try
     .   withPredicate (\t -> notLowerKeywords t || notUpperKeywords t)
-    .   lexTextWithHd
-    =<< satisfy isAlpha
+    $   satisfy isAlpha
+    >>= lexTextWithHd
 
 -- name with no restriction
 lexAnyNameF :: LexerF Name
-lexAnyNameF = lexTextToNameF . lexeme . try . lexTextWithHd =<< satisfy isAlpha
+lexAnyNameF = lexTextToNameF . lexeme . try $ satisfy isAlpha >>= lexTextWithHd
 
 lexTextToNameF :: LexerF (Text, Range) -> LexerF Name
 lexTextToNameF l = uncurry Name . second locOf <$> l
