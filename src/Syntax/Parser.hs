@@ -104,14 +104,17 @@ pConstDecl = ConstDecl <$> lexCon <*> pDeclType pName
 pVarDecl :: ParserF Declaration
 pVarDecl = VarDecl <$> lexVar <*> pDeclType lowerName
 
+-- `T a1 a2 ... = C1 ai1 ai2 .. | C2 ... | ...`
 pTypeDecl :: ParserF Declaration
 pTypeDecl =
   TypeDecl <$> lexData <*> pQTyCon <*> lexEqual <*> pSepBy lexGuardBar pQDCon
   where pQDCon = QDCon <$> pName <*> many pType'
 
+-- `T a1 a2 ...`
 pQTyCon :: ParserF QTyCon
 pQTyCon = QTyCon <$> pName <*> many pName
 
+-- `n : type` | `n : type { expr }` | `n args = expr`
 pBlockDecl :: ParserF BlockDecl
 pBlockDecl = lift $ Lex.lineFold scn (eitherP (try pBlockDeclType) pDeclBody ↓)
  where
@@ -120,12 +123,15 @@ pBlockDecl = lift $ Lex.lineFold scn (eitherP (try pBlockDeclType) pDeclBody ↓
   pBlockDeclProp = eitherP pDeclProp pExpr'
   pDeclBody      = DeclBody <$> pName <*> many lowerName <*> lexEqual <*> pExpr'
 
+-- `n : type`
 pDeclBase :: ParserF Name -> ParserF DeclBase
 pDeclBase name = DeclBase <$> pList name <*> lexColon <*> pType'
 
+-- `{ expr }`
 pDeclProp :: ParserF DeclProp
 pDeclProp = DeclProp <$> lexBraceStart <*> pExpr' <*> lexBraceEnd
 
+-- `n : type` | `n : type { expr }`
 pDeclType :: ParserF Name -> ParserF DeclType
 pDeclType name = DeclType <$> pDeclBase name <*> optional pDeclProp
 
