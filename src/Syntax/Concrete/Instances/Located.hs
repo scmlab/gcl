@@ -1,10 +1,10 @@
 module Syntax.Concrete.Instances.Located where
 
-import           Syntax.Concrete.Types
-import           Syntax.Common                  ( )
-import           Data.Loc                       ( Located(locOf)
-                                                , (<-->)
+import           Data.Loc                       ( (<-->)
+                                                , Located(locOf)
                                                 )
+import           Syntax.Common                  ( )
+import           Syntax.Concrete.Types
 
 --------------------------------------------------------------------------------
 
@@ -18,18 +18,14 @@ instance Located Program where
   locOf (Program a b) = a <--> b
 
 instance Located Declaration where
-  locOf (ConstDecl l r   ) = l <--> r
-  locOf (VarDecl   l r   ) = l <--> r
-  locOf (TypeDecl l _ _ r) = l <--> r
+  locOf (ConstDecl l r     ) = l <--> r
+  locOf (VarDecl   l r     ) = l <--> r
 
-instance Located QTyCon where
-  locOf (QTyCon l r) = l <--> r
+instance Located TypeDefnCtor where
+  locOf (TypeDefnCtor l r) = l <--> r
 
-instance Located QDCon where
-  locOf (QDCon l r) = l <--> r
-
-instance Located BlockDeclaration where
-  locOf (BlockDeclaration l _ r) = l <--> r
+instance Located DefinitionBlock where
+  locOf (DefinitionBlock l _ r) = l <--> r
 
 instance Located DeclBase where
   locOf (DeclBase l _ r) = l <--> r
@@ -42,9 +38,6 @@ instance Located DeclBody where
 
 instance Located DeclType where
   locOf (DeclType l r) = l <--> r
-
-instance Located BlockDeclType where
-  locOf (BlockDeclType l r) = l <--> r
 
 -------------------------------------------------------------------------------
 
@@ -64,6 +57,7 @@ instance Located Stmt where
   locOf (HLookup l _ _ r            ) = l <--> r
   locOf (HMutate l _ _ r            ) = l <--> r
   locOf (Dispose l r                ) = l <--> r
+  locOf (Block l _ r                ) = l <--> r
 
 --------------------------------------------------------------------------------
 
@@ -88,7 +82,7 @@ instance Located Type where
   locOf (TBase a       ) = locOf a
   locOf (TArray l _ _ r) = l <--> r
   locOf (TFunc l _ r   ) = l <--> r
-  locOf (TCon l        ) = locOf l
+  locOf (TCon l r      ) = l <--> r
   locOf (TVar x        ) = locOf x
 
 --------------------------------------------------------------------------------

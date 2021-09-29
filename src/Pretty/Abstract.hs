@@ -13,8 +13,8 @@ import           Syntax.Abstract
 
 -- | Program
 instance Pretty Program where
-  pretty (Program tdecls decls _ _ stmts _) =
-    vsep $ map pretty tdecls ++ map pretty decls ++ map pretty stmts
+  pretty (Program _ decls props stmts _) =
+    vsep $ map pretty decls ++ map pretty props ++ map pretty stmts
 
 --------------------------------------------------------------------------------
 
@@ -41,19 +41,19 @@ instance Pretty Declaration where
       <> pretty p
       <> " }"
 
-instance Pretty LetDeclaration where
-  pretty (LetDecl name args expr _) =
-    "let " <> pretty name <> hsep (map pretty args) <> " = " <> pretty expr
+instance Pretty FuncDefn where
+  pretty (FuncDefn name clauses _) = 
+    vsep (map f clauses)
+    where 
+      f (args, body) = pretty name <> hsep (map pretty args) <> " = " <> pretty body 
 
-instance Pretty TypeDeclaration where
-  pretty (TypeDecl qty qdcons _) =
-    "data " <> pretty qty <> "= " <> hsep (punctuate "| " (map pretty qdcons))
+instance Pretty TypeDefn where
+  pretty (TypeDefn name binders qdcons _) =
+    "data " <> pretty name <+> hsep (map pretty binders) <> "= " <> hsep
+      (punctuate "| " (map pretty qdcons))
 
-instance Pretty QTyCon where
-  pretty (QTyCon n args) = pretty n <+> hsep (map pretty args)
-
-instance Pretty QDCon where
-  pretty (QDCon cn ts) = pretty cn <+> hsep (map wrap ts)
+instance Pretty TypeDefnCtor where
+  pretty (TypeDefnCtor cn ts) = pretty cn <+> hsep (map wrap ts)
    where
     wrap t@TBase{} = pretty t
     wrap t         = "(" <> pretty t <> ")"
@@ -87,6 +87,7 @@ instance Pretty Stmt where
   pretty (HLookup x  e  _) = pretty x <+> ":=" <+> pretty e <> "*"
   pretty (HMutate e1 e2 _) = pretty e1 <> "*" <+> ":=" <+> pretty e2
   pretty (Dispose e _    ) = "free" <+> pretty e
+  pretty (Block   p _    ) = "|[" <+> pretty p <+> "]|"
 
 instance Pretty GdCmd where
   pretty (GdCmd guard body _) =

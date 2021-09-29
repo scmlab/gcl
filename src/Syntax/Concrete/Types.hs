@@ -44,24 +44,47 @@ data SepBy (sep :: Symbol) a = Head a | Delim a (Token sep) (SepBy sep a)
 
 --------------------------------------------------------------------------------
 
--- | Program / Declaration / Statement
+-- | Program
 data Program
   = Program
-      [Declaration'] -- constant and variable declarations
+      [Either Declaration DefinitionBlock] -- constant and variable declarations
       [Stmt] -- main program
   deriving (Eq, Show)
+
+--------------------------------------------------------------------------------
+-- | Definitions 
+
+data DefinitionBlock = DefinitionBlock (Token "{:") [Definition] (Token ":}") deriving (Eq, Show)
+data Definition 
+  = -- data T a1 a2 ... = K1 v1 v2 ... | K2 u1 u2 ...
+    TypeDefn (Token "data") Name [Name] (Token "=") (SepBy "|" TypeDefnCtor)
+    -- f : A -> B { Prop }
+  | FuncDefnSig DeclBase (Maybe DeclProp)
+    -- f a = a 
+  | FuncDefn DeclBody
+  deriving (Eq, Show)
+
+data TypeDefnCtor = TypeDefnCtor Name [Type] deriving (Eq, Show)
+
+--------------------------------------------------------------------------------
+-- | Declaration 
 
 data Declaration
   = ConstDecl (Token "con") DeclType
   | VarDecl (Token "var") DeclType
-  -- data T a1 a2 ... = K1 v1 v2 ... | K2 u1 u2 ...
-  | TypeDecl (Token "data") QTyCon (Token "=") (SepBy "|" QDCon)
   deriving (Eq, Show)
 
-data BlockDeclaration = BlockDeclaration (Token "{:") [BlockDecl] (Token ":}") deriving (Eq, Show)
+--------------------------------------------------------------------------------
 
-data QTyCon = QTyCon Name [Name] deriving (Eq, Show)
-data QDCon = QDCon Name [Type] deriving (Eq, Show)
+-- Low level Declaration wrapper, and synonym types
+data DeclBase = DeclBase (SepBy "," Name) (Token ":") Type deriving (Eq, Show)
+
+data DeclProp = DeclProp (Token "{") Expr (Token "}") deriving (Eq, Show)
+data DeclType = DeclType DeclBase (Maybe DeclProp) deriving (Eq, Show)
+data DeclBody = DeclBody Name [Name] (Token "=") Expr deriving (Eq, Show)
+
+--------------------------------------------------------------------------------
+-- | Statements 
 
 data Stmt
   = Skip Range
@@ -79,6 +102,7 @@ data Stmt
   | HLookup Name (Token ":=") (Token "*") Expr
   | HMutate (Token "*") Expr (Token ":=") Expr
   | Dispose (Token "dispose") Expr
+  | Block (Token "|[") Program (Token "]|")
   deriving (Eq, Show)
 
 data GdCmd = GdCmd Expr TokArrows [Stmt] deriving (Eq, Show)
@@ -86,20 +110,6 @@ data ProofAnchor = ProofAnchor Text Range deriving (Eq, Show)
 
 --------------------------------------------------------------------------------
 
--- Low level Declaration wrapper, and synonym types
-data DeclBase = DeclBase (SepBy "," Name) (Token ":") Type deriving (Eq, Show)
-
-data DeclProp = DeclProp (Token "{") Expr (Token "}") deriving (Eq, Show)
-data DeclType = DeclType DeclBase (Maybe DeclProp) deriving (Eq, Show)
-data DeclBody = DeclBody Name [Name] (Token "=") Expr deriving (Eq, Show)
-
-type BlockDeclProp = Either DeclProp Expr
-data BlockDeclType = BlockDeclType DeclBase (Maybe BlockDeclProp) deriving (Eq, Show)
-type BlockDecl = Either BlockDeclType DeclBody
-
-type Declaration' = Either Declaration BlockDeclaration
-
---------------------------------------------------------------------------------
 
 -- | Endpoint
 data EndpointOpen
@@ -128,7 +138,7 @@ data Type
   | TBase TBase
   | TArray (Token "array") Interval (Token "of") Type
   | TFunc Type TokArrows Type
-  | TCon QTyCon
+  | TCon Name [Name]
   | TVar Name
   deriving (Eq, Show)
 

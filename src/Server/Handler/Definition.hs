@@ -89,15 +89,16 @@ instance HasScopes GotoM (Range -> LocationLink) where
     pos <- ask
     lift $ local (scope :) $ runReaderT p pos
 
+-- TODO: handle type definitions and type signature of functions 
 runGotoM :: Program -> Position -> GotoM a -> CmdM a
-runGotoM (Program _ decls _ defns _ _) pos f = runReaderT (runReaderT f pos)
+runGotoM (Program (Definitions _funcDefnSigs _typeDefns funcDefns) decls _ _ _) pos f = runReaderT (runReaderT f pos)
                                                           [declScope]
  where
   declScope :: Map Text (Range -> LocationLink)
   declScope =
     Map.fromList
       . concatMap (mapMaybe declToLocationLink)
-      $ (map splitDecl decls, Map.toList defns)
+      $ (map splitDecl decls, Map.toList funcDefns)
 
   -- split a parallel declaration into many simpler declarations
   splitDecl :: Declaration -> [(Name, Declaration)]
@@ -122,7 +123,7 @@ runGotoM (Program _ decls _ defns _ _) pos f = runReaderT (runReaderT f pos)
     return (text, toLocationLink)
 
 instance StabM GotoM Program LocationLink where
-  stabM (Program _ decls _ _ stmts _) =
+  stabM (Program _ decls _ stmts _) =
     (<>) <$> stabLocated decls <*> stabLocated stmts
 
 instance StabM GotoM Declaration LocationLink where
@@ -130,14 +131,15 @@ instance StabM GotoM Declaration LocationLink where
     ConstDecl _ _ c _ -> stabLocated c
     VarDecl   _ _ c _ -> stabLocated c
 
-instance StabM GotoM LetDeclaration LocationLink where
-  stabM (LetDecl _ args c _) = do
-    -- creates a local scope for arguments
-    let argsScope = Map.fromList $ mapMaybe nameToLocationLink args
-    -- temporarily prepend this local scope to the scope stack
+instance StabM GotoM FuncDefn LocationLink where
+  stabM (FuncDefn _ clauses _) = do
+    results <- forM clauses $ \(args, body) -> do 
+      -- creates a local scope for arguments
+      let argsScope = Map.fromList $ mapMaybe nameToLocationLink args
+      -- temporarily prepend this local scope to the scope stack
+      pushScope argsScope $ stabM body
 
-    pushScope argsScope $ stabM c
-    -- TODO : TypeDecl StabM
+    return $ concat results 
 
 instance StabM GotoM Stmt LocationLink where
   stabM = \case

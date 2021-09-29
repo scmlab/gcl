@@ -130,12 +130,12 @@ refine source range = do
     return $ find (withinRange range) specs
 
 typeCheck :: A.Program -> CmdM ()
-typeCheck p = case TypeChecking.runTM (TypeChecking.checkProg p) of
+typeCheck p = case TypeChecking.runTM (TypeChecking.checkProgram p) of
   Left  e -> throwError [TypeError e]
   Right v -> return v
 
 sweep :: A.Program -> CmdM ([PO], [Spec], [A.Expr], [StructWarning])
-sweep program@(A.Program _ _ globalProps _ _ _) = case WP.sweep program of
+sweep program@(A.Program _ _ globalProps _ _) = case WP.sweep program of
   Left  e                     -> throwError [StructError e]
   Right (pos, specs, warings) -> do
     return (List.sort pos, sortOn locOf specs, globalProps, warings)
@@ -155,7 +155,7 @@ parseProgram source = do
   concrete <- parse pProgram source
   case runExcept (toAbstract concrete) of
     Left  (Range start end) -> digHole (Range start end) >>= parseProgram
-    Right program         -> return program
+    Right program           -> return program
 
 --------------------------------------------------------------------------------
 

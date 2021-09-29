@@ -12,7 +12,6 @@ import           Prelude                 hiding ( Ordering(..) )
 import           Syntax.Common                  ( Name
                                                 , Op
                                                 )
-
 --------------------------------------------------------------------------------
 
 type Const = Text
@@ -22,18 +21,51 @@ type Var = Text
 type TypeVar = Text
 
 --------------------------------------------------------------------------------
-
 -- | Program
-data Program = Program [TypeDeclaration] -- type declarations
-                                         [Declaration]     -- constant and variable declarations
-                                                       [Expr]            -- global properties
-                                                              Defns             -- let bindings
-                                                                    [Stmt]            -- main program
-                                                                           Loc
+
+data Program = Program Definitions       -- definitions (the functional language part)
+                                   [Declaration]     -- constant and variable declarations
+                                                 [Expr]            -- global properties
+                                                        [Stmt]            -- main program
+                                                               Loc
   deriving (Eq, Show)
 
---type Types = Map Name TypeDeclaration
-type Defns = Map Name Expr
+--------------------------------------------------------------------------------
+-- | Definitions (the functional language part)
+
+data Definitions = Definitions
+  { defnTypes    :: Map Name TypeDefn
+  , defnFuncSigs :: Map Name FuncDefnSig
+  , defnFuncs    :: Map Name [Expr]
+  }
+  deriving (Eq, Show)
+
+instance Semigroup Definitions where
+  Definitions a b c <> Definitions d e f =
+    Definitions (a <> d) (b <> e) (c <> f)
+
+instance Monoid Definitions where
+  mempty = Definitions mempty mempty mempty
+
+-- function definition
+data FuncDefn = FuncDefn
+  { funcName :: Name
+  , funcClauses :: [([Name], Expr)]
+  , funcLoc  :: Loc
+  }
+  deriving (Eq, Show)
+
+-- type signature of function definition
+data FuncDefnSig = FuncDefnSig Name Type (Maybe Expr) Loc
+  deriving (Eq, Show)
+
+-- type definition
+data TypeDefn = TypeDefn Name [Name] [TypeDefnCtor] Loc
+  deriving (Eq, Show)
+
+-- constructor of type definition
+data TypeDefnCtor = TypeDefnCtor Name [Type]
+  deriving (Eq, Show)
 
 --------------------------------------------------------------------------------
 
@@ -41,17 +73,6 @@ type Defns = Map Name Expr
 data Declaration
   = ConstDecl [Name] Type (Maybe Expr) Loc
   | VarDecl [Name] Type (Maybe Expr) Loc
-  deriving (Eq, Show)
-
-data LetDeclaration = LetDecl Name [Name] Expr Loc
-  deriving (Eq, Show)
-
-data TypeDeclaration = TypeDecl QTyCon [QDCon] Loc
-  deriving (Eq, Show)
-
-data QTyCon = QTyCon Name [Name]
-  deriving (Eq, Show, Generic)
-data QDCon = QDCon Name [Type]
   deriving (Eq, Show)
 
 --------------------------------------------------------------------------------
@@ -72,6 +93,7 @@ data Stmt
   | HLookup Name Expr Loc      --  x := *e
   | HMutate Expr Expr Loc      --  *e1 := e2
   | Dispose Expr Loc           --  dispose e
+  | Block Program Loc
 
   deriving (Eq, Show)
 
@@ -98,7 +120,7 @@ data Type
   = TBase TBase Loc
   | TArray Interval Type Loc
   | TFunc Type Type Loc
-  | TCon QTyCon
+  | TCon Name [Name] Loc
   | TVar Name Loc
   deriving (Eq, Show, Generic)
 
@@ -115,9 +137,9 @@ data Expr
   | Quant Expr [Name] Expr Expr Loc
   | Subst Expr -- expression to be substituted
     (Set Name) -- free variables in that expression
-               -- NOTE, the expression may be some definition like "P", 
+               -- NOTE, the expression may be some definition like "P",
               --  in that case, the free variables should be that of after it's been expanded
-    Mapping -- mapping of substitution to be displayed to users 
+    Mapping -- mapping of substitution to be displayed to users
   | Expand Expr Expr
   | ArrIdx Expr Expr Loc
   | ArrUpd Expr Expr Expr Loc
@@ -125,14 +147,6 @@ data Expr
 
 type QuantOp' = Either Op Expr
 
-data Bindings =
-  AssignBinding Expr
-  | LetBinding Expr
-  | BetaBinding Expr
-  | AlphaBinding Expr
-  deriving (Eq, Show, Generic)
-
-type Subst = Map Name Bindings
 type Mapping = Map Text Expr
 
 ----------------------------------------------------------------

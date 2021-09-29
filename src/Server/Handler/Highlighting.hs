@@ -94,22 +94,35 @@ instance Collect AsName J.SemanticTokenAbsolute where
   collect (AsName a) = toToken' J.SttFunction [] a
 
 --------------------------------------------------------------------------------
+-- Program 
 
 instance Collect Program J.SemanticTokenAbsolute where
   collect (Program as bs) = (as >>= collect) <> (bs >>= collect)
 
-instance Collect Declaration' J.SemanticTokenAbsolute where
-  collect (Left  a) = collect a
-  collect (Right a) = collect a
+--------------------------------------------------------------------------------
+-- Definition  
+
+instance Collect DefinitionBlock J.SemanticTokenAbsolute where
+  collect (DefinitionBlock _tokA as _tokB) = toList as >>= collect
+
+instance Collect Definition J.SemanticTokenAbsolute where
+  collect (TypeDefn tokData name binders _tokDef bs) =
+    toToken J.SttKeyword [] tokData
+      <> toToken' J.SttType [] name
+      <> toToken' J.SttParameter [] binders
+      <> (toList bs >>= collect)
+  collect (FuncDefnSig a b) = collect a <> collect b 
+  collect (FuncDefn x) = collect x
+
+--------------------------------------------------------------------------------
+-- Declaration
 
 instance Collect Declaration J.SemanticTokenAbsolute where
   collect (ConstDecl tok a) = toToken J.SttKeyword [] tok <> collect a
   collect (VarDecl   tok a) = toToken J.SttKeyword [] tok <> collect a
-  -- TODO: handle TypeDecl colloct
-  collect TypeDecl{}        = mempty
 
-instance Collect BlockDeclaration J.SemanticTokenAbsolute where
-  collect (BlockDeclaration _tokA as _tokB) = toList as >>= collect
+instance Collect TypeDefnCtor J.SemanticTokenAbsolute where
+  collect (TypeDefnCtor name types) = collect (AsName name) <> (types >>= collect)
 
 instance Collect DeclBase J.SemanticTokenAbsolute where
   collect (DeclBase as _ b) = (toList as >>= collect . AsVariable) <> collect b
@@ -123,15 +136,6 @@ instance Collect DeclBody J.SemanticTokenAbsolute where
     toToken' J.SttFunction [J.StmDeclaration] a
       <> (bs >>= collect . AsVariable)
       <> collect c
-
-instance Collect BlockDeclProp J.SemanticTokenAbsolute where
-  collect (Left  a) = collect a
-  collect (Right a) = collect a
-instance Collect BlockDeclType J.SemanticTokenAbsolute where
-  collect (BlockDeclType a b) = collect a <> collect b
-instance Collect BlockDecl J.SemanticTokenAbsolute where
-  collect (Left  a) = collect a
-  collect (Right a) = collect a
 
 --------------------------------------------------------------------------------
 -- Stmt
@@ -181,6 +185,8 @@ instance Collect Stmt J.SemanticTokenAbsolute where
         <> toToken' J.SttKeyword [] tok
         <> collect b
     Dispose tok a -> toToken' J.SttKeyword [] tok <> collect a
+    -- TODO:
+    Block{}       -> []
 
 instance Collect GdCmd J.SemanticTokenAbsolute where
   collect (GdCmd a tok bs) =
@@ -202,7 +208,9 @@ instance Collect Expr J.SemanticTokenAbsolute where
     --  1. the client will ignore tokens that are out of order
     --  2. `App` may create tokens that are out of order
     --      (e.g. "1 +" will be parsed as `App + 1`)
-    App a b     -> sort $ collect a <> collect b
+    App a@App{}   b -> sort $ collect a <> collect b
+    App (Const a) b -> sort $ collect (AsName a) <> collect b
+    App a         b -> sort $ collect a <> collect b
     Quant tokA op names tokB a tokC b tokD ->
       toToken' J.SttKeyword [] tokA
         <> toToken' J.SttOperator [] op

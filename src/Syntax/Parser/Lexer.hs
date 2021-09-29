@@ -40,10 +40,7 @@ import           Text.Megaparsec                ( MonadParsec
                                                   , try
                                                   )
                                                 , Parsec
-                                                , Stream
-                                                  ( tokensToChunk
-                                                  , tokenToChunk
-                                                  )
+                                                , Stream(tokensToChunk)
                                                 , getOffset
                                                 , getSourcePos
                                                 , satisfy
@@ -86,7 +83,7 @@ skipBlockComment = Lex.skipBlockComment tokBlockCommentStart tokBlockCommentEnd
 -- wrapper of tokens
 
 lexeme :: Lexer a -> LexerF (a, Range)
-lexeme p = (↑) (\sc' -> Lex.lexeme (try sc' <|> sc) . getRange $ p)
+lexeme p = ParseFunc (\sc' -> Lex.lexeme (try sc' <|> sc) . getRange $ p)
 
 symbol :: Text -> LexerF (Token a)
 symbol t = do
@@ -234,6 +231,12 @@ lexDeclStartF = symbol tokDeclStart
 
 lexDeclEndF :: LexerF (Token tokDeclEnd)
 lexDeclEndF = symbol tokDeclEnd
+
+lexBlockStartF :: LexerF (Token tokBlockStart)
+lexBlockStartF = symbol tokBlockStart
+
+lexBlockEndF :: LexerF (Token tokBlockEnd)
+lexBlockEndF = symbol tokBlockEnd
 
 ------------------------------------------
 -- Operators
@@ -431,7 +434,6 @@ lexTrueF = LitBool True . rangeOf <$> symbol tokTrue
 
 lexFalseF :: LexerF Lit
 lexFalseF = LitBool False . rangeOf <$> symbol tokFalse
-
 lexIntF :: LexerF Lit
 lexIntF = uncurry LitInt . second rangeOf <$> lexeme Lex.decimal
 
@@ -484,7 +486,7 @@ withRange p = do
 -- NOTE : make sure no space consumed after parser m
 notFollowedBySymbolF :: LexerF a -> LexerF a
 notFollowedBySymbolF m = ParseFunc
-  (\sc' -> (↓) m (return ()) <* notFollowedBy (satisfy isSymbol) <* sc')
+  (\sc' -> unParseFunc m (return ()) <* notFollowedBy (satisfy isSymbol) <* sc')
 
 withPredicate :: (a -> Bool) -> Lexer a -> Lexer a
 withPredicate f p = do

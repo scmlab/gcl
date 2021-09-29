@@ -1,28 +1,25 @@
 module Syntax.Abstract.Instances.Located where
 
 import           Data.Loc
-import           Syntax.Common                  ( )
-import           Syntax.Abstract.Types
 import           Prelude                 hiding ( Ordering(..) )
+import           Syntax.Abstract.Types
+import           Syntax.Common                  ( )
 
 instance Located Program where
-  locOf (Program _ _ _ _ _ l) = l
+  locOf (Program _ _ _ _ l) = l
 
 instance Located Declaration where
   locOf (ConstDecl _ _ _ l) = l
   locOf (VarDecl   _ _ _ l) = l
 
-instance Located LetDeclaration where
-  locOf (LetDecl _ _ _ l) = l
+instance Located FuncDefn where
+  locOf (FuncDefn _ _ l) = l
 
-instance Located TypeDeclaration where
-  locOf (TypeDecl _ _ l) = l
+instance Located TypeDefn where
+  locOf (TypeDefn _ _ _ l) = l
 
-instance Located QTyCon where
-  locOf (QTyCon l r) = l <--> r
-
-instance Located QDCon where
-  locOf (QDCon l r) = l <--> r
+instance Located TypeDefnCtor where
+  locOf (TypeDefnCtor l r) = l <--> r
 
 instance Located Stmt where
   locOf (Skip  l            ) = l
@@ -39,6 +36,7 @@ instance Located Stmt where
   locOf (HLookup _ _ l      ) = l
   locOf (HMutate _ _ l      ) = l
   locOf (Dispose _ l        ) = l
+  locOf (Block   _ l        ) = l
 
 instance Located GdCmd where
   locOf (GdCmd _ _ l) = l
@@ -54,7 +52,7 @@ instance Located Type where
   locOf (TBase _ l   ) = l
   locOf (TArray _ _ l) = l
   locOf (TFunc  _ _ l) = l
-  locOf (TCon l      ) = locOf l
+  locOf (TCon   _ _ l) = locOf l
   locOf (TVar _ l    ) = l
 
 instance Located Expr where

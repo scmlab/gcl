@@ -77,12 +77,10 @@ runWP
 runWP p decls = runExcept $ evalRWST p decls (0, 0, 0)
 
 sweep :: A.Program -> Either StructError ([PO], [Spec], [StructWarning])
-sweep (A.Program _ decls _ defns stmts _) = do
-  let scope = Map.mapKeys nameToText $ A.extractDeclarations decls defns
+sweep program@(A.Program _ _ _props stmts _) = do
+  let scope = A.programToScopeForSubstitution program
   (_, (pos, specs, warnings)) <- runWP (structProgram stmts) scope
   -- update Proof Obligations with corresponding Proof Anchors
-
-
   let proofAnchors = stmts >>= \case
         A.Proof anchors _ -> anchors
         _                 -> []
@@ -303,8 +301,8 @@ struct (inv, Just bnd) (A.Do gcmds l) post = do
         , originLoc              = l
         }
   let explainTermination = Explain
-        { originHeader      = "Loop Termination"
-        , originExplanation =
+        { originHeader           = "Loop Termination"
+        , originExplanation      =
           "When the loop invariant"
           <> (codeE . render) inv
           <> "and one of the guards"
@@ -313,9 +311,9 @@ struct (inv, Just bnd) (A.Do gcmds l) post = do
           <> (codeE . render) bnd
           <> "should be greater then"
           <> (codeE . render) (A.Lit (A.Num 0) NoLoc)
-        , originInfMode     = Primary
+        , originInfMode          = Primary
         , originHighlightPartial = True
-        , originLoc         = l
+        , originLoc              = l
         }
   tellPO (Conjunct (inv : map (Negate . guardLoop) guards))
          post
@@ -333,6 +331,8 @@ struct (inv, Nothing) (A.Do gcmds l) post = do
   tellPO (Conjunct (inv : map (Negate . guardLoop) guards)) post (AtLoop l)
   forM_ gcmds (structGdcmdInduct inv)
 struct _ (A.Proof _ _) _ = return ()
+-- TODO:
+struct _ A.Block{}     _ = return ()
 struct _ _             _ = error "missing case in struct"
 
 structGdcmdInduct :: Pred -> A.GdCmd -> WP ()
@@ -447,8 +447,9 @@ wp (A.Dispose e _) post = do
     {- wp (dispose e) P = (e -> _) * P -}
   e_allocated <- allocated e
   return $ Constant (e_allocated `A.sConj` toExpr post)
-
-wp _ _ = error "missing case in wp"
+-- TODO:
+wp A.Block{} post = return post
+wp _         _    = error "missing case in wp"
 
 allocated :: Fresh m => A.Expr -> m A.Expr
 allocated e = do

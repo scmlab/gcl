@@ -1,36 +1,34 @@
 module Syntax.Abstract.Util where
 
-import           Syntax.Abstract                ( Expr(Lam)
-                                                , GdCmd(..)
-                                                , Stmt
-                                                , Declaration(..)
-                                                , Defns
-                                                , LetDeclaration(..)
-                                                , TypeDeclaration(..)
-                                                , QDCon(..)
-                                                , Bindings(..)
-                                                , Type(..)
-                                                )
-import           Syntax.Common                  ( Name )
 import           Data.Loc                       ( (<-->)
+                                                , Located(locOfList)
                                                 , locOf
                                                 )
 import           Data.Map                       ( Map )
 import qualified Data.Map                      as Map
+import qualified Data.Maybe                    as Maybe
+import           Data.Text                      ( Text )
+import           Syntax.Abstract
+import           Syntax.Common                  ( Name
+                                                , nameToText
+                                                )
 
 extractAssertion :: Declaration -> Maybe Expr
 extractAssertion (ConstDecl _ _ e _) = e
 extractAssertion (VarDecl   _ _ e _) = e
 
-extractLetBinding :: LetDeclaration -> (Name, Expr)
-extractLetBinding (LetDecl name args expr _) = (name, wrapLam args expr)
--- TODO:
+funcDefnSigsToConstDecl :: FuncDefnSig -> [Declaration]
+funcDefnSigsToConstDecl (FuncDefnSig name t prop loc) =
+  [ConstDecl [name] t prop loc]
 
-extractQDCons :: TypeDeclaration -> [Declaration]
-extractQDCons (TypeDecl qty qdcons _) = map wrap qdcons
+typeDefnCtorsToConstDecl :: TypeDefn -> [Declaration]
+typeDefnCtorsToConstDecl (TypeDefn name binders qdcons _) = map wrap qdcons
  where
-  wrap (QDCon cn ts) =
-    ConstDecl [cn] (wrapTFunc ts (TCon qty)) Nothing (locOf cn)
+  wrap (TypeDefnCtor cn ts) = ConstDecl
+    [cn]
+    (wrapTFunc ts (TCon name binders (locOf name <--> locOfList binders)))
+    Nothing
+    (locOf cn)
 
 wrapTFunc :: [Type] -> Type -> Type
 wrapTFunc []       t  = t
@@ -47,25 +45,25 @@ wrapLam :: [Name] -> Expr -> Expr
 wrapLam []       body = body
 wrapLam (x : xs) body = let b = wrapLam xs body in Lam x b (x <--> b)
 
-bindingsToExpr :: Bindings -> Expr
-bindingsToExpr (AssignBinding e) = e
-bindingsToExpr (LetBinding    e) = e
-bindingsToExpr (BetaBinding   e) = e
-bindingsToExpr (AlphaBinding  e) = e
+-- function definition           => Just Expr 
+-- constant/variable declaration => Nothing 
 
-assignBindingToExpr :: Bindings -> Maybe Expr
-assignBindingToExpr (AssignBinding e) = Just e
-assignBindingToExpr _                 = Nothing
+-- TODO: 
+programToScopeForSubstitution :: Program -> Map Text (Maybe Expr)
+programToScopeForSubstitution (Program defns decls _ _ _) =
+  Map.mapKeys nameToText $ foldMap extractDeclaration decls <> Map.map
+    Maybe.listToMaybe
+    (defnFuncs defns)
+ where
+  extractDeclaration :: Declaration -> Map Name (Maybe Expr)
+  extractDeclaration (ConstDecl names _ _ _) =
+    Map.fromList (zip names (repeat Nothing))
+  extractDeclaration (VarDecl names _ _ _) =
+    Map.fromList (zip names (repeat Nothing))
 
-extractDeclaration :: Declaration -> Map Name (Maybe Expr)
-extractDeclaration (ConstDecl ns _ _ _) =
-  Map.fromList (zip ns (repeat Nothing))
-extractDeclaration (VarDecl ns _ _ _) = Map.fromList (zip ns (repeat Nothing))
---extractDeclaration (LetDecl n args body _) = Map.singleton n (Just (wrapLam args body))
-
--- extract type constructor to env
---extractDeclaration (TypeDecl _ cons _) = Map.fromList $ map (\(QDCon n _) -> (n, Nothing)) cons
-
-extractDeclarations :: [Declaration] -> Defns -> Map Name (Maybe Expr)
-extractDeclarations decls defns =
-  foldMap extractDeclaration decls <> Map.map Just defns
+collectFuncDefns :: [FuncDefn] -> Map Name [Expr]
+collectFuncDefns = Map.fromListWith mergeFuncDefnsOfTheSameName
+  . map (\(FuncDefn name clauses _) -> (name, map (uncurry wrapLam) clauses))
+ where
+  mergeFuncDefnsOfTheSameName :: [Expr] -> [Expr] -> [Expr]
+  mergeFuncDefnsOfTheSameName = (<>)

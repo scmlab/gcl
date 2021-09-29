@@ -16,6 +16,9 @@ import           Syntax.Abstract
 
 import           Control.Monad.Except
 import           Control.Monad.Reader
+import           Data.Loc                       ( Located
+                                                , locOf
+                                                )
 import           Data.Map                       ( Map )
 import qualified Data.Map                      as Map
 import           Data.Maybe                     ( listToMaybe
@@ -25,12 +28,9 @@ import           Data.Text                      ( Text )
 import qualified GCL.Type                      as Type
 import           Language.LSP.Types      hiding ( Range )
 import           Pretty                         ( toText )
+import           Render
 import           Server.DSL
 import           Syntax.Common
-import           Render
-import           Data.Loc                       ( locOf
-                                                , Located
-                                                )
 
 ignoreErrors :: Either [Error] (Maybe Hover) -> Maybe Hover
 ignoreErrors (Left  _errors  ) = Nothing
@@ -57,25 +57,6 @@ instance Render HoverResult where
 
 --------------------------------------------------------------------------------
 
--- -- | A "Scope" is a mapping of names and HoverResults
--- type Scope = Map Text HoverResult
-
--- -- | See if a name is in the scope
--- lookupScope :: Scope -> Name -> Maybe HoverResult
--- lookupScope scope name = Map.lookup (nameToText name) scope
-
--- -- | See if a name is in a series of scopes (from local to global)
--- -- | Return the first result (which should be the most local target)
--- lookupScopes :: [Scope] -> Name -> Maybe HoverResult
--- lookupScopes scopes name = foldl findFirst Nothing scopes
---  where
---   findFirst :: Maybe HoverResult -> Scope -> Maybe HoverResult
---   findFirst (Just found) _     = Just found
---   findFirst Nothing      scope = lookupScope scope name
-
-
---------------------------------------------------------------------------------
-
 type HoverM = ReaderT Position (ReaderT [Scope HoverResult] CmdM)
 
 instance HasPosition HoverM where
@@ -88,16 +69,15 @@ instance HasScopes HoverM HoverResult where
     lift $ local (scope :) $ runReaderT p pos
 
 runHoverM :: Program -> Position -> HoverM a -> CmdM a
-runHoverM (Program tdecls decls _ defns _ _) pos f = runReaderT
-  (runReaderT f pos)
-  [declScope]
+runHoverM (Program defns decls _ _ _) pos f = runReaderT (runReaderT f pos)
+                                                         [declScope]
  where
   declScope :: Map Text HoverResult
-  declScope = case Type.runTM (Type.declsToEnv tdecls decls defns) of
+  declScope = case Type.runTM (Type.defnsAndDeclsToEnv defns decls) of
     -- ignore type errors
     Left _ -> Map.empty
     Right env ->
-      Map.mapKeys nameToText $ Map.map typeToHoverResult (Type.localDecls env)
+      Map.mapKeys nameToText $ Map.map typeToHoverResult (Type.envLocalDefns env)
 
 typeToHoverResult :: Type -> HoverResult
 typeToHoverResult t = Result { resultHover = hover, resultType = t }
@@ -122,17 +102,19 @@ instance StabM HoverM Declaration HoverResult where
     ConstDecl a _ c _ -> (<>) <$> stabLocated a <*> stabLocated c
     VarDecl   a _ c _ -> (<>) <$> stabLocated a <*> stabLocated c
 
-instance StabM HoverM LetDeclaration HoverResult where
-  stabM (LetDecl name args body _) = do
+instance StabM HoverM FuncDefn HoverResult where
+  stabM (FuncDefn name clauses _) = do
     name' <- stabLocated name
-    -- creates a local scope for arguments
-    args' <- stabLocated (toArgs name args)
-    let argsScope = Map.fromList $ zip (map nameToText args) args'
-    -- temporarily prepend this local scope to the scope stack
-    body' <- pushScope argsScope $ stabLocated body
 
-    return $ concat [name', args', body']
-    -- TODO: hover type declaration
+    results <- forM clauses $ \(args, body) -> do
+      -- creates a local scope for arguments
+      args' <- stabLocated (toArgs name args)
+      let argsScope = Map.fromList $ zip (map nameToText args) args'
+      -- temporarily prepend this local scope to the scope stack
+      body' <- pushScope argsScope $ stabLocated body
+      return $ args' <> body'
+
+    return $ name' <> concat results
 
 instance StabM HoverM Expr HoverResult where
   stabM = \case
@@ -170,9 +152,8 @@ instance StabM HoverM Name HoverResult where
       Just hoverResult -> return [hoverResult]
 
 instance StabM HoverM Program HoverResult where
-  stabM (Program _ decls _ _ stmts _) =
+  stabM (Program _ decls _ stmts _) =
     (<>) <$> stabLocated decls <*> stabLocated stmts
-
 
 --------------------------------------------------------------------------------
 
@@ -194,12 +175,6 @@ instance StabM HoverM Arg HoverResult where
       Nothing -> return []
       Just (Result _ t) ->
         return $ map typeToHoverResult $ maybeToList $ locateArgType t index
-
-    -- scopes <- askScopes
-    -- case lookupScopes scopes func of
-    --   Nothing -> return []
-    --   Just (Result _ t) ->
-    --     return $ map typeToHoverResult $ maybeToList $ locateArgType t index
 
    where
       -- given the type of a function and the index of one of its argument

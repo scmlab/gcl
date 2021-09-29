@@ -1,16 +1,15 @@
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE RoleAnnotations #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE DeriveFunctor #-}
 
 module Syntax.Parser.Util where
 
 import Control.Applicative (Alternative (..))
 import Control.Monad (MonadPlus)
 import Control.Monad.Trans (MonadTrans, lift)
-import Data.Coerce (coerce)
 import Data.Loc (posCol)
 import qualified Data.Loc as Loc
 import Data.Text (Text)
@@ -22,47 +21,34 @@ import Text.Megaparsec.Error (parseErrorTextPretty)
 -- wrap new type for parser
 ------------------------------------------
 
-type role ParseFunc _ nominal
-
-newtype ParseFunc m a = ParseFunc {parser :: m () -> m a}
-
-(↑) :: (m () -> m a) -> ParseFunc m a
-(↑) = coerce
-
-(↓) :: ParseFunc m a -> (m () -> m a)
-(↓) = coerce
-
-liftP :: m a -> ParseFunc m a
-liftP = (↑) . const
-
-instance Functor m => Functor (ParseFunc m) where
-  fmap f p = (↑) $ fmap f . parser p
+newtype ParseFunc m a = ParseFunc { unParseFunc :: m () -> m a} 
+  deriving (Functor)
 
 instance Applicative m => Applicative (ParseFunc m) where
-  pure = liftP . pure
-  pf <*> pa = (↑) (\sc' -> parser pf sc' <*> parser pa sc')
+  pure = ParseFunc . const . pure
+  pf <*> pa = ParseFunc (\sc' -> unParseFunc pf sc' <*> unParseFunc pa sc')
 
 instance Alternative m => Alternative (ParseFunc m) where
-  empty = (↑) (const empty)
-  pa <|> pb = (↑) (\sc' -> parser pa sc' <|> parser pb sc')
+  empty = ParseFunc (const empty)
+  pa <|> pb = ParseFunc (\sc' -> unParseFunc pa sc' <|> unParseFunc pb sc')
 
 instance Monad m => Monad (ParseFunc m) where
-  pa >>= f = (↑) (\sc -> parser pa sc >>= (\a -> parser (f a) sc))
+  pa >>= f = ParseFunc (\sc -> unParseFunc pa sc >>= (\a -> unParseFunc (f a) sc))
 
 instance MonadPlus m => MonadPlus (ParseFunc m)
 
 instance MonadTrans ParseFunc where
-  lift = liftP
+  lift = ParseFunc . const
 
 instance MonadParsec e s m => MonadParsec e s (ParseFunc m) where
   parseError = lift . parseError
-  label s p = (↑) (label s . parser p)
-  hidden p = (↑) (hidden . parser p)
-  try p = (↑) (try . parser p)
-  lookAhead p = (↑) (lookAhead . parser p)
-  notFollowedBy p = (↑) (notFollowedBy . parser p)
-  withRecovery f p = (↑) (\sc' -> withRecovery (\err -> parser (f err) sc') (parser p sc'))
-  observing p = (↑) (observing . parser p)
+  label s p = ParseFunc (label s . unParseFunc p)
+  hidden p = ParseFunc (hidden . unParseFunc p)
+  try p = ParseFunc (try . unParseFunc p)
+  lookAhead p = ParseFunc (lookAhead . unParseFunc p)
+  notFollowedBy p = ParseFunc (notFollowedBy . unParseFunc p)
+  withRecovery f p = ParseFunc (\sc' -> withRecovery (\err -> unParseFunc (f err) sc') (unParseFunc p sc'))
+  observing p = ParseFunc (observing . unParseFunc p)
   eof = lift eof
   token f g = lift (token f g)
   tokens f t = lift (tokens f t)

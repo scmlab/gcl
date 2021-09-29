@@ -4,26 +4,29 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE TupleSections #-}
+
 module Syntax.Concrete.Instances.ToAbstract where
 
 import           Control.Monad.Except           ( Except
                                                 , throwError
                                                 )
-import           Data.Loc                       ( Loc(..)
-                                                , (<-->)
+import           Data.Bifunctor                 ( second )
+import           Data.Either                    ( partitionEithers )
+import           Data.Loc                       ( (<-->)
+                                                , Loc(..)
                                                 , Located(locOf)
                                                 )
-import           Syntax.Concrete.Types
-import           Syntax.Concrete.Instances.Located
-                                                ( )
+import           Data.Loc.Range
+import qualified Data.Map                      as Map
 import qualified Syntax.Abstract               as A
 import qualified Syntax.Abstract.Operator      as A
 import qualified Syntax.Abstract.Util          as A
-import qualified Syntax.ConstExpr              as ConstExpr
+import           Syntax.Abstract.Util
 import           Syntax.Common                  ( Name )
-import           Data.Loc.Range
-import           Data.Either                    ( partitionEithers )
+import           Syntax.Concrete.Instances.Located
+                                                ( )
+import           Syntax.Concrete.Types
+import qualified Syntax.ConstExpr              as ConstExpr
 
 --------------------------------------------------------------------------------
 
@@ -37,52 +40,95 @@ instance ToAbstract a b => ToAbstract (Maybe a) (Maybe b) where
 
 instance ToAbstract a b => ToAbstract [a] [b] where
   toAbstract = mapM toAbstract
---------------------------------------------------------------------------------
 
--- | Program / Declaration / Statement
+--------------------------------------------------------------------------------
+-- | Program
+
 instance ToAbstract Program A.Program where
   toAbstract prog@(Program ds stmts') = do
-    (tdecls, ds', lds) <- foldl (<>) ([], [], []) <$> toAbstract ds
-    let decls                   = ds' <> foldMap A.extractQDCons tdecls -- add constructors' type into declarations
-    let letBindings             = ConstExpr.pickLetBindings lds
+    (originalDecls, defns) <- foldl (<>) ([], mempty) <$> toAbstract ds
+
+    let funcDefnSigsAsConstDecl =
+          foldMap A.funcDefnSigsToConstDecl (A.defnFuncSigs defns)
+    let typeDefnCtorAsConstDecl =
+          foldMap A.typeDefnCtorsToConstDecl (A.defnTypes defns)
+    let decls =
+          originalDecls
+            <> funcDefnSigsAsConstDecl -- add type of functions into declarations
+            <> typeDefnCtorAsConstDecl -- add type of constructors' into declarations
+
     let (globProps, assertions) = ConstExpr.pickGlobals decls
     let pre =
           [ A.Assert (A.conjunct assertions) NoLoc | not (null assertions) ]
     stmts <- toAbstract stmts'
 
-    return $ A.Program tdecls
-                       decls
-                       globProps
-                       letBindings
-                       (pre ++ stmts)
-                       (locOf prog)
+    return $ A.Program defns decls globProps (pre ++ stmts) (locOf prog)
 
-instance ToAbstract Declaration (Either A.TypeDeclaration A.Declaration) where
+instance ToAbstract (Either Declaration DefinitionBlock) ([A.Declaration], A.Definitions) where
+  toAbstract (Left d) = do
+    decls <- toAbstract d
+    return ([decls], mempty)
+  toAbstract (Right defnBlock) = do
+    defns <- toAbstract defnBlock
+    return ([], defns)
+
+--------------------------------------------------------------------------------
+-- | Definition 
+
+instance ToAbstract DefinitionBlock A.Definitions where
+  toAbstract (DefinitionBlock _ decls _) = do
+    (typeDefns, (funcDefnSigs, funcDefns)) <-
+      second partitionEithers . partitionEithers <$> toAbstract decls
+
+    -- invariant: there should be only ONE TypeDefn of the same name 
+    let defnTypes =
+          Map.fromList $ map (\x@(A.TypeDefn name _ _ _) -> (name, x)) typeDefns
+    -- invariant: there should be only ONE FuncDefnSig of the same name 
+    let defnFuncSigs = Map.fromList $ map
+          (\x@(A.FuncDefnSig name _ _ _) -> (name, x))
+          (concat funcDefnSigs)
+
+
+    return $ A.Definitions { A.defnTypes    = defnTypes
+                           , A.defnFuncSigs = defnFuncSigs
+                           , A.defnFuncs    = collectFuncDefns funcDefns
+                           }
+
+instance ToAbstract Definition (Either A.TypeDefn (Either [A.FuncDefnSig] A.FuncDefn)) where
+  toAbstract (TypeDefn tok name binders _ cons) = do
+    Left
+      <$> (A.TypeDefn name binders <$> toAbstract (fromSepBy cons) <*> pure
+            (tok <--> cons)
+          )
+  toAbstract (FuncDefnSig decl prop) = do
+    (names, typ) <- toAbstract decl
+    Right
+      .   Left
+      <$> mapM
+            (\name -> A.FuncDefnSig name typ <$> toAbstract prop <*> pure
+              (decl <--> prop)
+            )
+            names
+  toAbstract (FuncDefn decl) = Right . Right <$> toAbstract decl
+
+
+instance ToAbstract TypeDefnCtor A.TypeDefnCtor where
+  toAbstract (TypeDefnCtor c ts) = A.TypeDefnCtor c <$> toAbstract ts
+
+--------------------------------------------------------------------------------
+-- | Declaraion
+
+instance ToAbstract Declaration A.Declaration where
   toAbstract d = case d of
     ConstDecl _ decl -> do
       (name, body, prop) <- toAbstract decl
-      return . Right $ A.ConstDecl name body prop (locOf d)
+      return $ A.ConstDecl name body prop (locOf d)
     VarDecl _ decl -> do
       (name, body, prop) <- toAbstract decl
-      return . Right $ A.VarDecl name body prop (locOf d)
-    TypeDecl _ tycon _ cons -> do
-      Left
-        <$> (   A.TypeDecl
-            <$> toAbstract tycon
-            <*> toAbstract (fromSepBy cons)
-            <*> pure (locOf d)
-            )
+      return $ A.VarDecl name body prop (locOf d)
 
-
-instance ToAbstract BlockDeclaration ([A.Declaration], [A.LetDeclaration]) where
-  toAbstract (BlockDeclaration _ decls _) =
-    partitionEithers <$> toAbstract decls
-
-instance ToAbstract QTyCon A.QTyCon where
-  toAbstract (QTyCon n ns) = pure $ A.QTyCon n ns
-
-instance ToAbstract QDCon A.QDCon where
-  toAbstract (QDCon c ts) = A.QDCon c <$> toAbstract ts
+--------------------------------------------------------------------------------
+-- | Statement 
 
 instance ToAbstract Stmt A.Stmt where
   toAbstract stmt = case stmt of
@@ -107,6 +153,7 @@ instance ToAbstract Stmt A.Stmt where
     HMutate _ e1 _ e2 ->
       A.HMutate <$> toAbstract e1 <*> toAbstract e2 <*> pure (locOf stmt)
     Dispose _ e -> A.Dispose <$> toAbstract e <*> pure (locOf stmt)
+    Block _ p _ -> A.Block <$> toAbstract p <*> pure (locOf stmt)
 
 instance ToAbstract GdCmd A.GdCmd where
   toAbstract (GdCmd a _ b) =
@@ -132,28 +179,10 @@ instance ToAbstract DeclType ([Name], A.Type, Maybe A.Expr) where
     e       <- toAbstract prop
     return (ns, t, e)
 
-instance ToAbstract BlockDeclProp A.Expr where
-  toAbstract (Left  prop) = toAbstract prop
-  toAbstract (Right prop) = toAbstract prop
-
-instance ToAbstract DeclBody A.LetDeclaration where
-  toAbstract d@(DeclBody n args _ b) = do
-    A.LetDecl n args <$> toAbstract b <*> pure (locOf d)
-
-instance ToAbstract BlockDeclType A.Declaration where
-  toAbstract d@(BlockDeclType decl prop) = do
-    (ns, t) <- toAbstract decl
-    A.ConstDecl ns t <$> toAbstract prop <*> pure (locOf d)
-
--- One BlockDecl can be parse into a ConstDecl or a ConstDecl and a LetDecl
-instance ToAbstract BlockDecl (Either A.Declaration A.LetDeclaration) where
-  toAbstract (Left  decl) = Left <$> toAbstract decl
-  toAbstract (Right decl) = Right <$> toAbstract decl
-
-instance ToAbstract Declaration' ([A.TypeDeclaration], [A.Declaration], [A.LetDeclaration]) where
-  toAbstract (Left d) =
-    uncurry (, , []) . partitionEithers . (: []) <$> toAbstract d
-  toAbstract (Right bd) = uncurry ([], , ) <$> toAbstract bd
+instance ToAbstract DeclBody A.FuncDefn where
+  toAbstract d@(DeclBody n args _ body) = do
+    body' <- toAbstract body
+    return $ A.FuncDefn n [(args, body')] (locOf d)
 
 --------------------------------------------------------------------------------
 
@@ -185,7 +214,7 @@ instance ToAbstract Type A.Type where
       A.TArray <$> toAbstract a <*> toAbstract b <*> pure (locOf t)
     (TFunc a _ b) ->
       A.TFunc <$> toAbstract a <*> toAbstract b <*> pure (locOf t)
-    (TCon a      ) -> A.TCon <$> toAbstract a
+    (TCon a b    ) -> return $ A.TCon a b (a <--> b)
     (TVar a      ) -> pure $ A.TVar a (locOf t)
     (TParen _ a _) -> do
       t' <- toAbstract a
@@ -193,7 +222,7 @@ instance ToAbstract Type A.Type where
         A.TBase a' _     -> pure $ A.TBase a' (locOf t)
         A.TArray a' b' _ -> pure $ A.TArray a' b' (locOf t)
         A.TFunc  a' b' _ -> pure $ A.TFunc a' b' (locOf t)
-        A.TCon a'        -> pure $ A.TCon a'
+        A.TCon   a' b' _ -> pure $ A.TCon a' b' (locOf t)
         A.TVar a' _      -> pure $ A.TVar a' (locOf t)
 
 --------------------------------------------------------------------------------
