@@ -170,7 +170,7 @@ declaration = testGroup
   , testCase "block declaration 1" $ runBlock
     "{:\n\
         \   A, B : Int\n\
-        \     A > 0\n\
+        \     { A > 0 }\n\
         \:}"
   , testCase "block declaration 1"
     $ runBlock "{:\n\
@@ -179,7 +179,7 @@ declaration = testGroup
   , testCase "block declaration 2" $ runBlock
     "{:\n\
         \   A, B : Int\n\
-        \     {A > 0}\n\
+        \     { A > 0 }\n\
         \:}"
   , testCase "block declaration 3"
     $ runBlock
