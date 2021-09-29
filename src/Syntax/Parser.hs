@@ -76,11 +76,18 @@ runParse p filepath s = case parse p filepath s of
 pProgram :: Parser Program
 pProgram = do
   scn
-  Program <$> many (eitherP pDeclaration pBlockDeclaration) <*> pStmts <* eof
+  parser pProgram' scn
+  where
+    pProgram' = Program <$> pDeclarations' <*> pStmts' <* eof
 
 ------------------------------------------
 -- parse Declaration
 ------------------------------------------
+
+pDeclarations' :: ParserF [Declaration'] 
+pDeclarations' = pIndentBlock (eitherP pDeclaration' pBlockDeclaration')
+  where
+    pDeclaration' = lift pDeclaration
 
 pDeclaration :: Parser Declaration
 pDeclaration = Lex.lineFold scn (parser p)
@@ -141,9 +148,11 @@ pBlockDeclType =
 ------------------------------------------
 
 pStmts :: Parser [Stmt]
-pStmts = (↓) (pIndentBlock (lift pStmt)) scn <|> return []
--- pStmts = many (pStmt <* scn)
+pStmts = parser pStmts' scn
+  -- (↓) (pIndentBlock (lift pStmt)) scn <|> return []
 
+pStmts' :: ParserF [Stmt] 
+pStmts' = pIndentBlock (lift pStmt) 
 
 -- NOTE :: this function doesn't consume newline after finish parsing the statement
 pStmt :: Parser Stmt
