@@ -38,7 +38,6 @@ import           Text.Megaparsec                ( MonadParsec(..)
                                                 , (<?>)
                                                 , manyTill_
                                                 )
-import           Text.Megaparsec.Char           ( eol )
 import qualified Text.Megaparsec.Char.Lexer    as Lex
 import           Data.Bifunctor                 ( second )
 import           Data.Loc.Range                 ( rangeOf )
@@ -529,20 +528,7 @@ pIndentBlock
      ParserF [a]
 pIndentBlock p = do
   pos <- Lex.indentLevel
-  mp0 <- optional . try . lift $ p'
-
-  case mp0 of
-    Just p0 -> do
-      isEol <- optional . try $ eol
-      done  <- isJust <$> optional eof
-      case (isEol, done) of
-        (Just _, False) -> do
-          ps <- lift $ indentedItems pos scn p'
-          return (p0 : ps)
-        _ -> do
-          return [p0]                          -- eof or no newline => only one indented element
-    Nothing -> return []
-  where p' = (↓) p sc                             -- make sure p doesn't parse newline
+  indentedItems pos (lift scn) p
 
 -- copied from Text.Megaparsec.Char.Lexer
 indentedItems :: (MonadParsec e s m) => Pos -> m () -> m b -> m [b]
@@ -552,8 +538,6 @@ indentedItems lvl sc' p = go
     sc'
     pos  <- Lex.indentLevel
     done <- isJust <$> optional eof
-    if done
-      then return []
-      else if pos == lvl
-        then try ((:) <$> p <*> go) <|> return []
-        else return []
+    if not done && pos == lvl
+      then try ((:) <$> p <*> go) <|> return []
+      else return []
