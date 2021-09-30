@@ -14,7 +14,6 @@ module Render.Element
   , textE
   , codeE
   , linkE
-  , substE
   , expandE
   , parensE
   , iconE
@@ -155,8 +154,6 @@ isEmpty inlines = all elemIsEmpty (Seq.viewl (unInlines inlines))
   elemIsEmpty (Snpt xs    ) = isEmpty xs
   elemIsEmpty (Text _ _   ) = False
   elemIsEmpty (Link _ xs _) = all elemIsEmpty $ unInlines xs
-  elemIsEmpty (Sbst xs env ys _) =
-    all elemIsEmpty $ unInlines xs <> unInlines env <> unInlines ys
   elemIsEmpty (Expn xs _ ys) = all elemIsEmpty $ unInlines xs <> unInlines ys
   elemIsEmpty (Horz xs     ) = all isEmpty xs
   elemIsEmpty (Vert xs     ) = all isEmpty xs
@@ -182,10 +179,6 @@ codeE xs = Inlines $ Seq.singleton $ Snpt xs
 -- | Text with source location
 linkE :: Range -> Inlines -> Inlines
 linkE range xs = Inlines $ Seq.singleton $ Link range xs []
-
--- | Text that changes after clicked
-substE :: Inlines -> Inlines -> Inlines -> Inlines
-substE before env after = Inlines $ Seq.singleton $ Sbst before env after []
 
 expandE :: Inlines -> Inlines -> Inlines -> Inlines
 expandE before mapping after =
@@ -229,8 +222,6 @@ data Inline
   -- | "Snippet" for inline code 
   | Snpt Inlines
   | Link Range Inlines ClassNames
-  | -- | For Subst
-    Sbst Inlines Inlines Inlines ClassNames
   | -- | For Expand
     Expn Inlines Inlines Inlines
   | -- | Horizontal grouping, wrap when there's no space
@@ -253,7 +244,6 @@ instance Pretty Inline where
   pretty (Text s _   ) = pretty s
   pretty (Snpt s     ) = pretty s
   pretty (Link _ xs _) = pretty xs
-  pretty Sbst{}        = mempty
   pretty (Expn xs _ _) = pretty xs
   pretty (Horz xs    ) = Pretty.hcat (map pretty $ toList xs)
   pretty (Vert xs    ) = Pretty.vcat (map pretty $ toList xs)
