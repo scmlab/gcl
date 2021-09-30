@@ -179,8 +179,8 @@ instance PrettyWithLoc Definition where
       <> prettyWithLoc qdcons
   prettyWithLoc (FuncDefnSig base prop) =
     prettyWithLoc base <> maybe Empty prettyWithLoc prop
-  prettyWithLoc (FuncDefn x) = prettyWithLoc x
-
+  prettyWithLoc (FuncDefn n args e b) = prettyWithLoc n <> prettyWithLoc args <> prettyWithLoc e <> prettyWithLoc b
+    
 --------------------------------------------------------------------------------
 
 -- | Declaration
@@ -204,13 +204,6 @@ instance Pretty DeclType where
 instance PrettyWithLoc DeclType where
   prettyWithLoc (DeclType decl prop) =
     prettyWithLoc decl <> maybe Empty prettyWithLoc prop
-
-instance Pretty DeclBody where
-  pretty = toDoc . prettyWithLoc
-
-instance PrettyWithLoc DeclBody where
-  prettyWithLoc (DeclBody n args e b) =
-    prettyWithLoc n <> prettyWithLoc args <> prettyWithLoc e <> prettyWithLoc b
 
 instance Pretty Declaration where
   pretty = toDoc . prettyWithLoc

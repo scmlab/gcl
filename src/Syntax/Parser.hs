@@ -126,9 +126,7 @@ pDefinitionF = lift $ Lex.lineFold
   (unParseFunc (choice [try pFuncDefnSigF, pTypeDefnF, pFuncDefnF]))
  where
   pFuncDefnSigF = FuncDefnSig <$> pDeclBaseF lexNameF <*> optional pDeclPropF
-  pFuncDefnF    = FuncDefn <$> pDeclBodyF
-  pDeclBodyF =
-    DeclBody <$> lexNameF <*> many lexLowerNameF <*> lexEqualF <*> pExprF
+  pFuncDefnF    = FuncDefn <$> lexNameF <*> many lexLowerNameF <*> lexEqualF <*> pExprF
 
 -- `n : type`
 pDeclBaseF :: ParserF Name -> ParserF DeclBase
