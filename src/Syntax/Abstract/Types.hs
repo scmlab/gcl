@@ -149,6 +149,15 @@ type QuantOp' = Either Op Expr
 
 type Mapping = Map Text Expr
 
+--------------------------------------------------------------------------------
+-- | Pattern matching
+
+data Pattern
+  = PattBinder Name -- binder
+  | PattWildcard Range -- matches anything 
+  | PattConstructor Name [Pattern] -- destructs a constructor
+  deriving (Eq, Show, Generic)
+
 ----------------------------------------------------------------
 
 -- | Literals

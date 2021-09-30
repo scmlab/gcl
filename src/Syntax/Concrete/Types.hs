@@ -167,6 +167,21 @@ data Expr
 type QuantOp' = Either Op Expr
 
 --------------------------------------------------------------------------------
+-- | Pattern matching 
+
+data Pattern 
+  = PattParen (Token "(") Pattern (Token ")") -- pattern wrapped inside a pair of parenthesis
+  | PattBinder Name -- binder
+  | PattWildcard (Token "_") -- matches anything 
+  | PattConstructor Name [Pattern] -- destructs a constructor
+  deriving (Eq, Show)
+
+-- | CaseOf
+--     Expr              -- case expr of 
+--     [(Pattern, Expr)] -- pattern -> expr 
+--     Loc
+
+--------------------------------------------------------------------------------
 
 -- | Literals (Integer / Boolean / Character)
 data Lit = LitInt Int Range | LitBool Bool Range | LitChar Char Range

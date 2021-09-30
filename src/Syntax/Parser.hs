@@ -328,9 +328,9 @@ pEndpointClose =
   try (IncludingClosing <$> pExpr' <*> lexBracketEnd)
     <|> (ExcludingClosing <$> pExpr' <*> lexParenEnd)
 
-------------------------------------------
--- parse Expr
-------------------------------------------
+--------------------------------------------------------------------------------
+-- | Expressions 
+--------------------------------------------------------------------------------
 
 pExpr :: Parser Expr
 pExpr = unParseFunc pExpr' scn <?> "expression"
@@ -445,6 +445,13 @@ pUnary m = do
   -- NOTE: operator cannot be followed by any symbol
   op <- try (notFollowedBySymbol m)
   return $ \x -> App (Op op) x
+
+--------------------------------------------------------------------------------
+-- | Pattern Matching  
+--------------------------------------------------------------------------------
+
+pPatterns :: ParserF Pattern 
+pPatterns = Paren <$> lexParenStart <*> pExpr' <*> lexParenEnd
 
 ------------------------------------------
 -- combinators
