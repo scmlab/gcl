@@ -169,10 +169,10 @@ definition = testGroup
     $ run "{:\n\
         \   A, B : Int {A > 0}\n\
         \:}"
-  , testCase "definition (with prop) 2"
-    $ run "{:\n\
+  , testCase "definition (with prop) 2" $ run
+    "{:\n\
         \   A, B : Int\n\
-        \     {A > 0}\n\
+        \     { A > 0 }\n\
         \:}"
   , testCase "definition 3"
     $ run

@@ -109,8 +109,9 @@ instance ToAbstract Definition (Either A.TypeDefn (Either [A.FuncDefnSig] A.Func
               (decl <--> prop)
             )
             names
-  toAbstract (FuncDefn decl) = Right . Right <$> toAbstract decl
-
+  toAbstract (FuncDefn name args _ body) = do
+    body' <- toAbstract body
+    return $ Right $ Right $ A.FuncDefn name [(args, body')] (name <--> body)
 
 instance ToAbstract TypeDefnCtor A.TypeDefnCtor where
   toAbstract (TypeDefnCtor c ts) = A.TypeDefnCtor c <$> toAbstract ts
@@ -178,11 +179,6 @@ instance ToAbstract DeclType ([Name], A.Type, Maybe A.Expr) where
     (ns, t) <- toAbstract decl
     e       <- toAbstract prop
     return (ns, t, e)
-
-instance ToAbstract DeclBody A.FuncDefn where
-  toAbstract d@(DeclBody n args _ body) = do
-    body' <- toAbstract body
-    return $ A.FuncDefn n [(args, body')] (locOf d)
 
 --------------------------------------------------------------------------------
 

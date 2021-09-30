@@ -20,10 +20,6 @@ import           GCL.Type                       ( Environment(..)
                                                 , inferExpr
                                                 , runTM
                                                 )
-import           Pretty                         ( Pretty(pretty)
-                                                , toByteString
-                                                , toText
-                                                )
 import           Syntax.Abstract
 import qualified Syntax.Abstract.Util          as A
 import           Syntax.Common                  ( Name(Name)
@@ -38,6 +34,12 @@ import           Syntax.Parser                  ( Parser
                                                 , pStmts
                                                 , pType
                                                 , runParse
+                                                )
+import           Pretty                         ( Pretty(pretty)
+                                                , toText
+                                                , toByteString
+                                                , punctuate
+                                                , hsep
                                                 )
 import           Test.Tasty                     ( TestTree
                                                 , testGroup
@@ -183,13 +185,14 @@ declarationTests :: TestTree
 declarationTests = testGroup
   "Check Declaration"
   [ testCase "const declaration"
-    $ declarationCheck "con C : Int" "Environment[(C, Int)][][]"
+    $ declarationCheck "con C : Int" "Environment[(C, TVar Int)][][]"
   , testCase "const declaration w/ prop"
-    $ declarationCheck "con C : Int { C > 0 }" "Environment[(C, Int)][][]"
+    $ declarationCheck "con C : Int { C > 0 }" "Environment[(C, TVar Int)][][]"
   , testCase "var declaration"
-    $ declarationCheck "var x : Bool" "Environment[(x, Bool)][][]"
-  , testCase "var declaration w/ prop"
-    $ declarationCheck "var x : Bool { x = True }" "Environment[(x, Bool)][][]"
+    $ declarationCheck "var x : Bool" "Environment[(x, TVar Bool)][][]"
+  , testCase "var declaration w/ prop" $ declarationCheck
+    "var x : Bool { x = True }"
+    "Environment[(x, TVar Bool)][][]"
   ]
 
 definitionTests :: TestTree
@@ -202,20 +205,27 @@ definitionTests = testGroup
     "{:\n\
         \  A, B : Int\
         \:}"
-    "Environment[(A, Int), (B, Int)][][]"
-  , testCase "definition 2" $ blockDeclarationCheck
+    "Environment[(A, TVar Int), (B, TVar Int)][][]"
+  , testCase "block declaration 2" $ blockDeclarationCheck
     "{:\n\
         \  A, B : Int { A = 0 }\
         \:}"
-    "Environment[(A, Int), (B, Int)][][]"
-  , testCase "definition 4" $ blockDeclarationCheck
+    "Environment[(A, TVar Int), (B, TVar Int)][][]"
+  , testCase "block declaration 3" $ blockDeclarationCheck
     "{:\n\
-        \  A, B : Int { A = 0 }\n\
+        \  A, B : Int\n\
+        \    { A = 0 }\n\
+        \:}"
+    "Environment[(A, TVar Int), (B, TVar Int)][][]"
+  , testCase "block declaration 4" $ blockDeclarationCheck
+    "{:\n\
+        \  A, B : Int\n\
+        \    { A = 0 }\n\
         \  F : Int -> Int -> Int\n\
         \  P : Char -> Bool\n\
         \:}"
-    "Environment[(A, Int), (B, Int), (F, Int → Int → Int), (P, Char → Bool)][][]"
-  , testCase "definition 5" $ blockDeclarationCheck
+    "Environment[(A, TVar Int), (B, TVar Int), ( F\n, TVar Int → TVar Int → TVar Int ), (P, TVar Char → TVar Bool)][][]"
+  , testCase "block declaration 5" $ blockDeclarationCheck
     "{:\n\
         \   N = 5\n\
         \   N = 6\n\
@@ -411,7 +421,7 @@ programCheck t1 = toText wrap @?= "()"
       Right x   -> Right x
 
 instance (Pretty a, Pretty b) => Pretty (Map a b) where
-  pretty m = pretty $ Map.toList m
+  pretty m = "[" <> hsep (punctuate "," (map pretty (Map.toList m))) <> "]"
 
 instance Pretty Environment where
   pretty Environment {..} =

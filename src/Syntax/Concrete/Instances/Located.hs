@@ -33,9 +33,6 @@ instance Located DeclBase where
 instance Located DeclProp where
   locOf (DeclProp l _ r) = l <--> r
 
-instance Located DeclBody where
-  locOf (DeclBody l _ _ r) = l <--> r
-
 instance Located DeclType where
   locOf (DeclType l r) = l <--> r
 
