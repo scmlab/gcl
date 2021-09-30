@@ -225,6 +225,15 @@ instance Collect Lit J.SemanticTokenAbsolute where
   collect = toToken' J.SttNumber []
 
 --------------------------------------------------------------------------------
+-- Pattern 
+
+instance Collect Pattern J.SemanticTokenAbsolute where
+  collect (PattParen _ a _) = collect a
+  collect (PattBinder a) = collect (AsVariable a)
+  collect (PattWildcard tok) = toToken J.SttKeyword [] tok
+  collect (PattConstructor a bs) = toToken' J.SttEnumMember [] a <> (bs >>= collect)
+    
+--------------------------------------------------------------------------------
 -- Type
 
 instance Collect EndpointOpen J.SemanticTokenAbsolute where
