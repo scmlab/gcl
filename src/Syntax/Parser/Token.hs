@@ -284,6 +284,9 @@ tokTrue = "True"
 tokFalse :: Text
 tokFalse = "False"
 
+tokUnderscore :: Text
+tokUnderscore = "_"
+
 notLowerKeywords :: Text -> Bool
 notLowerKeywords t = t `notElem` lowerKeywords
 

@@ -446,12 +446,20 @@ pUnary m = do
   op <- try (notFollowedBySymbol m)
   return $ \x -> App (Op op) x
 
---------------------------------------------------------------------------------
--- | Pattern Matching  
---------------------------------------------------------------------------------
+------------------------------------------
+-- Pattern matching
+------------------------------------------
 
-pPatterns :: ParserF Pattern 
-pPatterns = Paren <$> lexParenStart <*> pExpr' <*> lexParenEnd
+pPattern :: Parser Pattern
+pPattern = unParseFunc pPatternF scn <?> "pattern"
+
+pPatternF :: ParserF Pattern 
+pPatternF = choice [
+    PattParen <$> lexParenStart <*> pPatternF <*> lexParenEnd,
+    PattWildcard <$> lexUnderscore,
+    PattBinder <$> lowerName, 
+    PattConstructor <$> upperName <*> many pPatternF
+  ] 
 
 ------------------------------------------
 -- combinators

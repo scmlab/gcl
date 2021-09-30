@@ -433,6 +433,9 @@ lexTypeBool = symbol tokTypeBool
 lexTypeChar :: LexerF (Token tokTypeChar)
 lexTypeChar = symbol tokTypeChar
 
+lexUnderscore :: LexerF (Token lexUnderscore)
+lexUnderscore = symbol tokUnderscore
+
 ------------------------------------------
 -- helper combinators
 ------------------------------------------

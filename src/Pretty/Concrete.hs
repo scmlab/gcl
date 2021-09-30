@@ -149,6 +149,10 @@ instance PrettyWithLoc (Token "|[") where
 
 instance PrettyWithLoc (Token "]|") where
   prettyWithLoc (Token l r) = DocWithLoc (pretty tokBlockEnd) l r
+
+instance PrettyWithLoc (Token "_") where
+  prettyWithLoc (Token l r) = DocWithLoc (pretty tokUnderscore) l r
+
 --------------------------------------------------------------------------------
 
 -- | Program
@@ -366,6 +370,19 @@ handleOp op = case classify op of
   Postfix _ -> do
     p <- var
     return $ prettyWithLoc p <> prettyWithLoc op
+
+--------------------------------------------------------------------------------
+-- | Pattern
+
+instance Pretty Pattern where
+  pretty = toDoc . prettyWithLoc
+
+instance PrettyWithLoc Pattern where
+  prettyWithLoc patt = case patt of
+    PattParen a b c     -> prettyWithLoc a <> prettyWithLoc b <> prettyWithLoc c
+    PattBinder   a      -> prettyWithLoc a
+    PattWildcard a      -> prettyWithLoc a
+    PattConstructor a b -> prettyWithLoc a <> prettyWithLoc b
 
 --------------------------------------------------------------------------------
 

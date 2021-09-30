@@ -7,15 +7,7 @@ import           Data.Text.Prettyprint.Doc      ( Pretty )
 import           Pretty                         ( toByteString
                                                 , toText
                                                 )
-import           Syntax.Parser                  ( Parser
-                                                , pDeclaration
-                                                , pDefinitionBlock
-                                                , pExpr
-                                                , pProgram
-                                                , pStmt
-                                                , pType
-                                                , runParse
-                                                )
+import           Syntax.Parser
 import           Syntax.Parser.Lexer            ( scn )
 import           Test.Tasty                     ( TestTree
                                                 , testGroup
@@ -33,7 +25,15 @@ import           Test.Util                      ( parseTest
 tests :: TestTree
 tests = testGroup
   "Parser"
-  [expression, type', definition, declaration, statement, parseError, golden]
+  [ expression
+  , pattern'
+  , type'
+  , definition
+  , declaration
+  , statement
+  , parseError
+  , golden
+  ]
 
 --------------------------------------------------------------------------------
 
@@ -116,6 +116,21 @@ expression = testGroup
   where run = parserIso (scn >> pExpr)
 
 --------------------------------------------------------------------------------
+-- | Pattern
+
+pattern' :: TestTree
+pattern' = testGroup
+  "Pattern"
+  [ testCase "pattern (binder)" $ run "a"
+  , testCase "pattern (wildcard)" $ run "_"
+  , testCase "pattern (constructor)" $ run "Just (Just a)"
+  , testCase "pattern (parenthesis 1)" $ run "(_)"
+  , testCase "pattern (parenthesis 2)" $ run "(a)"
+  , testCase "pattern (parenthesis 3)" $ run "(Just (Just a))"
+  ]
+  where run = parserIso (scn >> pPattern)
+
+--------------------------------------------------------------------------------
 
 -- | Type
 type' :: TestTree
@@ -147,8 +162,7 @@ definition = testGroup
   "Definitions"
   [ testCase "type definition 1" $ run "{:\ndata List a = Nil | Con a\n:}"
   , testCase "type definition 2" $ run "{:\ndata List a = Node (List a)\n:}"
-  , testCase "definition 1"
-    $ run "{:\n\
+  , testCase "definition 1" $ run "{:\n\
         \   A, B : Int\n\
         \:}"
   , testCase "definition (with prop) 1"
