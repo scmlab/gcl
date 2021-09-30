@@ -1,11 +1,11 @@
-INV [ A,B,0 / x,y,z ]
-  INV [ A,B,0 / x,y,z ] ===> (A * B) + 0 = A * B
+INV [ x,y,z \ A,B,0 ]
+  INV [ x,y,z \ A,B,0 ] ===> (A * B) + 0 = A * B
     
 INV
   INV ===> (x * y) + z = A * B
     
-INV [ x - 1 / x ] [ z + y / z ]
-  INV [ x - 1 / x ] [ z + y / z ] ===> ((x - 1) * y) + (z + y) = A * B
+INV [ x \ x - 1 ] [ z \ z + y ]
+  INV [ x \ x - 1 ] [ z \ z + y ] ===> ((x - 1) * y) + (z + y) = A * B
     
 INV
   INV ===> (x * y) + z = A * B

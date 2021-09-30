@@ -8,18 +8,18 @@ Q n
     sum i n
       sum i n ===> ⟨ Σ k : i ≤ k < n : f[k] ⟩
         
-P [ s ↑ r / s ] [ (r + f[n]) ↑ 0 / r ] (n + 1)
-  P [ s ↑ r / s ] [ (r + f[n]) ↑ 0 / r ] (n + 1) ===> s ↑ ((r + f[n]) ↑ 0) = ⟨ ↑ ij : 0 ≤ i ≤ j ≤ n + 1 : sum i j ⟩
+P [ s \ s ↑ r ] [ r \ (r + f[n]) ↑ 0 ] (n + 1)
+  P [ s \ s ↑ r ] [ r \ (r + f[n]) ↑ 0 ] (n + 1) ===> s ↑ ((r + f[n]) ↑ 0) = ⟨ ↑ ij : 0 ≤ i ≤ j ≤ n + 1 : sum i j ⟩
     sum i j
       sum i j ===> ⟨ Σ k : i ≤ k < j : f[k] ⟩
         
-Q [ (r + f[n]) ↑ 0 / r ] (n + 1)
-  Q [ (r + f[n]) ↑ 0 / r ] (n + 1) ===> (r + f[n]) ↑ 0 = ⟨ ↑ i : 0 ≤ i ≤ n + 1 : sum i (n + 1) ⟩
+Q [ r \ (r + f[n]) ↑ 0 ] (n + 1)
+  Q [ r \ (r + f[n]) ↑ 0 ] (n + 1) ===> (r + f[n]) ↑ 0 = ⟨ ↑ i : 0 ≤ i ≤ n + 1 : sum i (n + 1) ⟩
     sum i (n + 1)
       sum i (n + 1) ===> ⟨ Σ k : i ≤ k < n + 1 : f[k] ⟩
         
-P [ 0 / s ] 0
-  P [ 0 / s ] 0 ===> 0 = ⟨ ↑ ij : 0 ≤ i ≤ j ≤ 0 : sum i j ⟩
+P [ s \ 0 ] 0
+  P [ s \ 0 ] 0 ===> 0 = ⟨ ↑ ij : 0 ≤ i ≤ j ≤ 0 : sum i j ⟩
     sum i j
       sum i j ===> ⟨ Σ k : i ≤ k < j : f[k] ⟩
         
