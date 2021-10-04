@@ -8,7 +8,9 @@ instance ToJSON Interval
 instance ToJSON TBase
 instance ToJSON Type
 instance ToJSON Expr
+instance ToJSON Pattern 
 instance ToJSON Lit
 
 instance FromJSON Expr
+instance FromJSON Pattern 
 instance FromJSON Lit

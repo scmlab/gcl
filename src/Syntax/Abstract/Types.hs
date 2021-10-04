@@ -143,6 +143,7 @@ data Expr
   | Expand Expr Expr
   | ArrIdx Expr Expr Loc
   | ArrUpd Expr Expr Expr Loc
+  | CaseOf Expr [(Pattern, Expr)] Loc
   deriving (Eq, Show, Generic)
 
 type QuantOp' = Either Op Expr

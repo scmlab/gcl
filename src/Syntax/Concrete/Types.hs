@@ -174,11 +174,6 @@ data Pattern
   | PattConstructor Name [Pattern] -- destructs a constructor
   deriving (Eq, Show)
 
--- | CaseOf
---     Expr              -- case expr of 
---     [(Pattern, Expr)] -- pattern -> expr 
---     Loc
-
 --------------------------------------------------------------------------------
 
 -- | Literals (Integer / Boolean / Character)

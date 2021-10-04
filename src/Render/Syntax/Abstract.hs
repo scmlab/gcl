@@ -81,6 +81,11 @@ handleExpr _ (ArrIdx e1 e2 _) = return $ render e1 <> "[" <> render e2 <> "]"
 handleExpr _ (ArrUpd e1 e2 e3 _) =
   return $ "(" <+> render e1 <+> ":" <+> render e2 <+> "↣" <+> render e3 <+> ")"
     -- SCM: need to print parenthesis around e1 when necessary.
+handleExpr _ (CaseOf expr clauses _) =
+  let clauses' = map (\(p, e) -> render p <+> "->" <+> render e) clauses
+  in  return $ "case" <+> render expr <+> "of" <+> vertE clauses'
+
+
 
 instance Render Mapping where
   render env | null env  = mempty
@@ -88,6 +93,14 @@ instance Render Mapping where
    where
     vars  = punctuateE "," $ map render $ Map.keys env
     exprs = punctuateE "," $ map render $ Map.elems env
+
+--------------------------------------------------------------------------------
+
+instance Render Pattern where
+  render (PattBinder   a) = render a
+  render (PattWildcard _) = "_"
+  render (PattConstructor ctor patterns) =
+    render ctor <+> horzE (map render patterns)
 
 --------------------------------------------------------------------------------
 

@@ -304,6 +304,11 @@ instance Substitutable Expr where
         <*> subst mapping value
         <*> pure l
 
+    -- apply subst on body of clauses only
+    CaseOf e clauses l -> do
+      let (patterns, bodies) = unzip clauses
+      bodies' <- mapM (subst mapping) bodies
+      return $ CaseOf e (zip patterns bodies') l
 
 instance Substitutable Pred where
   subst mapping = \case
