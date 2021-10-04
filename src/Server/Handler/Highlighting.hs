@@ -112,7 +112,10 @@ instance Collect Definition J.SemanticTokenAbsolute where
       <> toToken' J.SttParameter [] binders
       <> (toList bs >>= collect)
   collect (FuncDefnSig a b) = collect a <> collect b 
-  collect (FuncDefn x) = collect x
+  collect (FuncDefn a bs _tok c) = 
+    toToken' J.SttFunction [J.StmDeclaration] a
+      <> (bs >>= collect . AsVariable)
+      <> collect c
 
 --------------------------------------------------------------------------------
 -- Declaration
@@ -131,11 +134,6 @@ instance Collect DeclProp J.SemanticTokenAbsolute where
   collect (DeclProp _tokA a _tokB) = collect a
 instance Collect DeclType J.SemanticTokenAbsolute where
   collect (DeclType a b) = collect a <> collect b
-instance Collect DeclBody J.SemanticTokenAbsolute where
-  collect (DeclBody a bs _tok c) =
-    toToken' J.SttFunction [J.StmDeclaration] a
-      <> (bs >>= collect . AsVariable)
-      <> collect c
 
 --------------------------------------------------------------------------------
 -- Stmt
@@ -224,6 +222,15 @@ instance Collect Expr J.SemanticTokenAbsolute where
 instance Collect Lit J.SemanticTokenAbsolute where
   collect = toToken' J.SttNumber []
 
+--------------------------------------------------------------------------------
+-- Pattern 
+
+instance Collect Pattern J.SemanticTokenAbsolute where
+  collect (PattParen _ a _) = collect a
+  collect (PattBinder a) = collect (AsVariable a)
+  collect (PattWildcard tok) = toToken J.SttKeyword [] tok
+  collect (PattConstructor a bs) = toToken' J.SttEnumMember [] a <> (bs >>= collect)
+    
 --------------------------------------------------------------------------------
 -- Type
 

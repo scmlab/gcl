@@ -4,7 +4,6 @@
 module Render.Syntax.Abstract where
 
 import qualified Data.Map                      as Map
-import           Data.Map                       ( Map )
 import           Pretty.Variadic                ( Variadic(..)
                                                 , var
                                                 )
@@ -15,7 +14,6 @@ import           Syntax.Abstract
 -- import           Syntax.Abstract.Util           ( assignBindingToExpr )
 import           Syntax.Common                  ( ArithOp(..)
                                                 , Fixity(..)
-                                                , Name
                                                 , Op(..)
                                                 , classify
                                                 )
@@ -84,19 +82,9 @@ handleExpr _ (ArrUpd e1 e2 e3 _) =
   return $ "(" <+> render e1 <+> ":" <+> render e2 <+> "↣" <+> render e3 <+> ")"
     -- SCM: need to print parenthesis around e1 when necessary.
 
--- instance Render Subst where
---   render = render . Map.mapMaybe assignBindingToExpr
-
 instance Render Mapping where
   render env | null env  = mempty
-             | otherwise = "[" <+> exprs <+> "/" <+> vars <+> "]"
-   where
-    vars  = punctuateE "," $ map render $ Map.keys env
-    exprs = punctuateE "," $ map render $ Map.elems env
-
-instance Render (Map Name Expr) where
-  render env | null env  = mempty
-             | otherwise = "[" <+> exprs <+> "/" <+> vars <+> "]"
+             | otherwise = "[" <+> vars <+> "\\" <+> exprs <+> "]"
    where
     vars  = punctuateE "," $ map render $ Map.keys env
     exprs = punctuateE "," $ map render $ Map.elems env

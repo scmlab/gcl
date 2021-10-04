@@ -149,6 +149,10 @@ instance PrettyWithLoc (Token "|[") where
 
 instance PrettyWithLoc (Token "]|") where
   prettyWithLoc (Token l r) = DocWithLoc (pretty tokBlockEnd) l r
+
+instance PrettyWithLoc (Token "_") where
+  prettyWithLoc (Token l r) = DocWithLoc (pretty tokUnderscore) l r
+
 --------------------------------------------------------------------------------
 
 -- | Program
@@ -179,8 +183,8 @@ instance PrettyWithLoc Definition where
       <> prettyWithLoc qdcons
   prettyWithLoc (FuncDefnSig base prop) =
     prettyWithLoc base <> maybe Empty prettyWithLoc prop
-  prettyWithLoc (FuncDefn x) = prettyWithLoc x
-
+  prettyWithLoc (FuncDefn n args e b) = prettyWithLoc n <> prettyWithLoc args <> prettyWithLoc e <> prettyWithLoc b
+    
 --------------------------------------------------------------------------------
 
 -- | Declaration
@@ -204,13 +208,6 @@ instance Pretty DeclType where
 instance PrettyWithLoc DeclType where
   prettyWithLoc (DeclType decl prop) =
     prettyWithLoc decl <> maybe Empty prettyWithLoc prop
-
-instance Pretty DeclBody where
-  pretty = toDoc . prettyWithLoc
-
-instance PrettyWithLoc DeclBody where
-  prettyWithLoc (DeclBody n args e b) =
-    prettyWithLoc n <> prettyWithLoc args <> prettyWithLoc e <> prettyWithLoc b
 
 instance Pretty Declaration where
   pretty = toDoc . prettyWithLoc
@@ -366,6 +363,19 @@ handleOp op = case classify op of
   Postfix _ -> do
     p <- var
     return $ prettyWithLoc p <> prettyWithLoc op
+
+--------------------------------------------------------------------------------
+-- | Pattern
+
+instance Pretty Pattern where
+  pretty = toDoc . prettyWithLoc
+
+instance PrettyWithLoc Pattern where
+  prettyWithLoc patt = case patt of
+    PattParen a b c     -> prettyWithLoc a <> prettyWithLoc b <> prettyWithLoc c
+    PattBinder   a      -> prettyWithLoc a
+    PattWildcard a      -> prettyWithLoc a
+    PattConstructor a b -> prettyWithLoc a <> prettyWithLoc b
 
 --------------------------------------------------------------------------------
 

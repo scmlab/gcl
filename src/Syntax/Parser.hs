@@ -133,9 +133,8 @@ pDefinitionF = lift $ Lex.lineFold
   (unParseFunc (choice [try pFuncDefnSigF, pTypeDefnF, pFuncDefnF]))
  where
   pFuncDefnSigF = FuncDefnSig <$> pDeclBaseF lexNameF <*> optional pDeclPropF
-  pFuncDefnF    = FuncDefn <$> pDeclBodyF
-  pDeclBodyF =
-    DeclBody <$> lexNameF <*> many lexLowerNameF <*> lexEqualF <*> pExprF
+  pFuncDefnF =
+    FuncDefn <$> lexNameF <*> many lexLowerNameF <*> lexEqualF <*> pExprF
 
 -- `n : type`
 pDeclBaseF :: ParserF Name -> ParserF DeclBase
@@ -295,9 +294,9 @@ pTypeF =
     try (IncludingClosing <$> pExprF <*> lexBracketEndF)
       <|> (ExcludingClosing <$> pExprF <*> lexParenEndF)
 
-------------------------------------------
--- parse Expr
-------------------------------------------
+--------------------------------------------------------------------------------
+-- | Expressions 
+--------------------------------------------------------------------------------
 
 pExpr :: Parser Expr
 pExpr = unParseFunc pExprF scn <?> "expression"
@@ -397,6 +396,21 @@ pExprF =
     -- NOTE: operator cannot be followed by any symbol
     op <- try (notFollowedBySymbolF m)
     return $ \x -> App (Op op) x
+
+------------------------------------------
+-- Pattern matching
+------------------------------------------
+
+pPattern :: Parser Pattern
+pPattern = unParseFunc pPatternF scn <?> "pattern"
+
+pPatternF :: ParserF Pattern
+pPatternF = choice
+  [ PattParen <$> lexParenStartF <*> pPatternF <*> lexParenEndF
+  , PattWildcard <$> lexUnderscore
+  , PattBinder <$> lexLowerNameF
+  , PattConstructor <$> lexUpperNameF <*> many pPatternF
+  ]
 
 ------------------------------------------
 -- combinators

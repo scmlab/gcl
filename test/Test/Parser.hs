@@ -7,15 +7,7 @@ import           Data.Text.Prettyprint.Doc      ( Pretty )
 import           Pretty                         ( toByteString
                                                 , toText
                                                 )
-import           Syntax.Parser                  ( Parser
-                                                , pDeclaration
-                                                , pDefinitionBlock
-                                                , pExpr
-                                                , pProgram
-                                                , pStmt
-                                                , pType
-                                                , runParse
-                                                )
+import           Syntax.Parser
 import           Syntax.Parser.Lexer            ( scn )
 import           Test.Tasty                     ( TestTree
                                                 , testGroup
@@ -33,7 +25,15 @@ import           Test.Util                      ( parseTest
 tests :: TestTree
 tests = testGroup
   "Parser"
-  [expression, type', definition, declaration, statement, parseError, golden]
+  [ expression
+  , pattern'
+  , type'
+  , definition
+  , declaration
+  , statement
+  , parseError
+  , golden
+  ]
 
 --------------------------------------------------------------------------------
 
@@ -114,6 +114,21 @@ expression = testGroup
   , testCase "mixed 10" $ run "3 / 2 + X"
   ]
   where run = parserIso (scn >> pExpr)
+
+--------------------------------------------------------------------------------
+-- | Pattern
+
+pattern' :: TestTree
+pattern' = testGroup
+  "Pattern"
+  [ testCase "pattern (binder)" $ run "a"
+  , testCase "pattern (wildcard)" $ run "_"
+  , testCase "pattern (constructor)" $ run "Just (Just a)"
+  , testCase "pattern (parenthesis 1)" $ run "(_)"
+  , testCase "pattern (parenthesis 2)" $ run "(a)"
+  , testCase "pattern (parenthesis 3)" $ run "(Just (Just a))"
+  ]
+  where run = parserIso (scn >> pPattern)
 
 --------------------------------------------------------------------------------
 

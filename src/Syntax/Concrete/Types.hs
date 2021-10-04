@@ -61,7 +61,7 @@ data Definition
     -- f : A -> B { Prop }
   | FuncDefnSig DeclBase (Maybe DeclProp)
     -- f a = a 
-  | FuncDefn DeclBody
+  | FuncDefn Name [Name] (Token "=") Expr
   deriving (Eq, Show)
 
 data TypeDefnCtor = TypeDefnCtor Name [Type] deriving (Eq, Show)
@@ -78,10 +78,8 @@ data Declaration
 
 -- Low level Declaration wrapper, and synonym types
 data DeclBase = DeclBase (SepBy "," Name) (Token ":") Type deriving (Eq, Show)
-
 data DeclProp = DeclProp (Token "{") Expr (Token "}") deriving (Eq, Show)
 data DeclType = DeclType DeclBase (Maybe DeclProp) deriving (Eq, Show)
-data DeclBody = DeclBody Name [Name] (Token "=") Expr deriving (Eq, Show)
 
 --------------------------------------------------------------------------------
 -- | Statements 
@@ -165,6 +163,21 @@ data Expr
   deriving (Eq, Show, Generic)
 
 type QuantOp' = Either Op Expr
+
+--------------------------------------------------------------------------------
+-- | Pattern matching 
+
+data Pattern 
+  = PattParen (Token "(") Pattern (Token ")") -- pattern wrapped inside a pair of parenthesis
+  | PattBinder Name -- binder
+  | PattWildcard (Token "_") -- matches anything 
+  | PattConstructor Name [Pattern] -- destructs a constructor
+  deriving (Eq, Show)
+
+-- | CaseOf
+--     Expr              -- case expr of 
+--     [(Pattern, Expr)] -- pattern -> expr 
+--     Loc
 
 --------------------------------------------------------------------------------
 
