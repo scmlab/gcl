@@ -76,11 +76,18 @@ pProgram = do
   unParseFunc (pProgramF <* eof) scn
 
 pProgramF :: ParserF Program
-pProgramF =
-  Program
-    <$> pIndentBlockF (eitherP pDeclarationF pDefinitionBlockF)
-    <*> pStmtsF
-  where pDeclarationF = lift pDeclaration
+pProgramF = do
+  obs    <- observing (lookAhead lexBlockEndF)
+  (x, y) <- case obs of
+    Left  _ -> mconcat <$> pIndentBlockF p
+    Right _ -> return ([], [])
+  return $ Program x y
+ where
+  pDeclarationF = lift pDeclaration
+  p =
+    (,)
+      <$> pIndentBlockF (eitherP pDeclarationF pDefinitionBlockF)
+      <*> pIndentBlockF (lift pStmt)
 
 ------------------------------------------
 -- parse Declaration
@@ -470,10 +477,7 @@ pIndentBlockF
      ParserF [a]
 pIndentBlockF p = do
   pos <- Lex.indentLevel
-  obs <- lookAhead (observing p)
-  case obs of
-    Left  _ -> return []
-    Right _ -> indentedItems pos (lift scn) p
+  indentedItems pos (lift scn) p
 
 -- copied from Text.Megaparsec.Char.Lexer
 indentedItems :: (MonadParsec e s m) => Pos -> m () -> m b -> m [b]
