@@ -102,10 +102,10 @@ instance StabM HoverM Declaration HoverResult where
     VarDecl   a _ c _ -> (<>) <$> stabLocated a <*> stabLocated c
 
 instance StabM HoverM FuncDefn HoverResult where
-  stabM (FuncDefn name clauses _) = do
+  stabM (FuncDefn name cases _) = do
     name' <- stabLocated name
 
-    results <- forM clauses $ \(args, body) -> do
+    results <- forM cases $ \(args, body) -> do
       -- creates a local scope for arguments
       args' <- stabLocated (toArgs name args)
       let argsScope = Map.fromList $ zip (map nameToText args) args'

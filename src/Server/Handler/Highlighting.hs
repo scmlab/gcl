@@ -219,21 +219,20 @@ instance Collect Expr J.SemanticTokenAbsolute where
         <> toToken' J.SttKeyword [] tokC
         <> collect b
         <> toToken' J.SttKeyword [] tokD
-    Case tokA expr tokB clauses ->
+    Elim tokA expr tokB _ cases _ ->
       sort
         $  toToken' J.SttKeyword [] tokA
         <> collect expr
         <> toToken' J.SttKeyword [] tokB
-        <> (clauses >>= collect) 
+        <> (toList cases >>= collect)
 
--- instance Collect Expr J.SemanticTokenAbsolute where
-
-instance Collect (Pattern, TokArrows, Expr) J.SemanticTokenAbsolute where
-  collect (patt, arrow, body) = 
-      sort
-        $  collect patt
-        <> toToken' J.SttKeyword [] arrow
-        <> collect body
+instance Collect ElimCase J.SemanticTokenAbsolute where
+  collect (ElimConstructor ctor binders arrow body) =
+    sort
+      $  toToken' J.SttEnumMember [] ctor
+      <> (binders >>= collect . AsVariable)
+      <> toToken' J.SttMacro [] arrow
+      <> collect body
 
 instance Collect Lit J.SemanticTokenAbsolute where
   collect = toToken' J.SttNumber []

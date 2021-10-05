@@ -96,7 +96,7 @@ instance Located Expr where
   locOf (Arr l _ _ r          ) = l <--> r
   locOf (App x y              ) = x <--> y
   locOf (Quant l _ _ _ _ _ _ r) = l <--> r
-  locOf (Case l _ _ r         ) = l <--> r
+  locOf (Elim l _ _ _ _ r     ) = l <--> r
 
 --------------------------------------------------------------------------------
 

@@ -160,13 +160,17 @@ data Expr
       (Token ":")
       Expr
       TokQuantEnds
-  | Case (Token "case") Expr (Token "of") [(Pattern, TokArrows, Expr)]
+  -- elim expr of { Just a -> expr | Nothing -> expr }
+  | Elim (Token "elim") Expr (Token "of") (Token "{") (SepBy "|" ElimCase) (Token "}")
   deriving (Eq, Show, Generic)
 
 type QuantOp' = Either Op Expr
 
 --------------------------------------------------------------------------------
 -- | Pattern matching 
+
+data ElimCase = ElimConstructor Name [Name] TokArrows Expr 
+  deriving (Eq, Show, Generic)
 
 data Pattern
   = PattParen (Token "(") Pattern (Token ")") -- pattern wrapped inside a pair of parenthesis
