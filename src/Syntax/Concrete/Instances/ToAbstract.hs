@@ -245,12 +245,26 @@ instance ToAbstract Expr A.Expr where
       toAbstractQOp qop = case qop of
         Left  op   -> return (A.Op op)
         Right expr -> toAbstract expr
+    Case _ expr _ clauses ->
+      A.Case <$> toAbstract expr <*> mapM toAbstractClause clauses <*> pure
+        (locOf x)
+     where
+      toAbstractClause (patt, _, body) =
+        (,) <$> toAbstract patt <*> toAbstract body
+
+instance ToAbstract Pattern A.Pattern where
+  toAbstract (PattParen _ x _) = toAbstract x
+  toAbstract (PattBinder   x ) = return $ A.PattBinder x
+  toAbstract (PattWildcard x ) = return $ A.PattWildcard (rangeOf x)
+  toAbstract (PattConstructor ctor patterns) = A.PattConstructor ctor <$> toAbstract patterns
 
 -- | Literals (Integer / Boolean / Character)
 instance ToAbstract Lit A.Lit where
   toAbstract (LitInt  a _) = pure $ A.Num a
   toAbstract (LitBool a _) = pure $ A.Bol a
   toAbstract (LitChar a _) = pure $ A.Chr a
+
+
 --------------------------------------------------------------------------------
 
 fromSepBy :: SepBy sep a -> [a]

@@ -108,11 +108,11 @@ instance Collect DefinitionBlock J.SemanticTokenAbsolute where
 instance Collect Definition J.SemanticTokenAbsolute where
   collect (TypeDefn tokData name binders _tokDef bs) =
     toToken J.SttKeyword [] tokData
-      <> toToken' J.SttType [] name
+      <> toToken' J.SttType      [] name
       <> toToken' J.SttParameter [] binders
       <> (toList bs >>= collect)
-  collect (FuncDefnSig a b) = collect a <> collect b 
-  collect (FuncDefn a bs _tok c) = 
+  collect (FuncDefnSig a b) = collect a <> collect b
+  collect (FuncDefn a bs _tok c) =
     toToken' J.SttFunction [J.StmDeclaration] a
       <> (bs >>= collect . AsVariable)
       <> collect c
@@ -125,7 +125,8 @@ instance Collect Declaration J.SemanticTokenAbsolute where
   collect (VarDecl   tok a) = toToken J.SttKeyword [] tok <> collect a
 
 instance Collect TypeDefnCtor J.SemanticTokenAbsolute where
-  collect (TypeDefnCtor name types) = collect (AsName name) <> (types >>= collect)
+  collect (TypeDefnCtor name types) =
+    collect (AsName name) <> (types >>= collect)
 
 instance Collect DeclBase J.SemanticTokenAbsolute where
   collect (DeclBase as _ b) = (toList as >>= collect . AsVariable) <> collect b
@@ -195,13 +196,13 @@ instance Collect GdCmd J.SemanticTokenAbsolute where
 
 instance Collect Expr J.SemanticTokenAbsolute where
   collect = \case
-    Paren _ a _ -> collect a
-    Lit   a     -> collect a
-    Var   a     -> collect (AsVariable a)
-    Const a     -> collect (AsVariable a)
-    Op    a     -> toToken' J.SttOperator [] a
+    Paren _ a _     -> collect a
+    Lit   a         -> collect a
+    Var   a         -> collect (AsVariable a)
+    Const a         -> collect (AsVariable a)
+    Op    a         -> toToken' J.SttOperator [] a
     --Chain a b c -> collect a <> toToken' J.SttOperator [] b <> collect c
-    Arr a _ b _ -> collect a <> collect b
+    Arr a _ b _     -> collect a <> collect b
     -- NOTE: sorting is need here, because:
     --  1. the client will ignore tokens that are out of order
     --  2. `App` may create tokens that are out of order
@@ -218,6 +219,21 @@ instance Collect Expr J.SemanticTokenAbsolute where
         <> toToken' J.SttKeyword [] tokC
         <> collect b
         <> toToken' J.SttKeyword [] tokD
+    Case tokA expr tokB clauses ->
+      sort
+        $  toToken' J.SttKeyword [] tokA
+        <> collect expr
+        <> toToken' J.SttKeyword [] tokB
+        <> (clauses >>= collect) 
+
+-- instance Collect Expr J.SemanticTokenAbsolute where
+
+instance Collect (Pattern, TokArrows, Expr) J.SemanticTokenAbsolute where
+  collect (patt, arrow, body) = 
+      sort
+        $  collect patt
+        <> toToken' J.SttKeyword [] arrow
+        <> collect body
 
 instance Collect Lit J.SemanticTokenAbsolute where
   collect = toToken' J.SttNumber []
@@ -226,11 +242,12 @@ instance Collect Lit J.SemanticTokenAbsolute where
 -- Pattern 
 
 instance Collect Pattern J.SemanticTokenAbsolute where
-  collect (PattParen _ a _) = collect a
-  collect (PattBinder a) = collect (AsVariable a)
+  collect (PattParen _ a _ ) = collect a
+  collect (PattBinder   a  ) = collect (AsVariable a)
   collect (PattWildcard tok) = toToken J.SttKeyword [] tok
-  collect (PattConstructor a bs) = toToken' J.SttEnumMember [] a <> (bs >>= collect)
-    
+  collect (PattConstructor a bs) =
+    toToken' J.SttEnumMember [] a <> (bs >>= collect)
+
 --------------------------------------------------------------------------------
 -- Type
 

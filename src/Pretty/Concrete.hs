@@ -59,9 +59,6 @@ instance PrettyWithLoc (Token "data") where
 instance PrettyWithLoc (Token "array") where
   prettyWithLoc (Token l r) = DocWithLoc (pretty tokArray) l r
 
-instance PrettyWithLoc (Token "of") where
-  prettyWithLoc (Token l r) = DocWithLoc (pretty tokOf) l r
-
 instance PrettyWithLoc (Token "new") where
   prettyWithLoc (Token l r) = DocWithLoc (pretty tokNew) l r
 
@@ -79,6 +76,12 @@ instance PrettyWithLoc (Token "->") where
 
 instance PrettyWithLoc (Token "→") where
   prettyWithLoc (Token l r) = DocWithLoc (pretty tokArrowU) l r
+
+instance PrettyWithLoc (Token "case") where
+  prettyWithLoc (Token l r) = DocWithLoc (pretty tokCase) l r
+
+instance PrettyWithLoc (Token "of") where
+  prettyWithLoc (Token l r) = DocWithLoc (pretty tokOf) l r
 
 instance PrettyWithLoc (Token "*") where
   prettyWithLoc (Token l r) = DocWithLoc (pretty tokStar) l r
@@ -183,8 +186,9 @@ instance PrettyWithLoc Definition where
       <> prettyWithLoc qdcons
   prettyWithLoc (FuncDefnSig base prop) =
     prettyWithLoc base <> maybe Empty prettyWithLoc prop
-  prettyWithLoc (FuncDefn n args e b) = prettyWithLoc n <> prettyWithLoc args <> prettyWithLoc e <> prettyWithLoc b
-    
+  prettyWithLoc (FuncDefn n args e b) =
+    prettyWithLoc n <> prettyWithLoc args <> prettyWithLoc e <> prettyWithLoc b
+
 --------------------------------------------------------------------------------
 
 -- | Declaration
@@ -342,6 +346,14 @@ handleExpr (Quant open op xs m r n t close) =
     <> prettyWithLoc n
     <> prettyWithLoc t
     <> prettyWithLoc close
+handleExpr (Case a expr b clauses) =
+  return
+    $  prettyWithLoc a
+    <> prettyWithLoc expr
+    <> prettyWithLoc b
+    <> foldMap
+         (\(c, d, e) -> prettyWithLoc c <> prettyWithLoc d <> prettyWithLoc e)
+         clauses
 
 handleOp :: Op -> Variadic Expr (DocWithLoc ann)
 handleOp op = case classify op of

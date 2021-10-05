@@ -77,6 +77,9 @@ tokArrow = "->"
 tokArrowU :: Text
 tokArrowU = "→"
 
+tokCase :: Text
+tokCase = "case"
+
 tokStar :: Text
 tokStar = "*"
 

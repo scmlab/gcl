@@ -81,7 +81,7 @@ handleExpr _ (ArrIdx e1 e2 _) = return $ render e1 <> "[" <> render e2 <> "]"
 handleExpr _ (ArrUpd e1 e2 e3 _) =
   return $ "(" <+> render e1 <+> ":" <+> render e2 <+> "↣" <+> render e3 <+> ")"
     -- SCM: need to print parenthesis around e1 when necessary.
-handleExpr _ (CaseOf expr clauses _) =
+handleExpr _ (Case expr clauses _) =
   let clauses' = map (\(p, e) -> render p <+> "->" <+> render e) clauses
   in  return $ "case" <+> render expr <+> "of" <+> vertE clauses'
 

@@ -90,7 +90,7 @@ instance Free A.Expr where
   fv (A.Expand _ after    ) = fv after
   fv (A.ArrIdx e1 e2 _    ) = fv e1 <> fv e2
   fv (A.ArrUpd e1 e2 e3 _ ) = fv e1 <> fv e2 <> fv e3
-  fv (A.CaseOf e clauses _) = fv e <> Set.unions (map (fv . snd) clauses)
+  fv (A.Case e clauses _) = fv e <> Set.unions (map (fv . snd) clauses)
 
 -- instance Free A.Bindings where
 --   fv = fv . A.bindingsToExpr

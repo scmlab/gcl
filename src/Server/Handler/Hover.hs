@@ -117,12 +117,9 @@ instance StabM HoverM FuncDefn HoverResult where
 
 instance StabM HoverM Expr HoverResult where
   stabM = \case
-    -- Paren a _      -> stabLocated a
     Var   a _ -> stabLocated a
     Const a _ -> stabLocated a
     Op op     -> stabLocated op
-    --Chain a op c _ -> do
-      --concat <$> sequence [stabLocated a, stabLocated op, stabLocated c]
     App a b _ -> (<>) <$> stabLocated a <*> stabLocated b
     Lam _ b _ -> stabLocated b
     Quant op _ c d _ ->

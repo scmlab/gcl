@@ -67,7 +67,7 @@ instance Located Expr where
   locOf (Expand es _    ) = locOf es
   locOf (ArrIdx _ _ l   ) = l
   locOf (ArrUpd _ _ _ l ) = l
-  locOf (CaseOf _ _ l   ) = l
+  locOf (Case _ _ l   ) = l
 
 instance Located Lit where
   locOf _ = NoLoc
