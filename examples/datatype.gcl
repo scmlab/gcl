@@ -1,0 +1,10 @@
+{:  
+    data Boole = T | F 
+    not : Boole -> Boole 
+    not x = elim x of 
+        { T a -> T 
+        | F -> F
+        }
+:}
+
+{ True }
