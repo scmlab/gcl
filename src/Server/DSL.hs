@@ -8,6 +8,7 @@ import           Control.Monad.Cont
 import           Control.Monad.Except
 import           Control.Monad.Trans.Free
 import           Control.Monad.Writer
+import           Data.IntMap                    ( IntMap )
 import           Data.List                      ( find
                                                 , sortOn
                                                 )
@@ -41,10 +42,18 @@ import           Syntax.Parser                  ( Parser
 --------------------------------------------------------------------------------
 
 data Cache = Cache
-  { cachePOs      :: [PO]
+  { -- Proof Obligations 
+    cachePOs      :: [PO]
+    -- Specs (holes)
   , cacheSpecs    :: [Spec]
+    -- Global properties
   , cacheProps    :: [A.Expr]
+    -- Warnings 
   , cacheWarnings :: [StructWarning]
+    -- expressions that can be reduced are stored here and labeled with an ID 
+    -- so that when the client wants to reduce some expression
+    -- we can find the corresponding redex here 
+  , cacheRedexes  :: IntMap A.Expr
   }
   deriving (Eq, Show)
 
@@ -133,8 +142,8 @@ refine source range = do
  where
   findPointedSpec :: CmdM (Maybe Spec)
   findPointedSpec = do
-    program          <- parseProgram source
-    cache <- sweep program
+    program <- parseProgram source
+    cache   <- sweep program
     return $ find (withinRange range) (cacheSpecs cache)
 
 typeCheck :: A.Program -> CmdM ()
@@ -147,9 +156,10 @@ sweep program@(A.Program _ _ globalProps _ _) = case WP.sweep program of
   Left  e                     -> throwError [StructError e]
   Right (pos, specs, warings) -> do
     return $ Cache { cachePOs      = List.sort pos
-                   , cacheSpecs   = sortOn locOf specs
+                   , cacheSpecs    = sortOn locOf specs
                    , cacheProps    = globalProps
                    , cacheWarnings = warings
+                   , cacheRedexes  = mempty
                    }
 
 --------------------------------------------------------------------------------
@@ -174,7 +184,7 @@ parseProgram source = do
 generateResponseAndDiagnosticsFromResult :: Result -> CmdM [ResKind]
 generateResponseAndDiagnosticsFromResult (Left  errors) = throwError errors
 generateResponseAndDiagnosticsFromResult (Right cache ) = do
-  let (Cache pos specs globalProps warnings) = cache
+  let (Cache pos specs globalProps warnings _) = cache
 
   -- get Specs around the mouse selection
   lastSelection <- getLastSelection
