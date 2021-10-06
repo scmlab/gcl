@@ -1,3 +1,4 @@
+{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PartialTypeSignatures #-}
@@ -7,7 +8,6 @@ module Syntax.Parser where
 import           Control.Applicative.Combinators
                                                 ( (<|>)
                                                 , choice
-                                                , eitherP
                                                 , many
                                                 , manyTill
                                                 , optional
@@ -77,17 +77,16 @@ pProgram = do
 
 pProgramF :: ParserF Program
 pProgramF = do
-  obs    <- observing (lookAhead lexBlockEndF)
-  (x, y) <- case obs of
-    Left  _ -> mconcat <$> pIndentBlockF p
-    Right _ -> return ([], [])
-  return $ Program x y
+  (x, y, z) <- mconcat <$> pIndentBlockF wrap
+  return $ Program (map Left x <> map Right y) z
  where
   pDeclarationF = lift pDeclaration
-  p =
-    (,)
-      <$> pIndentBlockF (eitherP pDeclarationF pDefinitionBlockF)
-      <*> pIndentBlockF (lift pStmt)
+  wrap          = do
+    choice
+      [ (\x -> ([x], [], [])) <$> pDeclarationF
+      , (\x -> ([], [x], [])) <$> pDefinitionBlockF
+      , (\x -> ([], [], [x])) <$> lift pStmt
+      ]
 
 ------------------------------------------
 -- parse Declaration
@@ -295,7 +294,7 @@ pTypeF =
       <|> (ExcludingClosing <$> pExprF <*> lexParenEndF)
 
 --------------------------------------------------------------------------------
--- | Expressions 
+-- | Expressions
 --------------------------------------------------------------------------------
 
 pExpr :: Parser Expr
@@ -517,6 +516,16 @@ indentedItems lvl sc' p = go
     sc'
     pos  <- Lex.indentLevel
     done <- isJust <$> optional eof
-    if not done && pos == lvl
-      then try ((:) <$> p <*> go) <|> return []
-      else return []
+    if done
+    then return []
+    else if
+      | pos > lvl -> Lex.incorrectIndent Ord.EQ lvl pos
+      | pos == lvl -> try ((:) <$> p <*> go) <|> return []
+      | otherwise -> return []
+
+
+    -- if pos > lvl
+    -- then Lex.incorrectIndent Ord.EQ lvl pos
+    -- else if not done && pos == lvl
+    --    then try ((:) <$> p <*> go) <|> return []
+    --    else return []
