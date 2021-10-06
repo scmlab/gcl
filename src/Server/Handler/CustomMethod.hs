@@ -61,7 +61,8 @@ handleInsertAnchor hash = do
     Nothing -> throwError [Others "Cannot read the range of the program"]
     Just x  -> return x
 
-  source'  <- editText (Range (rangeEnd range) (rangeEnd range)) ("\n\n" <> template)
+  source' <- editText (Range (rangeEnd range) (rangeEnd range))
+                      ("\n\n" <> template)
 
   program' <- parseProgram source'
   typeCheck program'
@@ -70,31 +71,41 @@ handleInsertAnchor hash = do
   cacheResult (Right result)
   generateResponseAndDiagnosticsFromResult (Right result)
 
+handleEval :: Text -> CmdM [ResKind]
+handleEval payload = do 
+  logM payload
+  return []
+
 handleCustomMethod :: ReqKind -> CmdM [ResKind]
 handleCustomMethod = \case
-  ReqInspect      range -> handleInspect range
-  ReqRefine       range -> handleRefine range
-  ReqInsertAnchor hash  -> handleInsertAnchor hash
-  ReqDebug              -> return $ error "crash!"
+  ReqInspect      range   -> handleInspect range
+  ReqRefine       range   -> handleRefine range
+  ReqInsertAnchor hash    -> handleInsertAnchor hash
+  ReqEval         payload -> handleEval payload
+  ReqDebug                -> return $ error "crash!"
 
 handler :: JSON.Value -> (Response -> ServerM ()) -> ServerM ()
 handler params responder = do
     -- JSON Value => Request => Response
   case JSON.fromJSON params of
     JSON.Error msg -> do
-      logText $ " --> CustomMethod: CannotDecodeRequest " <> Text.pack (show msg) <> " " <> Text.pack (show params)
+      logText
+        $  " --> CustomMethod: CannotDecodeRequest "
+        <> Text.pack (show msg)
+        <> " "
+        <> Text.pack (show params)
       responder $ CannotDecodeRequest $ show msg ++ "\n" ++ show params
     JSON.Success requests -> handleRequests requests
-    where 
+ where
       -- make the type explicit to appease the type checker 
-      handleRequests :: [Request] -> ServerM ()
-      handleRequests = mapM_ handleRequest 
+  handleRequests :: [Request] -> ServerM ()
+  handleRequests = mapM_ handleRequest
 
-      handleRequest :: Request -> ServerM ()
-      handleRequest request@(Req filepath kind) = do
-        logText $ " --> Custom Reqeust: " <> Text.pack (show request)
-        -- convert Request to Response
-        interpret filepath
-                  (customRequestResponder filepath responder)
-                  (handleCustomMethod kind)
-    
+  handleRequest :: Request -> ServerM ()
+  handleRequest request@(Req filepath kind) = do
+    logText $ " --> Custom Reqeust: " <> Text.pack (show request)
+    -- convert Request to Response
+    interpret filepath
+              (customRequestResponder filepath responder)
+              (handleCustomMethod kind)
+

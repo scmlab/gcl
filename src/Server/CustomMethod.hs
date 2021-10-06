@@ -49,6 +49,7 @@ data ReqKind
   = ReqInspect Range
   | ReqRefine Range
   | ReqInsertAnchor Text
+  | ReqEval Text
   | ReqDebug
   deriving (Generic)
 
@@ -58,6 +59,7 @@ instance Show ReqKind where
   show (ReqInspect range) = "Inspect " <> show range
   show (ReqRefine range) = "Refine " <> show range
   show (ReqInsertAnchor hash) = "InsertAnchor " <> show hash
+  show (ReqEval payload) = "Eval " <> show payload
   show ReqDebug = "Debug"
 
 data Request = Req FilePath ReqKind
