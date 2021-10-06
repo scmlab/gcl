@@ -244,12 +244,12 @@ instance ToAbstract Expr A.Expr where
       toAbstractQOp qop = case qop of
         Left  op   -> return (A.Op op)
         Right expr -> toAbstract expr
-    Elim _ expr _ _ cases _ ->
-      A.Elim <$> toAbstract expr <*> toAbstract cases <*> pure (locOf x)
+    Case _ expr _ _ cases _ ->
+      A.Case <$> toAbstract expr <*> toAbstract cases <*> pure (locOf x)
 
-instance ToAbstract ElimCase A.ElimCase where
-  toAbstract (ElimConstructor ctor binders _ body) =
-    A.ElimConstructor ctor <$> toAbstract binders <*> toAbstract body
+instance ToAbstract Case A.Case where
+  toAbstract (CaseConstructor ctor binders _ body) =
+    A.CaseConstructor ctor <$> toAbstract binders <*> toAbstract body
 
 instance ToAbstract Pattern A.Pattern where
   toAbstract (PattParen _ x _) = toAbstract x

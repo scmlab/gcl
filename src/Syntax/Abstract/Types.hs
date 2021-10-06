@@ -143,7 +143,7 @@ data Expr
   | Expand Expr Expr
   | ArrIdx Expr Expr Loc
   | ArrUpd Expr Expr Expr Loc
-  | Elim Expr [ElimCase] Loc
+  | Case Expr [Case] Loc
   deriving (Eq, Show, Generic)
 
 type QuantOp' = Either Op Expr
@@ -153,7 +153,7 @@ type Mapping = Map Text Expr
 --------------------------------------------------------------------------------
 -- | Pattern matching
 
-data ElimCase = ElimConstructor Name [Name] Expr 
+data Case = CaseConstructor Name [Name] Expr 
   deriving (Eq, Show, Generic)
 
 data Pattern

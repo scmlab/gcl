@@ -8,11 +8,11 @@ instance ToJSON Interval
 instance ToJSON TBase
 instance ToJSON Type
 instance ToJSON Expr
-instance ToJSON ElimCase 
+instance ToJSON Case 
 instance ToJSON Pattern 
 instance ToJSON Lit
 
 instance FromJSON Expr
-instance FromJSON ElimCase 
+instance FromJSON Case 
 instance FromJSON Pattern 
 instance FromJSON Lit

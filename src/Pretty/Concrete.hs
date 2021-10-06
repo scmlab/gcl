@@ -77,8 +77,8 @@ instance PrettyWithLoc (Token "->") where
 instance PrettyWithLoc (Token "→") where
   prettyWithLoc (Token l r) = DocWithLoc (pretty tokArrowU) l r
 
-instance PrettyWithLoc (Token "elim") where
-  prettyWithLoc (Token l r) = DocWithLoc (pretty tokElim) l r
+instance PrettyWithLoc (Token "case") where
+  prettyWithLoc (Token l r) = DocWithLoc (pretty tokCase) l r
 
 instance PrettyWithLoc (Token "of") where
   prettyWithLoc (Token l r) = DocWithLoc (pretty tokOf) l r
@@ -346,7 +346,7 @@ handleExpr (Quant open op xs m r n t close) =
     <> prettyWithLoc n
     <> prettyWithLoc t
     <> prettyWithLoc close
-handleExpr (Elim a expr b c cases d) =
+handleExpr (Case a expr b c cases d) =
   return
     $  prettyWithLoc a
     <> prettyWithLoc expr
@@ -379,8 +379,8 @@ handleOp op = case classify op of
 --------------------------------------------------------------------------------
 -- | Pattern
 
-instance PrettyWithLoc ElimCase where
-  prettyWithLoc (ElimConstructor a b c d) =
+instance PrettyWithLoc Case where
+  prettyWithLoc (CaseConstructor a b c d) =
     prettyWithLoc a <> prettyWithLoc b <> prettyWithLoc c <> prettyWithLoc d
 
 instance Pretty Pattern where

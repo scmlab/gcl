@@ -344,7 +344,7 @@ pExprF =
 
   -- To avoid stuck at parsing terms other than array
   pTermF =
-    choice [pElimF, pLitF, try pArrayF, pParenF, pVarF, pConstF, pQuantF ] <?> "term"
+    choice [pCaseOfF, pLitF, try pArrayF, pParenF, pVarF, pConstF, pQuantF ] <?> "term"
 
   pParenF = Paren <$> lexParenStartF <*> pExprF <*> lexParenEndF
 
@@ -397,17 +397,17 @@ pExprF =
     op <- try (notFollowedBySymbolF m)
     return $ \x -> App (Op op) x
 
-  pElimF =
-    Elim
-      <$> lexElim
+  pCaseOfF =
+    Case
+      <$> lexCase
       <*> pExprF
       <*> lexOfF
       <*> lexBraceStartF
-      <*> pSepByF lexGuardBarF pElimCaseF
+      <*> pSepByF lexGuardBarF pCaseF
       <*> lexBraceEndF
 
-  pElimCaseF =
-    ElimConstructor
+  pCaseF =
+    CaseConstructor
       <$> lexUpperNameF
       <*> many lexLowerNameF
       <*> lexArrowF

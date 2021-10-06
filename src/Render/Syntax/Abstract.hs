@@ -81,7 +81,7 @@ handleExpr _ (ArrIdx e1 e2 _) = return $ render e1 <> "[" <> render e2 <> "]"
 handleExpr _ (ArrUpd e1 e2 e3 _) =
   return $ "(" <+> render e1 <+> ":" <+> render e2 <+> "↣" <+> render e3 <+> ")"
     -- SCM: need to print parenthesis around e1 when necessary.
-handleExpr _ (Elim expr cases _) =
+handleExpr _ (Case expr cases _) =
   return $ "case" <+> render expr <+> "of" <+> vertE (map render cases)
 
 instance Render Mapping where
@@ -93,8 +93,8 @@ instance Render Mapping where
 
 --------------------------------------------------------------------------------
 
-instance Render ElimCase where
-  render (ElimConstructor ctor binders body) =
+instance Render Case where
+  render (CaseConstructor ctor binders body) =
     render ctor <+> horzE (map render binders) <+> "->" <+> render body 
 
 instance Render Pattern where
