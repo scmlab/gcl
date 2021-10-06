@@ -40,7 +40,15 @@ import           Syntax.Parser                  ( Parser
 
 --------------------------------------------------------------------------------
 
-type Result = Either [Error] ([PO], [Spec], [A.Expr], [StructWarning])
+data Cache = Cache
+  { cachePOs      :: [PO]
+  , cacheSpecs    :: [Spec]
+  , cacheProps    :: [A.Expr]
+  , cacheWarnings :: [StructWarning]
+  }
+  deriving (Eq, Show)
+
+type Result = Either [Error] Cache
 
 -- The "Syntax" of the DSL for handling LSP requests and responses
 data Cmd next
@@ -126,19 +134,23 @@ refine source range = do
   findPointedSpec :: CmdM (Maybe Spec)
   findPointedSpec = do
     program          <- parseProgram source
-    (_, specs, _, _) <- sweep program
-    return $ find (withinRange range) specs
+    cache <- sweep program
+    return $ find (withinRange range) (cacheSpecs cache)
 
 typeCheck :: A.Program -> CmdM ()
 typeCheck p = case TypeChecking.runTM (TypeChecking.checkProgram p) of
   Left  e -> throwError [TypeError e]
   Right v -> return v
 
-sweep :: A.Program -> CmdM ([PO], [Spec], [A.Expr], [StructWarning])
+sweep :: A.Program -> CmdM Cache
 sweep program@(A.Program _ _ globalProps _ _) = case WP.sweep program of
   Left  e                     -> throwError [StructError e]
   Right (pos, specs, warings) -> do
-    return (List.sort pos, sortOn locOf specs, globalProps, warings)
+    return $ Cache { cachePOs      = List.sort pos
+                   , cacheSpecs   = sortOn locOf specs
+                   , cacheProps    = globalProps
+                   , cacheWarnings = warings
+                   }
 
 --------------------------------------------------------------------------------
 
@@ -160,52 +172,53 @@ parseProgram source = do
 --------------------------------------------------------------------------------
 
 generateResponseAndDiagnosticsFromResult :: Result -> CmdM [ResKind]
-generateResponseAndDiagnosticsFromResult (Left errors) = throwError errors
-generateResponseAndDiagnosticsFromResult (Right (pos, specs, globalProps, warnings))
-  = do
-    -- get Specs around the mouse selection
-    lastSelection <- getLastSelection
-    let overlappedSpecs = case lastSelection of
-          Nothing        -> specs
-          Just selection -> filter (withinRange selection) specs
-    -- get POs around the mouse selection (including their corresponding Proofs)
+generateResponseAndDiagnosticsFromResult (Left  errors) = throwError errors
+generateResponseAndDiagnosticsFromResult (Right cache ) = do
+  let (Cache pos specs globalProps warnings) = cache
 
-    let withinPOrange sel po = case poAnchorLoc po of
-          Nothing     -> withinRange sel po
-          Just anchor -> withinRange sel po || withinRange sel anchor
+  -- get Specs around the mouse selection
+  lastSelection <- getLastSelection
+  let overlappedSpecs = case lastSelection of
+        Nothing        -> specs
+        Just selection -> filter (withinRange selection) specs
+  -- get POs around the mouse selection (including their corresponding Proofs)
 
-    let overlappedPOs = case lastSelection of
-          Nothing        -> pos
-          Just selection -> filter (withinPOrange selection) pos
-    -- render stuff
-    let warningsSections =
-          if null warnings then [] else map renderSection warnings
-    let globalPropsSections = if null globalProps
-          then []
-          else map
-            (\expr -> Section
-              Plain
-              [Header "Property" (fromLoc (locOf expr)), Code (render expr)]
-            )
-            globalProps
-    let specsSections =
-          if null overlappedSpecs then [] else map renderSection overlappedSpecs
-    let poSections =
-          if null overlappedPOs then [] else map renderSection overlappedPOs
-    let sections = mconcat
-          [warningsSections, specsSections, poSections, globalPropsSections]
+  let withinPOrange sel po = case poAnchorLoc po of
+        Nothing     -> withinRange sel po
+        Just anchor -> withinRange sel po || withinRange sel anchor
 
-    version <- bumpVersion
-    let encodeSpec spec =
-          ( specID spec
-          , toText $ render (specPreCond spec)
-          , toText $ render (specPostCond spec)
-          , specRange spec
+  let overlappedPOs = case lastSelection of
+        Nothing        -> pos
+        Just selection -> filter (withinPOrange selection) pos
+  -- render stuff
+  let warningsSections =
+        if null warnings then [] else map renderSection warnings
+  let globalPropsSections = if null globalProps
+        then []
+        else map
+          (\expr -> Section
+            Plain
+            [Header "Property" (fromLoc (locOf expr)), Code (render expr)]
           )
+          globalProps
+  let specsSections =
+        if null overlappedSpecs then [] else map renderSection overlappedSpecs
+  let poSections =
+        if null overlappedPOs then [] else map renderSection overlappedPOs
+  let sections = mconcat
+        [warningsSections, specsSections, poSections, globalPropsSections]
 
-    let responses =
-          [ResDisplay version sections, ResUpdateSpecs (map encodeSpec specs)]
-    let diagnostics = concatMap collect pos ++ concatMap collect warnings
-    sendDiagnostics diagnostics
+  version <- bumpVersion
+  let encodeSpec spec =
+        ( specID spec
+        , toText $ render (specPreCond spec)
+        , toText $ render (specPostCond spec)
+        , specRange spec
+        )
 
-    return responses
+  let responses =
+        [ResDisplay version sections, ResUpdateSpecs (map encodeSpec specs)]
+  let diagnostics = concatMap collect pos ++ concatMap collect warnings
+  sendDiagnostics diagnostics
+
+  return responses
