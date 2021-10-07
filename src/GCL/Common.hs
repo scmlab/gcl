@@ -90,9 +90,10 @@ instance Free A.Expr where
   fv (A.Expand _ after   ) = fv after
   fv (A.ArrIdx e1 e2 _   ) = fv e1 <> fv e2
   fv (A.ArrUpd e1 e2 e3 _) = fv e1 <> fv e2 <> fv e3
+  fv (A.Case e cases _   ) = fv e <> Set.unions (map fv cases)
 
--- instance Free A.Bindings where
---   fv = fv . A.bindingsToExpr
+instance Free A.Case where
+  fv (A.CaseConstructor _ xs expr) = fv expr \\ Set.fromList xs
 
 instance Free A.Mapping where
   fv mapping = Set.unions (map fv (Map.elems mapping))

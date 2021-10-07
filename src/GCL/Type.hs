@@ -203,6 +203,7 @@ infer (ArrUpd e1 e2 e3 l) = do
   unify t2 (TBase TInt l)
   unify t1 (TArray interval t3 l)
   return t1
+infer (Case expr _ _) = infer expr
 
 emptyInterval :: Interval
 emptyInterval = Interval (Including zero) (Excluding zero) NoLoc

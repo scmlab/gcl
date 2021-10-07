@@ -77,6 +77,9 @@ tokArrow = "->"
 tokArrowU :: Text
 tokArrowU = "→"
 
+tokCase :: Text
+tokCase = "case"
+
 tokStar :: Text
 tokStar = "*"
 
@@ -309,6 +312,7 @@ lowerKeywords =
   , tokOf
   , tokNew
   , tokDispose
+  , tokCase
   ]
 
 upperKeywords :: [Text]

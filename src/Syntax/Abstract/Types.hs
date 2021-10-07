@@ -143,6 +143,7 @@ data Expr
   | Expand Expr Expr
   | ArrIdx Expr Expr Loc
   | ArrUpd Expr Expr Expr Loc
+  | Case Expr [Case] Loc
   deriving (Eq, Show, Generic)
 
 type QuantOp' = Either Op Expr
@@ -151,6 +152,9 @@ type Mapping = Map Text Expr
 
 --------------------------------------------------------------------------------
 -- | Pattern matching
+
+data Case = CaseConstructor Name [Name] Expr 
+  deriving (Eq, Show, Generic)
 
 data Pattern
   = PattBinder Name -- binder

@@ -18,7 +18,8 @@ import           GCL.Common                     ( Free(fv)
                                                 , Fresh(fresh, freshWithLabel)
                                                 )
 import           GCL.Predicate                  ( Pred(..) )
-import           Syntax.Abstract                ( Expr(..)
+import           Syntax.Abstract                ( Case(CaseConstructor)
+                                                , Expr(..)
                                                 , Mapping
                                                 )
 import           Syntax.Common                  ( Name(Name)
@@ -304,6 +305,11 @@ instance Substitutable Expr where
         <*> subst mapping value
         <*> pure l
 
+    -- apply subst on body of cases only
+    Case e cases l -> do
+      cases' <- forM cases $ \(CaseConstructor ctor binders body) ->
+        CaseConstructor ctor binders <$> subst mapping body
+      return $ Case e cases' l
 
 instance Substitutable Pred where
   subst mapping = \case

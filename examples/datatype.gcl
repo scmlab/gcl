@@ -1,0 +1,10 @@
+{:  
+    data B = T | F 
+    not : B -> B 
+    not x = case x of 
+        { T -> F 
+        | F -> T
+        }
+:}
+
+{ True }

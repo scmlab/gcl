@@ -55,7 +55,7 @@ data Program
 -- | Definitions 
 
 data DefinitionBlock = DefinitionBlock (Token "{:") [Definition] (Token ":}") deriving (Eq, Show)
-data Definition 
+data Definition
   = -- data T a1 a2 ... = K1 v1 v2 ... | K2 u1 u2 ...
     TypeDefn (Token "data") Name [Name] (Token "=") (SepBy "|" TypeDefnCtor)
     -- f : A -> B { Prop }
@@ -160,6 +160,8 @@ data Expr
       (Token ":")
       Expr
       TokQuantEnds
+  -- case expr of { ctor1 -> expr | ctor2 binder1 binder2 -> expr }
+  | Case (Token "case") Expr (Token "of") (Token "{") (SepBy "|" Case) (Token "}")
   deriving (Eq, Show, Generic)
 
 type QuantOp' = Either Op Expr
@@ -167,17 +169,17 @@ type QuantOp' = Either Op Expr
 --------------------------------------------------------------------------------
 -- | Pattern matching 
 
-data Pattern 
+-- ctor1 binder1 binder2 ... -> expr
+data Case = CaseConstructor Name [Name] TokArrows Expr 
+  deriving (Eq, Show, Generic)
+
+-- NOTE: current not in use
+data Pattern
   = PattParen (Token "(") Pattern (Token ")") -- pattern wrapped inside a pair of parenthesis
   | PattBinder Name -- binder
   | PattWildcard (Token "_") -- matches anything 
   | PattConstructor Name [Pattern] -- destructs a constructor
   deriving (Eq, Show)
-
--- | CaseOf
---     Expr              -- case expr of 
---     [(Pattern, Expr)] -- pattern -> expr 
---     Loc
 
 --------------------------------------------------------------------------------
 

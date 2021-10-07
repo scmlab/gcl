@@ -41,6 +41,10 @@ instance ToAbstract a b => ToAbstract (Maybe a) (Maybe b) where
 instance ToAbstract a b => ToAbstract [a] [b] where
   toAbstract = mapM toAbstract
 
+
+instance ToAbstract Name Name where
+  toAbstract = return
+
 --------------------------------------------------------------------------------
 -- | Program
 
@@ -97,9 +101,7 @@ instance ToAbstract DefinitionBlock A.Definitions where
 instance ToAbstract Definition (Either A.TypeDefn (Either [A.FuncDefnSig] A.FuncDefn)) where
   toAbstract (TypeDefn tok name binders _ cons) = do
     Left
-      <$> (A.TypeDefn name binders <$> toAbstract (fromSepBy cons) <*> pure
-            (tok <--> cons)
-          )
+      <$> (A.TypeDefn name binders <$> toAbstract cons <*> pure (tok <--> cons))
   toAbstract (FuncDefnSig decl prop) = do
     (names, typ) <- toAbstract decl
     Right
@@ -133,24 +135,23 @@ instance ToAbstract Declaration A.Declaration where
 
 instance ToAbstract Stmt A.Stmt where
   toAbstract stmt = case stmt of
-    Skip  _ -> pure (A.Skip (locOf stmt))
-    Abort _ -> pure (A.Abort (locOf stmt))
-    Assign a _ b ->
-      A.Assign (fromSepBy a) <$> toAbstract (fromSepBy b) <*> pure (locOf stmt)
+    Skip  _      -> pure (A.Skip (locOf stmt))
+    Abort _      -> pure (A.Abort (locOf stmt))
+    Assign a _ b -> do
+      A.Assign <$> toAbstract a <*> toAbstract b <*> pure (locOf stmt)
     AAssign x _ i _ _ e ->
       A.AAssign (A.Var x (locOf x)) <$> toAbstract i <*> toAbstract e <*> pure
         (locOf stmt)
     Assert _ a _ -> A.Assert <$> toAbstract a <*> pure (locOf stmt)
     LoopInvariant _ a _ _ _ b _ ->
       A.LoopInvariant <$> toAbstract a <*> toAbstract b <*> pure (locOf stmt)
-    Do _ a _          -> A.Do <$> toAbstract (fromSepBy a) <*> pure (locOf stmt)
-    If _ a _          -> A.If <$> toAbstract (fromSepBy a) <*> pure (locOf stmt)
-    SpecQM l          -> throwError l
-    Spec  l t       r -> pure (A.Spec t (rangeOf l <> rangeOf r))
-    Proof _ anchors _ -> A.Proof <$> toAbstract anchors <*> pure (locOf stmt)
-    Alloc p _ _ _ es _ ->
-      A.Alloc p <$> toAbstract (fromSepBy es) <*> pure (locOf stmt)
-    HLookup x _ _ e -> A.HLookup x <$> toAbstract e <*> pure (locOf stmt)
+    Do _ a _           -> A.Do <$> toAbstract a <*> pure (locOf stmt)
+    If _ a _           -> A.If <$> toAbstract a <*> pure (locOf stmt)
+    SpecQM l           -> throwError l
+    Spec  l t       r  -> pure (A.Spec t (rangeOf l <> rangeOf r))
+    Proof _ anchors _  -> A.Proof <$> toAbstract anchors <*> pure (locOf stmt)
+    Alloc p _ _ _ es _ -> A.Alloc p <$> toAbstract es <*> pure (locOf stmt)
+    HLookup x _ _ e    -> A.HLookup x <$> toAbstract e <*> pure (locOf stmt)
     HMutate _ e1 _ e2 ->
       A.HMutate <$> toAbstract e1 <*> toAbstract e2 <*> pure (locOf stmt)
     Dispose _ e -> A.Dispose <$> toAbstract e <*> pure (locOf stmt)
@@ -167,9 +168,7 @@ instance ToAbstract ProofAnchor A.ProofAnchor where
 
 -- Low level Declaration wrapper, and synonym types
 instance ToAbstract DeclBase ([Name], A.Type) where
-  toAbstract (DeclBase a _ b) = do
-    b' <- toAbstract b
-    return (fromSepBy a, b')
+  toAbstract (DeclBase a _ b) = (,) <$> toAbstract a <*> toAbstract b
 
 instance ToAbstract DeclProp A.Expr where
   toAbstract (DeclProp _ e _) = toAbstract e
@@ -245,14 +244,34 @@ instance ToAbstract Expr A.Expr where
       toAbstractQOp qop = case qop of
         Left  op   -> return (A.Op op)
         Right expr -> toAbstract expr
+    Case _ expr _ _ cases _ ->
+      A.Case <$> toAbstract expr <*> toAbstract cases <*> pure (locOf x)
+
+instance ToAbstract Case A.Case where
+  toAbstract (CaseConstructor ctor binders _ body) =
+    A.CaseConstructor ctor <$> toAbstract binders <*> toAbstract body
+
+instance ToAbstract Pattern A.Pattern where
+  toAbstract (PattParen _ x _) = toAbstract x
+  toAbstract (PattBinder   x ) = return $ A.PattBinder x
+  toAbstract (PattWildcard x ) = return $ A.PattWildcard (rangeOf x)
+  toAbstract (PattConstructor ctor patterns) =
+    A.PattConstructor ctor <$> toAbstract patterns
 
 -- | Literals (Integer / Boolean / Character)
 instance ToAbstract Lit A.Lit where
   toAbstract (LitInt  a _) = pure $ A.Num a
   toAbstract (LitBool a _) = pure $ A.Bol a
   toAbstract (LitChar a _) = pure $ A.Chr a
+
+
 --------------------------------------------------------------------------------
 
-fromSepBy :: SepBy sep a -> [a]
-fromSepBy (Head a      ) = [a]
-fromSepBy (Delim a _ as) = a : fromSepBy as
+instance ToAbstract a b => ToAbstract (SepBy sep a) [b] where
+  toAbstract (Head a) = do
+    b <- toAbstract a
+    return [b]
+  toAbstract (Delim a _ as) = do
+    b  <- toAbstract a
+    bs <- toAbstract as
+    return (b : bs)

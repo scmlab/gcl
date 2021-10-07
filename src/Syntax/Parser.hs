@@ -7,7 +7,6 @@ module Syntax.Parser where
 import           Control.Applicative.Combinators
                                                 ( (<|>)
                                                 , choice
-                                                , eitherP
                                                 , many
                                                 , manyTill
                                                 , optional
@@ -76,11 +75,17 @@ pProgram = do
   unParseFunc (pProgramF <* eof) scn
 
 pProgramF :: ParserF Program
-pProgramF =
-  Program
-    <$> pIndentBlockF (eitherP pDeclarationF pDefinitionBlockF)
-    <*> pStmtsF
-  where pDeclarationF = lift pDeclaration
+pProgramF = do
+  (x, y, z) <- mconcat <$> pIndentBlockF wrap
+  return $ Program (map Left x <> map Right y) z
+ where
+  pDeclarationF = lift pDeclaration
+  wrap          = do
+    choice
+      [ (\x -> ([x], [], [])) <$> pDeclarationF
+      , (\x -> ([], [x], [])) <$> pDefinitionBlockF
+      , (\x -> ([], [], [x])) <$> lift pStmt
+      ]
 
 ------------------------------------------
 -- parse Declaration
@@ -288,7 +293,7 @@ pTypeF =
       <|> (ExcludingClosing <$> pExprF <*> lexParenEndF)
 
 --------------------------------------------------------------------------------
--- | Expressions 
+-- | Expressions
 --------------------------------------------------------------------------------
 
 pExpr :: Parser Expr
@@ -337,7 +342,7 @@ pExprF =
 
   -- To avoid stuck at parsing terms other than array
   pTermF =
-    choice [pLitF, try pArrayF, pParenF, pVarF, pConstF, pQuantF] <?> "term"
+    choice [pCaseOfF, pLitF, try pArrayF, pParenF, pVarF, pConstF, pQuantF ] <?> "term"
 
   pParenF = Paren <$> lexParenStartF <*> pExprF <*> lexParenEndF
 
@@ -389,6 +394,22 @@ pExprF =
     -- NOTE: operator cannot be followed by any symbol
     op <- try (notFollowedBySymbolF m)
     return $ \x -> App (Op op) x
+
+  pCaseOfF =
+    Case
+      <$> lexCase
+      <*> pExprF
+      <*> lexOfF
+      <*> lexBraceStartF
+      <*> pSepByF lexGuardBarF pCaseF
+      <*> lexBraceEndF
+
+  pCaseF =
+    CaseConstructor
+      <$> lexUpperNameF
+      <*> many lexLowerNameF
+      <*> lexArrowF
+      <*> pExprF
 
 ------------------------------------------
 -- Pattern matching
@@ -484,10 +505,7 @@ pIndentBlockF
      ParserF [a]
 pIndentBlockF p = do
   pos <- Lex.indentLevel
-  obs <- lookAhead (observing p)
-  case obs of
-    Left  _ -> return []
-    Right _ -> indentedItems pos (lift scn) p
+  indentedItems pos (lift scn) p
 
 -- copied from Text.Megaparsec.Char.Lexer
 indentedItems :: (MonadParsec e s m) => Pos -> m () -> m b -> m [b]

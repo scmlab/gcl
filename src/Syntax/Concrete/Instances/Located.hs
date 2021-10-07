@@ -12,14 +12,17 @@ instance Located a => Located (SepBy sep a) where
   locOf (Head a      ) = locOf a
   locOf (Delim a _ as) = a <--> locOf as
 
+instance (Located a, Located c) => Located (a, b, c) where
+  locOf (a, _, c) = a <--> c
+
 --------------------------------------------------------------------------------
 
 instance Located Program where
   locOf (Program a b) = a <--> b
 
 instance Located Declaration where
-  locOf (ConstDecl l r     ) = l <--> r
-  locOf (VarDecl   l r     ) = l <--> r
+  locOf (ConstDecl l r) = l <--> r
+  locOf (VarDecl   l r) = l <--> r
 
 instance Located TypeDefnCtor where
   locOf (TypeDefnCtor l r) = l <--> r
@@ -93,6 +96,15 @@ instance Located Expr where
   locOf (Arr l _ _ r          ) = l <--> r
   locOf (App x y              ) = x <--> y
   locOf (Quant l _ _ _ _ _ _ r) = l <--> r
+  locOf (Case l _ _ _ _ r     ) = l <--> r
+
+--------------------------------------------------------------------------------
+
+instance Located Pattern where
+  locOf (PattParen l _ r    ) = l <--> r
+  locOf (PattBinder   l     ) = locOf l
+  locOf (PattWildcard l     ) = locOf l
+  locOf (PattConstructor l r) = l <--> r
 
 --------------------------------------------------------------------------------
 
