@@ -312,6 +312,7 @@ lowerKeywords =
   , tokOf
   , tokNew
   , tokDispose
+  , tokCase
   ]
 
 upperKeywords :: [Text]
