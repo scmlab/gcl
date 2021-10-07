@@ -46,7 +46,7 @@ specPayloadWithoutIndentationTests =
     run = runGoldenTest "./test/source/Server/" "./test/golden/Server/" "" $ \sourcePath source -> do
       return $ serializeTestResult $ runTest sourcePath source $ do
             program <- parseProgram source
-            (_, specs, _, _) <- sweep program
+            specs <- cacheSpecs <$> sweep program
             return $ Right $ map (map (\x -> "\"" <> x <> "\"") . specPayloadWithoutIndentation source) specs
 
 
@@ -66,7 +66,7 @@ refineSpecsTest =
     run = runGoldenTest "./test/source/Server/" "./test/golden/Server/" "" $ \sourcePath source -> do
       return $ serializeTestResult $ runTest sourcePath source $ do
             program <- parseProgram source
-            (_, specs, _, _) <- sweep program
+            specs <- cacheSpecs <$> sweep program
             case listToMaybe specs of
               Just spec -> do
                 let range = rangeOf spec

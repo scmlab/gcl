@@ -62,7 +62,11 @@ import           Syntax.Common                  ( Name(Name)
 type TM = Except StructError
 
 type WP
-  = RWST Substitution.Scope ([PO], [Spec], [StructWarning]) (Int, Int, Int) TM
+  = RWST
+      Substitution.Scope
+      ([PO], [Spec], [StructWarning], [A.Expr])
+      (Int, Int, Int)
+      TM
 
 instance Fresh WP where
   fresh = do
@@ -73,13 +77,14 @@ instance Fresh WP where
 runWP
   :: WP a
   -> Substitution.Scope
-  -> Either StructError (a, ([PO], [Spec], [StructWarning]))
+  -> Either StructError (a, ([PO], [Spec], [StructWarning], [A.Expr]))
 runWP p decls = runExcept $ evalRWST p decls (0, 0, 0)
 
-sweep :: A.Program -> Either StructError ([PO], [Spec], [StructWarning])
+sweep
+  :: A.Program -> Either StructError ([PO], [Spec], [StructWarning], [A.Expr])
 sweep program@(A.Program _ _ _props stmts _) = do
   let scope = A.programToScopeForSubstitution program
-  (_, (pos, specs, warnings)) <- runWP (structProgram stmts) scope
+  (_, (pos, specs, warnings, redexes)) <- runWP (structProgram stmts) scope
   -- update Proof Obligations with corresponding Proof Anchors
   let proofAnchors = stmts >>= \case
         A.Proof anchors _ -> anchors
@@ -93,7 +98,25 @@ sweep program@(A.Program _ _ _props stmts _) = do
 
   let pos' = map updatePO pos
 
-  return (pos', specs, warnings)
+  return (pos', specs, warnings, redexes)
+
+substitute
+  :: ( Substitution.Substitutable a
+     , Substitution.Reducible a
+     , Substitution.CollectRedexes a
+     )
+  => [Name]
+  -> [A.Expr]
+  -> a
+  -> WP a
+substitute xs es expr = do
+  scope <- ask
+  let (result, redexes) = Substitution.run scope xs es expr
+  tell ([], [], [], redexes)
+  return result
+
+
+--------------------------------------------------------------------------------
 
 data ProgView
   = ProgViewEmpty
@@ -395,13 +418,10 @@ wp :: A.Stmt -> Pred -> WP Pred
 wp (A.Abort _       ) _    = return (Constant A.false)
 wp (A.Skip  _       ) post = return post
 
-wp (A.Assign xs es _) post = do
-  scope <- ask
-  return $ Substitution.run scope xs es post
+wp (A.Assign xs es _) post = substitute xs es post
 
-wp (A.AAssign (A.Var x _) i e _) post = do
-  scope <- ask
-  return $ Substitution.run scope [x] [A.ArrUpd (A.nameVar x) i e NoLoc] post
+wp (A.AAssign (A.Var x _) i e _) post =
+  substitute [x] [A.ArrUpd (A.nameVar x) i e NoLoc] post
 
 wp (A.AAssign _ _ _ l) _    = throwError (MultiDimArrayAsgnNotImp l)
 
@@ -417,8 +437,7 @@ wp (A.Proof _ _         ) post = return post
 wp (A.Alloc x (e : es) _) post = do -- non-empty
     {- wp (x := es) P = (forall x', (x' -> es) -* P[x'/x])-}
   x'    <- freshName' (toText x) -- generate fresh name using the exisiting "x"
-  scope <- ask
-  let post' = Substitution.run scope [x] [A.nameVar x'] (toExpr post)
+  post' <- substitute [x] [A.nameVar x'] (toExpr post)
 
   return $ Constant (A.forAll [x'] A.true (newallocs x' `A.sImp` post'))
  where
@@ -430,8 +449,7 @@ wp (A.Alloc x (e : es) _) post = do -- non-empty
 wp (A.HLookup x e _) post = do
     {- wp (x := *e) P = (exists v . (e->v) * ((e->v) -* P[v/x])) -}
   v     <- freshName' (toText x) -- generate fresh name using the exisiting "x"
-  scope <- ask
-  let post' = Substitution.run scope [x] [A.nameVar v] (toExpr post)
+  post' <- substitute [x] [A.nameVar v] (toExpr post)
 
   return $ Constant
     (A.exists [v] A.true (entry v `A.sConj` (entry v `A.sImp` post')))
@@ -514,32 +532,28 @@ sp (pre, _) (A.Assign xs es l) = do
     return $ Name x' NoLoc
   let freshVars = map (`A.Var` l) freshNames
   -- substitute "xs"s with fresh names in "pre"
-  scope <- ask
-  let pre' = Substitution.run scope xs freshVars (toExpr pre)
-  --
-  let predicate = A.conjunct $ zipWith
-        (\x e -> A.nameVar x `A.eqq` Substitution.run scope xs freshVars e)
-        xs
-        es
+  pre' <- substitute xs freshVars (toExpr pre)
 
-  return $ Constant (A.exists freshNames predicate pre')
+
+  --
+  let pairs = zip xs es
+  predicates <- forM pairs $ \(x, e) -> do
+    e' <- substitute xs freshVars e
+    return $ A.nameVar x `A.eqq` e'
+  return $ Constant (A.exists freshNames (A.conjunct predicates) pre')
 
 sp (pre, _) (A.AAssign (A.Var x _) i e _) = do
-     -- {P} x[I] := E { (exist x' :: x = x'[I[x'/x] -> E[x'/x]] && P[x'/x]) }
-  scope <- ask
-  x'    <- freshText
+  -- {P} x[I] := E { (exist x' :: x = x'[I[x'/x] -> E[x'/x]] && P[x'/x]) }
+  x'   <- freshText
 
-  let pre' = Substitution.run scope [x] [A.variable x'] (toExpr pre)
+  pre' <- substitute [x] [A.variable x'] (toExpr pre)
+  i'   <- substitute [x] [A.variable x'] i
+  e'   <- substitute [x] [A.variable x'] e
+
   return $ Constant
-    (A.exists
-      [Name x' NoLoc]
-      (       A.nameVar x
-      `A.eqq` A.ArrUpd (A.variable x')
-                       (Substitution.run scope [x] [A.variable x'] i)
-                       (Substitution.run scope [x] [A.variable x'] e)
-                       NoLoc
-      )
-      pre'
+    (A.exists [Name x' NoLoc]
+              (A.nameVar x `A.eqq` A.ArrUpd (A.variable x') i' e' NoLoc)
+              pre'
     )
 
 sp (_  , _) (A.AAssign _ _ _ l) = throwError (MultiDimArrayAsgnNotImp l)
@@ -561,16 +575,14 @@ sp (pre, _) _ = return pre
 
 tellPO :: Pred -> Pred -> Origin -> WP ()
 tellPO p q origin = unless (toExpr p == toExpr q) $ do
-
-  scope <- ask
-  let p' = Substitution.run scope [] [] p
-  let q' = Substitution.run scope [] [] q
+  p'        <- substitute [] [] p
+  q'        <- substitute [] [] q
 
   (i, j, k) <- get
   put (succ i, j, k)
   let anchorHash =
         Text.pack $ showHex (abs (Hashable.hash (toString (p', q')))) ""
-  tell ([PO p' q' anchorHash Nothing origin], [], [])
+  tell ([PO p' q' anchorHash Nothing origin], [], [], [])
 
 
 tellPO' :: Origin -> Pred -> Pred -> WP ()
@@ -578,18 +590,15 @@ tellPO' l p q = tellPO p q l
 
 tellSpec :: Pred -> Pred -> Range -> WP ()
 tellSpec p q l = do
-
-  scope <- ask
-  let p' = Substitution.run scope [] [] p
-  let q' = Substitution.run scope [] [] q
+  p'        <- substitute [] [] p
+  q'        <- substitute [] [] q
 
   (i, j, k) <- get
   put (i, succ j, k)
-  tell ([], [Specification j p' q' l], [])
+  tell ([], [Specification j p' q' l], [], [])
 
 throwWarning :: StructWarning -> WP ()
-throwWarning warning = do
-  tell ([], [], [warning])
+throwWarning warning = tell ([], [], [warning], [])
 
 
 withFreshVar :: (A.Expr -> WP a) -> WP a

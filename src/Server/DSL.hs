@@ -8,7 +8,6 @@ import           Control.Monad.Cont
 import           Control.Monad.Except
 import           Control.Monad.Trans.Free
 import           Control.Monad.Writer
-import           Data.IntMap                    ( IntMap )
 import           Data.List                      ( find
                                                 , sortOn
                                                 )
@@ -26,7 +25,10 @@ import qualified GCL.WP                        as WP
 import           GCL.WP.Type                    ( StructWarning )
 import           Language.LSP.Types             ( Diagnostic )
 import           Prelude                 hiding ( span )
-import           Pretty                         ( toText )
+import           Pretty                         ( Pretty(pretty)
+                                                , toText
+                                                , vsep
+                                                )
 import           Render
 import           Server.CustomMethod
 import           Server.Handler.Diagnostic      ( )
@@ -53,9 +55,21 @@ data Cache = Cache
     -- expressions that can be reduced are stored here and labeled with an ID 
     -- so that when the client wants to reduce some expression
     -- we can find the corresponding redex here 
-  , cacheRedexes  :: IntMap A.Expr
+  , cacheRedexes  :: [A.Expr]
   }
   deriving (Eq, Show)
+
+instance Pretty Cache where
+  pretty cache =
+    "Cache { "
+      <> vsep
+           [ "POs: " <> pretty (cachePOs cache)
+           , "Specs: " <> pretty (cacheSpecs cache)
+           , "Props: " <> pretty (cacheProps cache)
+           , "Warnings: " <> pretty (cacheWarnings cache)
+           , "Redexes: " <> pretty (cacheRedexes cache)
+           ]
+      <> " }"
 
 type Result = Either [Error] Cache
 
@@ -153,13 +167,13 @@ typeCheck p = case TypeChecking.runTM (TypeChecking.checkProgram p) of
 
 sweep :: A.Program -> CmdM Cache
 sweep program@(A.Program _ _ globalProps _ _) = case WP.sweep program of
-  Left  e                     -> throwError [StructError e]
-  Right (pos, specs, warings) -> do
+  Left  e                              -> throwError [StructError e]
+  Right (pos, specs, warings, redexes) -> do
     return $ Cache { cachePOs      = List.sort pos
                    , cacheSpecs    = sortOn locOf specs
                    , cacheProps    = globalProps
                    , cacheWarnings = warings
-                   , cacheRedexes  = mempty
+                   , cacheRedexes  = redexes
                    }
 
 --------------------------------------------------------------------------------

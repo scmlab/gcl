@@ -15,7 +15,7 @@ import           Render                         ( Inlines(..)
                                                 , Render(render)
                                                 )
 import           Server.DSL                     ( parseProgram
-                                                , sweep
+                                                , sweep, Cache (cachePOs)
                                                 )
 import           Server.Interpreter.Test        ( runTest
                                                 , serializeTestResultValueOnly
@@ -48,7 +48,7 @@ letBindings = testGroup
       $ \sourcePath source -> do
           return $ serializeTestResultValueOnly $ runTest sourcePath source $ do
             program        <- parseProgram source
-            (pos, _, _, _) <- sweep program
+            pos <- cachePOs <$> sweep program
             let substs = pos >>= extractExpand
             let trees  = map toTree substs
             return (Right (VList trees))

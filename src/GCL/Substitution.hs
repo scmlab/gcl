@@ -5,6 +5,10 @@
 module GCL.Substitution
   ( run
   , Scope
+  -- TODO: don't export these 
+  , Substitutable
+  , Reducible
+  , CollectRedexes
   ) where
 
 import           Control.Monad.RWS
@@ -28,14 +32,15 @@ import           Syntax.Common                  ( Name(Name)
 ------------------------------------------------------------------
 
 run
-  :: (Substitutable a, Reducible a)
+  :: (Substitutable a, Reducible a, CollectRedexes a)
   => Scope -- declarations
   -> [Name] -- name of variables to be substituted
   -> [Expr] -- values to be substituted for
   -> a
-  -> a
-run scope names exprs predicate = fst
-  $ evalRWS (subst mapping predicate >>= reduce) scope 0
+  -> (a, [Expr])
+run scope names exprs predicate =
+  let result = fst $ evalRWS (subst mapping predicate >>= reduce) scope 0
+  in  (result, collectRedexes result)
  where
   mapping :: Mapping
   mapping = mappingFromSubstitution names exprs

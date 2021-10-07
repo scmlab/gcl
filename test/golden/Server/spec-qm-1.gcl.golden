@@ -1,9 +1,13 @@
 ### Result
 
-([], [ Precondition at ./test/source/Server/spec-qm-1.gcl [0-6] 1:1-3:3
-     `True`
-     Postcondition
-     `True` ], [], [])
+Cache { POs: []
+Specs: [ Precondition at ./test/source/Server/spec-qm-1.gcl [0-6] 1:1-3:3
+       `True`
+       Postcondition
+       `True` ]
+Props: []
+Warnings: []
+Redexes: [] }
 
 ### Source
 
