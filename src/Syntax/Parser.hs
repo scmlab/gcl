@@ -1,4 +1,3 @@
-{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PartialTypeSignatures #-}
@@ -516,16 +515,6 @@ indentedItems lvl sc' p = go
     sc'
     pos  <- Lex.indentLevel
     done <- isJust <$> optional eof
-    if done
-    then return []
-    else if
-      | pos > lvl -> Lex.incorrectIndent Ord.EQ lvl pos
-      | pos == lvl -> try ((:) <$> p <*> go) <|> return []
-      | otherwise -> return []
-
-
-    -- if pos > lvl
-    -- then Lex.incorrectIndent Ord.EQ lvl pos
-    -- else if not done && pos == lvl
-    --    then try ((:) <$> p <*> go) <|> return []
-    --    else return []
+    if not done && pos == lvl
+      then try ((:) <$> p <*> go) <|> return []
+      else return []
