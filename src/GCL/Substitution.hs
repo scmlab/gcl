@@ -57,6 +57,38 @@ instance Fresh M where
 
 ------------------------------------------------------------------
 
+class CollectRedexes a where
+    collectRedexes :: a -> [Expr]
+
+instance CollectRedexes Pred where
+  collectRedexes predicate = case predicate of
+    Constant x          -> collectRedexes x
+    GuardIf   x _       -> collectRedexes x
+    GuardLoop x _       -> collectRedexes x
+    Assertion x _       -> collectRedexes x
+    LoopInvariant x y _ -> collectRedexes x <> collectRedexes y
+    Bound x _           -> collectRedexes x
+    Conjunct xs         -> xs >>= collectRedexes
+    Disjunct xs         -> xs >>= collectRedexes
+    Negate   x          -> collectRedexes x
+
+instance CollectRedexes Expr where
+  collectRedexes expr = case expr of
+    App x y _       -> collectRedexes x <> collectRedexes y
+    Lam _ x _       -> collectRedexes x
+    Quant _ _ _ x _ -> collectRedexes x
+    -- Subst ex set map -> _
+    Expand ex _     -> [ex]
+    ArrIdx x y _    -> collectRedexes x <> collectRedexes y
+    ArrUpd x y z _  -> collectRedexes x <> collectRedexes y <> collectRedexes z
+    Case _ xs _     -> xs >>= collectRedexes
+    _               -> []
+
+instance CollectRedexes Case where
+  collectRedexes (CaseConstructor _ _ x) = collectRedexes x
+
+------------------------------------------------------------------
+
 
 
 --      a                  x    ~~~~~~~~~~~>    b
