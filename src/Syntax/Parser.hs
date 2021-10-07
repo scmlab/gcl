@@ -343,7 +343,8 @@ pExprF =
 
   -- To avoid stuck at parsing terms other than array
   pTermF =
-    choice [pElimF, pLitF, try pArrayF, pParenF, pVarF, pConstF, pQuantF ] <?> "term"
+    choice [pElimF, pLitF, try pArrayF, pParenF, pVarF, pConstF, pQuantF]
+      <?> "term"
 
   pParenF = Paren <$> lexParenStartF <*> pExprF <*> lexParenEndF
 
@@ -516,16 +517,6 @@ indentedItems lvl sc' p = go
     sc'
     pos  <- Lex.indentLevel
     done <- isJust <$> optional eof
-    if done
-    then return []
-    else if
-      | pos > lvl -> Lex.incorrectIndent Ord.EQ lvl pos
-      | pos == lvl -> try ((:) <$> p <*> go) <|> return []
-      | otherwise -> return []
-
-
-    -- if pos > lvl
-    -- then Lex.incorrectIndent Ord.EQ lvl pos
-    -- else if not done && pos == lvl
-    --    then try ((:) <$> p <*> go) <|> return []
-    --    else return []
+    if not done && pos == lvl
+      then try ((:) <$> p <*> go) <|> return []
+      else return []
