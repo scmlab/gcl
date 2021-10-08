@@ -16,7 +16,7 @@ Cache { POs: [ Loop Invariant at ./test/source/Server/spec-qm-5.gcl [53-77] 5:1-
              N - n ≥ 0`
              When the loop invariant f[n] = 0 and one of the guards n ≠ N remain true (that is, whilst looping), the bound N - n should be greater then 0  ]
 Specs: [ Precondition at ./test/source/Server/spec-qm-5.gcl [113-143] 7:13-9:15
-       `⟨ ∃ ?n_0 : n = ?n_0 + 1 : f[?n_0] = 0 ∧ ?n_0 ≠ N ⟩`
+       `⟨ ∃ ?n_10 : n = ?n_10 + 1 : f[?n_10] = 0 ∧ ?n_10 ≠ N ⟩`
        Postcondition
        `f[n] = 0` ]
 Props: []

@@ -36,13 +36,14 @@ import           Syntax.Common                  ( Name(Name)
 run
   :: (Substitutable a, Reducible a, CollectRedexes a)
   => Scope -- declarations
+  -> Int -- initial redex ID counter
   -> [Name] -- name of variables to be substituted
   -> [Expr] -- values to be substituted for
   -> a
-  -> (a, [(Int, Expr)])
-run scope names exprs predicate =
-  let result = fst $ evalRWS (subst mapping predicate >>= reduce) scope (0, 0)
-  in  (result, collectRedexes result)
+  -> (a, [(Int, Expr)], Int)
+run scope index names exprs predicate =
+  let (output, (_, index'), _) = runRWS (subst mapping predicate >>= reduce) scope (0, index)
+  in  (output, collectRedexes output, index')
  where
   mapping :: Mapping
   mapping = mappingFromSubstitution names exprs

@@ -1,24 +1,24 @@
 ( 0: INV [ x,y,z \ A,B,0 ]
   INV [ x,y,z \ A,B,0 ] ===> (A * B) + 0 = A * B
     
-0: INV
+33: INV
   INV ===> (x * y) + z = A * B
     
-0: INV [ x \ x - 1 ] [ z \ z + y ]
+22: INV [ x \ x - 1 ] [ z \ z + y ]
   INV [ x \ x - 1 ] [ z \ z + y ] ===> ((x - 1) * y) + (z + y) = A * B
     
-0: INV
+10: INV
   INV ===> (x * y) + z = A * B
     
-0: INV
+50: INV
   INV ===> (x * y) + z = A * B
     
-0: INV
+64: INV
   INV ===> (x * y) + z = A * B
     
 , (0, INV [ x,y,z \ A,B,0 ])
-(0, INV)
-(0, INV [ x \ x - 1 ] [ z \ z + y ])
-(0, INV)
-(0, INV)
-(0, INV) )
+(33, INV)
+(22, INV [ x \ x - 1 ] [ z \ z + y ])
+(10, INV)
+(50, INV)
+(64, INV) )

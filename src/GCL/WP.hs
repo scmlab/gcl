@@ -111,7 +111,9 @@ substitute
   -> WP a
 substitute xs es expr = do
   scope <- ask
-  let (result, redexes) = Substitution.run scope xs es expr
+  counter <- get
+  let (result, redexes, counter') = Substitution.run scope counter xs es expr
+  put counter'
   tell ([], [], [], redexes)
   return result
 

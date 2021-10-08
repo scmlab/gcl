@@ -1,21 +1,21 @@
-( 0: P n
+( 258: P n
   P n ===> s = ⟨ ↑ ij : 0 ≤ i ≤ j ≤ n : sum i j ⟩
-    5: sum i j
+    263: sum i j
       sum i j ===> ⟨ Σ k : i ≤ k < j : f[k] ⟩
         
-14: Q n
+272: Q n
   Q n ===> r = ⟨ ↑ i : 0 ≤ i ≤ n : sum i n ⟩
-    18: sum i n
+    276: sum i n
       sum i n ===> ⟨ Σ k : i ≤ k < n : f[k] ⟩
         
-0: P [ s \ s ↑ r ] [ r \ (r + f[n]) ↑ 0 ] (n + 1)
+149: P [ s \ s ↑ r ] [ r \ (r + f[n]) ↑ 0 ] (n + 1)
   P [ s \ s ↑ r ] [ r \ (r + f[n]) ↑ 0 ] (n + 1) ===> s ↑ ((r + f[n]) ↑ 0) = ⟨ ↑ ij : 0 ≤ i ≤ j ≤ n + 1 : sum i j ⟩
-    4: sum i j
+    153: sum i j
       sum i j ===> ⟨ Σ k : i ≤ k < j : f[k] ⟩
         
-12: Q [ r \ (r + f[n]) ↑ 0 ] (n + 1)
+161: Q [ r \ (r + f[n]) ↑ 0 ] (n + 1)
   Q [ r \ (r + f[n]) ↑ 0 ] (n + 1) ===> (r + f[n]) ↑ 0 = ⟨ ↑ i : 0 ≤ i ≤ n + 1 : sum i (n + 1) ⟩
-    15: sum i (n + 1)
+    164: sum i (n + 1)
       sum i (n + 1) ===> ⟨ Σ k : i ≤ k < n + 1 : f[k] ⟩
         
 0: P [ s \ 0 ] 0
@@ -28,45 +28,45 @@
     14: sum i 0
       sum i 0 ===> ⟨ Σ k : i ≤ k < 0 : f[k] ⟩
         
-0: P n
+74: P n
   P n ===> s = ⟨ ↑ ij : 0 ≤ i ≤ j ≤ n : sum i j ⟩
-    5: sum i j
+    79: sum i j
       sum i j ===> ⟨ Σ k : i ≤ k < j : f[k] ⟩
         
-14: Q n
+88: Q n
   Q n ===> r = ⟨ ↑ i : 0 ≤ i ≤ n : sum i n ⟩
-    18: sum i n
+    92: sum i n
       sum i n ===> ⟨ Σ k : i ≤ k < n : f[k] ⟩
         
-0: P n
+356: P n
   P n ===> s = ⟨ ↑ ij : 0 ≤ i ≤ j ≤ n : sum i j ⟩
-    5: sum i j
+    361: sum i j
       sum i j ===> ⟨ Σ k : i ≤ k < j : f[k] ⟩
         
-14: Q n
+370: Q n
   Q n ===> r = ⟨ ↑ i : 0 ≤ i ≤ n : sum i n ⟩
-    18: sum i n
+    374: sum i n
       sum i n ===> ⟨ Σ k : i ≤ k < n : f[k] ⟩
         
-0: P n
+433: P n
   P n ===> s = ⟨ ↑ ij : 0 ≤ i ≤ j ≤ n : sum i j ⟩
-    5: sum i j
+    438: sum i j
       sum i j ===> ⟨ Σ k : i ≤ k < j : f[k] ⟩
         
-14: Q n
+447: Q n
   Q n ===> r = ⟨ ↑ i : 0 ≤ i ≤ n : sum i n ⟩
-    18: sum i n
+    451: sum i n
       sum i n ===> ⟨ Σ k : i ≤ k < n : f[k] ⟩
         
-, (0, P n)
-(14, Q n)
-(0, P [ s \ s ↑ r ] [ r \ (r + f[n]) ↑ 0 ] (n + 1))
-(12, Q [ r \ (r + f[n]) ↑ 0 ] (n + 1))
+, (258, P n)
+(272, Q n)
+(149, P [ s \ s ↑ r ] [ r \ (r + f[n]) ↑ 0 ] (n + 1))
+(161, Q [ r \ (r + f[n]) ↑ 0 ] (n + 1))
 (0, P [ s \ 0 ] 0)
 (11, Q 0)
-(0, P n)
-(14, Q n)
-(0, P n)
-(14, Q n)
-(0, P n)
-(14, Q n) )
+(74, P n)
+(88, Q n)
+(356, P n)
+(370, Q n)
+(433, P n)
+(447, Q n) )
