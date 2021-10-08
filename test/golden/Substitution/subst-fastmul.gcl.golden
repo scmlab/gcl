@@ -1,4 +1,4 @@
-INV [ x,y,z \ A,B,0 ]
+( INV [ x,y,z \ A,B,0 ]
   INV [ x,y,z \ A,B,0 ] ===> (A * B) + 0 = A * B
     
 INV
@@ -16,3 +16,9 @@ INV
 INV
   INV ===> (x * y) + z = A * B
     
+, INV [ x,y,z \ A,B,0 ]
+INV
+INV [ x \ x - 1 ] [ z \ z + y ]
+INV
+INV
+INV )

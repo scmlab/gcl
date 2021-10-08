@@ -1,4 +1,4 @@
-P n
+( P n
   P n ===> s = ⟨ ↑ ij : 0 ≤ i ≤ j ≤ n : sum i j ⟩
     sum i j
       sum i j ===> ⟨ Σ k : i ≤ k < j : f[k] ⟩
@@ -58,3 +58,15 @@ Q n
     sum i n
       sum i n ===> ⟨ Σ k : i ≤ k < n : f[k] ⟩
         
+, P n
+Q n
+P [ s \ s ↑ r ] [ r \ (r + f[n]) ↑ 0 ] (n + 1)
+Q [ r \ (r + f[n]) ↑ 0 ] (n + 1)
+P [ s \ 0 ] 0
+Q 0
+P n
+Q n
+P n
+Q n
+P n
+Q n )

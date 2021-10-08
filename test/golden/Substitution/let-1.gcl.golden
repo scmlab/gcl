@@ -1,3 +1,1 @@
-P a
-  P a ===> a = a
-    
+(P a   P a ===> a = a  , P a)

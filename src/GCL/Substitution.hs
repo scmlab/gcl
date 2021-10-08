@@ -8,7 +8,7 @@ module GCL.Substitution
   -- TODO: don't export these 
   , Substitutable
   , Reducible
-  , CollectRedexes
+  , CollectRedexes(collectRedexes)
   ) where
 
 import           Control.Monad.RWS
@@ -21,7 +21,7 @@ import           Data.Text                      ( Text )
 import           GCL.Common                     ( Free(fv)
                                                 , Fresh(fresh, freshWithLabel)
                                                 )
-import           GCL.Predicate                  ( Pred(..) )
+import           GCL.Predicate                  ( Pred(..), PO (PO) )
 import           Syntax.Abstract                ( Case(CaseConstructor)
                                                 , Expr(..)
                                                 , Mapping
@@ -65,6 +65,9 @@ instance Fresh M where
 class CollectRedexes a where
     collectRedexes :: a -> [Expr]
 
+instance CollectRedexes PO where
+  collectRedexes (PO pre post _ _ _) = collectRedexes pre <> collectRedexes post
+
 instance CollectRedexes Pred where
   collectRedexes predicate = case predicate of
     Constant x          -> collectRedexes x
@@ -82,8 +85,8 @@ instance CollectRedexes Expr where
     App x y _       -> collectRedexes x <> collectRedexes y
     Lam _ x _       -> collectRedexes x
     Quant _ _ _ x _ -> collectRedexes x
-    -- Subst ex set map -> _
-    Expand ex _     -> [ex]
+    Subst x _ _     -> collectRedexes x
+    Expand before _ -> [before]
     ArrIdx x y _    -> collectRedexes x <> collectRedexes y
     ArrUpd x y z _  -> collectRedexes x <> collectRedexes y <> collectRedexes z
     Case _ xs _     -> xs >>= collectRedexes

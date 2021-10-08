@@ -14,15 +14,17 @@ import           Pretty
 import           Render                         ( Inlines(..)
                                                 , Render(render)
                                                 )
-import           Server.DSL                     ( parseProgram
-                                                , sweep, Cache (cachePOs)
+import           Server.DSL                     ( Cache(cachePOs)
+                                                , parseProgram
+                                                , sweep
                                                 )
 import           Server.Interpreter.Test        ( runTest
                                                 , serializeTestResultValueOnly
                                                 )
-import           Syntax.Abstract                ( Expr(..) )
+import           Syntax.Abstract                ( Expr(..), Case (CaseConstructor) )
 import           Test.Tasty              hiding ( after )
 import           Test.Util
+import GCL.Substitution (collectRedexes)
 
 tests :: TestTree
 tests = testGroup "Substitution" [letBindings]
@@ -47,11 +49,12 @@ letBindings = testGroup
     runGoldenTest "./test/source/Substitution/" "./test/golden/Substitution/" ""
       $ \sourcePath source -> do
           return $ serializeTestResultValueOnly $ runTest sourcePath source $ do
-            program        <- parseProgram source
-            pos <- cachePOs <$> sweep program
-            let substs = pos >>= extractExpand
-            let trees  = map toTree substs
-            return (Right (VList trees))
+            program <- parseProgram source
+            cache   <- sweep program
+            let pos = cachePOs cache
+            let trees  = VList $ map toTree (pos >>= extractExpand)
+            let redexes = VList (pos >>= collectRedexes)
+            return (Right (trees, redexes))
 
 
 -- Tree-like structure for representing the transition from one Expn to the next
@@ -117,10 +120,9 @@ instance ExtractExpand Pred where
 
 instance ExtractExpand Expr where
   extractExpand = \case
-    --Chain x _ y _   -> extractExpand x <> extractExpand y
     App x y _       -> extractExpand x <> extractExpand y
     Lam _ x _       -> extractExpand x
-    Quant x _ y z _ -> extractExpand x <> extractExpand y <> extractExpand z
+    Quant _ _ _ z _ -> extractExpand z
     Expand before after ->
       [ EXPN (render before)
              (render after)
@@ -130,6 +132,10 @@ instance ExtractExpand Expr where
     Subst  x _ _   -> extractExpand x
     ArrIdx x y _   -> extractExpand x <> extractExpand y
     ArrUpd x y z _ -> extractExpand x <> extractExpand y <> extractExpand z
+    Case _ xs _     -> xs >>= extractExpand
     _              -> []
+
+instance ExtractExpand Case where
+  extractExpand (CaseConstructor _ _ x) = extractExpand x
 
 --------------------------------------------------------------------------------
