@@ -42,7 +42,8 @@ run
   -> a
   -> (a, [(Int, Expr)], Int)
 run scope index names exprs predicate =
-  let (output, (_, index'), _) = runRWS (subst mapping predicate >>= reduce) scope (0, index)
+  let (output, (_, index'), _) =
+        runRWS (subst mapping predicate >>= reduce) scope (0, index)
   in  (output, collectRedexes output, index')
  where
   mapping :: Mapping
@@ -94,15 +95,15 @@ instance CollectRedexes Pred where
 
 instance CollectRedexes Expr where
   collectRedexes expr = case expr of
-    App x y _             -> collectRedexes x <> collectRedexes y
-    Lam _ x _             -> collectRedexes x
-    Quant _ _ _ x _       -> collectRedexes x
-    Subst  x     _      _ -> collectRedexes x
-    Expand index before _ -> [(index, before)]
-    ArrIdx x     y      _ -> collectRedexes x <> collectRedexes y
+    App x y _                   -> collectRedexes x <> collectRedexes y
+    Lam _ x _                   -> collectRedexes x
+    Quant _ _ _ x _             -> collectRedexes x
+    DisplaySubst x     _      _ -> collectRedexes x
+    Expand       index before _ -> [(index, before)]
+    ArrIdx       x     y      _ -> collectRedexes x <> collectRedexes y
     ArrUpd x y z _ -> collectRedexes x <> collectRedexes y <> collectRedexes z
-    Case _ xs _           -> xs >>= collectRedexes
-    _                     -> []
+    Case _ xs _                 -> xs >>= collectRedexes
+    _                           -> []
 
 instance CollectRedexes Case where
   collectRedexes (CaseConstructor _ _ x) = collectRedexes x
@@ -147,8 +148,8 @@ instance Reducible Expr where
     Lam binder body l -> Lam binder <$> reduce body <*> return l
     Quant op binders range body l ->
       Quant op binders range <$> reduce body <*> return l
-    Subst e freeVarsInE mapping ->
-      Subst <$> reduce e <*> return freeVarsInE <*> return mapping
+    DisplaySubst e freeVarsInE mapping ->
+      DisplaySubst <$> reduce e <*> return freeVarsInE <*> return mapping
     Expand index before after ->
       Expand index <$> reduce before <*> reduce after
     ArrIdx array index l -> ArrIdx <$> reduce array <*> reduce index <*> pure l
@@ -207,8 +208,9 @@ instance Substitutable Expr where
             -- [subst-Var-defined]
           Just (Just binding) -> do
             after <- subst mapping binding
-            let before =
-                  Subst expr (fv binding) (shrinkMapping binding mapping)
+            let before = DisplaySubst expr
+                                      (fv binding)
+                                      (shrinkMapping binding mapping)
             return $ Expand index before after
           -- [subst-Var-defined]
           Just Nothing -> return expr
@@ -239,8 +241,9 @@ instance Substitutable Expr where
             -- [subst-Const-defined]
           Just (Just binding) -> do
             after <- subst mapping binding
-            let before =
-                  Subst expr (fv binding) (shrinkMapping binding mapping)
+            let before = DisplaySubst expr
+                                      (fv binding)
+                                      (shrinkMapping binding mapping)
             return $ Expand index before after
           -- [subst-Const-not-defined]
           Just Nothing -> return expr
@@ -320,14 +323,16 @@ instance Substitutable Expr where
         --      when shrinking the applied outer new mapping (`mapping` in this case)
         --      free variables occured from the inner old mapping (`mapping'` in this case)
         --      should be taken into consideration
-    Subst e freeVarsInE mapping' ->
+    DisplaySubst e freeVarsInE mapping' ->
       let
         freeVarsInMapping' = fv mapping'
         freeVars           = freeVarsInE <> freeVarsInMapping'
         shrinkedMapping =
           Map.restrictKeys mapping (Set.map nameToText freeVars)
       in
-        return $ Subst (Subst e freeVarsInE mapping') freeVars shrinkedMapping
+        return $ DisplaySubst (DisplaySubst e freeVarsInE mapping')
+                              freeVars
+                              shrinkedMapping
 --
 --      a                   ~[.../...]~>    a'
 --      b                   ~[.../...]~>    b'

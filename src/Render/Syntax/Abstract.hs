@@ -73,7 +73,7 @@ handleExpr _ (Quant op xs r t _) =
   renderQOp (Op (ArithOp (Mul   _))) = "Π"
   renderQOp (Op op'                ) = render op'
   renderQOp op'                      = render op'
-handleExpr n (Subst expr _ mapping) =
+handleExpr n (DisplaySubst expr _ mapping) =
   return $ renderPrec n expr <+> render mapping
 handleExpr n (Expand _ before after) =
   return $ expandE (renderPrec n before) mempty (renderPrec n after)
@@ -95,7 +95,7 @@ instance Render Mapping where
 
 instance Render Case where
   render (CaseConstructor ctor binders body) =
-    render ctor <+> horzE (map render binders) <+> "->" <+> render body 
+    render ctor <+> horzE (map render binders) <+> "->" <+> render body
 
 instance Render Pattern where
   render (PattBinder   a) = render a

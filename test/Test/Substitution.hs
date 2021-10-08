@@ -138,11 +138,11 @@ instance ExtractExpand Expr where
              (extractExpand before)
              (extractExpand after)
       ]
-    Subst  x _ _   -> extractExpand x
-    ArrIdx x y _   -> extractExpand x <> extractExpand y
-    ArrUpd x y z _ -> extractExpand x <> extractExpand y <> extractExpand z
-    Case _ xs _    -> xs >>= extractExpand
-    _              -> []
+    DisplaySubst x _ _ -> extractExpand x
+    ArrIdx       x y _ -> extractExpand x <> extractExpand y
+    ArrUpd x y z _     -> extractExpand x <> extractExpand y <> extractExpand z
+    Case _ xs _        -> xs >>= extractExpand
+    _                  -> []
 
 instance ExtractExpand Case where
   extractExpand (CaseConstructor _ _ x) = extractExpand x

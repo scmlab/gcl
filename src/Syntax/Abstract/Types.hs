@@ -49,9 +49,9 @@ instance Monoid Definitions where
 
 -- function definition
 data FuncDefn = FuncDefn
-  { funcName :: Name
+  { funcName    :: Name
   , funcClauses :: [([Name], Expr)]
-  , funcLoc  :: Loc
+  , funcLoc     :: Loc
   }
   deriving (Eq, Show)
 
@@ -135,7 +135,8 @@ data Expr
   | App Expr Expr Loc
   | Lam Name Expr Loc
   | Quant Expr [Name] Expr Expr Loc
-  | Subst Expr -- expression to be substituted
+  | DisplaySubst -- for displaying the mapping of substitution `expr [ v \ e ... ]`
+    Expr -- expression to be substituted
     (Set Name) -- free variables in that expression
                -- NOTE, the expression may be some definition like "P",
               --  in that case, the free variables should be that of after it's been expanded
@@ -153,7 +154,7 @@ type Mapping = Map Text Expr
 --------------------------------------------------------------------------------
 -- | Pattern matching
 
-data Case = CaseConstructor Name [Name] Expr 
+data Case = CaseConstructor Name [Name] Expr
   deriving (Eq, Show, Generic)
 
 data Pattern
