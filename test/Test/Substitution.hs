@@ -23,7 +23,7 @@ import           Server.Interpreter.Test        ( runTest
                                                 , serializeTestResultValueOnly
                                                 )
 import           Syntax.Abstract                ( Case(CaseConstructor)
-                                                , Expr(..)
+                                                , Expr(..), Redex(..)
                                                 )
 import           Test.Tasty              hiding ( after )
 import           Test.Util
@@ -131,7 +131,7 @@ instance ExtractExpand Expr where
     App x y _       -> extractExpand x <> extractExpand y
     Lam _ x _       -> extractExpand x
     Quant _ _ _ z _ -> extractExpand z
-    Expand index before after ->
+    Redex (Rdx index before after) ->
       [ EXPN index
              (render before)
              (render after)

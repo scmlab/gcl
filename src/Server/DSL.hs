@@ -55,7 +55,7 @@ data Cache = Cache
     -- expressions that can be reduced are stored here and labeled with an ID 
     -- so that when the client wants to reduce some expression
     -- we can find the corresponding redex here 
-  , cacheRedexes  :: [(Int, A.Expr)]
+  , cacheRedexes  :: [A.Redex]
   }
   deriving (Eq, Show)
 

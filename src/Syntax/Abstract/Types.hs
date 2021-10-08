@@ -141,7 +141,7 @@ data Expr
                -- NOTE, the expression may be some definition like "P",
               --  in that case, the free variables should be that of after it's been expanded
     Mapping -- mapping of substitution to be displayed to users
-  | Expand Int Expr Expr
+  | Redex Redex
   | ArrIdx Expr Expr Loc
   | ArrUpd Expr Expr Expr Loc
   | Case Expr [Case] Loc
@@ -150,6 +150,12 @@ data Expr
 type QuantOp' = Either Op Expr
 
 type Mapping = Map Text Expr
+
+data Redex = Rdx {
+    redexID :: Int,
+    redexBefore :: Expr,
+    redexAfter :: Expr
+  } deriving (Eq, Show, Generic)
 
 --------------------------------------------------------------------------------
 -- | Pattern matching

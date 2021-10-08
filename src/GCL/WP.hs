@@ -64,7 +64,7 @@ type TM = Except StructError
 type WP
   = RWST
       Substitution.Scope
-      ([PO], [Spec], [StructWarning], [(Int, A.Expr)])
+      ([PO], [Spec], [StructWarning], [A.Redex])
       Int
       TM
 
@@ -77,11 +77,11 @@ instance Fresh WP where
 runWP
   :: WP a
   -> Substitution.Scope
-  -> Either StructError (a, ([PO], [Spec], [StructWarning], [(Int, A.Expr)]))
+  -> Either StructError (a, ([PO], [Spec], [StructWarning], [A.Redex]))
 runWP p decls = runExcept $ evalRWST p decls 0
 
 sweep
-  :: A.Program -> Either StructError ([PO], [Spec], [StructWarning], [(Int, A.Expr)])
+  :: A.Program -> Either StructError ([PO], [Spec], [StructWarning], [A.Redex])
 sweep program@(A.Program _ _ _props stmts _) = do
   let scope = A.programToScopeForSubstitution program
   (_, (pos, specs, warnings, redexes)) <- runWP (structProgram stmts) scope

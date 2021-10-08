@@ -27,6 +27,7 @@ import           GCL.Predicate                  ( PO(PO)
 import           Syntax.Abstract                ( Case(CaseConstructor)
                                                 , Expr(..)
                                                 , Mapping
+                                                , Redex(..)
                                                 )
 import           Syntax.Common                  ( Name(Name)
                                                 , nameToText
@@ -40,7 +41,7 @@ run
   -> [Name] -- name of variables to be substituted
   -> [Expr] -- values to be substituted for
   -> a
-  -> (a, [(Int, Expr)], Int)
+  -> (a, [Redex], Int)
 run scope index names exprs predicate =
   let (output, (_, index'), _) =
         runRWS (subst mapping predicate >>= reduce) scope (0, index)
@@ -75,7 +76,7 @@ freshRedexIndex = do
 ------------------------------------------------------------------
 
 class CollectRedexes a where
-    collectRedexes :: a -> [(Int, Expr)]
+    collectRedexes :: a -> [Redex]
 
 instance CollectRedexes PO where
   collectRedexes (PO pre post _ _ _) =
@@ -95,15 +96,15 @@ instance CollectRedexes Pred where
 
 instance CollectRedexes Expr where
   collectRedexes expr = case expr of
-    App x y _                   -> collectRedexes x <> collectRedexes y
-    Lam _ x _                   -> collectRedexes x
-    Quant _ _ _ x _             -> collectRedexes x
-    DisplaySubst x     _      _ -> collectRedexes x
-    Expand       index before _ -> [(index, before)]
-    ArrIdx       x     y      _ -> collectRedexes x <> collectRedexes y
+    App x y _          -> collectRedexes x <> collectRedexes y
+    Lam _ x _          -> collectRedexes x
+    Quant _ _ _ x _    -> collectRedexes x
+    DisplaySubst x _ _ -> collectRedexes x
+    Redex redex        -> [redex]
+    ArrIdx x y _       -> collectRedexes x <> collectRedexes y
     ArrUpd x y z _ -> collectRedexes x <> collectRedexes y <> collectRedexes z
-    Case _ xs _                 -> xs >>= collectRedexes
-    _                           -> []
+    Case _ xs _        -> xs >>= collectRedexes
+    _                  -> []
 
 instance CollectRedexes Case where
   collectRedexes (CaseConstructor _ _ x) = collectRedexes x
@@ -138,9 +139,11 @@ instance Reducible Expr where
       x' <- reduce x
       case f' of
           -- [reduce-App-Expand-Lam]
-        Expand index before (Lam n body l2) ->
-          Expand index <$> reduce (App before x' l1) <*> reduce
-            (App (Lam n body l2) x' l1)
+        Redex (Rdx index before (Lam n body l2)) ->
+          Redex
+            <$> (Rdx index <$> reduce (App before x' l1) <*> reduce
+                  (App (Lam n body l2) x' l1)
+                )
         -- [reduce-App-Lam]
         Lam n body _ -> subst (mappingFromSubstitution [n] [x']) body
         -- [Others]
@@ -150,12 +153,15 @@ instance Reducible Expr where
       Quant op binders range <$> reduce body <*> return l
     DisplaySubst e freeVarsInE mapping ->
       DisplaySubst <$> reduce e <*> return freeVarsInE <*> return mapping
-    Expand index before after ->
-      Expand index <$> reduce before <*> reduce after
+    Redex redex          -> Redex <$> reduce redex
     ArrIdx array index l -> ArrIdx <$> reduce array <*> reduce index <*> pure l
     ArrUpd array index value l ->
       ArrUpd <$> reduce array <*> reduce index <*> reduce value <*> pure l
     _ -> return expr
+
+instance Reducible Redex where
+  reduce (Rdx index before after) =
+    Rdx index <$> reduce before <*> reduce after
 
 instance Reducible Pred where
   reduce = \case
@@ -211,7 +217,7 @@ instance Substitutable Expr where
             let before = DisplaySubst expr
                                       (fv binding)
                                       (shrinkMapping binding mapping)
-            return $ Expand index before after
+            return $ Redex (Rdx index before after)
           -- [subst-Var-defined]
           Just Nothing -> return expr
           Nothing      -> return expr
@@ -244,7 +250,7 @@ instance Substitutable Expr where
             let before = DisplaySubst expr
                                       (fv binding)
                                       (shrinkMapping binding mapping)
-            return $ Expand index before after
+            return $ Redex (Rdx index before after)
           -- [subst-Const-not-defined]
           Just Nothing -> return expr
           Nothing      -> return expr
@@ -339,8 +345,8 @@ instance Substitutable Expr where
 -- ---------------------------------------------------------------[subst-Expand]
 --      a ===> b            ~[.../...]~>    a' ===> b'
 --
-    Expand index before after ->
-      Expand index <$> subst mapping before <*> subst mapping after
+    Redex (Rdx index before after) ->
+      Redex <$> (Rdx index <$> subst mapping before <*> subst mapping after)
 
 --
 --      a                   ~[.../...]~>    a'

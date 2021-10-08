@@ -42,10 +42,10 @@ instance Pretty Declaration where
       <> " }"
 
 instance Pretty FuncDefn where
-  pretty (FuncDefn name clauses _) = 
+  pretty (FuncDefn name clauses _) =
     vsep (map f clauses)
-    where 
-      f (args, body) = pretty name <> hsep (map pretty args) <> " = " <> pretty body 
+    where
+      f (args, body) = pretty name <> hsep (map pretty args) <> " = " <> pretty body
 
 instance Pretty TypeDefn where
   pretty (TypeDefn name binders qdcons _) =
@@ -110,6 +110,13 @@ instance Pretty Expr where
 
 instance PrettyPrec Expr where
   prettyPrec = fromRenderPrec
+
+instance Pretty Redex where
+  pretty = prettyPrec 0
+
+instance PrettyPrec Redex where
+  prettyPrec n (Rdx index before _after) = "(" <> pretty index <> "," <+> prettyPrec n before <> ")"
+
 
 --------------------------------------------------------------------------------
 

@@ -75,14 +75,17 @@ handleExpr _ (Quant op xs r t _) =
   renderQOp op'                      = render op'
 handleExpr n (DisplaySubst expr _ mapping) =
   return $ renderPrec n expr <+> render mapping
-handleExpr n (Expand _ before after) =
-  return $ expandE (renderPrec n before) mempty (renderPrec n after)
+handleExpr n (Redex redex   ) = return $ renderPrec n redex
 handleExpr _ (ArrIdx e1 e2 _) = return $ render e1 <> "[" <> render e2 <> "]"
 handleExpr _ (ArrUpd e1 e2 e3 _) =
   return $ "(" <+> render e1 <+> ":" <+> render e2 <+> "↣" <+> render e3 <+> ")"
     -- SCM: need to print parenthesis around e1 when necessary.
 handleExpr _ (Case expr cases _) =
   return $ "case" <+> render expr <+> "of" <+> vertE (map render cases)
+
+instance Render Redex where
+  renderPrec n (Rdx _index before after) =
+    expandE (renderPrec n before) mempty (renderPrec n after)
 
 instance Render Mapping where
   render env | null env  = mempty
