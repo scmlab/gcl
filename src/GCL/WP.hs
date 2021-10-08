@@ -65,20 +65,20 @@ type WP
   = RWST
       Substitution.Scope
       ([PO], [Spec], [StructWarning], [(Int, A.Expr)])
-      (Int, Int, Int)
+      Int
       TM
 
 instance Fresh WP where
   fresh = do
-    (i, j, k) <- get
-    put (i, j, succ k)
-    return k
+    i <- get 
+    put (succ i)
+    return i
 
 runWP
   :: WP a
   -> Substitution.Scope
   -> Either StructError (a, ([PO], [Spec], [StructWarning], [(Int, A.Expr)]))
-runWP p decls = runExcept $ evalRWST p decls (0, 0, 0)
+runWP p decls = runExcept $ evalRWST p decls 0
 
 sweep
   :: A.Program -> Either StructError ([PO], [Spec], [StructWarning], [(Int, A.Expr)])
@@ -577,9 +577,6 @@ tellPO :: Pred -> Pred -> Origin -> WP ()
 tellPO p q origin = unless (toExpr p == toExpr q) $ do
   p'        <- substitute [] [] p
   q'        <- substitute [] [] q
-
-  (i, j, k) <- get
-  put (succ i, j, k)
   let anchorHash =
         Text.pack $ showHex (abs (Hashable.hash (toString (p', q')))) ""
   tell ([PO p' q' anchorHash Nothing origin], [], [], [])
@@ -592,10 +589,8 @@ tellSpec :: Pred -> Pred -> Range -> WP ()
 tellSpec p q l = do
   p'        <- substitute [] [] p
   q'        <- substitute [] [] q
-
-  (i, j, k) <- get
-  put (i, succ j, k)
-  tell ([], [Specification j p' q' l], [], [])
+  i <- fresh 
+  tell ([], [Specification i p' q' l], [], [])
 
 throwWarning :: StructWarning -> WP ()
 throwWarning warning = tell ([], [], [warning], [])
