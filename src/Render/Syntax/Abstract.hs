@@ -75,7 +75,7 @@ handleExpr _ (Quant op xs r t _) =
   renderQOp op'                      = render op'
 handleExpr n (Subst expr _ mapping) =
   return $ renderPrec n expr <+> render mapping
-handleExpr n (Expand before after) =
+handleExpr n (Expand _ before after) =
   return $ expandE (renderPrec n before) mempty (renderPrec n after)
 handleExpr _ (ArrIdx e1 e2 _) = return $ render e1 <> "[" <> render e2 <> "]"
 handleExpr _ (ArrUpd e1 e2 e3 _) =

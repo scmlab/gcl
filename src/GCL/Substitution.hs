@@ -21,7 +21,9 @@ import           Data.Text                      ( Text )
 import           GCL.Common                     ( Free(fv)
                                                 , Fresh(fresh, freshWithLabel)
                                                 )
-import           GCL.Predicate                  ( Pred(..), PO (PO) )
+import           GCL.Predicate                  ( PO(PO)
+                                                , Pred(..)
+                                                )
 import           Syntax.Abstract                ( Case(CaseConstructor)
                                                 , Expr(..)
                                                 , Mapping
@@ -37,9 +39,9 @@ run
   -> [Name] -- name of variables to be substituted
   -> [Expr] -- values to be substituted for
   -> a
-  -> (a, [Expr])
+  -> (a, [(Int, Expr)])
 run scope names exprs predicate =
-  let result = fst $ evalRWS (subst mapping predicate >>= reduce) scope 0
+  let result = fst $ evalRWS (subst mapping predicate >>= reduce) scope (0, 0)
   in  (result, collectRedexes result)
  where
   mapping :: Mapping
@@ -52,21 +54,30 @@ mappingFromSubstitution xs es =
 ------------------------------------------------------------------
 
 type Scope = Map Text (Maybe Expr)
-type M = RWS Scope () Int
+type M = RWS Scope () (Int, Int)
 
+-- for alpha-renaming 
 instance Fresh M where
   fresh = do
-    i <- get
-    put (succ i)
-    return i
+    (x, i) <- get
+    put (succ x, i)
+    return x
+
+-- for indexing redexes
+freshRedexIndex :: M Int
+freshRedexIndex = do
+  (x, i) <- get
+  put (x, succ i)
+  return i
 
 ------------------------------------------------------------------
 
 class CollectRedexes a where
-    collectRedexes :: a -> [Expr]
+    collectRedexes :: a -> [(Int, Expr)]
 
 instance CollectRedexes PO where
-  collectRedexes (PO pre post _ _ _) = collectRedexes pre <> collectRedexes post
+  collectRedexes (PO pre post _ _ _) =
+    collectRedexes pre <> collectRedexes post
 
 instance CollectRedexes Pred where
   collectRedexes predicate = case predicate of
@@ -82,15 +93,15 @@ instance CollectRedexes Pred where
 
 instance CollectRedexes Expr where
   collectRedexes expr = case expr of
-    App x y _       -> collectRedexes x <> collectRedexes y
-    Lam _ x _       -> collectRedexes x
-    Quant _ _ _ x _ -> collectRedexes x
-    Subst x _ _     -> collectRedexes x
-    Expand before _ -> [before]
-    ArrIdx x y _    -> collectRedexes x <> collectRedexes y
-    ArrUpd x y z _  -> collectRedexes x <> collectRedexes y <> collectRedexes z
-    Case _ xs _     -> xs >>= collectRedexes
-    _               -> []
+    App x y _             -> collectRedexes x <> collectRedexes y
+    Lam _ x _             -> collectRedexes x
+    Quant _ _ _ x _       -> collectRedexes x
+    Subst  x     _      _ -> collectRedexes x
+    Expand index before _ -> [(index, before)]
+    ArrIdx x     y      _ -> collectRedexes x <> collectRedexes y
+    ArrUpd x y z _ -> collectRedexes x <> collectRedexes y <> collectRedexes z
+    Case _ xs _           -> xs >>= collectRedexes
+    _                     -> []
 
 instance CollectRedexes Case where
   collectRedexes (CaseConstructor _ _ x) = collectRedexes x
@@ -125,8 +136,8 @@ instance Reducible Expr where
       x' <- reduce x
       case f' of
           -- [reduce-App-Expand-Lam]
-        Expand before (Lam n body l2) ->
-          Expand <$> reduce (App before x' l1) <*> reduce
+        Expand index before (Lam n body l2) ->
+          Expand index <$> reduce (App before x' l1) <*> reduce
             (App (Lam n body l2) x' l1)
         -- [reduce-App-Lam]
         Lam n body _ -> subst (mappingFromSubstitution [n] [x']) body
@@ -137,7 +148,8 @@ instance Reducible Expr where
       Quant op binders range <$> reduce body <*> return l
     Subst e freeVarsInE mapping ->
       Subst <$> reduce e <*> return freeVarsInE <*> return mapping
-    Expand before after  -> Expand <$> reduce before <*> reduce after
+    Expand index before after ->
+      Expand index <$> reduce before <*> reduce after
     ArrIdx array index l -> ArrIdx <$> reduce array <*> reduce index <*> pure l
     ArrUpd array index value l ->
       ArrUpd <$> reduce array <*> reduce index <*> reduce value <*> pure l
@@ -189,13 +201,14 @@ instance Substitutable Expr where
       Just value -> return value -- [subst-Var-substituted]
       Nothing    -> do
         scope <- ask
+        index <- freshRedexIndex
         case Map.lookup (nameToText name) scope of
             -- [subst-Var-defined]
           Just (Just binding) -> do
             after <- subst mapping binding
             let before =
                   Subst expr (fv binding) (shrinkMapping binding mapping)
-            return $ Expand before after
+            return $ Expand index before after
           -- [subst-Var-defined]
           Just Nothing -> return expr
           Nothing      -> return expr
@@ -220,13 +233,14 @@ instance Substitutable Expr where
       Just value -> reduce value -- [subst-Const-substituted]
       Nothing    -> do
         scope <- ask
+        index <- freshRedexIndex
         case Map.lookup (nameToText name) scope of
             -- [subst-Const-defined]
           Just (Just binding) -> do
             after <- subst mapping binding
             let before =
                   Subst expr (fv binding) (shrinkMapping binding mapping)
-            return $ Expand before after
+            return $ Expand index before after
           -- [subst-Const-not-defined]
           Just Nothing -> return expr
           Nothing      -> return expr
@@ -319,8 +333,8 @@ instance Substitutable Expr where
 -- ---------------------------------------------------------------[subst-Expand]
 --      a ===> b            ~[.../...]~>    a' ===> b'
 --
-    Expand before after ->
-      Expand <$> subst mapping before <*> subst mapping after
+    Expand index before after ->
+      Expand index <$> subst mapping before <*> subst mapping after
 
 --
 --      a                   ~[.../...]~>    a'

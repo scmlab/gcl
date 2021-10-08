@@ -1,72 +1,72 @@
-( P n
+( 0: P n
   P n ===> s = ⟨ ↑ ij : 0 ≤ i ≤ j ≤ n : sum i j ⟩
-    sum i j
+    5: sum i j
       sum i j ===> ⟨ Σ k : i ≤ k < j : f[k] ⟩
         
-Q n
+14: Q n
   Q n ===> r = ⟨ ↑ i : 0 ≤ i ≤ n : sum i n ⟩
-    sum i n
+    18: sum i n
       sum i n ===> ⟨ Σ k : i ≤ k < n : f[k] ⟩
         
-P [ s \ s ↑ r ] [ r \ (r + f[n]) ↑ 0 ] (n + 1)
+0: P [ s \ s ↑ r ] [ r \ (r + f[n]) ↑ 0 ] (n + 1)
   P [ s \ s ↑ r ] [ r \ (r + f[n]) ↑ 0 ] (n + 1) ===> s ↑ ((r + f[n]) ↑ 0) = ⟨ ↑ ij : 0 ≤ i ≤ j ≤ n + 1 : sum i j ⟩
-    sum i j
+    4: sum i j
       sum i j ===> ⟨ Σ k : i ≤ k < j : f[k] ⟩
         
-Q [ r \ (r + f[n]) ↑ 0 ] (n + 1)
+12: Q [ r \ (r + f[n]) ↑ 0 ] (n + 1)
   Q [ r \ (r + f[n]) ↑ 0 ] (n + 1) ===> (r + f[n]) ↑ 0 = ⟨ ↑ i : 0 ≤ i ≤ n + 1 : sum i (n + 1) ⟩
-    sum i (n + 1)
+    15: sum i (n + 1)
       sum i (n + 1) ===> ⟨ Σ k : i ≤ k < n + 1 : f[k] ⟩
         
-P [ s \ 0 ] 0
+0: P [ s \ 0 ] 0
   P [ s \ 0 ] 0 ===> 0 = ⟨ ↑ ij : 0 ≤ i ≤ j ≤ 0 : sum i j ⟩
-    sum i j
+    3: sum i j
       sum i j ===> ⟨ Σ k : i ≤ k < j : f[k] ⟩
         
-Q 0
+11: Q 0
   Q 0 ===> r = ⟨ ↑ i : 0 ≤ i ≤ 0 : sum i 0 ⟩
-    sum i 0
+    14: sum i 0
       sum i 0 ===> ⟨ Σ k : i ≤ k < 0 : f[k] ⟩
         
-P n
+0: P n
   P n ===> s = ⟨ ↑ ij : 0 ≤ i ≤ j ≤ n : sum i j ⟩
-    sum i j
+    5: sum i j
       sum i j ===> ⟨ Σ k : i ≤ k < j : f[k] ⟩
         
-Q n
+14: Q n
   Q n ===> r = ⟨ ↑ i : 0 ≤ i ≤ n : sum i n ⟩
-    sum i n
+    18: sum i n
       sum i n ===> ⟨ Σ k : i ≤ k < n : f[k] ⟩
         
-P n
+0: P n
   P n ===> s = ⟨ ↑ ij : 0 ≤ i ≤ j ≤ n : sum i j ⟩
-    sum i j
+    5: sum i j
       sum i j ===> ⟨ Σ k : i ≤ k < j : f[k] ⟩
         
-Q n
+14: Q n
   Q n ===> r = ⟨ ↑ i : 0 ≤ i ≤ n : sum i n ⟩
-    sum i n
+    18: sum i n
       sum i n ===> ⟨ Σ k : i ≤ k < n : f[k] ⟩
         
-P n
+0: P n
   P n ===> s = ⟨ ↑ ij : 0 ≤ i ≤ j ≤ n : sum i j ⟩
-    sum i j
+    5: sum i j
       sum i j ===> ⟨ Σ k : i ≤ k < j : f[k] ⟩
         
-Q n
+14: Q n
   Q n ===> r = ⟨ ↑ i : 0 ≤ i ≤ n : sum i n ⟩
-    sum i n
+    18: sum i n
       sum i n ===> ⟨ Σ k : i ≤ k < n : f[k] ⟩
         
-, P n
-Q n
-P [ s \ s ↑ r ] [ r \ (r + f[n]) ↑ 0 ] (n + 1)
-Q [ r \ (r + f[n]) ↑ 0 ] (n + 1)
-P [ s \ 0 ] 0
-Q 0
-P n
-Q n
-P n
-Q n
-P n
-Q n )
+, (0, P n)
+(14, Q n)
+(0, P [ s \ s ↑ r ] [ r \ (r + f[n]) ↑ 0 ] (n + 1))
+(12, Q [ r \ (r + f[n]) ↑ 0 ] (n + 1))
+(0, P [ s \ 0 ] 0)
+(11, Q 0)
+(0, P n)
+(14, Q n)
+(0, P n)
+(14, Q n)
+(0, P n)
+(14, Q n) )

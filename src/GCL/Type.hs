@@ -181,9 +181,9 @@ infer (Quant qop iters rng t l) = do
 --   t <- infer expr
 --   s <- mapM infer (Map.map bindingsToExpr sub)
 --   return $ subst s t
-infer (Expand _ after  ) = infer after
-infer (Subst  expr _  _) = infer expr
-infer (ArrIdx e1   e2 l) = do
+infer (Expand _    _  after) = infer after
+infer (Subst  expr _  _    ) = infer expr
+infer (ArrIdx e1   e2 l    ) = do
   t1 <- infer e1
   let interval = case t1 of
         TArray itv _ _ -> itv
@@ -226,9 +226,9 @@ lookupInferEnv n = do
   env <- ask
   case Map.lookup n (envLocalDefns env) of
     Nothing -> case Map.lookup n (envLocalContext env) of
-      Nothing   -> throwError $ NotInScope n (locOf n)
-      Just [] -> throwError $ NotInScope n (locOf n) -- when there are no clauses in a function 
-      Just (expr: _) -> infer expr
+      Nothing         -> throwError $ NotInScope n (locOf n)
+      Just []         -> throwError $ NotInScope n (locOf n) -- when there are no clauses in a function 
+      Just (expr : _) -> infer expr
     Just t -> return $ typeWithLoc (locOf n) t
 
 freshVar :: Loc -> Infer Type
@@ -285,14 +285,14 @@ checkStmt env (Assign ns es loc)
     length ns > length es
   = let extraVars = drop (length es) ns
     in  throwError $ NotEnoughExprsInAssigment (NE.fromList extraVars)
-                                                                                                                                                        -- (locOf $ mergeRangesUnsafe (fromLocs $ map locOf extraVars))
-                                                                                                                                                    -- (locOf $ mergeRangesUnsafe (fromLocs $ map locOf extraVars))
+                                                                                                                                                                        -- (locOf $ mergeRangesUnsafe (fromLocs $ map locOf extraVars))
+                                                                                                                                                                    -- (locOf $ mergeRangesUnsafe (fromLocs $ map locOf extraVars))
                                                loc
   | length ns < length es
   = let extraExprs = drop (length ns) es
     in  throwError $ TooManyExprsInAssigment (NE.fromList extraExprs)
-                                                                                                                                                        -- (locOf $ mergeRangesUnsafe (fromLocs $ map locOf extraExprs))
-                                                                                                                                                    -- (locOf $ mergeRangesUnsafe (fromLocs $ map locOf extraExprs))
+                                                                                                                                                                        -- (locOf $ mergeRangesUnsafe (fromLocs $ map locOf extraExprs))
+                                                                                                                                                                    -- (locOf $ mergeRangesUnsafe (fromLocs $ map locOf extraExprs))
                                              loc
   | otherwise
   = forM_ (zip ns es) (checkAssign env)
