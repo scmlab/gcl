@@ -17,6 +17,7 @@ import           Data.Text                      ( Text )
 import qualified Data.Text                     as Text
 import qualified Syntax.Abstract               as A
 import           Syntax.Common                  ( Name(..) )
+import qualified Data.List.NonEmpty as NonEmpty
 
 -- Monad for generating fresh variable
 class Monad m => Fresh m where
@@ -86,7 +87,7 @@ instance Free A.Expr where
   fv (A.Lam x  e  _) = fv e \\ Set.singleton x
   fv (A.Quant op xs range term _) =
     (fv op <> fv range <> fv term) \\ Set.fromList xs
-  fv (A.DisplaySubst _ pairs) = fst (last pairs)
+  fv (A.DisplaySubst _ pairs) = fst (NonEmpty.head pairs)
   fv (A.Redex x             ) = fv (A.redexAfter x)
   fv (A.ArrIdx e1 e2 _      ) = fv e1 <> fv e2
   fv (A.ArrUpd e1 e2 e3 _   ) = fv e1 <> fv e2 <> fv e3

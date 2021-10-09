@@ -2,6 +2,7 @@
 
 module Syntax.Abstract.Types where
 
+import           Data.List.NonEmpty             ( NonEmpty )
 import           Data.Loc                       ( Loc )
 import           Data.Loc.Range                 ( Range )
 import           Data.Map                       ( Map )
@@ -137,10 +138,10 @@ data Expr
   | Quant Expr [Name] Expr Expr Loc
   | DisplaySubst -- for displaying the mapping of substitution `expr [ v \ e ... ]`
     Name -- expression to be substituted
-    [(Set Name -- free variables in that expression
+    (NonEmpty (Set Name -- free variables in that expression
                -- NOTE, the expression may be some definition like "P",
               --  in that case, the free variables should be that of after it's been expanded
-    ,Mapping)] -- mapping of substitution to be displayed to users
+    ,Mapping)) -- mapping of substitution to be displayed to users
   | Redex Redex
   | ArrIdx Expr Expr Loc
   | ArrUpd Expr Expr Expr Loc
@@ -159,6 +160,14 @@ data Redex = Rdx
   , redexAfter   :: Expr
   }
   deriving (Eq, Show, Generic)
+
+data DisplaySubstAction =
+  AppendMapping
+    (Set Name)  -- free variables in that expression
+               -- NOTE, the expression may be some definition like "P",
+              --  in that case, the free variables should be that of after it's been expanded
+    Mapping -- mapping of substitution to be displayed to users
+  | AppendArgument Expr
 
 --------------------------------------------------------------------------------
 -- | Pattern matching

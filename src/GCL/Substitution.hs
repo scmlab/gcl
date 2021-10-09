@@ -12,6 +12,7 @@ module GCL.Substitution
   ) where
 
 import           Control.Monad.RWS
+import qualified Data.List.NonEmpty            as NonEmpty
 import           Data.Loc                       ( locOf )
 import           Data.Map                       ( Map )
 import qualified Data.Map                      as Map
@@ -214,9 +215,12 @@ instance Substitutable Expr where
             -- [subst-Var-defined]
           Just (Just binding) -> do
             after <- subst mapping binding
-            let
-              before =
-                DisplaySubst name [(fv binding, shrinkMapping binding mapping)]
+            let before = DisplaySubst
+                  name
+                  -- NonEmpty.singleton is only available after base-4.15
+                  (NonEmpty.fromList
+                    [(fv binding, shrinkMapping binding mapping)]
+                  )
             return $ Redex (Rdx index [] before after)
           -- [subst-Var-defined]
           Just Nothing -> return expr
@@ -247,9 +251,12 @@ instance Substitutable Expr where
             -- [subst-Const-defined]
           Just (Just binding) -> do
             after <- subst mapping binding
-            let
-              before =
-                DisplaySubst name [(fv binding, shrinkMapping binding mapping)]
+            let before = DisplaySubst
+                  name
+                    -- NonEmpty.singleton is only available after base-4.15
+                  (NonEmpty.fromList
+                    [(fv binding, shrinkMapping binding mapping)]
+                  )
             return $ Redex (Rdx index [] before after)
           -- [subst-Const-not-defined]
           Just Nothing -> return expr
@@ -331,12 +338,14 @@ instance Substitutable Expr where
         --      should be taken into consideration
     DisplaySubst name mappings ->
       let
-        (freeVarsInExpr, mappingOfExpr) = last mappings
+        (freeVarsInExpr, mappingOfExpr) = NonEmpty.head mappings
         freeVars                        = freeVarsInExpr <> fv mappingOfExpr
         shrinkedMapping =
           Map.restrictKeys mapping (Set.map nameToText freeVars)
       in
-        return $ DisplaySubst name (mappings ++ [(freeVars, shrinkedMapping)])
+        return $ DisplaySubst
+          name
+          (NonEmpty.cons (freeVars, shrinkedMapping) mappings)
 --
 --      a                   ~[.../...]~>    a'
 --      b                   ~[.../...]~>    b'

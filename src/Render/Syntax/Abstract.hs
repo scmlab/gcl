@@ -3,6 +3,7 @@
 
 module Render.Syntax.Abstract where
 
+import           Data.Foldable                  ( toList )
 import qualified Data.Map                      as Map
 import           Pretty.Variadic                ( Variadic(..)
                                                 , var
@@ -76,9 +77,12 @@ handleExpr _ (Quant op xs r t _) =
 handleExpr n (DisplaySubst expr freeVarsAndMappings) =
   return $ renderPrec n expr <+> mappings
  where
+  -- reverse the stack when printing it 
   mappings = punctuateE
-      " "
-      (map render $ filter (not . Map.null) $ map snd freeVarsAndMappings)
+    " "
+    (map render $ filter (not . Map.null) $ map snd $ reverse $ toList
+      freeVarsAndMappings
+    )
 handleExpr n (Redex redex   ) = return $ renderPrec n redex
 handleExpr _ (ArrIdx e1 e2 _) = return $ render e1 <> "[" <> render e2 <> "]"
 handleExpr _ (ArrUpd e1 e2 e3 _) =
