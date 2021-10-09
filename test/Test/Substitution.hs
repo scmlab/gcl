@@ -23,7 +23,8 @@ import           Server.Interpreter.Test        ( runTest
                                                 , serializeTestResultValueOnly
                                                 )
 import           Syntax.Abstract                ( Case(CaseConstructor)
-                                                , Expr(..), Redex(..)
+                                                , Expr(..)
+                                                , Redex(..)
                                                 )
 import           Test.Tasty              hiding ( after )
 import           Test.Util
@@ -138,11 +139,11 @@ instance ExtractExpand Expr where
              (extractExpand before)
              (extractExpand after)
       ]
-    DisplaySubst x _ _ -> extractExpand x
-    ArrIdx       x y _ -> extractExpand x <> extractExpand y
-    ArrUpd x y z _     -> extractExpand x <> extractExpand y <> extractExpand z
-    Case _ xs _        -> xs >>= extractExpand
-    _                  -> []
+    DisplaySubst _ _ -> []
+    ArrIdx x y _     -> extractExpand x <> extractExpand y
+    ArrUpd x y z _   -> extractExpand x <> extractExpand y <> extractExpand z
+    Case _ xs _      -> xs >>= extractExpand
+    _                -> []
 
 instance ExtractExpand Case where
   extractExpand (CaseConstructor _ _ x) = extractExpand x

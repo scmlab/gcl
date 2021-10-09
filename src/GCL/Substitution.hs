@@ -96,15 +96,15 @@ instance CollectRedexes Pred where
 
 instance CollectRedexes Expr where
   collectRedexes expr = case expr of
-    App x y _          -> collectRedexes x <> collectRedexes y
-    Lam _ x _          -> collectRedexes x
-    Quant _ _ _ x _    -> collectRedexes x
-    DisplaySubst x _ _ -> collectRedexes x
-    Redex redex        -> [redex]
-    ArrIdx x y _       -> collectRedexes x <> collectRedexes y
-    ArrUpd x y z _ -> collectRedexes x <> collectRedexes y <> collectRedexes z
-    Case _ xs _        -> xs >>= collectRedexes
-    _                  -> []
+    App x y _        -> collectRedexes x <> collectRedexes y
+    Lam _ x _        -> collectRedexes x
+    Quant _ _ _ x _  -> collectRedexes x
+    DisplaySubst _ _ -> []
+    Redex redex      -> [redex]
+    ArrIdx x y _     -> collectRedexes x <> collectRedexes y
+    ArrUpd x y z _   -> collectRedexes x <> collectRedexes y <> collectRedexes z
+    Case _ xs _      -> xs >>= collectRedexes
+    _                -> []
 
 instance CollectRedexes Case where
   collectRedexes (CaseConstructor _ _ x) = collectRedexes x
@@ -141,8 +141,9 @@ instance Reducible Expr where
           -- [reduce-App-Expand-Lam]
         Redex (Rdx index history before lambda@Lam{}) ->
           Redex
-            <$> (Rdx index ("[reduce-App-Expand-Lam]" : history) <$> reduce (App before x' l1) <*> reduce
-                  (App lambda x' l1)
+            <$> (   Rdx index ("[reduce-App-Expand-Lam]" : history)
+                <$> reduce (App before x' l1)
+                <*> reduce (App lambda x' l1)
                 )
         -- [reduce-App-Lam]
         Lam n body _ -> subst (mappingFromSubstitution [n] [x']) body
@@ -151,9 +152,8 @@ instance Reducible Expr where
     Lam binder body l -> Lam binder <$> reduce body <*> return l
     Quant op binders range body l ->
       Quant op binders range <$> reduce body <*> return l
-    DisplaySubst e freeVarsInE mapping ->
-      DisplaySubst <$> reduce e <*> return freeVarsInE <*> return mapping
-    Redex redex          -> Redex <$> reduce redex
+    DisplaySubst name mappings -> return (DisplaySubst name mappings)
+    Redex redex -> Redex <$> reduce redex
     ArrIdx array index l -> ArrIdx <$> reduce array <*> reduce index <*> pure l
     ArrUpd array index value l ->
       ArrUpd <$> reduce array <*> reduce index <*> reduce value <*> pure l
@@ -214,9 +214,9 @@ instance Substitutable Expr where
             -- [subst-Var-defined]
           Just (Just binding) -> do
             after <- subst mapping binding
-            let before = DisplaySubst expr
-                                      (fv binding)
-                                      (shrinkMapping binding mapping)
+            let
+              before =
+                DisplaySubst name [(fv binding, shrinkMapping binding mapping)]
             return $ Redex (Rdx index [] before after)
           -- [subst-Var-defined]
           Just Nothing -> return expr
@@ -247,9 +247,9 @@ instance Substitutable Expr where
             -- [subst-Const-defined]
           Just (Just binding) -> do
             after <- subst mapping binding
-            let before = DisplaySubst expr
-                                      (fv binding)
-                                      (shrinkMapping binding mapping)
+            let
+              before =
+                DisplaySubst name [(fv binding, shrinkMapping binding mapping)]
             return $ Redex (Rdx index [] before after)
           -- [subst-Const-not-defined]
           Just Nothing -> return expr
@@ -329,11 +329,14 @@ instance Substitutable Expr where
         --      when shrinking the applied outer new mapping (`mapping` in this case)
         --      free variables occured from the inner old mapping (`mapping'` in this case)
         --      should be taken into consideration
-    DisplaySubst _ freeVarsInExpr mappingOfExpr ->
-      let freeVars = freeVarsInExpr <> fv mappingOfExpr
-          shrinkedMapping =
-            Map.restrictKeys mapping (Set.map nameToText freeVars)
-      in  return $ DisplaySubst expr freeVars shrinkedMapping
+    DisplaySubst name mappings ->
+      let
+        (freeVarsInExpr, mappingOfExpr) = last mappings
+        freeVars                        = freeVarsInExpr <> fv mappingOfExpr
+        shrinkedMapping =
+          Map.restrictKeys mapping (Set.map nameToText freeVars)
+      in
+        return $ DisplaySubst name (mappings ++ [(freeVars, shrinkedMapping)])
 --
 --      a                   ~[.../...]~>    a'
 --      b                   ~[.../...]~>    b'
@@ -341,7 +344,11 @@ instance Substitutable Expr where
 --      a ===> b            ~[.../...]~>    a' ===> b'
 --
     Redex (Rdx index history before after) ->
-      Redex <$> (Rdx index ("[subst]" : history) <$> subst mapping before <*> subst mapping after)
+      Redex
+        <$> (   Rdx index ("[subst]" : history)
+            <$> subst mapping before
+            <*> subst mapping after
+            )
 
 --
 --      a                   ~[.../...]~>    a'

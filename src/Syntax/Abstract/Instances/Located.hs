@@ -56,18 +56,18 @@ instance Located Type where
   locOf (TVar _ l    ) = l
 
 instance Located Expr where
-  locOf (Var   _ l          ) = l
-  locOf (Const _ l          ) = l
-  locOf (Lit   _ l          ) = l
-  locOf (Op op              ) = locOf op
-  locOf (App _ _ l          ) = l
-  locOf (Lam _ _ l          ) = l
-  locOf (Quant _ _ _ _ l    ) = l
-  locOf (DisplaySubst es _ _) = locOf es
-  locOf (Redex x            ) = locOf x
-  locOf (ArrIdx _ _ l       ) = l
-  locOf (ArrUpd _ _ _ l     ) = l
-  locOf (Case _ _ l         ) = l
+  locOf (Var   _ l        ) = l
+  locOf (Const _ l        ) = l
+  locOf (Lit   _ l        ) = l
+  locOf (Op op            ) = locOf op
+  locOf (App _ _ l        ) = l
+  locOf (Lam _ _ l        ) = l
+  locOf (Quant _ _ _ _ l  ) = l
+  locOf (DisplaySubst es _) = locOf es
+  locOf (Redex x          ) = locOf x
+  locOf (ArrIdx _ _ l     ) = l
+  locOf (ArrUpd _ _ _ l   ) = l
+  locOf (Case _ _ l       ) = l
 
 instance Located Redex where
   locOf = locOf . redexBefore

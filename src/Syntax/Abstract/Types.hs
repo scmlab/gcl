@@ -136,11 +136,11 @@ data Expr
   | Lam Name Expr Loc
   | Quant Expr [Name] Expr Expr Loc
   | DisplaySubst -- for displaying the mapping of substitution `expr [ v \ e ... ]`
-    Expr -- expression to be substituted
-    (Set Name) -- free variables in that expression
+    Name -- expression to be substituted
+    [(Set Name -- free variables in that expression
                -- NOTE, the expression may be some definition like "P",
               --  in that case, the free variables should be that of after it's been expanded
-    Mapping -- mapping of substitution to be displayed to users
+    ,Mapping)] -- mapping of substitution to be displayed to users
   | Redex Redex
   | ArrIdx Expr Expr Loc
   | ArrUpd Expr Expr Expr Loc
@@ -151,12 +151,14 @@ type QuantOp' = Either Op Expr
 
 type Mapping = Map Text Expr
 
-data Redex = Rdx {
-    redexID :: Int,
-    redexHistory :: [String], -- tmep 
-    redexBefore :: Expr,
-    redexAfter :: Expr
-  } deriving (Eq, Show, Generic)
+data Redex = Rdx
+  { redexID      :: Int
+  , redexHistory :: [String]
+  , -- tmep 
+    redexBefore  :: Expr
+  , redexAfter   :: Expr
+  }
+  deriving (Eq, Show, Generic)
 
 --------------------------------------------------------------------------------
 -- | Pattern matching
