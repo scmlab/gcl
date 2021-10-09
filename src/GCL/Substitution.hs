@@ -139,10 +139,10 @@ instance Reducible Expr where
       x' <- reduce x
       case f' of
           -- [reduce-App-Expand-Lam]
-        Redex (Rdx index before (Lam n body l2)) ->
+        Redex (Rdx index history before lambda@Lam{}) ->
           Redex
-            <$> (Rdx index <$> reduce (App before x' l1) <*> reduce
-                  (App (Lam n body l2) x' l1)
+            <$> (Rdx index ("[reduce-App-Expand-Lam]" : history) <$> reduce (App before x' l1) <*> reduce
+                  (App lambda x' l1)
                 )
         -- [reduce-App-Lam]
         Lam n body _ -> subst (mappingFromSubstitution [n] [x']) body
@@ -160,8 +160,8 @@ instance Reducible Expr where
     _ -> return expr
 
 instance Reducible Redex where
-  reduce (Rdx index before after) =
-    Rdx index <$> reduce before <*> reduce after
+  reduce (Rdx index history before after) =
+    Rdx index ("[reduce]" : history) <$> reduce before <*> reduce after
 
 instance Reducible Pred where
   reduce = \case
@@ -217,7 +217,7 @@ instance Substitutable Expr where
             let before = DisplaySubst expr
                                       (fv binding)
                                       (shrinkMapping binding mapping)
-            return $ Redex (Rdx index before after)
+            return $ Redex (Rdx index [] before after)
           -- [subst-Var-defined]
           Just Nothing -> return expr
           Nothing      -> return expr
@@ -250,7 +250,7 @@ instance Substitutable Expr where
             let before = DisplaySubst expr
                                       (fv binding)
                                       (shrinkMapping binding mapping)
-            return $ Redex (Rdx index before after)
+            return $ Redex (Rdx index [] before after)
           -- [subst-Const-not-defined]
           Just Nothing -> return expr
           Nothing      -> return expr
@@ -329,24 +329,19 @@ instance Substitutable Expr where
         --      when shrinking the applied outer new mapping (`mapping` in this case)
         --      free variables occured from the inner old mapping (`mapping'` in this case)
         --      should be taken into consideration
-    DisplaySubst e freeVarsInE mapping' ->
-      let
-        freeVarsInMapping' = fv mapping'
-        freeVars           = freeVarsInE <> freeVarsInMapping'
-        shrinkedMapping =
-          Map.restrictKeys mapping (Set.map nameToText freeVars)
-      in
-        return $ DisplaySubst (DisplaySubst e freeVarsInE mapping')
-                              freeVars
-                              shrinkedMapping
+    DisplaySubst _ freeVarsInExpr mappingOfExpr ->
+      let freeVars = freeVarsInExpr <> fv mappingOfExpr
+          shrinkedMapping =
+            Map.restrictKeys mapping (Set.map nameToText freeVars)
+      in  return $ DisplaySubst expr freeVars shrinkedMapping
 --
 --      a                   ~[.../...]~>    a'
 --      b                   ~[.../...]~>    b'
 -- ---------------------------------------------------------------[subst-Expand]
 --      a ===> b            ~[.../...]~>    a' ===> b'
 --
-    Redex (Rdx index before after) ->
-      Redex <$> (Rdx index <$> subst mapping before <*> subst mapping after)
+    Redex (Rdx index history before after) ->
+      Redex <$> (Rdx index ("[subst]" : history) <$> subst mapping before <*> subst mapping after)
 
 --
 --      a                   ~[.../...]~>    a'

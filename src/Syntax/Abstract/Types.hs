@@ -153,6 +153,7 @@ type Mapping = Map Text Expr
 
 data Redex = Rdx {
     redexID :: Int,
+    redexHistory :: [String], -- tmep 
     redexBefore :: Expr,
     redexAfter :: Expr
   } deriving (Eq, Show, Generic)

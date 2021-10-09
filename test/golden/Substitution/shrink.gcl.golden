@@ -1,4 +1,9 @@
 ( 0: P [ global1 \ global1 + 1 ] 3
   P [ global1 \ global1 + 1 ] 3 ===> global1 + 1 = 3
     
-, (0, P [ global1 \ global1 + 1 ] 3) )
+, (0, [ [reduce]
+      , [subst]
+      , [reduce]
+      , [subst]
+      , [reduce-App-Expand-Lam]
+      , [reduce] ] , P [ global1 \ global1 + 1 ] 3) )

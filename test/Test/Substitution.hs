@@ -131,7 +131,7 @@ instance ExtractExpand Expr where
     App x y _       -> extractExpand x <> extractExpand y
     Lam _ x _       -> extractExpand x
     Quant _ _ _ z _ -> extractExpand z
-    Redex (Rdx index before after) ->
+    Redex (Rdx index _history before after) ->
       [ EXPN index
              (render before)
              (render after)

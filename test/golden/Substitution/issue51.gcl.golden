@@ -58,15 +58,29 @@
     451: sum i n
       sum i n ===> ⟨ Σ k : i ≤ k < n : f[k] ⟩
         
-, (258, P n)
-(272, Q n)
-(149, P [ s \ s ↑ r ] [ r \ (r + f[n]) ↑ 0 ] (n + 1))
-(161, Q [ r \ (r + f[n]) ↑ 0 ] (n + 1))
-(0, P [ s \ 0 ] 0)
-(11, Q 0)
-(74, P n)
-(88, Q n)
-(356, P n)
-(370, Q n)
-(433, P n)
-(447, Q n) )
+, (258, [[reduce-App-Expand-Lam], [reduce]] , P n)
+(272, [[reduce-App-Expand-Lam], [reduce]] , Q n)
+(149, [ [reduce]
+      , [subst]
+      , [reduce]
+      , [subst]
+      , [reduce]
+      , [subst]
+      , [reduce-App-Expand-Lam]
+      , [reduce] ] , P [ s \ s ↑ r ] [ r \ (r + f[n]) ↑ 0 ] (n + 1))
+(161, [ [reduce]
+      , [subst]
+      , [reduce]
+      , [subst]
+      , [reduce]
+      , [subst]
+      , [reduce-App-Expand-Lam]
+      , [reduce] ] , Q [ r \ (r + f[n]) ↑ 0 ] (n + 1))
+(0, [[reduce], [subst], [reduce-App-Expand-Lam], [reduce]] , P [ s \ 0 ] 0)
+(11, [[reduce], [subst], [reduce-App-Expand-Lam], [reduce]] , Q 0)
+(74, [[reduce-App-Expand-Lam], [reduce]] , P n)
+(88, [[reduce-App-Expand-Lam], [reduce]] , Q n)
+(356, [[reduce-App-Expand-Lam], [reduce]] , P n)
+(370, [[reduce-App-Expand-Lam], [reduce]] , Q n)
+(433, [[reduce-App-Expand-Lam], [reduce]] , P n)
+(447, [[reduce-App-Expand-Lam], [reduce]] , Q n) )
