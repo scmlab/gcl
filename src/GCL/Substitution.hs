@@ -4,6 +4,7 @@
 
 module GCL.Substitution
   ( run
+  , stepRedex
   , Scope
   -- TODO: don't export these 
   , Substitutable
@@ -12,6 +13,7 @@ module GCL.Substitution
   ) where
 
 import           Control.Monad.RWS
+import           Data.Foldable                  ( toList )
 import qualified Data.List.NonEmpty            as NonEmpty
 import           Data.Loc                       ( locOf )
 import           Data.Map                       ( Map )
@@ -97,15 +99,15 @@ instance CollectRedexes Pred where
 
 instance CollectRedexes Expr where
   collectRedexes expr = case expr of
-    App x y _        -> collectRedexes x <> collectRedexes y
-    Lam _ x _        -> collectRedexes x
-    Quant _ _ _ x _  -> collectRedexes x
-    RedexStem {} -> []
-    Redex redex      -> [redex]
-    ArrIdx x y _     -> collectRedexes x <> collectRedexes y
-    ArrUpd x y z _   -> collectRedexes x <> collectRedexes y <> collectRedexes z
-    Case _ xs _      -> xs >>= collectRedexes
-    _                -> []
+    App x y _       -> collectRedexes x <> collectRedexes y
+    Lam _ x _       -> collectRedexes x
+    Quant _ _ _ x _ -> collectRedexes x
+    RedexStem{}     -> []
+    Redex redex     -> [redex]
+    ArrIdx x y _    -> collectRedexes x <> collectRedexes y
+    ArrUpd x y z _  -> collectRedexes x <> collectRedexes y <> collectRedexes z
+    Case _ xs _     -> xs >>= collectRedexes
+    _               -> []
 
 instance CollectRedexes Case where
   collectRedexes (CaseConstructor _ _ x) = collectRedexes x
@@ -448,11 +450,15 @@ shrinkMapping expr mapping =
   in  Map.restrictKeys mapping freeVars
 
 ------------------------------------------------------------------
--- | TEMP: Convert redexBefore to redexAfter 
 
--- toAfter :: Expr -> Expr
--- toAfter expr = expr
---   where 
---     replaceRedexStem :: Expr -> Expr 
---     replaceRedexStem (RedexStem na ne) = _wh
---     replaceRedexStem others = others 
+stepRedex :: Scope -> Expr -> Expr
+stepRedex scope expr = fst $ evalRWS (go expr) scope (0, 0)
+  where 
+    go :: Expr -> M Expr
+    go (App f x l) = App <$> go f <*> pure x <*> pure l >>= reduce
+    go (RedexStem _ value substs) = foldM (flip subst) value mappings >>= reduce
+      where
+        mappings :: [Mapping]
+        mappings = reverse $ map snd $ toList substs
+    go (Redex redex) = go (redexBefore redex)
+    go others        = return others

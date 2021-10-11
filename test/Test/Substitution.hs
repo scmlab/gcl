@@ -10,7 +10,7 @@ import qualified Data.Map                      as Map
 import           GCL.Predicate                  ( PO(PO)
                                                 , Pred(..)
                                                 )
-import           GCL.Substitution               ( collectRedexes )
+import           GCL.Substitution               ( collectRedexes, stepRedex )
 import           Pretty
 import           Render                         ( Inlines(..)
                                                 , Render(render)
@@ -28,6 +28,7 @@ import           Syntax.Abstract                ( Case(CaseConstructor)
                                                 )
 import           Test.Tasty              hiding ( after )
 import           Test.Util
+import Syntax.Abstract.Util (programToScopeForSubstitution)
 
 tests :: TestTree
 tests = testGroup "Substitution" [letBindings]
@@ -55,9 +56,10 @@ letBindings = testGroup
             program <- parseProgram source
             cache   <- sweep program
             let pos     = cachePOs cache
-            let trees   = VList $ map toTree (pos >>= extractExpand)
-            let redexes = VList (pos >>= collectRedexes)
-            return (Right (trees, redexes))
+            let trees   = map toTree (pos >>= extractExpand)
+            let redexes = pos >>= collectRedexes
+            let redexesWithNextStep = map (\rdx -> (rdx, stepRedex (programToScopeForSubstitution program) (redexBefore rdx))) redexes
+            return (Right (VList trees, VList redexesWithNextStep))
 
 
 -- Tree-like structure for representing the transition from one Expn to the next
