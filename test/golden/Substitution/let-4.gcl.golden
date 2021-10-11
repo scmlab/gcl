@@ -5,8 +5,4 @@
         
   Q [ y \ y + 1 ] 1 ===> y + 1
     
-, (0, [ [reduce]
-      , [subst]
-      , [reduce-App-Expand-Lam]
-      , [reduce-App-Expand-Lam]
-      , [reduce] ] , P 3 (Q [ y \ y + 1 ] 1)) )
+, (0, P 3 (Q [ y \ y + 1 ] 1)) )

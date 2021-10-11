@@ -115,14 +115,8 @@ instance Pretty Redex where
   pretty = prettyPrec 0
 
 instance PrettyPrec Redex where
-  prettyPrec n (Rdx index history before _after) =
-    "("
-      <>  pretty index
-      <>  ","
-      <+> pretty history
-      <+> ","
-      <+> prettyPrec n before
-      <>  ")"
+  prettyPrec n (Rdx index before _after) =
+    "(" <> pretty index <> "," <+> prettyPrec n before <> ")"
 
 
 --------------------------------------------------------------------------------

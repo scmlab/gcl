@@ -16,13 +16,9 @@
 64: INV
   INV ===> (x * y) + z = A * B
     
-, (0, [[reduce], [subst], [reduce]] , INV [ x,y,z \ A,B,0 ])
-(33, [[reduce]] , INV)
-(22, [ [reduce]
-     , [subst]
-     , [reduce]
-     , [subst]
-     , [reduce] ] , INV [ x \ x - 1 ] [ z \ z + y ])
-(10, [[reduce]] , INV)
-(50, [[reduce]] , INV)
-(64, [[reduce]] , INV) )
+, (0, INV [ x,y,z \ A,B,0 ])
+(33, INV)
+(22, INV [ x \ x - 1 ] [ z \ z + y ])
+(10, INV)
+(50, INV)
+(64, INV) )

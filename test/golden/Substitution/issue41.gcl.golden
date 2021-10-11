@@ -1,4 +1,4 @@
 ( 0: P (n + i)
   P (n + i) ===> ⟨ ∀ ?i_1 : 0 ≤ ?i_1 < n + i : f ?i_1 ⟩
     
-, (0, [[reduce], [subst], [reduce-App-Expand-Lam], [reduce]] , P (n + i)) )
+, (0, P (n + i)) )

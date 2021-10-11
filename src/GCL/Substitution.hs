@@ -140,11 +140,10 @@ instance Reducible Expr where
       x' <- reduce x
       case f' of
           -- [reduce-App-Expand-Lam]
-        Redex (Rdx index history before lambda@Lam{}) ->
+        Redex (Rdx index before lambda@Lam{}) ->
           Redex
-            <$> (   Rdx index ("[reduce-App-Expand-Lam]" : history)
-                <$> reduce (App before x' l1)
-                <*> reduce (App lambda x' l1)
+            <$> (Rdx index <$> reduce (App before x' l1) <*> reduce
+                  (App lambda x' l1)
                 )
         -- [reduce-App-Lam]
         Lam n body _ -> subst (mappingFromSubstitution [n] [x']) body
@@ -161,8 +160,8 @@ instance Reducible Expr where
     _ -> return expr
 
 instance Reducible Redex where
-  reduce (Rdx index history before after) =
-    Rdx index ("[reduce]" : history) <$> reduce before <*> reduce after
+  reduce (Rdx index before after) =
+    Rdx index <$> reduce before <*> reduce after
 
 instance Reducible Pred where
   reduce = \case
@@ -221,7 +220,7 @@ instance Substitutable Expr where
                   (NonEmpty.fromList
                     [(fv binding, shrinkMapping binding mapping)]
                   )
-            return $ Redex (Rdx index [] before after)
+            return $ Redex (Rdx index before after)
           -- [subst-Var-defined]
           Just Nothing -> return expr
           Nothing      -> return expr
@@ -257,7 +256,7 @@ instance Substitutable Expr where
                   (NonEmpty.fromList
                     [(fv binding, shrinkMapping binding mapping)]
                   )
-            return $ Redex (Rdx index [] before after)
+            return $ Redex (Rdx index before after)
           -- [subst-Const-not-defined]
           Just Nothing -> return expr
           Nothing      -> return expr
@@ -352,12 +351,8 @@ instance Substitutable Expr where
 -- ---------------------------------------------------------------[subst-Expand]
 --      a ===> b            ~[.../...]~>    a' ===> b'
 --
-    Redex (Rdx index history before after) ->
-      Redex
-        <$> (   Rdx index ("[subst]" : history)
-            <$> subst mapping before
-            <*> subst mapping after
-            )
+    Redex (Rdx index before after) ->
+      Redex <$> (Rdx index <$> subst mapping before <*> subst mapping after)
 
 --
 --      a                   ~[.../...]~>    a'
