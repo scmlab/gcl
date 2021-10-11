@@ -14,8 +14,7 @@ Specs: [ Precondition at ./test/source/Server/spec-qm-4.gcl [16-30] 2:5-4:7
        Postcondition
        `True` ]
 Props: []
-Warnings: []
-Redexes: [] }
+Warnings: [] }
 
 ### Source
 

@@ -52,10 +52,6 @@ data Cache = Cache
   , cacheProps    :: [A.Expr]
     -- Warnings 
   , cacheWarnings :: [StructWarning]
-    -- expressions that can be reduced are stored here and labeled with an ID 
-    -- so that when the client wants to reduce some expression
-    -- we can find the corresponding redex here 
-  , cacheRedexes  :: [A.Redex]
   }
   deriving (Eq, Show)
 
@@ -67,7 +63,6 @@ instance Pretty Cache where
            , "Specs: " <> pretty (cacheSpecs cache)
            , "Props: " <> pretty (cacheProps cache)
            , "Warnings: " <> pretty (cacheWarnings cache)
-           , "Redexes: " <> pretty (cacheRedexes cache)
            ]
       <> " }"
 
@@ -168,12 +163,11 @@ typeCheck p = case TypeChecking.runTM (TypeChecking.checkProgram p) of
 sweep :: A.Program -> CmdM Cache
 sweep program@(A.Program _ _ globalProps _ _) = case WP.sweep program of
   Left  e                              -> throwError [StructError e]
-  Right (pos, specs, warings, redexes) -> do
+  Right (pos, specs, warings, _redexes) -> do
     return $ Cache { cachePOs      = List.sort pos
                    , cacheSpecs    = sortOn locOf specs
                    , cacheProps    = globalProps
                    , cacheWarnings = warings
-                   , cacheRedexes  = redexes
                    }
 
 --------------------------------------------------------------------------------
@@ -198,7 +192,7 @@ parseProgram source = do
 generateResponseAndDiagnosticsFromResult :: Result -> CmdM [ResKind]
 generateResponseAndDiagnosticsFromResult (Left  errors) = throwError errors
 generateResponseAndDiagnosticsFromResult (Right cache ) = do
-  let (Cache pos specs globalProps warnings _) = cache
+  let (Cache pos specs globalProps warnings) = cache
 
   -- get Specs around the mouse selection
   lastSelection <- getLastSelection

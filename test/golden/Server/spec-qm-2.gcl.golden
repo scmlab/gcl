@@ -10,8 +10,7 @@ Specs: [ Precondition at ./test/source/Server/spec-qm-2.gcl [0-6] 1:1-3:3
        Postcondition
        `True` ]
 Props: []
-Warnings: []
-Redexes: [] }
+Warnings: [] }
 
 ### Source
 

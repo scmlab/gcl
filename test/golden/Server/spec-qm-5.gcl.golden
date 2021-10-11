@@ -20,8 +20,7 @@ Specs: [ Precondition at ./test/source/Server/spec-qm-5.gcl [113-143] 7:13-9:15
        Postcondition
        `f[n] = 0` ]
 Props: []
-Warnings: []
-Redexes: [] }
+Warnings: [] }
 
 ### Source
 
