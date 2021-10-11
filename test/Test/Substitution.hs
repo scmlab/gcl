@@ -139,7 +139,7 @@ instance ExtractExpand Expr where
              (extractExpand before)
              (extractExpand after)
       ]
-    DisplaySubst _ _ -> []
+    RedexStem {} -> []
     ArrIdx x y _     -> extractExpand x <> extractExpand y
     ArrUpd x y z _   -> extractExpand x <> extractExpand y <> extractExpand z
     Case _ xs _      -> xs >>= extractExpand

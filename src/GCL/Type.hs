@@ -182,7 +182,7 @@ infer (Quant qop iters rng t l) = do
 --   s <- mapM infer (Map.map bindingsToExpr sub)
 --   return $ subst s t
 infer (Redex (Rdx _ _ after)) = infer after
-infer (DisplaySubst name _    ) = lookupInferEnv name
+infer (RedexStem name _ _    ) = lookupInferEnv name
 infer (ArrIdx e1 e2 l         ) = do
   t1 <- infer e1
   let interval = case t1 of

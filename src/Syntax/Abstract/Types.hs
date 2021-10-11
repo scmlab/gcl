@@ -136,8 +136,9 @@ data Expr
   | App Expr Expr Loc
   | Lam Name Expr Loc
   | Quant Expr [Name] Expr Expr Loc
-  | DisplaySubst -- for displaying the mapping of substitution `expr [ v \ e ... ]`
-    Name -- expression to be substituted
+  | RedexStem -- the inner part of a Redex `name [ v \ e ... ] [ v \ e ... ]`
+    Name -- the name to be substituted
+    Expr -- the expression for substituting the name 
     (NonEmpty (Set Name -- free variables in that expression
                -- NOTE, the expression may be some definition like "P",
               --  in that case, the free variables should be that of after it's been expanded
@@ -160,7 +161,7 @@ data Redex = Rdx
   }
   deriving (Eq, Show, Generic)
 
-data DisplaySubstAction =
+data RedexStemAction =
   AppendMapping
     (Set Name)  -- free variables in that expression
                -- NOTE, the expression may be some definition like "P",

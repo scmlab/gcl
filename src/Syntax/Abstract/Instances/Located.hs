@@ -63,7 +63,7 @@ instance Located Expr where
   locOf (App _ _ l        ) = l
   locOf (Lam _ _ l        ) = l
   locOf (Quant _ _ _ _ l  ) = l
-  locOf (DisplaySubst es _) = locOf es
+  locOf (RedexStem es _ _) = locOf es
   locOf (Redex x          ) = locOf x
   locOf (ArrIdx _ _ l     ) = l
   locOf (ArrUpd _ _ _ l   ) = l

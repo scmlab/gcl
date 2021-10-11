@@ -100,7 +100,7 @@ instance CollectRedexes Expr where
     App x y _        -> collectRedexes x <> collectRedexes y
     Lam _ x _        -> collectRedexes x
     Quant _ _ _ x _  -> collectRedexes x
-    DisplaySubst _ _ -> []
+    RedexStem {} -> []
     Redex redex      -> [redex]
     ArrIdx x y _     -> collectRedexes x <> collectRedexes y
     ArrUpd x y z _   -> collectRedexes x <> collectRedexes y <> collectRedexes z
@@ -152,7 +152,7 @@ instance Reducible Expr where
     Lam binder body l -> Lam binder <$> reduce body <*> return l
     Quant op binders range body l ->
       Quant op binders range <$> reduce body <*> return l
-    DisplaySubst name mappings -> return (DisplaySubst name mappings)
+    RedexStem name value mappings -> return (RedexStem name value mappings)
     Redex redex -> Redex <$> reduce redex
     ArrIdx array index l -> ArrIdx <$> reduce array <*> reduce index <*> pure l
     ArrUpd array index value l ->
@@ -214,8 +214,9 @@ instance Substitutable Expr where
             -- [subst-Var-defined]
           Just (Just binding) -> do
             after <- subst mapping binding
-            let before = DisplaySubst
+            let before = RedexStem
                   name
+                  binding
                   -- NonEmpty.singleton is only available after base-4.15
                   (NonEmpty.fromList
                     [(fv binding, shrinkMapping binding mapping)]
@@ -250,8 +251,9 @@ instance Substitutable Expr where
             -- [subst-Const-defined]
           Just (Just binding) -> do
             after <- subst mapping binding
-            let before = DisplaySubst
+            let before = RedexStem
                   name
+                  binding
                     -- NonEmpty.singleton is only available after base-4.15
                   (NonEmpty.fromList
                     [(fv binding, shrinkMapping binding mapping)]
@@ -335,15 +337,16 @@ instance Substitutable Expr where
         --      when shrinking the applied outer new mapping (`mapping` in this case)
         --      free variables occured from the inner old mapping (`mapping'` in this case)
         --      should be taken into consideration
-    DisplaySubst name mappings ->
+    RedexStem name e mappings ->
       let
         (freeVarsInExpr, mappingOfExpr) = NonEmpty.head mappings
         freeVars                        = freeVarsInExpr <> fv mappingOfExpr
         shrinkedMapping =
           Map.restrictKeys mapping (Set.map nameToText freeVars)
       in
-        return $ DisplaySubst
+        return $ RedexStem
           name
+          e
           (NonEmpty.cons (freeVars, shrinkedMapping) mappings)
 --
 --      a                   ~[.../...]~>    a'
@@ -443,3 +446,13 @@ shrinkMapping expr mapping =
       freeVars = Set.map nameToText (fv expr)
       -- restrict the mapping with only free variables
   in  Map.restrictKeys mapping freeVars
+
+------------------------------------------------------------------
+-- | TEMP: Convert redexBefore to redexAfter 
+
+-- toAfter :: Expr -> Expr
+-- toAfter expr = expr
+--   where 
+--     replaceRedexStem :: Expr -> Expr 
+--     replaceRedexStem (RedexStem na ne) = _wh
+--     replaceRedexStem others = others 
