@@ -1,1 +1,1 @@
-(0: P a   P a ===> a = a  , ((0, P a), a = a))
+(0: P a   P a ===> a = a  , 0: P a   P a ===> a = a  )

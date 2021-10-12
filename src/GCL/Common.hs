@@ -4,7 +4,7 @@
 module GCL.Common where
 
 import           Control.Monad.RWS              ( RWST(..) )
-import           Control.Monad.State            ( StateT(..) )
+import           Control.Monad.State            ( StateT(..), State, MonadState (get, put) )
 import           Data.Loc                       ( Loc(..) )
 import           Data.Map                       ( Map )
 import qualified Data.Map                      as Map
@@ -45,6 +45,10 @@ freshName prefix l = Name <$> freshWithLabel prefix <*> pure l
 
 freshName' :: Fresh m => Text -> m Name
 freshName' prefix = freshName prefix NoLoc
+
+instance Fresh (State Int) where 
+  getCounter = get 
+  setCounter = put 
 
 type FreshState = Int
 

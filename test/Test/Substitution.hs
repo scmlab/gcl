@@ -11,7 +11,7 @@ import qualified Data.Map                      as Map
 import           GCL.Predicate                  ( PO(PO)
                                                 , Pred(..)
                                                 )
-import           GCL.Substitution               ( stepRedex )
+import           GCL.Substitution               ( stepRedex, step, Scope, CollectRedexes (collectRedexes) )
 import           Pretty
 import           Render                         ( Inlines(..)
                                                 , Render(render)
@@ -31,6 +31,9 @@ import           Syntax.Abstract.Util           ( programToScopeForSubstitution
                                                 )
 import           Test.Tasty              hiding ( after )
 import           Test.Util
+import Data.IntMap (IntMap)
+import GCL.Common (Fresh)
+import Control.Monad.State (runState, evalState, forM)
 
 tests :: TestTree
 tests = testGroup "Substitution" [letBindings]
@@ -58,20 +61,23 @@ letBindings = testGroup
             program <- parseProgram source
             cache   <- sweep program
             let pos     = cachePOs cache
-            let trees   = map toTree (pos >>= extractExpand)
+            let trees   = map fromEXPN (pos >>= extractExpand)
             let redexes = cacheRedexes cache
+            let scope = programToScopeForSubstitution program
+            let treesFromRedexes = evalState (mapM (fromRedex scope) (cacheRedexes cache)) (0 :: Int)
             let
               redexesWithNextStep =
                 map
                     (\rdx ->
                       ( rdx
-                      , stepRedex (programToScopeForSubstitution program)
+                      , stepRedex scope
                                   (redexBefore rdx)
                       )
                     )
                   $ toList redexes
-            return (Right (VList trees, VList redexesWithNextStep))
+            return (Right (VList trees, VList $ toList treesFromRedexes))
 
+--------------------------------------------------------------------------------
 
 -- Tree-like structure for representing the transition from one Expn to the next
 data Tree = Node Int -- index of the redex s
@@ -91,8 +97,8 @@ instance Pretty Tree where
     prettyTransition (transition, children) =
       [pretty transition, indent 2 $ vcat (map pretty children)]
 
-toTree :: EXPN -> Tree
-toTree (EXPN index before after inBefore inAfter) = Node
+fromEXPN :: EXPN -> Tree
+fromEXPN (EXPN index before after inBefore inAfter) = Node
   index
   before
   (toBefore <> toAfter)
@@ -101,13 +107,22 @@ toTree (EXPN index before after inBefore inAfter) = Node
   toBefore = Map.fromList $ map
     (\expn ->
       ( renderedBefore expn <> " ===> " <> renderedAfter expn
-      , map toTree (buttonsInBefore expn)
+      , map fromEXPN (buttonsInBefore expn)
       )
     )
     inBefore
 
   toAfter :: Map Inlines [Tree]
-  toAfter = Map.singleton (before <> " ===> " <> after) (map toTree inAfter)
+  toAfter = Map.singleton (before <> " ===> " <> after) (map fromEXPN inAfter)
+
+fromRedex :: Fresh m => Scope -> Redex -> m Tree 
+fromRedex scope (Rdx i before _) = do 
+  trees <- do 
+    after <- step scope before
+    let redexesInAfter = collectRedexes after
+    inAfter <- forM redexesInAfter (fromRedex scope)
+    return $ Map.singleton (render before <> " ===> " <> render after) inAfter
+  return $ Node i (render before) trees
 
 --------------------------------------------------------------------------------
 -- | Typeclass for extracting `Expand` from the syntax tree
