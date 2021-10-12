@@ -3,7 +3,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 module GCL.Common where
 
-import           Control.Monad                  ( liftM2 )
 import           Control.Monad.RWS              ( RWST(..) )
 import           Control.Monad.State            ( StateT(..) )
 import           Data.Loc                       ( Loc(..) )
@@ -19,23 +18,27 @@ import qualified Syntax.Abstract               as A
 import           Syntax.Common                  ( Name(..) )
 import qualified Data.List.NonEmpty as NonEmpty
 
--- Monad for generating fresh variable
+-- Monad for generating fresh variables 
 class Monad m => Fresh m where
+  -- minimum requirement:
+  getCounter :: m Int 
+  setCounter :: Int -> m () 
+  -- get a fresh variable (and bump the counter)
   fresh :: m Int
-  freshText :: m Text
-  freshWithLabel :: Text -> m Text
-  freshTexts :: Int -> m [Text]
-  -- freshName :: m Name
+  fresh = do 
+    i <- getCounter
+    setCounter (succ i)
+    return i 
 
+  -- get a fresh variable in the form of Text 
+  freshText :: m Text
   freshText =
     (\i -> Text.pack ("?m_" ++ show i)) <$> fresh
 
+  -- a more fancy `freshText`
+  freshWithLabel :: Text -> m Text
   freshWithLabel l =
     (\i -> Text.pack ("?" ++ Text.unpack l ++ "_" ++ show i)) <$> fresh
-
-  freshTexts 0 = return []
-  freshTexts n = liftM2 (:) freshText (freshTexts (n - 1))
-
 
 freshName :: Fresh m => Text -> Loc -> m Name
 freshName prefix l = Name <$> freshWithLabel prefix <*> pure l

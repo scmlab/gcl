@@ -117,10 +117,8 @@ type Infer = RWST Environment [Constraint] FreshState (Except TypeError)
 type TM = StateT FreshState (Except TypeError)
 
 instance Fresh Infer where
-  fresh = do
-    i <- get
-    (put . succ) i
-    return i
+  getCounter = get 
+  setCounter = put 
 
 unify :: Type -> Type -> Infer ()
 unify x y = tell [(x, y)]

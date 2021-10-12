@@ -22,7 +22,7 @@ import qualified Data.Set                      as Set
 import           Data.Set                       ( Set )
 import           Data.Text                      ( Text )
 import           GCL.Common                     ( Free(fv)
-                                                , Fresh(fresh, freshWithLabel)
+                                                , Fresh(..)
                                                 )
 import           GCL.Predicate                  ( PO(PO)
                                                 , Pred(..)
@@ -64,17 +64,8 @@ type M = RWS Scope () (Int, Int)
 
 -- for alpha-renaming 
 instance Fresh M where
-  fresh = do
-    (x, i) <- get
-    put (succ x, i)
-    return x
-
--- for indexing redexes
-freshRedexIndex :: M Int
-freshRedexIndex = do
-  (x, i) <- get
-  put (x, succ i)
-  return i
+  getCounter = fst <$> get 
+  setCounter i = modify' (\(_, x) -> (i, x))
 
 ------------------------------------------------------------------
 
@@ -211,7 +202,7 @@ instance Substitutable Expr where
       Just value -> return value -- [subst-Var-substituted]
       Nothing    -> do
         scope <- ask
-        index <- freshRedexIndex
+        index <- fresh
         case Map.lookup (nameToText name) scope of
             -- [subst-Var-defined]
           Just (Just binding) -> do
@@ -248,7 +239,7 @@ instance Substitutable Expr where
       Just value -> reduce value -- [subst-Const-substituted]
       Nothing    -> do
         scope <- ask
-        index <- freshRedexIndex
+        index <- fresh
         case Map.lookup (nameToText name) scope of
             -- [subst-Const-defined]
           Just (Just binding) -> do

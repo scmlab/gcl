@@ -67,10 +67,8 @@ type WP
   = RWST Substitution.Scope ([PO], [Spec], [StructWarning], [A.Redex]) Int TM
 
 instance Fresh WP where
-  fresh = do
-    i <- get
-    put (succ i)
-    return i
+  getCounter = get 
+  setCounter = put 
 
 runWP
   :: WP a
