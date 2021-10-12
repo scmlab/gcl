@@ -4,7 +4,6 @@
 
 module GCL.Substitution
   ( run
-  , stepRedex
   , step
   , Scope
   -- TODO: don't export these 
@@ -462,18 +461,3 @@ shrinkMapping expr mapping =
       freeVars = Set.map nameToText (fv expr)
       -- restrict the mapping with only free variables
   in  Map.restrictKeys mapping freeVars
-
-------------------------------------------------------------------
-
-stepRedex :: Scope -> Expr -> Expr
-stepRedex scope expr = fst $ evalRWS (go expr) scope 0
- where
-  go :: Expr -> M Expr
-  go (App       f x     l     ) = App <$> go f <*> pure x <*> pure l >>= reduce
-  go (RedexStem _ value substs) = foldM (flip subst) value mappings >>= reduce
-   where
-    mappings :: [Mapping]
-    mappings = reverse $ map snd $ toList substs
-  go (Redex redex) = go (redexBefore redex)
-  go others        = return others
-

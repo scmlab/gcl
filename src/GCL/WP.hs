@@ -96,6 +96,7 @@ sweep program@(A.Program _ _ _props stmts _) = do
 
   return (pos', specs, warnings, redexes)
 
+-- ugly imports 
 substitute
   :: ( Substitution.Substitutable a
      , Substitution.Reducible a
@@ -110,7 +111,6 @@ substitute xs es expr = do
   (result, redexes) <- Substitution.run scope xs es expr
   tell ([], [], [], redexes)
   return result
-
 
 --------------------------------------------------------------------------------
 

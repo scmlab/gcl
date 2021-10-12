@@ -71,18 +71,18 @@ handleInsertAnchor hash = do
   cacheResult (Right result)
   generateResponseAndDiagnosticsFromResult (Right result)
 
-handleEval :: Text -> CmdM [ResKind]
-handleEval payload = do 
-  logM payload
+handleSubst :: Int -> CmdM [ResKind]
+handleSubst i = do
+  logM $ Text.pack $ "Substituting Redex " <> show i
   return []
 
 handleCustomMethod :: ReqKind -> CmdM [ResKind]
 handleCustomMethod = \case
-  ReqInspect      range   -> handleInspect range
-  ReqRefine       range   -> handleRefine range
-  ReqInsertAnchor hash    -> handleInsertAnchor hash
-  ReqEval         payload -> handleEval payload
-  ReqDebug                -> return $ error "crash!"
+  ReqInspect      range -> handleInspect range
+  ReqRefine       range -> handleRefine range
+  ReqInsertAnchor hash  -> handleInsertAnchor hash
+  ReqSubst        i     -> handleSubst i
+  ReqDebug              -> return $ error "crash!"
 
 handler :: JSON.Value -> (Response -> ServerM ()) -> ServerM ()
 handler params responder = do
