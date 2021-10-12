@@ -67,8 +67,8 @@ type WP
   = RWST Substitution.Scope ([PO], [Spec], [StructWarning], [A.Redex]) Int TM
 
 instance Fresh WP where
-  getCounter = get 
-  setCounter = put 
+  getCounter = get
+  setCounter = put
 
 runWP
   :: WP a
@@ -106,10 +106,8 @@ substitute
   -> a
   -> WP a
 substitute xs es expr = do
-  scope   <- ask
-  counter <- get
-  let (result, redexes, counter') = Substitution.run scope counter xs es expr
-  put counter'
+  scope             <- ask
+  (result, redexes) <- Substitution.run scope xs es expr
   tell ([], [], [], redexes)
   return result
 

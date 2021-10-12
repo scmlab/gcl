@@ -38,17 +38,20 @@ import           Syntax.Common                  ( Name(Name)
 ------------------------------------------------------------------
 
 run
-  :: (Substitutable a, Reducible a, CollectRedexes a)
+  :: Fresh m
+  => (Substitutable a, Reducible a, CollectRedexes a)
   => Scope -- declarations
-  -> Int -- initial redex ID counter
+  -- -> Int -- initial redex ID counter
   -> [Name] -- name of variables to be substituted
   -> [Expr] -- values to be substituted for
   -> a
-  -> (a, [Redex], Int)
-run scope index names exprs predicate =
-  let (output, (_, index'), _) =
-        runRWS (subst mapping predicate >>= reduce) scope (0, index)
-  in  (output, collectRedexes output, index')
+  -> m (a, [Redex])
+run scope names exprs predicate = do
+  index <- getCounter
+  let (output, index', _) =
+        runRWS (subst mapping predicate >>= reduce) scope index
+  setCounter index'
+  return (output, collectRedexes output)
  where
   mapping :: Mapping
   mapping = mappingFromSubstitution names exprs
@@ -60,12 +63,13 @@ mappingFromSubstitution xs es =
 ------------------------------------------------------------------
 
 type Scope = Map Text (Maybe Expr)
-type M = RWS Scope () (Int, Int)
+type M = RWS Scope () Int
 
 -- for alpha-renaming 
 instance Fresh M where
-  getCounter = fst <$> get 
-  setCounter i = modify' (\(_, x) -> (i, x))
+  getCounter = get 
+  setCounter = put 
+      -- modify' (\(_, x) -> (i, x))
 
 ------------------------------------------------------------------
 
@@ -443,13 +447,13 @@ shrinkMapping expr mapping =
 ------------------------------------------------------------------
 
 stepRedex :: Scope -> Expr -> Expr
-stepRedex scope expr = fst $ evalRWS (go expr) scope (0, 0)
-  where 
-    go :: Expr -> M Expr
-    go (App f x l) = App <$> go f <*> pure x <*> pure l >>= reduce
-    go (RedexStem _ value substs) = foldM (flip subst) value mappings >>= reduce
-      where
-        mappings :: [Mapping]
-        mappings = reverse $ map snd $ toList substs
-    go (Redex redex) = go (redexBefore redex)
-    go others        = return others
+stepRedex scope expr = fst $ evalRWS (go expr) scope 0
+ where
+  go :: Expr -> M Expr
+  go (App       f x     l     ) = App <$> go f <*> pure x <*> pure l >>= reduce
+  go (RedexStem _ value substs) = foldM (flip subst) value mappings >>= reduce
+   where
+    mappings :: [Mapping]
+    mappings = reverse $ map snd $ toList substs
+  go (Redex redex) = go (redexBefore redex)
+  go others        = return others
