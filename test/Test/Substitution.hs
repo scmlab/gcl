@@ -1,40 +1,35 @@
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE LambdaCase #-}
 
 module Test.Substitution
   ( tests
   ) where
 
+import           Control.Monad.State            ( evalState
+                                                , forM
+                                                )
 import           Data.Foldable                  ( toList )
 import           Data.Map                       ( Map )
 import qualified Data.Map                      as Map
-import           GCL.Predicate                  ( PO(PO)
-                                                , Pred(..)
+import           GCL.Common                     ( Fresh )
+import           GCL.Substitution               ( CollectRedexes(collectRedexes)
+                                                , Scope
+                                                , step
                                                 )
-import           GCL.Substitution               ( stepRedex, step, Scope, CollectRedexes (collectRedexes) )
 import           Pretty
-import           Render                         ( Inlines(..)
-                                                , Render(render)
-                                                )
-import           Server.DSL                     ( Cache(cachePOs, cacheRedexes)
+import           Render.Class                   ( Render(render) )
+import           Render.Element                 ( Inlines(..) )
+import           Server.DSL                     ( Cache(cacheRedexes)
                                                 , parseProgram
                                                 , sweep
                                                 )
 import           Server.Interpreter.Test        ( runTest
                                                 , serializeTestResultValueOnly
                                                 )
-import           Syntax.Abstract                ( Case(CaseConstructor)
-                                                , Expr(..)
-                                                , Redex(..)
-                                                )
+import           Syntax.Abstract.Types          ( Redex(..) )
 import           Syntax.Abstract.Util           ( programToScopeForSubstitution
                                                 )
 import           Test.Tasty              hiding ( after )
 import           Test.Util
-import Data.IntMap (IntMap)
-import GCL.Common (Fresh)
-import Control.Monad.State (runState, evalState, forM)
-import qualified Data.IntMap as IntMap
 
 tests :: TestTree
 tests = testGroup "Substitution" [letBindings]
@@ -61,14 +56,11 @@ letBindings = testGroup
           return $ serializeTestResultValueOnly $ runTest sourcePath source $ do
             program <- parseProgram source
             cache   <- sweep program
-            let pos     = cachePOs cache
             let scope = programToScopeForSubstitution program
-            let treesFromOldRedex = IntMap.fromList $ map (\expn -> (redexIndex expn, fromEXPN expn )) (pos >>= extractExpand)
-            let treesFromRedexes = evalState (mapM (fromRedex scope) (cacheRedexes cache)) (0 :: Int)
-
-            let mergedTree = IntMap.mergeWithKey (\_key old new -> Just (old, new)) undefined undefined treesFromOldRedex treesFromRedexes
-
-            return (Right (VList $ toList mergedTree))
+            let treesFromRedexes = evalState
+                  (mapM (fromRedex scope) (cacheRedexes cache))
+                  (0 :: Int)
+            return (Right (VList $ toList treesFromRedexes))
 
 --------------------------------------------------------------------------------
 
@@ -90,83 +82,11 @@ instance Pretty Tree where
     prettyTransition (transition, children) =
       [pretty transition, indent 2 $ vcat (map pretty children)]
 
-fromEXPN :: EXPN -> Tree
-fromEXPN (EXPN index before after inBefore inAfter) = Node
-  index
-  before
-  (toBefore <> toAfter)
- where
-  toBefore :: Map Inlines [Tree]
-  toBefore = Map.fromList $ map
-    (\expn ->
-      ( renderedBefore expn <> " ===> " <> renderedAfter expn
-      , map fromEXPN (buttonsInBefore expn)
-      )
-    )
-    inBefore
-
-  toAfter :: Map Inlines [Tree]
-  toAfter = Map.singleton (before <> " ===> " <> after) (map fromEXPN inAfter)
-
-fromRedex :: Fresh m => Scope -> Redex -> m Tree 
-fromRedex scope (Rdx i before _) = do 
-  trees <- do 
+fromRedex :: Fresh m => Scope -> Redex -> m Tree
+fromRedex scope (Rdx i before _) = do
+  trees <- do
     after <- step scope before
     let redexesInAfter = collectRedexes after
     inAfter <- forM redexesInAfter (fromRedex scope)
     return $ Map.singleton (render before <> " ===> " <> render after) inAfter
   return $ Node i (render before) trees
-
---------------------------------------------------------------------------------
--- | Typeclass for extracting `Expand` from the syntax tree
-
--- like `Expand`, but augmented with "buttons" in "before" and "after"
-data EXPN = EXPN
-  { redexIndex      :: Int
-  , renderedBefore  :: Inlines
-  , renderedAfter   :: Inlines
-  , buttonsInBefore :: [EXPN]
-  , buttonsInAfter  :: [EXPN]
-  }
-  deriving Show
-
-class ExtractExpand a where
-  extractExpand :: a -> [EXPN]
-
-instance ExtractExpand PO where
-  extractExpand (PO pre post _ _ _) = extractExpand pre <> extractExpand post
-
-instance ExtractExpand Pred where
-  extractExpand = \case
-    Constant x          -> extractExpand x
-    GuardIf   x _       -> extractExpand x
-    GuardLoop x _       -> extractExpand x
-    Assertion x _       -> extractExpand x
-    LoopInvariant x y _ -> extractExpand x <> extractExpand y
-    Bound x _           -> extractExpand x
-    Conjunct xs         -> xs >>= extractExpand
-    Disjunct xs         -> xs >>= extractExpand
-    Negate   x          -> extractExpand x
-
-instance ExtractExpand Expr where
-  extractExpand = \case
-    App x y _       -> extractExpand x <> extractExpand y
-    Lam _ x _       -> extractExpand x
-    Quant _ _ _ z _ -> extractExpand z
-    Redex (Rdx index before after) ->
-      [ EXPN index
-             (render before)
-             (render after)
-             (extractExpand before)
-             (extractExpand after)
-      ]
-    RedexStem{}    -> []
-    ArrIdx x y _   -> extractExpand x <> extractExpand y
-    ArrUpd x y z _ -> extractExpand x <> extractExpand y <> extractExpand z
-    Case _ xs _    -> xs >>= extractExpand
-    _              -> []
-
-instance ExtractExpand Case where
-  extractExpand (CaseConstructor _ _ x) = extractExpand x
-
---------------------------------------------------------------------------------
