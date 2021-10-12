@@ -3,7 +3,9 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase #-}
 
-module GCL.WP where
+module GCL.WP
+  ( sweep
+  ) where
 
 import           Control.Arrow                  ( first )
 import           Control.Monad.Except           ( Except
@@ -62,15 +64,11 @@ import           Syntax.Common                  ( Name(Name)
 type TM = Except StructError
 
 type WP
-  = RWST
-      Substitution.Scope
-      ([PO], [Spec], [StructWarning], [A.Redex])
-      Int
-      TM
+  = RWST Substitution.Scope ([PO], [Spec], [StructWarning], [A.Redex]) Int TM
 
 instance Fresh WP where
   fresh = do
-    i <- get 
+    i <- get
     put (succ i)
     return i
 
@@ -110,7 +108,7 @@ substitute
   -> a
   -> WP a
 substitute xs es expr = do
-  scope <- ask
+  scope   <- ask
   counter <- get
   let (result, redexes, counter') = Substitution.run scope counter xs es expr
   put counter'
@@ -577,8 +575,8 @@ sp (pre, _) _ = return pre
 
 tellPO :: Pred -> Pred -> Origin -> WP ()
 tellPO p q origin = unless (toExpr p == toExpr q) $ do
-  p'        <- substitute [] [] p
-  q'        <- substitute [] [] q
+  p' <- substitute [] [] p
+  q' <- substitute [] [] q
   let anchorHash =
         Text.pack $ showHex (abs (Hashable.hash (toString (p', q')))) ""
   tell ([PO p' q' anchorHash Nothing origin], [], [], [])
@@ -589,9 +587,9 @@ tellPO' l p q = tellPO p q l
 
 tellSpec :: Pred -> Pred -> Range -> WP ()
 tellSpec p q l = do
-  p'        <- substitute [] [] p
-  q'        <- substitute [] [] q
-  i <- fresh 
+  p' <- substitute [] [] p
+  q' <- substitute [] [] q
+  i  <- fresh
   tell ([], [Specification i p' q' l], [], [])
 
 throwWarning :: StructWarning -> WP ()

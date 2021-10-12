@@ -8,6 +8,8 @@ import           Control.Monad.Cont
 import           Control.Monad.Except
 import           Control.Monad.Trans.Free
 import           Control.Monad.Writer
+import           Data.IntMap                    ( IntMap )
+import qualified Data.IntMap                   as IntMap
 import           Data.List                      ( find
                                                 , sortOn
                                                 )
@@ -52,6 +54,7 @@ data Cache = Cache
   , cacheProps    :: [A.Expr]
     -- Warnings 
   , cacheWarnings :: [StructWarning]
+  , cacheRedexes  :: IntMap A.Redex
   }
   deriving (Eq, Show)
 
@@ -163,11 +166,15 @@ typeCheck p = case TypeChecking.runTM (TypeChecking.checkProgram p) of
 sweep :: A.Program -> CmdM Cache
 sweep program@(A.Program _ _ globalProps _ _) = case WP.sweep program of
   Left  e                              -> throwError [StructError e]
-  Right (pos, specs, warings, _redexes) -> do
+  Right (pos, specs, warings, redexes) -> do
+    let redexIntMap =
+          IntMap.fromList $ map (\redex -> (A.redexID redex, redex)) redexes
+
     return $ Cache { cachePOs      = List.sort pos
                    , cacheSpecs    = sortOn locOf specs
                    , cacheProps    = globalProps
                    , cacheWarnings = warings
+                   , cacheRedexes  = redexIntMap
                    }
 
 --------------------------------------------------------------------------------
@@ -192,7 +199,7 @@ parseProgram source = do
 generateResponseAndDiagnosticsFromResult :: Result -> CmdM [ResKind]
 generateResponseAndDiagnosticsFromResult (Left  errors) = throwError errors
 generateResponseAndDiagnosticsFromResult (Right cache ) = do
-  let (Cache pos specs globalProps warnings) = cache
+  let (Cache pos specs globalProps warnings _redexes) = cache
 
   -- get Specs around the mouse selection
   lastSelection <- getLastSelection
