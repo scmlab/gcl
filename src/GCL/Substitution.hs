@@ -5,6 +5,7 @@
 module GCL.Substitution
   ( run
   , stepRedex
+  , step
   , Scope
   -- TODO: don't export these 
   , Substitutable
@@ -46,15 +47,26 @@ run
   -> [Expr] -- values to be substituted for
   -> a
   -> m (a, [Redex])
-run scope names exprs predicate = do
-  index <- getCounter
-  let (output, index', _) =
-        runRWS (subst mapping predicate >>= reduce) scope index
-  setCounter index'
+run scope names exprs predicate = runM scope $ do
+  output <- subst mapping predicate >>= reduce
   return (output, collectRedexes output)
  where
   mapping :: Mapping
   mapping = mappingFromSubstitution names exprs
+
+
+step :: Fresh m => Scope -> Expr -> m Expr
+step scope expr = runM scope $ go expr 
+ where
+  go :: Expr -> M Expr
+  go (App       f x     l     ) = App <$> go f <*> pure x <*> pure l >>= reduce
+  go (RedexStem _ value substs) = foldM (flip subst) value mappings >>= reduce
+   where
+    mappings :: [Mapping]
+    mappings = reverse $ map snd $ toList substs
+  go (Redex redex) = go (redexBefore redex)
+  go others        = return others
+
 
 mappingFromSubstitution :: [Name] -> [Expr] -> Mapping
 mappingFromSubstitution xs es =
@@ -64,6 +76,13 @@ mappingFromSubstitution xs es =
 
 type Scope = Map Text (Maybe Expr)
 type M = RWS Scope () Int
+
+runM :: Fresh m => Scope -> M b -> m b
+runM scope p = do
+  counter <- getCounter
+  let (output, counter', _) = runRWS p scope counter
+  setCounter counter'
+  return output
 
 -- for alpha-renaming 
 instance Fresh M where
@@ -457,3 +476,4 @@ stepRedex scope expr = fst $ evalRWS (go expr) scope 0
     mappings = reverse $ map snd $ toList substs
   go (Redex redex) = go (redexBefore redex)
   go others        = return others
+

@@ -58,16 +58,16 @@
     453: sum i n
       sum i n ===> ⟨ Σ k : i ≤ k < n : f[k] ⟩
         
-, ((260, P n), s = ⟨ ↑ ij : 0 ≤ i ≤ j ≤ n : sum i j ⟩)
-((274, Q n), r = ⟨ ↑ i : 0 ≤ i ≤ n : sum i n ⟩)
+, ((0, P [ s \ 0 ] 0), 0 = ⟨ ↑ ij : 0 ≤ i ≤ j ≤ 0 : sum i j ⟩)
+((11, Q 0), r = ⟨ ↑ i : 0 ≤ i ≤ 0 : sum i 0 ⟩)
+((74, P n), s = ⟨ ↑ ij : 0 ≤ i ≤ j ≤ n : sum i j ⟩)
+((88, Q n), r = ⟨ ↑ i : 0 ≤ i ≤ n : sum i n ⟩)
 ( (149, P [ s \ s ↑ r ] [ r \ (r + f[n]) ↑ 0 ] (n + 1))
 , s ↑ ((r + f[n]) ↑ 0) = ⟨ ↑ ij : 0 ≤ i ≤ j ≤ n + 1 : sum i j ⟩ )
 ( (162, Q [ r \ (r + f[n]) ↑ 0 ] (n + 1))
 , (r + f[n]) ↑ 0 = ⟨ ↑ i : 0 ≤ i ≤ n + 1 : sum i (n + 1) ⟩ )
-((0, P [ s \ 0 ] 0), 0 = ⟨ ↑ ij : 0 ≤ i ≤ j ≤ 0 : sum i j ⟩)
-((11, Q 0), r = ⟨ ↑ i : 0 ≤ i ≤ 0 : sum i 0 ⟩)
-((74, P n), s = ⟨ ↑ ij : 0 ≤ i ≤ j ≤ n : sum i j ⟩)
-((88, Q n), r = ⟨ ↑ i : 0 ≤ i ≤ n : sum i n ⟩)
+((260, P n), s = ⟨ ↑ ij : 0 ≤ i ≤ j ≤ n : sum i j ⟩)
+((274, Q n), r = ⟨ ↑ i : 0 ≤ i ≤ n : sum i n ⟩)
 ((358, P n), s = ⟨ ↑ ij : 0 ≤ i ≤ j ≤ n : sum i j ⟩)
 ((372, Q n), r = ⟨ ↑ i : 0 ≤ i ≤ n : sum i n ⟩)
 ((435, P n), s = ⟨ ↑ ij : 0 ≤ i ≤ j ≤ n : sum i j ⟩)

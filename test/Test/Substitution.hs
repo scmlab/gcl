@@ -5,17 +5,18 @@ module Test.Substitution
   ( tests
   ) where
 
+import           Data.Foldable                  ( toList )
 import           Data.Map                       ( Map )
 import qualified Data.Map                      as Map
 import           GCL.Predicate                  ( PO(PO)
                                                 , Pred(..)
                                                 )
-import           GCL.Substitution               ( collectRedexes, stepRedex )
+import           GCL.Substitution               ( stepRedex )
 import           Pretty
 import           Render                         ( Inlines(..)
                                                 , Render(render)
                                                 )
-import           Server.DSL                     ( Cache(cachePOs)
+import           Server.DSL                     ( Cache(cachePOs, cacheRedexes)
                                                 , parseProgram
                                                 , sweep
                                                 )
@@ -26,9 +27,10 @@ import           Syntax.Abstract                ( Case(CaseConstructor)
                                                 , Expr(..)
                                                 , Redex(..)
                                                 )
+import           Syntax.Abstract.Util           ( programToScopeForSubstitution
+                                                )
 import           Test.Tasty              hiding ( after )
 import           Test.Util
-import Syntax.Abstract.Util (programToScopeForSubstitution)
 
 tests :: TestTree
 tests = testGroup "Substitution" [letBindings]
@@ -57,8 +59,17 @@ letBindings = testGroup
             cache   <- sweep program
             let pos     = cachePOs cache
             let trees   = map toTree (pos >>= extractExpand)
-            let redexes = pos >>= collectRedexes
-            let redexesWithNextStep = map (\rdx -> (rdx, stepRedex (programToScopeForSubstitution program) (redexBefore rdx))) redexes
+            let redexes = cacheRedexes cache
+            let
+              redexesWithNextStep =
+                map
+                    (\rdx ->
+                      ( rdx
+                      , stepRedex (programToScopeForSubstitution program)
+                                  (redexBefore rdx)
+                      )
+                    )
+                  $ toList redexes
             return (Right (VList trees, VList redexesWithNextStep))
 
 
@@ -141,11 +152,11 @@ instance ExtractExpand Expr where
              (extractExpand before)
              (extractExpand after)
       ]
-    RedexStem {} -> []
-    ArrIdx x y _     -> extractExpand x <> extractExpand y
-    ArrUpd x y z _   -> extractExpand x <> extractExpand y <> extractExpand z
-    Case _ xs _      -> xs >>= extractExpand
-    _                -> []
+    RedexStem{}    -> []
+    ArrIdx x y _   -> extractExpand x <> extractExpand y
+    ArrUpd x y z _ -> extractExpand x <> extractExpand y <> extractExpand z
+    Case _ xs _    -> xs >>= extractExpand
+    _              -> []
 
 instance ExtractExpand Case where
   extractExpand (CaseConstructor _ _ x) = extractExpand x

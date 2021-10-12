@@ -17,8 +17,8 @@
   INV ===> (x * y) + z = A * B
     
 , ((0, INV [ x,y,z \ A,B,0 ]), (A * B) + 0 = A * B)
-((33, INV), (x * y) + z = A * B)
-((22, INV [ x \ x - 1 ] [ z \ z + y ]), ((x - 1) * y) + (z + y) = A * B)
 ((10, INV), (x * y) + z = A * B)
+((22, INV [ x \ x - 1 ] [ z \ z + y ]), ((x - 1) * y) + (z + y) = A * B)
+((33, INV), (x * y) + z = A * B)
 ((50, INV), (x * y) + z = A * B)
 ((64, INV), (x * y) + z = A * B) )
