@@ -34,6 +34,7 @@ import           Test.Util
 import Data.IntMap (IntMap)
 import GCL.Common (Fresh)
 import Control.Monad.State (runState, evalState, forM)
+import qualified Data.IntMap as IntMap
 
 tests :: TestTree
 tests = testGroup "Substitution" [letBindings]
@@ -61,21 +62,13 @@ letBindings = testGroup
             program <- parseProgram source
             cache   <- sweep program
             let pos     = cachePOs cache
-            let trees   = map fromEXPN (pos >>= extractExpand)
-            let redexes = cacheRedexes cache
             let scope = programToScopeForSubstitution program
+            let treesFromOldRedex = IntMap.fromList $ map (\expn -> (redexIndex expn, fromEXPN expn )) (pos >>= extractExpand)
             let treesFromRedexes = evalState (mapM (fromRedex scope) (cacheRedexes cache)) (0 :: Int)
-            let
-              redexesWithNextStep =
-                map
-                    (\rdx ->
-                      ( rdx
-                      , stepRedex scope
-                                  (redexBefore rdx)
-                      )
-                    )
-                  $ toList redexes
-            return (Right (VList trees, VList $ toList treesFromRedexes))
+
+            let mergedTree = IntMap.mergeWithKey (\_key old new -> Just (old, new)) undefined undefined treesFromOldRedex treesFromRedexes
+
+            return (Right (VList $ toList mergedTree))
 
 --------------------------------------------------------------------------------
 
