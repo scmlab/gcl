@@ -144,7 +144,7 @@ pDeclTypeF name = DeclType <$> pDeclBaseF name <*> optional pDeclPropF
 ------------------------------------------
 
 pStmtsF :: ParserF [Stmt]
-pStmtsF = pIndentBlockF (lift pStmt)
+pStmtsF = pIndentBlockF pStmtF
 
 -- NOTE :: this function doesn't consume newline after finish parsing the statement
 pStmtF :: ParserF Stmt
@@ -201,7 +201,7 @@ pStmtF =
 
   pIfF     = If <$> lexIfF <*> pIndentSepByF pGdCmdF lexGuardBarF <*> lexFiF
 
-  pGdCmdF  = GdCmd <$> pExprF <*> lexArrowF <*> pIndentBlockF (lift pStmt)
+  pGdCmdF  = GdCmd <$> pExprF <*> lexArrowF <*> pIndentBlockF pStmtF
 
   pSpecQMF = SpecQM . rangeOf <$> lexQMF
 
