@@ -90,15 +90,8 @@ pProgramF = do
 -- parse Declaration
 ------------------------------------------
 --
-pDeclaration :: Parser Declaration
-pDeclaration = Lex.lineFold scn (unParseFunc p)
-  where p = (pConstDeclF <|> pVarDeclF) <* lift scn <?> "declaration"
-
 pDeclarationF :: ParserF Declaration
 pDeclarationF = pConstDeclF <|> pVarDeclF
-
-pDefinitionBlock :: Parser DefinitionBlock
-pDefinitionBlock = unParseFunc pDefinitionBlockF scn
 
 pDefinitionBlockF :: ParserF DefinitionBlock
 pDefinitionBlockF =
@@ -150,17 +143,10 @@ pDeclTypeF name = DeclType <$> pDeclBaseF name <*> optional pDeclPropF
 -- parse Stmt
 ------------------------------------------
 
-pStmts :: Parser [Stmt]
-pStmts = unParseFunc pStmtsF scn
-  -- (↓) (pIndentBlockF (lift pStmt)) scn <|> return []
-
 pStmtsF :: ParserF [Stmt]
 pStmtsF = pIndentBlockF (lift pStmt)
 
 -- NOTE :: this function doesn't consume newline after finish parsing the statement
-pStmt :: Parser Stmt
-pStmt = Lex.lineFold scn (unParseFunc pStmtF) <?> "statement"
-
 pStmtF :: ParserF Stmt
 pStmtF =
   choice
@@ -260,9 +246,6 @@ pStmtF =
 -- parse Type
 ------------------------------------------
 
-pType :: Parser Type
-pType = unParseFunc pTypeF scn <?> "type"
-
 pTypeF :: ParserF Type
 pTypeF = makeExprParser pTypeFTerm [[InfixR pTFuncF]] <?> "type"
  where
@@ -293,9 +276,6 @@ pTypeF = makeExprParser pTypeFTerm [[InfixR pTFuncF]] <?> "type"
 --------------------------------------------------------------------------------
 -- | Expressions
 --------------------------------------------------------------------------------
-
-pExpr :: Parser Expr
-pExpr = unParseFunc pExprF scn <?> "expression"
 
 pExprF :: ParserF Expr
 pExprF = makeExprParser pExprArithF chainOpTable <?> "expression"
@@ -402,9 +382,6 @@ pExprF = makeExprParser pExprArithF chainOpTable <?> "expression"
 -- Pattern matching
 ------------------------------------------
 
-pPattern :: Parser Pattern
-pPattern = unParseFunc pPatternF scn <?> "pattern"
-
 pPatternF :: ParserF Pattern
 pPatternF = choice
   [ PattParen <$> lexParenStartF <*> pPatternF <*> lexParenEndF
@@ -507,3 +484,28 @@ indentedItems lvl sc' p = go
     if not done && pos == lvl
       then try ((:) <$> p <*> go) <|> return []
       else return []
+
+------------------------------------------
+-- For test only
+------------------------------------------
+
+pDeclaration :: Parser Declaration
+pDeclaration = Lex.lineFold scn (unParseFunc pDeclarationF)
+
+pDefinitionBlock :: Parser DefinitionBlock
+pDefinitionBlock = unParseFunc pDefinitionBlockF scn
+
+pStmts :: Parser [Stmt]
+pStmts = unParseFunc pStmtsF scn
+
+pStmt :: Parser Stmt
+pStmt = Lex.lineFold scn (unParseFunc pStmtF) <?> "statement"
+
+pType :: Parser Type
+pType = unParseFunc pTypeF scn <?> "type"
+
+pExpr :: Parser Expr
+pExpr = unParseFunc pExprF scn <?> "expression"
+
+pPattern :: Parser Pattern
+pPattern = unParseFunc pPatternF scn <?> "pattern"
