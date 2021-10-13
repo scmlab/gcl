@@ -49,9 +49,9 @@ instance Monoid Definitions where
 
 -- function definition
 data FuncDefn = FuncDefn
-  { funcName :: Name
+  { funcName    :: Name
   , funcClauses :: [([Name], Expr)]
-  , funcLoc  :: Loc
+  , funcLoc     :: Loc
   }
   deriving (Eq, Show)
 
@@ -143,7 +143,7 @@ data Expr
   | Expand Expr Expr
   | ArrIdx Expr Expr Loc
   | ArrUpd Expr Expr Expr Loc
-  | Case Expr [Case] Loc
+  | Case Expr [CaseConstructor] Loc
   deriving (Eq, Show, Generic)
 
 type QuantOp' = Either Op Expr
@@ -153,12 +153,12 @@ type Mapping = Map Text Expr
 --------------------------------------------------------------------------------
 -- | Pattern matching
 
-data Case = CaseConstructor Name [Name] Expr 
+data CaseConstructor = CaseConstructor Name [Name] Expr
   deriving (Eq, Show, Generic)
 
 data Pattern
   = PattBinder Name -- binder
-  | PattWildcard Range -- matches anything 
+  | PattWildcard Range -- matches anything
   | PattConstructor Name [Pattern] -- destructs a constructor
   deriving (Eq, Show, Generic)
 

@@ -18,7 +18,9 @@ import           GCL.Common                     ( Free(fv)
                                                 , Fresh(fresh, freshWithLabel)
                                                 )
 import           GCL.Predicate                  ( Pred(..) )
-import           Syntax.Abstract                ( Case(CaseConstructor)
+import           Syntax.Abstract                ( CaseConstructor
+                                                  ( CaseConstructor
+                                                  )
                                                 , Expr(..)
                                                 , Mapping
                                                 )

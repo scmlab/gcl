@@ -226,7 +226,7 @@ instance Collect Expr J.SemanticTokenAbsolute where
         <> toToken' J.SttKeyword [] tokB
         <> (toList cases >>= collect)
 
-instance Collect Case J.SemanticTokenAbsolute where
+instance Collect CaseConstructor J.SemanticTokenAbsolute where
   collect (CaseConstructor ctor binders arrow body) =
     sort
       $  toToken' J.SttEnumMember [] ctor

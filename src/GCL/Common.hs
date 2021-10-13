@@ -92,7 +92,7 @@ instance Free A.Expr where
   fv (A.ArrUpd e1 e2 e3 _) = fv e1 <> fv e2 <> fv e3
   fv (A.Case e cases _   ) = fv e <> Set.unions (map fv cases)
 
-instance Free A.Case where
+instance Free A.CaseConstructor where
   fv (A.CaseConstructor _ xs expr) = fv expr \\ Set.fromList xs
 
 instance Free A.Mapping where

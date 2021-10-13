@@ -393,9 +393,10 @@ pExprF =
     op <- try (notFollowedBySymbolF m)
     return $ \x -> App (Op op) x
 
-  pCaseOfF = Case <$> lexCase <*> pExprF <*> lexOfF <*> pIndentBlockF pCaseF
+  pCaseOfF =
+    Case <$> lexCase <*> pExprF <*> lexOfF <*> pIndentBlockF pCaseConstructorF
 
-  pCaseF   = ParseFunc $ \sc' ->
+  pCaseConstructorF = ParseFunc $ sc' ->
     Lex.lineFold sc'
       .   unParseFunc
       $   CaseConstructor

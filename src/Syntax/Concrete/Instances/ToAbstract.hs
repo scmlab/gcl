@@ -247,7 +247,7 @@ instance ToAbstract Expr A.Expr where
     Case _ expr _ cases ->
       A.Case <$> toAbstract expr <*> toAbstract cases <*> pure (locOf x)
 
-instance ToAbstract Case A.Case where
+instance ToAbstract CaseConstructor A.CaseConstructor where
   toAbstract (CaseConstructor ctor binders _ body) =
     A.CaseConstructor ctor <$> toAbstract binders <*> toAbstract body
 
