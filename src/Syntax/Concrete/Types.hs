@@ -52,7 +52,7 @@ data Program
   deriving (Eq, Show)
 
 --------------------------------------------------------------------------------
--- | Definitions 
+-- | Definitions
 
 data DefinitionBlock = DefinitionBlock (Token "{:") [Definition] (Token ":}") deriving (Eq, Show)
 data Definition
@@ -60,14 +60,14 @@ data Definition
     TypeDefn (Token "data") Name [Name] (Token "=") (SepBy "|" TypeDefnCtor)
     -- f : A -> B { Prop }
   | FuncDefnSig DeclBase (Maybe DeclProp)
-    -- f a = a 
+    -- f a = a
   | FuncDefn Name [Name] (Token "=") Expr
   deriving (Eq, Show)
 
 data TypeDefnCtor = TypeDefnCtor Name [Type] deriving (Eq, Show)
 
 --------------------------------------------------------------------------------
--- | Declaration 
+-- | Declaration
 
 data Declaration
   = ConstDecl (Token "con") DeclType
@@ -82,7 +82,7 @@ data DeclProp = DeclProp (Token "{") Expr (Token "}") deriving (Eq, Show)
 data DeclType = DeclType DeclBase (Maybe DeclProp) deriving (Eq, Show)
 
 --------------------------------------------------------------------------------
--- | Statements 
+-- | Statements
 
 data Stmt
   = Skip Range
@@ -161,23 +161,23 @@ data Expr
       Expr
       TokQuantEnds
   -- case expr of { ctor1 -> expr | ctor2 binder1 binder2 -> expr }
-  | Case (Token "case") Expr (Token "of") (Token "{") (SepBy "|" Case) (Token "}")
+  | Case (Token "case") Expr (Token "of") [Case]
   deriving (Eq, Show, Generic)
 
 type QuantOp' = Either Op Expr
 
 --------------------------------------------------------------------------------
--- | Pattern matching 
+-- | Pattern matching
 
 -- ctor1 binder1 binder2 ... -> expr
-data Case = CaseConstructor Name [Name] TokArrows Expr 
+data Case = CaseConstructor Name [Name] TokArrows Expr
   deriving (Eq, Show, Generic)
 
 -- NOTE: current not in use
 data Pattern
   = PattParen (Token "(") Pattern (Token ")") -- pattern wrapped inside a pair of parenthesis
   | PattBinder Name -- binder
-  | PattWildcard (Token "_") -- matches anything 
+  | PattWildcard (Token "_") -- matches anything
   | PattConstructor Name [Pattern] -- destructs a constructor
   deriving (Eq, Show)
 

@@ -94,13 +94,13 @@ instance Collect AsName J.SemanticTokenAbsolute where
   collect (AsName a) = toToken' J.SttFunction [] a
 
 --------------------------------------------------------------------------------
--- Program 
+-- Program
 
 instance Collect Program J.SemanticTokenAbsolute where
   collect (Program as bs) = (as >>= collect) <> (bs >>= collect)
 
 --------------------------------------------------------------------------------
--- Definition  
+-- Definition
 
 instance Collect DefinitionBlock J.SemanticTokenAbsolute where
   collect (DefinitionBlock _tokA as _tokB) = toList as >>= collect
@@ -219,7 +219,7 @@ instance Collect Expr J.SemanticTokenAbsolute where
         <> toToken' J.SttKeyword [] tokC
         <> collect b
         <> toToken' J.SttKeyword [] tokD
-    Case tokA expr tokB _ cases _ ->
+    Case tokA expr tokB cases ->
       sort
         $  toToken' J.SttKeyword [] tokA
         <> collect expr
@@ -238,7 +238,7 @@ instance Collect Lit J.SemanticTokenAbsolute where
   collect = toToken' J.SttNumber []
 
 --------------------------------------------------------------------------------
--- Pattern 
+-- Pattern
 
 instance Collect Pattern J.SemanticTokenAbsolute where
   collect (PattParen _ a _ ) = collect a

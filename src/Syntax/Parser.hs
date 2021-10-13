@@ -322,7 +322,7 @@ pExprF =
     ]
 
   arithTable =
-    [ [Postfix pAppF]
+    [ [InfixL pAppF]
     , [InfixN . pBinaryF . fmap ArithOp $ lexExpF]
     , [ InfixN . pBinaryF . fmap ArithOp $ lexMaxF
       , InfixN . pBinaryF . fmap ArithOp $ lexMinF
@@ -342,7 +342,8 @@ pExprF =
 
   -- To avoid stuck at parsing terms other than array
   pTermF =
-    choice [pCaseOfF, pLitF, try pArrayF, pParenF, pVarF, pConstF, pQuantF ] <?> "term"
+    choice [pCaseOfF, pLitF, try pArrayF, pParenF, pVarF, pConstF, pQuantF]
+      <?> "term"
 
   pParenF = Paren <$> lexParenStartF <*> pExprF <*> lexParenEndF
 
@@ -380,10 +381,7 @@ pExprF =
     pQuantOp    = choice [Left <$> lexOpsF, Right <$> pTermF]
     pQuantNames = sepBy1 lexLowerNameF . try . ParseFunc $ id
 
-  pAppF = do
-    terms <- many pTermF
-    return $ \func -> do
-      foldl App func terms
+  pAppF = pure App
 
   pBinaryF m = do
     -- NOTE: operator cannot be followed by any symbol
@@ -395,17 +393,12 @@ pExprF =
     op <- try (notFollowedBySymbolF m)
     return $ \x -> App (Op op) x
 
-  pCaseOfF =
-    Case
-      <$> lexCase
-      <*> pExprF
-      <*> lexOfF
-      <*> lexBraceStartF
-      <*> pSepByF lexGuardBarF pCaseF
-      <*> lexBraceEndF
+  pCaseOfF = Case <$> lexCase <*> pExprF <*> lexOfF <*> pIndentBlockF pCaseF
 
-  pCaseF =
-    CaseConstructor
+  pCaseF   = ParseFunc $ \sc' ->
+    Lex.lineFold sc'
+      .   unParseFunc
+      $   CaseConstructor
       <$> lexUpperNameF
       <*> many lexLowerNameF
       <*> lexArrowF

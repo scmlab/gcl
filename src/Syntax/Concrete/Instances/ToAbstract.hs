@@ -77,17 +77,17 @@ instance ToAbstract (Either Declaration DefinitionBlock) ([A.Declaration], A.Def
     return ([], defns)
 
 --------------------------------------------------------------------------------
--- | Definition 
+-- | Definition
 
 instance ToAbstract DefinitionBlock A.Definitions where
   toAbstract (DefinitionBlock _ decls _) = do
     (typeDefns, (funcDefnSigs, funcDefns)) <-
       second partitionEithers . partitionEithers <$> toAbstract decls
 
-    -- invariant: there should be only ONE TypeDefn of the same name 
+    -- invariant: there should be only ONE TypeDefn of the same name
     let defnTypes =
           Map.fromList $ map (\x@(A.TypeDefn name _ _ _) -> (name, x)) typeDefns
-    -- invariant: there should be only ONE FuncDefnSig of the same name 
+    -- invariant: there should be only ONE FuncDefnSig of the same name
     let defnFuncSigs = Map.fromList $ map
           (\x@(A.FuncDefnSig name _ _ _) -> (name, x))
           (concat funcDefnSigs)
@@ -131,7 +131,7 @@ instance ToAbstract Declaration A.Declaration where
       return $ A.VarDecl name body prop (locOf d)
 
 --------------------------------------------------------------------------------
--- | Statement 
+-- | Statement
 
 instance ToAbstract Stmt A.Stmt where
   toAbstract stmt = case stmt of
@@ -244,7 +244,7 @@ instance ToAbstract Expr A.Expr where
       toAbstractQOp qop = case qop of
         Left  op   -> return (A.Op op)
         Right expr -> toAbstract expr
-    Case _ expr _ _ cases _ ->
+    Case _ expr _ cases ->
       A.Case <$> toAbstract expr <*> toAbstract cases <*> pure (locOf x)
 
 instance ToAbstract Case A.Case where

@@ -96,7 +96,10 @@ instance Located Expr where
   locOf (Arr l _ _ r          ) = l <--> r
   locOf (App x y              ) = x <--> y
   locOf (Quant l _ _ _ _ _ _ r) = l <--> r
-  locOf (Case l _ _ _ _ r     ) = l <--> r
+  locOf (Case l _ _ r         ) = l <--> r
+
+instance Located Case where
+  locOf (CaseConstructor l _ _ r) = l <--> r
 
 --------------------------------------------------------------------------------
 

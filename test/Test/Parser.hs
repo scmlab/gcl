@@ -8,7 +8,7 @@ import           Pretty                         ( toByteString
                                                 , toText
                                                 )
 import           Syntax.Parser
-import           Syntax.Parser.Lexer            ( scn )
+import           Syntax.Parser.Lexer
 import           Test.Tasty                     ( TestTree
                                                 , testGroup
                                                 )
@@ -20,7 +20,9 @@ import           Test.Util                      ( parseTest
                                                 , removeTrailingWhitespace
                                                 , runGoldenTest
                                                 )
-
+import           Syntax.Concrete
+import           Syntax.Parser.Util
+import           Control.Applicative.Combinators
 
 tests :: TestTree
 tests = testGroup
@@ -112,8 +114,17 @@ expression = testGroup
   , testCase "mixed 8" $ run "(1 + 2) * (3) = (4)"
   , testCase "mixed 9" $ run "3 / (2 + X)"
   , testCase "mixed 10" $ run "3 / 2 + X"
+  , testCase "case of 1" $ run "case x of\n\
+    \  Nothing -> 0\n"
+  , testCase "case of 2" $ run "case x of\n\
+    \  Just y -> 0\n"
+  , testCase "case of 3"
+    $ run "case x of\n\
+        \    Just y -> 0\n\
+        \    Nothing -> 1"
   ]
   where run = parserIso (scn >> pExpr)
+
 
 --------------------------------------------------------------------------------
 -- | Pattern
