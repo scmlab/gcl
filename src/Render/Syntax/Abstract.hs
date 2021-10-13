@@ -92,8 +92,7 @@ handleExpr _ (Case expr cases _) =
   return $ "case" <+> render expr <+> "of" <+> vertE (map render cases)
 
 instance Render Redex where
-  renderPrec n (Rdx _index before after) =
-    expandE (renderPrec n before) mempty (renderPrec n after)
+  renderPrec n (Rdx index before _after) = substE index (renderPrec n before)
 
 instance Render Mapping where
   render env | null env  = mempty

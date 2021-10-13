@@ -4,13 +4,19 @@
 
 module Server.CustomMethod where
 
-import Data.Aeson (FromJSON, ToJSON)
-import Data.Text (Text)
-import GHC.Generics (Generic)
-import Render
-import GCL.Predicate (Origin, PO, Spec, InfMode)
-import Data.Loc.Range
-import Pretty
+import           Data.Aeson                     ( FromJSON
+                                                , ToJSON
+                                                )
+import           Data.Loc.Range
+import           Data.Text                      ( Text )
+import           GCL.Predicate                  ( InfMode
+                                                , Origin
+                                                , PO
+                                                , Spec
+                                                )
+import           GHC.Generics                   ( Generic )
+import           Pretty
+import           Render
 
 --------------------------------------------------------------------------------
 
@@ -18,18 +24,20 @@ import Pretty
 data ResKind
   = ResDisplay Int [Section]
   | ResUpdateSpecs [(Int, Text, Text, Range)]
+  | ResSubstitute Int Inlines
   | ResConsoleLog Text
   deriving (Eq, Generic)
 
 instance ToJSON ResKind
 
 instance Pretty ResKind where
-  pretty (ResDisplay _ _) = "Display"
-  pretty (ResUpdateSpecs _) = "UpdateSpecs"
-  pretty (ResConsoleLog x) = "ConsoleLog " <> pretty x
+  pretty (ResDisplay _ _   ) = "Display"
+  pretty (ResUpdateSpecs _ ) = "UpdateSpecs"
+  pretty (ResSubstitute i x) = "Substitute " <> pretty i <> " : " <> pretty x
+  pretty (ResConsoleLog x  ) = "ConsoleLog " <> pretty x
 
 instance Show ResKind where
-  show = toString 
+  show = toString
 
 data Response
   = Res FilePath [ResKind]
@@ -39,7 +47,7 @@ data Response
 instance ToJSON Response
 
 instance Show Response where
-  show (Res _path kinds) = show kinds
+  show (Res _path kinds      ) = show kinds
   show (CannotDecodeRequest s) = "CannotDecodeRequest " <> s
 
 --------------------------------------------------------------------------------
@@ -49,21 +57,21 @@ data ReqKind
   = ReqInspect Range
   | ReqRefine Range
   | ReqInsertAnchor Text
-  | ReqSubst Int
+  | ReqSubstitute Int
   | ReqDebug
   deriving (Generic)
 
 instance FromJSON ReqKind
 
 instance Show ReqKind where
-  show (ReqInspect range) = "Inspect " <> show range
-  show (ReqRefine range) = "Refine " <> show range
-  show (ReqInsertAnchor hash) = "InsertAnchor " <> show hash
-  show (ReqSubst i) = "Subst " <> show i
-  show ReqDebug = "Debug"
+  show (ReqInspect      range) = "Inspect " <> show range
+  show (ReqRefine       range) = "Refine " <> show range
+  show (ReqInsertAnchor hash ) = "InsertAnchor " <> show hash
+  show (ReqSubstitute   i    ) = "Substitute " <> show i
+  show ReqDebug                = "Debug"
 
 data Request = Req FilePath ReqKind
-  deriving (Generic)
+  deriving Generic
 
 instance FromJSON Request
 

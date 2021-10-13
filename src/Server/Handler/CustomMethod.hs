@@ -3,7 +3,9 @@
 module Server.Handler.CustomMethod where
 
 import           Control.Monad.Except           ( throwError )
+import           Control.Monad.State
 import qualified Data.Aeson                    as JSON
+import qualified Data.IntMap                   as IntMap
 import           Data.Loc                       ( Located(locOf)
                                                 , posCol
                                                 )
@@ -12,9 +14,14 @@ import qualified Data.Text                     as Text
 import           Data.Text                      ( Text )
 import           Error                          ( Error(Others) )
 import           GCL.Predicate
+import qualified GCL.Substitution              as Substitution
+import           Render                         ( Render(render) )
 import           Server.CustomMethod
 import           Server.DSL
 import           Server.Interpreter.RealWorld
+import           Syntax.Abstract                ( Redex(redexBefore) )
+import           Syntax.Abstract.Util           ( programToScopeForSubstitution
+                                                )
 
 handleInspect :: Range -> CmdM [ResKind]
 handleInspect range = do
@@ -73,15 +80,30 @@ handleInsertAnchor hash = do
 
 handleSubst :: Int -> CmdM [ResKind]
 handleSubst i = do
-  logM $ Text.pack $ "Substituting Redex " <> show i
-  return []
+  result <- readCachedResult
+  case result of
+    Just (Left  _error) -> return []
+    Just (Right cache ) -> do
+      logM $ Text.pack $ "Substituting Redex " <> show i
+
+      case IntMap.lookup i (cacheRedexes cache) of
+        Nothing    -> return []
+        Just redex -> do
+          let scope = programToScopeForSubstitution (cacheProgram cache)
+          let (expr, counter) = runState
+                (Substitution.step scope (redexBefore redex))
+                (cacheCounter cache)
+          let newCache = cache { cacheCounter = counter }
+          cacheResult (Right newCache)
+          return [ResSubstitute i (render expr)]
+    Nothing -> return []
 
 handleCustomMethod :: ReqKind -> CmdM [ResKind]
 handleCustomMethod = \case
   ReqInspect      range -> handleInspect range
   ReqRefine       range -> handleRefine range
   ReqInsertAnchor hash  -> handleInsertAnchor hash
-  ReqSubst        i     -> handleSubst i
+  ReqSubstitute   i     -> handleSubst i
   ReqDebug              -> return $ error "crash!"
 
 handler :: JSON.Value -> (Response -> ServerM ()) -> ServerM ()

@@ -46,8 +46,9 @@ import           Syntax.Parser                  ( Parser
 --------------------------------------------------------------------------------
 
 data Cache = Cache
-  { -- Proof Obligations 
-    cachePOs      :: [PO]
+  { cacheProgram  :: A.Program
+    -- Proof Obligations 
+  , cachePOs      :: [PO]
     -- Specs (holes)
   , cacheSpecs    :: [Spec]
     -- Global properties
@@ -55,6 +56,8 @@ data Cache = Cache
     -- Warnings 
   , cacheWarnings :: [StructWarning]
   , cacheRedexes  :: IntMap A.Redex
+    -- counter (for generating fresh variables)
+  , cacheCounter  :: Int
   }
   deriving (Eq, Show)
 
@@ -165,16 +168,18 @@ typeCheck p = case TypeChecking.runTM (TypeChecking.checkProgram p) of
 
 sweep :: A.Program -> CmdM Cache
 sweep program@(A.Program _ _ globalProps _ _) = case WP.sweep program of
-  Left  e                              -> throwError [StructError e]
-  Right (pos, specs, warings, redexes) -> do
+  Left  e -> throwError [StructError e]
+  Right (pos, specs, warings, redexes, counter) -> do
     let redexIntMap =
           IntMap.fromList $ map (\redex -> (A.redexID redex, redex)) redexes
 
-    return $ Cache { cachePOs      = List.sort pos
+    return $ Cache { cacheProgram  = program
+                   , cachePOs      = List.sort pos
                    , cacheSpecs    = sortOn locOf specs
                    , cacheProps    = globalProps
                    , cacheWarnings = warings
                    , cacheRedexes  = redexIntMap
+                   , cacheCounter  = counter
                    }
 
 --------------------------------------------------------------------------------
@@ -199,7 +204,7 @@ parseProgram source = do
 generateResponseAndDiagnosticsFromResult :: Result -> CmdM [ResKind]
 generateResponseAndDiagnosticsFromResult (Left  errors) = throwError errors
 generateResponseAndDiagnosticsFromResult (Right cache ) = do
-  let (Cache pos specs globalProps warnings _redexes) = cache
+  let (Cache _ pos specs globalProps warnings _redexes _) = cache
 
   -- get Specs around the mouse selection
   lastSelection <- getLastSelection

@@ -14,7 +14,7 @@ module Render.Element
   , textE
   , codeE
   , linkE
-  , expandE
+  , substE
   , parensE
   , iconE
   , horzE
@@ -62,7 +62,7 @@ data Block
   -- Plain header with optional location
   = Header Text (Maybe Range)
   -- Special header for Proof Obligations
-  | HeaderWithButtons 
+  | HeaderWithButtons
       Text -- Header text
       (Maybe Range) -- Header location 
       Text -- Anchor hash
@@ -154,11 +154,11 @@ isEmpty inlines = all elemIsEmpty (Seq.viewl (unInlines inlines))
   elemIsEmpty (Snpt xs    ) = isEmpty xs
   elemIsEmpty (Text _ _   ) = False
   elemIsEmpty (Link _ xs _) = all elemIsEmpty $ unInlines xs
-  elemIsEmpty (Expn xs _ ys) = all elemIsEmpty $ unInlines xs <> unInlines ys
-  elemIsEmpty (Horz xs     ) = all isEmpty xs
-  elemIsEmpty (Vert xs     ) = all isEmpty xs
-  elemIsEmpty (Parn _      ) = False
-  elemIsEmpty (PrHz _      ) = False
+  elemIsEmpty (Sbst _ xs  ) = all elemIsEmpty $ unInlines xs
+  elemIsEmpty (Horz xs    ) = all isEmpty xs
+  elemIsEmpty (Vert xs    ) = all isEmpty xs
+  elemIsEmpty (Parn _     ) = False
+  elemIsEmpty (PrHz _     ) = False
 
 infixr 6 <+>
 
@@ -180,9 +180,8 @@ codeE xs = Inlines $ Seq.singleton $ Snpt xs
 linkE :: Range -> Inlines -> Inlines
 linkE range xs = Inlines $ Seq.singleton $ Link range xs []
 
-expandE :: Inlines -> Inlines -> Inlines -> Inlines
-expandE before mapping after =
-  Inlines $ Seq.singleton $ Expn before mapping after
+substE :: Int -> Inlines -> Inlines
+substE i expr = Inlines $ Seq.singleton $ Sbst i expr
 
 -- | Note: when there's only 1 Horz inside a Parn, convert it to PrHz
 parensE :: Inlines -> Inlines
@@ -222,8 +221,8 @@ data Inline
   -- | "Snippet" for inline code 
   | Snpt Inlines
   | Link Range Inlines ClassNames
-  | -- | For Expand
-    Expn Inlines Inlines Inlines
+  | -- | For Substitution
+    Sbst Int Inlines
   | -- | Horizontal grouping, wrap when there's no space
     Horz [Inlines]
   | -- | Vertical grouping, each children would end with a newline
@@ -244,7 +243,7 @@ instance Pretty Inline where
   pretty (Text s _   ) = pretty s
   pretty (Snpt s     ) = pretty s
   pretty (Link _ xs _) = pretty xs
-  pretty (Expn xs _ _) = pretty xs
+  pretty (Sbst _i xs ) = pretty xs
   pretty (Horz xs    ) = Pretty.hcat (map pretty $ toList xs)
   pretty (Vert xs    ) = Pretty.vcat (map pretty $ toList xs)
   pretty (Parn x     ) = "(" <> pretty x <> ")"
