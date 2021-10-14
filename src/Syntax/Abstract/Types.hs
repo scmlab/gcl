@@ -157,7 +157,6 @@ data Redex = Rdx
   { redexID      :: Int
   , -- tmep 
     redexBefore  :: Expr
-  , redexAfter   :: Expr
   }
   deriving (Eq, Show, Generic)
 

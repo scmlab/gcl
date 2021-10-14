@@ -55,7 +55,7 @@ run scope names exprs predicate = runM scope $ do
 
 
 step :: Fresh m => Scope -> Expr -> m Expr
-step scope expr = runM scope $ go expr 
+step scope expr = runM scope $ go expr
  where
   go :: Expr -> M Expr
   go (App       f x     l     ) = App <$> go f <*> pure x <*> pure l >>= reduce
@@ -85,8 +85,8 @@ runM scope p = do
 
 -- for alpha-renaming 
 instance Fresh M where
-  getCounter = get 
-  setCounter = put 
+  getCounter = get
+  setCounter = put
       -- modify' (\(_, x) -> (i, x))
 
 ------------------------------------------------------------------
@@ -155,15 +155,11 @@ instance Reducible Expr where
       x' <- reduce x
       case f' of
           -- [reduce-App-Expand-Lam]
-        Redex (Rdx index before lambda@Lam{}) ->
-          Redex
-            <$> (Rdx index <$> reduce (App before x' l1) <*> reduce
-                  (App lambda x' l1)
-                )
+        Redex (Rdx index e) -> Redex <$> (Rdx index <$> reduce (App e x' l1))
         -- [reduce-App-Lam]
-        Lam n body _ -> subst (mappingFromSubstitution [n] [x']) body
+        Lam n body _        -> subst (mappingFromSubstitution [n] [x']) body
         -- [Others]
-        _            -> return $ App f' x' l1
+        _                   -> return $ App f' x' l1
     Lam binder body l -> Lam binder <$> reduce body <*> return l
     Quant op binders range body l ->
       Quant op binders range <$> reduce body <*> return l
@@ -175,8 +171,7 @@ instance Reducible Expr where
     _ -> return expr
 
 instance Reducible Redex where
-  reduce (Rdx index before after) =
-    Rdx index <$> reduce before <*> reduce after
+  reduce (Rdx index expr) = Rdx index <$> reduce expr
 
 instance Reducible Pred where
   reduce = \case
@@ -228,15 +223,14 @@ instance Substitutable Expr where
         case Map.lookup (nameToText name) scope of
             -- [subst-Var-defined]
           Just (Just binding) -> do
-            after <- subst mapping binding
-            let before = RedexStem
+            let e = RedexStem
                   name
                   binding
                   -- NonEmpty.singleton is only available after base-4.15
                   (NonEmpty.fromList
                     [(fv binding, shrinkMapping binding mapping)]
                   )
-            return $ Redex (Rdx index before after)
+            return $ Redex (Rdx index e)
           -- [subst-Var-defined]
           Just Nothing -> return expr
           Nothing      -> return expr
@@ -265,15 +259,14 @@ instance Substitutable Expr where
         case Map.lookup (nameToText name) scope of
             -- [subst-Const-defined]
           Just (Just binding) -> do
-            after <- subst mapping binding
-            let before = RedexStem
+            let e = RedexStem
                   name
                   binding
                     -- NonEmpty.singleton is only available after base-4.15
                   (NonEmpty.fromList
                     [(fv binding, shrinkMapping binding mapping)]
                   )
-            return $ Redex (Rdx index before after)
+            return $ Redex (Rdx index e)
           -- [subst-Const-not-defined]
           Just Nothing -> return expr
           Nothing      -> return expr
@@ -369,8 +362,7 @@ instance Substitutable Expr where
 -- ---------------------------------------------------------------[subst-Expand]
 --      a ===> b            ~[.../...]~>    a' ===> b'
 --
-    Redex (Rdx index before after) ->
-      Redex <$> (Rdx index <$> subst mapping before <*> subst mapping after)
+    Redex (Rdx index e) -> Redex <$> (Rdx index <$> subst mapping e)
 
 --
 --      a                   ~[.../...]~>    a'

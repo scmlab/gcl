@@ -179,7 +179,7 @@ infer (Quant qop iters rng t l) = do
 --   t <- infer expr
 --   s <- mapM infer (Map.map bindingsToExpr sub)
 --   return $ subst s t
-infer (Redex (Rdx _ _ after)) = infer after
+infer (Redex (Rdx _ expr)) = infer expr
 infer (RedexStem name _ _    ) = lookupInferEnv name
 infer (ArrIdx e1 e2 l         ) = do
   t1 <- infer e1

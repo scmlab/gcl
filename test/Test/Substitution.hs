@@ -66,12 +66,12 @@ letBindings = testGroup
 
 -- Tree-like structure for representing the transition from one Expn to the next
 data Tree = Node Int -- index of the redex s
-                     Inlines -- BEFORE + MAPPING (before pressing any "buttons")
+                     Inlines -- before pressing any "buttons"
                              (Map Inlines [Tree]) -- transitions
 
 instance Pretty Tree where
-  pretty (Node index before transitions) =
-    pretty index <> ":" <+> pretty before <> line <> indent
+  pretty (Node index expr transitions) =
+    pretty index <> ":" <+> pretty expr <> line <> indent
       2
       (vcat (prettyTransitions transitions))
    where
@@ -83,7 +83,7 @@ instance Pretty Tree where
       [pretty transition, indent 2 $ vcat (map pretty children)]
 
 fromRedex :: Fresh m => Scope -> Redex -> m Tree
-fromRedex scope (Rdx i before _) = do
+fromRedex scope (Rdx i before) = do
   trees <- do
     after <- step scope before
     let redexesInAfter = collectRedexes after

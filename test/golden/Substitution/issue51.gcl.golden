@@ -3,58 +3,58 @@
     3: sum i j
       sum i j ===> ⟨ Σ k : i ≤ k < j : f[k] ⟩
         
-11: Q 0
+1: Q 0
   Q 0 ===> r = ⟨ ↑ i : 0 ≤ i ≤ 0 : sum i 0 ⟩
-    64: sum i 0
+    41: sum i 0
       sum i 0 ===> ⟨ Σ k : i ≤ k < 0 : f[k] ⟩
         
-74: P n
+7: P n
   P n ===> s = ⟨ ↑ ij : 0 ≤ i ≤ j ≤ n : sum i j ⟩
-    124: sum i j
+    79: sum i j
       sum i j ===> ⟨ Σ k : i ≤ k < j : f[k] ⟩
         
-88: Q n
+9: Q n
   Q n ===> r = ⟨ ↑ i : 0 ≤ i ≤ n : sum i n ⟩
-    171: sum i n
+    108: sum i n
       sum i n ===> ⟨ Σ k : i ≤ k < n : f[k] ⟩
         
-149: P [ s \ s ↑ r ] [ r \ (r + f[n]) ↑ 0 ] (n + 1)
+26: P [ s \ s ↑ r ] [ r \ (r + f[n]) ↑ 0 ] (n + 1)
   P [ s \ s ↑ r ] [ r \ (r + f[n]) ↑ 0 ] (n + 1) ===> s ↑ ((r + f[n]) ↑ 0) = ⟨ ↑ ij : 0 ≤ i ≤ j ≤ n + 1 : sum i j ⟩
-    216: sum i j
+    136: sum i j
       sum i j ===> ⟨ Σ k : i ≤ k < j : f[k] ⟩
         
-162: Q [ r \ (r + f[n]) ↑ 0 ] (n + 1)
+27: Q [ r \ (r + f[n]) ↑ 0 ] (n + 1)
   Q [ r \ (r + f[n]) ↑ 0 ] (n + 1) ===> (r + f[n]) ↑ 0 = ⟨ ↑ i : 0 ≤ i ≤ n + 1 : sum i (n + 1) ⟩
-    316: sum i (n + 1)
+    203: sum i (n + 1)
       sum i (n + 1) ===> ⟨ Σ k : i ≤ k < n + 1 : f[k] ⟩
         
-260: P n
+42: P n
   P n ===> s = ⟨ ↑ ij : 0 ≤ i ≤ j ≤ n : sum i j ⟩
-    408: sum i j
+    263: sum i j
       sum i j ===> ⟨ Σ k : i ≤ k < j : f[k] ⟩
         
-274: Q n
+44: Q n
   Q n ===> r = ⟨ ↑ i : 0 ≤ i ≤ n : sum i n ⟩
-    455: sum i n
+    292: sum i n
       sum i n ===> ⟨ Σ k : i ≤ k < n : f[k] ⟩
         
-358: P n
+58: P n
   P n ===> s = ⟨ ↑ ij : 0 ≤ i ≤ j ≤ n : sum i j ⟩
-    500: sum i j
+    320: sum i j
       sum i j ===> ⟨ Σ k : i ≤ k < j : f[k] ⟩
         
-372: Q n
+60: Q n
   Q n ===> r = ⟨ ↑ i : 0 ≤ i ≤ n : sum i n ⟩
-    547: sum i n
+    349: sum i n
       sum i n ===> ⟨ Σ k : i ≤ k < n : f[k] ⟩
         
-435: P n
+79: P n
   P n ===> s = ⟨ ↑ ij : 0 ≤ i ≤ j ≤ n : sum i j ⟩
-    592: sum i j
+    377: sum i j
       sum i j ===> ⟨ Σ k : i ≤ k < j : f[k] ⟩
         
-449: Q n
+81: Q n
   Q n ===> r = ⟨ ↑ i : 0 ≤ i ≤ n : sum i n ⟩
-    639: sum i n
+    406: sum i n
       sum i n ===> ⟨ Σ k : i ≤ k < n : f[k] ⟩
         
