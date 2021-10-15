@@ -9,7 +9,6 @@ import           Control.Monad.Except
 import           Control.Monad.Trans.Free
 import           Control.Monad.Writer
 import           Data.IntMap                    ( IntMap )
-import qualified Data.IntMap                   as IntMap
 import           Data.List                      ( find
                                                 , sortOn
                                                 )
@@ -170,15 +169,12 @@ sweep :: A.Program -> CmdM Cache
 sweep program@(A.Program _ _ globalProps _ _) = case WP.sweep program of
   Left  e -> throwError [StructError e]
   Right (pos, specs, warings, redexes, counter) -> do
-    let redexIntMap =
-          IntMap.fromList $ map (\redex -> (A.redexID redex, redex)) redexes
-
     return $ Cache { cacheProgram  = program
                    , cachePOs      = List.sort pos
                    , cacheSpecs    = sortOn locOf specs
                    , cacheProps    = globalProps
                    , cacheWarnings = warings
-                   , cacheRedexes  = redexIntMap
+                   , cacheRedexes  = redexes
                    , cacheCounter  = counter
                    }
 

@@ -11,8 +11,8 @@ import           Data.Foldable                  ( toList )
 import           Data.Map                       ( Map )
 import qualified Data.Map                      as Map
 import           GCL.Common                     ( Fresh )
-import           GCL.Substitution               ( CollectRedexes(collectRedexes)
-                                                , Scope
+import           GCL.Substitution               ( Scope
+                                                , buildRedexMap
                                                 , step
                                                 )
 import           Pretty
@@ -86,7 +86,7 @@ fromRedex :: Fresh m => Scope -> Redex -> m Tree
 fromRedex scope (Rdx i before) = do
   trees <- do
     after <- step scope before
-    let redexesInAfter = collectRedexes after
-    inAfter <- forM redexesInAfter (fromRedex scope)
+    let redexesInAfter = buildRedexMap after
+    inAfter <- forM (toList redexesInAfter) (fromRedex scope)
     return $ Map.singleton (render before <> " ===> " <> render after) inAfter
   return $ Node i (render before) trees

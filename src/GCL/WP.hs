@@ -22,6 +22,7 @@ import           Control.Monad.RWS              ( MonadReader(ask)
                                                 , withRWST
                                                 )
 import qualified Data.Hashable                 as Hashable
+import           Data.IntMap                    ( IntMap )
 import qualified Data.List                     as List
 import           Data.Loc                       ( Loc(..)
                                                 , Located(..)
@@ -63,7 +64,11 @@ import           Syntax.Common                  ( Name(Name)
 type TM = Except StructError
 
 type WP
-  = RWST Substitution.Scope ([PO], [Spec], [StructWarning], [A.Redex]) Int TM
+  = RWST
+      Substitution.Scope
+      ([PO], [Spec], [StructWarning], IntMap A.Redex)
+      Int
+      TM
 
 instance Fresh WP where
   getCounter = get
@@ -74,12 +79,12 @@ runWP
   -> Substitution.Scope
   -> Either
        StructError
-       (a, Int, ([PO], [Spec], [StructWarning], [A.Redex]))
+       (a, Int, ([PO], [Spec], [StructWarning], IntMap A.Redex))
 runWP p decls = runExcept $ runRWST p decls 0
 
 sweep
   :: A.Program
-  -> Either StructError ([PO], [Spec], [StructWarning], [A.Redex], Int)
+  -> Either StructError ([PO], [Spec], [StructWarning], IntMap A.Redex, Int)
 sweep program@(A.Program _ _ _props stmts _) = do
   let scope = A.programToScopeForSubstitution program
   (_, counter, (pos, specs, warnings, redexes)) <- runWP (structProgram stmts)
@@ -578,7 +583,7 @@ tellPO p q origin = unless (toExpr p == toExpr q) $ do
   q' <- substitute [] [] q
   let anchorHash =
         Text.pack $ showHex (abs (Hashable.hash (toString (p', q')))) ""
-  tell ([PO p' q' anchorHash Nothing origin], [], [], [])
+  tell ([PO p' q' anchorHash Nothing origin], [], [], mempty)
 
 
 tellPO' :: Origin -> Pred -> Pred -> WP ()
@@ -589,10 +594,10 @@ tellSpec p q l = do
   p' <- substitute [] [] p
   q' <- substitute [] [] q
   i  <- fresh
-  tell ([], [Specification i p' q' l], [], [])
+  tell ([], [Specification i p' q' l], [], mempty)
 
 throwWarning :: StructWarning -> WP ()
-throwWarning warning = tell ([], [], [warning], [])
+throwWarning warning = tell ([], [], [warning], mempty)
 
 
 withFreshVar :: (A.Expr -> WP a) -> WP a

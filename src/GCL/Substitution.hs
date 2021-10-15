@@ -4,16 +4,19 @@
 
 module GCL.Substitution
   ( run
+  , buildRedexMap
   , step
   , Scope
   -- TODO: don't export these 
   , Substitutable
   , Reducible
-  , CollectRedexes(collectRedexes)
+  , CollectRedexes
   ) where
 
 import           Control.Monad.RWS
 import           Data.Foldable                  ( toList )
+import qualified Data.IntMap                   as IntMap
+import           Data.IntMap                    ( IntMap )
 import qualified Data.List.NonEmpty            as NonEmpty
 import           Data.Loc                       ( locOf )
 import           Data.Map                       ( Map )
@@ -45,14 +48,16 @@ run
   -> [Name] -- name of variables to be substituted
   -> [Expr] -- values to be substituted for
   -> a
-  -> m (a, [Redex])
+  -> m (a, IntMap Redex)
 run scope names exprs predicate = runM scope $ do
   output <- subst mapping predicate >>= reduce
-  return (output, collectRedexes output)
+  return (output, buildRedexMap output)
  where
   mapping :: Mapping
   mapping = mappingFromSubstitution names exprs
 
+buildRedexMap :: CollectRedexes a => a -> IntMap Redex
+buildRedexMap = IntMap.fromList . map (\redex -> (redexID redex, redex)) . collectRedexes
 
 step :: Fresh m => Scope -> Expr -> m Expr
 step scope expr = runM scope $ go expr
