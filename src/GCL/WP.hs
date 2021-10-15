@@ -18,7 +18,7 @@ import           Control.Monad.Except           ( Except
 import           Control.Monad.RWS              ( MonadReader(ask)
                                                 , MonadState(..)
                                                 , MonadWriter(..)
-                                                , RWST (runRWST)
+                                                , RWST(runRWST)
                                                 , withRWST
                                                 )
 import qualified Data.Hashable                 as Hashable
@@ -72,14 +72,18 @@ instance Fresh WP where
 runWP
   :: WP a
   -> Substitution.Scope
-  -> Either StructError (a, Int, ([PO], [Spec], [StructWarning], [A.Redex]))
+  -> Either
+       StructError
+       (a, Int, ([PO], [Spec], [StructWarning], [A.Redex]))
 runWP p decls = runExcept $ runRWST p decls 0
 
 sweep
-  :: A.Program -> Either StructError ([PO], [Spec], [StructWarning], [A.Redex], Int)
+  :: A.Program
+  -> Either StructError ([PO], [Spec], [StructWarning], [A.Redex], Int)
 sweep program@(A.Program _ _ _props stmts _) = do
   let scope = A.programToScopeForSubstitution program
-  (_, counter, (pos, specs, warnings, redexes)) <- runWP (structProgram stmts) scope
+  (_, counter, (pos, specs, warnings, redexes)) <- runWP (structProgram stmts)
+                                                         scope
   -- update Proof Obligations with corresponding Proof Anchors
   let proofAnchors = stmts >>= \case
         A.Proof anchors _ -> anchors

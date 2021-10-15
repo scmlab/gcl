@@ -1,3 +1,9 @@
-0: P [ global1 \ global1 + 1 ] 3
+1: P 3
+  P 3 ===> global1 = 3
+    
+2: P [ global1 \ global1 + 1 ] 3
+  P [ global1 \ global1 + 1 ] 3 ===> global1 + 1 = 3
+    
+3: P [ global1 \ global1 + 1 ] 3
   P [ global1 \ global1 + 1 ] 3 ===> global1 + 1 = 3
     

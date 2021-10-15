@@ -87,7 +87,6 @@ runM scope p = do
 instance Fresh M where
   getCounter = get
   setCounter = put
-      -- modify' (\(_, x) -> (i, x))
 
 ------------------------------------------------------------------
 
@@ -155,11 +154,11 @@ instance Reducible Expr where
       x' <- reduce x
       case f' of
           -- [reduce-App-Expand-Lam]
-        Redex (Rdx index e) -> Redex <$> (Rdx index <$> reduce (App e x' l1))
+        Redex (Rdx _ e) -> Redex <$> (Rdx <$> fresh <*> reduce (App e x' l1))
         -- [reduce-App-Lam]
-        Lam n body _        -> subst (mappingFromSubstitution [n] [x']) body
+        Lam n body _    -> subst (mappingFromSubstitution [n] [x']) body
         -- [Others]
-        _                   -> return $ App f' x' l1
+        _               -> return $ App f' x' l1
     Lam binder body l -> Lam binder <$> reduce body <*> return l
     Quant op binders range body l ->
       Quant op binders range <$> reduce body <*> return l
@@ -362,7 +361,7 @@ instance Substitutable Expr where
 -- ---------------------------------------------------------------[subst-Expand]
 --      a ===> b            ~[.../...]~>    a' ===> b'
 --
-    Redex (Rdx index e) -> Redex <$> (Rdx index <$> subst mapping e)
+    Redex (Rdx _ e) -> Redex <$> (Rdx <$> fresh <*> subst mapping e)
 
 --
 --      a                   ~[.../...]~>    a'
