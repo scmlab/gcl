@@ -4,7 +4,11 @@
 module GCL.Common where
 
 import           Control.Monad.RWS              ( RWST(..) )
-import           Control.Monad.State            ( StateT(..), State, MonadState (get, put) )
+import           Control.Monad.State            ( MonadState(get, put)
+                                                , State
+                                                , StateT(..)
+                                                )
+import qualified Data.List.NonEmpty            as NonEmpty
 import           Data.Loc                       ( Loc(..) )
 import           Data.Map                       ( Map )
 import qualified Data.Map                      as Map
@@ -16,19 +20,18 @@ import           Data.Text                      ( Text )
 import qualified Data.Text                     as Text
 import qualified Syntax.Abstract               as A
 import           Syntax.Common                  ( Name(..) )
-import qualified Data.List.NonEmpty as NonEmpty
 
 -- Monad for generating fresh variables 
 class Monad m => Fresh m where
   -- minimum requirement:
-  getCounter :: m Int 
-  setCounter :: Int -> m () 
+  getCounter :: m Int
+  setCounter :: Int -> m ()
   -- get a fresh variable (and bump the counter)
   fresh :: m Int
-  fresh = do 
+  fresh = do
     i <- getCounter
     setCounter (succ i)
-    return i 
+    return i
 
   -- get a fresh variable in the form of Text 
   freshText :: m Text
@@ -46,9 +49,9 @@ freshName prefix l = Name <$> freshWithLabel prefix <*> pure l
 freshName' :: Fresh m => Text -> m Name
 freshName' prefix = freshName prefix NoLoc
 
-instance Fresh (State Int) where 
-  getCounter = get 
-  setCounter = put 
+instance Fresh (State Int) where
+  getCounter = get
+  setCounter = put
 
 type FreshState = Int
 
@@ -95,10 +98,10 @@ instance Free A.Expr where
   fv (A.Quant op xs range term _) =
     (fv op <> fv range <> fv term) \\ Set.fromList xs
   fv (A.RedexStem _ _ pairs) = fst (NonEmpty.head pairs)
-  fv (A.Redex x             ) = fv (A.redexBefore x)
-  fv (A.ArrIdx e1 e2 _      ) = fv e1 <> fv e2
-  fv (A.ArrUpd e1 e2 e3 _   ) = fv e1 <> fv e2 <> fv e3
-  fv (A.Case e cases _      ) = fv e <> Set.unions (map fv cases)
+  fv (A.Redex x            ) = fv (A.redexExpr x)
+  fv (A.ArrIdx e1 e2 _     ) = fv e1 <> fv e2
+  fv (A.ArrUpd e1 e2 e3 _  ) = fv e1 <> fv e2 <> fv e3
+  fv (A.Case e cases _     ) = fv e <> Set.unions (map fv cases)
 
 instance Free A.Case where
   fv (A.CaseConstructor _ xs expr) = fv expr \\ Set.fromList xs

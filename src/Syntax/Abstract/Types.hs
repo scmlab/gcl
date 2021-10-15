@@ -154,9 +154,8 @@ type QuantOp' = Either Op Expr
 type Mapping = Map Text Expr
 
 data Redex = Rdx
-  { redexID      :: Int
-  , -- tmep 
-    redexBefore  :: Expr
+  { redexID   :: Int
+  , redexExpr :: Expr
   }
   deriving (Eq, Show, Generic)
 

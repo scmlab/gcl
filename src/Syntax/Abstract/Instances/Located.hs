@@ -70,7 +70,7 @@ instance Located Expr where
   locOf (Case _ _ l       ) = l
 
 instance Located Redex where
-  locOf = locOf . redexBefore
+  locOf = locOf . redexExpr
 
 instance Located Lit where
   locOf _ = NoLoc

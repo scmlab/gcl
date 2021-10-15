@@ -19,7 +19,7 @@ import           Render                         ( Render(render) )
 import           Server.CustomMethod
 import           Server.DSL
 import           Server.Interpreter.RealWorld
-import           Syntax.Abstract                ( Redex(redexBefore) )
+import           Syntax.Abstract                ( Redex(redexExpr) )
 import           Syntax.Abstract.Util           ( programToScopeForSubstitution
                                                 )
 
@@ -91,7 +91,7 @@ handleSubst i = do
         Just redex -> do
           let scope = programToScopeForSubstitution (cacheProgram cache)
           let (expr, counter) = runState
-                (Substitution.step scope (redexBefore redex))
+                (Substitution.step scope (redexExpr redex))
                 (cacheCounter cache)
           let newCache = cache { cacheCounter = counter }
           cacheResult (Right newCache)

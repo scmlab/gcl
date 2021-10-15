@@ -63,7 +63,7 @@ step scope expr = runM scope $ go expr
    where
     mappings :: [Mapping]
     mappings = reverse $ map snd $ toList substs
-  go (Redex redex) = go (redexBefore redex)
+  go (Redex redex) = go (redexExpr redex)
   go others        = return others
 
 
