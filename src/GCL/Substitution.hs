@@ -59,17 +59,16 @@ run scope names exprs predicate = runM scope $ do
   mapping = mappingFromSubstitution names exprs
 
 buildRedexMap :: CollectRedexes a => a -> IntMap Redex
-buildRedexMap = IntMap.fromList . map (\redex -> (redexID redex, redex)) . collectRedexes
+buildRedexMap =
+  IntMap.fromList . map (\redex -> (redexID redex, redex)) . collectRedexes
 
 step :: Fresh m => Scope -> Expr -> m Expr
 step scope expr = runM scope $ go expr
  where
   go :: Expr -> M Expr
-  go (App       f x     l     ) = App <$> go f <*> pure x <*> pure l >>= reduce
-  go (RedexStem _ value substs) = foldM (flip subst) value mappings >>= reduce
-   where
-    mappings :: [Mapping]
-    mappings = reverse $ map snd $ toList substs
+  go (App f x l) = App <$> go f <*> pure x <*> pure l >>= reduce
+  go (RedexStem _ value _ mappings) =
+    foldM (flip subst) value (reverse $ toList mappings) >>= reduce
   go (Redex redex) = go (redexExpr redex)
   go others        = return others
 
@@ -169,8 +168,7 @@ instance Reducible Expr where
     Lam binder body l -> Lam binder <$> reduce body <*> return l
     Quant op binders range body l ->
       Quant op binders range <$> reduce body <*> return l
-    RedexStem name value mappings -> return (RedexStem name value mappings)
-    Redex redex -> Redex <$> reduce redex
+    Redex redex          -> Redex <$> reduce redex
     ArrIdx array index l -> ArrIdx <$> reduce array <*> reduce index <*> pure l
     ArrUpd array index value l ->
       ArrUpd <$> reduce array <*> reduce index <*> reduce value <*> pure l
@@ -232,10 +230,9 @@ instance Substitutable Expr where
             let e = RedexStem
                   name
                   binding
+                  (fv binding)
                   -- NonEmpty.singleton is only available after base-4.15
-                  (NonEmpty.fromList
-                    [(fv binding, shrinkMapping binding mapping)]
-                  )
+                  (NonEmpty.fromList [shrinkMapping binding mapping])
             return $ Redex (Rdx index e)
           -- [subst-Var-defined]
           Just Nothing -> return expr
@@ -268,10 +265,9 @@ instance Substitutable Expr where
             let e = RedexStem
                   name
                   binding
-                    -- NonEmpty.singleton is only available after base-4.15
-                  (NonEmpty.fromList
-                    [(fv binding, shrinkMapping binding mapping)]
-                  )
+                  (fv binding)
+                  -- NonEmpty.singleton is only available after base-4.15
+                  (NonEmpty.fromList [shrinkMapping binding mapping])
             return $ Redex (Rdx index e)
           -- [subst-Const-not-defined]
           Just Nothing -> return expr
@@ -348,20 +344,27 @@ instance Substitutable Expr where
 
         -- apply new mappings on the outside instead of merging them (Issue #54)
         -- NOTE:
-        --      when shrinking the applied outer new mapping (`mapping` in this case)
-        --      free variables occured from the inner old mapping (`mapping'` in this case)
+        --      when shrinking the applied outer new mapping
+        --      free variables occured from the inner old mapping
         --      should be taken into consideration
-    RedexStem name e mappings ->
+    RedexStem name e freeVars mappings ->
       let
-        (freeVarsInExpr, mappingOfExpr) = NonEmpty.head mappings
-        freeVars                        = freeVarsInExpr <> fv mappingOfExpr
+        removeSubstitutedVars :: Mapping -> Set Name -> Set Name
+        removeSubstitutedVars m = Set.filter (\v -> not $ Set.member (nameToText v) (Map.keysSet m))
+
+    
+        outermostMapping = NonEmpty.head mappings
+
+        freeVars' = freeVars <> Set.unions (map fv $ Map.elems outermostMapping)
+        newFreeVars = removeSubstitutedVars mapping freeVars <> Set.unions (map fv $ Map.elems outermostMapping)
+
         shrinkedMapping =
-          Map.restrictKeys mapping (Set.map nameToText freeVars)
+          Map.restrictKeys mapping (Set.map nameToText freeVars')
       in
-        return $ RedexStem
-          name
-          e
-          (NonEmpty.cons (freeVars, shrinkedMapping) mappings)
+        return $ RedexStem name
+                           e
+                           newFreeVars
+                           (NonEmpty.cons shrinkedMapping mappings)
 --
 --      a                   ~[.../...]~>    a'
 --      b                   ~[.../...]~>    b'

@@ -139,10 +139,11 @@ data Expr
   | RedexStem -- the inner part of a Redex `name [ v \ e ... ] [ v \ e ... ]`
     Name -- the name to be substituted
     Expr -- the expression for substituting the name 
-    (NonEmpty (Set Name -- free variables in that expression
+    (Set Name)
+     -- free variables in that expression
                -- NOTE, the expression may be some definition like "P",
               --  in that case, the free variables should be that of after it's been expanded
-    ,Mapping)) -- mapping of substitution to be displayed to users
+    (NonEmpty Mapping) -- mapping of substitution to be displayed to users
   | Redex Redex
   | ArrIdx Expr Expr Loc
   | ArrUpd Expr Expr Expr Loc
@@ -158,14 +159,6 @@ data Redex = Rdx
   , redexExpr :: Expr
   }
   deriving (Eq, Show, Generic)
-
-data RedexStemAction =
-  AppendMapping
-    (Set Name)  -- free variables in that expression
-               -- NOTE, the expression may be some definition like "P",
-              --  in that case, the free variables should be that of after it's been expanded
-    Mapping -- mapping of substitution to be displayed to users
-  | AppendArgument Expr
 
 --------------------------------------------------------------------------------
 -- | Pattern matching

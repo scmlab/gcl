@@ -74,14 +74,13 @@ handleExpr _ (Quant op xs r t _) =
   renderQOp (Op (ArithOp (Mul   _))) = "Π"
   renderQOp (Op op'                ) = render op'
   renderQOp op'                      = render op'
-handleExpr n (RedexStem name _value freeVarsAndMappings) =
-  return $ renderPrec n name <+> mappings
+handleExpr n (RedexStem name _value _freeVars mappings) =
+  return $ renderPrec n name <+> mappings'
  where
   -- reverse the stack when printing it 
-  mappings = punctuateE
+  mappings' = punctuateE
     " "
-    (map render $ filter (not . Map.null) $ map snd $ reverse $ toList
-      freeVarsAndMappings
+    (map render $ filter (not . Map.null) $ reverse $ toList mappings
     )
 handleExpr n (Redex redex   ) = return $ renderPrec n redex
 handleExpr _ (ArrIdx e1 e2 _) = return $ render e1 <> "[" <> render e2 <> "]"

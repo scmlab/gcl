@@ -117,8 +117,8 @@ type Infer = RWST Environment [Constraint] FreshState (Except TypeError)
 type TM = StateT FreshState (Except TypeError)
 
 instance Fresh Infer where
-  getCounter = get 
-  setCounter = put 
+  getCounter = get
+  setCounter = put
 
 unify :: Type -> Type -> Infer ()
 unify x y = tell [(x, y)]
@@ -179,9 +179,9 @@ infer (Quant qop iters rng t l) = do
 --   t <- infer expr
 --   s <- mapM infer (Map.map bindingsToExpr sub)
 --   return $ subst s t
-infer (Redex (Rdx _ expr)) = infer expr
-infer (RedexStem name _ _    ) = lookupInferEnv name
-infer (ArrIdx e1 e2 l         ) = do
+infer (Redex (Rdx _ expr)  ) = infer expr
+infer (RedexStem name _ _ _) = lookupInferEnv name
+infer (ArrIdx e1 e2 l      ) = do
   t1 <- infer e1
   let interval = case t1 of
         TArray itv _ _ -> itv
@@ -283,14 +283,14 @@ checkStmt env (Assign ns es loc)
     length ns > length es
   = let extraVars = drop (length es) ns
     in  throwError $ NotEnoughExprsInAssigment (NE.fromList extraVars)
+                                                                                                                                                                                                        -- (locOf $ mergeRangesUnsafe (fromLocs $ map locOf extraVars))
                                                                                                                                                                                                     -- (locOf $ mergeRangesUnsafe (fromLocs $ map locOf extraVars))
-                                                                                                                                                                                                -- (locOf $ mergeRangesUnsafe (fromLocs $ map locOf extraVars))
                                                loc
   | length ns < length es
   = let extraExprs = drop (length ns) es
     in  throwError $ TooManyExprsInAssigment (NE.fromList extraExprs)
+                                                                                                                                                                                                        -- (locOf $ mergeRangesUnsafe (fromLocs $ map locOf extraExprs))
                                                                                                                                                                                                     -- (locOf $ mergeRangesUnsafe (fromLocs $ map locOf extraExprs))
-                                                                                                                                                                                                -- (locOf $ mergeRangesUnsafe (fromLocs $ map locOf extraExprs))
                                              loc
   | otherwise
   = forM_ (zip ns es) (checkAssign env)
