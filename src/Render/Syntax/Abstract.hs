@@ -103,7 +103,7 @@ instance Render Mapping where
 
 --------------------------------------------------------------------------------
 
-instance Render Case where
+instance Render CaseConstructor where
   render (CaseConstructor ctor binders body) =
     render ctor <+> horzE (map render binders) <+> "->" <+> render body
 

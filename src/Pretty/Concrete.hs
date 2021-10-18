@@ -168,7 +168,7 @@ instance PrettyWithLoc Program where
 
 --------------------------------------------------------------------------------
 
--- | Definition 
+-- | Definition
 
 instance Pretty DefinitionBlock where
   pretty = toDoc . prettyWithLoc
@@ -346,14 +346,12 @@ handleExpr (Quant open op xs m r n t close) =
     <> prettyWithLoc n
     <> prettyWithLoc t
     <> prettyWithLoc close
-handleExpr (Case a expr b c cases d) =
+handleExpr (Case a expr b cases) =
   return
     $  prettyWithLoc a
     <> prettyWithLoc expr
     <> prettyWithLoc b
-    <> prettyWithLoc c
     <> prettyWithLoc cases
-    <> prettyWithLoc d
 
 handleOp :: Op -> Variadic Expr (DocWithLoc ann)
 handleOp op = case classify op of
@@ -379,7 +377,7 @@ handleOp op = case classify op of
 --------------------------------------------------------------------------------
 -- | Pattern
 
-instance PrettyWithLoc Case where
+instance PrettyWithLoc CaseConstructor where
   prettyWithLoc (CaseConstructor a b c d) =
     prettyWithLoc a <> prettyWithLoc b <> prettyWithLoc c <> prettyWithLoc d
 

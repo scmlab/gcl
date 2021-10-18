@@ -30,7 +30,9 @@ import           GCL.Common                     ( Free(fv)
 import           GCL.Predicate                  ( PO(PO)
                                                 , Pred(..)
                                                 )
-import           Syntax.Abstract                ( Case(CaseConstructor)
+import           Syntax.Abstract                ( CaseConstructor
+                                                  ( CaseConstructor
+                                                  )
                                                 , Expr(..)
                                                 , Mapping
                                                 , Redex(..)
@@ -126,7 +128,7 @@ instance CollectRedexes Expr where
     Case _ xs _     -> xs >>= collectRedexes
     _               -> []
 
-instance CollectRedexes Case where
+instance CollectRedexes CaseConstructor where
   collectRedexes (CaseConstructor _ _ x) = collectRedexes x
 
 ------------------------------------------------------------------

@@ -146,7 +146,7 @@ data Expr
   | Redex Redex
   | ArrIdx Expr Expr Loc
   | ArrUpd Expr Expr Expr Loc
-  | Case Expr [Case] Loc
+  | Case Expr [CaseConstructor] Loc
   deriving (Eq, Show, Generic)
 
 type QuantOp' = Either Op Expr
@@ -170,12 +170,12 @@ data RedexStemAction =
 --------------------------------------------------------------------------------
 -- | Pattern matching
 
-data Case = CaseConstructor Name [Name] Expr
+data CaseConstructor = CaseConstructor Name [Name] Expr
   deriving (Eq, Show, Generic)
 
 data Pattern
   = PattBinder Name -- binder
-  | PattWildcard Range -- matches anything 
+  | PattWildcard Range -- matches anything
   | PattConstructor Name [Pattern] -- destructs a constructor
   deriving (Eq, Show, Generic)
 
