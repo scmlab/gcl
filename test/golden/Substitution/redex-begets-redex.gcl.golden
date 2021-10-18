@@ -1,0 +1,5 @@
+0: Father
+  Father ===> Son + 1
+    1: Son
+      Son ===> 0
+        

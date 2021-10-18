@@ -18,7 +18,7 @@ import           GCL.Substitution               ( Scope
 import           Pretty
 import           Render.Class                   ( Render(render) )
 import           Render.Element                 ( Inlines(..) )
-import           Server.DSL                     ( Cache(cacheRedexes)
+import           Server.DSL                     ( Cache(cacheRedexes, cacheCounter)
                                                 , parseProgram
                                                 , sweep
                                                 )
@@ -47,6 +47,7 @@ letBindings = testGroup
   , run "shrinking the mapping 1"       "shrink.gcl"
   , run "shrinking the mapping 2"       "issue51.gcl"
   , run "consecutive vs parallel"       "issue54.gcl"
+  , run "redex begets redex"            "redex-begets-redex.gcl"
   ]
  where
   run :: String -> FilePath -> TestTree
@@ -59,7 +60,7 @@ letBindings = testGroup
             let scope = programToScopeForSubstitution program
             let treesFromRedexes = evalState
                   (mapM (fromRedex scope) (cacheRedexes cache))
-                  (0 :: Int)
+                  (cacheCounter cache)
             return (Right (VList $ toList treesFromRedexes))
 
 --------------------------------------------------------------------------------

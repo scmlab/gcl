@@ -85,17 +85,21 @@ handleSubst i = do
     Just (Left  _error) -> return []
     Just (Right cache ) -> do
       logM $ Text.pack $ "Substituting Redex " <> show i
-
+      -- 
       case IntMap.lookup i (cacheRedexes cache) of
         Nothing    -> return []
         Just redex -> do
           let scope = programToScopeForSubstitution (cacheProgram cache)
-          let (expr, counter) = runState
+          let (newExpr, counter) = runState
                 (Substitution.step scope (redexExpr redex))
                 (cacheCounter cache)
-          let newCache = cache { cacheCounter = counter }
+          let redexesInNewExpr = Substitution.buildRedexMap newExpr
+          let newCache = cache
+                { cacheCounter = counter
+                , cacheRedexes = cacheRedexes cache <> redexesInNewExpr
+                }
           cacheResult (Right newCache)
-          return [ResSubstitute i (render expr)]
+          return [ResSubstitute i (render newExpr)]
     Nothing -> return []
 
 handleCustomMethod :: ReqKind -> CmdM [ResKind]
