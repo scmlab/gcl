@@ -77,7 +77,7 @@ pProgram = do
 
 pProgramF :: ParserF Program
 pProgramF = do
-  (x, y, z) <- mconcat <$> pIndentBlockF wrap <* optional eol
+  (x, y, z) <- mconcat <$> pIndentBlockF wrap
   return $ Program (map Left x <> map Right y) z
  where
   wrap = do
@@ -99,7 +99,6 @@ pDefinitionBlockF =
   DefinitionBlock
     <$> lexDeclStartF
     <*> pIndentBlockF pDefinitionF
-    <*  optional eol
     <*> lexDeclEndF
 
 pConstDeclF :: ParserF Declaration
@@ -210,8 +209,7 @@ pStmtF =
       <*  optional eol
       <*> lexFiF
 
-  pGdCmdF =
-    GdCmd <$> pExprF <*> lexArrowF <*> pIndentBlockF pStmtF <* optional eol
+  pGdCmdF  = GdCmd <$> pExprF <*> lexArrowF <*> pIndentBlockF pStmtF
 
   pSpecQMF = SpecQM . rangeOf <$> lexQMF
 
@@ -494,8 +492,9 @@ indentedItems :: (MonadParsec e s m) => Pos -> m () -> m b -> m [b]
 indentedItems lvl sc' p = go
  where
   go = do
-    pos  <- try (Lex.indentGuard sc' Ord.EQ lvl) <|> Lex.indentLevel
-    --pos  <- Lex.indentLevel
+    --pos  <- try (Lex.indentGuard sc' Ord.EQ lvl) <|> Lex.indentLevel
+    sc'
+    pos  <- Lex.indentLevel
     done <- isJust <$> optional eof
     if not done && pos == lvl
       then try ((:) <$> p <*> go) <|> return []
@@ -516,8 +515,7 @@ pDefinitionBlock :: Parser DefinitionBlock
 pDefinitionBlock = scn *> unParseFunc pDefinitionBlockF scn
 
 pStmts :: Parser [Stmt]
-pStmts = scn *> unParseFunc pStmtsF scn
-  where pStmtsF = pIndentBlockF pStmtF <* optional eol
+pStmts = scn *> unParseFunc pStmtsF scn where pStmtsF = pIndentBlockF pStmtF
 
 pStmt :: Parser Stmt
 pStmt = Lex.lineFold scn (unParseFunc pStmtF) <?> "statement"
