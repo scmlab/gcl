@@ -7,21 +7,36 @@
 
 module Syntax.Parser.Util where
 
-import Control.Applicative (Alternative (..))
-import Control.Monad (MonadPlus)
-import Control.Monad.Trans (MonadTrans, lift)
-import Data.Loc (posCol)
-import qualified Data.Loc as Loc
-import Data.Text (Text)
-import Syntax.Concrete (Token (Token))
-import Text.Megaparsec (MonadParsec (..), ParseError (..), ParseErrorBundle (..), Pos, PosState (..), ShowErrorComponent, SourcePos (..), State (..), Stream (..), errorOffset, mkPos, setParserState, unPos)
-import Text.Megaparsec.Error (parseErrorTextPretty)
+import           Control.Applicative            ( Alternative(..) )
+import           Control.Monad                  ( MonadPlus )
+import           Control.Monad.Trans            ( MonadTrans
+                                                , lift
+                                                )
+import           Data.Loc                       ( posCol )
+import qualified Data.Loc                      as Loc
+import           Data.Text                      ( Text )
+import           Syntax.Concrete                ( Token(Token) )
+import           Text.Megaparsec                ( MonadParsec(..)
+                                                , ParseError(..)
+                                                , ParseErrorBundle(..)
+                                                , Pos
+                                                , PosState(..)
+                                                , ShowErrorComponent
+                                                , SourcePos(..)
+                                                , State(..)
+                                                , Stream(..)
+                                                , errorOffset
+                                                , mkPos
+                                                , setParserState
+                                                , unPos
+                                                )
+import           Text.Megaparsec.Error          ( parseErrorTextPretty )
 
 ------------------------------------------
 -- wrap new type for parser
 ------------------------------------------
 
-newtype ParseFunc m a = ParseFunc { unParseFunc :: m () -> m a} 
+newtype ParseFunc m a = ParseFunc { unParseFunc :: m () -> m a}
   deriving (Functor)
 
 instance Applicative m => Applicative (ParseFunc m) where
@@ -33,7 +48,8 @@ instance Alternative m => Alternative (ParseFunc m) where
   pa <|> pb = ParseFunc (\sc' -> unParseFunc pa sc' <|> unParseFunc pb sc')
 
 instance Monad m => Monad (ParseFunc m) where
-  pa >>= f = ParseFunc (\sc -> unParseFunc pa sc >>= (\a -> unParseFunc (f a) sc))
+  pa >>= f =
+    ParseFunc (\sc -> unParseFunc pa sc >>= (\a -> unParseFunc (f a) sc))
 
 instance MonadPlus m => MonadPlus (ParseFunc m)
 
@@ -47,7 +63,8 @@ instance MonadParsec e s m => MonadParsec e s (ParseFunc m) where
   try p = ParseFunc (try . unParseFunc p)
   lookAhead p = ParseFunc (lookAhead . unParseFunc p)
   notFollowedBy p = ParseFunc (notFollowedBy . unParseFunc p)
-  withRecovery f p = ParseFunc (\sc' -> withRecovery (\err -> unParseFunc (f err) sc') (unParseFunc p sc'))
+  withRecovery f p = ParseFunc
+    (\sc' -> withRecovery (\err -> unParseFunc (f err) sc') (unParseFunc p sc'))
   observing p = ParseFunc (observing . unParseFunc p)
   eof = lift eof
   token f g = lift (token f g)
@@ -68,32 +85,33 @@ getTokenColumn :: Syntax.Concrete.Token e -> Text.Megaparsec.Pos
 getTokenColumn (Token s _) = mkPos . posCol $ s
 
 posStateToPos :: Stream s => PosState s -> Loc.Pos
-posStateToPos PosState {pstateOffset, pstateSourcePos = SourcePos {..}} =
+posStateToPos PosState { pstateOffset, pstateSourcePos = SourcePos {..} } =
   Loc.Pos sourceName (unPos sourceLine) (unPos sourceColumn) pstateOffset
 
 getCurPos :: (MonadParsec e s m) => m Loc.Pos
 getCurPos = do
-  st@State {stateOffset, statePosState} <- getParserState
+  st@State { stateOffset, statePosState } <- getParserState
   let pst = reachOffsetNoLine stateOffset statePosState
-  setParserState st {statePosState = pst}
+  setParserState st { statePosState = pst }
   return . posStateToPos $ pst
 
 getEndPos :: (MonadParsec e s m) => m Loc.Pos
 getEndPos = do
-  st@State {stateOffset, statePosState} <- getParserState
+  st@State { stateOffset, statePosState } <- getParserState
   let pst = reachOffsetNoLine stateOffset statePosState
-  setParserState st {statePosState = pst}
+  setParserState st { statePosState = pst }
   return . posStateToPos $ pst
 
-fromParseErrorBundle :: ShowErrorComponent e => ParseErrorBundle Text e -> [SyntacticError]
-fromParseErrorBundle (ParseErrorBundle errs posState) =
-  snd $ foldr f (posState, []) errs
-  where
-    f ::
-      ShowErrorComponent e =>
-      ParseError Text e ->
-      (PosState Text, [SyntacticError]) ->
-      (PosState Text, [SyntacticError])
-    f err (i, acc) =
-      let n = reachOffsetNoLine (errorOffset err) i
-       in (n, (posStateToPos n, parseErrorTextPretty err) : acc)
+fromParseErrorBundle
+  :: ShowErrorComponent e => ParseErrorBundle Text e -> [SyntacticError]
+fromParseErrorBundle (ParseErrorBundle errs posState) = snd
+  $ foldr f (posState, []) errs
+ where
+  f
+    :: ShowErrorComponent e
+    => ParseError Text e
+    -> (PosState Text, [SyntacticError])
+    -> (PosState Text, [SyntacticError])
+  f err (i, acc) =
+    let n = reachOffsetNoLine (errorOffset err) i
+    in  (n, (posStateToPos n, parseErrorTextPretty err) : acc)
