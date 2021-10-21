@@ -37,6 +37,7 @@ import           Text.Megaparsec                ( (<?>)
                                                 , parse
                                                 , tokensToChunk
                                                 )
+import           Text.Megaparsec.Char           ( eol )
 import qualified Text.Megaparsec.Char.Lexer    as Lex
 
 -- The monad binding of ParserF will insert space consumer or indent guard inbetween,
@@ -76,14 +77,14 @@ pProgram = do
 
 pProgramF :: ParserF Program
 pProgramF = do
-  (x, y, z) <- mconcat <$> pIndentBlockF wrap
+  (x, y, z) <- mconcat <$> pIndentBlockF wrap <* optional eol
   return $ Program (map Left x <> map Right y) z
  where
   wrap = do
     choice
       [ (\x -> ([x], [], [])) <$> pDeclarationF
       , (\x -> ([], [x], [])) <$> pDefinitionBlockF
-      , (\x -> ([], [], [x])) <$> lift pStmt
+      , (\x -> ([], [], [x])) <$> pStmtF
       ]
 
 ------------------------------------------
@@ -98,6 +99,7 @@ pDefinitionBlockF =
   DefinitionBlock
     <$> lexDeclStartF
     <*> pIndentBlockF pDefinitionF
+    <*  optional eol
     <*> lexDeclEndF
 
 pConstDeclF :: ParserF Declaration
@@ -142,9 +144,6 @@ pDeclTypeF name = DeclType <$> pDeclBaseF name <*> optional pDeclPropF
 ------------------------------------------
 -- parse Stmt
 ------------------------------------------
-
-pStmtsF :: ParserF [Stmt]
-pStmtsF = pIndentBlockF pStmtF
 
 -- NOTE :: this function doesn't consume newline after finish parsing the statement
 pStmtF :: ParserF Stmt
@@ -197,11 +196,22 @@ pStmtF =
       <*> pExprF
       <*> lexBraceEndF
 
-  pDoF     = Do <$> lexDoF <*> pIndentSepByF pGdCmdF lexGuardBarF <*> lexOdF
+  pDoF =
+    Do
+      <$> lexDoF
+      <*> pIndentSepByF pGdCmdF lexGuardBarF
+      <*  optional eol
+      <*> lexOdF
 
-  pIfF     = If <$> lexIfF <*> pIndentSepByF pGdCmdF lexGuardBarF <*> lexFiF
+  pIfF =
+    If
+      <$> lexIfF
+      <*> pIndentSepByF pGdCmdF lexGuardBarF
+      <*  optional eol
+      <*> lexFiF
 
-  pGdCmdF  = GdCmd <$> pExprF <*> lexArrowF <*> pIndentBlockF pStmtF
+  pGdCmdF =
+    GdCmd <$> pExprF <*> lexArrowF <*> pIndentBlockF pStmtF <* optional eol
 
   pSpecQMF = SpecQM . rangeOf <$> lexQMF
 
@@ -278,8 +288,10 @@ pTypeF = makeExprParser pTypeFTerm [[InfixR pTFuncF]] <?> "type"
 --------------------------------------------------------------------------------
 
 pExprF :: ParserF Expr
-pExprF = makeExprParser pExprArithF chainOpTable <?> "expression"
+pExprF =
+  makeExprParser (pExprArithF <|> pCaseOfF) chainOpTable <?> "expression"
  where
+  chainOpTable :: [[Operator ParserF Expr]]
   chainOpTable =
     [ [InfixL . pBinaryF . fmap ChainOp $ lexEQF]
     , [ InfixL . pBinaryF . fmap ChainOp . choice $ [lexNEQF, lexNEQUF]
@@ -296,6 +308,7 @@ pExprF = makeExprParser pExprArithF chainOpTable <?> "expression"
       ]
     ]
 
+  arithTable :: [[Operator ParserF Expr]]
   arithTable =
     [ [InfixL pAppF]
     , [InfixN . pBinaryF . fmap ArithOp $ lexExpF]
@@ -312,17 +325,19 @@ pExprF = makeExprParser pExprArithF chainOpTable <?> "expression"
     , [Prefix . pUnaryF . fmap ArithOp . choice $ [lexNegF, lexNegUF]]
     ]
 
-  pExprArithF =
-    makeExprParser pTermF arithTable <* ParseFunc (\sc' -> try sc' <|> sc)
+  pExprArithF :: ParserF Expr
+  pExprArithF = makeExprParser pTermF arithTable
 
   -- To avoid stuck at parsing terms other than array
+  pTermF :: ParserF Expr
   pTermF =
-    choice [pCaseOfF, pLitF, try pArrayF, pParenF, pVarF, pConstF, pQuantF]
-      <?> "term"
+    choice [pLitF, try pArrayF, pParenF, pVarF, pConstF, pQuantF] <?> "term"
 
+  pParenF :: ParserF Expr
   pParenF = Paren <$> lexParenStartF <*> pExprF <*> lexParenEndF
 
   -- Allow A[A[i]], A[i1][i2]...[in]
+  pArrayF :: ParserF Expr
   pArrayF = do
     arr <- choice [pParenF, pVarF, pConstF]
     is  <- some $ do
@@ -336,12 +351,16 @@ pExprF = makeExprParser pExprArithF chainOpTable <?> "expression"
     pArrayHelper a []                 = a
     pArrayHelper a ((bs, i, be) : is) = pArrayHelper (Arr a bs i be) is
 
-  pLitF   = Lit <$> lexLitsF
+  pLitF :: ParserF Expr
+  pLitF = Lit <$> lexLitsF
 
-  pVarF   = Var <$> lexLowerNameF
+  pVarF :: ParserF Expr
+  pVarF = Var <$> lexLowerNameF
 
+  pConstF :: ParserF Expr
   pConstF = Const <$> lexNameF
 
+  pQuantF :: ParserF Expr
   pQuantF =
     Quant
       <$> lexQuantStartsF
@@ -356,21 +375,26 @@ pExprF = makeExprParser pExprArithF chainOpTable <?> "expression"
     pQuantOp    = choice [Left <$> lexOpsF, Right <$> pTermF]
     pQuantNames = sepBy1 lexLowerNameF . try . ParseFunc $ id
 
+  pAppF :: ParserF (Expr -> Expr -> Expr)
   pAppF = pure App
 
+  pBinaryF :: ParserF Op -> ParserF (Expr -> Expr -> Expr)
   pBinaryF m = do
     -- NOTE: operator cannot be followed by any symbol
     op <- try (notFollowedBySymbolF m)
     return $ \x y -> App (App (Op op) x) y
 
+  pUnaryF :: ParserF Op -> ParserF (Expr -> Expr)
   pUnaryF m = do
     -- NOTE: operator cannot be followed by any symbol
     op <- try (notFollowedBySymbolF m)
     return $ \x -> App (Op op) x
 
+  pCaseOfF :: ParserF Expr
   pCaseOfF =
     Case <$> lexCase <*> pExprF <*> lexOfF <*> pIndentBlockF pCaseConstructorF
 
+  pCaseConstructorF :: ParserF CaseConstructor
   pCaseConstructorF =
     CaseConstructor
       <$> lexUpperNameF
@@ -404,6 +428,9 @@ pSepByF delim p = do
 pListF :: ParserF a -> ParserF (SepBy tokComma a)
 pListF = pSepByF lexCommaF
 
+pScGuard :: ParserF ()
+pScGuard = ParseFunc id
+
 ------------------------------------------
 -- Dirty Indents
 ------------------------------------------
@@ -436,54 +463,47 @@ pBlockTextF start p end = do
   end'   = unParseFunc end sc
 
 -- parse indentblock with delim
-pIndentSepByF
-  :: ParserF a
-  ->                      -- parser to be indented
-     ParserF (Token sep)
-  ->            -- delim parser
-     ParserF (SepBy sep a)
-pIndentSepByF p delim = do
-  gdPos <- Lex.indentLevel
-  x     <- p
-  let g = do
-        delimPos <- Lex.indentLevel
-        if compare delimPos gdPos == Ord.LT
-          then Delim x <$> lift (delimF gdPos) <*> parseP gdPos delimPos
-          else Lex.incorrectIndent Ord.LT gdPos delimPos
-  try g <|> return (Head x)
+-- will not parse the last newline
+pIndentSepByF :: ParserF a -> ParserF (Token sep) -> ParserF (SepBy sep a)
+pIndentSepByF p delim = ParseFunc go
  where
-    -- make sure parser after delim start at the same position
-  delimF pos = unParseFunc delim (void $ Lex.indentGuard sc Ord.EQ pos)
+  go sc' = do
+    x <- unParseFunc p sc'
 
-  parseP gdPos delimPos = do
-    x <- p
     let g = do
-          -- make sure the delim parser start at the same position
-          lift . void $ Lex.indentGuard scn Ord.EQ delimPos
-          Delim x <$> lift (delimF gdPos) <*> parseP gdPos delimPos
+          delimPos <- sc' >> Lex.indentLevel
+          Delim x
+            <$> unParseFunc delim (void $ Lex.indentGuard sc' Ord.GT delimPos)
+            <*> go sc'
     try g <|> return (Head x)
 
+-- will not parse the last newline
 pIndentBlockF
   :: ParserF a
   ->                      -- parser to be indented
      ParserF [a]
 pIndentBlockF p = ParseFunc
-  (\sc' -> do
+  (\_ -> do
     pos <- Lex.indentLevel
-    indentedItems pos scn (Lex.lineFold sc' (unParseFunc p))
+    indentedItems pos scn (lineFold (unParseFunc p))
   )
 
--- copied from Text.Megaparsec.Char.Lexer
+-- modified from Text.Megaparsec.Char.Lexer
+-- will not parse the last newline
 indentedItems :: (MonadParsec e s m) => Pos -> m () -> m b -> m [b]
 indentedItems lvl sc' p = go
  where
   go = do
-    sc'
-    pos  <- Lex.indentLevel
+    pos  <- try (Lex.indentGuard sc' Ord.EQ lvl) <|> Lex.indentLevel
+    --pos  <- Lex.indentLevel
     done <- isJust <$> optional eof
     if not done && pos == lvl
       then try ((:) <$> p <*> go) <|> return []
       else return []
+
+lineFold :: (Parser () -> Parser a) -> Parser a
+lineFold action = do
+  Lex.indentLevel >>= action . void . Lex.indentGuard scn Ord.GT
 
 ------------------------------------------
 -- For test only
@@ -493,19 +513,20 @@ pDeclaration :: Parser Declaration
 pDeclaration = Lex.lineFold scn (unParseFunc pDeclarationF)
 
 pDefinitionBlock :: Parser DefinitionBlock
-pDefinitionBlock = unParseFunc pDefinitionBlockF scn
+pDefinitionBlock = scn *> unParseFunc pDefinitionBlockF scn
 
 pStmts :: Parser [Stmt]
-pStmts = unParseFunc pStmtsF scn
+pStmts = scn *> unParseFunc pStmtsF scn
+  where pStmtsF = pIndentBlockF pStmtF <* optional eol
 
 pStmt :: Parser Stmt
 pStmt = Lex.lineFold scn (unParseFunc pStmtF) <?> "statement"
 
 pType :: Parser Type
-pType = unParseFunc pTypeF scn <?> "type"
+pType = scn *> unParseFunc pTypeF scn <?> "type"
 
 pExpr :: Parser Expr
-pExpr = unParseFunc pExprF scn <?> "expression"
+pExpr = scn *> unParseFunc pExprF scn <?> "expression"
 
 pPattern :: Parser Pattern
-pPattern = unParseFunc pPatternF scn <?> "pattern"
+pPattern = scn *> unParseFunc pPatternF scn <?> "pattern"
