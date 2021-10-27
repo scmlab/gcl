@@ -22,6 +22,7 @@ import           GCL.Common
 import           GHC.Generics                   ( Generic )
 import           Prelude                 hiding ( Ordering(..) )
 import           Syntax.Abstract
+import           Syntax.Abstract.Util
 import           Syntax.Common
 
 data TypeError
@@ -201,7 +202,19 @@ infer (ArrUpd e1 e2 e3 l) = do
   unify t2 (TBase TInt l)
   unify t1 (TArray interval t3 l)
   return t1
-infer (Case expr _ _) = infer expr
+infer (Case expr cs l) = do
+  te <- infer expr
+  ts <- mapM (inferCaseConstructor te) cs
+  t  <- freshVar l
+  mapM_ (unify t) ts
+  return t
+ where
+  inferCaseConstructor t (CaseConstructor n args e) = do
+    tc    <- lookupInferEnv n
+    targs <- mapM (freshVar . locOf) args
+    unify tc (wrapTFunc targs t)
+
+    inferInEnv [ (a, at) | a <- args, at <- targs ] (infer e)
 
 emptyInterval :: Interval
 emptyInterval = Interval (Including zero) (Excluding zero) NoLoc
@@ -225,7 +238,7 @@ lookupInferEnv n = do
   case Map.lookup n (envLocalDefns env) of
     Nothing -> case Map.lookup n (envLocalContext env) of
       Nothing         -> throwError $ NotInScope n (locOf n)
-      Just []         -> throwError $ NotInScope n (locOf n) -- when there are no clauses in a function 
+      Just []         -> throwError $ NotInScope n (locOf n) -- when there are no clauses in a function
       Just (expr : _) -> infer expr
     Just t -> return $ typeWithLoc (locOf n) t
 
@@ -282,16 +295,10 @@ checkStmt env (Assign ns es loc)
   | -- NOTE : Not sure if Assign work this way
     length ns > length es
   = let extraVars = drop (length es) ns
-    in  throwError $ NotEnoughExprsInAssigment (NE.fromList extraVars)
-                                                                                                                                                                                                        -- (locOf $ mergeRangesUnsafe (fromLocs $ map locOf extraVars))
-                                                                                                                                                                                                    -- (locOf $ mergeRangesUnsafe (fromLocs $ map locOf extraVars))
-                                               loc
+    in  throwError $ NotEnoughExprsInAssigment (NE.fromList extraVars) loc
   | length ns < length es
   = let extraExprs = drop (length ns) es
-    in  throwError $ TooManyExprsInAssigment (NE.fromList extraExprs)
-                                                                                                                                                                                                        -- (locOf $ mergeRangesUnsafe (fromLocs $ map locOf extraExprs))
-                                                                                                                                                                                                    -- (locOf $ mergeRangesUnsafe (fromLocs $ map locOf extraExprs))
-                                             loc
+    in  throwError $ TooManyExprsInAssigment (NE.fromList extraExprs) loc
   | otherwise
   = forM_ (zip ns es) (checkAssign env)
 checkStmt env (AAssign x i e _) = do
@@ -398,8 +405,8 @@ defnsAndDeclsToEnv defns decls = do
     Map.foldlWithKey
       (\envM name exprs -> do
         env' <- envM
-        -- banacorn: there maybe be more than one clauses in the definition of a function 
-        -- we use the first clause to infer the type of the function 
+        -- banacorn: there maybe be more than one clauses in the definition of a function
+        -- we use the first clause to infer the type of the function
         case Maybe.listToMaybe exprs of
           Nothing   -> return env'
           Just expr -> do
@@ -442,6 +449,8 @@ unifies (TFunc  t1 t2 _) (TFunc  t3             t4 _) = do
   s1 <- unifies t1 t3
   s2 <- unifies (subst s1 t2) (subst s1 t4)
   return (s2 `compose` s1)
+unifies (TCon n1 args1 _) (TCon n2 args2 _)
+  | n1 == n2 && length args1 == length args2 = return emptySubs
 unifies (TVar x l) t          = bind x t l
 unifies t          (TVar x _) = bind x t (locOf t)
 unifies t1         t2         = throwError $ UnifyFailed t1 t2 (locOf t1)

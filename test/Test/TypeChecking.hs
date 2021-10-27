@@ -104,6 +104,10 @@ exprTests = testGroup
       --   exprCheck "_" "TVar",
     testCase "Quant 1" $ exprCheck "<| + i : 0 ≤ i < N : F i |>" "Int"
   , testCase "Quant 2" $ exprCheck "<| ∃ c : c = 'a' : G c |>" "Bool"
+  , testCase "Case of 1"
+    $ exprCheck "case x of\n\
+    \  Just y -> y\n\
+    \  Nothing -> 0" "Int"
   ]
 
 typeTests :: TestTree
@@ -236,6 +240,17 @@ definitionTests = testGroup
         \    G i j = i + j\n\
         \:}"
     "Environment[(G, Int → Int → Int)][][(G, [λ i → λ j → i + j])]"
+  , testCase "definition 7" $ blockDeclarationCheck
+    "{:\n\
+        \   data Maybe a = Just a | Nothing\n\
+        \   G : Maybe a -> Int\n\
+        \   G x = case x of\n\
+        \             Just y -> y\n\
+        \             Nothing -> 0\n\
+        \   A = 5\n\
+        \   F a b = a + b\n\
+        \:}"
+    "Environment[(A, Int), (F, Int → Int → Int), (G, Maybe a → Int), ( Just\n, Int → Maybe a ), (Nothing, Maybe a)][( Maybe\n, ([a], [Just (TVar a), Nothing ]) )][(A, [5]), (F, [λ a → λ b → a + b]), ( G\n, [λ x → case x of Just y -> yNothing -> 0] )]"
   ]
 
 programTest :: TestTree
@@ -333,24 +348,35 @@ name' t = Name t NoLoc
 env :: Environment
 env = Environment
   { envLocalDefns   = Map.fromList
-    [ (name' "A"  , tint)
-    , (name' "B"  , tint)
-    , (name' "N"  , tint)
+    [ (name' "A"      , tint)
+    , (name' "B"      , tint)
+    , (name' "N"      , tint)
     , (name' "Arr", tarr (Including (litNum 0)) (Excluding (cons "N")) tint)
-    , (name' "P"  , tfunc tint tbool)
-    , (name' "Q"  , tfunc (tvar "?m") tbool)
-    , (name' "F"  , tfunc tint tint)
-    , (name' "G"  , tfunc tchar tbool)
-    , (name' "Max", tfunc tint (tfunc tint tbool))
-    , (name' "i"  , tint)
-    , (name' "j"  , tint)
-    , (name' "k"  , tint)
-    , (name' "b"  , tbool)
-    , (name' "p"  , tbool)
-    , (name' "q"  , tbool)
-    , (name' "r"  , tbool)
+    , (name' "P"      , tfunc tint tbool)
+    , (name' "Q"      , tfunc (tvar "?m") tbool)
+    , (name' "F"      , tfunc tint tint)
+    , (name' "G"      , tfunc tchar tbool)
+    , (name' "Max"    , tfunc tint (tfunc tint tbool))
+    , (name' "i"      , tint)
+    , (name' "j"      , tint)
+    , (name' "k"      , tint)
+    , (name' "b"      , tbool)
+    , (name' "p"      , tbool)
+    , (name' "q"      , tbool)
+    , (name' "r"      , tbool)
+    , (name' "x", TCon (name' "Maybe") [name' "a"] NoLoc)
+    , (name' "Just", tfunc tint (TCon (name' "Maybe") [name' "a"] NoLoc))
+    , (name' "Nothing", TCon (name' "Maybe") [name' "a"] NoLoc)
     ]
-  , envTypeDefns    = mempty
+  , envTypeDefns    = Map.fromList
+                        [ ( name' "Maybe"
+                          , ( [name' "a"]
+                            , [ TypeDefnCtor (name' "Just")    [tvar "a"]
+                              , TypeDefnCtor (name' "Nothing") []
+                              ]
+                            )
+                          )
+                        ]
   , envLocalContext = mempty
   }
 

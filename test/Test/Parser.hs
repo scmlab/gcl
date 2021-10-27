@@ -120,7 +120,7 @@ expression = testGroup
         \    Just y -> 0\n\
         \    Nothing -> 1"
   ]
-  where run = parserIso (scn >> pExpr)
+  where run = parserIso pExpr
 
 
 --------------------------------------------------------------------------------
@@ -136,7 +136,7 @@ pattern' = testGroup
   , testCase "pattern (parenthesis 2)" $ run "(a)"
   , testCase "pattern (parenthesis 3)" $ run "(Just (Just a))"
   ]
-  where run = parserIso (scn >> pPattern)
+  where run = parserIso pPattern
 
 --------------------------------------------------------------------------------
 
@@ -161,15 +161,15 @@ type' = testGroup
   , testCase "array 3" $ run "array [  0 .. N  ] of     Int"
   , testCase "type decl" $ run "List a"
   ]
-  where run = parserIso (scn >> pType)
+  where run = parserIso pType
 
 --------------------------------------------------------------------------------
 -- | Definition
 definition :: TestTree
 definition = testGroup
   "Definitions"
-  [ testCase "type definition 1" $ run "{:\ndata List a = Nil | Con a\n:}"
-  , testCase "type definition 2" $ run "{:\ndata List a = Node (List a)\n:}"
+  [ testCase "type definition 1" $ run "{:\n data List a = Nil | Con a\n:}"
+  , testCase "type definition 2" $ run "{:\n data List a = Node (List a)\n:}"
   , testCase "definition 1" $ run "{:\n\
         \   A, B : Int\n\
         \:}"
@@ -210,8 +210,17 @@ definition = testGroup
         \   F a b = a + b\n\
         \   B, C : Int\n\
         \:}"
+  , testCase "definition 7"
+    $ run
+        "{:\n\
+        \  G x = (case x of\n\
+        \       Just y -> y\n\
+        \       Nothing -> 0)\n\
+        \  A : Int\n\
+        \:}"
   ]
   where run = parserIso pDefinitionBlock
+
 --------------------------------------------------------------------------------
 
 -- | Declaration
