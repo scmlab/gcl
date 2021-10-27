@@ -75,16 +75,34 @@ type Result = Either [Error] Cache
 
 -- The "Syntax" of the DSL for handling LSP requests and responses
 data Cmd next
-  = EditText Range Text (Text -> next)
-  | Mute Bool next
+  = EditText
+      Range -- ^ Range to replace 
+      Text -- ^ Text to replace with 
+      (Text -> next) -- ^ Continuation with the text of the whole file after the edit
+
+  -- | State for indicating whether we should ignore events like `STextDocumentDidChange` 
+  | SetMute
+      Bool
+      next
+
   | GetFilePath (FilePath -> next)
+
   | GetSource (Text -> next)
-  | PutLastSelection Range next
+
+  -- | Store mouse selection 
+  | SetLastSelection
+      Range
+      next
+  -- | Read mouse selection 
   | GetLastSelection (Maybe Range -> next)
+  -- | Each Response has a different ID, bump the counter of that ID
   | BumpResponseVersion (Int -> next)
   | Log Text next
-  | CacheResult Result next
-  | ReadCachedResult (Maybe Result -> next)
+  -- | Store the computed result 
+  | SetCacheResult Result next
+  -- | Read the computed result 
+  | GetCachedResult (Maybe Result -> next)
+  -- | SendDiagnostics from the LSP protocol 
   | SendDiagnostics [Diagnostic] next
   deriving (Functor)
 
@@ -97,7 +115,7 @@ editText :: Range -> Text -> CmdM Text
 editText range text = liftF (EditText range text id)
 
 mute :: Bool -> CmdM ()
-mute b = liftF (Mute b ())
+mute b = liftF (SetMute b ())
 
 getFilePath :: CmdM FilePath
 getFilePath = liftF (GetFilePath id)
@@ -106,16 +124,16 @@ getSource :: CmdM Text
 getSource = liftF (GetSource id)
 
 setLastSelection :: Range -> CmdM ()
-setLastSelection selection = liftF (PutLastSelection selection ())
+setLastSelection selection = liftF (SetLastSelection selection ())
 
 getLastSelection :: CmdM (Maybe Range)
 getLastSelection = liftF (GetLastSelection id)
 
 cacheResult :: Result -> CmdM ()
-cacheResult result = liftF (CacheResult result ())
+cacheResult result = liftF (SetCacheResult result ())
 
 readCachedResult :: CmdM (Maybe Result)
-readCachedResult = liftF (ReadCachedResult id)
+readCachedResult = liftF (GetCachedResult id)
 
 logM :: Text -> CmdM ()
 logM text = liftF (Log text ())

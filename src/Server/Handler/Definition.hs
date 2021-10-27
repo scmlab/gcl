@@ -19,7 +19,7 @@ import           Error
 import qualified Language.LSP.Types            as J
 import           Language.LSP.Types      hiding ( Range )
 import           Server.DSL
-import           Server.Interpreter.RealWorld
+import           Server.Monad
 import           Server.Stab
 import           Server.Util
 import           Syntax.Abstract

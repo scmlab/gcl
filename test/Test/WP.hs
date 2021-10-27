@@ -4,7 +4,7 @@ module Test.WP where
 
 import Pretty ()
 import Server.DSL (parseProgram, sweep, Cache (cachePOs))
-import Server.Interpreter.Test
+import Test.Server.Interpreter
 import Test.Util (runGoldenTest)
 import Test.Tasty (TestTree, testGroup)
 import Prelude hiding (Ordering (..))

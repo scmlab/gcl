@@ -5,7 +5,7 @@ import Control.Monad.Except hiding (guard)
 import qualified Data.Text.IO as Text
 import GHC.IO.IOMode (IOMode (ReadWriteMode))
 import Server.Handler (handlers)
-import Server.Interpreter.RealWorld
+import Server.Monad
 import Language.LSP.Server
 import qualified Language.LSP.Types as LSP hiding (TextDocumentSyncClientCapabilities (..))
 import Network.Simple.TCP (HostPreference (Host), serve)

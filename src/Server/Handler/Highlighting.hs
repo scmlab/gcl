@@ -18,7 +18,7 @@ import           Data.Foldable                  ( toList )
 import           Data.List                      ( sort )
 import           Error                          ( Error )
 import           Server.DSL
-import           Server.Interpreter.RealWorld
+import           Server.Monad
 import           Syntax.Common                  ( Name )
 import           Syntax.Parser                  ( pProgram )
 

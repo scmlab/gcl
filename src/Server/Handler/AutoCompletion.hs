@@ -4,7 +4,7 @@
 module Server.Handler.AutoCompletion where
 
 import           Language.LSP.Types
-import           Server.Interpreter.RealWorld
+import           Server.Monad
 
 handler :: Position -> Maybe CompletionContext -> ServerM (a |? CompletionList)
 handler position completionContext = do

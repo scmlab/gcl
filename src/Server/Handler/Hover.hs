@@ -9,7 +9,7 @@ module Server.Handler.Hover
   ) where
 
 import           Error                          ( Error )
-import           Server.Interpreter.RealWorld
+import           Server.Monad
 import           Server.Stab
 import           Syntax.Abstract
 

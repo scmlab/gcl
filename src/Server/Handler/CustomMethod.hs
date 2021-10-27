@@ -18,7 +18,7 @@ import qualified GCL.Substitution              as Substitution
 import           Render                         ( Render(render) )
 import           Server.CustomMethod
 import           Server.DSL
-import           Server.Interpreter.RealWorld
+import           Server.Monad
 import           Syntax.Abstract                ( Redex(redexExpr) )
 import           Syntax.Abstract.Util           ( programToScopeForSubstitution
                                                 )

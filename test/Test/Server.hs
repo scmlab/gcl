@@ -3,7 +3,7 @@
 module Test.Server (tests) where
 
 import Server.DSL
-import Server.Interpreter.Test
+import Test.Server.Interpreter
 import Test.Tasty
 import GCL.Predicate.Util (specPayloadWithoutIndentation)
 import Data.Maybe (listToMaybe)

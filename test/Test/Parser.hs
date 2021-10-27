@@ -8,7 +8,6 @@ import           Pretty                         ( toByteString
                                                 , toText
                                                 )
 import           Syntax.Parser
-import           Syntax.Parser.Lexer
 import           Test.Tasty                     ( TestTree
                                                 , testGroup
                                                 )

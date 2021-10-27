@@ -7,8 +7,6 @@ module Server.Handler
   ( handlers
   ) where
 
--- import qualified Server.CustomMethod as Custom
-
 import           Control.Lens                   ( (^.) )
 import           Control.Monad.Except
 import qualified Data.Aeson                    as JSON
@@ -18,7 +16,7 @@ import           Language.LSP.Server            ( Handlers
                                                 , requestHandler
                                                 )
 import           Server.DSL
-import           Server.Interpreter.RealWorld
+import           Server.Monad
 
 import qualified Language.LSP.Types            as J
 import qualified Language.LSP.Types.Lens       as J

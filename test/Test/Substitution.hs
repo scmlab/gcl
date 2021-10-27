@@ -18,15 +18,18 @@ import           GCL.Substitution               ( Scope
 import           Pretty
 import           Render.Class                   ( Render(render) )
 import           Render.Element                 ( Inlines(..) )
-import           Server.DSL                     ( Cache(cacheRedexes, cacheCounter)
+import           Server.DSL                     ( Cache
+                                                  ( cacheCounter
+                                                  , cacheRedexes
+                                                  )
                                                 , parseProgram
                                                 , sweep
                                                 )
-import           Server.Interpreter.Test        ( runTest
-                                                , serializeTestResultValueOnly
-                                                )
 import           Syntax.Abstract.Types          ( Redex(..) )
 import           Syntax.Abstract.Util           ( programToScopeForSubstitution
+                                                )
+import           Test.Server.Interpreter        ( runTest
+                                                , serializeTestResultValueOnly
                                                 )
 import           Test.Tasty              hiding ( after )
 import           Test.Util
