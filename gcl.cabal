@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: e4b9eec7906cceaf80cc658abeb4fff930f2643e18d29135c5eb5f7fce299162
+-- hash: cfc086275f9bb14082153e43af1d95a6c9572af48c08f7e075375f99becd5ea5
 
 name:           gcl
 version:        0.1.0.0
@@ -52,7 +52,6 @@ library
       Render.Syntax.Abstract
       Render.Syntax.Common
       Server
-      Server.AnnotateToken
       Server.CustomMethod
       Server.DSL
       Server.Handler
@@ -64,6 +63,7 @@ library
       Server.Handler.Hover
       Server.Monad
       Server.Stab
+      Server.TokenMap.Concrete
       Server.Util
       Syntax.Abstract
       Syntax.Abstract.Instances.Json
@@ -194,7 +194,6 @@ test-suite gcl-test
       Render.Syntax.Abstract
       Render.Syntax.Common
       Server
-      Server.AnnotateToken
       Server.CustomMethod
       Server.DSL
       Server.Handler
@@ -206,6 +205,7 @@ test-suite gcl-test
       Server.Handler.Hover
       Server.Monad
       Server.Stab
+      Server.TokenMap.Concrete
       Server.Util
       Syntax.Abstract
       Syntax.Abstract.Instances.Json

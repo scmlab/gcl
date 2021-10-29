@@ -38,8 +38,8 @@ handler uri pos responder = do
     Just filepath -> do
       interpret filepath (responder . ignoreErrors) $ do
         source  <- getSource
-        program <- parseProgram source
-        runGotoM program pos $ stabM program
+        (_concrete, abstract) <- parseProgram source
+        runGotoM abstract pos $ stabM abstract
 
 --------------------------------------------------------------------------------
 

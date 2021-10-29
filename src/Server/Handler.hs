@@ -51,9 +51,9 @@ handlers = mconcat
         Just filepath -> do
           interpret filepath (notificationResponder filepath) $ do
             source  <- getSource
-            program <- parseProgram source
-            typeCheck program
-            result <- sweep program
+            (concrete, abstract) <- parseProgram source
+            typeCheck abstract
+            result <- sweep concrete abstract
             cacheResult (Right result)
             generateResponseAndDiagnosticsFromResult (Right result)
   , notificationHandler J.STextDocumentDidOpen $ \ntf -> do
@@ -64,9 +64,9 @@ handlers = mconcat
       Nothing       -> pure ()
       Just filepath -> do
         interpret filepath (notificationResponder filepath) $ do
-          program <- parseProgram source
-          typeCheck program
-          result <- sweep program
+          (concrete, abstract) <- parseProgram source
+          typeCheck abstract
+          result <- sweep concrete abstract
           cacheResult (Right result)
           generateResponseAndDiagnosticsFromResult (Right result)
   , -- Goto Definition

@@ -40,9 +40,10 @@ handler uri pos responder = case uriToFilePath uri of
   Nothing       -> return ()
   Just filepath -> do
     interpret filepath (responder . ignoreErrors) $ do
-      source       <- getSource
-      program      <- parseProgram source
-      hoverResults <- runHoverM program pos $ stabM program
+      source                <- getSource
+      (_concrete, abstract) <- parseProgram source
+
+      hoverResults          <- runHoverM abstract pos $ stabM abstract
       return $ listToMaybe $ map resultHover hoverResults
 
 data HoverResult = Result
@@ -74,9 +75,9 @@ runHoverM (Program defns decls _ _ _) pos f = runReaderT (runReaderT f pos)
   declScope :: Map Text HoverResult
   declScope = case Type.runTM (Type.defnsAndDeclsToEnv defns decls) of
     -- ignore type errors
-    Left _ -> Map.empty
-    Right env ->
-      Map.mapKeys nameToText $ Map.map typeToHoverResult (Type.envLocalDefns env)
+    Left  _   -> Map.empty
+    Right env -> Map.mapKeys nameToText
+      $ Map.map typeToHoverResult (Type.envLocalDefns env)
 
 typeToHoverResult :: Type -> HoverResult
 typeToHoverResult t = Result { resultHover = hover, resultType = t }
@@ -103,7 +104,7 @@ instance StabM HoverM Declaration HoverResult where
 
 instance StabM HoverM FuncDefn HoverResult where
   stabM (FuncDefn name cases _) = do
-    name' <- stabLocated name
+    name'   <- stabLocated name
 
     results <- forM cases $ \(args, body) -> do
       -- creates a local scope for arguments

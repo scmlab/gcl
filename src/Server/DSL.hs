@@ -15,6 +15,7 @@ import           Data.List                      ( find
 import qualified Data.List                     as List
 import           Data.Loc                hiding ( fromLoc )
 import           Data.Loc.Range
+import           Data.Map                       ( Map )
 import           Data.Text                      ( Text )
 import qualified Data.Text                     as Text
 import           Error
@@ -34,8 +35,12 @@ import           Render
 import           Server.CustomMethod
 import           Server.Handler.Diagnostic      ( )
 import           Server.Stab                    ( collect )
+import           Server.TokenMap.Concrete       ( Highlighting
+                                                , collectHighlighting
+                                                )
 import qualified Syntax.Abstract               as A
 import           Syntax.Concrete                ( ToAbstract(toAbstract) )
+import qualified Syntax.Concrete               as C
 import           Syntax.Parser                  ( Parser
                                                 , pProgram
                                                 , pStmts
@@ -45,18 +50,19 @@ import           Syntax.Parser                  ( Parser
 --------------------------------------------------------------------------------
 
 data Cache = Cache
-  { cacheProgram  :: A.Program
+  { cacheHighlighings :: Map Range Highlighting
+  , cacheProgram      :: A.Program
     -- Proof Obligations 
-  , cachePOs      :: [PO]
+  , cachePOs          :: [PO]
     -- Specs (holes)
-  , cacheSpecs    :: [Spec]
+  , cacheSpecs        :: [Spec]
     -- Global properties
-  , cacheProps    :: [A.Expr]
+  , cacheProps        :: [A.Expr]
     -- Warnings 
-  , cacheWarnings :: [StructWarning]
-  , cacheRedexes  :: IntMap A.Redex
+  , cacheWarnings     :: [StructWarning]
+  , cacheRedexes      :: IntMap A.Redex
     -- counter (for generating fresh variables)
-  , cacheCounter  :: Int
+  , cacheCounter      :: Int
   }
   deriving (Eq, Show)
 
@@ -174,8 +180,8 @@ refine source range = do
  where
   findPointedSpec :: CmdM (Maybe Spec)
   findPointedSpec = do
-    program <- parseProgram source
-    cache   <- sweep program
+    (concrete, abstract) <- parseProgram source
+    cache                <- sweep concrete abstract
     return $ find (withinRange range) (cacheSpecs cache)
 
 typeCheck :: A.Program -> CmdM ()
@@ -183,18 +189,21 @@ typeCheck p = case TypeChecking.runTM (TypeChecking.checkProgram p) of
   Left  e -> throwError [TypeError e]
   Right v -> return v
 
-sweep :: A.Program -> CmdM Cache
-sweep program@(A.Program _ _ globalProps _ _) = case WP.sweep program of
-  Left  e -> throwError [StructError e]
-  Right (pos, specs, warings, redexes, counter) -> do
-    return $ Cache { cacheProgram  = program
-                   , cachePOs      = List.sort pos
-                   , cacheSpecs    = sortOn locOf specs
-                   , cacheProps    = globalProps
-                   , cacheWarnings = warings
-                   , cacheRedexes  = redexes
-                   , cacheCounter  = counter
-                   }
+sweep :: C.Program -> A.Program -> CmdM Cache
+sweep concrete abstract@(A.Program _ _ globalProps _ _) =
+  case WP.sweep abstract of
+    Left  e -> throwError [StructError e]
+    Right (pos, specs, warings, redexes, counter) -> do
+      let highlighings = collectHighlighting concrete
+      return $ Cache { cacheHighlighings = highlighings
+                     , cacheProgram      = abstract
+                     , cachePOs          = List.sort pos
+                     , cacheSpecs        = sortOn locOf specs
+                     , cacheProps        = globalProps
+                     , cacheWarnings     = warings
+                     , cacheRedexes      = redexes
+                     , cacheCounter      = counter
+                     }
 
 --------------------------------------------------------------------------------
 
@@ -206,19 +215,19 @@ parse p source = do
     Left  errors -> throwError $ map SyntacticError errors
     Right val    -> return val
 
-parseProgram :: Text -> CmdM A.Program
+parseProgram :: Text -> CmdM (C.Program, A.Program)
 parseProgram source = do
   concrete <- parse pProgram source
   case runExcept (toAbstract concrete) of
     Left  (Range start end) -> digHole (Range start end) >>= parseProgram
-    Right program           -> return program
+    Right abstract          -> return (concrete, abstract)
 
 --------------------------------------------------------------------------------
 
 generateResponseAndDiagnosticsFromResult :: Result -> CmdM [ResKind]
 generateResponseAndDiagnosticsFromResult (Left  errors) = throwError errors
 generateResponseAndDiagnosticsFromResult (Right cache ) = do
-  let (Cache _ pos specs globalProps warnings _redexes _) = cache
+  let (Cache _ _ pos specs globalProps warnings _redexes _) = cache
 
   -- get Specs around the mouse selection
   lastSelection <- getLastSelection

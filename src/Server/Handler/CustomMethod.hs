@@ -48,10 +48,10 @@ handleRefine range = do
           in  Text.unlines $ x : map (indentation <>) xs
   source' <- editText (specRange spec) indentedPayload
 
-  program <- parseProgram source'
-  typeCheck program
+  (concrete, abstract) <- parseProgram source'
+  typeCheck abstract
   mute False
-  result <- sweep program
+  result <- sweep concrete abstract
   cacheResult (Right result)
   generateResponseAndDiagnosticsFromResult (Right result)
 
@@ -63,18 +63,17 @@ handleInsertAnchor hash = do
   let template = "{- #" <> hash <> "\n\n-}"
   -- range for appending the template of proof 
   source  <- getSource
-  program <- parseProgram source
-  range   <- case fromLoc (locOf program) of
+  (_, abstract) <- parseProgram source
+  range   <- case fromLoc (locOf abstract) of
     Nothing -> throwError [Others "Cannot read the range of the program"]
     Just x  -> return x
 
   source' <- editText (Range (rangeEnd range) (rangeEnd range))
                       ("\n\n" <> template)
-
-  program' <- parseProgram source'
-  typeCheck program'
+  (concrete', abstract') <- parseProgram source'
+  typeCheck abstract'
   mute False
-  result <- sweep program'
+  result <- sweep concrete' abstract'
   cacheResult (Right result)
   generateResponseAndDiagnosticsFromResult (Right result)
 
