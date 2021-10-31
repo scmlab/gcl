@@ -10,9 +10,7 @@ do b ≠ 0 ->
         a := a * 2
         b := b / 2
      | odd b -> 
-        [!
-        
-        !]
+        r := a + r 
         b := b - 1
     fi
 od
