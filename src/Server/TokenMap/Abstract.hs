@@ -93,6 +93,9 @@ lookupScopes name = asks lookupScopesPrim
   findFirst (Just found) _     = Just found
   findFirst Nothing      scope = Map.lookup name scope
 
+_pushScope :: Scope Info -> M a -> M a
+_pushScope scope = local (scope :)
+
 --------------------------------------------------------------------------------
 
 -- | Given a Abstract syntax node, returns a mapping of Range-Info
@@ -169,16 +172,31 @@ instance Collect GdCmd where
 
 instance Collect Expr where
   collect = \case
+    Lit _ _ -> return ()
     Var   a _        -> collect a
     Const a _        -> collect a
     Op op            -> collect op
     App a b _        -> (<>) <$> collect a <*> collect b
     Lam _ b _        -> collect b
-    Quant op _ c d _ -> do
+    -- TODO: provide types for _args
+    Quant op _args c d _ -> do
       collect op
+      -- let argsScope = Map.fromList $ mapMaybe nameToLocationLink args
       collect c
       collect d
-    _ -> return ()
+    -- RedexStem/Redex will only appear in proof obligations, not in code 
+    RedexStem {} -> return ()
+    Redex _ -> return ()
+    ArrIdx e i _ -> do
+      collect e
+      collect i
+    ArrUpd e i f _ -> do
+      collect e
+      collect i
+      collect f
+    -- TODO: provide types for tokens in patterns 
+    Case e _patterns _ -> do
+      collect e
 
 instance Collect Op where
   collect (ChainOp op) = collect op
