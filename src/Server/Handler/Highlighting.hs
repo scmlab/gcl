@@ -25,8 +25,6 @@ handler uri responder = case J.uriToFilePath uri of
   Nothing       -> return ()
   Just filepath -> do
     interpret filepath (responder . ignoreErrors) $ do
-
-
       result <- readCachedResult
       let highlightings = toList $ case result of
             Nothing            -> mempty

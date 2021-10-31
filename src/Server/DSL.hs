@@ -35,6 +35,7 @@ import           Render
 import           Server.CustomMethod
 import           Server.Handler.Diagnostic      ( )
 import           Server.Stab                    ( collect )
+import           Server.TokenMap.Abstract
 import           Server.TokenMap.Concrete       ( Highlighting
                                                 , collectHighlighting
                                                 )
@@ -51,6 +52,7 @@ import           Syntax.Parser                  ( Parser
 
 data Cache = Cache
   { cacheHighlighings :: Map Range Highlighting
+  , cacheInfos        :: IntervalMap Info
   , cacheProgram      :: A.Program
     -- Proof Obligations 
   , cachePOs          :: [PO]
@@ -195,7 +197,9 @@ sweep concrete abstract@(A.Program _ _ globalProps _ _) =
     Left  e -> throwError [StructError e]
     Right (pos, specs, warings, redexes, counter) -> do
       let highlighings = collectHighlighting concrete
+      let infos        = collectInfo abstract
       return $ Cache { cacheHighlighings = highlighings
+                     , cacheInfos        = infos
                      , cacheProgram      = abstract
                      , cachePOs          = List.sort pos
                      , cacheSpecs        = sortOn locOf specs
@@ -227,7 +231,7 @@ parseProgram source = do
 generateResponseAndDiagnosticsFromResult :: Result -> CmdM [ResKind]
 generateResponseAndDiagnosticsFromResult (Left  errors) = throwError errors
 generateResponseAndDiagnosticsFromResult (Right cache ) = do
-  let (Cache _ _ pos specs globalProps warnings _redexes _) = cache
+  let (Cache _ _ _ pos specs globalProps warnings _redexes _) = cache
 
   -- get Specs around the mouse selection
   lastSelection <- getLastSelection

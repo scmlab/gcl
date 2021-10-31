@@ -20,15 +20,17 @@ import           Data.Loc                       ( Located
                                                 )
 import           Data.Map                       ( Map )
 import qualified Data.Map                      as Map
-import           Data.Maybe                     ( listToMaybe
-                                                , maybeToList
-                                                )
+import           Data.Maybe                     ( maybeToList )
 import           Data.Text                      ( Text )
 import qualified GCL.Type                      as Type
 import           Language.LSP.Types      hiding ( Range )
 import           Pretty                         ( toText )
 import           Render
 import           Server.DSL
+import qualified Server.SrcLoc                 as SrcLoc
+import           Server.TokenMap.Abstract       ( Info(infoHover)
+                                                , lookupIntervalMap
+                                                )
 import           Syntax.Common
 
 ignoreErrors :: Either [Error] (Maybe Hover) -> Maybe Hover
@@ -36,15 +38,19 @@ ignoreErrors (Left  _errors  ) = Nothing
 ignoreErrors (Right locations) = locations
 
 handler :: Uri -> Position -> (Maybe Hover -> ServerM ()) -> ServerM ()
-handler uri pos responder = case uriToFilePath uri of
+handler uri position responder = case uriToFilePath uri of
   Nothing       -> return ()
   Just filepath -> do
     interpret filepath (responder . ignoreErrors) $ do
-      source                <- getSource
-      (_concrete, abstract) <- parseProgram source
-
-      hoverResults          <- runHoverM abstract pos $ stabM abstract
-      return $ listToMaybe $ map resultHover hoverResults
+      source <- getSource
+      result <- readCachedResult
+      let infos = case result of
+            Nothing            -> mempty
+            Just (Left  _    ) -> mempty
+            Just (Right cache) -> cacheInfos cache
+      let table = SrcLoc.makeToOffset source
+      let pos   = SrcLoc.fromLSPPosition table filepath position
+      return $ infoHover <$> lookupIntervalMap infos pos
 
 data HoverResult = Result
   { resultHover :: Hover

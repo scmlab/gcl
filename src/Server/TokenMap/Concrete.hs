@@ -18,7 +18,6 @@ import           Syntax.Concrete
 collectHighlighting :: Program -> Map Range Highlighting
 collectHighlighting = collect 
 
--- | All of the information we want to collect on a Token 
 type Highlighting = J.SemanticTokenAbsolute
 
 toHighlighting
