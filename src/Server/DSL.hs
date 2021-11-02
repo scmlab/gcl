@@ -66,7 +66,6 @@ data Cache = Cache
     -- counter (for generating fresh variables)
   , cacheCounter      :: Int
   }
-  deriving (Eq, Show)
 
 instance Pretty Cache where
   pretty cache =

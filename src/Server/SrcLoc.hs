@@ -9,6 +9,9 @@ module Server.SrcLoc
   , fromOffset
   , fromLSPRange
   , fromLSPPosition
+  , toLSPLocation
+  , toLSPRange
+  , toLSPPosition
   ) where
 
 import           Data.IntMap                    ( IntMap )
@@ -38,6 +41,16 @@ fromLSPPosition table filepath (J.Position line col) = Pos
   (fromIntegral line + 1) -- starts at 1
   (fromIntegral col + 1) -- starts at 1 
   (fromIntegral (toOffset table (line, col))) -- starts at 0
+
+toLSPLocation :: Range -> J.Location
+toLSPLocation (Range start end) =
+  J.Location (J.Uri $ Text.pack $ posFile start) (toLSPRange (Range start end))
+
+toLSPRange :: Range -> J.Range
+toLSPRange (Range start end) = J.Range (toLSPPosition start) (toLSPPosition end)
+
+toLSPPosition :: Pos -> J.Position
+toLSPPosition (Pos _path ln col _offset) = J.Position ((ln - 1) `max` 0) ((col - 1) `max` 0)
 
 --------------------------------------------------------------------------------
 -- | Positon => Offset convertion

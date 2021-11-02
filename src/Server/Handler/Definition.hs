@@ -13,7 +13,7 @@ import           Data.Loc                       ( Located
 import           Data.Loc.Range
 import qualified Data.Map                      as Map
 import           Data.Map                       ( Map )
-import           Data.Maybe                     ( mapMaybe )
+import           Data.Maybe                     ( mapMaybe, maybeToList )
 import           Data.Text                      ( Text )
 import           Error
 import qualified Language.LSP.Types            as J
@@ -21,25 +21,41 @@ import           Language.LSP.Types      hiding ( Range )
 import           Server.DSL
 import           Server.Monad
 import           Server.Stab
-import           Server.Util
 import           Syntax.Abstract
 import           Syntax.Common                  ( Name
                                                 , nameToText
                                                 )
+import qualified Server.SrcLoc as SrcLoc
+import Server.TokenMap.Abstract
 
 ignoreErrors :: Either [Error] [LocationLink] -> [LocationLink]
 ignoreErrors (Left  _errors  ) = []
 ignoreErrors (Right locations) = locations
 
 handler :: Uri -> Position -> ([LocationLink] -> ServerM ()) -> ServerM ()
-handler uri pos responder = do
+handler uri position responder = do
   case uriToFilePath uri of
     Nothing       -> return ()
     Just filepath -> do
       interpret filepath (responder . ignoreErrors) $ do
         source  <- getSource
-        (_concrete, abstract) <- parseProgram source
-        runGotoM abstract pos $ stabM abstract
+
+        result <- readCachedResult
+        let infos = case result of
+              Nothing            -> mempty
+              Just (Left  _    ) -> mempty
+              Just (Right cache) -> cacheInfos cache
+        let table = SrcLoc.makeToOffset source
+        let pos   = SrcLoc.fromLSPPosition table filepath position
+
+        return $ maybeToList $ do -- Maybe monad here 
+          info <- lookupIntervalMap infos pos
+          infoLocationLink info
+          -- return hover
+
+
+        -- (_concrete, abstract) <- parseProgram source
+        -- runGotoM abstract pos $ stabM abstract
 
 --------------------------------------------------------------------------------
 
@@ -70,10 +86,10 @@ nameToLocationLink arg = do
   let targetUri = J.filePathToUri (rangeFile targetRange)
 
   let text      = nameToText arg
-  let toLocationLink callerRange = LocationLink (Just $ toRange callerRange)
+  let toLocationLink callerRange = LocationLink (Just $ SrcLoc.toLSPRange callerRange)
                                                 targetUri
-                                                (toRange targetRange)
-                                                (toRange targetRange)
+                                                (SrcLoc.toLSPRange targetRange)
+                                                (SrcLoc.toLSPRange targetRange)
 
   return (text, toLocationLink)
 --------------------------------------------------------------------------------
@@ -115,10 +131,10 @@ runGotoM (Program (Definitions _funcDefnSigs _typeDefns funcDefns) decls _ _ _) 
 
     let text      = nameToText name
     let toLocationLink callerRange = LocationLink
-          (Just $ toRange callerRange)
+          (Just $ SrcLoc.toLSPRange callerRange)
           targetUri
-          (toRange targetRange)
-          (toRange targetSelRange)
+          (SrcLoc.toLSPRange targetRange)
+          (SrcLoc.toLSPRange targetSelRange)
 
     return (text, toLocationLink)
 

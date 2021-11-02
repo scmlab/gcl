@@ -12,7 +12,7 @@ import           Server.Monad
 import           Language.LSP.Types      hiding ( Range )
 import           Server.DSL
 import qualified Server.SrcLoc                 as SrcLoc
-import           Server.TokenMap.Abstract       ( Info(infoHover)
+import           Server.TokenMap.Abstract       ( Info(infoHoverAndType)
                                                 , lookupIntervalMap
                                                 )
 
@@ -33,4 +33,9 @@ handler uri position responder = case uriToFilePath uri of
             Just (Right cache) -> cacheInfos cache
       let table = SrcLoc.makeToOffset source
       let pos   = SrcLoc.fromLSPPosition table filepath position
-      return $ infoHover <$> lookupIntervalMap infos pos
+
+
+      return $ do -- Maybe monad here 
+        info <- lookupIntervalMap infos pos
+        (hover, _typ) <- infoHoverAndType info
+        return hover

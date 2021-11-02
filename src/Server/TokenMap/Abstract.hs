@@ -13,18 +13,23 @@ import           Control.Monad.Reader
 import           Control.Monad.Writer
 import           Data.IntMap                    ( IntMap )
 import qualified Data.IntMap                   as IntMap
-import           Data.Loc                       ( Pos
+import           Data.Loc                       ( Located
+                                                , Pos
                                                 , locOf
                                                 , posCoff
                                                 )
 import           Data.Loc.Range
 import           Data.Map                       ( Map )
 import qualified Data.Map                      as Map
+import qualified Data.Map.Merge.Lazy           as Map
+import           Data.Maybe                     ( mapMaybe )
 import           Data.Text                      ( Text )
 import qualified GCL.Type                      as TypeChecking
 import qualified Language.LSP.Types            as J
 import           Pretty                         ( toText )
 import           Render
+import qualified Server.SrcLoc                 as SrcLoc
+-- import qualified Server.SrcLoc                 as SrcLoc
 import           Server.Stab                    ( Scope )
 import           Syntax.Abstract
 import           Syntax.Common
@@ -45,43 +50,122 @@ collectInfo program = runM program (collect program)
 
 -- | Information we want to collect of a node of Abstract syntax  
 data Info = Info
-  { infoHover :: J.Hover
-  , infoType  :: Type
+  { infoHoverAndType :: Maybe (J.Hover, Type)
+  , infoLocationLink :: Maybe J.LocationLink
   }
-  deriving (Eq, Show)
+
+data Target = Target
+  { targetHoverAndType     :: Maybe (J.Hover, Type)
+  , targetLocationLinkToBe :: Maybe (Range -> J.LocationLink)
+  }
+
+emptyInfo :: Info
+emptyInfo = Info Nothing Nothing
+
+emptyTarget :: Target
+emptyTarget = Target Nothing Nothing
 
 instance Render Info where
-  render (Info _ t) = "Info " <+> render t
+  render (Info _ _) = "Info"
 
-fromType :: Type -> Info
-fromType t = Info { infoHover = hover, infoType = t }
+fromType :: Type -> Info -> Info
+fromType t info = info { infoHoverAndType = Just (hover, t) }
  where
   hover   = J.Hover content Nothing
   content = J.HoverContents $ J.markedUpContent "gcl" (toText t)
+
+addTypeToTarget :: Type -> Target -> Target
+addTypeToTarget t target = target { targetHoverAndType = Just (hover, t) }
+ where
+  hover   = J.Hover content Nothing
+  content = J.HoverContents $ J.markedUpContent "gcl" (toText t)
+
+addLocationLinkToTarget :: (Range -> J.LocationLink) -> Target -> Target
+addLocationLinkToTarget l target = target { targetLocationLinkToBe = Just l }
 
 addType :: Type -> M ()
 addType t = case fromLoc (locOf t) of
   Nothing    -> return ()
   Just range -> tell $ IntMap.singleton
     (posCoff (rangeStart range))
-    (posCoff (rangeEnd range), fromType t)
+    (posCoff (rangeEnd range), fromType t emptyInfo)
+
+fromTarget :: Range -> Target -> Info
+fromTarget range (Target hover linkToBe) = Info hover $ case linkToBe of
+  Nothing -> Nothing
+  Just f  -> Just (f range)
+
+-- convert a Name to a LocationLink (that is waiting for the caller's Range)
+-- nameToLocationLink :: Name -> Maybe (Text, Range -> J.LocationLink)
+-- nameToLocationLink name = do
+--   targetRange <- fromLoc (locOf name)
+--   let targetUri = J.filePathToUri (rangeFile targetRange)
+--   let text      = nameToText name
+--   let toLocationLink callerRange = J.LocationLink
+--         (Just $ SrcLoc.toLSPRange callerRange)
+--         targetUri
+--         (SrcLoc.toLSPRange targetRange)
+--         (SrcLoc.toLSPRange targetRange)
+
+--   return (text, toLocationLink)
 
 --------------------------------------------------------------------------------
 
-type M = WriterT (IntervalMap Info) (Reader [Scope Info])
+type M = WriterT (IntervalMap Info) (Reader [Scope Target])
 
 runM :: Program -> M a -> IntervalMap Info
-runM (Program defns decls _ _ _) f = runReader (execWriterT f) [declScope]
+runM (Program defns@(Definitions _funcDefnSigs _typeDefns funcDefns) decls _ _ _) f
+  = runReader (execWriterT f) [topLevelScope]
  where
-  declScope :: Map Text Info
-  declScope =
-    case TypeChecking.runTM (TypeChecking.defnsAndDeclsToEnv defns decls) of
-    -- ignore type errors
-      Left  _   -> Map.empty
-      Right env -> Map.mapKeys nameToText
-        $ Map.map fromType (TypeChecking.envLocalDefns env)
+  topLevelScope :: Map Text Target
+  topLevelScope = Map.merge
+    (Map.traverseMissing (\_ t -> pure $ addTypeToTarget t emptyTarget))
+    (Map.traverseMissing (\_ l -> pure $ addLocationLinkToTarget l emptyTarget))
+    (Map.zipWithAMatched
+      (\_ t l ->
+        pure $ addTypeToTarget t $ addLocationLinkToTarget l emptyTarget
+      )
+    )
+    types
+    locationLinks
 
-lookupScopes :: Text -> M (Maybe Info)
+  types :: Map Text Type
+  types =
+    -- run type checking to get the types of definitions/declarations
+    case TypeChecking.runTM (TypeChecking.defnsAndDeclsToEnv defns decls) of
+      Left  _   -> Map.empty -- ignore type errors
+      Right env -> Map.mapKeys nameToText (TypeChecking.envLocalDefns env)
+
+  locationLinks :: Map Text (Range -> J.LocationLink)
+  locationLinks =
+    Map.fromList
+      . concatMap (mapMaybe declToLocationLink)
+      $ (map splitDecl decls, Map.toList funcDefns)
+
+  -- split a parallel declaration into many simpler declarations
+  splitDecl :: Declaration -> [(Name, Declaration)]
+  splitDecl decl@(ConstDecl names _ _ _) = [ (name, decl) | name <- names ]
+  splitDecl decl@(VarDecl   names _ _ _) = [ (name, decl) | name <- names ]
+
+  -- convert a declaration (and its name) to a LocationLink (that is waiting for the caller's Range)
+  declToLocationLink
+    :: Located a => (Name, a) -> Maybe (Text, Range -> J.LocationLink)
+  declToLocationLink (name, x) = do
+    targetRange    <- fromLoc (locOf x)
+    targetSelRange <- fromLoc (locOf name)
+    let targetUri = J.filePathToUri (rangeFile targetRange)
+
+    let text      = nameToText name
+    let toLocationLink callerRange = J.LocationLink
+          (Just $ SrcLoc.toLSPRange callerRange)
+          targetUri
+          (SrcLoc.toLSPRange targetRange)
+          (SrcLoc.toLSPRange targetSelRange)
+
+    return (text, toLocationLink)
+
+
+lookupScopes :: Text -> M (Maybe Target)
 lookupScopes name = asks lookupScopesPrim
  where
   -- | See if a name is in a series of scopes (from local to global)
@@ -93,8 +177,8 @@ lookupScopes name = asks lookupScopesPrim
   findFirst (Just found) _     = Just found
   findFirst Nothing      scope = Map.lookup name scope
 
-_pushScope :: Scope Info -> M a -> M a
-_pushScope scope = local (scope :)
+-- _pushScope :: Scope Info -> M a -> M a
+-- _pushScope scope = local (scope :)
 
 --------------------------------------------------------------------------------
 
@@ -120,12 +204,12 @@ instance Collect Name where
   collect name = do
     result <- lookupScopes (nameToText name)
     case result of
-      Nothing    -> return ()
-      Just token -> case fromLoc (locOf name) of
+      Nothing     -> return ()
+      Just target -> case fromLoc (locOf name) of
         Nothing    -> return ()
         Just range -> tell $ IntMap.singleton
           (posCoff (rangeStart range))
-          (posCoff (rangeEnd range), token)
+          (posCoff (rangeEnd range), fromTarget range target)
 
 --------------------------------------------------------------------------------
 -- Program
@@ -172,12 +256,12 @@ instance Collect GdCmd where
 
 instance Collect Expr where
   collect = \case
-    Lit _ _ -> return ()
-    Var   a _        -> collect a
-    Const a _        -> collect a
-    Op op            -> collect op
-    App a b _        -> (<>) <$> collect a <*> collect b
-    Lam _ b _        -> collect b
+    Lit   _ _            -> return ()
+    Var   a _            -> collect a
+    Const a _            -> collect a
+    Op op                -> collect op
+    App a b _            -> (<>) <$> collect a <*> collect b
+    Lam _ b _            -> collect b
     -- TODO: provide types for _args
     Quant op _args c d _ -> do
       collect op
@@ -185,8 +269,8 @@ instance Collect Expr where
       collect c
       collect d
     -- RedexStem/Redex will only appear in proof obligations, not in code 
-    RedexStem {} -> return ()
-    Redex _ -> return ()
+    RedexStem{}  -> return ()
+    Redex _      -> return ()
     ArrIdx e i _ -> do
       collect e
       collect i

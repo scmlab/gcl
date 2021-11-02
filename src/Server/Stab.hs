@@ -18,7 +18,7 @@ import           Data.Map                       ( Map )
 import qualified Data.Map                      as Map
 import           Data.Text                      ( Text )
 import qualified Language.LSP.Types            as J
-import qualified Server.Util                   as J
+import qualified Server.SrcLoc as SrcLoc
 
 --------------------------------------------------------------------------------
 
@@ -82,7 +82,7 @@ lookupScopesPrim scopes name = foldl findFirst Nothing scopes
 stabbedRanged :: Ranged a => J.Position -> a -> Bool
 stabbedRanged position node =
   let Range start end = rangeOf node
-  in  J.toPos start `cmp` position /= GT && position `cmp` J.toPos end /= GT
+  in  SrcLoc.toLSPPosition start `cmp` position /= GT && position `cmp` SrcLoc.toLSPPosition end /= GT
  where
   cmp :: J.Position -> J.Position -> Ordering
   cmp (J.Position lineA colA) (J.Position lineB colB) =
@@ -95,7 +95,7 @@ stabbedLocated :: Located a => J.Position -> a -> Bool
 stabbedLocated position node = case fromLoc (locOf node) of
   Nothing -> False
   Just (Range start end) ->
-    J.toPos start `cmp` position /= GT && position `cmp` J.toPos end /= GT
+    SrcLoc.toLSPPosition start `cmp` position /= GT && position `cmp` SrcLoc.toLSPPosition end /= GT
  where
   cmp :: J.Position -> J.Position -> Ordering
   cmp (J.Position lineA colA) (J.Position lineB colB) =

@@ -49,7 +49,7 @@ import           Server.DSL                     ( Cmd(..)
                                                 )
 import qualified Server.DSL                    as DSL
 import           Server.Stab                    ( collect )
-import qualified Server.Util                   as J
+import qualified Server.SrcLoc as SrcLoc
 
 --------------------------------------------------------------------------------
 
@@ -178,7 +178,7 @@ interpret filepath responder p = case runCmdM p of
   Right (Free (EditText range text next)) -> do
     logText $ " ### EditText " <> toText range <> " " <> text
     -- apply edit
-    let removeSpec = TextEdit (J.toRange range) text
+    let removeSpec = TextEdit (SrcLoc.toLSPRange range) text
     let identifier =
           VersionedTextDocumentIdentifier (filePathToUri filepath) (Just 0)
     let textDocumentEdit = TextDocumentEdit identifier (List [InL removeSpec])

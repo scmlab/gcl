@@ -23,7 +23,7 @@ import           Language.LSP.Types      hiding ( Range
                                                 )
 import           Pretty
 import           Server.Stab
-import qualified Server.Util                   as J
+import qualified Server.SrcLoc as SrcLoc
 
 instance Collect StructError Diagnostic where
   collect (MissingAssertion loc) = makeError
@@ -165,10 +165,10 @@ makeWarning loc title body = case fromLoc loc of
 makeDiagnostic
   :: Maybe DiagnosticSeverity -> Range -> Text -> Text -> Diagnostic
 makeDiagnostic severity range title body = Diagnostic
-  (J.toRange range)
+  (SrcLoc.toLSPRange range)
   severity
   Nothing
   Nothing
   title
   Nothing
-  (Just $ List [DiagnosticRelatedInformation (J.toLoc range) body])
+  (Just $ List [DiagnosticRelatedInformation (SrcLoc.toLSPLocation range) body])
