@@ -2,12 +2,19 @@
     data B = T | F 
 
     t : B 
-    t = T 
+    t = T
 
     not : B -> B 
     not x = case x of 
           T -> F 
           F -> T
+
+    -- data Maybe = Just B | Nothing 
+
+    -- isJust : Maybe -> B 
+    -- isJust x = case x of 
+    --     Nothing -> F 
+    --     Just a -> T 
 :}
 
 
