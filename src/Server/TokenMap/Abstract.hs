@@ -22,7 +22,8 @@ import           Data.Loc.Range
 import           Data.Map                       ( Map )
 import qualified Data.Map                      as Map
 import qualified Data.Map.Merge.Lazy           as Map
-import           Data.Maybe                     ( mapMaybe )
+import           Data.Maybe                     ( mapMaybe
+                                                )
 import           Data.Text                      ( Text )
 import qualified GCL.Type                      as TypeChecking
 import qualified Language.LSP.Types            as J
@@ -59,20 +60,11 @@ data Target = Target
   , targetLocationLinkToBe :: Maybe (Range -> J.LocationLink)
   }
 
-emptyInfo :: Info
-emptyInfo = Info Nothing Nothing
-
 emptyTarget :: Target
 emptyTarget = Target Nothing Nothing
 
 instance Render Info where
   render (Info _ _) = "Info"
-
-fromType :: Type -> Info -> Info
-fromType t info = info { infoHoverAndType = Just (hover, t) }
- where
-  hover   = J.Hover content Nothing
-  content = J.HoverContents $ J.markedUpContent "gcl" (toText t)
 
 addTypeToTarget :: Type -> Target -> Target
 addTypeToTarget t target = target { targetHoverAndType = Just (hover, t) }
@@ -88,33 +80,24 @@ addType t = case fromLoc (locOf t) of
   Nothing    -> return ()
   Just range -> tell $ IntMap.singleton
     (posCoff (rangeStart range))
-    (posCoff (rangeEnd range), fromType t emptyInfo)
+    ( posCoff (rangeEnd range)
+    , Info { infoHoverAndType = Just (hover, t), infoLocationLink = Nothing }
+    )
+   where
+    hover   = J.Hover content Nothing
+    content = J.HoverContents $ J.markedUpContent "gcl" (toText t)
 
 fromTarget :: Range -> Target -> Info
 fromTarget range (Target hover linkToBe) = Info hover $ case linkToBe of
   Nothing -> Nothing
   Just f  -> Just (f range)
 
--- convert a Name to a LocationLink (that is waiting for the caller's Range)
--- nameToLocationLink :: Name -> Maybe (Text, Range -> J.LocationLink)
--- nameToLocationLink name = do
---   targetRange <- fromLoc (locOf name)
---   let targetUri = J.filePathToUri (rangeFile targetRange)
---   let text      = nameToText name
---   let toLocationLink callerRange = J.LocationLink
---         (Just $ SrcLoc.toLSPRange callerRange)
---         targetUri
---         (SrcLoc.toLSPRange targetRange)
---         (SrcLoc.toLSPRange targetRange)
-
---   return (text, toLocationLink)
-
 --------------------------------------------------------------------------------
 
 type M = WriterT (IntervalMap Info) (Reader [Scope Target])
 
 runM :: Program -> M a -> IntervalMap Info
-runM (Program defns@(Definitions _funcDefnSigs _typeDefns funcDefns) decls _ _ _) f
+runM (Program defns@(Definitions typeDefns _funcDefnSigs funcDefns) decls _ _ _) f
   = runReader (execWriterT f) [topLevelScope]
  where
   topLevelScope :: Map Text Target
@@ -136,11 +119,20 @@ runM (Program defns@(Definitions _funcDefnSigs _typeDefns funcDefns) decls _ _ _
       Left  _   -> Map.empty -- ignore type errors
       Right env -> Map.mapKeys nameToText (TypeChecking.envLocalDefns env)
 
-  locationLinks :: Map Text (Range -> J.LocationLink)
-  locationLinks =
-    Map.fromList
-      . concatMap (mapMaybe declToLocationLink)
-      $ (map splitDecl decls, Map.toList funcDefns)
+  locationLinks = locationLinksFromFuncDefns <> locationLinksFromDecls <> locationLinksFromTypeDefns
+
+  locationLinksFromDecls :: Map Text (Range -> J.LocationLink)
+  locationLinksFromDecls =
+    Map.fromList $ mapMaybe declToLocationLink $ concatMap splitDecl decls
+
+  locationLinksFromFuncDefns :: Map Text (Range -> J.LocationLink)
+  locationLinksFromFuncDefns =
+    Map.fromList $ mapMaybe declToLocationLink $ Map.toList funcDefns
+
+  locationLinksFromTypeDefns :: Map Text (Range -> J.LocationLink)
+  locationLinksFromTypeDefns =
+    Map.fromList $ mapMaybe declToLocationLink $ Map.toList typeDefns
+
 
   -- split a parallel declaration into many simpler declarations
   splitDecl :: Declaration -> [(Name, Declaration)]
@@ -193,6 +185,9 @@ instance Collect a => Collect (Maybe a) where
 instance Collect a => Collect [a] where
   collect = mapM_ collect
 
+instance Collect a => Collect (Map k a) where
+  collect = mapM_ collect
+
 instance (Collect a, Collect b) => Collect (Either a b) where
   collect (Left  a) = collect a
   collect (Right a) = collect a
@@ -215,9 +210,24 @@ instance Collect Name where
 -- Program
 
 instance Collect Program where
-  collect (Program _ decls _ stmts _) = do
+  collect (Program defns decls _ stmts _) = do
+    collect defns
     collect decls
     collect stmts
+
+--------------------------------------------------------------------------------
+-- Definition
+
+instance Collect Definitions where
+  collect defns = do 
+    -- collect (defnTypes defns)
+    collect (defnFuncSigs defns)
+    collect (defnFuncs defns)
+
+instance Collect FuncDefnSig where
+  collect (FuncDefnSig _name t prop _) = do 
+    collect t
+    collect prop
 
 --------------------------------------------------------------------------------
 -- Declaration
@@ -253,6 +263,19 @@ instance Collect GdCmd where
     collect stmts
 
 --------------------------------------------------------------------------------
+
+  -- stabM = \case
+  --   Var   a _          -> stabLocated a
+  --   Const a _          -> stabLocated a
+  --   --Chain a _ c _      -> (<>) <$> stabLocated a <*> stabLocated c
+  --   App a b _          -> (<>) <$> stabLocated a <*> stabLocated b
+  --   Lam _ b _          -> stabLocated b
+  --   Quant _ args c d _ -> do
+  --     -- creates a local scope for arguments
+  --     let argsScope = Map.fromList $ mapMaybe nameToLocationLink args
+  --     -- temporarily prepend this local scope to the scope stack
+  --     pushScope argsScope $ (<>) <$> stabLocated c <*> stabLocated d
+  --   _ -> return []
 
 instance Collect Expr where
   collect = \case
@@ -295,3 +318,22 @@ instance Collect ChainOp where
 instance Collect QuantOp' where
   collect (Left  op  ) = collect op
   collect (Right expr) = collect expr
+
+--------------------------------------------------------------------------------
+-- | Types 
+
+instance Collect Type where
+  collect = \case
+    TBase _ _ -> return ()
+    TArray i x _ -> collect i  >> collect x
+    TFunc x y _ -> collect x >> collect y
+    TCon x _ _ -> collect x
+    TVar _ _ -> return ()
+
+instance Collect Interval where
+  collect (Interval x y _) = collect x >> collect y
+
+instance Collect Endpoint where
+  collect = \case    
+    Including x -> collect x
+    Excluding x -> collect x

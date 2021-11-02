@@ -1,5 +1,9 @@
 {:  
     data B = T | F 
+
+    t : B 
+    t = T 
+
     not : B -> B 
     not x = case x of 
           T -> F 
