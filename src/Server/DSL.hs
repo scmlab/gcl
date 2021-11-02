@@ -33,8 +33,6 @@ import           Pretty                         ( Pretty(pretty)
                                                 )
 import           Render
 import           Server.CustomMethod
-import           Server.Handler.Diagnostic      ( )
-import           Server.Stab                    ( collect )
 import           Server.TokenMap.Abstract
 import           Server.TokenMap.Concrete       ( Highlighting
                                                 , collectHighlighting
@@ -47,6 +45,7 @@ import           Syntax.Parser                  ( Parser
                                                 , pStmts
                                                 , runParse
                                                 )
+import Server.Handler.Diagnostic (Collect(collect))
 
 --------------------------------------------------------------------------------
 

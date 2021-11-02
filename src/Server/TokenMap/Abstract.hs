@@ -31,7 +31,6 @@ import           Pretty                         ( toText )
 import           Render
 import qualified Server.SrcLoc                 as SrcLoc
 -- import qualified Server.SrcLoc                 as SrcLoc
-import           Server.Stab                    ( Scope )
 import           Syntax.Abstract
 import           Syntax.Common
 
@@ -93,6 +92,9 @@ fromTarget range (Target hover linkToBe) = Info hover $ case linkToBe of
   Just f  -> Just (f range)
 
 --------------------------------------------------------------------------------
+
+-- | A "Scope" is a mapping of names and LocationLinks
+type Scope a = Map Text a
 
 type M = WriterT (IntervalMap Info) (Reader [Scope Target])
 
@@ -157,11 +159,11 @@ runM (Program defns@(Definitions typeDefns _funcDefnSigs funcDefns) decls _ _ _)
     return (text, toLocationLink)
 
 
+  -- | See if a name is in a series of scopes (from local to global)
+  -- | Return the first result (which should be the most local target)
 lookupScopes :: Text -> M (Maybe Target)
 lookupScopes name = asks lookupScopesPrim
  where
-  -- | See if a name is in a series of scopes (from local to global)
-  -- | Return the first result (which should be the most local target)
   lookupScopesPrim :: [Scope a] -> Maybe a
   lookupScopesPrim scopes = foldl findFirst Nothing scopes
 
@@ -169,8 +171,30 @@ lookupScopes name = asks lookupScopesPrim
   findFirst (Just found) _     = Just found
   findFirst Nothing      scope = Map.lookup name scope
 
--- _pushScope :: Scope Info -> M a -> M a
--- _pushScope scope = local (scope :)
+localScope :: [Name] -> M a -> M a
+localScope = pushScope . scopeFromLocalBinders
+  where 
+    pushScope :: Scope Target -> M a -> M a
+    pushScope scope = local (scope :)
+
+    scopeFromLocalBinders :: [Name] -> Scope Target
+    scopeFromLocalBinders names = Map.map (`addLocationLinkToTarget` emptyTarget) $ Map.fromList $ mapMaybe fromName names
+      where
+        -- convert a declaration (and its name) to a LocationLink (that is waiting for the caller's Range)
+        fromName ::  Name -> Maybe (Text, Range -> J.LocationLink)
+        fromName name = do
+          targetRange    <- fromLoc (locOf name)
+          let targetUri = J.filePathToUri (rangeFile targetRange)
+
+          let text      = nameToText name
+          let toLocationLink callerRange = J.LocationLink
+                (Just $ SrcLoc.toLSPRange callerRange)
+                targetUri
+                (SrcLoc.toLSPRange targetRange)
+                (SrcLoc.toLSPRange targetRange)
+
+          return (text, toLocationLink)
+
 
 --------------------------------------------------------------------------------
 
@@ -219,13 +243,13 @@ instance Collect Program where
 -- Definition
 
 instance Collect Definitions where
-  collect defns = do 
+  collect defns = do
     -- collect (defnTypes defns)
     collect (defnFuncSigs defns)
     collect (defnFuncs defns)
 
 instance Collect FuncDefnSig where
-  collect (FuncDefnSig _name t prop _) = do 
+  collect (FuncDefnSig _name t prop _) = do
     collect t
     collect prop
 
@@ -264,19 +288,6 @@ instance Collect GdCmd where
 
 --------------------------------------------------------------------------------
 
-  -- stabM = \case
-  --   Var   a _          -> stabLocated a
-  --   Const a _          -> stabLocated a
-  --   --Chain a _ c _      -> (<>) <$> stabLocated a <*> stabLocated c
-  --   App a b _          -> (<>) <$> stabLocated a <*> stabLocated b
-  --   Lam _ b _          -> stabLocated b
-  --   Quant _ args c d _ -> do
-  --     -- creates a local scope for arguments
-  --     let argsScope = Map.fromList $ mapMaybe nameToLocationLink args
-  --     -- temporarily prepend this local scope to the scope stack
-  --     pushScope argsScope $ (<>) <$> stabLocated c <*> stabLocated d
-  --   _ -> return []
-
 instance Collect Expr where
   collect = \case
     Lit   _ _            -> return ()
@@ -285,12 +296,11 @@ instance Collect Expr where
     Op op                -> collect op
     App a b _            -> (<>) <$> collect a <*> collect b
     Lam _ b _            -> collect b
-    -- TODO: provide types for _args
-    Quant op _args c d _ -> do
+    Quant op args c d _ -> do
       collect op
-      -- let argsScope = Map.fromList $ mapMaybe nameToLocationLink args
-      collect c
-      collect d
+      localScope args $ do
+        collect c
+        collect d
     -- RedexStem/Redex will only appear in proof obligations, not in code 
     RedexStem{}  -> return ()
     Redex _      -> return ()
@@ -305,12 +315,12 @@ instance Collect Expr where
     Case e patterns _ -> do
       collect e
       collect patterns
- 
-instance Collect CaseConstructor where 
-  -- TODO collect _args
-  collect (CaseConstructor ctor _args body) = do 
+
+instance Collect CaseConstructor where
+  collect (CaseConstructor ctor args body) = do
     collect ctor
-    collect body
+    localScope args $ do
+      collect body
 
 instance Collect Op where
   collect (ChainOp op) = collect op
@@ -341,6 +351,6 @@ instance Collect Interval where
   collect (Interval x y _) = collect x >> collect y
 
 instance Collect Endpoint where
-  collect = \case    
+  collect = \case
     Including x -> collect x
     Excluding x -> collect x

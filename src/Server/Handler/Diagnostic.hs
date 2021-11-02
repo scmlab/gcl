@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FlexibleInstances #-}
 module Server.Handler.Diagnostic where
 
 import           Data.Foldable                  ( toList )
@@ -22,7 +23,6 @@ import           Language.LSP.Types      hiding ( Range
                                                 , line
                                                 )
 import           Pretty
-import           Server.Stab
 import qualified Server.SrcLoc as SrcLoc
 
 instance Collect StructError Diagnostic where
@@ -172,3 +172,16 @@ makeDiagnostic severity range title body = Diagnostic
   title
   Nothing
   (Just $ List [DiagnosticRelatedInformation (SrcLoc.toLSPLocation range) body])
+
+--------------------------------------------------------------------------------
+
+class Collect a b where
+  collect :: a -> [b]
+
+instance Collect a b => Collect (Maybe a) b where
+  collect Nothing  = []
+  collect (Just x) = collect x
+
+instance (Collect a x, Collect b x) => Collect (Either a b) x where
+  collect (Left  a) = collect a
+  collect (Right a) = collect a
