@@ -22,8 +22,6 @@ import           Data.Loc.Range
 import           Data.Map                       ( Map )
 import qualified Data.Map                      as Map
 import qualified Data.Map.Merge.Lazy           as Map
-import           Data.Maybe                     ( mapMaybe
-                                                )
 import           Data.Text                      ( Text )
 import qualified GCL.Type                      as TypeChecking
 import qualified Language.LSP.Types            as J
@@ -112,7 +110,7 @@ runM (Program defns@(Definitions typeDefns _funcDefnSigs funcDefns) decls _ _ _)
       )
     )
     types
-    locationLinks
+    (Map.mapKeys nameToText locationLinks)
 
   types :: Map Text Type
   types =
@@ -121,46 +119,77 @@ runM (Program defns@(Definitions typeDefns _funcDefnSigs funcDefns) decls _ _ _)
       Left  _   -> Map.empty -- ignore type errors
       Right env -> Map.mapKeys nameToText (TypeChecking.envLocalDefns env)
 
-  locationLinks = locationLinksFromFuncDefns <> locationLinksFromDecls <> locationLinksFromTypeDefns
+  locationLinks :: Map Name (Range -> J.LocationLink)
+  locationLinks =
+    locationLinksFromFuncDefns
+      <> locationLinksFromDecls
+      <> locationLinksFromTypeDefns
 
-  locationLinksFromDecls :: Map Text (Range -> J.LocationLink)
+  locationLinksFromDecls :: Map Name (Range -> J.LocationLink)
   locationLinksFromDecls =
-    Map.fromList $ mapMaybe declToLocationLink $ concatMap splitDecl decls
+    makeLocationLinks $ Map.fromList $ concatMap splitDecl decls
 
-  locationLinksFromFuncDefns :: Map Text (Range -> J.LocationLink)
+  locationLinksFromFuncDefns :: Map Name (Range -> J.LocationLink)
   locationLinksFromFuncDefns =
-    Map.fromList $ mapMaybe declToLocationLink $ Map.toList funcDefns
+    makeLocationLinks funcDefns
 
-  locationLinksFromTypeDefns :: Map Text (Range -> J.LocationLink)
+  locationLinksFromTypeDefns :: Map Name (Range -> J.LocationLink)
   locationLinksFromTypeDefns =
-    Map.fromList $ mapMaybe declToLocationLink $ Map.toList typeDefns
-
+    makeLocationLinks typeDefns
 
   -- split a parallel declaration into many simpler declarations
   splitDecl :: Declaration -> [(Name, Declaration)]
   splitDecl decl@(ConstDecl names _ _ _) = [ (name, decl) | name <- names ]
   splitDecl decl@(VarDecl   names _ _ _) = [ (name, decl) | name <- names ]
 
-  -- convert a declaration (and its name) to a LocationLink (that is waiting for the caller's Range)
-  declToLocationLink
-    :: Located a => (Name, a) -> Maybe (Text, Range -> J.LocationLink)
-  declToLocationLink (name, x) = do
-    targetRange    <- fromLoc (locOf x)
-    targetSelRange <- fromLoc (locOf name)
-    let targetUri = J.filePathToUri (rangeFile targetRange)
+--  Helper function for converting 
+--      a Map of "names" and "targets" 
+--   to a Map of "names" and functions 
+--        (which will become LocationLinks when supplied with the range of "origin")
+--
+--  For example: 
+--
+--    ╔═════ where the user clicks ════╗
+--    ║                                ║
+--    ║             double 3           ║
+--    ║  origin ──▶ ~~~~~~             ║
+--    ║                                ║
+--    ╚════════════════════════════════╝
+--
+--    ╔═══════ where it leads to ══════╗
+--    ║                                ║
+--    ║             double x = x * 2   ║
+--    ║    name ──▶ ~~~~~~             ║
+--    ║  target ──▶ ~~~~~~~~~~~~~~~~   ║
+--    ║                                ║
+--    ╚════════════════════════════════╝
 
-    let text      = nameToText name
-    let toLocationLink callerRange = J.LocationLink
-          (Just $ SrcLoc.toLSPRange callerRange)
-          targetUri
-          (SrcLoc.toLSPRange targetRange)
-          (SrcLoc.toLSPRange targetSelRange)
+makeLocationLinks
+  :: Located a => Map Name a -> Map Name (Range -> J.LocationLink)
+makeLocationLinks = Map.mapMaybeWithKey $ \name target -> do
+  targetRange    <- fromLoc (locOf target)
+  targetSelectionRange <- fromLoc (locOf name)
+  let toLocationLink originSelectionRange = J.LocationLink
+        { -- Span of the origin of this link.
+          -- Used as the underlined span for mouse interaction. Defaults to the word
+          -- range at the mouse position.
+          J._originSelectionRange = Just $ SrcLoc.toLSPRange originSelectionRange
+          -- The target resource identifier of this link.
+        , J._targetUri            = J.filePathToUri (rangeFile targetRange)
+          -- The full target range of this link. If the target for example is a
+          -- symbol then target range is the range enclosing this symbol not including
+          -- leading/trailing whitespace but everything else like comments. This
+          -- information is typically used to highlight the range in the editor.
+        , J._targetRange          = SrcLoc.toLSPRange targetRange
+          -- The range that should be selected and revealed when this link is being
+          -- followed, e.g the name of a function. Must be contained by the the
+          -- '_targetRange'
+        , J._targetSelectionRange = SrcLoc.toLSPRange targetSelectionRange
+        }
+  return toLocationLink
 
-    return (text, toLocationLink)
-
-
-  -- | See if a name is in a series of scopes (from local to global)
-  -- | Return the first result (which should be the most local target)
+-- | See if a name is in a series of scopes (from local to global)
+-- | Return the first result (which should be the most local target)
 lookupScopes :: Text -> M (Maybe Target)
 lookupScopes name = asks lookupScopesPrim
  where
@@ -173,28 +202,17 @@ lookupScopes name = asks lookupScopesPrim
 
 localScope :: [Name] -> M a -> M a
 localScope = pushScope . scopeFromLocalBinders
-  where 
-    pushScope :: Scope Target -> M a -> M a
-    pushScope scope = local (scope :)
+ where
+  pushScope :: Scope Target -> M a -> M a
+  pushScope scope = local (scope :)
 
-    scopeFromLocalBinders :: [Name] -> Scope Target
-    scopeFromLocalBinders names = Map.map (`addLocationLinkToTarget` emptyTarget) $ Map.fromList $ mapMaybe fromName names
-      where
-        -- convert a declaration (and its name) to a LocationLink (that is waiting for the caller's Range)
-        fromName ::  Name -> Maybe (Text, Range -> J.LocationLink)
-        fromName name = do
-          targetRange    <- fromLoc (locOf name)
-          let targetUri = J.filePathToUri (rangeFile targetRange)
-
-          let text      = nameToText name
-          let toLocationLink callerRange = J.LocationLink
-                (Just $ SrcLoc.toLSPRange callerRange)
-                targetUri
-                (SrcLoc.toLSPRange targetRange)
-                (SrcLoc.toLSPRange targetRange)
-
-          return (text, toLocationLink)
-
+  scopeFromLocalBinders :: [Name] -> Scope Target
+  scopeFromLocalBinders names =
+    Map.map (`addLocationLinkToTarget` emptyTarget)
+      $ Map.mapKeys nameToText
+      $ makeLocationLinks
+      $ Map.fromList
+      $ zip names names
 
 --------------------------------------------------------------------------------
 
@@ -290,12 +308,12 @@ instance Collect GdCmd where
 
 instance Collect Expr where
   collect = \case
-    Lit   _ _            -> return ()
-    Var   a _            -> collect a
-    Const a _            -> collect a
-    Op op                -> collect op
-    App a b _            -> (<>) <$> collect a <*> collect b
-    Lam _ b _            -> collect b
+    Lit   _ _           -> return ()
+    Var   a _           -> collect a
+    Const a _           -> collect a
+    Op op               -> collect op
+    App a b _           -> (<>) <$> collect a <*> collect b
+    Lam _ b _           -> collect b
     Quant op args c d _ -> do
       collect op
       localScope args $ do
@@ -341,11 +359,11 @@ instance Collect QuantOp' where
 
 instance Collect Type where
   collect = \case
-    TBase _ _ -> return ()
-    TArray i x _ -> collect i  >> collect x
-    TFunc x y _ -> collect x >> collect y
-    TCon x _ _ -> collect x
-    TVar _ _ -> return ()
+    TBase _ _    -> return ()
+    TArray i x _ -> collect i >> collect x
+    TFunc  x y _ -> collect x >> collect y
+    TCon   x _ _ -> collect x
+    TVar _ _     -> return ()
 
 instance Collect Interval where
   collect (Interval x y _) = collect x >> collect y
