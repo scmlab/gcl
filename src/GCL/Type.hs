@@ -280,9 +280,6 @@ checkType env t@(TCon  n  _  _) = do
         (Map.lookup n (envTypeDefns env))
 checkType _ (TVar _ _) = return ()
 
-checkExpr :: Environment -> Expr -> TM ()
-checkExpr env expr = void $ inferExpr env expr
-
 checkGdCmd :: Environment -> GdCmd -> TM ()
 checkGdCmd env (GdCmd expr stmts _) = do
   checkPredicate env expr
@@ -302,12 +299,12 @@ checkStmt env (Assign ns es loc)
   | otherwise
   = forM_ (zip ns es) (checkAssign env)
 checkStmt env (AAssign x i e _) = do
-  tx <- inferExpr env x
-  case tx of
-    TArray _ t _ -> do
-      checkIsType env i (tInt NoLoc)
-      checkIsType env e t
-    _ -> throwError $ NotArray tx (locOf x)
+  checkIsType env i (tInt NoLoc)
+  te <- inferExpr env e
+  checkIsType
+    env
+    x
+    (TArray (Interval (Including i) (Including i) (locOf i)) te (locOf x))
 checkStmt env (Assert expr _) = do
   checkPredicate env expr
 checkStmt env (LoopInvariant e1 e2 _) = do
@@ -317,17 +314,14 @@ checkStmt env (Do    gdcmds _) = mapM_ (checkGdCmd env) gdcmds
 checkStmt env (If    gdcmds _) = mapM_ (checkGdCmd env) gdcmds
 checkStmt _   (Spec  _      _) = return ()
 checkStmt _   (Proof _      _) = return ()
-checkStmt env (Alloc x es l  ) = case Map.lookup x (envLocalDefns env) of
-  Nothing             -> throwError $ NotInScope x (locOf x)
-  Just (TBase TInt _) -> mapM_ (\e -> checkIsType env e (tInt NoLoc)) es
-  Just t              -> throwError (UnifyFailed t (tInt NoLoc) l)
-checkStmt env (HLookup x e l) = case Map.lookup x (envLocalDefns env) of
-  Nothing             -> throwError $ NotInScope x (locOf x)
-  Just (TBase TInt _) -> checkIsType env e (tInt NoLoc)
-  Just t              -> throwError (UnifyFailed t (tInt NoLoc) l)
+checkStmt env (Alloc x es _  ) = case Map.lookup x (envLocalDefns env) of
+  Nothing -> throwError $ NotInScope x (locOf x)
+  Just t  -> mapM_ (\e -> checkIsType env e t) es
+checkStmt env (HLookup x e _) = case Map.lookup x (envLocalDefns env) of
+  Nothing -> throwError $ NotInScope x (locOf x)
+  Just t  -> checkIsType env e t
 checkStmt env (HMutate e1 e2 _) = do
-  checkIsType env e1 (tInt NoLoc)
-  checkIsType env e2 (tInt NoLoc)
+  inferExpr env e1 >>= checkIsType env e2
 checkStmt env (Dispose e _) = checkIsType env e (tInt NoLoc)
 checkStmt env (Block   p _) = checkProg env p
 
@@ -377,7 +371,7 @@ checkProg env (Program defns decls props stmts _) = do
   mapM_ (checkIsVarAssign decls) stmts
   env' <- extendEnv env =<< defnsAndDeclsToEnv defns decls
   checkEnvironment env'
-  mapM_ (checkExpr env') props
+  mapM_ (inferExpr env') props
   mapM_ (checkStmt env') stmts
 
 defnsAndDeclsToEnv :: Definitions -> [Declaration] -> TM Environment

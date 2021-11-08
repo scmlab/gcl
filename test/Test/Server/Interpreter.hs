@@ -21,8 +21,7 @@ import           Error                          ( Error )
 import           Language.LSP.Types             ( Diagnostic )
 import           Pretty
 import           Server.DSL
-import           Server.Stab                    ( collect )
-
+import Server.Handler.Diagnostic (collect)
 --------------------------------------------------------------------------------
 
 data TestResult a = TestResult

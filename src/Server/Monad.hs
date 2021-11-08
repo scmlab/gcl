@@ -48,8 +48,8 @@ import           Server.DSL                     ( Cmd(..)
                                                 , runCmdM
                                                 )
 import qualified Server.DSL                    as DSL
-import qualified Server.SrcLoc as SrcLoc
-import Server.Handler.Diagnostic (collect)
+import           Server.Handler.Diagnostic      ( collect )
+import qualified Server.SrcLoc                 as SrcLoc
 
 --------------------------------------------------------------------------------
 

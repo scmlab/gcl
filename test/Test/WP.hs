@@ -25,7 +25,7 @@ run = runGoldenTest "./test/source/WP/" "./test/golden/WP/" "" $ \sourcePath sou
     serializeTestResult $
       runTest sourcePath source $ do
         program <- parseProgram source
-        cache <- sweep program
+        cache <- uncurry sweep program
         return (Right (cachePOs cache))
     
 -- | Expression
