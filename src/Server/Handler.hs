@@ -8,7 +8,6 @@ module Server.Handler
   ) where
 
 import           Control.Lens                   ( (^.) )
-import           Control.Monad.Except
 import qualified Data.Aeson                    as JSON
 import qualified Data.Text                     as Text
 import           Language.LSP.Server            ( Handlers
@@ -41,24 +40,29 @@ handlers = mconcat
     let params = req ^. J.params
     CustomMethod.handler params (responder . Right . JSON.toJSON)
   , notificationHandler J.STextDocumentDidChange $ \ntf -> do
-    m <- getMute
-    logText $ " --> TextDocumentDidChange (muted: " <> Text.pack (show m) <> ")"
-    unless m $ do
-      let uri    = ntf ^. (J.params . J.textDocument . J.uri)
-      let change = ntf ^. (J.params . J.contentChanges)
+    let uri    = ntf ^. (J.params . J.textDocument . J.uri)
+    let change = ntf ^. (J.params . J.contentChanges)
+    interpret uri (notificationResponder uri) $ do
+      muted <- isMuted
+      logText
+        $  " --> TextDocumentDidChange (muted: "
+        <> Text.pack (show muted)
+        <> ")"
       logText $ Text.pack $ " --> " <> show change
-      interpret uri (notificationResponder uri) $ do
-        source               <- getSource
-        (concrete, abstract) <- parseProgram source
-        typeCheck abstract
-        result <- sweep concrete abstract
-        cacheResult (Right result)
-        generateResponseAndDiagnosticsFromResult (Right result)
+      if muted
+        then return []
+        else do
+          source               <- getSource
+          (concrete, abstract) <- parseProgram source
+          typeCheck abstract
+          result <- sweep concrete abstract
+          cacheResult (Right result)
+          generateResponseAndDiagnosticsFromResult (Right result)
   , notificationHandler J.STextDocumentDidOpen $ \ntf -> do
-    logText " --> TextDocumentDidOpen"
     let uri    = ntf ^. (J.params . J.textDocument . J.uri)
     let source = ntf ^. (J.params . J.textDocument . J.text)
     interpret uri (notificationResponder uri) $ do
+      logText " --> TextDocumentDidOpen"
       (concrete, abstract) <- parseProgram source
       typeCheck abstract
       result <- sweep concrete abstract
@@ -66,20 +70,18 @@ handlers = mconcat
       generateResponseAndDiagnosticsFromResult (Right result)
   , -- Goto Definition
     requestHandler J.STextDocumentDefinition $ \req responder -> do
-    logText "<-- Goto Definition"
     let uri = req ^. (J.params . J.textDocument . J.uri)
     let pos = req ^. (J.params . J.position)
     Definition.handler uri pos (responder . Right . J.InR . J.InR . J.List)
   , -- Hover
     requestHandler J.STextDocumentHover $ \req responder -> do
-    logText "<-- Hover"
     let uri = req ^. (J.params . J.textDocument . J.uri)
     let pos = req ^. (J.params . J.position)
     Hover.handler uri pos (responder . Right)
   , requestHandler J.STextDocumentSemanticTokensFull $ \req responder -> do
-    logText "<-- Syntax Highlighting"
     let uri = req ^. (J.params . J.textDocument . J.uri)
     interpret uri (responder . ignoreErrors) $ do
+      logText "<-- Syntax Highlighting"
       result <- readCachedResult
       let highlightings = toList $ case result of
             Nothing            -> mempty

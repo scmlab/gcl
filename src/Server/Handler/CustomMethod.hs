@@ -85,7 +85,7 @@ handleSubst i = do
   case result of
     Just (Left  _error) -> return []
     Just (Right cache ) -> do
-      logM $ Text.pack $ "Substituting Redex " <> show i
+      logText $ Text.pack $ "Substituting Redex " <> show i
       -- 
       case IntMap.lookup i (cacheRedexes cache) of
         Nothing    -> return []
@@ -116,11 +116,11 @@ handler params responder = do
     -- JSON Value => Request => Response
   case JSON.fromJSON params of
     JSON.Error msg -> do
-      logText
-        $  " --> CustomMethod: CannotDecodeRequest "
-        <> Text.pack (show msg)
-        <> " "
-        <> Text.pack (show params)
+      -- logText
+      --   $  " --> CustomMethod: CannotDecodeRequest "
+      --   <> Text.pack (show msg)
+      --   <> " "
+      --   <> Text.pack (show params)
       responder $ CannotDecodeRequest $ show msg ++ "\n" ++ show params
     JSON.Success requests -> handleRequests requests
  where
@@ -130,9 +130,10 @@ handler params responder = do
 
   handleRequest :: Request -> ServerM ()
   handleRequest request@(Req filepath kind) = do
-    logText $ " --> Custom Reqeust: " <> Text.pack (show request)
     -- convert Request to Response
     interpret (J.filePathToUri filepath)
               (customRequestResponder filepath responder)
-              (handleCustomMethod kind)
+      $ do
+          logText $ " --> Custom Reqeust: " <> Text.pack (show request)
+          handleCustomMethod kind
 

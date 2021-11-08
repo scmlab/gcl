@@ -7,11 +7,9 @@ module Server.Monad
   , GlobalEnv(globalChan)
   , initGlobalEnv
   , runServerM
-  , logText
   , customRequestResponder
   , notificationResponder
   , interpret
-  , getMute
   ) where
 
 import           Control.Concurrent             ( Chan
@@ -195,6 +193,9 @@ interpret uri responder p = case J.uriToFilePath uri of
     Right (Free (SetMute b next)) -> do
       setMute b
       interpret uri responder next
+    Right (Free (GetMute next)) -> do
+      m <- getMute
+      interpret uri responder (next m)
     Right (Free (GetFilePath next)) -> interpret uri responder (next filepath)
     Right (Free (GetSource   next)) -> do
       result <- fmap J.virtualFileText

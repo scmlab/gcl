@@ -24,6 +24,7 @@ handler uri position responder = do
     Nothing       -> return ()
     Just filepath -> do
       interpret uri (responder . ignoreErrors) $ do
+        logText "<-- Goto Definition"
         source <- getSource
 
         result <- readCachedResult

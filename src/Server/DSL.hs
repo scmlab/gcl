@@ -34,6 +34,7 @@ import           Pretty                         ( Pretty(pretty)
 import           Render
 import           Server.CustomMethod
 import           Server.Handler.Diagnostic      ( Collect(collect) )
+import           Server.Highlighting            ( collectHighlighting )
 import           Server.TokenMap
 import qualified Syntax.Abstract               as A
 import           Syntax.Concrete                ( ToAbstract(toAbstract) )
@@ -43,7 +44,6 @@ import           Syntax.Parser                  ( Parser
                                                 , pStmts
                                                 , runParse
                                                 )
-import Server.Highlighting (collectHighlighting)
 
 --------------------------------------------------------------------------------
 
@@ -88,6 +88,7 @@ data Cmd next
   | SetMute
       Bool
       next
+  | GetMute (Bool -> next)
 
   | GetFilePath (FilePath -> next)
 
@@ -121,6 +122,9 @@ editText range text = liftF (EditText range text id)
 mute :: Bool -> CmdM ()
 mute b = liftF (SetMute b ())
 
+isMuted :: CmdM Bool
+isMuted = liftF (GetMute id)
+
 getFilePath :: CmdM FilePath
 getFilePath = liftF (GetFilePath id)
 
@@ -139,15 +143,15 @@ cacheResult result = liftF (SetCacheResult result ())
 readCachedResult :: CmdM (Maybe Result)
 readCachedResult = liftF (GetCachedResult id)
 
-logM :: Text -> CmdM ()
-logM text = liftF (Log text ())
+logText :: Text -> CmdM ()
+logText text = liftF (Log text ())
 
 bumpVersion :: CmdM Int
 bumpVersion = liftF (BumpResponseVersion id)
 
 sendDiagnostics :: [J.Diagnostic] -> CmdM ()
 sendDiagnostics xs = do
-  logM $ " ### Diagnostic " <> toText (length xs)
+  logText $ " ### Diagnostic " <> toText (length xs)
   liftF (SendDiagnostics xs ())
 
 ------------------------------------------------------------------------------
@@ -156,7 +160,7 @@ sendDiagnostics xs = do
 -- and returns the modified source and the difference of source length
 digHole :: Range -> CmdM Text
 digHole range = do
-  logM $ " ### DigHole " <> toText range
+  logText $ " ### DigHole " <> toText range
   let indent   = Text.replicate (posCol (rangeStart range) - 1) " "
   let holeText = "[!\n" <> indent <> "\n" <> indent <> "!]"
   editText range holeText

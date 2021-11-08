@@ -82,6 +82,8 @@ interpret filepath p = case runCmdM p of
     interpret filepath (next newSource)
   Right (Free (SetMute _ next)) -> do
     interpret filepath next
+  Right (Free (GetMute next)) -> do
+    interpret filepath (next False)
   Right (Free (GetFilePath next)) -> do
     interpret filepath (next filepath)
   Right (Free (GetSource next)) -> do
