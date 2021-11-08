@@ -56,8 +56,8 @@ handlers = mconcat
           (concrete, abstract) <- parseProgram source
           typeCheck abstract
           result <- sweep concrete abstract
-          cacheResult (Right result)
-          generateResponseAndDiagnosticsFromResult (Right result)
+          cacheCurrentStage (FinalStage result)
+          generateResponseAndDiagnosticsFromCurrentStage (FinalStage result)
   , notificationHandler J.STextDocumentDidOpen $ \ntf -> do
     let uri    = ntf ^. (J.params . J.textDocument . J.uri)
     let source = ntf ^. (J.params . J.textDocument . J.text)
@@ -66,8 +66,8 @@ handlers = mconcat
       (concrete, abstract) <- parseProgram source
       typeCheck abstract
       result <- sweep concrete abstract
-      cacheResult (Right result)
-      generateResponseAndDiagnosticsFromResult (Right result)
+      cacheCurrentStage (FinalStage result)
+      generateResponseAndDiagnosticsFromCurrentStage (FinalStage result)
   , -- Goto Definition
     requestHandler J.STextDocumentDefinition $ \req responder -> do
     let uri = req ^. (J.params . J.textDocument . J.uri)
@@ -82,11 +82,10 @@ handlers = mconcat
     let uri = req ^. (J.params . J.textDocument . J.uri)
     interpret uri (responder . ignoreErrors) $ do
       logText "<-- Syntax Highlighting"
-      result <- readCachedResult
+      result <- readCurrentStage
       let highlightings = toList $ case result of
-            Nothing            -> mempty
-            Just (Left  _    ) -> mempty
-            Just (Right cache) -> cacheHighlighings cache
+            FirstStage _     -> mempty
+            FinalStage cache -> cacheHighlighings cache
       let legend = J.SemanticTokensLegend
             (J.List J.knownSemanticTokenTypes)
             (J.List J.knownSemanticTokenModifiers)

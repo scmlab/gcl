@@ -75,7 +75,9 @@ instance Pretty Cache where
            ]
       <> " }"
 
-type Result = Either [Error] Cache
+data Stage =
+    FirstStage [Error]
+  | FinalStage Cache
 
 -- The "Syntax" of the DSL for handling LSP requests and responses
 data Cmd next
@@ -103,10 +105,10 @@ data Cmd next
   -- | Each Response has a different ID, bump the counter of that ID
   | BumpResponseVersion (Int -> next)
   | Log Text next
-  -- | Store the computed result 
-  | SetCacheResult Result next
-  -- | Read the computed result 
-  | GetCachedResult (Maybe Result -> next)
+  -- | Store current stage 
+  | SetCurrentStage Stage next
+  -- | Read current stage 
+  | GetCurrentStage (Stage -> next)
   -- | SendDiagnostics from the LSP protocol 
   | SendDiagnostics [J.Diagnostic] next
   deriving (Functor)
@@ -137,11 +139,11 @@ setLastSelection selection = liftF (SetLastSelection selection ())
 getLastSelection :: CmdM (Maybe Range)
 getLastSelection = liftF (GetLastSelection id)
 
-cacheResult :: Result -> CmdM ()
-cacheResult result = liftF (SetCacheResult result ())
+cacheCurrentStage :: Stage -> CmdM ()
+cacheCurrentStage result = liftF (SetCurrentStage result ())
 
-readCachedResult :: CmdM (Maybe Result)
-readCachedResult = liftF (GetCachedResult id)
+readCurrentStage :: CmdM Stage
+readCurrentStage = liftF (GetCurrentStage id)
 
 logText :: Text -> CmdM ()
 logText text = liftF (Log text ())
@@ -228,9 +230,10 @@ parseProgram source = do
 
 --------------------------------------------------------------------------------
 
-generateResponseAndDiagnosticsFromResult :: Result -> CmdM [ResKind]
-generateResponseAndDiagnosticsFromResult (Left  errors) = throwError errors
-generateResponseAndDiagnosticsFromResult (Right cache ) = do
+generateResponseAndDiagnosticsFromCurrentStage :: Stage -> CmdM [ResKind]
+generateResponseAndDiagnosticsFromCurrentStage (FirstStage errors) =
+  throwError errors
+generateResponseAndDiagnosticsFromCurrentStage (FinalStage cache) = do
   let (Cache _ _ _ pos specs globalProps warnings _redexes _) = cache
 
   -- get Specs around the mouse selection

@@ -27,11 +27,10 @@ handler uri position responder = do
         logText "<-- Goto Definition"
         source <- getSource
 
-        result <- readCachedResult
+        result <- readCurrentStage
         let infos = case result of
-              Nothing            -> mempty
-              Just (Left  _    ) -> mempty
-              Just (Right cache) -> cacheTokenMap cache
+              FirstStage _     -> mempty
+              FinalStage cache -> cacheTokenMap cache
         let table = SrcLoc.makeToOffset source
         let pos   = SrcLoc.fromLSPPosition table filepath position
 

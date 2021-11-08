@@ -28,10 +28,8 @@ import qualified Language.LSP.Types            as J
 handleInspect :: Range -> CmdM [ResKind]
 handleInspect range = do
   setLastSelection range
-  result <- readCachedResult
-  case result of
-    Just v  -> generateResponseAndDiagnosticsFromResult v
-    Nothing -> return []
+  stage <- readCurrentStage
+  generateResponseAndDiagnosticsFromCurrentStage stage
 
 handleRefine :: Range -> CmdM [ResKind]
 handleRefine range = do
@@ -54,8 +52,8 @@ handleRefine range = do
   typeCheck abstract
   mute False
   result <- sweep concrete abstract
-  cacheResult (Right result)
-  generateResponseAndDiagnosticsFromResult (Right result)
+  cacheCurrentStage (FinalStage result)
+  generateResponseAndDiagnosticsFromCurrentStage (FinalStage result)
 
 handleInsertAnchor :: Text -> CmdM [ResKind]
 handleInsertAnchor hash = do
@@ -76,15 +74,15 @@ handleInsertAnchor hash = do
   typeCheck abstract'
   mute False
   result <- sweep concrete' abstract'
-  cacheResult (Right result)
-  generateResponseAndDiagnosticsFromResult (Right result)
+  cacheCurrentStage (FinalStage result)
+  generateResponseAndDiagnosticsFromCurrentStage (FinalStage result)
 
 handleSubst :: Int -> CmdM [ResKind]
 handleSubst i = do
-  result <- readCachedResult
+  result <- readCurrentStage
   case result of
-    Just (Left  _error) -> return []
-    Just (Right cache ) -> do
+    FirstStage _error -> return []
+    FinalStage cache  -> do
       logText $ Text.pack $ "Substituting Redex " <> show i
       -- 
       case IntMap.lookup i (cacheRedexes cache) of
@@ -99,9 +97,8 @@ handleSubst i = do
                 { cacheCounter = counter
                 , cacheRedexes = cacheRedexes cache <> redexesInNewExpr
                 }
-          cacheResult (Right newCache)
+          cacheCurrentStage (FinalStage newCache)
           return [ResSubstitute i (render newExpr)]
-    Nothing -> return []
 
 handleCustomMethod :: ReqKind -> CmdM [ResKind]
 handleCustomMethod = \case

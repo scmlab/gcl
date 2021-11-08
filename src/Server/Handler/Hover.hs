@@ -12,7 +12,7 @@ import           Server.Monad
 import           Language.LSP.Types      hiding ( Range )
 import           Server.DSL
 import qualified Server.SrcLoc                 as SrcLoc
-import           Server.TokenMap       ( Token(tokenHoverAndType)
+import           Server.TokenMap                ( Token(tokenHoverAndType)
                                                 , lookupIntervalMap
                                                 )
 
@@ -27,11 +27,10 @@ handler uri position responder = case uriToFilePath uri of
     interpret uri (responder . ignoreErrors) $ do
       logText "<-- Hover"
       source <- getSource
-      result <- readCachedResult
+      result <- readCurrentStage
       let infos = case result of
-            Nothing            -> mempty
-            Just (Left  _    ) -> mempty
-            Just (Right cache) -> cacheTokenMap cache
+            FirstStage _     -> mempty
+            FinalStage cache -> cacheTokenMap cache
       let table = SrcLoc.makeToOffset source
       let pos   = SrcLoc.fromLSPPosition table filepath position
 
