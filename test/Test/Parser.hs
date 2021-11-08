@@ -19,6 +19,8 @@ import           Test.Util                      ( parseTest
                                                 , removeTrailingWhitespace
                                                 , runGoldenTest
                                                 )
+import qualified Text.Megaparsec.Char.Lexer    as Lex
+import           Syntax.Parser.Util
 
 tests :: TestTree
 tests = testGroup
