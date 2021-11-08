@@ -23,7 +23,7 @@ handler uri position responder = do
   case uriToFilePath uri of
     Nothing       -> return ()
     Just filepath -> do
-      interpret filepath (responder . ignoreErrors) $ do
+      interpret uri (responder . ignoreErrors) $ do
         source <- getSource
 
         result <- readCachedResult

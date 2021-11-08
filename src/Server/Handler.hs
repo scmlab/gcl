@@ -47,29 +47,23 @@ handlers = mconcat
       let uri    = ntf ^. (J.params . J.textDocument . J.uri)
       let change = ntf ^. (J.params . J.contentChanges)
       logText $ Text.pack $ " --> " <> show change
-      case J.uriToFilePath uri of
-        Nothing       -> pure ()
-        Just filepath -> do
-          interpret filepath (notificationResponder filepath) $ do
-            source               <- getSource
-            (concrete, abstract) <- parseProgram source
-            typeCheck abstract
-            result <- sweep concrete abstract
-            cacheResult (Right result)
-            generateResponseAndDiagnosticsFromResult (Right result)
+      interpret uri (notificationResponder uri) $ do
+        source               <- getSource
+        (concrete, abstract) <- parseProgram source
+        typeCheck abstract
+        result <- sweep concrete abstract
+        cacheResult (Right result)
+        generateResponseAndDiagnosticsFromResult (Right result)
   , notificationHandler J.STextDocumentDidOpen $ \ntf -> do
     logText " --> TextDocumentDidOpen"
     let uri    = ntf ^. (J.params . J.textDocument . J.uri)
     let source = ntf ^. (J.params . J.textDocument . J.text)
-    case J.uriToFilePath uri of
-      Nothing       -> pure ()
-      Just filepath -> do
-        interpret filepath (notificationResponder filepath) $ do
-          (concrete, abstract) <- parseProgram source
-          typeCheck abstract
-          result <- sweep concrete abstract
-          cacheResult (Right result)
-          generateResponseAndDiagnosticsFromResult (Right result)
+    interpret uri (notificationResponder uri) $ do
+      (concrete, abstract) <- parseProgram source
+      typeCheck abstract
+      result <- sweep concrete abstract
+      cacheResult (Right result)
+      generateResponseAndDiagnosticsFromResult (Right result)
   , -- Goto Definition
     requestHandler J.STextDocumentDefinition $ \req responder -> do
     logText "<-- Goto Definition"
@@ -85,22 +79,19 @@ handlers = mconcat
   , requestHandler J.STextDocumentSemanticTokensFull $ \req responder -> do
     logText "<-- Syntax Highlighting"
     let uri = req ^. (J.params . J.textDocument . J.uri)
-    case J.uriToFilePath uri of
-      Nothing       -> return ()
-      Just filepath -> do
-        interpret filepath (responder . ignoreErrors) $ do
-          result <- readCachedResult
-          let highlightings = toList $ case result of
-                Nothing            -> mempty
-                Just (Left  _    ) -> mempty
-                Just (Right cache) -> cacheHighlighings cache
-          let legend = J.SemanticTokensLegend
-                (J.List J.knownSemanticTokenTypes)
-                (J.List J.knownSemanticTokenModifiers)
-          let tokens = J.makeSemanticTokens legend highlightings
-          case tokens of
-            Left t -> return $ Left $ J.ResponseError J.InternalError t Nothing
-            Right tokens' -> return $ Right $ Just tokens'
+    interpret uri (responder . ignoreErrors) $ do
+      result <- readCachedResult
+      let highlightings = toList $ case result of
+            Nothing            -> mempty
+            Just (Left  _    ) -> mempty
+            Just (Right cache) -> cacheHighlighings cache
+      let legend = J.SemanticTokensLegend
+            (J.List J.knownSemanticTokenTypes)
+            (J.List J.knownSemanticTokenModifiers)
+      let tokens = J.makeSemanticTokens legend highlightings
+      case tokens of
+        Left t -> return $ Left $ J.ResponseError J.InternalError t Nothing
+        Right tokens' -> return $ Right $ Just tokens'
   ]
 
 ignoreErrors

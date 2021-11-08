@@ -23,6 +23,8 @@ import           Syntax.Abstract                ( Redex(redexExpr) )
 import           Syntax.Abstract.Util           ( programToScopeForSubstitution
                                                 )
 
+import qualified Language.LSP.Types            as J
+
 handleInspect :: Range -> CmdM [ResKind]
 handleInspect range = do
   setLastSelection range
@@ -46,7 +48,7 @@ handleRefine range = do
           let indentation =
                 Text.replicate (posCol (rangeStart (specRange spec)) - 1) " "
           in  Text.unlines $ x : map (indentation <>) xs
-  source' <- editText (specRange spec) indentedPayload
+  source'              <- editText (specRange spec) indentedPayload
 
   (concrete, abstract) <- parseProgram source'
   typeCheck abstract
@@ -62,9 +64,9 @@ handleInsertAnchor hash = do
   -- template of proof to be appended to the source  
   let template = "{- #" <> hash <> "\n\n-}"
   -- range for appending the template of proof 
-  source  <- getSource
+  source        <- getSource
   (_, abstract) <- parseProgram source
-  range   <- case fromLoc (locOf abstract) of
+  range         <- case fromLoc (locOf abstract) of
     Nothing -> throwError [Others "Cannot read the range of the program"]
     Just x  -> return x
 
@@ -130,7 +132,7 @@ handler params responder = do
   handleRequest request@(Req filepath kind) = do
     logText $ " --> Custom Reqeust: " <> Text.pack (show request)
     -- convert Request to Response
-    interpret filepath
+    interpret (J.filePathToUri filepath)
               (customRequestResponder filepath responder)
               (handleCustomMethod kind)
 

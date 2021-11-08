@@ -24,7 +24,7 @@ handler :: Uri -> Position -> (Maybe Hover -> ServerM ()) -> ServerM ()
 handler uri position responder = case uriToFilePath uri of
   Nothing       -> return ()
   Just filepath -> do
-    interpret filepath (responder . ignoreErrors) $ do
+    interpret uri (responder . ignoreErrors) $ do
       source <- getSource
       result <- readCachedResult
       let infos = case result of
