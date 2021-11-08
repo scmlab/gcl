@@ -3,7 +3,7 @@
 module Server.Handler.CustomMethod where
 
 import           Control.Monad.Except           ( throwError )
-import           Control.Monad.State
+import           Control.Monad.State            ( runState )
 import qualified Data.Aeson                    as JSON
 import qualified Data.IntMap                   as IntMap
 import           Data.Loc                       ( Located(locOf)
@@ -28,8 +28,8 @@ import qualified Language.LSP.Types            as J
 handleInspect :: Range -> CmdM [ResKind]
 handleInspect range = do
   setLastSelection range
-  stage <- readCurrentStage
-  generateResponseAndDiagnosticsFromCurrentStage stage
+  stage <- readCurrentState
+  generateResponseAndDiagnosticsFromCurrentState stage
 
 handleRefine :: Range -> CmdM [ResKind]
 handleRefine range = do
@@ -51,9 +51,9 @@ handleRefine range = do
   (concrete, abstract) <- parseProgram source'
   typeCheck abstract
   mute False
-  result <- sweep concrete abstract
-  cacheCurrentStage (FinalStage result)
-  generateResponseAndDiagnosticsFromCurrentStage (FinalStage result)
+  state <- sweep concrete abstract
+  setCurrentState state
+  generateResponseAndDiagnosticsFromCurrentState state
 
 handleInsertAnchor :: Text -> CmdM [ResKind]
 handleInsertAnchor hash = do
@@ -73,32 +73,31 @@ handleInsertAnchor hash = do
   (concrete', abstract') <- parseProgram source'
   typeCheck abstract'
   mute False
-  result <- sweep concrete' abstract'
-  cacheCurrentStage (FinalStage result)
-  generateResponseAndDiagnosticsFromCurrentStage (FinalStage result)
+  state <- sweep concrete' abstract'
+  setCurrentState state
+  generateResponseAndDiagnosticsFromCurrentState state
 
 handleSubst :: Int -> CmdM [ResKind]
 handleSubst i = do
-  result <- readCurrentStage
-  case result of
-    FirstStage _error -> return []
-    FinalStage cache  -> do
-      logText $ Text.pack $ "Substituting Redex " <> show i
-      -- 
-      case IntMap.lookup i (cacheRedexes cache) of
-        Nothing    -> return []
-        Just redex -> do
-          let scope = programToScopeForSubstitution (cacheProgram cache)
-          let (newExpr, counter) = runState
-                (Substitution.step scope (redexExpr redex))
-                (cacheCounter cache)
-          let redexesInNewExpr = Substitution.buildRedexMap newExpr
-          let newCache = cache
-                { cacheCounter = counter
-                , cacheRedexes = cacheRedexes cache <> redexesInNewExpr
-                }
-          cacheCurrentStage (FinalStage newCache)
-          return [ResSubstitute i (render newExpr)]
+  state <- readCurrentState
+  logText $ Text.pack $ "Substituting Redex " <> show i
+  -- 
+  case stateProgram state of
+    Nothing      -> return []
+    Just program -> case IntMap.lookup i (stateRedexes state) of
+      Nothing    -> return []
+      Just redex -> do
+        let scope = programToScopeForSubstitution program
+        let (newExpr, counter) = runState
+              (Substitution.step scope (redexExpr redex))
+              (stateCounter state)
+        let redexesInNewExpr = Substitution.buildRedexMap newExpr
+        let newState = state
+              { stateCounter = counter
+              , stateRedexes = stateRedexes state <> redexesInNewExpr
+              }
+        setCurrentState newState
+        return [ResSubstitute i (render newExpr)]
 
 handleCustomMethod :: ReqKind -> CmdM [ResKind]
 handleCustomMethod = \case

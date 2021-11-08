@@ -15,8 +15,8 @@ import qualified Language.LSP.Types            as J
 import           Syntax.Common
 import           Syntax.Concrete
 
-collectHighlighting :: Program -> Map Range Highlighting
-collectHighlighting = collect 
+collectHighlighting :: Program -> [Highlighting]
+collectHighlighting = toList . collect 
 
 type Highlighting = J.SemanticTokenAbsolute
 

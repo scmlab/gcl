@@ -17,7 +17,6 @@ import           Language.LSP.Server            ( Handlers
 import           Server.DSL
 import           Server.Monad
 
-import           Data.Foldable                  ( toList )
 import           Error                          ( Error )
 import qualified Language.LSP.Types            as J
 import qualified Language.LSP.Types.Lens       as J
@@ -55,9 +54,9 @@ handlers = mconcat
           source               <- getSource
           (concrete, abstract) <- parseProgram source
           typeCheck abstract
-          result <- sweep concrete abstract
-          cacheCurrentStage (FinalStage result)
-          generateResponseAndDiagnosticsFromCurrentStage (FinalStage result)
+          state <- sweep concrete abstract
+          setCurrentState state
+          generateResponseAndDiagnosticsFromCurrentState state
   , notificationHandler J.STextDocumentDidOpen $ \ntf -> do
     let uri    = ntf ^. (J.params . J.textDocument . J.uri)
     let source = ntf ^. (J.params . J.textDocument . J.text)
@@ -65,9 +64,9 @@ handlers = mconcat
       logText " --> TextDocumentDidOpen"
       (concrete, abstract) <- parseProgram source
       typeCheck abstract
-      result <- sweep concrete abstract
-      cacheCurrentStage (FinalStage result)
-      generateResponseAndDiagnosticsFromCurrentStage (FinalStage result)
+      state <- sweep concrete abstract
+      setCurrentState state
+      generateResponseAndDiagnosticsFromCurrentState state
   , -- Goto Definition
     requestHandler J.STextDocumentDefinition $ \req responder -> do
     let uri = req ^. (J.params . J.textDocument . J.uri)
@@ -82,14 +81,11 @@ handlers = mconcat
     let uri = req ^. (J.params . J.textDocument . J.uri)
     interpret uri (responder . ignoreErrors) $ do
       logText "<-- Syntax Highlighting"
-      result <- readCurrentStage
-      let highlightings = toList $ case result of
-            FirstStage _     -> mempty
-            FinalStage cache -> cacheHighlighings cache
+      state <- readCurrentState
       let legend = J.SemanticTokensLegend
             (J.List J.knownSemanticTokenTypes)
             (J.List J.knownSemanticTokenModifiers)
-      let tokens = J.makeSemanticTokens legend highlightings
+      let tokens = J.makeSemanticTokens legend (stateHighlighings state)
       case tokens of
         Left t -> return $ Left $ J.ResponseError J.InternalError t Nothing
         Right tokens' -> return $ Right $ Just tokens'

@@ -18,9 +18,9 @@ import           GCL.Substitution               ( Scope
 import           Pretty
 import           Render.Class                   ( Render(render) )
 import           Render.Element                 ( Inlines(..) )
-import           Server.DSL                     ( Cache
-                                                  ( cacheCounter
-                                                  , cacheRedexes
+import           Server.DSL                     ( State
+                                                  ( stateCounter
+                                                  , stateRedexes
                                                   )
                                                 , parseProgram
                                                 , sweep
@@ -59,11 +59,11 @@ letBindings = testGroup
       $ \sourcePath source -> do
           return $ serializeTestResultValueOnly $ runTest sourcePath source $ do
             (cProgram, aProgram) <- parseProgram source
-            cache   <- sweep cProgram aProgram
+            state   <- sweep cProgram aProgram
             let scope = programToScopeForSubstitution aProgram
             let treesFromRedexes = evalState
-                  (mapM (fromRedex scope) (cacheRedexes cache))
-                  (cacheCounter cache)
+                  (mapM (fromRedex scope) (stateRedexes state))
+                  (stateCounter state)
             return (Right (VList $ toList treesFromRedexes))
 
 --------------------------------------------------------------------------------

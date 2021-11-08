@@ -27,15 +27,12 @@ handler uri position responder = case uriToFilePath uri of
     interpret uri (responder . ignoreErrors) $ do
       logText "<-- Hover"
       source <- getSource
-      result <- readCurrentStage
-      let infos = case result of
-            FirstStage _     -> mempty
-            FinalStage cache -> cacheTokenMap cache
+      state <- readCurrentState
       let table = SrcLoc.makeToOffset source
       let pos   = SrcLoc.fromLSPPosition table filepath position
 
 
       return $ do -- Maybe monad here 
-        info          <- lookupIntervalMap infos pos
+        info          <- lookupIntervalMap (stateTokenMap state) pos
         (hover, _typ) <- tokenHoverAndType info
         return hover

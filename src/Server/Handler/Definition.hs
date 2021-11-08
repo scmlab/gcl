@@ -27,13 +27,10 @@ handler uri position responder = do
         logText "<-- Goto Definition"
         source <- getSource
 
-        result <- readCurrentStage
-        let infos = case result of
-              FirstStage _     -> mempty
-              FinalStage cache -> cacheTokenMap cache
+        state <- readCurrentState
         let table = SrcLoc.makeToOffset source
         let pos   = SrcLoc.fromLSPPosition table filepath position
 
         return $ maybeToList $ do -- Maybe monad here 
-          info <- lookupIntervalMap infos pos
+          info <- lookupIntervalMap (stateTokenMap state) pos
           tokenLocationLink info

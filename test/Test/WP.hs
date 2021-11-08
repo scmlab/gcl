@@ -3,7 +3,7 @@
 module Test.WP where
 
 import Pretty ()
-import Server.DSL (parseProgram, sweep, Cache (cachePOs))
+import Server.DSL (parseProgram, sweep, State (statePOs))
 import Test.Server.Interpreter
 import Test.Util (runGoldenTest)
 import Test.Tasty (TestTree, testGroup)
@@ -25,8 +25,8 @@ run = runGoldenTest "./test/source/WP/" "./test/golden/WP/" "" $ \sourcePath sou
     serializeTestResult $
       runTest sourcePath source $ do
         program <- parseProgram source
-        cache <- uncurry sweep program
-        return (Right (cachePOs cache))
+        state <- uncurry sweep program
+        return (Right (statePOs state))
     
 -- | Expression
 statements :: TestTree

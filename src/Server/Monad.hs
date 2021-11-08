@@ -40,8 +40,8 @@ import           Render
 import           Server.CustomMethod
 import           Server.DSL                     ( Cmd(..)
                                                 , CmdM
-                                                , Stage(..)
-                                                , runCmdM
+                                                , State(..)
+                                                , runCmdM, emptyState
                                                 )
 import qualified Server.DSL                    as DSL
 import           Server.Handler.Diagnostic      ( collect )
@@ -62,7 +62,7 @@ data GlobalEnv = GlobalEnv
   ,
     -- 
     globalMute         :: IORef Bool
-  , globalCurrentStage :: IORef (Map FilePath Stage)
+  , globalCurrentState :: IORef (Map FilePath State)
   }
 
 -- | Constructs an initial global state
@@ -150,18 +150,18 @@ setMute b = do
   ref <- lift $ asks globalMute
   liftIO $ writeIORef ref b
 
-cacheCurrentStage :: FilePath -> Stage -> ServerM ()
-cacheCurrentStage filepath result = do
-  ref <- lift $ asks globalCurrentStage
+setCurrentState :: FilePath -> State -> ServerM ()
+setCurrentState filepath result = do
+  ref <- lift $ asks globalCurrentState
   liftIO $ modifyIORef' ref (Map.insert filepath result)
 
-readCurrentStage :: FilePath -> ServerM Stage
-readCurrentStage filepath = do
-  ref     <- lift $ asks globalCurrentStage
+readCurrentState :: FilePath -> ServerM State
+readCurrentState filepath = do
+  ref     <- lift $ asks globalCurrentState
   mapping <- liftIO $ readIORef ref
   case Map.lookup filepath mapping of
-    Nothing    -> return (FirstStage [])
-    Just stage -> return stage
+    Nothing    -> return emptyState
+    Just state -> return state
 
 --------------------------------------------------------------------------------
 
@@ -214,11 +214,11 @@ interpret uri responder p = case J.uriToFilePath uri of
       ref <- lift $ asks globalSelectionMap
       liftIO $ modifyIORef' ref (Map.insert filepath (Just selection))
       interpret uri responder next
-    Right (Free (GetCurrentStage next)) -> do
-      result <- readCurrentStage filepath
+    Right (Free (GetCurrentState next)) -> do
+      result <- readCurrentState filepath
       interpret uri responder (next result)
-    Right (Free (SetCurrentStage result next)) -> do
-      cacheCurrentStage filepath result
+    Right (Free (SetCurrentState result next)) -> do
+      setCurrentState filepath result
       interpret uri responder next
     Right (Free (BumpResponseVersion next)) -> do
       n <- bumpVersionM
@@ -232,6 +232,6 @@ interpret uri responder p = case J.uriToFilePath uri of
       interpret uri responder next
     Left errors -> do
       setMute False -- unmute on error!
-      cacheCurrentStage filepath (FirstStage errors)
+      setCurrentState filepath (emptyState { stateErrors = errors })
       logText $ Text.pack $ show errors
       responder (Left errors)
