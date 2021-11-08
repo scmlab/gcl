@@ -58,9 +58,9 @@ letBindings = testGroup
     runGoldenTest "./test/source/Substitution/" "./test/golden/Substitution/" ""
       $ \sourcePath source -> do
           return $ serializeTestResultValueOnly $ runTest sourcePath source $ do
-            program <- parseProgram source
-            cache   <- sweep program
-            let scope = programToScopeForSubstitution program
+            (cProgram, aProgram) <- parseProgram source
+            cache   <- sweep cProgram aProgram
+            let scope = programToScopeForSubstitution aProgram
             let treesFromRedexes = evalState
                   (mapM (fromRedex scope) (cacheRedexes cache))
                   (cacheCounter cache)
