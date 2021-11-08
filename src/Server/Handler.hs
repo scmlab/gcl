@@ -18,12 +18,13 @@ import           Language.LSP.Server            ( Handlers
 import           Server.DSL
 import           Server.Monad
 
+import           Data.Foldable                  ( toList )
+import           Error                          ( Error )
 import qualified Language.LSP.Types            as J
 import qualified Language.LSP.Types.Lens       as J
 import qualified Server.Handler.AutoCompletion as AutoCompletion
 import qualified Server.Handler.CustomMethod   as CustomMethod
 import qualified Server.Handler.Definition     as Definition
-import qualified Server.Handler.Highlighting   as Highlighting
 import qualified Server.Handler.Hover          as Hover
 
 -- handlers of the LSP server
@@ -50,7 +51,7 @@ handlers = mconcat
         Nothing       -> pure ()
         Just filepath -> do
           interpret filepath (notificationResponder filepath) $ do
-            source  <- getSource
+            source               <- getSource
             (concrete, abstract) <- parseProgram source
             typeCheck abstract
             result <- sweep concrete abstract
@@ -84,5 +85,26 @@ handlers = mconcat
   , requestHandler J.STextDocumentSemanticTokensFull $ \req responder -> do
     logText "<-- Syntax Highlighting"
     let uri = req ^. (J.params . J.textDocument . J.uri)
-    Highlighting.handler uri responder
+    case J.uriToFilePath uri of
+      Nothing       -> return ()
+      Just filepath -> do
+        interpret filepath (responder . ignoreErrors) $ do
+          result <- readCachedResult
+          let highlightings = toList $ case result of
+                Nothing            -> mempty
+                Just (Left  _    ) -> mempty
+                Just (Right cache) -> cacheHighlighings cache
+          let legend = J.SemanticTokensLegend
+                (J.List J.knownSemanticTokenTypes)
+                (J.List J.knownSemanticTokenModifiers)
+          let tokens = J.makeSemanticTokens legend highlightings
+          case tokens of
+            Left t -> return $ Left $ J.ResponseError J.InternalError t Nothing
+            Right tokens' -> return $ Right $ Just tokens'
   ]
+
+ignoreErrors
+  :: Either [Error] (Either J.ResponseError (Maybe J.SemanticTokens))
+  -> Either J.ResponseError (Maybe J.SemanticTokens)
+ignoreErrors (Left  _errors) = Right Nothing
+ignoreErrors (Right xs     ) = xs

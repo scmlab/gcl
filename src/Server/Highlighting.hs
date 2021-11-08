@@ -1,5 +1,5 @@
 {-# LANGUAGE LambdaCase #-}
-module Server.TokenMap.Concrete
+module Server.Highlighting
   ( Highlighting, collectHighlighting )
  where
 

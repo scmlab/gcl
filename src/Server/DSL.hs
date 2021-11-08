@@ -43,7 +43,7 @@ import           Syntax.Parser                  ( Parser
                                                 , pStmts
                                                 , runParse
                                                 )
-import Server.TokenMap.Concrete (collectHighlighting)
+import Server.Highlighting (collectHighlighting)
 
 --------------------------------------------------------------------------------
 
