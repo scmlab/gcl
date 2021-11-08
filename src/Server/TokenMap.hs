@@ -1,16 +1,16 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
-module Server.TokenMap.Abstract
-  ( Info(..)
-  , IntervalMap
+module Server.TokenMap
+  ( Token(..)
+  , TokenMap
   , lookupIntervalMap
-  , collectInfo
+  , collectTokenMap
   ) where
 
-import           Control.Monad.Reader
-import           Control.Monad.Writer
+import           Control.Monad.RWS
 import           Data.IntMap                    ( IntMap )
 import qualified Data.IntMap                   as IntMap
 import           Data.Loc                       ( Located
@@ -32,24 +32,24 @@ import qualified Server.SrcLoc                 as SrcLoc
 import           Syntax.Abstract
 import           Syntax.Common
 
-type IntervalMap a = IntMap (Int, a)
+newtype TokenMap = TokenMap (IntMap (Int, Token)) deriving (Monoid, Semigroup)
 
-lookupIntervalMap :: IntervalMap a -> Pos -> Maybe a
-lookupIntervalMap m pos =
+lookupIntervalMap :: TokenMap -> Pos -> Maybe Token
+lookupIntervalMap (TokenMap m) pos =
   let offset = posCoff pos
   in  case IntMap.lookupLE offset m of
         Nothing                 -> Nothing
         Just (_start, (end, x)) -> if offset <= end then Just x else Nothing
 
-collectInfo :: Program -> IntervalMap Info
-collectInfo program = runM program (collect program)
+collectTokenMap :: Program -> TokenMap
+collectTokenMap program = runM program (collect program)
 
 --------------------------------------------------------------------------------
 
 -- | Information we want to collect of a node of Abstract syntax  
-data Info = Info
-  { infoHoverAndType :: Maybe (J.Hover, Type)
-  , infoLocationLink :: Maybe J.LocationLink
+data Token = Token
+  { tokenHoverAndType :: Maybe (J.Hover, Type)
+  , tokenLocationLink :: Maybe J.LocationLink
   }
 
 data Target = Target
@@ -60,8 +60,8 @@ data Target = Target
 emptyTarget :: Target
 emptyTarget = Target Nothing Nothing
 
-instance Render Info where
-  render (Info _ _) = "Info"
+instance Render Token where
+  render (Token _ _) = "Token"
 
 addTypeToTarget :: Type -> Target -> Target
 addTypeToTarget t target = target { targetHoverAndType = Just (hover, t) }
@@ -75,30 +75,37 @@ addLocationLinkToTarget l target = target { targetLocationLinkToBe = Just l }
 addType :: Type -> M ()
 addType t = case fromLoc (locOf t) of
   Nothing    -> return ()
-  Just range -> tell $ IntMap.singleton
+  Just range -> tell $ TokenMap $ IntMap.singleton
     (posCoff (rangeStart range))
     ( posCoff (rangeEnd range)
-    , Info { infoHoverAndType = Just (hover, t), infoLocationLink = Nothing }
+    , Token { tokenHoverAndType = Just (hover, t), tokenLocationLink = Nothing }
     )
    where
     hover   = J.Hover content Nothing
     content = J.HoverContents $ J.markedUpContent "gcl" (toText t)
 
-fromTarget :: Range -> Target -> Info
-fromTarget range (Target hover linkToBe) = Info hover $ case linkToBe of
+fromTarget :: Range -> Target -> Token
+fromTarget range (Target hover linkToBe) = Token hover $ case linkToBe of
   Nothing -> Nothing
   Just f  -> Just (f range)
 
 --------------------------------------------------------------------------------
 
--- | A "Scope" is a mapping of names and LocationLinks
+-- | A mapping from names to something else
 type Scope a = Map Text a
 
-type M = WriterT (IntervalMap Info) (Reader [Scope Target])
+-- | Accumulates the result of `TokenMap` in writer 
+--   Stores stack of scopes in reader 
+type M = RWS [Scope Target] TokenMap ()
 
-runM :: Program -> M a -> IntervalMap Info
-runM (Program defns@(Definitions typeDefns _funcDefnSigs funcDefns) decls _ _ _) f
-  = runReader (execWriterT f) [topLevelScope]
+
+runM :: Program -> M a -> TokenMap
+runM program f = let (_, _, w) = runRWS f (programToScopes program) () in w
+
+-- | Extracts Scopes from a Program 
+programToScopes :: Program -> [Scope Target]
+programToScopes (Program defns@(Definitions typeDefns _funcDefnSigs funcDefns) decls _ _ _)
+  = [topLevelScope]
  where
   topLevelScope :: Map Text Target
   topLevelScope = Map.merge
@@ -111,6 +118,7 @@ runM (Program defns@(Definitions typeDefns _funcDefnSigs funcDefns) decls _ _ _)
     )
     types
     (Map.mapKeys nameToText locationLinks)
+
 
   types :: Map Text Type
   types =
@@ -130,12 +138,10 @@ runM (Program defns@(Definitions typeDefns _funcDefnSigs funcDefns) decls _ _ _)
     makeLocationLinks $ Map.fromList $ concatMap splitDecl decls
 
   locationLinksFromFuncDefns :: Map Name (Range -> J.LocationLink)
-  locationLinksFromFuncDefns =
-    makeLocationLinks funcDefns
+  locationLinksFromFuncDefns = makeLocationLinks funcDefns
 
   locationLinksFromTypeDefns :: Map Name (Range -> J.LocationLink)
-  locationLinksFromTypeDefns =
-    makeLocationLinks typeDefns
+  locationLinksFromTypeDefns = makeLocationLinks typeDefns
 
   -- split a parallel declaration into many simpler declarations
   splitDecl :: Declaration -> [(Name, Declaration)]
@@ -167,13 +173,14 @@ runM (Program defns@(Definitions typeDefns _funcDefnSigs funcDefns) decls _ _ _)
 makeLocationLinks
   :: Located a => Map Name a -> Map Name (Range -> J.LocationLink)
 makeLocationLinks = Map.mapMaybeWithKey $ \name target -> do
-  targetRange    <- fromLoc (locOf target)
+  targetRange          <- fromLoc (locOf target)
   targetSelectionRange <- fromLoc (locOf name)
   let toLocationLink originSelectionRange = J.LocationLink
         { -- Span of the origin of this link.
           -- Used as the underlined span for mouse interaction. Defaults to the word
           -- range at the mouse position.
-          J._originSelectionRange = Just $ SrcLoc.toLSPRange originSelectionRange
+          J._originSelectionRange = Just
+                                      $ SrcLoc.toLSPRange originSelectionRange
           -- The target resource identifier of this link.
         , J._targetUri            = J.filePathToUri (rangeFile targetRange)
           -- The full target range of this link. If the target for example is a
@@ -244,7 +251,7 @@ instance Collect Name where
       Nothing     -> return ()
       Just target -> case fromLoc (locOf name) of
         Nothing    -> return ()
-        Just range -> tell $ IntMap.singleton
+        Just range -> tell $ TokenMap $ IntMap.singleton
           (posCoff (rangeStart range))
           (posCoff (rangeEnd range), fromTarget range target)
 

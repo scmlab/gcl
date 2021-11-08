@@ -25,7 +25,7 @@ import           GCL.Predicate.Util             ( specPayloadWithoutIndentation
 import qualified GCL.Type                      as TypeChecking
 import qualified GCL.WP                        as WP
 import           GCL.WP.Type                    ( StructWarning )
-import           Language.LSP.Types             ( Diagnostic )
+import qualified Language.LSP.Types            as J
 import           Prelude                 hiding ( span )
 import           Pretty                         ( Pretty(pretty)
                                                 , toText
@@ -33,10 +33,8 @@ import           Pretty                         ( Pretty(pretty)
                                                 )
 import           Render
 import           Server.CustomMethod
-import           Server.TokenMap.Abstract
-import           Server.TokenMap.Concrete       ( Highlighting
-                                                , collectHighlighting
-                                                )
+import           Server.Handler.Diagnostic      ( Collect(collect) )
+import           Server.TokenMap
 import qualified Syntax.Abstract               as A
 import           Syntax.Concrete                ( ToAbstract(toAbstract) )
 import qualified Syntax.Concrete               as C
@@ -45,13 +43,13 @@ import           Syntax.Parser                  ( Parser
                                                 , pStmts
                                                 , runParse
                                                 )
-import Server.Handler.Diagnostic (Collect(collect))
+import Server.TokenMap.Concrete (collectHighlighting)
 
 --------------------------------------------------------------------------------
 
 data Cache = Cache
-  { cacheHighlighings :: Map Range Highlighting
-  , cacheInfos        :: IntervalMap Info
+  { cacheHighlighings :: Map Range J.SemanticTokenAbsolute
+  , cacheTokenMap     :: TokenMap
   , cacheProgram      :: A.Program
     -- Proof Obligations 
   , cachePOs          :: [PO]
@@ -109,7 +107,7 @@ data Cmd next
   -- | Read the computed result 
   | GetCachedResult (Maybe Result -> next)
   -- | SendDiagnostics from the LSP protocol 
-  | SendDiagnostics [Diagnostic] next
+  | SendDiagnostics [J.Diagnostic] next
   deriving (Functor)
 
 type CmdM = FreeT Cmd (Except [Error])
@@ -147,7 +145,7 @@ logM text = liftF (Log text ())
 bumpVersion :: CmdM Int
 bumpVersion = liftF (BumpResponseVersion id)
 
-sendDiagnostics :: [Diagnostic] -> CmdM ()
+sendDiagnostics :: [J.Diagnostic] -> CmdM ()
 sendDiagnostics xs = do
   logM $ " ### Diagnostic " <> toText (length xs)
   liftF (SendDiagnostics xs ())
@@ -195,9 +193,9 @@ sweep concrete abstract@(A.Program _ _ globalProps _ _) =
     Left  e -> throwError [StructError e]
     Right (pos, specs, warings, redexes, counter) -> do
       let highlighings = collectHighlighting concrete
-      let infos        = collectInfo abstract
+      let tokenMap     = collectTokenMap abstract
       return $ Cache { cacheHighlighings = highlighings
-                     , cacheInfos        = infos
+                     , cacheTokenMap     = tokenMap
                      , cacheProgram      = abstract
                      , cachePOs          = List.sort pos
                      , cacheSpecs        = sortOn locOf specs

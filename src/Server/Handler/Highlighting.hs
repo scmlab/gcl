@@ -2,14 +2,16 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleInstances #-}
 
-module Server.Handler.Highlighting where
+module Server.Handler.Highlighting
+  ( handler
+  ) where
 
-import qualified Language.LSP.Types            as J
+import           Error                          ( Error )
+import           Server.Monad
 
 import           Data.Foldable                  ( toList )
-import           Error                          ( Error )
-import           Server.DSL
-import           Server.Monad
+import qualified Language.LSP.Types            as J
+import Server.DSL
 
 ignoreErrors
   :: Either [Error] (Either J.ResponseError (Maybe J.SemanticTokens))

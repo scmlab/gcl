@@ -12,7 +12,7 @@ import           Server.Monad
 import           Language.LSP.Types      hiding ( Range )
 import           Server.DSL
 import qualified Server.SrcLoc                 as SrcLoc
-import           Server.TokenMap.Abstract       ( Info(infoHoverAndType)
+import           Server.TokenMap       ( Token(tokenHoverAndType)
                                                 , lookupIntervalMap
                                                 )
 
@@ -30,12 +30,12 @@ handler uri position responder = case uriToFilePath uri of
       let infos = case result of
             Nothing            -> mempty
             Just (Left  _    ) -> mempty
-            Just (Right cache) -> cacheInfos cache
+            Just (Right cache) -> cacheTokenMap cache
       let table = SrcLoc.makeToOffset source
       let pos   = SrcLoc.fromLSPPosition table filepath position
 
 
       return $ do -- Maybe monad here 
-        info <- lookupIntervalMap infos pos
-        (hover, _typ) <- infoHoverAndType info
+        info          <- lookupIntervalMap infos pos
+        (hover, _typ) <- tokenHoverAndType info
         return hover
