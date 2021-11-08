@@ -360,6 +360,10 @@ struct (inv, Nothing) (A.Do gcmds l) post = do
 struct _ (A.Proof _ _) _ = return ()
 -- TODO:
 struct _ A.Block{}     _ = return ()
+struct (pre, _) s@(A.Alloc _ _ l) post = tellPO' (AtAbort l) pre =<< wp s post
+struct (pre, _) s@(A.HLookup _ _ l) post = tellPO' (AtAbort l) pre =<< wp s post
+struct (pre, _) s@(A.HMutate _ _ l) post = tellPO' (AtAbort l) pre =<< wp s post
+struct (pre, _) s@(A.Dispose _ l) post = tellPO' (AtAbort l) pre =<< wp s post
 struct _ _             _ = error "missing case in struct"
 
 structGdcmdInduct :: Pred -> A.GdCmd -> WP ()
