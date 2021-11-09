@@ -51,10 +51,11 @@ handlers = mconcat
       if muted
         then return []
         else do
-          source               <- getSource
-          (concrete, abstract) <- parseProgram source
-          typeCheck abstract
-          result <- sweep concrete abstract
+          source    <- getSource
+          parsed    <- parse source
+          converted <- convert parsed
+          typeCheck (convertedProgram converted)
+          result <- sweep converted
           setCurrentStage (Swept result)
           generateResponseAndDiagnosticsFromCurrentState (Swept result)
   , notificationHandler J.STextDocumentDidOpen $ \ntf -> do
@@ -62,9 +63,10 @@ handlers = mconcat
     let source = ntf ^. (J.params . J.textDocument . J.text)
     interpret uri (notificationResponder uri) $ do
       logText " --> TextDocumentDidOpen"
-      (concrete, abstract) <- parseProgram source
-      typeCheck abstract
-      result <- sweep concrete abstract
+      parsed    <- parse source
+      converted <- convert parsed
+      typeCheck (convertedProgram converted)
+      result <- sweep converted
       setCurrentStage (Swept result)
       generateResponseAndDiagnosticsFromCurrentState (Swept result)
   , -- Goto Definition

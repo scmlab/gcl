@@ -37,8 +37,9 @@ instantiateSpec = testGroup
     runGoldenTest "./test/source/Server/" "./test/golden/Server/" ""
       $ \sourcePath source -> do
           return $ serializeTestResult $ runTest sourcePath source $ do
-            (concrete, abstract) <- parseProgram source
-            Right <$> sweep concrete abstract
+            parsed <- parse source
+            converted <- convert parsed
+            Right <$> sweep converted
 
 
 specPayloadWithoutIndentationTests :: TestTree
@@ -51,8 +52,9 @@ specPayloadWithoutIndentationTests = testGroup
     runGoldenTest "./test/source/Server/" "./test/golden/Server/" ""
       $ \sourcePath source -> do
           return $ serializeTestResult $ runTest sourcePath source $ do
-            (concrete, abstract) <- parseProgram source
-            result               <- sweep concrete abstract
+            parsed <- parse source
+            converted <- convert parsed
+            result <- sweep converted
             let specs = sweptSpecs result
             return $ Right $ map
               ( map (\x -> "\"" <> x <> "\"")
@@ -76,8 +78,9 @@ refineSpecsTest = testGroup
     runGoldenTest "./test/source/Server/" "./test/golden/Server/" ""
       $ \sourcePath source -> do
           return $ serializeTestResult $ runTest sourcePath source $ do
-            (concrete, abstract) <- parseProgram source
-            result                <- sweep concrete abstract
+            parsed <- parse source
+            converted <- convert parsed
+            result <- sweep converted
             let specs = sweptSpecs result
             case listToMaybe specs of
               Just spec -> do

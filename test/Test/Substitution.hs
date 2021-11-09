@@ -18,10 +18,7 @@ import           GCL.Substitution               ( Scope
 import           Pretty
 import           Render.Class                   ( Render(render) )
 import           Render.Element                 ( Inlines(..) )
-import           Server.DSL                     ( SweepResult(..)
-                                                , parseProgram
-                                                , sweep
-                                                )
+import           Server.DSL
 import           Syntax.Abstract.Types          ( Redex(..) )
 import           Syntax.Abstract.Util           ( programToScopeForSubstitution
                                                 )
@@ -55,9 +52,11 @@ letBindings = testGroup
     runGoldenTest "./test/source/Substitution/" "./test/golden/Substitution/" ""
       $ \sourcePath source -> do
           return $ serializeTestResultValueOnly $ runTest sourcePath source $ do
-            (cProgram, aProgram) <- parseProgram source
-            result                <- sweep cProgram aProgram
-            let scope = programToScopeForSubstitution aProgram
+            parsed    <- parse source
+            converted <- convert parsed
+            result    <- sweep converted
+            let scope =
+                  programToScopeForSubstitution (convertedProgram converted)
             let treesFromRedexes = evalState
                   (mapM (fromRedex scope) (sweptRedexes result))
                   (sweptCounter result)

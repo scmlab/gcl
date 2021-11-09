@@ -90,29 +90,21 @@ data SweepResult = SweepResult
   , sweptCounter       :: Int
   }
 
-sweep :: C.Program -> A.Program -> CmdM SweepResult
-sweep concrete abstract@(A.Program _ _ globalProps _ _) =
+sweep :: ConvertResult -> CmdM SweepResult
+sweep convertedResult = do
+  let abstract@(A.Program _ _ globalProps _ _) =
+        convertedProgram convertedResult
   case WP.sweep abstract of
     Left  e -> throwError [StructError e]
-    Right (pos, specs, warings, redexes, counter) -> do
-      let highlighings = collectHighlighting concrete
-      let tokenMap     = collectTokenMap abstract
-      let parseResult = ParseResult { parsedProgram      = concrete
-                                    , parsedHighlighings = highlighings
-                                    }
-      let convertedResult = ConvertResult
-            { convertedPreviousStage = parseResult
-            , convertedProgram       = abstract
-            , convertedTokenMap      = tokenMap
-            }
-      return $ SweepResult { sweptPreviousStage = convertedResult
-                           , sweptPOs           = List.sort pos
-                           , sweptSpecs         = sortOn locOf specs
-                           , sweptProps         = globalProps
-                           , sweptWarnings      = warings
-                           , sweptRedexes       = redexes
-                           , sweptCounter       = counter
-                           }
+    Right (pos, specs, warings, redexes, counter) -> return $ SweepResult
+      { sweptPreviousStage = convertedResult
+      , sweptPOs           = List.sort pos
+      , sweptSpecs         = sortOn locOf specs
+      , sweptProps         = globalProps
+      , sweptWarnings      = warings
+      , sweptRedexes       = redexes
+      , sweptCounter       = counter
+      }
 
 data Stage =
          Parsed ParseResult
@@ -246,8 +238,9 @@ refine source range = do
  where
   findPointedSpec :: CmdM (Maybe Spec)
   findPointedSpec = do
-    (concrete, abstract) <- parseProgram source
-    result               <- sweep concrete abstract
+    parsed    <- parse source
+    converted <- convert parsed
+    result    <- sweep converted
     let specs = sweptSpecs result
     return $ find (withinRange range) specs
 

@@ -47,11 +47,11 @@ handleRefine range = do
                 Text.replicate (posCol (rangeStart (specRange spec)) - 1) " "
           in  Text.unlines $ x : map (indentation <>) xs
   source'              <- editText (specRange spec) indentedPayload
-
-  (concrete, abstract) <- parseProgram source'
-  typeCheck abstract
+  parsed    <- parse source'
+  converted <- convert parsed
+  typeCheck (convertedProgram converted)
   mute False
-  result <- sweep concrete abstract
+  result <- sweep converted
   setCurrentStage (Swept result)
   generateResponseAndDiagnosticsFromCurrentState (Swept result)
 
@@ -70,10 +70,11 @@ handleInsertAnchor hash = do
 
   source' <- editText (Range (rangeEnd range) (rangeEnd range))
                       ("\n\n" <> template)
-  (concrete', abstract') <- parseProgram source'
-  typeCheck abstract'
+  parsed    <- parse source'
+  converted <- convert parsed
+  typeCheck (convertedProgram converted)
   mute False
-  result <- sweep concrete' abstract'
+  result <- sweep converted
   setCurrentStage (Swept result)
   generateResponseAndDiagnosticsFromCurrentState (Swept result)
 

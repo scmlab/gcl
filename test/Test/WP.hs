@@ -4,10 +4,7 @@ module Test.WP where
 
 import           Prelude                 hiding ( Ordering(..) )
 import           Pretty                         ( )
-import           Server.DSL                     ( SweepResult(..)
-                                                , parseProgram
-                                                , sweep
-                                                )
+import           Server.DSL
 import           Test.Server.Interpreter
 import           Test.Tasty                     ( TestTree
                                                 , testGroup
@@ -24,8 +21,9 @@ run =
   runGoldenTest "./test/source/WP/" "./test/golden/WP/" ""
     $ \sourcePath source -> do
         return $ serializeTestResult $ runTest sourcePath source $ do
-          (concrete, abstract) <- parseProgram source
-          result               <- sweep concrete abstract
+          parsed    <- parse source
+          converted <- convert parsed
+          result    <- sweep converted
           return (Right (sweptPOs result))
 
 -- | Expression
