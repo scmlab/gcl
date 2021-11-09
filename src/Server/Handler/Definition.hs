@@ -32,8 +32,8 @@ handler uri position responder = do
 
         stage <- readCurrentStage
         let tokenMap = case stage of
-              Converted result -> Just $ stateTokenMap (convertState result)
-              Swept     result -> Just $ stateTokenMap (sweepState result)
+              Converted result -> Just $ stateTokenMap (tempGetState result)
+              Swept     result -> Just $ stateTokenMap (tempGetState result)
               
         return $ maybeToList $ case tokenMap of
           Nothing -> Nothing

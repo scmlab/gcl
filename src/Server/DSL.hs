@@ -46,35 +46,42 @@ import           Syntax.Parser                  ( Parser
 
 --------------------------------------------------------------------------------
 
+class TempHasState a where
+  tempGetState :: a -> State
+
+instance TempHasState ConvertResult where
+  tempGetState = convertPreviousStage
+
+instance TempHasState SweepResult where
+  tempGetState = tempGetState . sweepPreviousStage
 
 data State = State
   { stateConcrete     :: Maybe C.Program
   , stateHighlighings :: [J.SemanticTokenAbsolute]
   , stateTokenMap     :: TokenMap
-  , stateProgram      :: Maybe A.Program
   }
 
 
 data ConvertResult = ConvertResult
-  { convertState   :: State
-  , convertProgram :: A.Program
+  { convertPreviousStage :: State
+  , convertProgram       :: A.Program
   }
 
 data SweepResult = SweepResult
-  { sweepState    :: State
-  , sweepPOs      :: [PO]
+  { sweepPreviousStage :: ConvertResult
+  , sweepPOs           :: [PO]
     -- Specs (holes)
-  , sweepSpecs    :: [Spec]
+  , sweepSpecs         :: [Spec]
     -- Global properties
-  , sweepProps    :: [A.Expr]
+  , sweepProps         :: [A.Expr]
     -- Warnings 
-  , sweepWarnings :: [StructWarning]
+  , sweepWarnings      :: [StructWarning]
     -- Redexes waiting to be reduce by the client on demand
-  , sweepRedexes  :: IntMap A.Redex
+  , sweepRedexes       :: IntMap A.Redex
     -- counter for generating fresh variables
-  , sweepCounter  :: Int
+  , sweepCounter       :: Int
   }
-  
+
 data Stage = Converted ConvertResult
         |  Swept SweepResult
 
@@ -219,19 +226,21 @@ sweep concrete abstract@(A.Program _ _ globalProps _ _) =
     Right (pos, specs, warings, redexes, counter) -> do
       let highlighings = collectHighlighting concrete
       let tokenMap     = collectTokenMap abstract
-      return $ SweepResult
-        { sweepState    = State { stateConcrete     = Just concrete
-                                , stateHighlighings = highlighings
-                                , stateTokenMap     = tokenMap
-                                , stateProgram      = Just abstract
-                                }
-        , sweepPOs      = List.sort pos
-        , sweepSpecs    = sortOn locOf specs
-        , sweepProps    = globalProps
-        , sweepWarnings = warings
-        , sweepRedexes  = redexes
-        , sweepCounter  = counter
-        }
+      let previousStage = ConvertResult
+            { convertPreviousStage = State { stateConcrete     = Just concrete
+                                           , stateHighlighings = highlighings
+                                           , stateTokenMap     = tokenMap
+                                           }
+            , convertProgram       = abstract
+            }
+      return $ SweepResult { sweepPreviousStage = previousStage
+                           , sweepPOs           = List.sort pos
+                           , sweepSpecs         = sortOn locOf specs
+                           , sweepProps         = globalProps
+                           , sweepWarnings      = warings
+                           , sweepRedexes       = redexes
+                           , sweepCounter       = counter
+                           }
 
 --------------------------------------------------------------------------------
 

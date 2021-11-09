@@ -83,24 +83,23 @@ handleSubst i = do
   logText $ Text.pack $ "Substituting Redex " <> show i
   -- 
   case stage of
-    Converted _     -> return []
-    Swept result -> do
-      case stateProgram (sweepState result) of
-        Nothing      -> return []
-        Just program -> case IntMap.lookup i (sweepRedexes result) of
-          Nothing    -> return []
-          Just redex -> do
-            let scope = programToScopeForSubstitution program
-            let (newExpr, counter) = runState
-                  (Substitution.step scope (redexExpr redex))
-                  (sweepCounter result)
-            let redexesInNewExpr = Substitution.buildRedexMap newExpr
-            let newResult = result
-                  { sweepCounter = counter
-                  , sweepRedexes = sweepRedexes result <> redexesInNewExpr
-                  }
-            setCurrentStage (Swept newResult)
-            return [ResSubstitute i (render newExpr)]
+    Converted _      -> return []
+    Swept     result -> do
+      let program = convertProgram (sweepPreviousStage result)
+      case IntMap.lookup i (sweepRedexes result) of
+        Nothing    -> return []
+        Just redex -> do
+          let scope = programToScopeForSubstitution program
+          let (newExpr, counter) = runState
+                (Substitution.step scope (redexExpr redex))
+                (sweepCounter result)
+          let redexesInNewExpr = Substitution.buildRedexMap newExpr
+          let newResult = result
+                { sweepCounter = counter
+                , sweepRedexes = sweepRedexes result <> redexesInNewExpr
+                }
+          setCurrentStage (Swept newResult)
+          return [ResSubstitute i (render newExpr)]
 
 handleCustomMethod :: ReqKind -> CmdM [ResKind]
 handleCustomMethod = \case

@@ -86,8 +86,8 @@ handlers = mconcat
             (J.List J.knownSemanticTokenTypes)
             (J.List J.knownSemanticTokenModifiers)
       let highlightings = case stage of
-            Converted result -> stateHighlighings (convertState result)
-            Swept     result -> stateHighlighings (sweepState result)
+            Converted result -> stateHighlighings (tempGetState result)
+            Swept     result -> stateHighlighings (tempGetState result)
       let tokens = J.makeSemanticTokens legend highlightings
       case tokens of
         Left t -> return $ Left $ J.ResponseError J.InternalError t Nothing
