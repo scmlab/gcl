@@ -48,8 +48,7 @@ import           Syntax.Parser                  ( Parser
 
 
 data State = State
-  { stateErrors       :: [Error]
-  , stateConcrete     :: Maybe C.Program
+  { stateConcrete     :: Maybe C.Program
   , stateHighlighings :: [J.SemanticTokenAbsolute]
   , stateTokenMap     :: TokenMap
   , stateProgram      :: Maybe A.Program
@@ -80,21 +79,22 @@ data SweepResult = SweepResult
   , sweepCounter  :: Int
   }
 
-data Stage = Uninitialized FilePath
-          | SweepFailure [Error]
-          | SweepSuccess State
+newtype Stage =
+    -- Uninitialized FilePath
+    --       | SweepFailure [Error]
+          SweepSuccess SweepResult
 
 instance Pretty Stage where
   pretty stage = case stage of
-    Uninitialized path   -> "Uninitialized: " <> pretty path
-    SweepFailure errors -> "Sweep Error: " <> pretty errors
-    SweepSuccess state ->
+    -- Uninitialized path   -> "Uninitialized: " <> pretty path
+    -- SweepFailure  errors -> "Sweep Error: " <> pretty errors
+    SweepSuccess result ->
       "Sweep Result { "
         <> vsep
-             [ "POs: " <> pretty (statePOs state)
-             , "Specs: " <> pretty (stateSpecs state)
-             , "Props: " <> pretty (stateProps state)
-             , "Warnings: " <> pretty (stateWarnings state)
+             [ "POs: " <> pretty (sweepPOs result)
+             , "Specs: " <> pretty (sweepSpecs result)
+             , "Props: " <> pretty (sweepProps result)
+             , "Warnings: " <> pretty (sweepWarnings result)
              ]
         <> " }"
 instance Pretty State where
@@ -216,8 +216,7 @@ refine source range = do
     (concrete, abstract) <- parseProgram source
     stage                <- sweep concrete abstract
     let specs = case stage of
-          SweepSuccess state -> stateSpecs state
-          _                  -> []
+          SweepSuccess result -> sweepSpecs result
     return $ find (withinRange range) specs
 
 typeCheck :: A.Program -> CmdM ()
@@ -232,18 +231,25 @@ sweep concrete abstract@(A.Program _ _ globalProps _ _) =
     Right (pos, specs, warings, redexes, counter) -> do
       let highlighings = collectHighlighting concrete
       let tokenMap     = collectTokenMap abstract
-      return $ SweepSuccess $ State { stateErrors       = []
-                                    , stateConcrete     = Just concrete
-                                    , stateHighlighings = highlighings
-                                    , stateTokenMap     = tokenMap
-                                    , stateProgram      = Just abstract
-                                    , statePOs          = List.sort pos
-                                    , stateSpecs        = sortOn locOf specs
-                                    , stateProps        = globalProps
-                                    , stateWarnings     = warings
-                                    , stateRedexes      = redexes
-                                    , stateCounter      = counter
-                                    }
+      return $ SweepSuccess $ SweepResult
+        { sweepState    = State { stateConcrete     = Just concrete
+                                , stateHighlighings = highlighings
+                                , stateTokenMap     = tokenMap
+                                , stateProgram      = Just abstract
+                                , statePOs          = List.sort pos
+                                , stateSpecs        = sortOn locOf specs
+                                , stateProps        = globalProps
+                                , stateWarnings     = warings
+                                , stateRedexes      = redexes
+                                , stateCounter      = counter
+                                }
+        , sweepPOs      = List.sort pos
+        , sweepSpecs    = sortOn locOf specs
+        , sweepProps    = globalProps
+        , sweepWarnings = warings
+        , sweepRedexes  = redexes
+        , sweepCounter  = counter
+        }
 
 --------------------------------------------------------------------------------
 
@@ -265,11 +271,11 @@ parseProgram source = do
 --------------------------------------------------------------------------------
 
 generateResponseAndDiagnosticsFromCurrentState :: Stage -> CmdM [ResKind]
-generateResponseAndDiagnosticsFromCurrentState (Uninitialized _) = return []
-generateResponseAndDiagnosticsFromCurrentState (SweepFailure errors) =
-  throwError errors
-generateResponseAndDiagnosticsFromCurrentState (SweepSuccess state) = do
-  let (State _ _ _ _ _ pos specs globalProps warnings _redexes _) = state
+-- generateResponseAndDiagnosticsFromCurrentState (Uninitialized _) = return []
+-- generateResponseAndDiagnosticsFromCurrentState (SweepFailure errors) =
+--   throwError errors
+generateResponseAndDiagnosticsFromCurrentState (SweepSuccess result) = do
+  let (SweepResult _ pos specs globalProps warnings _redexes _) = result
 
   -- get Specs around the mouse selection
   lastSelection <- getLastSelection

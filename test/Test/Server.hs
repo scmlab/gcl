@@ -54,15 +54,15 @@ specPayloadWithoutIndentationTests = testGroup
             (concrete, abstract) <- parseProgram source
             stage                <- sweep concrete abstract
             case stage of
-              SweepFailure errors -> return $ Left errors
-              SweepSuccess state  -> do
-                let specs = stateSpecs state
+              -- Uninitialied _     -> return $ Left 
+              -- SweepFailure errors -> return $ Left errors
+              SweepSuccess result  -> do
+                let specs = stateSpecs (sweepState result)
                 return $ Right $ map
                   ( map (\x -> "\"" <> x <> "\"")
                   . specPayloadWithoutIndentation source
                   )
                   specs
-
 
 
 refineSpecsTest :: TestTree
@@ -83,9 +83,9 @@ refineSpecsTest = testGroup
             (concrete, abstract) <- parseProgram source
             stage                <- sweep concrete abstract
             case stage of
-              SweepFailure errors -> return $ Left errors
-              SweepSuccess state  -> do
-                let specs = stateSpecs state
+              -- SweepFailure errors -> return $ Left errors
+              SweepSuccess result  -> do
+                let specs = stateSpecs (sweepState result)
                 case listToMaybe specs of
                   Just spec -> do
                     let range = rangeOf spec

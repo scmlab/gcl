@@ -17,7 +17,7 @@ import           Data.Loc.Range
 import           Data.Text                      ( Text )
 import qualified Data.Text                     as Text
 import qualified Data.Text.Encoding            as Text
-import           Error                          ( Error )
+import           Error                          ( Error (CannotReadFile) )
 import           Language.LSP.Types             ( Diagnostic )
 import           Pretty
 import           Server.DSL
@@ -96,9 +96,9 @@ interpret filepath p = case runCmdM p of
   Right (Free (SetLastSelection selection next)) -> do
     lift $ tell [TracePutLastSelection selection]
     interpret filepath next
-  Right (Free (GetCurrentState next)) -> do
+  Right (Free (GetCurrentState _next)) -> do
     lift $ tell []
-    interpret filepath (next (Uninitialized filepath))
+    interpret filepath $ return $ Left [CannotReadFile filepath]
   Right (Free (SetCurrentState _ next)) -> do
     lift $ tell []
     interpret filepath next

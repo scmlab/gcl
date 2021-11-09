@@ -16,6 +16,7 @@ import           Control.Concurrent             ( Chan
                                                 , newChan
                                                 , writeChan
                                                 )
+import           Control.Monad.Except           ( throwError )
 import           Control.Monad.Reader
 import           Control.Monad.Trans.Free
 import qualified Data.Aeson                    as JSON
@@ -155,13 +156,13 @@ setCurrentStage filepath stage = do
   ref <- lift $ asks globalCurrentStage
   liftIO $ modifyIORef' ref (Map.insert filepath stage)
 
-readCurrentStage :: FilePath -> ServerM Stage
+readCurrentStage :: FilePath -> ServerM (Maybe Stage)
 readCurrentStage filepath = do
   ref     <- lift $ asks globalCurrentStage
   mapping <- liftIO $ readIORef ref
   case Map.lookup filepath mapping of
-    Nothing    -> return $ Uninitialized filepath
-    Just stage -> return stage
+    Nothing    -> return Nothing
+    Just stage -> return $ Just stage
 
 --------------------------------------------------------------------------------
 
@@ -216,7 +217,10 @@ interpret uri responder p = case J.uriToFilePath uri of
       interpret uri responder next
     Right (Free (GetCurrentState next)) -> do
       result <- readCurrentStage filepath
-      interpret uri responder (next result)
+      interpret uri responder $ do
+        case result of
+          Nothing    -> throwError [CannotReadFile filepath]
+          Just state -> next state
     Right (Free (SetCurrentState result next)) -> do
       setCurrentStage filepath result
       interpret uri responder next
@@ -232,6 +236,7 @@ interpret uri responder p = case J.uriToFilePath uri of
       interpret uri responder next
     Left errors -> do
       setMute False -- unmute on error!
-      setCurrentStage filepath $ SweepFailure errors
+      -- TODO: restore this
+      -- setCurrentStage filepath $ SweepFailure errors
       logText $ Text.pack $ show errors
       responder (Left errors)

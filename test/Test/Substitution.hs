@@ -19,10 +19,7 @@ import           Pretty
 import           Render.Class                   ( Render(render) )
 import           Render.Element                 ( Inlines(..) )
 import           Server.DSL                     ( Stage(..)
-                                                , State
-                                                  ( stateCounter
-                                                  , stateRedexes
-                                                  )
+                                                , SweepResult(..)
                                                 , parseProgram
                                                 , sweep
                                                 )
@@ -62,12 +59,12 @@ letBindings = testGroup
             (cProgram, aProgram) <- parseProgram source
             stage                <- sweep cProgram aProgram
             case stage of
-              SweepFailure errors -> return $ Left errors
-              SweepSuccess state  -> do
+              -- SweepFailure errors -> return $ Left errors
+              SweepSuccess result -> do
                 let scope = programToScopeForSubstitution aProgram
                 let treesFromRedexes = evalState
-                      (mapM (fromRedex scope) (stateRedexes state))
-                      (stateCounter state)
+                      (mapM (fromRedex scope) (sweepRedexes result))
+                      (sweepCounter result)
                 return (Right (VList $ toList treesFromRedexes))
 
 --------------------------------------------------------------------------------

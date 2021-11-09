@@ -32,8 +32,9 @@ handler uri position responder = do
 
         stage <- readCurrentStage
         case stage of
-          SweepFailure _     -> return []
-          SweepSuccess state -> do
+          -- Uninitialized _ -> return []
+          -- SweepFailure _     -> return []
+          SweepSuccess result -> do
             return $ maybeToList $ do -- Maybe monad here 
-              info <- lookupIntervalMap (stateTokenMap state) pos
+              info <- lookupIntervalMap (stateTokenMap (sweepState result)) pos
               tokenLocationLink info

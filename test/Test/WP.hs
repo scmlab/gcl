@@ -5,7 +5,7 @@ module Test.WP where
 import           Prelude                 hiding ( Ordering(..) )
 import           Pretty                         ( )
 import           Server.DSL                     ( Stage(..)
-                                                , State(statePOs)
+                                                , SweepResult(..)
                                                 , parseProgram
                                                 , sweep
                                                 )
@@ -28,8 +28,8 @@ run =
           (concrete, abstract) <- parseProgram source
           stage                <- sweep concrete abstract
           case stage of
-            SweepFailure errors -> return $ Left errors
-            SweepSuccess state  -> return (Right (statePOs state))
+            -- SweepFailure errors -> return $ Left errors
+            SweepSuccess result -> return (Right (sweepPOs result))
 
 -- | Expression
 statements :: TestTree
