@@ -54,9 +54,9 @@ handlers = mconcat
           source               <- getSource
           (concrete, abstract) <- parseProgram source
           typeCheck abstract
-          state <- sweep concrete abstract
-          setCurrentState state
-          generateResponseAndDiagnosticsFromCurrentState state
+          stage <- sweep concrete abstract
+          setCurrentStage stage
+          generateResponseAndDiagnosticsFromCurrentState stage
   , notificationHandler J.STextDocumentDidOpen $ \ntf -> do
     let uri    = ntf ^. (J.params . J.textDocument . J.uri)
     let source = ntf ^. (J.params . J.textDocument . J.text)
@@ -65,7 +65,7 @@ handlers = mconcat
       (concrete, abstract) <- parseProgram source
       typeCheck abstract
       state <- sweep concrete abstract
-      setCurrentState state
+      setCurrentStage state
       generateResponseAndDiagnosticsFromCurrentState state
   , -- Goto Definition
     requestHandler J.STextDocumentDefinition $ \req responder -> do
@@ -81,11 +81,14 @@ handlers = mconcat
     let uri = req ^. (J.params . J.textDocument . J.uri)
     interpret uri (responder . ignoreErrors) $ do
       logText "<-- Syntax Highlighting"
-      state <- readCurrentState
+      stage <- readCurrentStage
       let legend = J.SemanticTokensLegend
             (J.List J.knownSemanticTokenTypes)
             (J.List J.knownSemanticTokenModifiers)
-      let tokens = J.makeSemanticTokens legend (stateHighlighings state)
+      let highlightings = case stage of
+            SweepFailure _     -> []
+            SweepSuccess state -> stateHighlighings state
+      let tokens = J.makeSemanticTokens legend highlightings
       case tokens of
         Left t -> return $ Left $ J.ResponseError J.InternalError t Nothing
         Right tokens' -> return $ Right $ Just tokens'

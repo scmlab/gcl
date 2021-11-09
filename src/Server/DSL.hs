@@ -46,21 +46,10 @@ import           Syntax.Parser                  ( Parser
 
 --------------------------------------------------------------------------------
 
--- data SweptResult = SweptResult
---   { sweptPOs      :: [PO]
---     -- Specs (holes)
---   , sweptSpecs    :: [Spec]
---     -- Global properties
---   , sweptProps    :: [A.Expr]
---     -- Warnings 
---   , sweptWarnings :: [StructWarning]
---   , sweptRedexes  :: IntMap A.Redex
---     -- counter (for generating fresh variables)
---   , sweptCounter  :: Int
---   }
 
 data State = State
   { stateErrors       :: [Error]
+  , stateConcrete     :: Maybe C.Program
   , stateHighlighings :: [J.SemanticTokenAbsolute]
   , stateTokenMap     :: TokenMap
   , stateProgram      :: Maybe A.Program
@@ -76,19 +65,50 @@ data State = State
   , stateCounter      :: Int
   }
 
-emptyState :: State
-emptyState = State { stateErrors       = []
-                   , stateHighlighings = []
-                   , stateTokenMap     = mempty
-                   , stateProgram      = Nothing
-                   , statePOs          = mempty
-                   , stateSpecs        = mempty
-                   , stateProps        = mempty
-                   , stateWarnings     = mempty
-                   , stateRedexes      = mempty
-                   , stateCounter      = 0
-                   }
+data SweepResult = SweepResult
+  { sweepState    :: State
+  , sweepPOs      :: [PO]
+    -- Specs (holes)
+  , sweepSpecs    :: [Spec]
+    -- Global properties
+  , sweepProps    :: [A.Expr]
+    -- Warnings 
+  , sweepWarnings :: [StructWarning]
+    -- Redexes waiting to be reduce by the client on demand
+  , sweepRedexes  :: IntMap A.Redex
+    -- counter for generating fresh variables
+  , sweepCounter  :: Int
+  }
 
+data Stage = SweepFailure [Error]
+ | SweepSuccess State
+
+-- emptyState :: State
+-- emptyState = State { stateErrors       = []
+--                    , stateConcrete     = Nothing
+--                    , stateHighlighings = []
+--                    , stateTokenMap     = mempty
+--                    , stateProgram      = Nothing
+--                    , statePOs          = mempty
+--                    , stateSpecs        = mempty
+--                    , stateProps        = mempty
+--                    , stateWarnings     = mempty
+--                    , stateRedexes      = mempty
+--                    , stateCounter      = 0
+--                    }
+
+instance Pretty Stage where
+  pretty stage = case stage of
+    SweepFailure errors -> "Sweep Error: " <> pretty errors
+    SweepSuccess state ->
+      "Sweep Result { "
+        <> vsep
+             [ "POs: " <> pretty (statePOs state)
+             , "Specs: " <> pretty (stateSpecs state)
+             , "Props: " <> pretty (stateProps state)
+             , "Warnings: " <> pretty (stateWarnings state)
+             ]
+        <> " }"
 instance Pretty State where
   pretty state =
     "State { "
@@ -127,9 +147,9 @@ data Cmd next
   | BumpResponseVersion (Int -> next)
   | Log Text next
   -- | Store current stage 
-  | SetCurrentState State next
+  | SetCurrentState Stage next
   -- | Read current stage 
-  | GetCurrentState (State -> next)
+  | GetCurrentState (Stage -> next)
   -- | SendDiagnostics from the LSP protocol 
   | SendDiagnostics [J.Diagnostic] next
   deriving (Functor)
@@ -160,11 +180,11 @@ setLastSelection selection = liftF (SetLastSelection selection ())
 getLastSelection :: CmdM (Maybe Range)
 getLastSelection = liftF (GetLastSelection id)
 
-setCurrentState :: State -> CmdM ()
-setCurrentState result = liftF (SetCurrentState result ())
+setCurrentStage :: Stage -> CmdM ()
+setCurrentStage result = liftF (SetCurrentState result ())
 
-readCurrentState :: CmdM State
-readCurrentState = liftF (GetCurrentState id)
+readCurrentStage :: CmdM Stage
+readCurrentStage = liftF (GetCurrentState id)
 
 logText :: Text -> CmdM ()
 logText text = liftF (Log text ())
@@ -206,32 +226,36 @@ refine source range = do
   findPointedSpec :: CmdM (Maybe Spec)
   findPointedSpec = do
     (concrete, abstract) <- parseProgram source
-    state                <- sweep concrete abstract
-    return $ find (withinRange range) (stateSpecs state)
+    stage                <- sweep concrete abstract
+    let specs = case stage of
+          SweepSuccess state -> stateSpecs state
+          _                  -> []
+    return $ find (withinRange range) specs
 
 typeCheck :: A.Program -> CmdM ()
 typeCheck p = case TypeChecking.runTM (TypeChecking.checkProgram p) of
   Left  e -> throwError [TypeError e]
   Right v -> return v
 
-sweep :: C.Program -> A.Program -> CmdM State
+sweep :: C.Program -> A.Program -> CmdM Stage
 sweep concrete abstract@(A.Program _ _ globalProps _ _) =
   case WP.sweep abstract of
     Left  e -> throwError [StructError e]
     Right (pos, specs, warings, redexes, counter) -> do
       let highlighings = collectHighlighting concrete
       let tokenMap     = collectTokenMap abstract
-      return $ State { stateErrors       = []
-                     , stateHighlighings = highlighings
-                     , stateTokenMap     = tokenMap
-                     , stateProgram      = Just abstract
-                     , statePOs          = List.sort pos
-                     , stateSpecs        = sortOn locOf specs
-                     , stateProps        = globalProps
-                     , stateWarnings     = warings
-                     , stateRedexes      = redexes
-                     , stateCounter      = counter
-                     }
+      return $ SweepSuccess $ State { stateErrors       = []
+                                    , stateConcrete     = Just concrete
+                                    , stateHighlighings = highlighings
+                                    , stateTokenMap     = tokenMap
+                                    , stateProgram      = Just abstract
+                                    , statePOs          = List.sort pos
+                                    , stateSpecs        = sortOn locOf specs
+                                    , stateProps        = globalProps
+                                    , stateWarnings     = warings
+                                    , stateRedexes      = redexes
+                                    , stateCounter      = counter
+                                    }
 
 --------------------------------------------------------------------------------
 
@@ -252,57 +276,55 @@ parseProgram source = do
 
 --------------------------------------------------------------------------------
 
-generateResponseAndDiagnosticsFromCurrentState :: State -> CmdM [ResKind]
-generateResponseAndDiagnosticsFromCurrentState state =
-  if not $ null (stateErrors state)
-    then throwError (stateErrors state)
-    else do
-      let (State _ _ _ _ pos specs globalProps warnings _redexes _) = state
+generateResponseAndDiagnosticsFromCurrentState :: Stage -> CmdM [ResKind]
+generateResponseAndDiagnosticsFromCurrentState (SweepFailure errors) =
+  throwError errors
+generateResponseAndDiagnosticsFromCurrentState (SweepSuccess state) = do
+  let (State _ _ _ _ _ pos specs globalProps warnings _redexes _) = state
 
-      -- get Specs around the mouse selection
-      lastSelection <- getLastSelection
-      let overlappedSpecs = case lastSelection of
-            Nothing        -> specs
-            Just selection -> filter (withinRange selection) specs
-      -- get POs around the mouse selection (including their corresponding Proofs)
+  -- get Specs around the mouse selection
+  lastSelection <- getLastSelection
+  let overlappedSpecs = case lastSelection of
+        Nothing        -> specs
+        Just selection -> filter (withinRange selection) specs
+  -- get POs around the mouse selection (including their corresponding Proofs)
 
-      let withinPOrange sel po = case poAnchorLoc po of
-            Nothing     -> withinRange sel po
-            Just anchor -> withinRange sel po || withinRange sel anchor
+  let withinPOrange sel po = case poAnchorLoc po of
+        Nothing     -> withinRange sel po
+        Just anchor -> withinRange sel po || withinRange sel anchor
 
-      let overlappedPOs = case lastSelection of
-            Nothing        -> pos
-            Just selection -> filter (withinPOrange selection) pos
-      -- render stuff
-      let warningsSections =
-            if null warnings then [] else map renderSection warnings
-      let globalPropsSections = if null globalProps
-            then []
-            else map
-              (\expr -> Section
-                Plain
-                [Header "Property" (fromLoc (locOf expr)), Code (render expr)]
-              )
-              globalProps
-      let specsSections = if null overlappedSpecs
-            then []
-            else map renderSection overlappedSpecs
-      let poSections =
-            if null overlappedPOs then [] else map renderSection overlappedPOs
-      let sections = mconcat
-            [warningsSections, specsSections, poSections, globalPropsSections]
+  let overlappedPOs = case lastSelection of
+        Nothing        -> pos
+        Just selection -> filter (withinPOrange selection) pos
+  -- render stuff
+  let warningsSections =
+        if null warnings then [] else map renderSection warnings
+  let globalPropsSections = if null globalProps
+        then []
+        else map
+          (\expr -> Section
+            Plain
+            [Header "Property" (fromLoc (locOf expr)), Code (render expr)]
+          )
+          globalProps
+  let specsSections =
+        if null overlappedSpecs then [] else map renderSection overlappedSpecs
+  let poSections =
+        if null overlappedPOs then [] else map renderSection overlappedPOs
+  let sections = mconcat
+        [warningsSections, specsSections, poSections, globalPropsSections]
 
-      version <- bumpVersion
-      let encodeSpec spec =
-            ( specID spec
-            , toText $ render (specPreCond spec)
-            , toText $ render (specPostCond spec)
-            , specRange spec
-            )
+  version <- bumpVersion
+  let encodeSpec spec =
+        ( specID spec
+        , toText $ render (specPreCond spec)
+        , toText $ render (specPostCond spec)
+        , specRange spec
+        )
 
-      let responses =
-            [ResDisplay version sections, ResUpdateSpecs (map encodeSpec specs)]
-      let diagnostics = concatMap collect pos ++ concatMap collect warnings
-      sendDiagnostics diagnostics
+  let responses =
+        [ResDisplay version sections, ResUpdateSpecs (map encodeSpec specs)]
+  let diagnostics = concatMap collect pos ++ concatMap collect warnings
+  sendDiagnostics diagnostics
 
-      return responses
+  return responses

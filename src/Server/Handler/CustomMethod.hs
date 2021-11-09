@@ -28,7 +28,7 @@ import qualified Language.LSP.Types            as J
 handleInspect :: Range -> CmdM [ResKind]
 handleInspect range = do
   setLastSelection range
-  stage <- readCurrentState
+  stage <- readCurrentStage
   generateResponseAndDiagnosticsFromCurrentState stage
 
 handleRefine :: Range -> CmdM [ResKind]
@@ -52,7 +52,7 @@ handleRefine range = do
   typeCheck abstract
   mute False
   state <- sweep concrete abstract
-  setCurrentState state
+  setCurrentStage state
   generateResponseAndDiagnosticsFromCurrentState state
 
 handleInsertAnchor :: Text -> CmdM [ResKind]
@@ -74,30 +74,33 @@ handleInsertAnchor hash = do
   typeCheck abstract'
   mute False
   state <- sweep concrete' abstract'
-  setCurrentState state
+  setCurrentStage state
   generateResponseAndDiagnosticsFromCurrentState state
 
 handleSubst :: Int -> CmdM [ResKind]
 handleSubst i = do
-  state <- readCurrentState
+  stage <- readCurrentStage
   logText $ Text.pack $ "Substituting Redex " <> show i
   -- 
-  case stateProgram state of
-    Nothing      -> return []
-    Just program -> case IntMap.lookup i (stateRedexes state) of
-      Nothing    -> return []
-      Just redex -> do
-        let scope = programToScopeForSubstitution program
-        let (newExpr, counter) = runState
-              (Substitution.step scope (redexExpr redex))
-              (stateCounter state)
-        let redexesInNewExpr = Substitution.buildRedexMap newExpr
-        let newState = state
-              { stateCounter = counter
-              , stateRedexes = stateRedexes state <> redexesInNewExpr
-              }
-        setCurrentState newState
-        return [ResSubstitute i (render newExpr)]
+  case stage of
+    SweepFailure _     -> return []
+    SweepSuccess state -> do
+      case stateProgram state of
+        Nothing      -> return []
+        Just program -> case IntMap.lookup i (stateRedexes state) of
+          Nothing    -> return []
+          Just redex -> do
+            let scope = programToScopeForSubstitution program
+            let (newExpr, counter) = runState
+                  (Substitution.step scope (redexExpr redex))
+                  (stateCounter state)
+            let redexesInNewExpr = Substitution.buildRedexMap newExpr
+            let newState = state
+                  { stateCounter = counter
+                  , stateRedexes = stateRedexes state <> redexesInNewExpr
+                  }
+            setCurrentStage (SweepSuccess newState)
+            return [ResSubstitute i (render newExpr)]
 
 handleCustomMethod :: ReqKind -> CmdM [ResKind]
 handleCustomMethod = \case

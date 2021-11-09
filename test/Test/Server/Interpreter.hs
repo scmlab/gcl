@@ -98,7 +98,7 @@ interpret filepath p = case runCmdM p of
     interpret filepath next
   Right (Free (GetCurrentState next)) -> do
     lift $ tell []
-    interpret filepath (next emptyState)
+    interpret filepath (next (SweepFailure []))
   Right (Free (SetCurrentState _ next)) -> do
     lift $ tell []
     interpret filepath next

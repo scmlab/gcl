@@ -18,7 +18,8 @@ import           GCL.Substitution               ( Scope
 import           Pretty
 import           Render.Class                   ( Render(render) )
 import           Render.Element                 ( Inlines(..) )
-import           Server.DSL                     ( State
+import           Server.DSL                     ( Stage(..)
+                                                , State
                                                   ( stateCounter
                                                   , stateRedexes
                                                   )
@@ -59,12 +60,15 @@ letBindings = testGroup
       $ \sourcePath source -> do
           return $ serializeTestResultValueOnly $ runTest sourcePath source $ do
             (cProgram, aProgram) <- parseProgram source
-            state   <- sweep cProgram aProgram
-            let scope = programToScopeForSubstitution aProgram
-            let treesFromRedexes = evalState
-                  (mapM (fromRedex scope) (stateRedexes state))
-                  (stateCounter state)
-            return (Right (VList $ toList treesFromRedexes))
+            stage                <- sweep cProgram aProgram
+            case stage of
+              SweepFailure errors -> return $ Left errors
+              SweepSuccess state  -> do
+                let scope = programToScopeForSubstitution aProgram
+                let treesFromRedexes = evalState
+                      (mapM (fromRedex scope) (stateRedexes state))
+                      (stateCounter state)
+                return (Right (VList $ toList treesFromRedexes))
 
 --------------------------------------------------------------------------------
 
