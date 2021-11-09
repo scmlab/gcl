@@ -26,7 +26,7 @@ run =
         return $ serializeTestResult $ runTest sourcePath source $ do
           (concrete, abstract) <- parseProgram source
           result               <- sweep concrete abstract
-          return (Right (sweepPOs result))
+          return (Right (sweptPOs result))
 
 -- | Expression
 statements :: TestTree

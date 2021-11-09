@@ -33,9 +33,11 @@ handler uri position responder = case uriToFilePath uri of
 
       stage <- readCurrentStage
 
-      let tokenMap = case stage of
-            Converted result -> Just $ stateTokenMap (tempGetState result)
-            Swept     result -> Just $ stateTokenMap (tempGetState result)
+      let
+        tokenMap = case stage of
+          Parsed _result -> Nothing
+          Converted result -> Just $ convertedTokenMap result
+          Swept result -> Just $ convertedTokenMap (sweptPreviousStage result)
 
       return $ case tokenMap of
         Nothing -> Nothing

@@ -46,47 +46,82 @@ import           Syntax.Parser                  ( Parser
 
 --------------------------------------------------------------------------------
 
-class TempHasState a where
-  tempGetState :: a -> State
-
-instance TempHasState ConvertResult where
-  tempGetState = convertPreviousStage
-
-instance TempHasState SweepResult where
-  tempGetState = tempGetState . sweepPreviousStage
-
-data State = State
-  { stateConcrete     :: Maybe C.Program
-  , stateHighlighings :: [J.SemanticTokenAbsolute]
-  , stateTokenMap     :: TokenMap
+data ParseResult = ParseResult
+  { parsedProgram      :: C.Program
+  , parsedHighlighings :: [J.SemanticTokenAbsolute]
   }
+
+parse :: Text -> CmdM ParseResult
+parse source = do
+  program <- parseWithParser pProgram source
+  return $ ParseResult { parsedProgram      = program
+                       , parsedHighlighings = collectHighlighting program
+                       }
 
 
 data ConvertResult = ConvertResult
-  { convertPreviousStage :: State
-  , convertProgram       :: A.Program
+  { convertedPreviousStage :: ParseResult
+  , convertedProgram       :: A.Program
+  , convertedTokenMap      :: TokenMap
   }
+
+convert :: ParseResult -> CmdM ConvertResult
+convert result = case runExcept (toAbstract (parsedProgram result)) of
+  Left  (Range start end) -> digHole (Range start end) >>= parse >>= convert
+  Right program           -> return $ ConvertResult
+    { convertedPreviousStage = result
+    , convertedProgram       = program
+    , convertedTokenMap      = collectTokenMap program
+    }
+
 
 data SweepResult = SweepResult
-  { sweepPreviousStage :: ConvertResult
-  , sweepPOs           :: [PO]
+  { sweptPreviousStage :: ConvertResult
+  , sweptPOs           :: [PO]
     -- Specs (holes)
-  , sweepSpecs         :: [Spec]
+  , sweptSpecs         :: [Spec]
     -- Global properties
-  , sweepProps         :: [A.Expr]
+  , sweptProps         :: [A.Expr]
     -- Warnings 
-  , sweepWarnings      :: [StructWarning]
+  , sweptWarnings      :: [StructWarning]
     -- Redexes waiting to be reduce by the client on demand
-  , sweepRedexes       :: IntMap A.Redex
+  , sweptRedexes       :: IntMap A.Redex
     -- counter for generating fresh variables
-  , sweepCounter       :: Int
+  , sweptCounter       :: Int
   }
 
-data Stage = Converted ConvertResult
+sweep :: C.Program -> A.Program -> CmdM SweepResult
+sweep concrete abstract@(A.Program _ _ globalProps _ _) =
+  case WP.sweep abstract of
+    Left  e -> throwError [StructError e]
+    Right (pos, specs, warings, redexes, counter) -> do
+      let highlighings = collectHighlighting concrete
+      let tokenMap     = collectTokenMap abstract
+      let parseResult = ParseResult { parsedProgram      = concrete
+                                    , parsedHighlighings = highlighings
+                                    }
+      let convertedResult = ConvertResult
+            { convertedPreviousStage = parseResult
+            , convertedProgram       = abstract
+            , convertedTokenMap      = tokenMap
+            }
+      return $ SweepResult { sweptPreviousStage = convertedResult
+                           , sweptPOs           = List.sort pos
+                           , sweptSpecs         = sortOn locOf specs
+                           , sweptProps         = globalProps
+                           , sweptWarnings      = warings
+                           , sweptRedexes       = redexes
+                           , sweptCounter       = counter
+                           }
+
+data Stage =
+         Parsed ParseResult
+        | Converted ConvertResult
         |  Swept SweepResult
 
 instance Pretty Stage where
   pretty stage = case stage of
+    Parsed    _result -> "Parsed"
     Converted _result -> "Converted"
     Swept     result  -> pretty result
 
@@ -94,15 +129,15 @@ instance Pretty SweepResult where
   pretty result =
     "Sweep Result { "
       <> vsep
-           [ "POs: " <> pretty (sweepPOs result)
-           , "Specs: " <> pretty (sweepSpecs result)
-           , "Props: " <> pretty (sweepProps result)
-           , "Warnings: " <> pretty (sweepWarnings result)
+           [ "POs: " <> pretty (sweptPOs result)
+           , "Specs: " <> pretty (sweptSpecs result)
+           , "Props: " <> pretty (sweptProps result)
+           , "Warnings: " <> pretty (sweptWarnings result)
            ]
       <> " }"
 
-instance Pretty State where
-  pretty _state = "State"
+-- instance Pretty State where
+--   pretty _state = "State"
 
 -- The "Syntax" of the DSL for handling LSP requests and responses
 data Cmd next
@@ -204,14 +239,16 @@ refine source range = do
       let payload = Text.unlines $ specPayloadWithoutIndentation source' spec
       -- HACK, `pStmts` will kaput if we feed empty strings into it
       let payloadIsEmpty = Text.null (Text.strip payload)
-      if payloadIsEmpty then return () else void $ parse pStmts payload
+      if payloadIsEmpty
+        then return ()
+        else void $ parseWithParser pStmts payload
       return (spec, specPayloadWithoutIndentation source' spec)
  where
   findPointedSpec :: CmdM (Maybe Spec)
   findPointedSpec = do
     (concrete, abstract) <- parseProgram source
     result               <- sweep concrete abstract
-    let specs = sweepSpecs result
+    let specs = sweptSpecs result
     return $ find (withinRange range) specs
 
 typeCheck :: A.Program -> CmdM ()
@@ -219,34 +256,10 @@ typeCheck p = case TypeChecking.runTM (TypeChecking.checkProgram p) of
   Left  e -> throwError [TypeError e]
   Right v -> return v
 
-sweep :: C.Program -> A.Program -> CmdM SweepResult
-sweep concrete abstract@(A.Program _ _ globalProps _ _) =
-  case WP.sweep abstract of
-    Left  e -> throwError [StructError e]
-    Right (pos, specs, warings, redexes, counter) -> do
-      let highlighings = collectHighlighting concrete
-      let tokenMap     = collectTokenMap abstract
-      let previousStage = ConvertResult
-            { convertPreviousStage = State { stateConcrete     = Just concrete
-                                           , stateHighlighings = highlighings
-                                           , stateTokenMap     = tokenMap
-                                           }
-            , convertProgram       = abstract
-            }
-      return $ SweepResult { sweepPreviousStage = previousStage
-                           , sweepPOs           = List.sort pos
-                           , sweepSpecs         = sortOn locOf specs
-                           , sweepProps         = globalProps
-                           , sweepWarnings      = warings
-                           , sweepRedexes       = redexes
-                           , sweepCounter       = counter
-                           }
-
 --------------------------------------------------------------------------------
 
--- | Parse with a parser
-parse :: Parser a -> Text -> CmdM a
-parse p source = do
+parseWithParser :: Parser a -> Text -> CmdM a
+parseWithParser p source = do
   filepath <- getFilePath
   case runParse p filepath source of
     Left  errors -> throwError $ map SyntacticError errors
@@ -254,7 +267,7 @@ parse p source = do
 
 parseProgram :: Text -> CmdM (C.Program, A.Program)
 parseProgram source = do
-  concrete <- parse pProgram source
+  concrete <- parseWithParser pProgram source
   case runExcept (toAbstract concrete) of
     Left  (Range start end) -> digHole (Range start end) >>= parseProgram
     Right abstract          -> return (concrete, abstract)
@@ -262,9 +275,7 @@ parseProgram source = do
 --------------------------------------------------------------------------------
 
 generateResponseAndDiagnosticsFromCurrentState :: Stage -> CmdM [ResKind]
--- generateResponseAndDiagnosticsFromCurrentState (Uninitialized _) = return []
--- generateResponseAndDiagnosticsFromCurrentState (SweepFailure errors) =
---   throwError errors
+generateResponseAndDiagnosticsFromCurrentState (Parsed    _result) = return []
 generateResponseAndDiagnosticsFromCurrentState (Converted _result) = return []
 generateResponseAndDiagnosticsFromCurrentState (Swept     result ) = do
   let (SweepResult _ pos specs globalProps warnings _redexes _) = result

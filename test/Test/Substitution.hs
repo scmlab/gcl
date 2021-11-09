@@ -59,8 +59,8 @@ letBindings = testGroup
             result                <- sweep cProgram aProgram
             let scope = programToScopeForSubstitution aProgram
             let treesFromRedexes = evalState
-                  (mapM (fromRedex scope) (sweepRedexes result))
-                  (sweepCounter result)
+                  (mapM (fromRedex scope) (sweptRedexes result))
+                  (sweptCounter result)
             return (Right (VList $ toList treesFromRedexes))
 
 --------------------------------------------------------------------------------

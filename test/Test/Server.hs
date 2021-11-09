@@ -53,7 +53,7 @@ specPayloadWithoutIndentationTests = testGroup
           return $ serializeTestResult $ runTest sourcePath source $ do
             (concrete, abstract) <- parseProgram source
             result               <- sweep concrete abstract
-            let specs = sweepSpecs result
+            let specs = sweptSpecs result
             return $ Right $ map
               ( map (\x -> "\"" <> x <> "\"")
               . specPayloadWithoutIndentation source
@@ -78,7 +78,7 @@ refineSpecsTest = testGroup
           return $ serializeTestResult $ runTest sourcePath source $ do
             (concrete, abstract) <- parseProgram source
             result                <- sweep concrete abstract
-            let specs = sweepSpecs result
+            let specs = sweptSpecs result
             case listToMaybe specs of
               Just spec -> do
                 let range = rangeOf spec
