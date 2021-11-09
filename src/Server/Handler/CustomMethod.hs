@@ -51,9 +51,9 @@ handleRefine range = do
   (concrete, abstract) <- parseProgram source'
   typeCheck abstract
   mute False
-  state <- sweep concrete abstract
-  setCurrentStage state
-  generateResponseAndDiagnosticsFromCurrentState state
+  result <- sweep concrete abstract
+  setCurrentStage (Swept result)
+  generateResponseAndDiagnosticsFromCurrentState (Swept result)
 
 handleInsertAnchor :: Text -> CmdM [ResKind]
 handleInsertAnchor hash = do
@@ -73,9 +73,9 @@ handleInsertAnchor hash = do
   (concrete', abstract') <- parseProgram source'
   typeCheck abstract'
   mute False
-  state <- sweep concrete' abstract'
-  setCurrentStage state
-  generateResponseAndDiagnosticsFromCurrentState state
+  result <- sweep concrete' abstract'
+  setCurrentStage (Swept result)
+  generateResponseAndDiagnosticsFromCurrentState (Swept result)
 
 handleSubst :: Int -> CmdM [ResKind]
 handleSubst i = do
@@ -83,9 +83,8 @@ handleSubst i = do
   logText $ Text.pack $ "Substituting Redex " <> show i
   -- 
   case stage of
-    -- Uninitialized _     -> return []
-    -- SweepFailure _     -> return []
-    SweepSuccess result -> do
+    Converted _     -> return []
+    Swept result -> do
       case stateProgram (sweepState result) of
         Nothing      -> return []
         Just program -> case IntMap.lookup i (sweepRedexes result) of
@@ -100,7 +99,7 @@ handleSubst i = do
                   { sweepCounter = counter
                   , sweepRedexes = sweepRedexes result <> redexesInNewExpr
                   }
-            setCurrentStage (SweepSuccess newResult)
+            setCurrentStage (Swept newResult)
             return [ResSubstitute i (render newExpr)]
 
 handleCustomMethod :: ReqKind -> CmdM [ResKind]

@@ -52,16 +52,12 @@ data State = State
   , stateHighlighings :: [J.SemanticTokenAbsolute]
   , stateTokenMap     :: TokenMap
   , stateProgram      :: Maybe A.Program
-  , statePOs          :: [PO]
-    -- Specs (holes)
-  , stateSpecs        :: [Spec]
-    -- Global properties
-  , stateProps        :: [A.Expr]
-    -- Warnings 
-  , stateWarnings     :: [StructWarning]
-  , stateRedexes      :: IntMap A.Redex
-    -- counter (for generating fresh variables)
-  , stateCounter      :: Int
+  }
+
+
+data ConvertResult = ConvertResult
+  { convertState   :: State
+  , convertProgram :: A.Program
   }
 
 data SweepResult = SweepResult
@@ -78,35 +74,28 @@ data SweepResult = SweepResult
     -- counter for generating fresh variables
   , sweepCounter  :: Int
   }
-
-newtype Stage =
-    -- Uninitialized FilePath
-    --       | SweepFailure [Error]
-          SweepSuccess SweepResult
+  
+data Stage = Converted ConvertResult
+        |  Swept SweepResult
 
 instance Pretty Stage where
   pretty stage = case stage of
-    -- Uninitialized path   -> "Uninitialized: " <> pretty path
-    -- SweepFailure  errors -> "Sweep Error: " <> pretty errors
-    SweepSuccess result ->
-      "Sweep Result { "
-        <> vsep
-             [ "POs: " <> pretty (sweepPOs result)
-             , "Specs: " <> pretty (sweepSpecs result)
-             , "Props: " <> pretty (sweepProps result)
-             , "Warnings: " <> pretty (sweepWarnings result)
-             ]
-        <> " }"
-instance Pretty State where
-  pretty state =
-    "State { "
+    Converted _result -> "Converted"
+    Swept     result  -> pretty result
+
+instance Pretty SweepResult where
+  pretty result =
+    "Sweep Result { "
       <> vsep
-           [ "POs: " <> pretty (statePOs state)
-           , "Specs: " <> pretty (stateSpecs state)
-           , "Props: " <> pretty (stateProps state)
-           , "Warnings: " <> pretty (stateWarnings state)
+           [ "POs: " <> pretty (sweepPOs result)
+           , "Specs: " <> pretty (sweepSpecs result)
+           , "Props: " <> pretty (sweepProps result)
+           , "Warnings: " <> pretty (sweepWarnings result)
            ]
       <> " }"
+
+instance Pretty State where
+  pretty _state = "State"
 
 -- The "Syntax" of the DSL for handling LSP requests and responses
 data Cmd next
@@ -214,9 +203,8 @@ refine source range = do
   findPointedSpec :: CmdM (Maybe Spec)
   findPointedSpec = do
     (concrete, abstract) <- parseProgram source
-    stage                <- sweep concrete abstract
-    let specs = case stage of
-          SweepSuccess result -> sweepSpecs result
+    result               <- sweep concrete abstract
+    let specs = sweepSpecs result
     return $ find (withinRange range) specs
 
 typeCheck :: A.Program -> CmdM ()
@@ -224,24 +212,18 @@ typeCheck p = case TypeChecking.runTM (TypeChecking.checkProgram p) of
   Left  e -> throwError [TypeError e]
   Right v -> return v
 
-sweep :: C.Program -> A.Program -> CmdM Stage
+sweep :: C.Program -> A.Program -> CmdM SweepResult
 sweep concrete abstract@(A.Program _ _ globalProps _ _) =
   case WP.sweep abstract of
     Left  e -> throwError [StructError e]
     Right (pos, specs, warings, redexes, counter) -> do
       let highlighings = collectHighlighting concrete
       let tokenMap     = collectTokenMap abstract
-      return $ SweepSuccess $ SweepResult
+      return $ SweepResult
         { sweepState    = State { stateConcrete     = Just concrete
                                 , stateHighlighings = highlighings
                                 , stateTokenMap     = tokenMap
                                 , stateProgram      = Just abstract
-                                , statePOs          = List.sort pos
-                                , stateSpecs        = sortOn locOf specs
-                                , stateProps        = globalProps
-                                , stateWarnings     = warings
-                                , stateRedexes      = redexes
-                                , stateCounter      = counter
                                 }
         , sweepPOs      = List.sort pos
         , sweepSpecs    = sortOn locOf specs
@@ -274,7 +256,8 @@ generateResponseAndDiagnosticsFromCurrentState :: Stage -> CmdM [ResKind]
 -- generateResponseAndDiagnosticsFromCurrentState (Uninitialized _) = return []
 -- generateResponseAndDiagnosticsFromCurrentState (SweepFailure errors) =
 --   throwError errors
-generateResponseAndDiagnosticsFromCurrentState (SweepSuccess result) = do
+generateResponseAndDiagnosticsFromCurrentState (Converted _result) = return []
+generateResponseAndDiagnosticsFromCurrentState (Swept     result ) = do
   let (SweepResult _ pos specs globalProps warnings _redexes _) = result
 
   -- get Specs around the mouse selection

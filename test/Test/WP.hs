@@ -4,8 +4,7 @@ module Test.WP where
 
 import           Prelude                 hiding ( Ordering(..) )
 import           Pretty                         ( )
-import           Server.DSL                     ( Stage(..)
-                                                , SweepResult(..)
+import           Server.DSL                     ( SweepResult(..)
                                                 , parseProgram
                                                 , sweep
                                                 )
@@ -26,10 +25,8 @@ run =
     $ \sourcePath source -> do
         return $ serializeTestResult $ runTest sourcePath source $ do
           (concrete, abstract) <- parseProgram source
-          stage                <- sweep concrete abstract
-          case stage of
-            -- SweepFailure errors -> return $ Left errors
-            SweepSuccess result -> return (Right (sweepPOs result))
+          result               <- sweep concrete abstract
+          return (Right (sweepPOs result))
 
 -- | Expression
 statements :: TestTree

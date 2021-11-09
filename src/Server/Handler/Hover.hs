@@ -32,11 +32,14 @@ handler uri position responder = case uriToFilePath uri of
 
 
       stage <- readCurrentStage
-      case stage of
-        -- Uninitialized _ -> return Nothing
-        -- SweepFailure _     -> return Nothing
-        SweepSuccess result -> do
-          return $ do -- Maybe monad here 
-            info          <- lookupIntervalMap (stateTokenMap (sweepState result)) pos
-            (hover, _typ) <- tokenHoverAndType info
-            return hover
+
+      let tokenMap = case stage of
+            Converted result -> Just $ stateTokenMap (convertState result)
+            Swept     result -> Just $ stateTokenMap (sweepState result)
+
+      return $ case tokenMap of
+        Nothing -> Nothing
+        Just xs -> do -- in Maybe Monad
+          info          <- lookupIntervalMap xs pos
+          (hover, _typ) <- tokenHoverAndType info
+          return hover

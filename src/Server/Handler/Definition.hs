@@ -31,10 +31,12 @@ handler uri position responder = do
         let pos   = SrcLoc.fromLSPPosition table filepath position
 
         stage <- readCurrentStage
-        case stage of
-          -- Uninitialized _ -> return []
-          -- SweepFailure _     -> return []
-          SweepSuccess result -> do
-            return $ maybeToList $ do -- Maybe monad here 
-              info <- lookupIntervalMap (stateTokenMap (sweepState result)) pos
-              tokenLocationLink info
+        let tokenMap = case stage of
+              Converted result -> Just $ stateTokenMap (convertState result)
+              Swept     result -> Just $ stateTokenMap (sweepState result)
+              
+        return $ maybeToList $ case tokenMap of
+          Nothing -> Nothing
+          Just xs -> do -- in Maybe monad
+            info <- lookupIntervalMap xs pos
+            tokenLocationLink info

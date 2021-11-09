@@ -52,17 +52,13 @@ specPayloadWithoutIndentationTests = testGroup
       $ \sourcePath source -> do
           return $ serializeTestResult $ runTest sourcePath source $ do
             (concrete, abstract) <- parseProgram source
-            stage                <- sweep concrete abstract
-            case stage of
-              -- Uninitialied _     -> return $ Left 
-              -- SweepFailure errors -> return $ Left errors
-              SweepSuccess result  -> do
-                let specs = stateSpecs (sweepState result)
-                return $ Right $ map
-                  ( map (\x -> "\"" <> x <> "\"")
-                  . specPayloadWithoutIndentation source
-                  )
-                  specs
+            result               <- sweep concrete abstract
+            let specs = sweepSpecs result
+            return $ Right $ map
+              ( map (\x -> "\"" <> x <> "\"")
+              . specPayloadWithoutIndentation source
+              )
+              specs
 
 
 refineSpecsTest :: TestTree
@@ -81,14 +77,11 @@ refineSpecsTest = testGroup
       $ \sourcePath source -> do
           return $ serializeTestResult $ runTest sourcePath source $ do
             (concrete, abstract) <- parseProgram source
-            stage                <- sweep concrete abstract
-            case stage of
-              -- SweepFailure errors -> return $ Left errors
-              SweepSuccess result  -> do
-                let specs = stateSpecs (sweepState result)
-                case listToMaybe specs of
-                  Just spec -> do
-                    let range = rangeOf spec
-                    resKind <- handleRefine range
-                    return $ Right resKind
-                  Nothing -> return $ Left [Others "cannot find any specs"]
+            result                <- sweep concrete abstract
+            let specs = sweepSpecs result
+            case listToMaybe specs of
+              Just spec -> do
+                let range = rangeOf spec
+                resKind <- handleRefine range
+                return $ Right resKind
+              Nothing -> return $ Left [Others "cannot find any specs"]
