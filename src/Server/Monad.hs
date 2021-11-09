@@ -160,7 +160,7 @@ readCurrentStage filepath = do
   ref     <- lift $ asks globalCurrentStage
   mapping <- liftIO $ readIORef ref
   case Map.lookup filepath mapping of
-    Nothing    -> return $ SweepFailure []
+    Nothing    -> return $ Uninitialized filepath
     Just stage -> return stage
 
 --------------------------------------------------------------------------------

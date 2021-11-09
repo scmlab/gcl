@@ -80,25 +80,13 @@ data SweepResult = SweepResult
   , sweepCounter  :: Int
   }
 
-data Stage = SweepFailure [Error]
- | SweepSuccess State
-
--- emptyState :: State
--- emptyState = State { stateErrors       = []
---                    , stateConcrete     = Nothing
---                    , stateHighlighings = []
---                    , stateTokenMap     = mempty
---                    , stateProgram      = Nothing
---                    , statePOs          = mempty
---                    , stateSpecs        = mempty
---                    , stateProps        = mempty
---                    , stateWarnings     = mempty
---                    , stateRedexes      = mempty
---                    , stateCounter      = 0
---                    }
+data Stage = Uninitialized FilePath
+          | SweepFailure [Error]
+          | SweepSuccess State
 
 instance Pretty Stage where
   pretty stage = case stage of
+    Uninitialized path   -> "Uninitialized: " <> pretty path
     SweepFailure errors -> "Sweep Error: " <> pretty errors
     SweepSuccess state ->
       "Sweep Result { "
@@ -277,6 +265,7 @@ parseProgram source = do
 --------------------------------------------------------------------------------
 
 generateResponseAndDiagnosticsFromCurrentState :: Stage -> CmdM [ResKind]
+generateResponseAndDiagnosticsFromCurrentState (Uninitialized _) = return []
 generateResponseAndDiagnosticsFromCurrentState (SweepFailure errors) =
   throwError errors
 generateResponseAndDiagnosticsFromCurrentState (SweepSuccess state) = do
