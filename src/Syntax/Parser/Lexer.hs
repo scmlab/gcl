@@ -413,7 +413,7 @@ lexNameF =
   lexTextToNameF
     .   lexeme
     .   try
-    .   withPredicate (\t -> notLowerKeywords t && notUpperKeywords t)
+    .   withPredicate notLowerKeywords
     $   satisfy isAlpha
     >>= lexTextWithHd
 

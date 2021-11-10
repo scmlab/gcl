@@ -269,7 +269,7 @@ pTypeF = makeExprParser pTypeFTerm [[InfixR pTFuncF]] <?> "type"
 
   pTConF     = TCon <$> lexNameF <*> many lexNameF
 
-  pTVarF     = TVar <$> lexAnyNameF <* notFollowedBy lexAnyNameF
+  pTVarF     = TVar <$> lexAnyNameF <* notFollowedBy lexNameF
 
   pIntervalF = Interval <$> pEndpointOpenF <*> lexRangeF <*> pEndpointCloseF
 
@@ -497,7 +497,7 @@ indentedItems lvl sc' p = go
     pos  <- Lex.indentLevel
     done <- isJust <$> optional eof
     if not done && pos == lvl
-      then try ((:) <$> p <*> go) <|> return []
+      then (:) <$> p <*> go <|> return []
       else return []
 
 lineFold :: (Parser () -> Parser a) -> Parser a
