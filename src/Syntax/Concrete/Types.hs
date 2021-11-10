@@ -175,7 +175,8 @@ data CaseConstructor = CaseConstructor Name [Name] TokArrows Expr
 
 -- NOTE: current not in use
 data Pattern
-  = PattParen (Token "(") Pattern (Token ")") -- pattern wrapped inside a pair of parenthesis
+  = PattLit Lit
+  | PattParen (Token "(") Pattern (Token ")") -- pattern wrapped inside a pair of parenthesis
   | PattBinder Name -- binder
   | PattWildcard (Token "_") -- matches anything
   | PattConstructor Name [Pattern] -- destructs a constructor

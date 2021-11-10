@@ -167,7 +167,8 @@ data CaseConstructor = CaseConstructor Name [Name] Expr
   deriving (Eq, Show, Generic)
 
 data Pattern
-  = PattBinder Name -- binder
+  = PattLit Lit
+  | PattBinder Name -- binder
   | PattWildcard Range -- matches anything
   | PattConstructor Name [Pattern] -- destructs a constructor
   deriving (Eq, Show, Generic)

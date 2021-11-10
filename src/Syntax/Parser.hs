@@ -406,7 +406,8 @@ pExprF =
 
 pPatternF :: ParserF Pattern
 pPatternF = choice
-  [ PattParen <$> lexParenStartF <*> pPatternF <*> lexParenEndF
+  [ PattLit <$> lexLitsF
+  , PattParen <$> lexParenStartF <*> pPatternF <*> lexParenEndF
   , PattWildcard <$> lexUnderscore
   , PattBinder <$> lexLowerNameF
   , PattConstructor <$> lexUpperNameF <*> many pPatternF
