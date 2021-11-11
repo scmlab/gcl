@@ -29,6 +29,7 @@ import           Data.IORef                     ( IORef
 import           Data.Loc.Range                 ( Range )
 import           Data.Map                       ( Map )
 import qualified Data.Map                      as Map
+import           Data.Maybe                     ( isJust )
 import           Data.Text                      ( Text )
 import           Error
 import qualified Language.LSP.Diagnostics      as J
@@ -46,7 +47,6 @@ import           Server.DSL                     ( Cmd(..)
 import qualified Server.DSL                    as DSL
 import           Server.Handler.Diagnostic      ( collect )
 import qualified Server.SrcLoc                 as SrcLoc
-import Data.Maybe (isJust)
 
 --------------------------------------------------------------------------------
 
@@ -117,10 +117,12 @@ customRequestResponder
   -> (Response -> ServerM ())
   -> ([Error], Maybe [ResKind])
   -> ServerM ()
-customRequestResponder filepath responder (_errors, _result) = do
+customRequestResponder filepath responder (errors, result) = do
+  -- (oldErrors, oldResult)       <- getState filepath
+  -- logText $ " #### Cst old: " <> toText (length oldErrors)
+  logText $ " #### Cst new: " <> toText (length errors, isJust result)
   -- TEMP: ignore all results from custom handlers
-  -- (oldErrors, result)       <- getState filepath
-  -- responsesFromError <- convertErrors filepath oldErrors
+  -- responsesFromError <- convertErrors filepath errors
   -- let responses = case result of
   --       Nothing -> responsesFromError
   --       Just xs -> responsesFromError <> xs
@@ -137,11 +139,17 @@ notificationResponder :: J.Uri -> ([Error], Maybe [ResKind]) -> ServerM ()
 notificationResponder uri (errors, result) = case J.uriToFilePath uri of
   Nothing       -> pure ()
   Just filepath -> do
-    logText $ " ### State: " <> toText (length errors, isJust result)
     responsesFromError <- convertErrors filepath errors
     let responses = case result of
           Nothing -> responsesFromError
           Just xs -> responsesFromError <> xs
+
+    logText
+      $  " <--- Respond with "
+      <> toText (length result)
+      <> " responses and "
+      <> toText (length errors)
+      <> " errors"
     -- send responses
     J.sendNotification (J.SCustomMethod "guabao") $ JSON.toJSON $ Res
       filepath
@@ -193,18 +201,14 @@ interpret uri responder p = case J.uriToFilePath uri of
     Right result -> go filepath result
     Left  errors -> do
       setMute False -- unmute on error!
-      -- get the latest cached result 
-      state <- getState filepath
-      setState filepath state
       responder (errors, Nothing)
 
  where
   go filepath = \case
-    Pure responses -> do
-      -- send responses
-      (errors, _) <- getState filepath
-      responder (errors, Just responses)
-      -- sendResponses filepath responder responses
+    Pure value -> do
+      -- the program returned with some value successfully
+      -- clear accumulated errors 
+      responder ([], Just value)
     Free (EditText range text next) -> do
       logText $ " ### EditText " <> toText range <> " " <> text
       -- apply edit
