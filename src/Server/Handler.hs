@@ -9,7 +9,6 @@ module Server.Handler
 
 import           Control.Lens                   ( (^.) )
 import qualified Data.Aeson                    as JSON
-import qualified Data.Text                     as Text
 import           Language.LSP.Server            ( Handlers
                                                 , notificationHandler
                                                 , requestHandler
@@ -40,17 +39,12 @@ handlers = mconcat
     CustomMethod.handler params (responder . Right . JSON.toJSON)
   , notificationHandler J.STextDocumentDidChange $ \ntf -> do
     let uri    = ntf ^. (J.params . J.textDocument . J.uri)
-    -- let change = ntf ^. (J.params . J.contentChanges)
     interpret uri (notificationResponder uri) $ do
       muted <- isMuted
-      logText
-        $  " ---> TextDocumentDidChange (muted: "
-        <> Text.pack (show muted)
-        <> ")"
-      -- logText $ Text.pack $ " ---> " <> show change
       if muted
         then return []
         else do
+          logText " ---> TextDocumentDidChange"
           source    <- getSource
           parsed    <- parse source
           persist (Parsed parsed)

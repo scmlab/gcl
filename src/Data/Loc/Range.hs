@@ -12,6 +12,7 @@ import Data.Loc hiding (fromLoc)
 import GHC.Generics (Generic)
 import Data.Maybe (mapMaybe)
 import Data.Text.Prettyprint.Doc (Pretty (pretty))
+import qualified Data.List as List
 
 -- | Represents an interval of two source locations
 --
@@ -237,3 +238,45 @@ instance Pretty Loc where
 
 instance Pretty Pos where
   pretty = pretty . displayPos
+
+--------------------------------------------------------------------------------
+
+-- | Like Range but a special  Show &Pretty instance, won't display the full path
+newtype ShortRange = ShortRange { unShortRange :: Range } 
+
+instance Show ShortRange where
+  show (ShortRange (Range start end)) =
+    let path = case split '/' (posFile start) of 
+          [] -> []
+          xs -> last xs 
+    in 
+    if posLine start == posLine end
+      then 
+       path
+          <> " ["
+          <> show (posCoff start)
+          <> "-"
+          <> show (posCoff end)
+          <> "] "
+          <> show (posLine start)
+          <> ":"
+          <> show (posCol start)
+          <> "-"
+          <> show (posCol end)
+      else
+        path
+          <> " ["
+          <> show (posCoff start)
+          <> "-"
+          <> show (posCoff end)
+          <> "] "
+          <> show (posLine start)
+          <> ":"
+          <> show (posCol start)
+          <> "-"
+          <> show(posLine end)
+          <> ":"
+          <> show (posCol end)
+    where 
+      split :: Char -> String -> [String]
+      split c = filter (/= [c]) . List.groupBy (\x y -> x /= c && y /= c)

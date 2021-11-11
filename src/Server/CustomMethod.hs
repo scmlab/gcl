@@ -64,8 +64,8 @@ data ReqKind
 instance FromJSON ReqKind
 
 instance Show ReqKind where
-  show (ReqInspect      range) = "Inspect " <> show range
-  show (ReqRefine       range) = "Refine " <> show range
+  show (ReqInspect      range) = "Inspect " <> show (ShortRange range)
+  show (ReqRefine       range) = "Refine " <> show (ShortRange range)
   show (ReqInsertAnchor hash ) = "InsertAnchor " <> show hash
   show (ReqSubstitute   i    ) = "Substitute " <> show i
   show ReqDebug                = "Debug"

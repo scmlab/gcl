@@ -25,7 +25,7 @@ handler uri position responder = case uriToFilePath uri of
   Nothing       -> return ()
   Just filepath -> do
     interpret uri (responder . ignoreErrors) $ do
-      logText "<-- Hover"
+      logText " <--- Hover"
       source <- getSource
       let table = SrcLoc.makeToOffset source
       let pos   = SrcLoc.fromLSPPosition table filepath position

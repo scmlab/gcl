@@ -192,10 +192,10 @@ getLastSelection = liftF (GetLastSelection id)
 persist :: Stage -> CmdM ()
 persist stage = do 
   case stage of 
-    Uninitialized _ -> logText " #### Uninitialized"
-    Parsed _ -> logText " #### Parsed"
-    Converted _ -> logText " #### Converted"
-    Swept _ -> logText " #### Swept"
+    Uninitialized _ -> logText "    - Uninitialized"
+    Parsed _ -> logText "    - Parsed"
+    Converted _ -> logText "    - Converted"
+    Swept _ -> logText "    - Swept"
   
   
   liftF (SetCurrentState ([], stage) ())
