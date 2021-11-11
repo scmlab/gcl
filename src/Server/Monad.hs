@@ -1,6 +1,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE LambdaCase #-}
 
 module Server.Monad
   ( ServerM
@@ -16,7 +17,6 @@ import           Control.Concurrent             ( Chan
                                                 , newChan
                                                 , writeChan
                                                 )
-import           Control.Monad.Except           ( throwError )
 import           Control.Monad.Reader
 import           Control.Monad.Trans.Free
 import qualified Data.Aeson                    as JSON
@@ -30,7 +30,6 @@ import           Data.Loc.Range                 ( Range )
 import           Data.Map                       ( Map )
 import qualified Data.Map                      as Map
 import           Data.Text                      ( Text )
-import qualified Data.Text                     as Text
 import           Error
 import qualified Language.LSP.Diagnostics      as J
 import qualified Language.LSP.Server           as J
@@ -47,6 +46,7 @@ import           Server.DSL                     ( Cmd(..)
 import qualified Server.DSL                    as DSL
 import           Server.Handler.Diagnostic      ( collect )
 import qualified Server.SrcLoc                 as SrcLoc
+import Data.Maybe (isJust)
 
 --------------------------------------------------------------------------------
 
@@ -63,7 +63,7 @@ data GlobalEnv = GlobalEnv
   ,
     -- 
     globalMute         :: IORef Bool
-  , globalCurrentStage :: IORef (Map FilePath Stage)
+  , globalCurrentStage :: IORef (Map FilePath ([Error], Stage))
   }
 
 -- | Constructs an initial global state
@@ -102,8 +102,8 @@ sendDiagnostics filepath diagnostics = do
                        (Just version)
                        (J.partitionBySource diagnostics)
 
-handleErrors :: FilePath -> Either [Error] [ResKind] -> ServerM [ResKind]
-handleErrors filepath (Left errors) = do
+convertErrors :: FilePath -> [Error] -> ServerM [ResKind]
+convertErrors filepath errors = do
   version <- bumpVersionM
   let responses =
         [ResDisplay version (map renderSection errors), ResUpdateSpecs []]
@@ -111,22 +111,37 @@ handleErrors filepath (Left errors) = do
   -- send diagnostics
   sendDiagnostics filepath diagnostics
   return responses
-handleErrors _ (Right responses) = return responses
 
 customRequestResponder
   :: FilePath
   -> (Response -> ServerM ())
-  -> Either [Error] [ResKind]
+  -> ([Error], Maybe [ResKind])
   -> ServerM ()
-customRequestResponder filepath responder result = do
-  responses <- handleErrors filepath result
-  responder (Res filepath responses)
+customRequestResponder filepath responder (_errors, _result) = do
+  -- TEMP: ignore all results from custom handlers
+  -- (oldErrors, result)       <- getState filepath
+  -- responsesFromError <- convertErrors filepath oldErrors
+  -- let responses = case result of
+  --       Nothing -> responsesFromError
+  --       Just xs -> responsesFromError <> xs
+  responder (Res filepath [])
 
-notificationResponder :: J.Uri -> Either [Error] [ResKind] -> ServerM ()
-notificationResponder uri result = case J.uriToFilePath uri of
+  -- (oldErrors, _)       <- getState filepath
+  -- responsesFromError <- convertErrors filepath errors
+  -- let responses = case result of
+  --       Nothing -> responsesFromError
+  --       Just xs -> responsesFromError <> xs
+  -- responder (Res filepath responses)
+
+notificationResponder :: J.Uri -> ([Error], Maybe [ResKind]) -> ServerM ()
+notificationResponder uri (errors, result) = case J.uriToFilePath uri of
   Nothing       -> pure ()
   Just filepath -> do
-    responses <- handleErrors filepath result
+    logText $ " ### State: " <> toText (length errors, isJust result)
+    responsesFromError <- convertErrors filepath errors
+    let responses = case result of
+          Nothing -> responsesFromError
+          Just xs -> responsesFromError <> xs
     -- send responses
     J.sendNotification (J.SCustomMethod "guabao") $ JSON.toJSON $ Res
       filepath
@@ -151,31 +166,46 @@ setMute b = do
   ref <- lift $ asks globalMute
   liftIO $ writeIORef ref b
 
-setCurrentStage :: FilePath -> Stage -> ServerM ()
-setCurrentStage filepath stage = do
+setState :: FilePath -> ([Error], Stage) -> ServerM ()
+setState filepath state = do
   ref <- lift $ asks globalCurrentStage
-  liftIO $ modifyIORef' ref (Map.insert filepath stage)
+  liftIO $ modifyIORef' ref (Map.insert filepath state)
 
-readCurrentStage :: FilePath -> ServerM (Maybe Stage)
-readCurrentStage filepath = do
+getState :: FilePath -> ServerM ([Error], Stage)
+getState filepath = do
   ref     <- lift $ asks globalCurrentStage
   mapping <- liftIO $ readIORef ref
   case Map.lookup filepath mapping of
-    Nothing    -> return Nothing
-    Just stage -> return $ Just stage
+    Nothing    -> return ([], Uninitialized filepath)
+    Just state -> return state
 
 --------------------------------------------------------------------------------
 
 interpret
-  :: Show a => J.Uri -> (Either [Error] a -> ServerM ()) -> CmdM a -> ServerM ()
+  :: Show a
+  => J.Uri
+  -> (([Error], Maybe a) -> ServerM ())
+  -> CmdM a
+  -> ServerM ()
 interpret uri responder p = case J.uriToFilePath uri of
   Nothing       -> pure ()
   Just filepath -> case runCmdM p of
-    Right (Pure responses) -> do
+    Right result -> go filepath result
+    Left  errors -> do
+      setMute False -- unmute on error!
+      -- get the latest cached result 
+      state <- getState filepath
+      setState filepath state
+      responder (errors, Nothing)
+
+ where
+  go filepath = \case
+    Pure responses -> do
       -- send responses
-      responder (Right responses)
+      (errors, _) <- getState filepath
+      responder (errors, Just responses)
       -- sendResponses filepath responder responses
-    Right (Free (EditText range text next)) -> do
+    Free (EditText range text next) -> do
       logText $ " ### EditText " <> toText range <> " " <> text
       -- apply edit
       let removeSpec = J.TextEdit (SrcLoc.toLSPRange range) text
@@ -193,50 +223,47 @@ interpret uri responder p = case J.uriToFilePath uri of
       void $ J.sendRequest J.SWorkspaceApplyEdit
                            applyWorkspaceEditParams
                            callback
-    Right (Free (SetMute b next)) -> do
+    Free (SetMute b next) -> do
       setMute b
       interpret uri responder next
-    Right (Free (GetMute next)) -> do
+    Free (GetMute next) -> do
       m <- getMute
       interpret uri responder (next m)
-    Right (Free (GetFilePath next)) -> interpret uri responder (next filepath)
-    Right (Free (GetSource   next)) -> do
+    Free (GetFilePath next) -> interpret uri responder (next filepath)
+    Free (GetSource   next) -> do
       result <- fmap J.virtualFileText
         <$> J.getVirtualFile (J.toNormalizedUri (J.filePathToUri filepath))
       case result of
-        Nothing     -> responder (Left [CannotReadFile filepath])
+        Nothing     -> responder ([CannotReadFile filepath], Nothing)
         Just source -> interpret uri responder (next source)
-    Right (Free (GetLastSelection next)) -> do
+    Free (GetLastSelection next) -> do
       ref     <- lift $ asks globalSelectionMap
       mapping <- liftIO $ readIORef ref
       let selection = join $ Map.lookup filepath mapping
       interpret uri responder (next selection)
-    Right (Free (SetLastSelection selection next)) -> do
+    Free (SetLastSelection selection next) -> do
       ref <- lift $ asks globalSelectionMap
       liftIO $ modifyIORef' ref (Map.insert filepath (Just selection))
       interpret uri responder next
-    Right (Free (GetCurrentState next)) -> do
-      result <- readCurrentStage filepath
+    Free (GetCurrentState next) -> do
+      state <- getState filepath
       interpret uri responder $ do
-        case result of
-          Nothing    -> throwError [CannotReadFile filepath]
-          Just state -> next state
-    Right (Free (SetCurrentState result next)) -> do
-      setCurrentStage filepath result
+        next state
+    Free (SetCurrentState (newError, newStage) next) -> do
+      (old, oldStage) <- getState filepath
+      if null old
+        -- overwrite with a new stage 
+        then setState filepath (newError, newStage)
+        -- do nothing 
+        else setState filepath (old, oldStage)
       interpret uri responder next
-    Right (Free (BumpResponseVersion next)) -> do
+    Free (BumpResponseVersion next) -> do
       n <- bumpVersionM
       interpret uri responder (next n)
-    Right (Free (Log text next)) -> do
+    Free (Log text next) -> do
       logText text
       interpret uri responder next
-    Right (Free (SendDiagnostics diagnostics next)) -> do
+    Free (SendDiagnostics diagnostics next) -> do
       -- send diagnostics
       sendDiagnostics filepath diagnostics
       interpret uri responder next
-    Left errors -> do
-      setMute False -- unmute on error!
-      -- TODO: restore this
-      -- setCurrentStage filepath $ SweepFailure errors
-      logText $ Text.pack $ show errors
-      responder (Left errors)

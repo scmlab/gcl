@@ -106,16 +106,17 @@ sweep convertedResult = do
       , sweptCounter       = counter
       }
 
-data Stage =
-         Parsed ParseResult
+data Stage = Uninitialized FilePath
+        | Parsed ParseResult
         | Converted ConvertResult
-        |  Swept SweepResult
+        | Swept SweepResult
 
 instance Pretty Stage where
   pretty stage = case stage of
-    Parsed    _result -> "Parsed"
-    Converted _result -> "Converted"
-    Swept     result  -> pretty result
+    Uninitialized filepath -> "Uninitialized " <> pretty filepath
+    Parsed        _result  -> "Parsed"
+    Converted     _result  -> "Converted"
+    Swept         result   -> pretty result
 
 instance Pretty SweepResult where
   pretty result =
@@ -127,9 +128,6 @@ instance Pretty SweepResult where
            , "Warnings: " <> pretty (sweptWarnings result)
            ]
       <> " }"
-
--- instance Pretty State where
---   pretty _state = "State"
 
 -- The "Syntax" of the DSL for handling LSP requests and responses
 data Cmd next
@@ -158,9 +156,9 @@ data Cmd next
   | BumpResponseVersion (Int -> next)
   | Log Text next
   -- | Store current stage 
-  | SetCurrentState Stage next
+  | SetCurrentState ([Error], Stage) next
   -- | Read current stage 
-  | GetCurrentState (Stage -> next)
+  | GetCurrentState (([Error], Stage) -> next)
   -- | SendDiagnostics from the LSP protocol 
   | SendDiagnostics [J.Diagnostic] next
   deriving (Functor)
@@ -191,11 +189,11 @@ setLastSelection selection = liftF (SetLastSelection selection ())
 getLastSelection :: CmdM (Maybe Range)
 getLastSelection = liftF (GetLastSelection id)
 
-setCurrentStage :: Stage -> CmdM ()
-setCurrentStage result = liftF (SetCurrentState result ())
+persist :: Stage -> CmdM ()
+persist stage = liftF (SetCurrentState ([], stage) ())
 
-readCurrentStage :: CmdM Stage
-readCurrentStage = liftF (GetCurrentState id)
+getState :: CmdM Stage
+getState = snd <$> liftF (GetCurrentState id)
 
 logText :: Text -> CmdM ()
 logText text = liftF (Log text ())
@@ -205,7 +203,7 @@ bumpVersion = liftF (BumpResponseVersion id)
 
 sendDiagnostics :: [J.Diagnostic] -> CmdM ()
 sendDiagnostics xs = do
-  logText $ " ### Diagnostic " <> toText (length xs)
+  logText $ " <--- Diagnostic " <> toText (length xs)
   liftF (SendDiagnostics xs ())
 
 ------------------------------------------------------------------------------
@@ -214,7 +212,7 @@ sendDiagnostics xs = do
 -- and returns the modified source and the difference of source length
 digHole :: Range -> CmdM Text
 digHole range = do
-  logText $ " ### DigHole " <> toText range
+  logText $ " <--- DigHole " <> toText range
   let indent   = Text.replicate (posCol (rangeStart range) - 1) " "
   let holeText = "[!\n" <> indent <> "\n" <> indent <> "!]"
   editText range holeText
@@ -265,57 +263,72 @@ parseProgram source = do
     Left  (Range start end) -> digHole (Range start end) >>= parseProgram
     Right abstract          -> return (concrete, abstract)
 
+
+
 --------------------------------------------------------------------------------
 
-generateResponseAndDiagnosticsFromCurrentState :: Stage -> CmdM [ResKind]
-generateResponseAndDiagnosticsFromCurrentState (Parsed    _result) = return []
-generateResponseAndDiagnosticsFromCurrentState (Converted _result) = return []
-generateResponseAndDiagnosticsFromCurrentState (Swept     result ) = do
-  let (SweepResult _ pos specs globalProps warnings _redexes _) = result
+generateResponseAndDiagnosticsFromCurrentState :: CmdM [ResKind]
+generateResponseAndDiagnosticsFromCurrentState = do
+  stage <- getState
+  case stage of
+      Uninitialized _      -> return []
+      Parsed        _      -> return []
+      Converted     _      -> return []
+      Swept         result -> do
+        let (SweepResult _ pos specs globalProps warnings _redexes _) = result
 
-  -- get Specs around the mouse selection
-  lastSelection <- getLastSelection
-  let overlappedSpecs = case lastSelection of
-        Nothing        -> specs
-        Just selection -> filter (withinRange selection) specs
-  -- get POs around the mouse selection (including their corresponding Proofs)
+        -- get Specs around the mouse selection
+        lastSelection <- getLastSelection
+        let overlappedSpecs = case lastSelection of
+              Nothing        -> specs
+              Just selection -> filter (withinRange selection) specs
+        -- get POs around the mouse selection (including their corresponding Proofs)
 
-  let withinPOrange sel po = case poAnchorLoc po of
-        Nothing     -> withinRange sel po
-        Just anchor -> withinRange sel po || withinRange sel anchor
+        let withinPOrange sel po = case poAnchorLoc po of
+              Nothing     -> withinRange sel po
+              Just anchor -> withinRange sel po || withinRange sel anchor
 
-  let overlappedPOs = case lastSelection of
-        Nothing        -> pos
-        Just selection -> filter (withinPOrange selection) pos
-  -- render stuff
-  let warningsSections =
-        if null warnings then [] else map renderSection warnings
-  let globalPropsSections = if null globalProps
-        then []
-        else map
-          (\expr -> Section
-            Plain
-            [Header "Property" (fromLoc (locOf expr)), Code (render expr)]
-          )
-          globalProps
-  let specsSections =
-        if null overlappedSpecs then [] else map renderSection overlappedSpecs
-  let poSections =
-        if null overlappedPOs then [] else map renderSection overlappedPOs
-  let sections = mconcat
-        [warningsSections, specsSections, poSections, globalPropsSections]
+        let overlappedPOs = case lastSelection of
+              Nothing        -> pos
+              Just selection -> filter (withinPOrange selection) pos
+        -- render stuff
+        let warningsSections =
+              if null warnings then [] else map renderSection warnings
+        let globalPropsSections = if null globalProps
+              then []
+              else map
+                (\expr -> Section
+                  Plain
+                  [Header "Property" (fromLoc (locOf expr)), Code (render expr)]
+                )
+                globalProps
+        let specsSections = if null overlappedSpecs
+              then []
+              else map renderSection overlappedSpecs
+        let poSections = if null overlappedPOs
+              then []
+              else map renderSection overlappedPOs
+        let sections =
+              mconcat
+                [ warningsSections
+                , specsSections
+                , poSections
+                , globalPropsSections
+                ]
 
-  version <- bumpVersion
-  let encodeSpec spec =
-        ( specID spec
-        , toText $ render (specPreCond spec)
-        , toText $ render (specPostCond spec)
-        , specRange spec
-        )
+        version <- bumpVersion
+        let encodeSpec spec =
+              ( specID spec
+              , toText $ render (specPreCond spec)
+              , toText $ render (specPostCond spec)
+              , specRange spec
+              )
 
-  let responses =
-        [ResDisplay version sections, ResUpdateSpecs (map encodeSpec specs)]
-  let diagnostics = concatMap collect pos ++ concatMap collect warnings
-  sendDiagnostics diagnostics
+        let responses =
+              [ ResDisplay version sections
+              , ResUpdateSpecs (map encodeSpec specs)
+              ]
+        let diagnostics = concatMap collect pos ++ concatMap collect warnings
+        sendDiagnostics diagnostics
 
-  return responses
+        return responses

@@ -28,8 +28,7 @@ import qualified Language.LSP.Types            as J
 handleInspect :: Range -> CmdM [ResKind]
 handleInspect range = do
   setLastSelection range
-  stage <- readCurrentStage
-  generateResponseAndDiagnosticsFromCurrentState stage
+  generateResponseAndDiagnosticsFromCurrentState
 
 handleRefine :: Range -> CmdM [ResKind]
 handleRefine range = do
@@ -46,14 +45,16 @@ handleRefine range = do
           let indentation =
                 Text.replicate (posCol (rangeStart (specRange spec)) - 1) " "
           in  Text.unlines $ x : map (indentation <>) xs
-  source'              <- editText (specRange spec) indentedPayload
-  parsed    <- parse source'
+  source' <- editText (specRange spec) indentedPayload
+  parsed  <- parse source'
+  persist (Parsed parsed)
   converted <- convert parsed
+  persist (Converted converted)
   typeCheck (convertedProgram converted)
   mute False
   result <- sweep converted
-  setCurrentStage (Swept result)
-  generateResponseAndDiagnosticsFromCurrentState (Swept result)
+  persist (Swept result)
+  generateResponseAndDiagnosticsFromCurrentState
 
 handleInsertAnchor :: Text -> CmdM [ResKind]
 handleInsertAnchor hash = do
@@ -75,18 +76,19 @@ handleInsertAnchor hash = do
   typeCheck (convertedProgram converted)
   mute False
   result <- sweep converted
-  setCurrentStage (Swept result)
-  generateResponseAndDiagnosticsFromCurrentState (Swept result)
+  persist (Swept result)
+  generateResponseAndDiagnosticsFromCurrentState
 
 handleSubst :: Int -> CmdM [ResKind]
 handleSubst i = do
-  stage <- readCurrentStage
+  stage <- getState
   logText $ Text.pack $ "Substituting Redex " <> show i
   -- 
   case stage of
-    Parsed    _      -> return []
-    Converted _      -> return []
-    Swept     result -> do
+    Uninitialized _      -> return []
+    Parsed        _      -> return []
+    Converted     _      -> return []
+    Swept         result -> do
       let program = convertedProgram (sweptPreviousStage result)
       case IntMap.lookup i (sweptRedexes result) of
         Nothing    -> return []
@@ -100,7 +102,7 @@ handleSubst i = do
                 { sweptCounter = counter
                 , sweptRedexes = sweptRedexes result <> redexesInNewExpr
                 }
-          setCurrentStage (Swept newResult)
+          persist (Swept newResult)
           return [ResSubstitute i (render newExpr)]
 
 handleCustomMethod :: ReqKind -> CmdM [ResKind]
@@ -134,6 +136,6 @@ handler params responder = do
     interpret (J.filePathToUri filepath)
               (customRequestResponder filepath responder)
       $ do
-          logText $ " --> Custom Reqeust: " <> Text.pack (show request)
+          logText $ " ---> Custom Reqeust: " <> Text.pack (show request)
           handleCustomMethod kind
 

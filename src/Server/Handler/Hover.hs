@@ -16,9 +16,9 @@ import           Server.TokenMap                ( Token(tokenHoverAndType)
                                                 , lookupIntervalMap
                                                 )
 
-ignoreErrors :: Either [Error] (Maybe Hover) -> Maybe Hover
-ignoreErrors (Left  _errors  ) = Nothing
-ignoreErrors (Right locations) = locations
+ignoreErrors :: ([Error], Maybe (Maybe Hover)) -> Maybe Hover
+ignoreErrors (_, Nothing) = Nothing
+ignoreErrors (_, Just xs) = xs
 
 handler :: Uri -> Position -> (Maybe Hover -> ServerM ()) -> ServerM ()
 handler uri position responder = case uriToFilePath uri of
@@ -31,10 +31,11 @@ handler uri position responder = case uriToFilePath uri of
       let pos   = SrcLoc.fromLSPPosition table filepath position
 
 
-      stage <- readCurrentStage
+      stage <- getState
 
       let
         tokenMap = case stage of
+          Uninitialized _ -> Nothing
           Parsed _result -> Nothing
           Converted result -> Just $ convertedTokenMap result
           Swept result -> Just $ convertedTokenMap (sweptPreviousStage result)

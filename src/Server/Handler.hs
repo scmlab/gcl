@@ -40,35 +40,39 @@ handlers = mconcat
     CustomMethod.handler params (responder . Right . JSON.toJSON)
   , notificationHandler J.STextDocumentDidChange $ \ntf -> do
     let uri    = ntf ^. (J.params . J.textDocument . J.uri)
-    let change = ntf ^. (J.params . J.contentChanges)
+    -- let change = ntf ^. (J.params . J.contentChanges)
     interpret uri (notificationResponder uri) $ do
       muted <- isMuted
       logText
-        $  " --> TextDocumentDidChange (muted: "
+        $  " ---> TextDocumentDidChange (muted: "
         <> Text.pack (show muted)
         <> ")"
-      logText $ Text.pack $ " --> " <> show change
+      -- logText $ Text.pack $ " ---> " <> show change
       if muted
         then return []
         else do
           source    <- getSource
           parsed    <- parse source
+          persist (Parsed parsed)
           converted <- convert parsed
+          persist (Converted converted)
           typeCheck (convertedProgram converted)
           result <- sweep converted
-          setCurrentStage (Swept result)
-          generateResponseAndDiagnosticsFromCurrentState (Swept result)
+          persist (Swept result)
+          generateResponseAndDiagnosticsFromCurrentState
   , notificationHandler J.STextDocumentDidOpen $ \ntf -> do
     let uri    = ntf ^. (J.params . J.textDocument . J.uri)
     let source = ntf ^. (J.params . J.textDocument . J.text)
     interpret uri (notificationResponder uri) $ do
-      logText " --> TextDocumentDidOpen"
+      logText " ---> TextDocumentDidOpen"
       parsed    <- parse source
+      persist (Parsed parsed)
       converted <- convert parsed
+      persist (Converted converted)
       typeCheck (convertedProgram converted)
       result <- sweep converted
-      setCurrentStage (Swept result)
-      generateResponseAndDiagnosticsFromCurrentState (Swept result)
+      persist (Swept result)
+      generateResponseAndDiagnosticsFromCurrentState
   , -- Goto Definition
     requestHandler J.STextDocumentDefinition $ \req responder -> do
     let uri = req ^. (J.params . J.textDocument . J.uri)
@@ -82,13 +86,14 @@ handlers = mconcat
   , requestHandler J.STextDocumentSemanticTokensFull $ \req responder -> do
     let uri = req ^. (J.params . J.textDocument . J.uri)
     interpret uri (responder . ignoreErrors) $ do
-      logText "<-- Syntax Highlighting"
-      stage <- readCurrentStage
+      logText " <--- Syntax Highlighting"
+      stage <- getState
       let legend = J.SemanticTokensLegend
             (J.List J.knownSemanticTokenTypes)
             (J.List J.knownSemanticTokenModifiers)
       let
         highlightings = case stage of
+          Uninitialized _ -> []
           Parsed result -> parsedHighlighings result
           Converted result ->
             parsedHighlighings (convertedPreviousStage result)
@@ -101,7 +106,7 @@ handlers = mconcat
   ]
 
 ignoreErrors
-  :: Either [Error] (Either J.ResponseError (Maybe J.SemanticTokens))
+  :: ([Error], Maybe (Either J.ResponseError (Maybe J.SemanticTokens)))
   -> Either J.ResponseError (Maybe J.SemanticTokens)
-ignoreErrors (Left  _errors) = Right Nothing
-ignoreErrors (Right xs     ) = xs
+ignoreErrors (_, Nothing) = Left $ J.ResponseError J.InternalError "?" Nothing 
+ignoreErrors (_, Just xs) = xs

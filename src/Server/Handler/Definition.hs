@@ -14,9 +14,9 @@ import           Server.Monad
 import qualified Server.SrcLoc                 as SrcLoc
 import           Server.TokenMap
 
-ignoreErrors :: Either [Error] [LocationLink] -> [LocationLink]
-ignoreErrors (Left  _errors  ) = []
-ignoreErrors (Right locations) = locations
+ignoreErrors :: ([Error], Maybe [LocationLink]) -> [LocationLink]
+ignoreErrors (_, Nothing) = []
+ignoreErrors (_, Just xs) = xs
 
 handler :: Uri -> Position -> ([LocationLink] -> ServerM ()) -> ServerM ()
 handler uri position responder = do
@@ -30,8 +30,9 @@ handler uri position responder = do
         let table = SrcLoc.makeToOffset source
         let pos   = SrcLoc.fromLSPPosition table filepath position
 
-        stage <- readCurrentStage
+        stage <- getState
         let tokenMap = case stage of
+              Uninitialized _ -> Nothing
               Parsed _result -> Nothing
               Converted result -> Just $ convertedTokenMap result
               Swept     result -> Just $ convertedTokenMap (sweptPreviousStage result)
