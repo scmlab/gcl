@@ -29,7 +29,6 @@ import           Data.IORef                     ( IORef
 import           Data.Loc.Range                 ( Range )
 import           Data.Map                       ( Map )
 import qualified Data.Map                      as Map
-import           Data.Maybe                     ( isJust )
 import           Data.Text                      ( Text )
 import           Error
 import qualified Language.LSP.Diagnostics      as J
@@ -93,14 +92,17 @@ logText s = do
 
 --------------------------------------------------------------------------------
 
+-- send diagnostics
 sendDiagnostics :: FilePath -> [J.Diagnostic] -> ServerM ()
 sendDiagnostics filepath diagnostics = do
-  -- send diagnostics
   version <- bumpVersionM
-  J.publishDiagnostics 100
-                       (J.toNormalizedUri (J.filePathToUri filepath))
-                       (Just version)
-                       (J.partitionBySource diagnostics)
+  -- only send diagnostics when it's not empty
+  -- otherwise the existing diagnostics would be erased 
+  unless (null diagnostics) $ do
+    J.publishDiagnostics 100
+                         (J.toNormalizedUri (J.filePathToUri filepath))
+                         (Just version)
+                         (J.partitionBySource diagnostics)
 
 convertErrors :: FilePath -> [Error] -> ServerM [ResKind]
 convertErrors filepath errors = do
@@ -108,8 +110,9 @@ convertErrors filepath errors = do
   let responses =
         [ResDisplay version (map renderSection errors), ResUpdateSpecs []]
   let diagnostics = errors >>= collect
-  -- send diagnostics
+
   sendDiagnostics filepath diagnostics
+
   return responses
 
 customRequestResponder
@@ -118,15 +121,32 @@ customRequestResponder
   -> ([Error], Maybe [ResKind])
   -> ServerM ()
 customRequestResponder filepath responder (errors, result) = do
-  -- (oldErrors, oldResult)       <- getState filepath
-  -- logText $ " #### Cst old: " <> toText (length oldErrors)
-  logText $ " #### Cst new: " <> toText (length errors, isJust result)
+  (oldErrors, oldResult)       <- getState filepath
+  logText $ " #### errors " <> toText (length oldErrors) <>  " => " <> toText (length errors)
+  case oldResult of 
+    Uninitialized _ -> logText "    ! Uninitialized"
+    Parsed _ -> logText "    ! Parsed"
+    Converted _ -> logText "    ! Converted"
+    Swept _ -> logText "    ! Swept"
+  
   -- TEMP: ignore all results from custom handlers
   -- responsesFromError <- convertErrors filepath errors
   -- let responses = case result of
   --       Nothing -> responsesFromError
   --       Just xs -> responsesFromError <> xs
-  responder (Res filepath [])
+
+  if null errors
+    then do
+      -- logText $ " #### Cst ok: " <> toText (length errors, isJust result)
+      let responses = case result of
+            Nothing -> []
+            Just xs -> xs
+      responder (Res filepath responses)
+    else do 
+      -- logText $ " #### Cst err: " <> toText (length errors, isJust result)
+      responder (Res filepath [])
+
+
 
   -- (oldErrors, _)       <- getState filepath
   -- responsesFromError <- convertErrors filepath errors
@@ -201,14 +221,17 @@ interpret uri responder p = case J.uriToFilePath uri of
     Right result -> go filepath result
     Left  errors -> do
       setMute False -- unmute on error!
+      -- got errors from computation
+      -- store it for later inspection 
+      cachedStage <- snd <$> getState filepath
+      setState filepath (errors, cachedStage)
       responder (errors, Nothing)
 
  where
   go filepath = \case
     Pure value -> do
-      -- the program returned with some value successfully
-      -- clear accumulated errors 
-      responder ([], Just value)
+      (errors, _) <- getState filepath
+      responder (errors, Just value)
     Free (EditText range text next) -> do
       logText $ " ### EditText " <> toText range <> " " <> text
       -- apply edit
@@ -253,13 +276,8 @@ interpret uri responder p = case J.uriToFilePath uri of
       state <- getState filepath
       interpret uri responder $ do
         next state
-    Free (SetCurrentState (newError, newStage) next) -> do
-      (old, oldStage) <- getState filepath
-      if null old
-        -- overwrite with a new stage 
-        then setState filepath (newError, newStage)
-        -- do nothing 
-        else setState filepath (old, oldStage)
+    Free (SetCurrentState state next) -> do
+      setState filepath state
       interpret uri responder next
     Free (BumpResponseVersion next) -> do
       n <- bumpVersionM

@@ -196,8 +196,6 @@ persist stage = do
     Parsed _ -> logText "    - Parsed"
     Converted _ -> logText "    - Converted"
     Swept _ -> logText "    - Swept"
-  
-  
   liftF (SetCurrentState ([], stage) ())
 
 getState :: CmdM Stage
