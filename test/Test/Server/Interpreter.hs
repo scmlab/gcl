@@ -8,16 +8,15 @@ module Test.Server.Interpreter
   , serializeTestResultValueOnly
   ) where
 
-import           Control.Monad.State
+import           Control.Monad.RWS
 import           Control.Monad.Trans.Free
-import           Control.Monad.Trans.Writer
 import qualified Data.ByteString.Lazy          as BSL
 import           Data.Loc
 import           Data.Loc.Range
 import           Data.Text                      ( Text )
 import qualified Data.Text                     as Text
 import qualified Data.Text.Encoding            as Text
-import           Error                          ( Error (CannotReadFile) )
+import           Error                          ( Error(CannotReadFile) )
 import           Language.LSP.Types             ( Diagnostic )
 import           Pretty
 import           Server.DSL
@@ -61,11 +60,12 @@ data Trace
   | TraceSendDiagnostics [Diagnostic]
   deriving (Eq, Show)
 
-type TestM = StateT Text (Writer [Trace])
+type TestM a = RWS () [Trace] Text a
 
 runTest :: FilePath -> Text -> CmdM (Either [Error] a) -> TestResult a
-runTest filepath source program = uncurry (uncurry TestResult)
-  $ runWriter (runStateT (interpret filepath program) source)
+runTest filepath source program =
+  let (result, text, trace) = runRWS (interpret filepath program) () source
+  in  TestResult result text trace
 
 -- Interprets the Server DSL and logs side effects as [Trace] 
 interpret :: FilePath -> CmdM (Either [Error] a) -> TestM (Either [Error] a)
@@ -78,7 +78,7 @@ interpret filepath p = case runCmdM p of
     let (_, after)     = Text.splitAt (posCoff end - posCoff start) rest
     let newSource      = before <> text <> after
     put newSource
-    lift $ tell [TraceEditText range text]
+    tell [TraceEditText range text]
     interpret filepath (next newSource)
   Right (Free (SetMute _ next)) -> do
     interpret filepath next
@@ -87,32 +87,32 @@ interpret filepath p = case runCmdM p of
   Right (Free (GetFilePath next)) -> do
     interpret filepath (next filepath)
   Right (Free (GetSource next)) -> do
-    lift $ tell [TraceGetSource]
+    tell [TraceGetSource]
     source <- get
     interpret filepath (next source)
   Right (Free (GetLastSelection next)) -> do
-    lift $ tell [TraceGetLastSelection]
+    tell [TraceGetLastSelection]
     interpret filepath (next Nothing)
   Right (Free (SetLastSelection selection next)) -> do
-    lift $ tell [TracePutLastSelection selection]
+    tell [TracePutLastSelection selection]
     interpret filepath next
   Right (Free (GetCurrentState _next)) -> do
-    lift $ tell []
+    tell []
     interpret filepath $ return $ Left [CannotReadFile filepath]
   Right (Free (SetCurrentState _ next)) -> do
-    lift $ tell []
+    tell []
     interpret filepath next
   Right (Free (BumpResponseVersion next)) -> do
-    lift $ tell [TraceBumpResponseVersion]
+    tell [TraceBumpResponseVersion]
     interpret filepath (next 0)
   Right (Free (Log text next)) -> do
-    lift $ tell [TraceLog text]
+    tell [TraceLog text]
     interpret filepath next
   Right (Free (SendDiagnostics diagnostics next)) -> do
-    lift $ tell [TraceSendDiagnostics diagnostics]
+    tell [TraceSendDiagnostics diagnostics]
     interpret filepath next
   Left errors -> do
     -- let responses = [ResDisplay 0 (headerE "Errors" : map renderSection errors)]
     let diagnostics = errors >>= collect
-    lift $ tell [TraceSendDiagnostics diagnostics]
+    tell [TraceSendDiagnostics diagnostics]
     return $ Left errors

@@ -47,12 +47,11 @@ handlers = mconcat
           logText " ---> TextDocumentDidChange"
           source    <- getSource
           parsed    <- parse source
-          persist (Parsed parsed)
           converted <- convert parsed
-          persist (Converted converted)
+          
           typeCheck (convertedProgram converted)
-          result <- sweep converted
-          persist (Swept result)
+          _ <- sweep converted
+          
           generateResponseAndDiagnosticsFromCurrentState
   , notificationHandler J.STextDocumentDidOpen $ \ntf -> do
     let uri    = ntf ^. (J.params . J.textDocument . J.uri)
@@ -60,12 +59,12 @@ handlers = mconcat
     interpret uri (notificationResponder uri) $ do
       logText " ---> TextDocumentDidOpen"
       parsed    <- parse source
-      persist (Parsed parsed)
+      
       converted <- convert parsed
-      persist (Converted converted)
+      
       typeCheck (convertedProgram converted)
-      result <- sweep converted
-      persist (Swept result)
+      _ <- sweep converted
+      
       generateResponseAndDiagnosticsFromCurrentState
   , -- Goto Definition
     requestHandler J.STextDocumentDefinition $ \req responder -> do

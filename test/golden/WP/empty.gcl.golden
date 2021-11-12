@@ -8,3 +8,6 @@
 
 ### Trace
 
+TraceLog "    - Parsed"
+TraceLog "    - Converted"
+TraceLog "    - Swept"

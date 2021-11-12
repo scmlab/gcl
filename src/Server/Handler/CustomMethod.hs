@@ -47,13 +47,13 @@ handleRefine range = do
           in  Text.unlines $ x : map (indentation <>) xs
   source' <- editText (specRange spec) indentedPayload
   parsed  <- parse source'
-  persist (Parsed parsed)
+  
   converted <- convert parsed
-  persist (Converted converted)
+  
   typeCheck (convertedProgram converted)
   mute False
-  result <- sweep converted
-  persist (Swept result)
+  _ <- sweep converted
+  
   generateResponseAndDiagnosticsFromCurrentState
 
 handleInsertAnchor :: Text -> CmdM [ResKind]
@@ -75,8 +75,8 @@ handleInsertAnchor hash = do
   converted <- convert parsed
   typeCheck (convertedProgram converted)
   mute False
-  result <- sweep converted
-  persist (Swept result)
+  _ <- sweep converted
+  
   generateResponseAndDiagnosticsFromCurrentState
 
 handleSubst :: Int -> CmdM [ResKind]

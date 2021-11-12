@@ -123,27 +123,15 @@ customRequestResponder
 customRequestResponder filepath responder (errors, result) = do
   (oldErrors, oldResult)       <- getState filepath
   logText $ " #### errors " <> toText (length oldErrors) <>  " => " <> toText (length errors)
-  case oldResult of 
-    Uninitialized _ -> logText "    ! Uninitialized"
-    Parsed _ -> logText "    ! Parsed"
-    Converted _ -> logText "    ! Converted"
-    Swept _ -> logText "    ! Swept"
-  
-  -- TEMP: ignore all results from custom handlers
-  -- responsesFromError <- convertErrors filepath errors
-  -- let responses = case result of
-  --       Nothing -> responsesFromError
-  --       Just xs -> responsesFromError <> xs
+
 
   if null errors
     then do
-      -- logText $ " #### Cst ok: " <> toText (length errors, isJust result)
       let responses = case result of
             Nothing -> []
             Just xs -> xs
       responder (Res filepath responses)
     else do 
-      -- logText $ " #### Cst err: " <> toText (length errors, isJust result)
       responder (Res filepath [])
 
 

@@ -25,7 +25,7 @@ Warnings: [] }
 
 ### Trace
 
-TraceLog " ### DigHole ./test/source/Server/spec-qm-2.gcl [0-1] 1:1-2"
+TraceLog " <--- DigHole ./test/source/Server/spec-qm-2.gcl [0-1] 1:1-2"
 TraceEditText ./test/source/Server/spec-qm-2.gcl [0-1] 1:1-2 "[!\n\n!]"
-TraceLog " ### DigHole ./test/source/Server/spec-qm-2.gcl [7-8] 4:1-2"
+TraceLog " <--- DigHole ./test/source/Server/spec-qm-2.gcl [7-8] 4:1-2"
 TraceEditText ./test/source/Server/spec-qm-2.gcl [7-8] 4:1-2 "[!\n\n!]"

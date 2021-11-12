@@ -31,7 +31,7 @@ fi
 
 ### Trace
 
-TraceLog " ### DigHole ./test/source/Server/spec-qm-4.gcl [16-17] 2:5-6"
+TraceLog " <--- DigHole ./test/source/Server/spec-qm-4.gcl [16-17] 2:5-6"
 TraceEditText ./test/source/Server/spec-qm-4.gcl [16-17] 2:5-6 "[!\n    \n    !]"
-TraceLog " ### DigHole ./test/source/Server/spec-qm-4.gcl [35-36] 5:5-6"
+TraceLog " <--- DigHole ./test/source/Server/spec-qm-4.gcl [35-36] 5:5-6"
 TraceEditText ./test/source/Server/spec-qm-4.gcl [35-36] 5:5-6 "[!\n    \n    !]"

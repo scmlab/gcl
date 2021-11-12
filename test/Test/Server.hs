@@ -18,7 +18,8 @@ import           Test.Util                      ( runGoldenTest )
 tests :: TestTree
 tests = testGroup
   "Server"
-  [instantiateSpec, specPayloadWithoutIndentationTests, refineSpecsTest]
+  [instantiateSpec]
+  -- [instantiateSpec, specPayloadWithoutIndentationTests, refineSpecsTest]
 
 --------------------------------------------------------------------------------
 
@@ -26,10 +27,10 @@ instantiateSpec :: TestTree
 instantiateSpec = testGroup
   "Instantiate Specs"
   [ run "top level 1" "spec-qm-1.gcl"
-  , run "top level 2" "spec-qm-2.gcl"
-  , run "indented 1"  "spec-qm-3.gcl"
-  , run "indented 2"  "spec-qm-4.gcl"
-  , run "complex 1"   "spec-qm-5.gcl"
+  -- , run "top level 2" "spec-qm-2.gcl"
+  -- , run "indented 1"  "spec-qm-3.gcl"
+  -- , run "indented 2"  "spec-qm-4.gcl"
+  -- , run "complex 1"   "spec-qm-5.gcl"
   ]
  where
   run :: String -> FilePath -> TestTree

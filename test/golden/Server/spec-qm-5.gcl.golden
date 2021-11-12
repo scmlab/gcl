@@ -38,5 +38,5 @@ od
 
 ### Trace
 
-TraceLog " ### DigHole ./test/source/Server/spec-qm-5.gcl [113-114] 7:13-14"
+TraceLog " <--- DigHole ./test/source/Server/spec-qm-5.gcl [113-114] 7:13-14"
 TraceEditText ./test/source/Server/spec-qm-5.gcl [113-114] 7:13-14 "[!\n            \n            !]"
