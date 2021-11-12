@@ -107,6 +107,7 @@ instance Render CaseConstructor where
     render ctor <+> horzE (map render binders) <+> "->" <+> render body
 
 instance Render Pattern where
+  render (PattLit a) = render a 
   render (PattBinder   a) = render a
   render (PattWildcard _) = "_"
   render (PattConstructor ctor patterns) =

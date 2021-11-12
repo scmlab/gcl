@@ -386,6 +386,7 @@ instance Pretty Pattern where
 
 instance PrettyWithLoc Pattern where
   prettyWithLoc patt = case patt of
+    PattLit a -> prettyWithLoc a
     PattParen a b c     -> prettyWithLoc a <> prettyWithLoc b <> prettyWithLoc c
     PattBinder   a      -> prettyWithLoc a
     PattWildcard a      -> prettyWithLoc a
