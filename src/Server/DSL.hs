@@ -6,6 +6,7 @@ module Server.DSL where
 
 import           Control.Monad.Cont
 import           Control.Monad.Except
+import           Control.Monad.State
 import           Control.Monad.Trans.Free
 import           Control.Monad.Writer
 import           Data.IntMap                    ( IntMap )
@@ -68,16 +69,16 @@ data ConvertResult = ConvertResult
   }
 
 convert :: ParseResult -> CmdM ConvertResult
-convert result = do 
+convert result = do
   converted <- case runExcept (toAbstract (parsedProgram result)) of
-        Left  (Range start end) -> digHole (Range start end) >>= parse >>= convert
-        Right program           -> return $ ConvertResult
-          { convertedPreviousStage = result
-          , convertedProgram       = program
-          , convertedTokenMap      = collectTokenMap program
-          }
+    Left  (Range start end) -> digHole (Range start end) >>= parse >>= convert
+    Right program           -> return $ ConvertResult
+      { convertedPreviousStage = result
+      , convertedProgram       = program
+      , convertedTokenMap      = collectTokenMap program
+      }
   persist (Converted converted)
-  return converted 
+  return converted
 
 
 data SweepResult = SweepResult
@@ -164,17 +165,19 @@ data Cmd next
   | BumpResponseVersion (Int -> next)
   | Log Text next
   -- | Store current stage 
-  | SetCurrentState ([Error], Stage) next
+  | SetCurrentState CmdState next
   -- | Read current stage 
-  | GetCurrentState (([Error], Stage) -> next)
+  | GetCurrentState (CmdState -> next)
   -- | SendDiagnostics from the LSP protocol 
   | SendDiagnostics [J.Diagnostic] next
   deriving (Functor)
 
-type CmdM = FreeT Cmd (Except [Error])
+type CmdM = FreeT Cmd (StateT CmdState (Except [Error]))
+type CmdState = ([Error], Stage)
 
-runCmdM :: CmdM a -> Either [Error] (FreeF Cmd a (CmdM a))
-runCmdM = runExcept . runFreeT
+runCmdM
+  :: CmdState -> CmdM a -> Either [Error] (FreeF Cmd a (CmdM a), CmdState)
+runCmdM st p = runExcept (runStateT (runFreeT p) st)
 
 editText :: Range -> Text -> CmdM Text
 editText range text = liftF (EditText range text id)
@@ -202,7 +205,7 @@ persist stage = do
   case stage of
     Uninitialized _ -> logText "    - Uninitialized"
     Parsed        _ -> logText "    - Parsed"
-    Converted     _ -> do 
+    Converted     _ -> do
       -- s <- getState
       -- case s of
       --   Uninitialized _ -> logText "    - (Uninitialized)"
@@ -210,7 +213,7 @@ persist stage = do
       --   Converted     _ -> logText "    - (Converted)"
       --   Swept         _ -> logText "    - (Swept)"
       logText "    - Converted"
-    Swept         _ -> logText "    - Swept"
+    Swept _ -> logText "    - Swept"
   liftF (SetCurrentState ([], stage) ())
 
 getState :: CmdM Stage

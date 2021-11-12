@@ -41,7 +41,7 @@ import           Server.CustomMethod
 import           Server.DSL                     ( Cmd(..)
                                                 , CmdM
                                                 , Stage(..)
-                                                , runCmdM
+                                                , runCmdM, CmdState
                                                 )
 import qualified Server.DSL                    as DSL
 import           Server.Handler.Diagnostic      ( collect )
@@ -131,7 +131,7 @@ customRequestResponder filepath responder (errors, result) = do
             Nothing -> []
             Just xs -> xs
       responder (Res filepath responses)
-    else do 
+    else do
       responder (Res filepath [])
 
 
@@ -197,16 +197,28 @@ getState filepath = do
 
 --------------------------------------------------------------------------------
 
+
 interpret
   :: Show a
   => J.Uri
   -> (([Error], Maybe a) -> ServerM ())
   -> CmdM a
   -> ServerM ()
-interpret uri responder p = case J.uriToFilePath uri of
+interpret uri responcder p = case J.uriToFilePath uri of
   Nothing       -> pure ()
-  Just filepath -> case runCmdM p of
-    Right result -> go filepath result
+  Just filepath -> interpret2 ([], Uninitialized filepath) filepath responcder p
+
+interpret2
+  :: Show a
+  => CmdState
+  -> FilePath
+  -> (([Error], Maybe a) -> ServerM ())
+  -> CmdM a
+  -> ServerM ()
+interpret2 state filepath responder p = case runCmdM state p of
+    Right (Pure value, (errors, _)) -> do
+      responder (errors, Just value)
+    Right (Free command, newState) -> go filepath newState responder command
     Left  errors -> do
       setMute False -- unmute on error!
       -- got errors from computation
@@ -215,65 +227,62 @@ interpret uri responder p = case J.uriToFilePath uri of
       setState filepath (errors, cachedStage)
       responder (errors, Nothing)
 
- where
-  go filepath = \case
-    Pure value -> do
-      (errors, _) <- getState filepath
-      responder (errors, Just value)
-    Free (EditText range text next) -> do
-      logText $ " ### EditText " <> toText range <> " " <> text
-      -- apply edit
-      let removeSpec = J.TextEdit (SrcLoc.toLSPRange range) text
-      let identifier = J.VersionedTextDocumentIdentifier uri (Just 0)
-      let textDocumentEdit =
-            J.TextDocumentEdit identifier (J.List [J.InL removeSpec])
-      let change = J.InL textDocumentEdit
-      let workspaceEdit =
-            J.WorkspaceEdit Nothing (Just (J.List [change])) Nothing
-      let applyWorkspaceEditParams =
-            J.ApplyWorkspaceEditParams (Just "Resolve Spec") workspaceEdit
-      let callback _ = interpret uri responder $ do
-            DSL.getSource >>= next
+go :: Show a => FilePath -> CmdState -> (([Error], Maybe a) -> ServerM ()) -> Cmd (CmdM a) -> ServerM ()
+go filepath state responder = \case
+  EditText range text next -> do
+    logText $ " ### EditText " <> toText range <> " " <> text
+    -- apply edit
+    let removeSpec = J.TextEdit (SrcLoc.toLSPRange range) text
 
-      void $ J.sendRequest J.SWorkspaceApplyEdit
-                           applyWorkspaceEditParams
-                           callback
-    Free (SetMute b next) -> do
-      setMute b
-      interpret uri responder next
-    Free (GetMute next) -> do
-      m <- getMute
-      interpret uri responder (next m)
-    Free (GetFilePath next) -> interpret uri responder (next filepath)
-    Free (GetSource   next) -> do
-      result <- fmap J.virtualFileText
-        <$> J.getVirtualFile (J.toNormalizedUri (J.filePathToUri filepath))
-      case result of
-        Nothing     -> responder ([CannotReadFile filepath], Nothing)
-        Just source -> interpret uri responder (next source)
-    Free (GetLastSelection next) -> do
-      ref     <- lift $ asks globalSelectionMap
-      mapping <- liftIO $ readIORef ref
-      let selection = join $ Map.lookup filepath mapping
-      interpret uri responder (next selection)
-    Free (SetLastSelection selection next) -> do
-      ref <- lift $ asks globalSelectionMap
-      liftIO $ modifyIORef' ref (Map.insert filepath (Just selection))
-      interpret uri responder next
-    Free (GetCurrentState next) -> do
-      state <- getState filepath
-      interpret uri responder $ do
-        next state
-    Free (SetCurrentState state next) -> do
-      setState filepath state
-      interpret uri responder next
-    Free (BumpResponseVersion next) -> do
-      n <- bumpVersionM
-      interpret uri responder (next n)
-    Free (Log text next) -> do
-      logText text
-      interpret uri responder next
-    Free (SendDiagnostics diagnostics next) -> do
-      -- send diagnostics
-      sendDiagnostics filepath diagnostics
-      interpret uri responder next
+    let identifier = J.VersionedTextDocumentIdentifier (J.filePathToUri filepath) (Just 0)
+    let textDocumentEdit =
+          J.TextDocumentEdit identifier (J.List [J.InL removeSpec])
+    let change = J.InL textDocumentEdit
+    let workspaceEdit =
+          J.WorkspaceEdit Nothing (Just (J.List [change])) Nothing
+    let applyWorkspaceEditParams =
+          J.ApplyWorkspaceEditParams (Just "Resolve Spec") workspaceEdit
+    let callback _ = interpret2 state filepath responder $ do
+          DSL.getSource >>= next
+
+    void $ J.sendRequest J.SWorkspaceApplyEdit
+                          applyWorkspaceEditParams
+                          callback
+  SetMute b next -> do
+    setMute b
+    interpret2 state filepath responder next
+  GetMute next -> do
+    m <- getMute
+    interpret2 state filepath responder (next m)
+  GetFilePath next -> interpret2 state filepath responder (next filepath)
+  GetSource   next -> do
+    result <- fmap J.virtualFileText
+      <$> J.getVirtualFile (J.toNormalizedUri (J.filePathToUri filepath))
+    case result of
+      Nothing     -> responder ([CannotReadFile filepath], Nothing)
+      Just source -> interpret2 state filepath responder (next source)
+  GetLastSelection next -> do
+    ref     <- lift $ asks globalSelectionMap
+    mapping <- liftIO $ readIORef ref
+    let selection = join $ Map.lookup filepath mapping
+    interpret2 state filepath responder (next selection)
+  SetLastSelection selection next -> do
+    ref <- lift $ asks globalSelectionMap
+    liftIO $ modifyIORef' ref (Map.insert filepath (Just selection))
+    interpret2 state filepath responder next
+  GetCurrentState next -> do
+    interpret2 state filepath responder $ do
+      next state
+  SetCurrentState state next -> do
+    setState filepath state
+    interpret2 state filepath responder next
+  BumpResponseVersion next -> do
+    n <- bumpVersionM
+    interpret2 state filepath responder (next n)
+  Log text next -> do
+    logText text
+    interpret2 state filepath responder next
+  SendDiagnostics diagnostics next -> do
+    -- send diagnostics
+    sendDiagnostics filepath diagnostics
+    interpret2 state filepath responder next
