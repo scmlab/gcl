@@ -396,7 +396,7 @@ pExprF =
   pCaseConstructorF =
     CaseConstructor
       <$> lexUpperNameF
-      <*> many lexLowerNameF
+      <*> many pPatternF
       <*> lexArrowF
       <*> pExprF
 

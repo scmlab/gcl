@@ -163,7 +163,7 @@ data Redex = Rdx
 --------------------------------------------------------------------------------
 -- | Pattern matching
 
-data CaseConstructor = CaseConstructor Name [Name] Expr
+data CaseConstructor = CaseConstructor Name [Pattern] Expr
   deriving (Eq, Show, Generic)
 
 data Pattern
