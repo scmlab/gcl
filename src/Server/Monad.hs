@@ -26,7 +26,6 @@ import           Data.IORef                     ( IORef
                                                 , readIORef
                                                 , writeIORef
                                                 )
-import           Data.Loc.Range                 ( Range )
 import           Data.Map                       ( Map )
 import qualified Data.Map                      as Map
 import           Data.Text                      ( Text )
@@ -40,8 +39,8 @@ import           Render
 import           Server.CustomMethod
 import           Server.DSL                     ( Cmd(..)
                                                 , CmdM
-                                                , Stage(..)
-                                                , runCmdM, CmdState
+                                                , CmdState (..)
+                                                , runCmdM, initState
                                                 )
 import qualified Server.DSL                    as DSL
 import           Server.Handler.Diagnostic      ( collect )
@@ -55,14 +54,11 @@ data GlobalEnv = GlobalEnv
     globalChan         :: Chan Text
   ,
     -- Keep tracks of all text selections (including cursor position)
-    globalSelectionMap :: IORef (Map FilePath (Maybe Range))
-  ,
+    -- globalSelectionMap :: IORef (Map FilePath (Maybe Range))
+  -- ,
     -- Counter for generating fresh numbers
     globalCounter      :: IORef Int
-  ,
-    -- 
-    globalMute         :: IORef Bool
-  , globalCurrentStage :: IORef (Map FilePath ([Error], Stage))
+  , globalCurrentStage :: IORef (Map FilePath CmdState)
   }
 
 -- | Constructs an initial global state
@@ -70,9 +66,8 @@ initGlobalEnv :: IO GlobalEnv
 initGlobalEnv =
   GlobalEnv
     <$> newChan
-    <*> newIORef Map.empty
+    -- <*> newIORef Map.empty
     <*> newIORef 0
-    <*> newIORef False
     <*> newIORef Map.empty
 
 --------------------------------------------------------------------------------
@@ -121,8 +116,9 @@ customRequestResponder
   -> ([Error], Maybe [ResKind])
   -> ServerM ()
 customRequestResponder filepath responder (errors, result) = do
-  (oldErrors, oldResult)       <- getState filepath
-  logText $ " #### errors " <> toText (length oldErrors) <>  " => " <> toText (length errors)
+  oldErrors <- cmdErrors <$> getState filepath
+  logText $ " #### errors " <> toText (length oldErrors) <> " => " <> toText
+    (length errors)
 
 
   if null errors
@@ -172,27 +168,17 @@ bumpVersionM = do
   liftIO $ writeIORef ref (succ n)
   return n
 
-getMute :: ServerM Bool
-getMute = do
-  ref <- lift $ asks globalMute
-  liftIO $ readIORef ref
-
-setMute :: Bool -> ServerM ()
-setMute b = do
-  ref <- lift $ asks globalMute
-  liftIO $ writeIORef ref b
-
-setState :: FilePath -> ([Error], Stage) -> ServerM ()
+setState :: FilePath -> CmdState -> ServerM ()
 setState filepath state = do
   ref <- lift $ asks globalCurrentStage
   liftIO $ modifyIORef' ref (Map.insert filepath state)
 
-getState :: FilePath -> ServerM ([Error], Stage)
+getState :: FilePath -> ServerM CmdState
 getState filepath = do
   ref     <- lift $ asks globalCurrentStage
   mapping <- liftIO $ readIORef ref
   case Map.lookup filepath mapping of
-    Nothing    -> return ([], Uninitialized filepath)
+    Nothing    -> return $ initState filepath
     Just state -> return state
 
 --------------------------------------------------------------------------------
@@ -205,8 +191,9 @@ interpret
   -> CmdM a
   -> ServerM ()
 interpret uri responcder p = case J.uriToFilePath uri of
-  Nothing       -> pure ()
-  Just filepath -> interpret2 ([], Uninitialized filepath) filepath responcder p
+  Nothing -> pure ()
+  Just filepath ->
+    interpret2 (initState filepath) filepath responcder p
 
 interpret2
   :: Show a
@@ -215,26 +202,37 @@ interpret2
   -> (([Error], Maybe a) -> ServerM ())
   -> CmdM a
   -> ServerM ()
-interpret2 state filepath responder p = case runCmdM state p of
-    Right (Pure value, (errors, _)) -> do
-      responder (errors, Just value)
-    Right (Free command, newState) -> go filepath newState responder command
-    Left  errors -> do
-      setMute False -- unmute on error!
-      -- got errors from computation
-      -- store it for later inspection 
-      cachedStage <- snd <$> getState filepath
-      setState filepath (errors, cachedStage)
-      responder (errors, Nothing)
+interpret2 state filepath responder p = case runCmdM filepath state p of
+  Right (Pure value, st, ()) -> do
+    responder (cmdErrors st, Just value)
+  Right (Free command, newState, ()) -> go filepath newState responder command
+  Left  errors                       -> do
+    -- got errors from computation
+    CmdState _ cachedStage _ selections <- getState filepath
+    let newState = CmdState 
+            errors -- store it for later inspection 
+            cachedStage
+            False -- unmute on error!
+            selections
+    setState filepath newState
+    responder (errors, Nothing)
 
-go :: Show a => FilePath -> CmdState -> (([Error], Maybe a) -> ServerM ()) -> Cmd (CmdM a) -> ServerM ()
+go
+  :: Show a
+  => FilePath
+  -> CmdState
+  -> (([Error], Maybe a) -> ServerM ())
+  -> Cmd (CmdM a)
+  -> ServerM ()
 go filepath state responder = \case
   EditText range text next -> do
     logText $ " ### EditText " <> toText range <> " " <> text
     -- apply edit
     let removeSpec = J.TextEdit (SrcLoc.toLSPRange range) text
 
-    let identifier = J.VersionedTextDocumentIdentifier (J.filePathToUri filepath) (Just 0)
+    let identifier = J.VersionedTextDocumentIdentifier
+          (J.filePathToUri filepath)
+          (Just 0)
     let textDocumentEdit =
           J.TextDocumentEdit identifier (J.List [J.InL removeSpec])
     let change = J.InL textDocumentEdit
@@ -245,36 +243,27 @@ go filepath state responder = \case
     let callback _ = interpret2 state filepath responder $ do
           DSL.getSource >>= next
 
-    void $ J.sendRequest J.SWorkspaceApplyEdit
-                          applyWorkspaceEditParams
-                          callback
-  SetMute b next -> do
-    setMute b
-    interpret2 state filepath responder next
-  GetMute next -> do
-    m <- getMute
-    interpret2 state filepath responder (next m)
-  GetFilePath next -> interpret2 state filepath responder (next filepath)
+    void $ J.sendRequest J.SWorkspaceApplyEdit applyWorkspaceEditParams callback
   GetSource   next -> do
     result <- fmap J.virtualFileText
       <$> J.getVirtualFile (J.toNormalizedUri (J.filePathToUri filepath))
     case result of
       Nothing     -> responder ([CannotReadFile filepath], Nothing)
       Just source -> interpret2 state filepath responder (next source)
-  GetLastSelection next -> do
-    ref     <- lift $ asks globalSelectionMap
-    mapping <- liftIO $ readIORef ref
-    let selection = join $ Map.lookup filepath mapping
-    interpret2 state filepath responder (next selection)
-  SetLastSelection selection next -> do
-    ref <- lift $ asks globalSelectionMap
-    liftIO $ modifyIORef' ref (Map.insert filepath (Just selection))
-    interpret2 state filepath responder next
+  -- GetLastSelection next -> do
+  --   ref     <- lift $ asks globalSelectionMap
+  --   mapping <- liftIO $ readIORef ref
+  --   let selection = join $ Map.lookup filepath mapping
+  --   interpret2 state filepath responder (next selection)
+  -- SetLastSelection selection next -> do
+  --   ref <- lift $ asks globalSelectionMap
+  --   liftIO $ modifyIORef' ref (Map.insert filepath (Just selection))
+  --   interpret2 state filepath responder next
   GetCurrentState next -> do
     interpret2 state filepath responder $ do
       next state
-  SetCurrentState state next -> do
-    setState filepath state
+  SetCurrentState st next -> do
+    setState filepath st
     interpret2 state filepath responder next
   BumpResponseVersion next -> do
     n <- bumpVersionM

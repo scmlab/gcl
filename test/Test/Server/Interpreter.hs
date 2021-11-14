@@ -70,8 +70,8 @@ runTest filepath source program =
 -- Interprets the Server DSL and logs side effects as [Trace] 
 interpret :: FilePath -> CmdM (Either [Error] a) -> TestM (Either [Error] a)
 interpret filepath p = case runCmdM p of
-  Right (Pure result                    ) -> return result
-  Right (Free (EditText range text next)) -> do
+  Right (Pure result                    , _) -> return result
+  Right (Free (EditText range text next), _) -> do
     let Range start end = range
     source <- get
     let (before, rest) = Text.splitAt (posCoff start) source
@@ -80,35 +80,35 @@ interpret filepath p = case runCmdM p of
     put newSource
     tell [TraceEditText range text]
     interpret filepath (next newSource)
-  Right (Free (SetMute _ next)) -> do
+  Right (Free (SetMute _ next), _) -> do
     interpret filepath next
-  Right (Free (GetMute next)) -> do
+  Right (Free (GetMute next), _) -> do
     interpret filepath (next False)
-  Right (Free (GetFilePath next)) -> do
+  Right (Free (GetFilePath next), _) -> do
     interpret filepath (next filepath)
-  Right (Free (GetSource next)) -> do
+  Right (Free (GetSource next), _) -> do
     tell [TraceGetSource]
     source <- get
     interpret filepath (next source)
-  Right (Free (GetLastSelection next)) -> do
+  Right (Free (GetLastSelection next), _) -> do
     tell [TraceGetLastSelection]
     interpret filepath (next Nothing)
-  Right (Free (SetLastSelection selection next)) -> do
+  Right (Free (SetLastSelection selection next), _) -> do
     tell [TracePutLastSelection selection]
     interpret filepath next
-  Right (Free (GetCurrentState _next)) -> do
+  Right (Free (GetCurrentState _next), _) -> do
     tell []
     interpret filepath $ return $ Left [CannotReadFile filepath]
-  Right (Free (SetCurrentState _ next)) -> do
+  Right (Free (SetCurrentState _ next), _) -> do
     tell []
     interpret filepath next
-  Right (Free (BumpResponseVersion next)) -> do
+  Right (Free (BumpResponseVersion next), _) -> do
     tell [TraceBumpResponseVersion]
     interpret filepath (next 0)
-  Right (Free (Log text next)) -> do
+  Right (Free (Log text next), _) -> do
     tell [TraceLog text]
     interpret filepath next
-  Right (Free (SendDiagnostics diagnostics next)) -> do
+  Right (Free (SendDiagnostics diagnostics next), _) -> do
     tell [TraceSendDiagnostics diagnostics]
     interpret filepath next
   Left errors -> do

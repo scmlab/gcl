@@ -6,9 +6,8 @@ module Server.DSL where
 
 import           Control.Monad.Cont
 import           Control.Monad.Except
-import           Control.Monad.State
+import           Control.Monad.RWS       hiding ( state )
 import           Control.Monad.Trans.Free
-import           Control.Monad.Writer
 import           Data.IntMap                    ( IntMap )
 import           Data.List                      ( find
                                                 , sortOn
@@ -145,22 +144,14 @@ data Cmd next
       Text -- ^ Text to replace with 
       (Text -> next) -- ^ Continuation with the text of the whole file after the edit
 
-  -- | State for indicating whether we should ignore events like `STextDocumentDidChange` 
-  | SetMute
-      Bool
-      next
-  | GetMute (Bool -> next)
-
-  | GetFilePath (FilePath -> next)
-
   | GetSource (Text -> next)
 
   -- | Store mouse selection 
-  | SetLastSelection
-      Range
-      next
-  -- | Read mouse selection 
-  | GetLastSelection (Maybe Range -> next)
+  -- | SetLastSelection
+  --     Range
+  --     next
+  -- -- | Read mouse selection 
+  -- | GetLastSelection (Maybe Range -> next)
   -- | Each Response has a different ID, bump the counter of that ID
   | BumpResponseVersion (Int -> next)
   | Log Text next
@@ -172,33 +163,52 @@ data Cmd next
   | SendDiagnostics [J.Diagnostic] next
   deriving (Functor)
 
-type CmdM = FreeT Cmd (StateT CmdState (Except [Error]))
-type CmdState = ([Error], Stage)
+type CmdM = FreeT Cmd (RWST FilePath () CmdState (Except [Error]))
+data CmdState = CmdState
+  { cmdErrors    :: [Error]
+  , cmdStage     :: Stage
+  , cmdMute      :: Bool   -- state for indicating whether we should ignore events like `STextDocumentDidChange` 
+  , cmdSelection :: Maybe Range -- text selections (including cursor position)
+  }
+
+initState :: FilePath -> CmdState
+initState filepath = CmdState [] (Uninitialized filepath) False Nothing
 
 runCmdM
-  :: CmdState -> CmdM a -> Either [Error] (FreeF Cmd a (CmdM a), CmdState)
-runCmdM st p = runExcept (runStateT (runFreeT p) st)
+  :: FilePath
+  -> CmdState
+  -> CmdM a
+  -> Either [Error] (FreeF Cmd a (CmdM a), CmdState, ())
+runCmdM filepath st p = runExcept (runRWST (runFreeT p) filepath st)
 
 editText :: Range -> Text -> CmdM Text
 editText range text = liftF (EditText range text id)
 
-mute :: Bool -> CmdM ()
-mute b = liftF (SetMute b ())
-
-isMuted :: CmdM Bool
-isMuted = liftF (GetMute id)
-
 getFilePath :: CmdM FilePath
-getFilePath = liftF (GetFilePath id)
+getFilePath = ask
 
 getSource :: CmdM Text
 getSource = liftF (GetSource id)
 
-setLastSelection :: Range -> CmdM ()
-setLastSelection selection = liftF (SetLastSelection selection ())
+getStage :: CmdM Stage
+getStage = cmdStage <$> liftF (GetCurrentState id)
 
-getLastSelection :: CmdM (Maybe Range)
-getLastSelection = liftF (GetLastSelection id)
+getErrors :: CmdM [Error]
+getErrors = cmdErrors <$> liftF (GetCurrentState id)
+
+isMuted :: CmdM Bool
+isMuted = cmdMute <$> liftF (GetCurrentState id)
+
+modifyState :: (CmdState -> CmdState) -> CmdM ()
+modifyState f = do
+  state <- liftF (GetCurrentState id)
+  liftF (SetCurrentState (f state) ())
+
+mute :: Bool -> CmdM ()
+mute m = modifyState $ \(CmdState e s _ r) -> CmdState e s m r
+
+setErrors :: [Error] -> CmdM ()
+setErrors e = modifyState $ \(CmdState _ s m r) -> CmdState e s m r
 
 persist :: Stage -> CmdM ()
 persist stage = do
@@ -214,10 +224,15 @@ persist stage = do
       --   Swept         _ -> logText "    - (Swept)"
       logText "    - Converted"
     Swept _ -> logText "    - Swept"
-  liftF (SetCurrentState ([], stage) ())
 
-getState :: CmdM Stage
-getState = snd <$> liftF (GetCurrentState id)
+  modifyState $ \(CmdState e _ m r) -> CmdState e stage m r
+
+setLastSelection :: Range -> CmdM ()
+setLastSelection selection =
+  modifyState $ \(CmdState e s m _) -> CmdState e s m (Just selection)
+
+getLastSelection :: CmdM (Maybe Range)
+getLastSelection = gets cmdSelection
 
 logText :: Text -> CmdM ()
 logText text = liftF (Log text ())
@@ -294,7 +309,7 @@ parseProgram source = do
 
 generateResponseAndDiagnosticsFromCurrentState :: CmdM [ResKind]
 generateResponseAndDiagnosticsFromCurrentState = do
-  stage <- getState
+  stage <- getStage
   case stage of
     Uninitialized _      -> return []
     Parsed        _      -> return []

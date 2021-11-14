@@ -80,7 +80,7 @@ handlers = mconcat
     let uri = req ^. (J.params . J.textDocument . J.uri)
     interpret uri (responder . ignoreErrors) $ do
       logText " <--- Syntax Highlighting"
-      stage <- getState
+      stage <- getStage
       let legend = J.SemanticTokensLegend
             (J.List J.knownSemanticTokenTypes)
             (J.List J.knownSemanticTokenModifiers)

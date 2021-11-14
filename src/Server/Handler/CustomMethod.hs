@@ -81,7 +81,7 @@ handleInsertAnchor hash = do
 
 handleSubst :: Int -> CmdM [ResKind]
 handleSubst i = do
-  stage <- getState
+  stage <- getStage
   logText $ Text.pack $ "Substituting Redex " <> show i
   -- 
   case stage of
