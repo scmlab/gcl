@@ -203,17 +203,20 @@ interpret2
   -> CmdM a
   -> ServerM ()
 interpret2 state filepath responder p = case runCmdM filepath state p of
-  Right (Pure value, st, ()) -> do
-    responder (cmdErrors st, Just value)
+  Right (Pure value, newState, ()) -> do
+    -- store the new state 
+    setState filepath newState 
+    responder (cmdErrors newState, Just value)
   Right (Free command, newState, ()) -> go filepath newState responder command
   Left  errors                       -> do
     -- got errors from computation
-    CmdState _ cachedStage _ selections <- getState filepath
+    CmdState _ cachedStage _ selections counter <- getState filepath
     let newState = CmdState 
             errors -- store it for later inspection 
             cachedStage
             False -- unmute on error!
             selections
+            counter
     setState filepath newState
     responder (errors, Nothing)
 
@@ -250,24 +253,6 @@ go filepath state responder = \case
     case result of
       Nothing     -> responder ([CannotReadFile filepath], Nothing)
       Just source -> interpret2 state filepath responder (next source)
-  -- GetLastSelection next -> do
-  --   ref     <- lift $ asks globalSelectionMap
-  --   mapping <- liftIO $ readIORef ref
-  --   let selection = join $ Map.lookup filepath mapping
-  --   interpret2 state filepath responder (next selection)
-  -- SetLastSelection selection next -> do
-  --   ref <- lift $ asks globalSelectionMap
-  --   liftIO $ modifyIORef' ref (Map.insert filepath (Just selection))
-  --   interpret2 state filepath responder next
-  GetCurrentState next -> do
-    interpret2 state filepath responder $ do
-      next state
-  SetCurrentState st next -> do
-    setState filepath st
-    interpret2 state filepath responder next
-  BumpResponseVersion next -> do
-    n <- bumpVersionM
-    interpret2 state filepath responder (next n)
   Log text next -> do
     logText text
     interpret2 state filepath responder next

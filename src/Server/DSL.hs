@@ -143,22 +143,8 @@ data Cmd next
       Range -- ^ Range to replace 
       Text -- ^ Text to replace with 
       (Text -> next) -- ^ Continuation with the text of the whole file after the edit
-
   | GetSource (Text -> next)
-
-  -- | Store mouse selection 
-  -- | SetLastSelection
-  --     Range
-  --     next
-  -- -- | Read mouse selection 
-  -- | GetLastSelection (Maybe Range -> next)
-  -- | Each Response has a different ID, bump the counter of that ID
-  | BumpResponseVersion (Int -> next)
   | Log Text next
-  -- | Store current stage 
-  | SetCurrentState CmdState next
-  -- | Read current stage 
-  | GetCurrentState (CmdState -> next)
   -- | SendDiagnostics from the LSP protocol 
   | SendDiagnostics [J.Diagnostic] next
   deriving (Functor)
@@ -169,10 +155,11 @@ data CmdState = CmdState
   , cmdStage     :: Stage
   , cmdMute      :: Bool   -- state for indicating whether we should ignore events like `STextDocumentDidChange` 
   , cmdSelection :: Maybe Range -- text selections (including cursor position)
+  , cmdCounter :: Int -- counter for generating different IDs for Responses
   }
 
 initState :: FilePath -> CmdState
-initState filepath = CmdState [] (Uninitialized filepath) False Nothing
+initState filepath = CmdState [] (Uninitialized filepath) False Nothing 0
 
 runCmdM
   :: FilePath
@@ -191,24 +178,19 @@ getSource :: CmdM Text
 getSource = liftF (GetSource id)
 
 getStage :: CmdM Stage
-getStage = cmdStage <$> liftF (GetCurrentState id)
+getStage = gets cmdStage
 
 getErrors :: CmdM [Error]
-getErrors = cmdErrors <$> liftF (GetCurrentState id)
+getErrors = gets cmdErrors
 
 isMuted :: CmdM Bool
-isMuted = cmdMute <$> liftF (GetCurrentState id)
-
-modifyState :: (CmdState -> CmdState) -> CmdM ()
-modifyState f = do
-  state <- liftF (GetCurrentState id)
-  liftF (SetCurrentState (f state) ())
+isMuted = gets cmdMute
 
 mute :: Bool -> CmdM ()
-mute m = modifyState $ \(CmdState e s _ r) -> CmdState e s m r
+mute m = modify' $ \state -> state { cmdMute = m }
 
 setErrors :: [Error] -> CmdM ()
-setErrors e = modifyState $ \(CmdState _ s m r) -> CmdState e s m r
+setErrors e = modify' $ \state -> state { cmdErrors = e }
 
 persist :: Stage -> CmdM ()
 persist stage = do
@@ -225,11 +207,11 @@ persist stage = do
       logText "    - Converted"
     Swept _ -> logText "    - Swept"
 
-  modifyState $ \(CmdState e _ m r) -> CmdState e stage m r
+  modify' $ \state -> state { cmdStage = stage }
 
 setLastSelection :: Range -> CmdM ()
 setLastSelection selection =
-  modifyState $ \(CmdState e s m _) -> CmdState e s m (Just selection)
+  modify' $ \state -> state { cmdSelection = Just selection }
 
 getLastSelection :: CmdM (Maybe Range)
 getLastSelection = gets cmdSelection
@@ -238,7 +220,10 @@ logText :: Text -> CmdM ()
 logText text = liftF (Log text ())
 
 bumpVersion :: CmdM Int
-bumpVersion = liftF (BumpResponseVersion id)
+bumpVersion = do 
+  i <- gets cmdCounter
+  modify' $ \state -> state { cmdCounter = succ i }
+  return i
 
 sendDiagnostics :: [J.Diagnostic] -> CmdM ()
 sendDiagnostics xs = do
