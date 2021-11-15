@@ -45,15 +45,15 @@ handleRefine range = do
           let indentation =
                 Text.replicate (posCol (rangeStart (specRange spec)) - 1) " "
           in  Text.unlines $ x : map (indentation <>) xs
-  source' <- editText (specRange spec) indentedPayload
-  parsed  <- parse source'
-  
+  source'   <- editText (specRange spec) indentedPayload
+  parsed    <- parse source'
+
   converted <- convert parsed
-  
+
   typeCheck (convertedProgram converted)
   mute False
   _ <- sweep converted
-  
+
   generateResponseAndDiagnosticsFromCurrentState
 
 handleInsertAnchor :: Text -> CmdM [ResKind]
@@ -76,7 +76,7 @@ handleInsertAnchor hash = do
   typeCheck (convertedProgram converted)
   mute False
   _ <- sweep converted
-  
+
   generateResponseAndDiagnosticsFromCurrentState
 
 handleSubst :: Int -> CmdM [ResKind]
@@ -126,13 +126,13 @@ handler params responder = do
       responder $ CannotDecodeRequest $ show msg ++ "\n" ++ show params
     JSON.Success requests -> handleRequests requests
  where
-      -- make the type explicit to appease the type checker 
+  -- make the type explicit to appease the type checker 
   handleRequests :: [Request] -> ServerM ()
   handleRequests = mapM_ handleRequest
 
+  -- convert Request to Response
   handleRequest :: Request -> ServerM ()
-  handleRequest request@(Req filepath kind) = do
-    -- convert Request to Response
+  handleRequest request@(Req filepath kind) =
     interpret (J.filePathToUri filepath)
               (customRequestResponder filepath responder)
       $ do

@@ -38,8 +38,8 @@ handlers = mconcat
     let params = req ^. J.params
     CustomMethod.handler params (responder . Right . JSON.toJSON)
   , notificationHandler J.STextDocumentDidChange $ \ntf -> do
-    let uri    = ntf ^. (J.params . J.textDocument . J.uri)
-    interpret uri (notificationResponder uri) $ do
+    let uri = ntf ^. (J.params . J.textDocument . J.uri)
+    interpret uri (customRequestToNotification uri) $ do
       muted <- isMuted
       if muted
         then return []
@@ -48,15 +48,14 @@ handlers = mconcat
           source    <- getSource
           parsed    <- parse source
           converted <- convert parsed
-          
           typeCheck (convertedProgram converted)
           _ <- sweep converted
-          
+
           generateResponseAndDiagnosticsFromCurrentState
   , notificationHandler J.STextDocumentDidOpen $ \ntf -> do
     let uri    = ntf ^. (J.params . J.textDocument . J.uri)
     let source = ntf ^. (J.params . J.textDocument . J.text)
-    interpret uri (notificationResponder uri) $ do
+    interpret uri (customRequestToNotification uri) $ do
       logText "\n ---> TextDocumentDidOpen"
       parsed    <- parse source
       converted <- convert parsed
@@ -83,8 +82,8 @@ handlers = mconcat
       stage <- load
       let
         highlightings = case stage of
-          Uninitialized _ -> []
-          Parsed result -> parsedHighlighings result
+          Uninitialized _      -> []
+          Parsed        result -> parsedHighlighings result
           Converted result ->
             parsedHighlighings (convertedPreviousStage result)
           Swept result -> parsedHighlighings
@@ -98,5 +97,5 @@ handlers = mconcat
 ignoreErrors
   :: ([Error], Maybe (Either J.ResponseError (Maybe J.SemanticTokens)))
   -> Either J.ResponseError (Maybe J.SemanticTokens)
-ignoreErrors (_, Nothing) = Left $ J.ResponseError J.InternalError "?" Nothing 
+ignoreErrors (_, Nothing) = Left $ J.ResponseError J.InternalError "?" Nothing
 ignoreErrors (_, Just xs) = xs

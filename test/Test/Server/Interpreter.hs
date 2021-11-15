@@ -33,7 +33,7 @@ data TestResult a = TestResult
   deriving (Eq, Show)
 
 instance Pretty a => Pretty (TestResult a) where
-  pretty (TestResult value source state trace) =
+  pretty (TestResult value source _state trace) =
     "### Result\n\n"
       <> pretty value
       <> "\n\n### Source\n\n"
@@ -54,9 +54,6 @@ serializeTestResultValueOnly =
 data Trace
   = TraceEditText Range Text
   | TraceGetSource
-  | TracePutLastSelection Range
-  | TraceGetLastSelection
-  | TraceBumpResponseVersion
   | TraceLog Text
   | TraceSendDiagnostics [Diagnostic]
   deriving (Eq, Show)

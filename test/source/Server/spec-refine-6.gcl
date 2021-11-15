@@ -1,0 +1,9 @@
+con A, B : Int { A ≥ 0 ∧ B > 0 }
+
+if True ->  [!
+            ?
+            ?
+            !]
+fi
+
+{ True }

@@ -69,8 +69,9 @@ refineSpecsTest = testGroup
   [ run "multiline, top-level"                  "spec-refine-1.gcl"
   , run "multiline, top-level, indented"        "spec-refine-2.gcl"
   , run "multiline, top-level, poorly indented" "spec-refine-3.gcl"
-  , run "multiline, in IF, 1"                   "spec-refine-4.gcl"
-  , run "multiline, in IF, 2"                   "spec-refine-5.gcl"
+  , run "multiline, 1 ? in IF, 1"                   "spec-refine-4.gcl"
+  , run "multiline, 2 ? in IF, 2"                   "spec-refine-5.gcl"
+  , run "multiline, 2 ? in IF, 3"                   "spec-refine-6.gcl"
   ]
  where
   run :: String -> FilePath -> TestTree

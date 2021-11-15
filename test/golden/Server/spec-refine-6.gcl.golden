@@ -1,0 +1,54 @@
+### Result
+
+[Display, UpdateSpecs]
+
+### Source
+
+con A, B : Int { A ≥ 0 ∧ B > 0 }
+
+if True ->  [!
+            
+            !]
+            [!
+            
+            !]
+
+fi
+
+{ True }
+
+### Trace
+
+TraceLog "      [ save ] Parsed"
+TraceLog "      [ save ] Converted"
+TraceLog "      [ save ] Swept"
+TraceLog "      [ event ] mute"
+TraceLog "      [ save ] Mouse selection: spec-refine-6.gcl [46-91] 3:13-6:15"
+TraceGetSource
+TraceLog "      [ save ] Parsed"
+TraceLog "      [ save ] Converted"
+TraceLog "      [ save ] Swept"
+TraceGetSource
+TraceGetSource
+TraceLog "      [ edit ] Replace ./test/source/Server/spec-refine-6.gcl [46-91] 3:13-6:15 \"[!\n            ?\n            ?\n            !]\" \n      with \"?\n            ?\n\""
+TraceEditText ./test/source/Server/spec-refine-6.gcl [46-91] 3:13-6:15 "?\n            ?\n"
+TraceLog "      [ save ] Parsed"
+TraceLog "    < DigHole ./test/source/Server/spec-refine-6.gcl [46-47] 3:13-14"
+TraceGetSource
+TraceLog "      [ edit ] Replace ./test/source/Server/spec-refine-6.gcl [46-47] 3:13-14 \"?\" \n      with \"[!\n            \n            !]\""
+TraceEditText ./test/source/Server/spec-refine-6.gcl [46-47] 3:13-14 "[!\n            \n            !]"
+TraceLog "      [ save ] Parsed"
+TraceLog "    < DigHole ./test/source/Server/spec-refine-6.gcl [89-90] 6:13-14"
+TraceGetSource
+TraceLog "      [ edit ] Replace ./test/source/Server/spec-refine-6.gcl [89-90] 6:13-14 \"?\" \n      with \"[!\n            \n            !]\""
+TraceEditText ./test/source/Server/spec-refine-6.gcl [89-90] 6:13-14 "[!\n            \n            !]"
+TraceLog "      [ save ] Parsed"
+TraceLog "      [ save ] Converted"
+TraceLog "      [ save ] Converted"
+TraceLog "      [ save ] Converted"
+TraceLog "      [ event ] unmute"
+TraceLog "      [ save ] Swept"
+TraceLog "      [ load ] from Swept"
+TraceLog "      [ load ] Mouse selection: Nothing"
+TraceLog "    < Send Diagnostics 1"
+TraceSendDiagnostics [Diagnostic {_range = Range {_start = Position {_line = 2, _character = 0}, _end = Position {_line = 2, _character = 2}}, _severity = Just DsWarning, _code = Nothing, _source = Nothing, _message = "Conditional", _tags = Nothing, _relatedInformation = Just (List [DiagnosticRelatedInformation {_location = Location {_uri = Uri {getUri = "./test/source/Server/spec-refine-6.gcl"}, _range = Range {_start = Position {_line = 2, _character = 0}, _end = Position {_line = 2, _character = 2}}}, _message = ""}])}]

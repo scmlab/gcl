@@ -149,7 +149,6 @@ data Cmd next
       (Text -> next) -- ^ Continuation with the text of the whole file after the edit
   | GetSource (Text -> next)
   | Log Text next
-  -- | SendDiagnostics from the LSP protocol 
   | SendDiagnostics [J.Diagnostic] next
   deriving (Functor)
 
@@ -174,7 +173,25 @@ runCmdM
 runCmdM filepath st p = runExcept (runRWST (runFreeT p) filepath st)
 
 editText :: Range -> Text -> CmdM Text
-editText range text = liftF (EditText range text id)
+editText range inserted = do 
+
+  let Range start end = range
+  source <- getSource
+  let (_, rest) = Text.splitAt (posCoff start) source
+  let (replaced, _)     = Text.splitAt (posCoff end - posCoff start) rest
+
+
+  case (Text.null replaced, Text.null inserted) of 
+    -- no-op
+    (True, True) -> return ()
+    -- deletion 
+    (True, False) -> logText $ "      [ edit ] Delete " <> toText range <> " \"" <> replaced <> "\""
+    -- insertion 
+    (False, True) -> logText $ "      [ edit ] Insert " <> toText range <> " \"" <> inserted <> "\""
+    -- replacement 
+    (False, False) -> logText $ "      [ edit ] Replace " <> toText range <> " \"" <> replaced <> "\" \n      with \"" <> inserted <> "\""
+
+  liftF (EditText range inserted id)
 
 getFilePath :: CmdM FilePath
 getFilePath = ask
@@ -199,7 +216,11 @@ isMuted :: CmdM Bool
 isMuted = gets cmdMute
 
 mute :: Bool -> CmdM ()
-mute m = modify' $ \state -> state { cmdMute = m }
+mute m = do 
+  if m 
+    then logText "      [ event ] mute"
+    else logText "      [ event ] unmute"
+  modify' $ \state -> state { cmdMute = m }
 
 setErrors :: [Error] -> CmdM ()
 setErrors e = modify' $ \state -> state { cmdErrors = e }
@@ -216,15 +237,15 @@ save stage = do
 
 setLastSelection :: Range -> CmdM ()
 setLastSelection selection = do
-  logText $ "    - Set selection " <> toText (ShortRange selection)
+  logText $ "      [ save ] Mouse selection: " <> toText (ShortRange selection)
   modify' $ \state -> state { cmdSelection = Just selection }
 
 getLastSelection :: CmdM (Maybe Range)
 getLastSelection = do
   sel <- gets cmdSelection
   case sel of
-    Nothing -> logText "    - Get selection but got Nothing"
-    Just r  -> logText $ "    - Get selection " <> toText (ShortRange r)
+    Nothing -> logText "      [ load ] Mouse selection: Nothing"
+    Just r  -> logText $ "      [ load ] Mouse selection: " <> toText (ShortRange r)
 
   return sel
 
@@ -234,13 +255,13 @@ logText text = liftF (Log text ())
 bumpVersion :: CmdM Int
 bumpVersion = do
   i <- gets cmdCounter
-  logText $ "    - Bump counter " <> toText i <> " => " <> toText (succ i)
+  -- logText $ "    - Bump counter " <> toText i <> " => " <> toText (succ i)
   modify' $ \state -> state { cmdCounter = succ i }
   return i
 
 sendDiagnostics :: [J.Diagnostic] -> CmdM ()
 sendDiagnostics xs = do
-  logText $ " <--- Send Diagnostics " <> toText (length xs)
+  logText $ "    < Send Diagnostics " <> toText (length xs)
   liftF (SendDiagnostics xs ())
 
 ------------------------------------------------------------------------------
@@ -249,7 +270,7 @@ sendDiagnostics xs = do
 -- and returns the modified source and the difference of source length
 digHole :: Range -> CmdM Text
 digHole range = do
-  logText $ " <--- DigHole " <> toText range
+  logText $ "    < DigHole " <> toText range
   let indent   = Text.replicate (posCol (rangeStart range) - 1) " "
   let holeText = "[!\n" <> indent <> "\n" <> indent <> "!]"
   editText range holeText
