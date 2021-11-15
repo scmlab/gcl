@@ -32,7 +32,7 @@ import qualified Server.SrcLoc                 as SrcLoc
 import           Syntax.Abstract
 import           Syntax.Common
 
-newtype TokenMap = TokenMap (IntMap (Int, Token)) deriving (Monoid, Semigroup)
+newtype TokenMap = TokenMap (IntMap (Int, Token)) deriving (Show, Eq, Monoid, Semigroup)
 
 lookupIntervalMap :: TokenMap -> Pos -> Maybe Token
 lookupIntervalMap (TokenMap m) pos =
@@ -50,7 +50,7 @@ collectTokenMap program = runM program (collect program)
 data Token = Token
   { tokenHoverAndType :: Maybe (J.Hover, Type)
   , tokenLocationLink :: Maybe J.LocationLink
-  }
+  } deriving (Show, Eq)
 
 data Target = Target
   { targetHoverAndType     :: Maybe (J.Hover, Type)

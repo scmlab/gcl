@@ -10,11 +10,20 @@ skip
 
 ### Trace
 
-TracePutLastSelection ./test/source/Server/spec-refine-1.gcl [0-10] 1:1-3:3
+TraceLog "    - Parsed"
+TraceLog "    - Converted"
+TraceLog "    - Swept"
+TraceLog "    - Set selection spec-refine-1.gcl [0-10] 1:1-3:3"
 TraceGetSource
+TraceLog "    - Parsed"
+TraceLog "    - Converted"
+TraceLog "    - Swept"
 TraceGetSource
 TraceEditText ./test/source/Server/spec-refine-1.gcl [0-10] 1:1-3:3 "skip"
-TraceGetLastSelection
-TraceBumpResponseVersion
-TraceLog " ### Diagnostic 1"
+TraceLog "    - Parsed"
+TraceLog "    - Converted"
+TraceLog "    - Swept"
+TraceLog "    - Get selection but got Nothing"
+TraceLog "    - Bump counter 0 => 1"
+TraceLog " <--- Send Diagnostics 1"
 TraceSendDiagnostics [Diagnostic {_range = Range {_start = Position {_line = 0, _character = 0}, _end = Position {_line = 0, _character = 4}}, _severity = Just DsWarning, _code = Nothing, _source = Nothing, _message = "Skip", _tags = Nothing, _relatedInformation = Just (List [DiagnosticRelatedInformation {_location = Location {_uri = Uri {getUri = "./test/source/Server/spec-refine-1.gcl"}, _range = Range {_start = Position {_line = 0, _character = 0}, _end = Position {_line = 0, _character = 4}}}, _message = ""}])}]

@@ -49,7 +49,7 @@ import           Syntax.Parser                  ( Parser
 data ParseResult = ParseResult
   { parsedProgram      :: C.Program
   , parsedHighlighings :: [J.SemanticTokenAbsolute]
-  }
+  } deriving (Show, Eq)
 
 parse :: Text -> CmdM ParseResult
 parse source = do
@@ -65,7 +65,7 @@ data ConvertResult = ConvertResult
   { convertedPreviousStage :: ParseResult
   , convertedProgram       :: A.Program
   , convertedTokenMap      :: TokenMap
-  }
+  } deriving (Show, Eq)
 
 convert :: ParseResult -> CmdM ConvertResult
 convert result = do
@@ -93,7 +93,7 @@ data SweepResult = SweepResult
   , sweptRedexes       :: IntMap A.Redex
     -- counter for generating fresh variables
   , sweptCounter       :: Int
-  }
+  } deriving (Show, Eq)
 
 sweep :: ConvertResult -> CmdM SweepResult
 sweep convertedResult = do
@@ -117,7 +117,8 @@ sweep convertedResult = do
 data Stage = Uninitialized FilePath
         | Parsed ParseResult
         | Converted ConvertResult
-        | Swept SweepResult
+        | Swept SweepResult 
+        deriving (Show, Eq)
 
 instance Pretty Stage where
   pretty stage = case stage of
@@ -155,8 +156,8 @@ data CmdState = CmdState
   , cmdStage     :: Stage
   , cmdMute      :: Bool   -- state for indicating whether we should ignore events like `STextDocumentDidChange` 
   , cmdSelection :: Maybe Range -- text selections (including cursor position)
-  , cmdCounter :: Int -- counter for generating different IDs for Responses
-  }
+  , cmdCounter   :: Int -- counter for generating different IDs for Responses
+  } deriving (Show, Eq)
 
 initState :: FilePath -> CmdState
 initState filepath = CmdState [] (Uninitialized filepath) False Nothing 0
@@ -210,24 +211,32 @@ persist stage = do
   modify' $ \state -> state { cmdStage = stage }
 
 setLastSelection :: Range -> CmdM ()
-setLastSelection selection =
+setLastSelection selection = do 
+  logText $ "    - Set selection " <> toText (ShortRange selection)
   modify' $ \state -> state { cmdSelection = Just selection }
 
 getLastSelection :: CmdM (Maybe Range)
-getLastSelection = gets cmdSelection
+getLastSelection = do 
+  sel <- gets cmdSelection
+  case sel of 
+    Nothing -> logText $ "    - Get selection but got Nothing"
+    Just r -> logText $ "    - Get selection " <> toText (ShortRange r)
+  
+  return sel 
 
 logText :: Text -> CmdM ()
 logText text = liftF (Log text ())
 
 bumpVersion :: CmdM Int
-bumpVersion = do 
+bumpVersion = do
   i <- gets cmdCounter
+  logText $ "    - Bump counter " <> toText i <> " => " <> toText (succ i)
   modify' $ \state -> state { cmdCounter = succ i }
   return i
 
 sendDiagnostics :: [J.Diagnostic] -> CmdM ()
 sendDiagnostics xs = do
-  logText $ " <--- Diagnostic " <> toText (length xs)
+  logText $ " <--- Send Diagnostics " <> toText (length xs)
   liftF (SendDiagnostics xs ())
 
 ------------------------------------------------------------------------------

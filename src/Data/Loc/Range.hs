@@ -5,14 +5,16 @@
 
 module Data.Loc.Range where
 
-import Data.Aeson (FromJSON (..), ToJSON (..))
-import Data.List.NonEmpty (NonEmpty)
-import qualified Data.List.NonEmpty as NE
-import Data.Loc hiding (fromLoc)
-import GHC.Generics (Generic)
-import Data.Maybe (mapMaybe)
-import Data.Text.Prettyprint.Doc (Pretty (pretty))
-import qualified Data.List as List
+import           Data.Aeson                     ( FromJSON(..)
+                                                , ToJSON(..)
+                                                )
+import qualified Data.List                     as List
+import           Data.List.NonEmpty             ( NonEmpty )
+import qualified Data.List.NonEmpty            as NE
+import           Data.Loc                hiding ( fromLoc )
+import           Data.Maybe                     ( mapMaybe )
+import           Data.Text.Prettyprint.Doc      ( Pretty(pretty) )
+import           GHC.Generics                   ( Generic )
 
 -- | Represents an interval of two source locations
 --
@@ -41,40 +43,39 @@ data Range = Range Pos Pos
   deriving (Eq, Generic)
 
 -- First by comparing their starting positions and then their ending positions
-instance Ord Range where 
-  compare (Range a b) (Range c d) = case compare a c of 
-    EQ -> compare b d 
-    others -> others 
+instance Ord Range where
+  compare (Range a b) (Range c d) = case compare a c of
+    EQ     -> compare b d
+    others -> others
 
 instance Show Range where
-  show (Range start end) =
-    if posLine start == posLine end
-      then
-        posFile start
-          <> " ["
-          <> show (posCoff start)
-          <> "-"
-          <> show (posCoff end)
-          <> "] "
-          <> show (posLine start)
-          <> ":"
-          <> show (posCol start)
-          <> "-"
-          <> show (posCol end)
-      else
-        posFile start
-          <> " ["
-          <> show (posCoff start)
-          <> "-"
-          <> show (posCoff end)
-          <> "] "
-          <> show (posLine start)
-          <> ":"
-          <> show (posCol start)
-          <> "-"
-          <> show (posLine end)
-          <> ":"
-          <> show (posCol end)
+  show (Range start end) = if posLine start == posLine end
+    then
+      posFile start
+      <> " ["
+      <> show (posCoff start)
+      <> "-"
+      <> show (posCoff end)
+      <> "] "
+      <> show (posLine start)
+      <> ":"
+      <> show (posCol start)
+      <> "-"
+      <> show (posCol end)
+    else
+      posFile start
+      <> " ["
+      <> show (posCoff start)
+      <> "-"
+      <> show (posCoff end)
+      <> "] "
+      <> show (posLine start)
+      <> ":"
+      <> show (posCol start)
+      <> "-"
+      <> show (posLine end)
+      <> ":"
+      <> show (posCol end)
 
 -- | Starting position of the range
 rangeStart :: Range -> Pos
@@ -85,12 +86,12 @@ rangeEnd :: Range -> Pos
 rangeEnd (Range _ b) = b
 
 -- | Filepath of the range
-rangeFile :: Range -> FilePath 
+rangeFile :: Range -> FilePath
 rangeFile (Range a _) = posFile a
 
 -- | Loc -> Maybe Range
 fromLoc :: Loc -> Maybe Range
-fromLoc NoLoc = Nothing
+fromLoc NoLoc     = Nothing
 fromLoc (Loc x y) = Just (Range x y)
 
 -- | [Loc] -> [Range]
@@ -144,7 +145,7 @@ instance Ranged a => Ranged (NonEmpty a) where
 -- | A value of type @R a@ is a value of type @a@ with an associated 'Range', but
 -- this location is ignored when performing comparisons.
 data R a = R Range a
-  deriving (Functor)
+  deriving Functor
 
 unRange :: R a -> a
 unRange (R _ a) = a
@@ -165,7 +166,8 @@ instance Ranged (R a) where
 
 -- | Make Pos instances of FromJSON and ToJSON
 instance ToJSON Pos where
-  toJSON (Pos filepath line column offset) = toJSON (filepath, line, column, offset)
+  toJSON (Pos filepath line column offset) =
+    toJSON (filepath, line, column, offset)
 
 instance FromJSON Pos where
   parseJSON v = do
@@ -185,53 +187,50 @@ instance ToJSON Range
 --  GT: the cursor is placed AFTER (but not touching) that thing
 compareWithPosition :: Located a => Pos -> a -> Ordering
 compareWithPosition pos x = case locOf x of
-  NoLoc -> EQ
-  Loc start end ->
-    if posCoff pos < posCoff start
-      then LT
-      else
-        if posCoff pos > posCoff end
-          then GT
-          else EQ
+  NoLoc         -> EQ
+  Loc start end -> if posCoff pos < posCoff start
+    then LT
+    else if posCoff pos > posCoff end then GT else EQ
 
 -- | See if something is within the selection
 withinRange :: Located a => Range -> a -> Bool
 withinRange (Range left right) x =
-  compareWithPosition left x == EQ
-    || compareWithPosition right x == EQ
+  compareWithPosition left x
+    == EQ
+    || compareWithPosition right x
+    == EQ
     || (compareWithPosition left x == LT && compareWithPosition right x == GT)
 
 --------------------------------------------------------------------------------
 
 instance Pretty Range where
-  pretty (Range start end) =
-    if posLine start == posLine end
-      then
-        pretty (posFile start)
-          <> " ["
-          <> pretty (posCoff start)
-          <> "-"
-          <> pretty (posCoff end)
-          <> "] "
-          <> pretty (posLine start)
-          <> ":"
-          <> pretty (posCol start)
-          <> "-"
-          <> pretty (posCol end)
-      else
-        pretty (posFile start)
-          <> " ["
-          <> pretty (posCoff start)
-          <> "-"
-          <> pretty (posCoff end)
-          <> "] "
-          <> pretty (posLine start)
-          <> ":"
-          <> pretty (posCol start)
-          <> "-"
-          <> pretty(posLine end)
-          <> ":"
-          <> pretty (posCol end)
+  pretty (Range start end) = if posLine start == posLine end
+    then
+      pretty (posFile start)
+      <> " ["
+      <> pretty (posCoff start)
+      <> "-"
+      <> pretty (posCoff end)
+      <> "] "
+      <> pretty (posLine start)
+      <> ":"
+      <> pretty (posCol start)
+      <> "-"
+      <> pretty (posCol end)
+    else
+      pretty (posFile start)
+      <> " ["
+      <> pretty (posCoff start)
+      <> "-"
+      <> pretty (posCoff end)
+      <> "] "
+      <> pretty (posLine start)
+      <> ":"
+      <> pretty (posCol start)
+      <> "-"
+      <> pretty (posLine end)
+      <> ":"
+      <> pretty (posCol end)
 
 instance Pretty Loc where
   pretty = pretty . displayLoc
@@ -242,41 +241,43 @@ instance Pretty Pos where
 --------------------------------------------------------------------------------
 
 -- | Like Range but a special  Show &Pretty instance, won't display the full path
-newtype ShortRange = ShortRange { unShortRange :: Range } 
+newtype ShortRange = ShortRange { unShortRange :: Range }
 
 instance Show ShortRange where
   show (ShortRange (Range start end)) =
-    let path = case split '/' (posFile start) of 
+    let path = case split '/' (posFile start) of
           [] -> []
-          xs -> last xs 
-    in 
-    if posLine start == posLine end
-      then 
-       path
-          <> " ["
-          <> show (posCoff start)
-          <> "-"
-          <> show (posCoff end)
-          <> "] "
-          <> show (posLine start)
-          <> ":"
-          <> show (posCol start)
-          <> "-"
-          <> show (posCol end)
-      else
-        path
-          <> " ["
-          <> show (posCoff start)
-          <> "-"
-          <> show (posCoff end)
-          <> "] "
-          <> show (posLine start)
-          <> ":"
-          <> show (posCol start)
-          <> "-"
-          <> show(posLine end)
-          <> ":"
-          <> show (posCol end)
-    where 
-      split :: Char -> String -> [String]
-      split c = filter (/= [c]) . List.groupBy (\x y -> x /= c && y /= c)
+          xs -> last xs
+    in  if posLine start == posLine end
+          then
+            path
+            <> " ["
+            <> show (posCoff start)
+            <> "-"
+            <> show (posCoff end)
+            <> "] "
+            <> show (posLine start)
+            <> ":"
+            <> show (posCol start)
+            <> "-"
+            <> show (posCol end)
+          else
+            path
+            <> " ["
+            <> show (posCoff start)
+            <> "-"
+            <> show (posCoff end)
+            <> "] "
+            <> show (posLine start)
+            <> ":"
+            <> show (posCol start)
+            <> "-"
+            <> show (posLine end)
+            <> ":"
+            <> show (posCol end)
+   where
+    split :: Char -> String -> [String]
+    split c = filter (/= [c]) . List.groupBy (\x y -> x /= c && y /= c)
+
+instance Pretty ShortRange where
+  pretty = pretty . show

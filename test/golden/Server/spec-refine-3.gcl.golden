@@ -14,8 +14,13 @@ abort
 
 ### Trace
 
-TracePutLastSelection ./test/source/Server/spec-refine-3.gcl [0-20] 1:1-4:3
+TraceLog "    - Parsed"
+TraceLog "    - Converted"
+TraceLog "    - Swept"
+TraceLog "    - Set selection spec-refine-3.gcl [0-20] 1:1-4:3"
 TraceGetSource
+TraceLog "    - Parsed"
+TraceLog "    - Converted"
+TraceLog "    - Swept"
 TraceGetSource
 TraceEditText ./test/source/Server/spec-refine-3.gcl [0-20] 1:1-4:3 "    skip\nabort\n"
-TraceSendDiagnostics [Diagnostic {_range = Range {_start = Position {_line = 1, _character = 0}, _end = Position {_line = 1, _character = 0}}, _severity = Just DsError, _code = Nothing, _source = Nothing, _message = "Syntax error", _tags = Nothing, _relatedInformation = Just (List [DiagnosticRelatedInformation {_location = Location {_uri = Uri {getUri = "./test/source/Server/spec-refine-3.gcl"}, _range = Range {_start = Position {_line = 1, _character = 0}, _end = Position {_line = 1, _character = 0}}}, _message = "unexpected 'a'\nexpecting end of input\n"}])}]

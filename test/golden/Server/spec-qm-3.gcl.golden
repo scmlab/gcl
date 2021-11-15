@@ -24,5 +24,10 @@ fi
 
 ### Trace
 
+TraceLog "    - Parsed"
 TraceLog " <--- DigHole ./test/source/Server/spec-qm-3.gcl [16-17] 2:5-6"
 TraceEditText ./test/source/Server/spec-qm-3.gcl [16-17] 2:5-6 "[!\n    \n    !]"
+TraceLog "    - Parsed"
+TraceLog "    - Converted"
+TraceLog "    - Converted"
+TraceLog "    - Swept"
