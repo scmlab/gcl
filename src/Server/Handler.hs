@@ -44,7 +44,7 @@ handlers = mconcat
       if muted
         then return []
         else do
-          logText " ---> TextDocumentDidChange"
+          logText "\n ---> TextDocumentDidChange"
           source    <- getSource
           parsed    <- parse source
           converted <- convert parsed
@@ -57,14 +57,11 @@ handlers = mconcat
     let uri    = ntf ^. (J.params . J.textDocument . J.uri)
     let source = ntf ^. (J.params . J.textDocument . J.text)
     interpret uri (notificationResponder uri) $ do
-      logText " ---> TextDocumentDidOpen"
+      logText "\n ---> TextDocumentDidOpen"
       parsed    <- parse source
-      
       converted <- convert parsed
-      
       typeCheck (convertedProgram converted)
       _ <- sweep converted
-      
       generateResponseAndDiagnosticsFromCurrentState
   , -- Goto Definition
     requestHandler J.STextDocumentDefinition $ \req responder -> do
@@ -79,11 +76,11 @@ handlers = mconcat
   , requestHandler J.STextDocumentSemanticTokensFull $ \req responder -> do
     let uri = req ^. (J.params . J.textDocument . J.uri)
     interpret uri (responder . ignoreErrors) $ do
-      logText " <--- Syntax Highlighting"
-      stage <- getStage
+      logText "\n ---> Syntax Highlighting"
       let legend = J.SemanticTokensLegend
             (J.List J.knownSemanticTokenTypes)
             (J.List J.knownSemanticTokenModifiers)
+      stage <- load
       let
         highlightings = case stage of
           Uninitialized _ -> []

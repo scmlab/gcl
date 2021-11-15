@@ -28,6 +28,7 @@ import           Data.IORef                     ( IORef
                                                 )
 import           Data.Map                       ( Map )
 import qualified Data.Map                      as Map
+import qualified Data.Maybe                    as Maybe
 import           Data.Text                      ( Text )
 import           Error
 import qualified Language.LSP.Diagnostics      as J
@@ -39,8 +40,9 @@ import           Render
 import           Server.CustomMethod
 import           Server.DSL                     ( Cmd(..)
                                                 , CmdM
-                                                , CmdState (..)
-                                                , runCmdM, initState
+                                                , CmdState(..)
+                                                , initState
+                                                , runCmdM
                                                 )
 import qualified Server.DSL                    as DSL
 import           Server.Handler.Diagnostic      ( collect )
@@ -115,29 +117,13 @@ customRequestResponder
   -> (Response -> ServerM ())
   -> ([Error], Maybe [ResKind])
   -> ServerM ()
-customRequestResponder filepath responder (errors, result) = do
-  oldErrors <- cmdErrors <$> getState filepath
-  logText $ " #### errors " <> toText (length oldErrors) <> " => " <> toText
-    (length errors)
-
-
-  if null errors
-    then do
-      let responses = case result of
-            Nothing -> []
-            Just xs -> xs
-      responder (Res filepath responses)
-    else do
-      responder (Res filepath [])
-
-
-
-  -- (oldErrors, _)       <- getState filepath
-  -- responsesFromError <- convertErrors filepath errors
-  -- let responses = case result of
-  --       Nothing -> responsesFromError
-  --       Just xs -> responsesFromError <> xs
-  -- responder (Res filepath responses)
+customRequestResponder filepath responder (errors, result) = if null errors
+  then do
+    let responses = Maybe.fromMaybe [] result
+    responder (Res filepath responses)
+  else do
+    responsesFromError <- convertErrors filepath errors
+    responder (Res filepath responsesFromError)
 
 notificationResponder :: J.Uri -> ([Error], Maybe [ResKind]) -> ServerM ()
 notificationResponder uri (errors, result) = case J.uriToFilePath uri of
@@ -191,9 +177,10 @@ interpret
   -> CmdM a
   -> ServerM ()
 interpret uri responcder p = case J.uriToFilePath uri of
-  Nothing -> pure ()
-  Just filepath ->
-    interpret2 (initState filepath) filepath responcder p
+  Nothing       -> pure ()
+  Just filepath -> do
+    state <- getState filepath
+    interpret2 state filepath responcder p
 
 interpret2
   :: Show a
@@ -205,18 +192,18 @@ interpret2
 interpret2 state filepath responder p = case runCmdM filepath state p of
   Right (Pure value, newState, ()) -> do
     -- store the new state 
-    setState filepath newState 
+    logText "[SUCCESS]"
+    setState filepath newState
     responder (cmdErrors newState, Just value)
   Right (Free command, newState, ()) -> go filepath newState responder command
   Left  errors                       -> do
     -- got errors from computation
     CmdState _ cachedStage _ selections counter <- getState filepath
-    let newState = CmdState 
-            errors -- store it for later inspection 
-            cachedStage
-            False -- unmute on error!
-            selections
-            counter
+    let newState =
+          CmdState errors -- store it for later inspection 
+                          cachedStage False -- unmute on error!
+                                            selections counter
+    logText "[ERROR]"
     setState filepath newState
     responder (errors, Nothing)
 
@@ -247,7 +234,7 @@ go filepath state responder = \case
           DSL.getSource >>= next
 
     void $ J.sendRequest J.SWorkspaceApplyEdit applyWorkspaceEditParams callback
-  GetSource   next -> do
+  GetSource next -> do
     result <- fmap J.virtualFileText
       <$> J.getVirtualFile (J.toNormalizedUri (J.filePathToUri filepath))
     case result of

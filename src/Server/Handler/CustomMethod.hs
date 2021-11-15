@@ -81,7 +81,7 @@ handleInsertAnchor hash = do
 
 handleSubst :: Int -> CmdM [ResKind]
 handleSubst i = do
-  stage <- getStage
+  stage <- load
   logText $ Text.pack $ "Substituting Redex " <> show i
   -- 
   case stage of
@@ -102,7 +102,7 @@ handleSubst i = do
                 { sweptCounter = counter
                 , sweptRedexes = sweptRedexes result <> redexesInNewExpr
                 }
-          persist (Swept newResult)
+          save (Swept newResult)
           return [ResSubstitute i (render newExpr)]
 
 handleCustomMethod :: ReqKind -> CmdM [ResKind]
@@ -136,6 +136,6 @@ handler params responder = do
     interpret (J.filePathToUri filepath)
               (customRequestResponder filepath responder)
       $ do
-          logText $ " ---> Custom Reqeust: " <> Text.pack (show request)
+          logText $ "\n ---> Custom Reqeust: " <> Text.pack (show request)
           handleCustomMethod kind
 

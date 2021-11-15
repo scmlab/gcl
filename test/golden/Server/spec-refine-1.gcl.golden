@@ -10,19 +10,20 @@ skip
 
 ### Trace
 
-TraceLog "    - Parsed"
-TraceLog "    - Converted"
-TraceLog "    - Swept"
+TraceLog "      [ save ] Parsed"
+TraceLog "      [ save ] Converted"
+TraceLog "      [ save ] Swept"
 TraceLog "    - Set selection spec-refine-1.gcl [0-10] 1:1-3:3"
 TraceGetSource
-TraceLog "    - Parsed"
-TraceLog "    - Converted"
-TraceLog "    - Swept"
+TraceLog "      [ save ] Parsed"
+TraceLog "      [ save ] Converted"
+TraceLog "      [ save ] Swept"
 TraceGetSource
 TraceEditText ./test/source/Server/spec-refine-1.gcl [0-10] 1:1-3:3 "skip"
-TraceLog "    - Parsed"
-TraceLog "    - Converted"
-TraceLog "    - Swept"
+TraceLog "      [ save ] Parsed"
+TraceLog "      [ save ] Converted"
+TraceLog "      [ save ] Swept"
+TraceLog "      [ load ] from Swept"
 TraceLog "    - Get selection but got Nothing"
 TraceLog "    - Bump counter 0 => 1"
 TraceLog " <--- Send Diagnostics 1"

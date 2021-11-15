@@ -30,7 +30,7 @@ handler uri position responder = do
         let table = SrcLoc.makeToOffset source
         let pos   = SrcLoc.fromLSPPosition table filepath position
 
-        stage <- getStage
+        stage <- load
         let tokenMap = case stage of
               Uninitialized _ -> Nothing
               Parsed _result -> Nothing

@@ -18,10 +18,10 @@ Warnings: [] }
 
 ### Trace
 
-TraceLog "    - Parsed"
+TraceLog "      [ save ] Parsed"
 TraceLog " <--- DigHole ./test/source/Server/spec-qm-1.gcl [0-1] 1:1-2"
 TraceEditText ./test/source/Server/spec-qm-1.gcl [0-1] 1:1-2 "[!\n\n!]"
-TraceLog "    - Parsed"
-TraceLog "    - Converted"
-TraceLog "    - Converted"
-TraceLog "    - Swept"
+TraceLog "      [ save ] Parsed"
+TraceLog "      [ save ] Converted"
+TraceLog "      [ save ] Converted"
+TraceLog "      [ save ] Swept"

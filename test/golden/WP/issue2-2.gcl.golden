@@ -15,6 +15,6 @@ var x, y, z : Int
 
 ### Trace
 
-TraceLog "    - Parsed"
-TraceLog "    - Converted"
-TraceLog "    - Swept"
+TraceLog "      [ save ] Parsed"
+TraceLog "      [ save ] Converted"
+TraceLog "      [ save ] Swept"

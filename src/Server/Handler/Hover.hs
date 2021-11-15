@@ -31,7 +31,7 @@ handler uri position responder = case uriToFilePath uri of
       let pos   = SrcLoc.fromLSPPosition table filepath position
 
 
-      stage <- getStage
+      stage <- load
 
       let
         tokenMap = case stage of

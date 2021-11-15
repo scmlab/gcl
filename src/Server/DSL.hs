@@ -49,7 +49,8 @@ import           Syntax.Parser                  ( Parser
 data ParseResult = ParseResult
   { parsedProgram      :: C.Program
   , parsedHighlighings :: [J.SemanticTokenAbsolute]
-  } deriving (Show, Eq)
+  }
+  deriving (Show, Eq)
 
 parse :: Text -> CmdM ParseResult
 parse source = do
@@ -57,7 +58,7 @@ parse source = do
   let parsed = ParseResult { parsedProgram      = program
                            , parsedHighlighings = collectHighlighting program
                            }
-  persist (Parsed parsed)
+  save (Parsed parsed)
   return parsed
 
 
@@ -65,7 +66,8 @@ data ConvertResult = ConvertResult
   { convertedPreviousStage :: ParseResult
   , convertedProgram       :: A.Program
   , convertedTokenMap      :: TokenMap
-  } deriving (Show, Eq)
+  }
+  deriving (Show, Eq)
 
 convert :: ParseResult -> CmdM ConvertResult
 convert result = do
@@ -76,7 +78,7 @@ convert result = do
       , convertedProgram       = program
       , convertedTokenMap      = collectTokenMap program
       }
-  persist (Converted converted)
+  save (Converted converted)
   return converted
 
 
@@ -93,7 +95,8 @@ data SweepResult = SweepResult
   , sweptRedexes       :: IntMap A.Redex
     -- counter for generating fresh variables
   , sweptCounter       :: Int
-  } deriving (Show, Eq)
+  }
+  deriving (Show, Eq)
 
 sweep :: ConvertResult -> CmdM SweepResult
 sweep convertedResult = do
@@ -111,13 +114,13 @@ sweep convertedResult = do
       , sweptCounter       = counter
       }
 
-  persist (Swept swept)
+  save (Swept swept)
   return swept
 
 data Stage = Uninitialized FilePath
         | Parsed ParseResult
         | Converted ConvertResult
-        | Swept SweepResult 
+        | Swept SweepResult
         deriving (Show, Eq)
 
 instance Pretty Stage where
@@ -157,7 +160,8 @@ data CmdState = CmdState
   , cmdMute      :: Bool   -- state for indicating whether we should ignore events like `STextDocumentDidChange` 
   , cmdSelection :: Maybe Range -- text selections (including cursor position)
   , cmdCounter   :: Int -- counter for generating different IDs for Responses
-  } deriving (Show, Eq)
+  }
+  deriving (Show, Eq)
 
 initState :: FilePath -> CmdState
 initState filepath = CmdState [] (Uninitialized filepath) False Nothing 0
@@ -178,8 +182,15 @@ getFilePath = ask
 getSource :: CmdM Text
 getSource = liftF (GetSource id)
 
-getStage :: CmdM Stage
-getStage = gets cmdStage
+load :: CmdM Stage
+load = do
+  stage <- gets cmdStage
+  case stage of
+    Uninitialized _ -> logText "      [ load ] from Uninitialized"
+    Parsed        _ -> logText "      [ load ] from Parsed"
+    Converted     _ -> logText "      [ load ] from Converted"
+    Swept         _ -> logText "      [ load ] from Swept"
+  return stage
 
 getErrors :: CmdM [Error]
 getErrors = gets cmdErrors
@@ -193,36 +204,29 @@ mute m = modify' $ \state -> state { cmdMute = m }
 setErrors :: [Error] -> CmdM ()
 setErrors e = modify' $ \state -> state { cmdErrors = e }
 
-persist :: Stage -> CmdM ()
-persist stage = do
+-- | Save current progress and remove existing Errors
+save :: Stage -> CmdM ()
+save stage = do
   case stage of
-    Uninitialized _ -> logText "    - Uninitialized"
-    Parsed        _ -> logText "    - Parsed"
-    Converted     _ -> do
-      -- s <- getState
-      -- case s of
-      --   Uninitialized _ -> logText "    - (Uninitialized)"
-      --   Parsed        _ -> logText "    - (Parsed)"
-      --   Converted     _ -> logText "    - (Converted)"
-      --   Swept         _ -> logText "    - (Swept)"
-      logText "    - Converted"
-    Swept _ -> logText "    - Swept"
-
-  modify' $ \state -> state { cmdStage = stage }
+    Uninitialized _ -> logText "      [ save ] Uninitialized"
+    Parsed        _ -> logText "      [ save ] Parsed"
+    Converted     _ -> logText "      [ save ] Converted"
+    Swept         _ -> logText "      [ save ] Swept"
+  modify' $ \state -> state { cmdErrors = [], cmdStage = stage }
 
 setLastSelection :: Range -> CmdM ()
-setLastSelection selection = do 
+setLastSelection selection = do
   logText $ "    - Set selection " <> toText (ShortRange selection)
   modify' $ \state -> state { cmdSelection = Just selection }
 
 getLastSelection :: CmdM (Maybe Range)
-getLastSelection = do 
+getLastSelection = do
   sel <- gets cmdSelection
-  case sel of 
-    Nothing -> logText $ "    - Get selection but got Nothing"
-    Just r -> logText $ "    - Get selection " <> toText (ShortRange r)
-  
-  return sel 
+  case sel of
+    Nothing -> logText "    - Get selection but got Nothing"
+    Just r  -> logText $ "    - Get selection " <> toText (ShortRange r)
+
+  return sel
 
 logText :: Text -> CmdM ()
 logText text = liftF (Log text ())
@@ -303,7 +307,7 @@ parseProgram source = do
 
 generateResponseAndDiagnosticsFromCurrentState :: CmdM [ResKind]
 generateResponseAndDiagnosticsFromCurrentState = do
-  stage <- getStage
+  stage <- load
   case stage of
     Uninitialized _      -> return []
     Parsed        _      -> return []

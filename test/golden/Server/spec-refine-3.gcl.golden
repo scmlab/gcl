@@ -14,13 +14,13 @@ abort
 
 ### Trace
 
-TraceLog "    - Parsed"
-TraceLog "    - Converted"
-TraceLog "    - Swept"
+TraceLog "      [ save ] Parsed"
+TraceLog "      [ save ] Converted"
+TraceLog "      [ save ] Swept"
 TraceLog "    - Set selection spec-refine-3.gcl [0-20] 1:1-4:3"
 TraceGetSource
-TraceLog "    - Parsed"
-TraceLog "    - Converted"
-TraceLog "    - Swept"
+TraceLog "      [ save ] Parsed"
+TraceLog "      [ save ] Converted"
+TraceLog "      [ save ] Swept"
 TraceGetSource
 TraceEditText ./test/source/Server/spec-refine-3.gcl [0-20] 1:1-4:3 "    skip\nabort\n"
