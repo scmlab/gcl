@@ -28,8 +28,11 @@ import qualified Language.LSP.Types            as J
 handleInspect :: Range -> CmdM [ResKind]
 handleInspect range = do
   setLastSelection range
-  generateResponseAndDiagnosticsFromCurrentState
-
+  stage <- load
+  case stage of 
+    Swept swept -> generateResponseAndDiagnostics swept
+    _ -> return []
+  
 handleRefine :: Range -> CmdM [ResKind]
 handleRefine range = do
   mute True
@@ -52,9 +55,9 @@ handleRefine range = do
 
   typeCheck (convertedProgram converted)
   mute False
-  _ <- sweep converted
+  swept <- sweep converted
 
-  generateResponseAndDiagnosticsFromCurrentState
+  generateResponseAndDiagnostics swept
 
 handleInsertAnchor :: Text -> CmdM [ResKind]
 handleInsertAnchor hash = do
@@ -75,9 +78,8 @@ handleInsertAnchor hash = do
   converted <- convert parsed
   typeCheck (convertedProgram converted)
   mute False
-  _ <- sweep converted
-
-  generateResponseAndDiagnosticsFromCurrentState
+  swept <- sweep converted
+  generateResponseAndDiagnostics swept
 
 handleSubst :: Int -> CmdM [ResKind]
 handleSubst i = do

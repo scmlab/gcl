@@ -27,7 +27,6 @@ TraceLog "      [ save ] Parsed"
 TraceLog "      [ save ] Converted"
 TraceLog "      [ event ] unmute"
 TraceLog "      [ save ] Swept"
-TraceLog "      [ load ] from Swept"
 TraceLog "      [ load ] Mouse selection: Nothing"
 TraceLog "    < Send Diagnostics 1"
 TraceSendDiagnostics [Diagnostic {_range = Range {_start = Position {_line = 0, _character = 0}, _end = Position {_line = 0, _character = 4}}, _severity = Just DsWarning, _code = Nothing, _source = Nothing, _message = "Skip", _tags = Nothing, _relatedInformation = Just (List [DiagnosticRelatedInformation {_location = Location {_uri = Uri {getUri = "./test/source/Server/spec-refine-2.gcl"}, _range = Range {_start = Position {_line = 0, _character = 0}, _end = Position {_line = 0, _character = 4}}}, _message = ""}])}]

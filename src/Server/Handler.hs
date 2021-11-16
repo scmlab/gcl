@@ -49,9 +49,8 @@ handlers = mconcat
           parsed    <- parse source
           converted <- convert parsed
           typeCheck (convertedProgram converted)
-          _ <- sweep converted
-
-          generateResponseAndDiagnosticsFromCurrentState
+          swept <- sweep converted
+          generateResponseAndDiagnostics swept
   , notificationHandler J.STextDocumentDidOpen $ \ntf -> do
     let uri    = ntf ^. (J.params . J.textDocument . J.uri)
     let source = ntf ^. (J.params . J.textDocument . J.text)
@@ -60,8 +59,8 @@ handlers = mconcat
       parsed    <- parse source
       converted <- convert parsed
       typeCheck (convertedProgram converted)
-      _ <- sweep converted
-      generateResponseAndDiagnosticsFromCurrentState
+      swept <- sweep converted
+      generateResponseAndDiagnostics swept
   , -- Goto Definition
     requestHandler J.STextDocumentDefinition $ \req responder -> do
     let uri = req ^. (J.params . J.textDocument . J.uri)

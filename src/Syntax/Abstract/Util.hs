@@ -13,10 +13,6 @@ import           Syntax.Common                  ( Name
                                                 , nameToText
                                                 )
 
-extractAssertion :: Declaration -> Maybe Expr
-extractAssertion (ConstDecl _ _ e _) = e
-extractAssertion (VarDecl   _ _ e _) = e
-
 funcDefnSigsToConstDecl :: FuncDefnSig -> [Declaration]
 funcDefnSigsToConstDecl (FuncDefnSig name t prop loc) =
   [ConstDecl [name] t prop loc]

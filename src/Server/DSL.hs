@@ -173,23 +173,43 @@ runCmdM
 runCmdM filepath st p = runExcept (runRWST (runFreeT p) filepath st)
 
 editText :: Range -> Text -> CmdM Text
-editText range inserted = do 
+editText range inserted = do
 
   let Range start end = range
   source <- getSource
-  let (_, rest) = Text.splitAt (posCoff start) source
-  let (replaced, _)     = Text.splitAt (posCoff end - posCoff start) rest
+  let (_, rest)     = Text.splitAt (posCoff start) source
+  let (replaced, _) = Text.splitAt (posCoff end - posCoff start) rest
 
 
-  case (Text.null replaced, Text.null inserted) of 
+  case (Text.null replaced, Text.null inserted) of
     -- no-op
     (True, True) -> return ()
     -- deletion 
-    (True, False) -> logText $ "      [ edit ] Delete " <> toText range <> " \"" <> replaced <> "\""
+    (True, False) ->
+      logText
+        $  "      [ edit ] Delete "
+        <> toText range
+        <> " \""
+        <> replaced
+        <> "\""
     -- insertion 
-    (False, True) -> logText $ "      [ edit ] Insert " <> toText range <> " \"" <> inserted <> "\""
+    (False, True) ->
+      logText
+        $  "      [ edit ] Insert "
+        <> toText range
+        <> " \""
+        <> inserted
+        <> "\""
     -- replacement 
-    (False, False) -> logText $ "      [ edit ] Replace " <> toText range <> " \"" <> replaced <> "\" \n      with \"" <> inserted <> "\""
+    (False, False) ->
+      logText
+        $  "      [ edit ] Replace "
+        <> toText range
+        <> " \""
+        <> replaced
+        <> "\" \n      with \""
+        <> inserted
+        <> "\""
 
   liftF (EditText range inserted id)
 
@@ -216,10 +236,8 @@ isMuted :: CmdM Bool
 isMuted = gets cmdMute
 
 mute :: Bool -> CmdM ()
-mute m = do 
-  if m 
-    then logText "      [ event ] mute"
-    else logText "      [ event ] unmute"
+mute m = do
+  if m then logText "      [ event ] mute" else logText "      [ event ] unmute"
   modify' $ \state -> state { cmdMute = m }
 
 setErrors :: [Error] -> CmdM ()
@@ -245,7 +263,8 @@ getLastSelection = do
   sel <- gets cmdSelection
   case sel of
     Nothing -> logText "      [ load ] Mouse selection: Nothing"
-    Just r  -> logText $ "      [ load ] Mouse selection: " <> toText (ShortRange r)
+    Just r ->
+      logText $ "      [ load ] Mouse selection: " <> toText (ShortRange r)
 
   return sel
 
@@ -326,60 +345,54 @@ parseProgram source = do
 
 --------------------------------------------------------------------------------
 
-generateResponseAndDiagnosticsFromCurrentState :: CmdM [ResKind]
-generateResponseAndDiagnosticsFromCurrentState = do
-  stage <- load
-  case stage of
-    Uninitialized _      -> return []
-    Parsed        _      -> return []
-    Converted     _      -> return []
-    Swept         result -> do
-      let (SweepResult _ pos specs globalProps warnings _redexes _) = result
+generateResponseAndDiagnostics :: SweepResult -> CmdM [ResKind]
+generateResponseAndDiagnostics result = do
+  let (SweepResult _ pos specs globalProps warnings _redexes _) = result
 
-      -- get Specs around the mouse selection
-      lastSelection <- getLastSelection
-      let overlappedSpecs = case lastSelection of
-            Nothing        -> specs
-            Just selection -> filter (withinRange selection) specs
-      -- get POs around the mouse selection (including their corresponding Proofs)
+  -- get Specs around the mouse selection
+  lastSelection <- getLastSelection
+  let overlappedSpecs = case lastSelection of
+        Nothing        -> specs
+        Just selection -> filter (withinRange selection) specs
+  -- get POs around the mouse selection (including their corresponding Proofs)
 
-      let withinPOrange sel po = case poAnchorLoc po of
-            Nothing     -> withinRange sel po
-            Just anchor -> withinRange sel po || withinRange sel anchor
+  let withinPOrange sel po = case poAnchorLoc po of
+        Nothing     -> withinRange sel po
+        Just anchor -> withinRange sel po || withinRange sel anchor
 
-      let overlappedPOs = case lastSelection of
-            Nothing        -> pos
-            Just selection -> filter (withinPOrange selection) pos
-      -- render stuff
-      let warningsSections =
-            if null warnings then [] else map renderSection warnings
-      let globalPropsSections = if null globalProps
-            then []
-            else map
-              (\expr -> Section
-                Plain
-                [Header "Property" (fromLoc (locOf expr)), Code (render expr)]
-              )
-              globalProps
-      let specsSections = if null overlappedSpecs
-            then []
-            else map renderSection overlappedSpecs
-      let poSections =
-            if null overlappedPOs then [] else map renderSection overlappedPOs
-      let sections = mconcat
-            [warningsSections, specsSections, poSections, globalPropsSections]
+  let overlappedPOs = case lastSelection of
+        Nothing        -> pos
+        Just selection -> filter (withinPOrange selection) pos
+  -- render stuff
+  let warningsSections =
+        if null warnings then [] else map renderSection warnings
+  logText $ toText (length globalProps)
+  let globalPropsSections = if null globalProps
+        then []
+        else map
+          (\expr -> Section
+            Plain
+            [Header "Property" (fromLoc (locOf expr)), Code (render expr)]
+          )
+          globalProps
+  let specsSections =
+        if null overlappedSpecs then [] else map renderSection overlappedSpecs
+  let poSections =
+        if null overlappedPOs then [] else map renderSection overlappedPOs
+  let sections = mconcat
+        [warningsSections, specsSections, poSections, globalPropsSections]
 
-      version <- bumpVersion
-      let encodeSpec spec =
-            ( specID spec
-            , toText $ render (specPreCond spec)
-            , toText $ render (specPostCond spec)
-            , specRange spec
-            )
+  version <- bumpVersion
+  let encodeSpec spec =
+        ( specID spec
+        , toText $ render (specPreCond spec)
+        , toText $ render (specPostCond spec)
+        , specRange spec
+        )
 
-      let responses =
-            [ResDisplay version sections, ResUpdateSpecs (map encodeSpec specs)]
-      let diagnostics = concatMap collect pos ++ concatMap collect warnings
-      sendDiagnostics diagnostics
+  let responses =
+        [ResDisplay version sections, ResUpdateSpecs (map encodeSpec specs)]
+  let diagnostics = concatMap collect pos ++ concatMap collect warnings
+  sendDiagnostics diagnostics
 
-      return responses
+  return responses
