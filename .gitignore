@@ -1,3 +1,4 @@
+*.monopic
 dist
 dist-*
 cabal-dev

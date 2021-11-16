@@ -19,7 +19,7 @@ import qualified Data.Text                     as Text
 import qualified Data.Text.Encoding            as Text
 import           Language.LSP.Types             ( Diagnostic )
 import           Pretty
-import           Server.DSL
+import           Server.Pipeline
 import Error (Error)
 
 --------------------------------------------------------------------------------
@@ -27,7 +27,7 @@ import Error (Error)
 data TestResult a = TestResult
   { testResultValue  :: Either [Error] a
   , testResultSource :: Text
-  , testResultState  :: CmdState
+  , testResultState  :: PipelineState
   , testResultTrace  :: [Trace]
   }
   deriving (Eq, Show)
@@ -58,19 +58,19 @@ data Trace
   | TraceSendDiagnostics [Diagnostic]
   deriving (Eq, Show)
 
-type TestM a = RWS FilePath [Trace] (Text, CmdState) a
+type TestM a = RWS FilePath [Trace] (Text, PipelineState) a
 
-runTest :: FilePath -> Text -> CmdM (Either [Error] a) -> TestResult a
+runTest :: FilePath -> Text -> PipelineM (Either [Error] a) -> TestResult a
 runTest filepath source program =
   let (result, (text, finalState), trace) =
         runRWS (interpret program) filepath (source, initState filepath)
   in  TestResult result text finalState trace
 
 -- Interprets the Server DSL and logs side effects as [Trace] 
-interpret :: CmdM (Either [Error] a) -> TestM (Either [Error] a)
+interpret :: PipelineM (Either [Error] a) -> TestM (Either [Error] a)
 interpret p = do
   filepath <- ask
-  case runCmdM filepath (initState filepath) p of
+  case runPipelineM filepath (initState filepath) p of
     Right (Pure value, newState, _) -> do
       -- store the new state 
       modify' $ \(source, _) -> (source, newState)
@@ -81,16 +81,16 @@ interpret p = do
       go command
     Left errors -> do
       -- got errors from computation
-      CmdState _ cachedStage _ selections counter <- gets snd
+      PipelineState _ cachedStage _ selections counter <- gets snd
       let newState =
-            CmdState errors -- store it for later inspection 
+            PipelineState errors -- store it for later inspection 
                             cachedStage False -- unmute on error!
                                               selections counter
       modify' $ \(source, _) -> (source, newState)
       return $ Left errors
 
 -- Interprets the Server DSL and logs side effects as [Trace] 
-go :: Cmd (CmdM (Either [Error] a)) -> TestM (Either [Error] a)
+go :: Instruction (PipelineM (Either [Error] a)) -> TestM (Either [Error] a)
 go = \case
   EditText range text next -> do
     let Range start end = range

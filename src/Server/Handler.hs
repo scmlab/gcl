@@ -13,7 +13,7 @@ import           Language.LSP.Server            ( Handlers
                                                 , notificationHandler
                                                 , requestHandler
                                                 )
-import           Server.DSL
+import           Server.Pipeline
 import           Server.Monad
 
 import           Error                          ( Error )
@@ -81,7 +81,7 @@ handlers = mconcat
       stage <- load
       let
         highlightings = case stage of
-          Uninitialized _      -> []
+          Raw _      -> []
           Parsed        result -> parsedHighlighings result
           Converted result ->
             parsedHighlighings (convertedPreviousStage result)

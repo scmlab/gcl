@@ -38,13 +38,13 @@ import qualified Language.LSP.VFS              as J
 import           Pretty                         ( toText )
 import           Render
 import           Server.CustomMethod
-import           Server.DSL                     ( Cmd(..)
-                                                , CmdM
-                                                , CmdState(..)
+import           Server.Pipeline                     ( Instruction(..)
+                                                , PipelineM
+                                                , PipelineState(..)
                                                 , initState
-                                                , runCmdM
+                                                , runPipelineM
                                                 )
-import qualified Server.DSL                    as DSL
+import qualified Server.Pipeline                    as DSL
 import           Server.Handler.Diagnostic      ( collect )
 import qualified Server.SrcLoc                 as SrcLoc
 
@@ -54,7 +54,7 @@ interpret
   :: Show a
   => J.Uri
   -> (([Error], Maybe a) -> ServerM ())
-  -> CmdM a
+  -> PipelineM a
   -> ServerM ()
 interpret uri continuation p = case J.uriToFilePath uri of
   Nothing       -> pure ()
@@ -64,25 +64,25 @@ executeOneStep
   :: Show a
   => FilePath
   -> (([Error], Maybe a) -> ServerM ())
-  -> CmdM a
+  -> PipelineM a
   -> ServerM ()
 executeOneStep filepath continuation p = do
   state <- getState filepath
-  case runCmdM filepath state p of
+  case runPipelineM filepath state p of
     Right (result, newState, ()) -> do
       -- persist the new state 
       setState filepath newState
       -- see if the computation has completed 
       case result of
-        Pure value   -> continuation (cmdErrors newState, Just value)
+        Pure value   -> continuation (pipelineErrors newState, Just value)
         Free command -> handleCommand filepath continuation command
     Left errors -> do -- got errors from computation
 
       oldState <- getState filepath
       logText "      [ event ] unmute"
       let newState =
-            oldState { cmdErrors = errors -- update errors for later inspection 
-                                         , cmdMute = False } -- unmute on error! 
+            oldState { pipelineErrors = errors -- update errors for later inspection 
+                                         , pipelineMute = False } -- unmute on error! 
       setState filepath newState
 
       continuation (errors, Nothing)
@@ -91,7 +91,7 @@ handleCommand
   :: Show a
   => FilePath
   -> (([Error], Maybe a) -> ServerM ())
-  -> Cmd (CmdM a)
+  -> Instruction (PipelineM a)
   -> ServerM ()
 handleCommand filepath continuation = \case
   EditText range text next -> do
@@ -134,7 +134,7 @@ data GlobalEnv = GlobalEnv
   ,
     -- Counter for generating fresh numbers
     globalCounter      :: IORef Int
-  , globalCurrentStage :: IORef (Map FilePath CmdState)
+  , globalCurrentStage :: IORef (Map FilePath PipelineState)
   }
 
 -- | Constructs an initial global state
@@ -181,12 +181,12 @@ bumpVersion = do
   liftIO $ writeIORef ref (succ n)
   return n
 
-setState :: FilePath -> CmdState -> ServerM ()
+setState :: FilePath -> PipelineState -> ServerM ()
 setState filepath state = do
   ref <- lift $ asks globalCurrentStage
   liftIO $ modifyIORef' ref (Map.insert filepath state)
 
-getState :: FilePath -> ServerM CmdState
+getState :: FilePath -> ServerM PipelineState
 getState filepath = do
   ref     <- lift $ asks globalCurrentStage
   mapping <- liftIO $ readIORef ref

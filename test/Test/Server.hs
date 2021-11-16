@@ -9,7 +9,7 @@ import           Data.Maybe                     ( listToMaybe )
 import           Error                          ( Error(Others) )
 import           GCL.Predicate.Util             ( specPayloadWithoutIndentation
                                                 )
-import           Server.DSL
+import           Server.Pipeline
 import           Server.Handler.CustomMethod    ( handleRefine )
 import           Test.Server.Interpreter
 import           Test.Tasty

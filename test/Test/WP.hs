@@ -4,7 +4,7 @@ module Test.WP where
 
 import           Prelude                 hiding ( Ordering(..) )
 import           Pretty                         ( )
-import           Server.DSL
+import           Server.Pipeline
 import           Test.Server.Interpreter
 import           Test.Tasty                     ( TestTree
                                                 , testGroup

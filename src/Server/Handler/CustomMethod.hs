@@ -17,7 +17,7 @@ import           GCL.Predicate
 import qualified GCL.Substitution              as Substitution
 import           Render                         ( Render(render) )
 import           Server.CustomMethod
-import           Server.DSL
+import           Server.Pipeline
 import           Server.Monad
 import           Syntax.Abstract                ( Redex(redexExpr) )
 import           Syntax.Abstract.Util           ( programToScopeForSubstitution
@@ -25,7 +25,7 @@ import           Syntax.Abstract.Util           ( programToScopeForSubstitution
 
 import qualified Language.LSP.Types            as J
 
-handleInspect :: Range -> CmdM [ResKind]
+handleInspect :: Range -> PipelineM [ResKind]
 handleInspect range = do
   setLastSelection range
   stage <- load
@@ -33,7 +33,7 @@ handleInspect range = do
     Swept swept -> generateResponseAndDiagnostics swept
     _ -> return []
   
-handleRefine :: Range -> CmdM [ResKind]
+handleRefine :: Range -> PipelineM [ResKind]
 handleRefine range = do
   mute True
   setLastSelection range
@@ -59,7 +59,7 @@ handleRefine range = do
 
   generateResponseAndDiagnostics swept
 
-handleInsertAnchor :: Text -> CmdM [ResKind]
+handleInsertAnchor :: Text -> PipelineM [ResKind]
 handleInsertAnchor hash = do
   -- mute the event listener before editing the source 
   mute True
@@ -81,13 +81,13 @@ handleInsertAnchor hash = do
   swept <- sweep converted
   generateResponseAndDiagnostics swept
 
-handleSubst :: Int -> CmdM [ResKind]
+handleSubst :: Int -> PipelineM [ResKind]
 handleSubst i = do
   stage <- load
   logText $ Text.pack $ "Substituting Redex " <> show i
   -- 
   case stage of
-    Uninitialized _      -> return []
+    Raw _      -> return []
     Parsed        _      -> return []
     Converted     _      -> return []
     Swept         result -> do
@@ -107,7 +107,7 @@ handleSubst i = do
           save (Swept newResult)
           return [ResSubstitute i (render newExpr)]
 
-handleCustomMethod :: ReqKind -> CmdM [ResKind]
+handleCustomMethod :: ReqKind -> PipelineM [ResKind]
 handleCustomMethod = \case
   ReqInspect      range -> handleInspect range
   ReqRefine       range -> handleRefine range

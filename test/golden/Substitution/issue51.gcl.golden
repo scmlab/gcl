@@ -1,100 +1,100 @@
 4: P [ s \ 0 ] 0
   P [ s \ 0 ] 0 ===> 0 = ⟨ ↑ ij : 0 ≤ i ≤ j ≤ 0 : sum i j ⟩
-    125: sum i j
+    124: sum i j
       sum i j ===> ⟨ Σ k : i ≤ k < j : f[k] ⟩
         
 5: Q 0
   Q 0 ===> r = ⟨ ↑ i : 0 ≤ i ≤ 0 : sum i 0 ⟩
-    156: sum i 0
+    155: sum i 0
       sum i 0 ===> ⟨ Σ k : i ≤ k < 0 : f[k] ⟩
         
-7: P [ s \ 0 ] 0
+6: P [ s \ 0 ] 0
   P [ s \ 0 ] 0 ===> 0 = ⟨ ↑ ij : 0 ≤ i ≤ j ≤ 0 : sum i j ⟩
-    192: sum i j
+    191: sum i j
       sum i j ===> ⟨ Σ k : i ≤ k < j : f[k] ⟩
         
-8: Q 0
+7: Q 0
   Q 0 ===> r = ⟨ ↑ i : 0 ≤ i ≤ 0 : sum i 0 ⟩
-    234: sum i 0
+    233: sum i 0
       sum i 0 ===> ⟨ Σ k : i ≤ k < 0 : f[k] ⟩
         
-21: P n
+20: P n
   P n ===> s = ⟨ ↑ ij : 0 ≤ i ≤ j ≤ n : sum i j ⟩
-    271: sum i j
+    270: sum i j
       sum i j ===> ⟨ Σ k : i ≤ k < j : f[k] ⟩
         
-22: Q n
+21: Q n
   Q n ===> r = ⟨ ↑ i : 0 ≤ i ≤ n : sum i n ⟩
-    302: sum i n
+    301: sum i n
       sum i n ===> ⟨ Σ k : i ≤ k < n : f[k] ⟩
         
-36: P (n + 1)
+35: P (n + 1)
   P (n + 1) ===> s = ⟨ ↑ ij : 0 ≤ i ≤ j ≤ n + 1 : sum i j ⟩
-    334: sum i j
+    333: sum i j
       sum i j ===> ⟨ Σ k : i ≤ k < j : f[k] ⟩
         
-37: Q (n + 1)
+36: Q (n + 1)
   Q (n + 1) ===> r = ⟨ ↑ i : 0 ≤ i ≤ n + 1 : sum i (n + 1) ⟩
-    365: sum i (n + 1)
+    364: sum i (n + 1)
       sum i (n + 1) ===> ⟨ Σ k : i ≤ k < n + 1 : f[k] ⟩
         
-38: P [ s \ s ↑ r ] (n + 1)
+37: P [ s \ s ↑ r ] (n + 1)
   P [ s \ s ↑ r ] (n + 1) ===> s ↑ r = ⟨ ↑ ij : 0 ≤ i ≤ j ≤ n + 1 : sum i j ⟩
-    404: sum i j
+    403: sum i j
       sum i j ===> ⟨ Σ k : i ≤ k < j : f[k] ⟩
         
-40: Q (n + 1)
+39: Q (n + 1)
   Q (n + 1) ===> r = ⟨ ↑ i : 0 ≤ i ≤ n + 1 : sum i (n + 1) ⟩
-    446: sum i (n + 1)
+    445: sum i (n + 1)
       sum i (n + 1) ===> ⟨ Σ k : i ≤ k < n + 1 : f[k] ⟩
         
-46: P [ s \ s ↑ r ] [ r \ (r + f[n]) ↑ 0 ] (n + 1)
+45: P [ s \ s ↑ r ] [ r \ (r + f[n]) ↑ 0 ] (n + 1)
   P [ s \ s ↑ r ] [ r \ (r + f[n]) ↑ 0 ] (n + 1) ===> s ↑ ((r + f[n]) ↑ 0) = ⟨ ↑ ij : 0 ≤ i ≤ j ≤ n + 1 : sum i j ⟩
-    499: sum i j
+    498: sum i j
       sum i j ===> ⟨ Σ k : i ≤ k < j : f[k] ⟩
         
-48: Q [ r \ (r + f[n]) ↑ 0 ] (n + 1)
+47: Q [ r \ (r + f[n]) ↑ 0 ] (n + 1)
   Q [ r \ (r + f[n]) ↑ 0 ] (n + 1) ===> (r + f[n]) ↑ 0 = ⟨ ↑ i : 0 ≤ i ≤ n + 1 : sum i (n + 1) ⟩
-    552: sum i (n + 1)
+    551: sum i (n + 1)
       sum i (n + 1) ===> ⟨ Σ k : i ≤ k < n + 1 : f[k] ⟩
         
-64: P n
+63: P n
   P n ===> s = ⟨ ↑ ij : 0 ≤ i ≤ j ≤ n : sum i j ⟩
-    594: sum i j
+    593: sum i j
       sum i j ===> ⟨ Σ k : i ≤ k < j : f[k] ⟩
         
-65: Q n
+64: Q n
   Q n ===> r = ⟨ ↑ i : 0 ≤ i ≤ n : sum i n ⟩
-    625: sum i n
+    624: sum i n
       sum i n ===> ⟨ Σ k : i ≤ k < n : f[k] ⟩
         
-66: P [ s \ s ↑ r ] [ r \ (r + f[n]) ↑ 0 ] (n + 1)
+65: P [ s \ s ↑ r ] [ r \ (r + f[n]) ↑ 0 ] (n + 1)
   P [ s \ s ↑ r ] [ r \ (r + f[n]) ↑ 0 ] (n + 1) ===> s ↑ ((r + f[n]) ↑ 0) = ⟨ ↑ ij : 0 ≤ i ≤ j ≤ n + 1 : sum i j ⟩
-    683: sum i j
+    682: sum i j
       sum i j ===> ⟨ Σ k : i ≤ k < j : f[k] ⟩
         
-68: Q [ r \ (r + f[n]) ↑ 0 ] (n + 1)
+67: Q [ r \ (r + f[n]) ↑ 0 ] (n + 1)
   Q [ r \ (r + f[n]) ↑ 0 ] (n + 1) ===> (r + f[n]) ↑ 0 = ⟨ ↑ i : 0 ≤ i ≤ n + 1 : sum i (n + 1) ⟩
-    749: sum i (n + 1)
+    748: sum i (n + 1)
       sum i (n + 1) ===> ⟨ Σ k : i ≤ k < n + 1 : f[k] ⟩
         
-84: P n
+83: P n
   P n ===> s = ⟨ ↑ ij : 0 ≤ i ≤ j ≤ n : sum i j ⟩
-    796: sum i j
+    795: sum i j
       sum i j ===> ⟨ Σ k : i ≤ k < j : f[k] ⟩
         
-85: Q n
+84: Q n
   Q n ===> r = ⟨ ↑ i : 0 ≤ i ≤ n : sum i n ⟩
-    827: sum i n
+    826: sum i n
       sum i n ===> ⟨ Σ k : i ≤ k < n : f[k] ⟩
         
-110: P n
+109: P n
   P n ===> s = ⟨ ↑ ij : 0 ≤ i ≤ j ≤ n : sum i j ⟩
-    859: sum i j
+    858: sum i j
       sum i j ===> ⟨ Σ k : i ≤ k < j : f[k] ⟩
         
-111: Q n
+110: Q n
   Q n ===> r = ⟨ ↑ i : 0 ≤ i ≤ n : sum i n ⟩
-    890: sum i n
+    889: sum i n
       sum i n ===> ⟨ Σ k : i ≤ k < n : f[k] ⟩
         

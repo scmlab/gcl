@@ -2,7 +2,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module Server.DSL where
+module Server.Pipeline where
 
 import           Control.Monad.Cont
 import           Control.Monad.Except
@@ -45,14 +45,77 @@ import           Syntax.Parser                  ( Parser
                                                 )
 
 --------------------------------------------------------------------------------
+-- | Stages of the processing pipeline 
+--
+--                      ┌───────────────────┐
+--                      │        Raw        │ : Text
+--                      └───────────────────┘
+--                                │
+--          parse error  ◀────────┤ parse
+--                                │
+--                                ▼
+--                      ┌───────────────────┐
+--           ┌─────────▶│      Parsed       │ : Concrete Syntax
+--           │          └───────────────────┘   Highlighting info
+--                                │
+--  request to dig hole  ◀────────┤ toAbstract
+--                                │
+--                                ▼
+--                      ┌───────────────────┐
+--                      │     Converted     │ : Abstract Syntax
+--                      └───────────────────┘   Scoping info
+--                                │
+--           type error  ◀────────┤ typeCheck
+--                                │
+--                                ▼
+--                      ┌───────────────────┐
+--                      │    TypeChecked    │ : Abstract Syntax
+--                      └───────────────────┘   Typing info
+--                                │
+--          sweep error  ◀────────┤ "sweep"
+--                                │
+--                                ▼
+--                      ┌───────────────────┐
+--                      │       Swept       │ : POs & whatnots
+--                      └───────────────────┘
+-- 
+data Stage = Raw FilePath
+           | Parsed ParseResult
+           | Converted ConvertResult
+        -- | TypeChecked TypeCheckResult
+           | Swept SweepResult
+           deriving (Show, Eq)
+
+instance Pretty Stage where
+  pretty stage = case stage of
+    Raw       filepath -> "Raw " <> pretty filepath
+    Parsed    _result  -> "Parsed"
+    Converted _result  -> "Converted"
+    Swept     result   -> pretty result
+
+instance Pretty SweepResult where
+  pretty result =
+    "Sweep Result { "
+      <> vsep
+           [ "POs: " <> pretty (sweptPOs result)
+           , "Specs: " <> pretty (sweptSpecs result)
+           , "Props: " <> pretty (sweptProps result)
+           , "Warnings: " <> pretty (sweptWarnings result)
+           ]
+      <> " }"
+
+
+--------------------------------------------------------------------------------
 
 data ParseResult = ParseResult
-  { parsedProgram      :: C.Program
-  , parsedHighlighings :: [J.SemanticTokenAbsolute]
+  { parsedProgram      :: C.Program -- Concrete syntax of parsed program
+  , parsedHighlighings :: [J.SemanticTokenAbsolute] -- Highlighting infos
   }
   deriving (Show, Eq)
 
-parse :: Text -> CmdM ParseResult
+-- | Converts raw Text to concrete syntax and Highlighting info
+--   persists the result 
+parse :: Text -> PipelineM ParseResult
 parse source = do
   program <- parseWithParser pProgram source
   let parsed = ParseResult { parsedProgram      = program
@@ -61,26 +124,31 @@ parse source = do
   save (Parsed parsed)
   return parsed
 
+--------------------------------------------------------------------------------
 
 data ConvertResult = ConvertResult
   { convertedPreviousStage :: ParseResult
-  , convertedProgram       :: A.Program
-  , convertedTokenMap      :: TokenMap
+  , convertedProgram       :: A.Program -- abstract syntax
+  , convertedTokenMap      :: TokenMap -- scoping info
   }
   deriving (Show, Eq)
 
-convert :: ParseResult -> CmdM ConvertResult
+-- | Converts concrete syntax to abstract syntax and scoping info
+--   persists the result
+convert :: ParseResult -> PipelineM ConvertResult
 convert result = do
   converted <- case runExcept (toAbstract (parsedProgram result)) of
-    Left  (Range start end) -> digHole (Range start end) >>= parse >>= convert
-    Right program           -> return $ ConvertResult
+    Left (Range start end) -> -- should dig hole!
+      digHole (Range start end) >>= parse >>= convert
+    Right program -> return $ ConvertResult
       { convertedPreviousStage = result
       , convertedProgram       = program
       , convertedTokenMap      = collectTokenMap program
       }
-  save (Converted converted)
+  save (Converted converted) -- save the current progress
   return converted
 
+--------------------------------------------------------------------------------
 
 data SweepResult = SweepResult
   { sweptPreviousStage :: ConvertResult
@@ -98,7 +166,9 @@ data SweepResult = SweepResult
   }
   deriving (Show, Eq)
 
-sweep :: ConvertResult -> CmdM SweepResult
+-- | Converts abstract syntax to POs and other stuff
+--   persists the result
+sweep :: ConvertResult -> PipelineM SweepResult
 sweep convertedResult = do
   let abstract@(A.Program _ _ globalProps _ _) =
         convertedProgram convertedResult
@@ -113,66 +183,66 @@ sweep convertedResult = do
       , sweptRedexes       = redexes
       , sweptCounter       = counter
       }
-
-  save (Swept swept)
+  save (Swept swept) -- save the current progress
   return swept
 
-data Stage = Uninitialized FilePath
-        | Parsed ParseResult
-        | Converted ConvertResult
-        | Swept SweepResult
-        deriving (Show, Eq)
+--------------------------------------------------------------------------------
+-- | Monad for handling the pipeline 
+--
+--  Side effects:
+--    Reader: FilePath
+--    State: PipelineState
+--    Exception: [Error]
+--
+--  Also, PipelineM is also a free monad of Instruction
+--  which allows us to "compile" a PipelineM program into a series of Instructions
+--  We can then decide to run these compiled Instructions in the real world 
+--                     or simulate them for testing 
 
-instance Pretty Stage where
-  pretty stage = case stage of
-    Uninitialized filepath -> "Uninitialized " <> pretty filepath
-    Parsed        _result  -> "Parsed"
-    Converted     _result  -> "Converted"
-    Swept         result   -> pretty result
+type PipelineM
+  = FreeT Instruction (RWST FilePath () PipelineState (Except [Error]))
 
-instance Pretty SweepResult where
-  pretty result =
-    "Sweep Result { "
-      <> vsep
-           [ "POs: " <> pretty (sweptPOs result)
-           , "Specs: " <> pretty (sweptSpecs result)
-           , "Props: " <> pretty (sweptProps result)
-           , "Warnings: " <> pretty (sweptWarnings result)
-           ]
-      <> " }"
+runPipelineM
+  :: FilePath
+  -> PipelineState
+  -> PipelineM a
+  -> Either
+       [Error]
+       (FreeF Instruction a (PipelineM a), PipelineState, ())
+runPipelineM filepath st p = runExcept (runRWST (runFreeT p) filepath st)
 
--- The "Syntax" of the DSL for handling LSP requests and responses
-data Cmd next
+--------------------------------------------------------------------------------
+-- | The State 
+
+data PipelineState = PipelineState
+  { pipelineErrors         :: [Error]
+  , pipelineStage          :: Stage
+  , pipelineMute           :: Bool   -- state for indicating whether we should ignore events like `STextDocumentDidChange` 
+  , pipelineMouseSelection :: Maybe Range -- text selections (including cursor position)
+  , pipelineCounter        :: Int -- counter for generating different IDs for Responses
+  }
+  deriving (Show, Eq)
+
+--------------------------------------------------------------------------------
+-- The "assembly code" for making LSP responses
+
+data Instruction next
   = EditText
       Range -- ^ Range to replace 
       Text -- ^ Text to replace with 
       (Text -> next) -- ^ Continuation with the text of the whole file after the edit
-  | GetSource (Text -> next)
-  | Log Text next
-  | SendDiagnostics [J.Diagnostic] next
+  | GetSource (Text -> next) -- ^ Read the content of a file from the LSP filesystem
+  | Log Text next -- ^ Make some noise
+  | SendDiagnostics [J.Diagnostic] next -- ^ Send Diagnostics 
   deriving (Functor)
 
-type CmdM = FreeT Cmd (RWST FilePath () CmdState (Except [Error]))
-data CmdState = CmdState
-  { cmdErrors    :: [Error]
-  , cmdStage     :: Stage
-  , cmdMute      :: Bool   -- state for indicating whether we should ignore events like `STextDocumentDidChange` 
-  , cmdSelection :: Maybe Range -- text selections (including cursor position)
-  , cmdCounter   :: Int -- counter for generating different IDs for Responses
-  }
-  deriving (Show, Eq)
+initState :: FilePath -> PipelineState
+initState filepath = PipelineState [] (Raw filepath) False Nothing 0
 
-initState :: FilePath -> CmdState
-initState filepath = CmdState [] (Uninitialized filepath) False Nothing 0
+--------------------------------------------------------------------------------
+-- PipelineM functions
 
-runCmdM
-  :: FilePath
-  -> CmdState
-  -> CmdM a
-  -> Either [Error] (FreeF Cmd a (CmdM a), CmdState, ())
-runCmdM filepath st p = runExcept (runRWST (runFreeT p) filepath st)
-
-editText :: Range -> Text -> CmdM Text
+editText :: Range -> Text -> PipelineM Text
 editText range inserted = do
 
   let Range start end = range
@@ -213,54 +283,54 @@ editText range inserted = do
 
   liftF (EditText range inserted id)
 
-getFilePath :: CmdM FilePath
+getFilePath :: PipelineM FilePath
 getFilePath = ask
 
-getSource :: CmdM Text
+getSource :: PipelineM Text
 getSource = liftF (GetSource id)
 
-load :: CmdM Stage
+load :: PipelineM Stage
 load = do
-  stage <- gets cmdStage
+  stage <- gets pipelineStage
   case stage of
-    Uninitialized _ -> logText "      [ load ] from Uninitialized"
-    Parsed        _ -> logText "      [ load ] from Parsed"
-    Converted     _ -> logText "      [ load ] from Converted"
-    Swept         _ -> logText "      [ load ] from Swept"
+    Raw       _ -> logText "      [ load ] from Raw"
+    Parsed    _ -> logText "      [ load ] from Parsed"
+    Converted _ -> logText "      [ load ] from Converted"
+    Swept     _ -> logText "      [ load ] from Swept"
   return stage
 
-getErrors :: CmdM [Error]
-getErrors = gets cmdErrors
+getErrors :: PipelineM [Error]
+getErrors = gets pipelineErrors
 
-isMuted :: CmdM Bool
-isMuted = gets cmdMute
+isMuted :: PipelineM Bool
+isMuted = gets pipelineMute
 
-mute :: Bool -> CmdM ()
+mute :: Bool -> PipelineM ()
 mute m = do
   if m then logText "      [ event ] mute" else logText "      [ event ] unmute"
-  modify' $ \state -> state { cmdMute = m }
+  modify' $ \state -> state { pipelineMute = m }
 
-setErrors :: [Error] -> CmdM ()
-setErrors e = modify' $ \state -> state { cmdErrors = e }
+setErrors :: [Error] -> PipelineM ()
+setErrors e = modify' $ \state -> state { pipelineErrors = e }
 
 -- | Save current progress and remove existing Errors
-save :: Stage -> CmdM ()
+save :: Stage -> PipelineM ()
 save stage = do
   case stage of
-    Uninitialized _ -> logText "      [ save ] Uninitialized"
-    Parsed        _ -> logText "      [ save ] Parsed"
-    Converted     _ -> logText "      [ save ] Converted"
-    Swept         _ -> logText "      [ save ] Swept"
-  modify' $ \state -> state { cmdErrors = [], cmdStage = stage }
+    Raw       _ -> logText "      [ save ] Raw"
+    Parsed    _ -> logText "      [ save ] Parsed"
+    Converted _ -> logText "      [ save ] Converted"
+    Swept     _ -> logText "      [ save ] Swept"
+  modify' $ \state -> state { pipelineErrors = [], pipelineStage = stage }
 
-setLastSelection :: Range -> CmdM ()
+setLastSelection :: Range -> PipelineM ()
 setLastSelection selection = do
   logText $ "      [ save ] Mouse selection: " <> toText (ShortRange selection)
-  modify' $ \state -> state { cmdSelection = Just selection }
+  modify' $ \state -> state { pipelineMouseSelection = Just selection }
 
-getLastSelection :: CmdM (Maybe Range)
+getLastSelection :: PipelineM (Maybe Range)
 getLastSelection = do
-  sel <- gets cmdSelection
+  sel <- gets pipelineMouseSelection
   case sel of
     Nothing -> logText "      [ load ] Mouse selection: Nothing"
     Just r ->
@@ -268,17 +338,17 @@ getLastSelection = do
 
   return sel
 
-logText :: Text -> CmdM ()
+logText :: Text -> PipelineM ()
 logText text = liftF (Log text ())
 
-bumpVersion :: CmdM Int
+bumpVersion :: PipelineM Int
 bumpVersion = do
-  i <- gets cmdCounter
+  i <- gets pipelineCounter
   -- logText $ "    - Bump counter " <> toText i <> " => " <> toText (succ i)
-  modify' $ \state -> state { cmdCounter = succ i }
+  modify' $ \state -> state { pipelineCounter = succ i }
   return i
 
-sendDiagnostics :: [J.Diagnostic] -> CmdM ()
+sendDiagnostics :: [J.Diagnostic] -> PipelineM ()
 sendDiagnostics xs = do
   logText $ "    < Send Diagnostics " <> toText (length xs)
   liftF (SendDiagnostics xs ())
@@ -287,7 +357,7 @@ sendDiagnostics xs = do
 
 -- converts the "?" at a given location to "[!   !]"
 -- and returns the modified source and the difference of source length
-digHole :: Range -> CmdM Text
+digHole :: Range -> PipelineM Text
 digHole range = do
   logText $ "    < DigHole " <> toText range
   let indent   = Text.replicate (posCol (rangeStart range) - 1) " "
@@ -295,7 +365,7 @@ digHole range = do
   editText range holeText
 
 -- | Try to parse a piece of text in a Spec
-refine :: Text -> Range -> CmdM (Spec, [Text])
+refine :: Text -> Range -> PipelineM (Spec, [Text])
 refine source range = do
   result <- findPointedSpec
   case result of
@@ -312,7 +382,7 @@ refine source range = do
         else void $ parseWithParser pStmts payload
       return (spec, specPayloadWithoutIndentation source' spec)
  where
-  findPointedSpec :: CmdM (Maybe Spec)
+  findPointedSpec :: PipelineM (Maybe Spec)
   findPointedSpec = do
     parsed    <- parse source
     converted <- convert parsed
@@ -320,32 +390,30 @@ refine source range = do
     let specs = sweptSpecs result
     return $ find (withinRange range) specs
 
-typeCheck :: A.Program -> CmdM ()
+typeCheck :: A.Program -> PipelineM ()
 typeCheck p = case TypeChecking.runTM (TypeChecking.checkProgram p) of
   Left  e -> throwError [TypeError e]
   Right v -> return v
 
 --------------------------------------------------------------------------------
 
-parseWithParser :: Parser a -> Text -> CmdM a
+parseWithParser :: Parser a -> Text -> PipelineM a
 parseWithParser p source = do
   filepath <- getFilePath
   case runParse p filepath source of
     Left  errors -> throwError $ map SyntacticError errors
     Right val    -> return val
 
-parseProgram :: Text -> CmdM (C.Program, A.Program)
+parseProgram :: Text -> PipelineM (C.Program, A.Program)
 parseProgram source = do
   concrete <- parseWithParser pProgram source
   case runExcept (toAbstract concrete) of
     Left  (Range start end) -> digHole (Range start end) >>= parseProgram
     Right abstract          -> return (concrete, abstract)
 
-
-
 --------------------------------------------------------------------------------
 
-generateResponseAndDiagnostics :: SweepResult -> CmdM [ResKind]
+generateResponseAndDiagnostics :: SweepResult -> PipelineM [ResKind]
 generateResponseAndDiagnostics result = do
   let (SweepResult _ pos specs globalProps warnings _redexes _) = result
 
@@ -366,7 +434,6 @@ generateResponseAndDiagnostics result = do
   -- render stuff
   let warningsSections =
         if null warnings then [] else map renderSection warnings
-  logText $ toText (length globalProps)
   let globalPropsSections = if null globalProps
         then []
         else map

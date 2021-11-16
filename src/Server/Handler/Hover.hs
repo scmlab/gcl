@@ -10,7 +10,7 @@ import           Error                          ( Error )
 import           Server.Monad
 
 import           Language.LSP.Types      hiding ( Range )
-import           Server.DSL
+import           Server.Pipeline
 import qualified Server.SrcLoc                 as SrcLoc
 import           Server.TokenMap                ( Token(tokenHoverAndType)
                                                 , lookupIntervalMap
@@ -35,7 +35,7 @@ handler uri position responder = case uriToFilePath uri of
 
       let
         tokenMap = case stage of
-          Uninitialized _ -> Nothing
+          Raw _ -> Nothing
           Parsed _result -> Nothing
           Converted result -> Just $ convertedTokenMap result
           Swept result -> Just $ convertedTokenMap (sweptPreviousStage result)

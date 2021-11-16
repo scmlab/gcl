@@ -9,7 +9,7 @@ module Server.Handler.Definition
 import           Data.Maybe                     ( maybeToList )
 import           Error                          ( Error )
 import           Language.LSP.Types      hiding ( Range )
-import           Server.DSL
+import           Server.Pipeline
 import           Server.Monad
 import qualified Server.SrcLoc                 as SrcLoc
 import           Server.TokenMap
@@ -32,7 +32,7 @@ handler uri position responder = do
 
         stage <- load
         let tokenMap = case stage of
-              Uninitialized _ -> Nothing
+              Raw _ -> Nothing
               Parsed _result -> Nothing
               Converted result -> Just $ convertedTokenMap result
               Swept     result -> Just $ convertedTokenMap (sweptPreviousStage result)

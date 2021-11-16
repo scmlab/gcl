@@ -18,7 +18,7 @@ import           GCL.Substitution               ( Scope
 import           Pretty
 import           Render.Class                   ( Render(render) )
 import           Render.Element                 ( Inlines(..) )
-import           Server.DSL
+import           Server.Pipeline
 import           Syntax.Abstract.Types          ( Redex(..) )
 import           Syntax.Abstract.Util           ( programToScopeForSubstitution
                                                 )
