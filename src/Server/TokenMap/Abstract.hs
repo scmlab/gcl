@@ -302,7 +302,7 @@ instance Collect Expr where
       collect i
       collect f
     -- TODO: provide types for tokens in patterns 
-    Case e _patterns _ -> do
+    Case e _ _ -> do
       collect e
 
 instance Collect Op where

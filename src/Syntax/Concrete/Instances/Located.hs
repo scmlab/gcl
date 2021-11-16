@@ -104,6 +104,7 @@ instance Located CaseConstructor where
 --------------------------------------------------------------------------------
 
 instance Located Pattern where
+  locOf (PattLit l) = locOf l
   locOf (PattParen l _ r    ) = l <--> r
   locOf (PattBinder   l     ) = locOf l
   locOf (PattWildcard l     ) = locOf l

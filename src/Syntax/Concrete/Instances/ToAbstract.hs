@@ -252,6 +252,7 @@ instance ToAbstract CaseConstructor A.CaseConstructor where
     A.CaseConstructor ctor <$> toAbstract binders <*> toAbstract body
 
 instance ToAbstract Pattern A.Pattern where
+  toAbstract (PattLit x) = A.PattLit <$> toAbstract x
   toAbstract (PattParen _ x _) = toAbstract x
   toAbstract (PattBinder   x ) = return $ A.PattBinder x
   toAbstract (PattWildcard x ) = return $ A.PattWildcard (rangeOf x)

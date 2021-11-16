@@ -2,6 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TupleSections #-}
 
 module GCL.Type where
 
@@ -18,11 +19,13 @@ import           Data.Map                       ( Map )
 import qualified Data.Map                      as Map
 import qualified Data.Maybe                    as Maybe
 import qualified Data.Set                      as Set
+import Data.Functor
+import Data.List
 import           GCL.Common
 import           GHC.Generics                   ( Generic )
 import           Prelude                 hiding ( Ordering(..) )
 import           Syntax.Abstract
-import           Syntax.Abstract.Util
+import Syntax.Abstract.Util
 import           Syntax.Common
 
 data TypeError
@@ -209,12 +212,34 @@ infer (Case expr cs l) = do
   mapM_ (unify t) ts
   return t
  where
-  inferCaseConstructor t (CaseConstructor n args e) = do
-    tc    <- lookupInferEnv n
-    targs <- mapM (freshVar . locOf) args
-    unify tc (wrapTFunc targs t)
+  inferCaseConstructor t (CaseConstructor n patts e) = do
+    subs <- inferPatts t n patts
+    inferInEnv subs (infer e)
 
-    inferInEnv [ (a, at) | a <- args, at <- targs ] (infer e)
+  inferPatts :: Type -> Name -> [Pattern] -> Infer [(Name, Type)]
+  inferPatts t n patts = do 
+    tn <- lookupInferEnv n
+    (subs, tpatts) <- unzip <$> mapM inferPatt patts
+    let subs' = concat subs
+    let ns = map fst subs'
+
+    -- check if there is duplicated identifier
+    let dups = map head . filter ((>1) . length) . group $ ns
+    unless (null dups) $
+        throwError $ DuplicatedIdentifier (head dups) (locOf . head $ dups)
+
+    unify tn (wrapTFunc tpatts t)
+    return subs'
+  
+  inferPatt :: Pattern -> Infer ([(Name, Type)], Type)
+  inferPatt (PattLit x) = return ([], litTypes x (locOf x))
+  inferPatt (PattBinder n) = do 
+    tn <- freshVar (locOf n)
+    return ([(n, tn)], tn)
+  inferPatt (PattWildcard r) = ([],) <$> freshVar (locOf r)
+  inferPatt (PattConstructor n patts) = do
+    tpatts <- freshVar (n <--> patts) 
+    inferPatts tpatts n patts <&> (, tpatts)
 
 emptyInterval :: Interval
 emptyInterval = Interval (Including zero) (Excluding zero) NoLoc
