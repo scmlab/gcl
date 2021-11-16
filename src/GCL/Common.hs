@@ -103,7 +103,12 @@ instance Free A.Expr where
   fv (A.Case e cases _          ) = fv e <> Set.unions (map fv cases)
 
 instance Free A.CaseConstructor where
-  fv (A.CaseConstructor _ xs expr) = fv expr \\ Set.fromList xs
+  fv (A.CaseConstructor _ patts expr) = fv expr \\ fv patts
+instance Free A.Pattern where
+  fv (A.PattLit _) = mempty
+  fv (A.PattBinder n) = Set.singleton n
+  fv (A.PattWildcard _) = mempty
+  fv (A.PattConstructor _ ps) = fv ps
 
 -- class for data that is substitutable
 class Substitutable a b where

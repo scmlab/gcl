@@ -69,6 +69,12 @@ instance Located Expr where
   locOf (ArrUpd _ _ _ l    ) = l
   locOf (Case _ _ l        ) = l
 
+instance Located Pattern where
+  locOf (PattLit l) = locOf l
+  locOf (PattBinder l) = locOf l
+  locOf (PattWildcard l) = locOf l
+  locOf (PattConstructor l r) = l <--> r
+
 instance Located Redex where
   locOf = locOf . redexExpr
 

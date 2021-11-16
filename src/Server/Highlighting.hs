@@ -200,9 +200,8 @@ instance CollectHighlighting Expr where
         <> collect cases
 
 instance CollectHighlighting CaseConstructor where
-  collect (CaseConstructor ctor binders arrow body) =
+  collect (CaseConstructor ctor _ arrow body) =
     collect (AsConstructor ctor)
-      <> collect (map AsVariable binders)
       <> toHighlighting J.SttMacro [] arrow
       <> collect body
 

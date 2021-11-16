@@ -170,12 +170,13 @@ type QuantOp' = Either Op Expr
 -- | Pattern matching
 
 -- ctor1 binder1 binder2 ... -> expr
-data CaseConstructor = CaseConstructor Name [Name] TokArrows Expr
+data CaseConstructor = CaseConstructor Name [Pattern] TokArrows Expr
   deriving (Eq, Show, Generic)
 
 -- NOTE: current not in use
 data Pattern
-  = PattParen (Token "(") Pattern (Token ")") -- pattern wrapped inside a pair of parenthesis
+  = PattLit Lit
+  | PattParen (Token "(") Pattern (Token ")") -- pattern wrapped inside a pair of parenthesis
   | PattBinder Name -- binder
   | PattWildcard (Token "_") -- matches anything
   | PattConstructor Name [Pattern] -- destructs a constructor

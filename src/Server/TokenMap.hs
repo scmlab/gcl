@@ -337,15 +337,15 @@ instance Collect Expr where
       collect i
       collect f
     -- TODO: provide types for tokens in patterns 
-    Case e patterns _ -> do
+    Case e _ _ -> do
       collect e
-      collect patterns
+      -- collect patterns
 
-instance Collect CaseConstructor where
-  collect (CaseConstructor ctor args body) = do
-    collect ctor
-    localScope args $ do
-      collect body
+-- instance Collect CaseConstructor where
+--   collect (CaseConstructor ctor args body) = do
+--     collect ctor
+--     localScope args $ do
+--       collect body
 
 instance Collect Op where
   collect (ChainOp op) = collect op
