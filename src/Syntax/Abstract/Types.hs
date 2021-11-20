@@ -123,6 +123,7 @@ data Type
   | TFunc Type Type Loc
   | TCon Name [Name] Loc
   | TVar Name Loc
+  | TMetaVar Name
   deriving (Eq, Show, Generic)
 
 --------------------------------------------------------------------------------

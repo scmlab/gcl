@@ -219,6 +219,7 @@ instance ToAbstract Type A.Type where
         A.TFunc  a' b' _ -> pure $ A.TFunc a' b' (locOf t)
         A.TCon   a' b' _ -> pure $ A.TCon a' b' (locOf t)
         A.TVar a' _      -> pure $ A.TVar a' (locOf t)
+        A.TMetaVar a' -> pure $ A.TMetaVar a'
 
 --------------------------------------------------------------------------------
 

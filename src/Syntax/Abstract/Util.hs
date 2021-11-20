@@ -1,15 +1,18 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Syntax.Abstract.Util where
 
 import           Data.Loc                       ( (<-->)
                                                 , Located(locOfList)
                                                 , locOf
+                                                , Loc(..)
                                                 )
 import           Data.Map                       ( Map )
 import qualified Data.Map                      as Map
 import qualified Data.Maybe                    as Maybe
 import           Data.Text                      ( Text )
 import           Syntax.Abstract
-import           Syntax.Common                  ( Name
+import           Syntax.Common                  ( Name(..)
                                                 , nameToText
                                                 )
 
@@ -41,10 +44,10 @@ wrapLam :: [Name] -> Expr -> Expr
 wrapLam []       body = body
 wrapLam (x : xs) body = let b = wrapLam xs body in Lam x b (x <--> b)
 
--- function definition           => Just Expr 
--- constant/variable declaration => Nothing 
+-- function definition           => Just Expr
+-- constant/variable declaration => Nothing
 
--- TODO: 
+-- TODO:
 programToScopeForSubstitution :: Program -> Map Text (Maybe Expr)
 programToScopeForSubstitution (Program defns decls _ _ _) =
   Map.mapKeys nameToText $ foldMap extractDeclaration decls <> Map.map
@@ -63,3 +66,8 @@ collectFuncDefns = Map.fromListWith mergeFuncDefnsOfTheSameName
  where
   mergeFuncDefnsOfTheSameName :: [Expr] -> [Expr] -> [Expr]
   mergeFuncDefnsOfTheSameName = (<>)
+
+baseToName :: TBase -> Name
+baseToName TInt  = Name "Int" NoLoc
+baseToName TBool = Name "Bool" NoLoc
+baseToName TChar = Name "Char" NoLoc

@@ -160,6 +160,7 @@ instance Render Type where
   render (TArray i b    _) = "array" <+> render i <+> "of" <+> render b
   render (TCon   n args _) = render n <+> horzE (map render args)
   render (TVar i _       ) = "TVar" <+> render i
+  render (TMetaVar n) = "TMetaVar" <+> render n
 
 -- | Interval
 instance Render Interval where

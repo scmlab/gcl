@@ -19,13 +19,13 @@ import           Data.Map                       ( Map )
 import qualified Data.Map                      as Map
 import qualified Data.Maybe                    as Maybe
 import qualified Data.Set                      as Set
-import Data.Functor
-import Data.List
+import           Data.Functor
+import           Data.List
 import           GCL.Common
 import           GHC.Generics                   ( Generic )
 import           Prelude                 hiding ( Ordering(..) )
 import           Syntax.Abstract
-import Syntax.Abstract.Util
+import           Syntax.Abstract.Util
 import           Syntax.Common
 
 data TypeError
@@ -67,11 +67,11 @@ extend env (x, s) = case Map.lookup x env of
   Nothing -> return $ Map.insert x s env
   Just _  -> throwError $ DuplicatedIdentifier x (locOf x)
 
-extendType :: Map Name Type -> (Name, Type) -> TM (Map Name Type)
-extendType env (n, t) = case Map.lookup n env of
+extendType :: Map Name Type -> (Name, Type, Loc) -> TM (Map Name Type)
+extendType env (n, t, l) = case Map.lookup n env of
   Nothing -> return $ Map.insert n t env
   Just t' -> do
-    s <- unifies t t'
+    s <- unifies t t' l
     return $ Map.map (subst s) env
 
 extendEnv :: Environment -> Environment -> TM Environment
@@ -91,13 +91,6 @@ extendEnv (Environment lds1 tds1 lctx1) (Environment lds2 tds2 lctx2) =
 ------------------------------------------
 -- Substitution
 ------------------------------------------
-
-typeWithLoc :: Loc -> Type -> Type
-typeWithLoc l (TBase b _     ) = TBase b l
-typeWithLoc l (TArray i  t  _) = TArray i t l
-typeWithLoc l (TFunc  t1 t2 _) = TFunc t1 t2 l
-typeWithLoc l (TCon   n  b  _) = TCon n b l
-typeWithLoc l (TVar n _      ) = TVar n l
 
 ------------------------------------------
 -- type inference
@@ -124,8 +117,8 @@ instance Fresh Infer where
   getCounter = get
   setCounter = put
 
-unify :: Type -> Type -> Infer ()
-unify x y = tell [(x, y)]
+unify :: Type -> Type -> Loc -> Infer ()
+unify x y l = tell [(x, y, l)]
 
 inferInEnv :: [(Name, Type)] -> Infer Type -> Infer Type
 inferInEnv l m = do
@@ -138,7 +131,7 @@ infer (Lit   lit l) = return (litTypes lit l)
 infer (Var   x   _) = lookupInferEnv x
 infer (Const c   _) = lookupInferEnv c
 infer (Op o       ) = inferOpTypes o
-infer (App (App (Op op@(ChainOp _)) e1 _) e2 _) = do
+infer (App (App (Op op@(ChainOp _)) e1 _) e2 l) = do
   top <- inferOpTypes op
 
   t1' <- case e1 of
@@ -149,67 +142,62 @@ infer (App (App (Op op@(ChainOp _)) e1 _) e2 _) = do
 
   t2' <- infer e2
 
-  let l = t1' <--> t2'
-  v <- freshVar l
-  unify top (TFunc t1' (TFunc t2' v l) l)
+  v   <- freshVar
+  unify top (TFunc t1' (TFunc t2' v NoLoc) NoLoc) l
 
   return (TBase TBool l)
 infer (App e1 e2 l) = do
   t1 <- infer e1
   t2 <- infer e2
-  v  <- freshVar l
-  unify t1 (TFunc t2 v l)
+  v  <- freshVar
+  unify t1 (TFunc t2 v NoLoc) l
   return v
 infer (Lam x e l) = do
-  v <- freshVar l
+  v <- freshVar
   t <- inferInEnv [(x, v)] (infer e)
   return (TFunc v t l)
 infer (Quant qop iters rng t l) = do
-  titers <- mapM (freshVar . locOf) iters
+  titers <- mapM (const freshVar) iters
   tr     <- inferInEnv [ (n, tn) | n <- iters, tn <- titers ] (infer rng)
-  unify tr (TBase TBool (locOf rng))
+  unify tr (TBase TBool NoLoc) (locOf rng)
   tt <- inferInEnv [ (n, tn) | n <- iters, tn <- titers ] (infer t)
   case qop of
     Op (ArithOp (Hash _)) -> do
-      unify tt (TBase TBool (locOf t))
+      unify tt (TBase TBool NoLoc) (locOf t)
       return (TBase TInt l)
     op -> do
       to <- infer op
-      x  <- freshVar l
-      unify to (TFunc x (TFunc x x (locOf qop)) (locOf qop))
-      unify tt x
+      x  <- freshVar
+      unify to (TFunc x (TFunc x x NoLoc) NoLoc) (locOf qop)
+      unify tt x (locOf t)
       return x
--- infer (Subst expr sub _) = do
---   t <- infer expr
---   s <- mapM infer (Map.map bindingsToExpr sub)
---   return $ subst s t
 infer (Redex (Rdx _ expr)  ) = infer expr
 infer (RedexStem name _ _ _) = lookupInferEnv name
-infer (ArrIdx e1 e2 l      ) = do
+infer (ArrIdx e1 e2 _      ) = do
   t1 <- infer e1
   let interval = case t1 of
         TArray itv _ _ -> itv
         _              -> emptyInterval
   t2 <- infer e2
-  unify t2 (TBase TInt l)
-  v <- freshVar l
-  unify t1 (TArray interval v l)
+  unify t2 (TBase TInt NoLoc) (locOf e2)
+  v <- freshVar
+  unify t1 (TArray interval v NoLoc) (locOf e1)
   return v
-infer (ArrUpd e1 e2 e3 l) = do
+infer (ArrUpd e1 e2 e3 _) = do
   t1 <- infer e1
   let interval = case t1 of
         TArray itv _ _ -> itv
         _              -> emptyInterval
   t2 <- infer e2
   t3 <- infer e3
-  unify t2 (TBase TInt l)
-  unify t1 (TArray interval t3 l)
+  unify t2 (TBase TInt NoLoc)         (locOf e2)
+  unify t1 (TArray interval t3 NoLoc) (locOf e1)
   return t1
-infer (Case expr cs l) = do
+infer (Case expr cs _) = do
   te <- infer expr
   ts <- mapM (inferCaseConstructor te) cs
-  t  <- freshVar l
-  mapM_ (unify t) ts
+  t  <- freshVar
+  mapM_ (uncurry (unify t)) (zip ts (map locOf cs))
   return t
  where
   inferCaseConstructor t (CaseConstructor n patts e) = do
@@ -217,28 +205,29 @@ infer (Case expr cs l) = do
     inferInEnv subs (infer e)
 
   inferPatts :: Type -> Name -> [Pattern] -> Infer [(Name, Type)]
-  inferPatts t n patts = do 
-    tn <- lookupInferEnv n
+  inferPatts t n patts = do
+    tn             <- lookupInferEnv n
     (subs, tpatts) <- unzip <$> mapM inferPatt patts
     let subs' = concat subs
-    let ns = map fst subs'
+    let ns    = map fst subs'
 
     -- check if there is duplicated identifier
-    let dups = map head . filter ((>1) . length) . group $ ns
-    unless (null dups) $
-        throwError $ DuplicatedIdentifier (head dups) (locOf . head $ dups)
+    let dups = map head . filter ((> 1) . length) . group $ ns
+    unless (null dups) $ throwError $ DuplicatedIdentifier
+      (head dups)
+      (locOf . head $ dups)
 
-    unify tn (wrapTFunc tpatts t)
+    unify tn (wrapTFunc tpatts t) (locOf tpatts)
     return subs'
-  
+
   inferPatt :: Pattern -> Infer ([(Name, Type)], Type)
-  inferPatt (PattLit x) = return ([], litTypes x (locOf x))
-  inferPatt (PattBinder n) = do 
-    tn <- freshVar (locOf n)
+  inferPatt (PattLit    x) = return ([], litTypes x (locOf x))
+  inferPatt (PattBinder n) = do
+    tn <- freshVar
     return ([(n, tn)], tn)
-  inferPatt (PattWildcard r) = ([],) <$> freshVar (locOf r)
+  inferPatt (PattWildcard _         ) = ([], ) <$> freshVar
   inferPatt (PattConstructor n patts) = do
-    tpatts <- freshVar (n <--> patts) 
+    tpatts <- freshVar
     inferPatts tpatts n patts <&> (, tpatts)
 
 emptyInterval :: Interval
@@ -265,11 +254,11 @@ lookupInferEnv n = do
       Nothing         -> throwError $ NotInScope n (locOf n)
       Just []         -> throwError $ NotInScope n (locOf n) -- when there are no clauses in a function
       Just (expr : _) -> infer expr
-    Just t -> return $ typeWithLoc (locOf n) t
+    Just t -> return t
 
-freshVar :: Loc -> Infer Type
-freshVar l = do
-  TVar <$> freshName "Type.freshVar" l <*> pure l
+freshVar :: Infer Type
+freshVar = do
+  TMetaVar <$> freshName "Type.metaVar" NoLoc
 
 ------------------------------------------
 -- type check
@@ -284,7 +273,7 @@ checkAssign env (n, expr) = case Map.lookup n (envLocalDefns env) of
 checkIsType :: Environment -> Expr -> Type -> TM ()
 checkIsType env expr t = do
   eType <- inferExpr env expr
-  void $ unifies eType t
+  void $ unifies eType t (locOf eType)
 
 checkPredicate :: Environment -> Expr -> TM ()
 checkPredicate env p = checkIsType env p (TBase TBool NoLoc)
@@ -303,7 +292,8 @@ checkType env t@(TCon  n  _  _) = do
   maybe (throwError $ UndefinedType n (locOf t))
         (\_ -> return ())
         (Map.lookup n (envTypeDefns env))
-checkType _ (TVar _ _) = return ()
+checkType _ (TVar _ _  ) = return ()
+checkType _ (TMetaVar _) = return ()
 
 checkGdCmd :: Environment -> GdCmd -> TM ()
 checkGdCmd env (GdCmd expr stmts _) = do
@@ -401,24 +391,22 @@ checkProg env (Program defns decls props stmts _) = do
 
 defnsAndDeclsToEnv :: Definitions -> [Declaration] -> TM Environment
 defnsAndDeclsToEnv defns decls = do
-  -- add type declaration and defns to enviornment
-  let env = (foldMap typeDeclToEnv (defnTypes defns))
-        { envLocalContext = defnFuncs defns
-        }
+  -- add type declaration and defnFuncs to enviornment
+  env <- foldM addTypeDecl mempty (defnTypes defns)
+    >>= \tds -> return $ Environment mempty tds (defnFuncs defns)
 
   -- add var const declaration into enviornment, add type inference result of defns into enviornment
-  foldM declToEnv env decls >>= inferLocalContext
+  foldM addDecl env decls >>= inferLocalContext
  where
-  typeDeclToEnv (TypeDefn name binders qdcons _) = do
-    mempty { envTypeDefns = Map.singleton name (binders, qdcons) }
+  addTypeDecl env (TypeDefn name binders qdcons _) = if name `Map.member` env
+    then throwError $ DuplicatedIdentifier name (locOf name)
+    else return $ Map.insert name (binders, qdcons) env
 
-  declToEnv env (ConstDecl ns t _ _) = foldM f env ns
-   where
-    f env' n = env' `extendEnv` Environment (Map.singleton n t) mempty mempty
+  addDecl env (ConstDecl ns t _ _) = foldM (addSingleDecl t) env ns
+  addDecl env (VarDecl   ns t _ _) = foldM (addSingleDecl t) env ns
 
-  declToEnv env (VarDecl ns t _ _) = foldM f env ns
-   where
-    f env' n = env' `extendEnv` Environment (Map.singleton n t) mempty mempty
+  addSingleDecl t env n =
+    env `extendEnv` Environment (Map.singleton n t) mempty mempty
 
   inferLocalContext env = do
     Map.foldlWithKey
@@ -432,7 +420,7 @@ defnsAndDeclsToEnv defns decls = do
             (eType, subs) <- inferExpr' env' expr
             lds           <-
               Map.map (subst subs)
-                <$> (envLocalDefns env' `extendType` (name, eType))
+                <$> (envLocalDefns env' `extendType` (name, eType, locOf expr))
             return $ env' { envLocalDefns = lds }
       )
       (pure env)
@@ -451,43 +439,50 @@ runTM = runExcept . runTM'
 -- unification
 ------------------------------------------
 
-type Constraint = (Type, Type)
+type Constraint = (Type, Type, Loc)
 
 type Unifier = (Subs Type, [Constraint])
 
 emptyUnifier :: Unifier
 emptyUnifier = (emptySubs, [])
 
-unifies :: Type -> Type -> TM (Subs Type)
-unifies (TBase t1 _) (TBase t2 _) | t1 == t2          = return emptySubs
-unifies (TArray _  t1 _) (TArray _              t2 _) = unifies t1 t2   {-  | i1 == i2 = unifies t1 t2 -}
+unifies :: Type -> Type -> Loc -> TM (Subs Type)
+unifies (TBase t1 _) (TBase t2 _) _ | t1 == t2 = return emptySubs
+unifies (TArray _ t1 _) (TArray _ t2 _) l = unifies t1 t2 l  {-  | i1 == i2 = unifies t1 t2 -}
   -- SCM: for now, we do not check the intervals
 -- view array of type `t` as function type of `Int -> t`
-unifies (TArray _  t1 _) (TFunc  (TBase TInt _) t2 _) = unifies t1 t2
-unifies (TFunc  t1 t2 _) (TFunc  t3             t4 _) = do
-  s1 <- unifies t1 t3
-  s2 <- unifies (subst s1 t2) (subst s1 t4)
+unifies (TArray _ t1 _) (TFunc (TBase TInt _) t2 _) l = unifies t1 t2 l
+unifies (TFunc (TBase TInt _) t1 _) (TArray _ t2 _) l = unifies t1 t2 l
+unifies (TFunc t1 t2 _) (TFunc t3 t4 _) l = do
+  s1 <- unifies t1 t3 l
+  s2 <- unifies (subst s1 t2) (subst s1 t4) l
   return (s2 `compose` s1)
-unifies (TCon n1 args1 _) (TCon n2 args2 _)
+unifies (TCon n1 args1 _) (TCon n2 args2 _) _
   | n1 == n2 && length args1 == length args2 = return emptySubs
-unifies (TVar x l) t          = bind x t l
-unifies t          (TVar x _) = bind x t (locOf t)
-unifies t1         t2         = throwError $ UnifyFailed t1 t2 (locOf t1)
+unifies (TVar x1 _) (TVar x2 _) _ | x1 == x2 = return emptySubs
+unifies (TVar x _) t@(TBase tb _) _ | x == baseToName tb =
+  return $ Map.singleton x t
+unifies (TVar x _) t@(TCon n args _) _ | x == n && null args =
+  return $ Map.singleton x t
+unifies t1 t2@(TVar _ _) l                   = unifies t2 t1 l
+unifies (TMetaVar x) (TMetaVar y) _ | x == y = return emptySubs
+unifies (TMetaVar x) t            l          = bind x t l
+unifies t            (TMetaVar x) l          = bind x t l
+unifies t1           t2           l          = throwError $ UnifyFailed t1 t2 l
 
 solveConstraints :: [Constraint] -> TM (Subs Type)
 solveConstraints cs = solveUnifier (emptySubs, cs)
 
 solveUnifier :: Unifier -> TM (Subs Type)
-solveUnifier (s, []    ) = return s
-solveUnifier (s, c : cs) = do
-  su <- uncurry unifies c
+solveUnifier (s, []              ) = return s
+solveUnifier (s, (t1, t2, l) : cs) = do
+  su <- unifies t1 t2 l
   solveUnifier (su `compose` s, map (f (subst su)) cs)
-  where f g (a, b) = (g a, g b)
+  where f g (a, b, c) = (g a, g b, c)
 
 bind :: Name -> Type -> Loc -> TM (Subs Type)
-bind x (TVar y _) _ | x == y = return emptySubs
 bind x t l | occurs x t = throwError $ RecursiveType x t l
-           | otherwise  = return (Map.singleton x (typeWithLoc l t))
+           | otherwise  = return (Map.singleton x t)
 
 ------------------------------------------
 -- helper functions
@@ -509,7 +504,7 @@ inferOpTypes op = do
     _                -> return (opTypes op)
  where
   f l = do
-    x <- freshVar l
+    x <- freshVar
     return (TFunc x (TFunc x (TBase TBool l) l) l)
 
 tBool, tInt :: Loc -> Type

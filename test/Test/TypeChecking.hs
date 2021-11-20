@@ -97,8 +97,6 @@ exprTests = testGroup
   , testCase "Func App 2" $ exprCheck "P i ∨ P j" "Bool"
   , testCase "Func App 3" $ exprCheck "P i => P j" "Bool"
   , testCase "Func App 4" $ exprCheck "Max i j" "Bool"
-  , testCase "Func App 5" $ exprCheck "Q i" "Bool"
-  , testCase "Func App 6" $ exprCheck "Q b" "Bool"
   ,
       -- testCase "Hole" $
       --   exprCheck "_" "TVar",
@@ -245,12 +243,12 @@ definitionTests = testGroup
         \   data Maybe a = Just a | Nothing\n\
         \   G : Maybe a -> Int\n\
         \   G x = case x of\n\
-        \             Just y -> y\n\
+        \             Just y -> 1\n\
         \             Nothing -> 0\n\
         \   A = 5\n\
         \   F a b = a + b\n\
         \:}"
-    "Environment[(A, Int), (F, Int → Int → Int), (G, Maybe a → Int), ( Just\n, Int → Maybe a ), (Nothing, Maybe a)][( Maybe\n, ([a], [Just (TVar a), Nothing ]) )][(A, [5]), (F, [λ a → λ b → a + b]), ( G\n, [λ x → case x of Just y -> yNothing -> 0] )]"
+    "Environment[(A, Int), (F, Int → Int → Int), (G, Maybe a → Int), ( Just\n, TVar a → Maybe a ), (Nothing, Maybe a)][( Maybe\n, ([a], [Just (TVar a), Nothing ]) )][(A, [5]), (F, [λ a → λ b → a + b]), ( G\n, [λ x → case x of Just y -> 1Nothing -> 0] )]"
   ]
 
 programTest :: TestTree
@@ -312,6 +310,9 @@ tchar = TBase TChar NoLoc
 tvar :: Text -> Type
 tvar x = TVar (name' x) NoLoc
 
+tmetavar :: Text -> Type
+tmetavar x = TMetaVar (name' x)
+
 tarr :: Endpoint -> Endpoint -> Type -> Type
 tarr e1 e2 t = TArray (interval e1 e2) t NoLoc
 
@@ -353,7 +354,6 @@ env = Environment
     , (name' "N"      , tint)
     , (name' "Arr", tarr (Including (litNum 0)) (Excluding (cons "N")) tint)
     , (name' "P"      , tfunc tint tbool)
-    , (name' "Q"      , tfunc (tvar "?m") tbool)
     , (name' "F"      , tfunc tint tint)
     , (name' "G"      , tfunc tchar tbool)
     , (name' "Max"    , tfunc tint (tfunc tint tbool))

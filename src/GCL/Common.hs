@@ -86,6 +86,7 @@ instance Free A.Type where
   fv (A.TFunc  t1 t2 _) = fv t1 <> fv t2
   fv (A.TCon   _  ns _) = Set.fromList ns
   fv (A.TVar x _      ) = Set.singleton x
+  fv (A.TMetaVar n) = Set.singleton n
 
 instance Free A.Expr where
   fv (A.Var   x _  ) = Set.singleton x
@@ -126,6 +127,7 @@ instance Substitutable A.Type A.Type where
   subst s (A.TFunc  t1 t2 l) = A.TFunc (subst s t1) (subst s t2) l
   subst _ t@A.TCon{}         = t
   subst s t@(A.TVar x _)     = Map.findWithDefault t x s
+  subst s t@(A.TMetaVar n) = Map.findWithDefault t n s
 
 toStateT :: Monad m => r -> RWST r w s m a -> StateT s m a
 toStateT r m = StateT

@@ -371,6 +371,7 @@ instance Collect Type where
     TFunc  x y _ -> collect x >> collect y
     TCon   x _ _ -> collect x
     TVar _ _     -> return ()
+    TMetaVar _   -> return ()
 
 instance Collect Interval where
   collect (Interval x y _) = collect x >> collect y

@@ -54,6 +54,7 @@ instance Located Type where
   locOf (TFunc  _ _ l) = l
   locOf (TCon   _ _ l) = locOf l
   locOf (TVar _ l    ) = l
+  locOf (TMetaVar _) = NoLoc
 
 instance Located Expr where
   locOf (Var   _ l         ) = l
@@ -68,6 +69,9 @@ instance Located Expr where
   locOf (ArrIdx _ _ l      ) = l
   locOf (ArrUpd _ _ _ l    ) = l
   locOf (Case _ _ l        ) = l
+
+instance Located CaseConstructor where
+  locOf (CaseConstructor l _ r) = l <--> r
 
 instance Located Pattern where
   locOf (PattLit l) = locOf l
