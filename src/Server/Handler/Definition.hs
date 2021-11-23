@@ -9,8 +9,8 @@ module Server.Handler.Definition
 import           Data.Maybe                     ( maybeToList )
 import           Error                          ( Error )
 import           Language.LSP.Types      hiding ( Range )
-import           Server.Pipeline
 import           Server.Monad
+import           Server.Pipeline
 import qualified Server.SrcLoc                 as SrcLoc
 import           Server.TokenMap
 
@@ -31,12 +31,17 @@ handler uri position responder = do
         let pos   = SrcLoc.fromLSPPosition table filepath position
 
         stage <- load
-        let tokenMap = case stage of
-              Raw _ -> Nothing
-              Parsed _result -> Nothing
-              Converted result -> Just $ convertedTokenMap result
-              Swept     result -> Just $ convertedTokenMap (sweptPreviousStage result)
-              
+        let
+          tokenMap = case stage of
+            Raw       _       -> Nothing
+            Parsed    _result -> Nothing
+            Converted result  -> Just $ convertedTokenMap result
+            TypeChecked result ->
+              Just $ convertedTokenMap (typeCheckedPreviousStage result)
+            Swept result ->
+              Just $ convertedTokenMap
+                (typeCheckedPreviousStage (sweptPreviousStage result))
+
         return $ maybeToList $ case tokenMap of
           Nothing -> Nothing
           Just xs -> do -- in Maybe monad

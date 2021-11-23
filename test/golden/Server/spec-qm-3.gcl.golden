@@ -32,4 +32,5 @@ TraceEditText ./test/source/Server/spec-qm-3.gcl [16-17] 2:5-6 "[!\n    \n    !]
 TraceLog "      [ save ] Parsed"
 TraceLog "      [ save ] Converted"
 TraceLog "      [ save ] Converted"
+TraceLog "      [ save ] TypeChecked"
 TraceLog "      [ save ] Swept"

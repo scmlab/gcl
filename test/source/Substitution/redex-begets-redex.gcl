@@ -1,4 +1,4 @@
 {: Father = Son + 1 :}
 {: Son = 0 :}
 
-{ Father }
+{ Father = 1 }

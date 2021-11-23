@@ -292,7 +292,7 @@ parseError = testGroup
   ]
  where
   runDeclaration = parserCompare pDeclaration
-  runType        = parserCompare pType
+  -- runType        = parserCompare pType
   runExpr        = parserCompare pExpr
 
 

@@ -19,12 +19,14 @@ fi
 
 TraceLog "      [ save ] Parsed"
 TraceLog "      [ save ] Converted"
+TraceLog "      [ save ] TypeChecked"
 TraceLog "      [ save ] Swept"
 TraceLog "      [ event ] mute"
 TraceLog "      [ save ] Mouse selection: spec-refine-5.gcl [12-57] 1:13-4:15"
 TraceGetSource
 TraceLog "      [ save ] Parsed"
 TraceLog "      [ save ] Converted"
+TraceLog "      [ save ] TypeChecked"
 TraceLog "      [ save ] Swept"
 TraceGetSource
 TraceGetSource
@@ -44,6 +46,7 @@ TraceLog "      [ save ] Parsed"
 TraceLog "      [ save ] Converted"
 TraceLog "      [ save ] Converted"
 TraceLog "      [ save ] Converted"
+TraceLog "      [ save ] TypeChecked"
 TraceLog "      [ event ] unmute"
 TraceLog "      [ save ] Swept"
 TraceLog "      [ load ] Mouse selection: Nothing"

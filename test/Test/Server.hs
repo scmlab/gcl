@@ -39,7 +39,8 @@ instantiateSpec = testGroup
           return $ serializeTestResult $ runTest sourcePath source $ do
             parsed <- parse source
             converted <- convert parsed
-            Right <$> sweep converted
+            typeChecked <- typeCheck converted
+            Right <$> sweep typeChecked
 
 
 specPayloadWithoutIndentationTests :: TestTree
@@ -54,7 +55,8 @@ specPayloadWithoutIndentationTests = testGroup
           return $ serializeTestResult $ runTest sourcePath source $ do
             parsed <- parse source
             converted <- convert parsed
-            result <- sweep converted
+            typeChecked <- typeCheck converted
+            result <- sweep typeChecked
             let specs = sweptSpecs result
             return $ Right $ map
               ( map (\x -> "\"" <> x <> "\"")
@@ -81,7 +83,8 @@ refineSpecsTest = testGroup
           return $ serializeTestResult $ runTest sourcePath source $ do
             parsed <- parse source
             converted <- convert parsed
-            result <- sweep converted
+            typeChecked <- typeCheck converted
+            result <- sweep typeChecked
             let specs = sweptSpecs result
             case listToMaybe specs of
               Just spec -> do

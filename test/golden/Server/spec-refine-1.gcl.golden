@@ -12,12 +12,14 @@ skip
 
 TraceLog "      [ save ] Parsed"
 TraceLog "      [ save ] Converted"
+TraceLog "      [ save ] TypeChecked"
 TraceLog "      [ save ] Swept"
 TraceLog "      [ event ] mute"
 TraceLog "      [ save ] Mouse selection: spec-refine-1.gcl [0-10] 1:1-3:3"
 TraceGetSource
 TraceLog "      [ save ] Parsed"
 TraceLog "      [ save ] Converted"
+TraceLog "      [ save ] TypeChecked"
 TraceLog "      [ save ] Swept"
 TraceGetSource
 TraceGetSource
@@ -25,6 +27,7 @@ TraceLog "      [ edit ] Replace ./test/source/Server/spec-refine-1.gcl [0-10] 1
 TraceEditText ./test/source/Server/spec-refine-1.gcl [0-10] 1:1-3:3 "skip"
 TraceLog "      [ save ] Parsed"
 TraceLog "      [ save ] Converted"
+TraceLog "      [ save ] TypeChecked"
 TraceLog "      [ event ] unmute"
 TraceLog "      [ save ] Swept"
 TraceLog "      [ load ] Mouse selection: Nothing"

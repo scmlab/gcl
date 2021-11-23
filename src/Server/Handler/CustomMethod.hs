@@ -17,8 +17,8 @@ import           GCL.Predicate
 import qualified GCL.Substitution              as Substitution
 import           Render                         ( Render(render) )
 import           Server.CustomMethod
-import           Server.Pipeline
 import           Server.Monad
+import           Server.Pipeline
 import           Syntax.Abstract                ( Redex(redexExpr) )
 import           Syntax.Abstract.Util           ( programToScopeForSubstitution
                                                 )
@@ -29,10 +29,10 @@ handleInspect :: Range -> PipelineM [ResKind]
 handleInspect range = do
   setLastSelection range
   stage <- load
-  case stage of 
+  case stage of
     Swept swept -> generateResponseAndDiagnostics swept
-    _ -> return []
-  
+    _           -> return []
+
 handleRefine :: Range -> PipelineM [ResKind]
 handleRefine range = do
   mute True
@@ -48,14 +48,13 @@ handleRefine range = do
           let indentation =
                 Text.replicate (posCol (rangeStart (specRange spec)) - 1) " "
           in  Text.unlines $ x : map (indentation <>) xs
-  source'   <- editText (specRange spec) indentedPayload
-  parsed    <- parse source'
+  source'     <- editText (specRange spec) indentedPayload
+  parsed      <- parse source'
 
-  converted <- convert parsed
-
-  typeCheck (convertedProgram converted)
+  converted   <- convert parsed
+  typeChecked <- typeCheck converted
   mute False
-  swept <- sweep converted
+  swept <- sweep typeChecked
 
   generateResponseAndDiagnostics swept
 
@@ -74,11 +73,11 @@ handleInsertAnchor hash = do
 
   source' <- editText (Range (rangeEnd range) (rangeEnd range))
                       ("\n\n" <> template)
-  parsed    <- parse source'
-  converted <- convert parsed
-  typeCheck (convertedProgram converted)
+  parsed      <- parse source'
+  converted   <- convert parsed
+  typeChecked <- typeCheck converted
   mute False
-  swept <- sweep converted
+  swept <- sweep typeChecked
   generateResponseAndDiagnostics swept
 
 handleSubst :: Int -> PipelineM [ResKind]
@@ -87,11 +86,13 @@ handleSubst i = do
   logText $ Text.pack $ "Substituting Redex " <> show i
   -- 
   case stage of
-    Raw _      -> return []
-    Parsed        _      -> return []
-    Converted     _      -> return []
-    Swept         result -> do
-      let program = convertedProgram (sweptPreviousStage result)
+    Raw         _      -> return []
+    Parsed      _      -> return []
+    Converted   _      -> return []
+    TypeChecked _      -> return []
+    Swept       result -> do
+      let program = convertedProgram
+            (typeCheckedPreviousStage (sweptPreviousStage result))
       case IntMap.lookup i (sweptRedexes result) of
         Nothing    -> return []
         Just redex -> do

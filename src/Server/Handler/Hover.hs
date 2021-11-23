@@ -35,10 +35,14 @@ handler uri position responder = case uriToFilePath uri of
 
       let
         tokenMap = case stage of
-          Raw _ -> Nothing
-          Parsed _result -> Nothing
-          Converted result -> Just $ convertedTokenMap result
-          Swept result -> Just $ convertedTokenMap (sweptPreviousStage result)
+          Raw       _       -> Nothing
+          Parsed    _result -> Nothing
+          Converted result  -> Just $ convertedTokenMap result
+          TypeChecked result ->
+            Just $ convertedTokenMap (typeCheckedPreviousStage result)
+          Swept result ->
+            Just $ convertedTokenMap
+              (typeCheckedPreviousStage (sweptPreviousStage result))
 
       return $ case tokenMap of
         Nothing -> Nothing

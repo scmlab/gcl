@@ -48,8 +48,8 @@ handlers = mconcat
           source    <- getSource
           parsed    <- parse source
           converted <- convert parsed
-          typeCheck (convertedProgram converted)
-          swept <- sweep converted
+          typeChecked <- typeCheck converted 
+          swept <- sweep typeChecked
           generateResponseAndDiagnostics swept
   , notificationHandler J.STextDocumentDidOpen $ \ntf -> do
     let uri    = ntf ^. (J.params . J.textDocument . J.uri)
@@ -58,8 +58,8 @@ handlers = mconcat
       logText "\n ---> TextDocumentDidOpen"
       parsed    <- parse source
       converted <- convert parsed
-      typeCheck (convertedProgram converted)
-      swept <- sweep converted
+      typeChecked <- typeCheck converted 
+      swept <- sweep typeChecked
       generateResponseAndDiagnostics swept
   , -- Goto Definition
     requestHandler J.STextDocumentDefinition $ \req responder -> do
@@ -85,8 +85,10 @@ handlers = mconcat
           Parsed        result -> parsedHighlighings result
           Converted result ->
             parsedHighlighings (convertedPreviousStage result)
+          TypeChecked result -> 
+            parsedHighlighings (convertedPreviousStage (typeCheckedPreviousStage result))
           Swept result -> parsedHighlighings
-            (convertedPreviousStage (sweptPreviousStage result))
+            (convertedPreviousStage (typeCheckedPreviousStage (sweptPreviousStage result)))
       let tokens = J.makeSemanticTokens legend highlightings
       case tokens of
         Left t -> return $ Left $ J.ResponseError J.InternalError t Nothing

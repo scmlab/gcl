@@ -1,10 +1,7 @@
 ### Result
 
-[ Assigment at ./test/source/WP/assignment.gcl [9-15] 2:1-7 #2992979340444012
-`True
-⇒
-0 = 1`
-After assignment, the postcondition 0 = x should be implied by the precondition True after free variables x have been substituted with 1  ]
+[ Type Error ./test/source/WP/assignment.gcl:2:1-2
+The definition x is not in scope ]
 
 ### Source
 
@@ -16,4 +13,3 @@ x := 1
 
 TraceLog "      [ save ] Parsed"
 TraceLog "      [ save ] Converted"
-TraceLog "      [ save ] Swept"

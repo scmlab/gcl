@@ -82,16 +82,17 @@ import           Syntax.Parser                  ( Parser
 data Stage = Raw FilePath
            | Parsed ParseResult
            | Converted ConvertResult
-        -- | TypeChecked TypeCheckResult
+           | TypeChecked TypeCheckResult
            | Swept SweepResult
            deriving (Show, Eq)
 
 instance Pretty Stage where
   pretty stage = case stage of
-    Raw       filepath -> "Raw " <> pretty filepath
-    Parsed    _result  -> "Parsed"
-    Converted _result  -> "Converted"
-    Swept     result   -> pretty result
+    Raw         filepath -> "Raw " <> pretty filepath
+    Parsed      _result  -> "Parsed"
+    Converted   _result  -> "Converted"
+    TypeChecked _result  -> "TypeChecked"
+    Swept       result   -> pretty result
 
 instance Pretty SweepResult where
   pretty result =
@@ -150,8 +151,32 @@ convert result = do
 
 --------------------------------------------------------------------------------
 
+data TypeCheckResult = TypeCheckResult
+  { typeCheckedPreviousStage :: ConvertResult
+  , typeCheckedTokenMap      :: () -- type checking info 
+  }
+  deriving (Show, Eq)
+
+-- | Converts concrete syntax to abstract syntax and scoping info
+--   persists the result
+typeCheck :: ConvertResult -> PipelineM TypeCheckResult
+typeCheck result = do
+  case
+      TypeChecking.runTM (TypeChecking.checkProgram (convertedProgram result))
+    of
+      Left  e -> throwError [TypeError e]
+      Right v -> return v
+
+  let typeChecked = TypeCheckResult { typeCheckedPreviousStage = result
+                                    , typeCheckedTokenMap      = ()
+                                    }
+  save (TypeChecked typeChecked) -- save the current progress
+  return typeChecked
+
+--------------------------------------------------------------------------------
+
 data SweepResult = SweepResult
-  { sweptPreviousStage :: ConvertResult
+  { sweptPreviousStage :: TypeCheckResult
   , sweptPOs           :: [PO]
     -- Specs (holes)
   , sweptSpecs         :: [Spec]
@@ -168,14 +193,14 @@ data SweepResult = SweepResult
 
 -- | Converts abstract syntax to POs and other stuff
 --   persists the result
-sweep :: ConvertResult -> PipelineM SweepResult
-sweep convertedResult = do
+sweep :: TypeCheckResult -> PipelineM SweepResult
+sweep result = do
   let abstract@(A.Program _ _ globalProps _ _) =
-        convertedProgram convertedResult
+        convertedProgram (typeCheckedPreviousStage result)
   swept <- case WP.sweep abstract of
     Left  e -> throwError [StructError e]
     Right (pos, specs, warings, redexes, counter) -> return $ SweepResult
-      { sweptPreviousStage = convertedResult
+      { sweptPreviousStage = result
       , sweptPOs           = List.sort pos
       , sweptSpecs         = sortOn locOf specs
       , sweptProps         = globalProps
@@ -293,10 +318,11 @@ load :: PipelineM Stage
 load = do
   stage <- gets pipelineStage
   case stage of
-    Raw       _ -> logText "      [ load ] from Raw"
-    Parsed    _ -> logText "      [ load ] from Parsed"
-    Converted _ -> logText "      [ load ] from Converted"
-    Swept     _ -> logText "      [ load ] from Swept"
+    Raw         _ -> logText "      [ load ] from Raw"
+    Parsed      _ -> logText "      [ load ] from Parsed"
+    Converted   _ -> logText "      [ load ] from Converted"
+    TypeChecked _ -> logText "      [ load ] from TypeChecked"
+    Swept       _ -> logText "      [ load ] from Swept"
   return stage
 
 getErrors :: PipelineM [Error]
@@ -320,6 +346,7 @@ save stage = do
     Raw       _ -> logText "      [ save ] Raw"
     Parsed    _ -> logText "      [ save ] Parsed"
     Converted _ -> logText "      [ save ] Converted"
+    TypeChecked _ -> logText "      [ save ] TypeChecked"
     Swept     _ -> logText "      [ save ] Swept"
   modify' $ \state -> state { pipelineErrors = [], pipelineStage = stage }
 
@@ -384,16 +411,12 @@ refine source range = do
  where
   findPointedSpec :: PipelineM (Maybe Spec)
   findPointedSpec = do
-    parsed    <- parse source
-    converted <- convert parsed
-    result    <- sweep converted
-    let specs = sweptSpecs result
+    parsed      <- parse source
+    converted   <- convert parsed
+    typeChecked <- typeCheck converted
+    swept       <- sweep typeChecked
+    let specs = sweptSpecs swept
     return $ find (withinRange range) specs
-
-typeCheck :: A.Program -> PipelineM ()
-typeCheck p = case TypeChecking.runTM (TypeChecking.checkProgram p) of
-  Left  e -> throwError [TypeError e]
-  Right v -> return v
 
 --------------------------------------------------------------------------------
 

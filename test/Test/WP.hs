@@ -23,7 +23,8 @@ run =
         return $ serializeTestResult $ runTest sourcePath source $ do
           parsed    <- parse source
           converted <- convert parsed
-          result    <- sweep converted
+          typeChecked <- typeCheck converted
+          result    <- sweep typeChecked
           return (Right (sweptPOs result))
 
 -- | Expression
