@@ -17,6 +17,7 @@ import qualified Data.Map                      as Map
 import           Data.Text                      ( Text )
 import           Language.LSP.Types             ( LocationLink(..) )
 import qualified Language.LSP.Types            as J
+import           Pretty                         ( Pretty(..) )
 import qualified Server.SrcLoc                 as SrcLoc
 import qualified Server.TokenMap               as TokenMap
 import           Server.TokenMap
@@ -24,17 +25,15 @@ import           Syntax.Abstract
 import           Syntax.Common
 
 collectLocationLinks :: Program -> TokenMap LocationLink
-collectLocationLinks program = runM program (collect program)
+collectLocationLinks program = runM (programToScopes program) (collect program)
+
+instance Pretty LocationLink where
+  pretty = pretty . show
+
 
 --------------------------------------------------------------------------------
 
--- | Information we want to collect of a node of Abstract syntax  
 type LocationLinkToBe = Range -> LocationLink
-
---------------------------------------------------------------------------------
-
-runM :: Program -> M LocationLinkToBe LocationLink a -> TokenMap LocationLink
-runM program f = let (_, _, w) = runRWS f (programToScopes program) () in w
 
 -- | Extracts Scopes from a Program 
 programToScopes :: Program -> [Scope LocationLinkToBe]
@@ -122,7 +121,7 @@ instance Collect LocationLinkToBe LocationLink Name where
   collect name = do
     result <- lookupScopes (nameToText name)
     case result of
-      Nothing     -> return ()
+      Nothing               -> return ()
       Just locationLinkToBe -> case fromLoc (locOf name) of
         Nothing    -> return ()
         Just range -> tell $ TokenMap.singleton range (locationLinkToBe range)

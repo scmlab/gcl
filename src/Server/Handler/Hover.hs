@@ -9,7 +9,9 @@ module Server.Handler.Hover
 import           Error                          ( Error )
 import           Server.Monad
 
+import           Data.Loc                       ( posCoff )
 import           Language.LSP.Types      hiding ( Range )
+import           Pretty                         ( toText )
 import           Server.Pipeline
 import qualified Server.SrcLoc                 as SrcLoc
 import qualified Server.TokenMap               as TokenMap
@@ -23,11 +25,10 @@ handler uri position responder = case uriToFilePath uri of
   Nothing       -> return ()
   Just filepath -> do
     interpret uri (responder . ignoreErrors) $ do
-      logText " ---> Hover"
       source <- getSource
       let table = SrcLoc.makeToOffset source
       let pos   = SrcLoc.fromLSPPosition table filepath position
-
+      logText $ " ---> Hover " <> toText (posCoff pos)
 
       stage <- load
 
@@ -40,8 +41,14 @@ handler uri position responder = case uriToFilePath uri of
           Swept result ->
             Just $ typeCheckedTokenMap (sweptPreviousStage result)
 
-      return $ case tokenMap of
-        Nothing -> Nothing
-        Just xs -> do -- in Maybe Monad
-          (hover, _typ) <- TokenMap.lookup xs pos
-          return hover
+      case tokenMap of
+        Nothing -> return Nothing
+        Just xs -> case TokenMap.lookup xs pos of
+          Nothing -> do
+            -- logText $ toText xs
+            logText "    < Hover (not found)"
+            return Nothing
+          Just (hover, _) -> do
+            logText $ "    < Hover " <> toText hover
+            return (Just hover)
+

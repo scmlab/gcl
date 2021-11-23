@@ -8,6 +8,7 @@ module Server.TokenMap
   , singleton
   , Scope
   , M
+  , runM
   , Collect(..)
   , lookup
   , lookupScopes
@@ -28,15 +29,27 @@ import           Data.Map                       ( Map )
 import qualified Data.Map                      as Map
 import           Data.Text                      ( Text )
 import           Prelude                 hiding ( lookup )
--- import qualified Server.SrcLoc                 as SrcLoc
+import           Pretty
 
-newtype TokenMap token = TokenMap (IntMap (Int, token)) deriving (Show, Eq, Monoid, Semigroup)
+newtype TokenMap token = TokenMap (IntMap (Int, token)) deriving (Eq, Monoid, Semigroup)
+
+instance Pretty token => Show (TokenMap token) where
+  show = show . pretty
+
+-- for debugging 
+instance Pretty token => Pretty (TokenMap token) where
+  pretty (TokenMap xs) =
+    vcat
+      $ map
+          (\(start, (end, token)) ->
+            "(" <> pretty start <> ", " <> pretty end <> ") => " <> pretty token
+          )
+      $ IntMap.toList xs
 
 singleton :: Range -> token -> TokenMap token
 singleton range token = TokenMap $ IntMap.singleton
   (posCoff (rangeStart range))
   (posCoff (rangeEnd range), token)
-
 
 lookup :: TokenMap token -> Pos -> Maybe token
 lookup (TokenMap m) pos =
@@ -53,6 +66,9 @@ type Scope input = Map Text input
 -- | Accumulates the result of `TokenMap` in writer 
 --   Stores stack of scopes in reader 
 type M input output = RWS [Scope input] (TokenMap output) ()
+
+runM :: [Scope input] -> M input output a -> TokenMap output
+runM scopes f = let (_, _, w) = runRWS f scopes () in w
 
 -- | See if a name is in a series of scopes (from local to global)
 -- | Return the first result (which should be the most local target)

@@ -8,14 +8,18 @@ module Server.Hover
   ) where
 
 import           Control.Monad.RWS
-import           Data.Loc                       ( locOf )
+import           Data.Loc                       ( Located
+                                                , locOf
+                                                )
 import           Data.Loc.Range
 import           Data.Map                       ( Map )
 import qualified Data.Map                      as Map
 import           Data.Text                      ( Text )
 import qualified GCL.Type                      as TypeChecking
 import qualified Language.LSP.Types            as J
-import           Pretty                         ( toText )
+import           Pretty                         ( Pretty(..)
+                                                , toText
+                                                )
 import           Server.TokenMap
 import qualified Server.TokenMap               as TokenMap
 -- import qualified Server.SrcLoc                 as SrcLoc
@@ -23,22 +27,23 @@ import           Syntax.Abstract
 import           Syntax.Common
 
 collectHoverInfo :: Program -> TokenMap (J.Hover, Type)
-collectHoverInfo program = runM program (collect program)
+collectHoverInfo program = runM (programToScopes program) (collect program)
+
+instance Pretty J.Hover where
+  pretty = pretty . show
 
 --------------------------------------------------------------------------------
+-- helper function for annotating some syntax node with its type
 
-addType :: Type -> M Type (J.Hover, Type) ()
-addType t = case fromLoc (locOf t) of
+annotateType :: Located a => a -> Type -> M Type (J.Hover, Type) ()
+annotateType node t = case fromLoc (locOf node) of
   Nothing    -> return ()
   Just range -> tell $ TokenMap.singleton range (hover, t)
-   where
-    hover   = J.Hover content Nothing
-    content = J.HoverContents $ J.markedUpContent "gcl" (toText t)
+ where
+  hover   = J.Hover content Nothing
+  content = J.HoverContents $ J.markedUpContent "gcl" (toText t)
 
 --------------------------------------------------------------------------------
-
-runM :: Program -> M Type (J.Hover, Type) a -> TokenMap (J.Hover, Type)
-runM program f = let (_, _, w) = runRWS f (programToScopes program) () in w
 
 -- | Extracts Scopes from a Program 
 programToScopes :: Program -> [Scope Type]
@@ -57,7 +62,7 @@ programToScopes (Program defns decls _ _ _) = [topLevelScope]
 instance Collect Type (J.Hover, Type) Name where
   collect name = do
     result <- lookupScopes (nameToText name)
-    forM_ result addType
+    forM_ result (annotateType name)
 
 --------------------------------------------------------------------------------
 -- Program
@@ -157,10 +162,10 @@ instance Collect Type (J.Hover, Type) Op where
   collect (ArithOp op) = collect op
 
 instance Collect Type (J.Hover, Type) ArithOp where
-  collect op = addType (TypeChecking.arithOpTypes op)
+  collect op = annotateType op (TypeChecking.arithOpTypes op)
 
 instance Collect Type (J.Hover, Type) ChainOp where
-  collect op = addType (TypeChecking.chainOpTypes op)
+  collect op = annotateType op (TypeChecking.chainOpTypes op)
 
 instance Collect Type (J.Hover, Type) QuantOp' where
   collect (Left  op  ) = collect op
