@@ -12,9 +12,7 @@ import           Server.Monad
 import           Language.LSP.Types      hiding ( Range )
 import           Server.Pipeline
 import qualified Server.SrcLoc                 as SrcLoc
-import           Server.TokenMap                ( Token(tokenHoverAndType)
-                                                , lookupIntervalMap
-                                                )
+import qualified Server.TokenMap               as TokenMap
 
 ignoreErrors :: ([Error], Maybe (Maybe Hover)) -> Maybe Hover
 ignoreErrors (_, Nothing) = Nothing
@@ -35,18 +33,15 @@ handler uri position responder = case uriToFilePath uri of
 
       let
         tokenMap = case stage of
-          Raw       _       -> Nothing
-          Parsed    _result -> Nothing
-          Converted result  -> Just $ convertedTokenMap result
-          TypeChecked result ->
-            Just $ convertedTokenMap (typeCheckedPreviousStage result)
+          Raw         _      -> Nothing
+          Parsed      _      -> Nothing
+          Converted   _      -> Nothing
+          TypeChecked result -> Just $ typeCheckedTokenMap result
           Swept result ->
-            Just $ convertedTokenMap
-              (typeCheckedPreviousStage (sweptPreviousStage result))
+            Just $ typeCheckedTokenMap (sweptPreviousStage result)
 
       return $ case tokenMap of
         Nothing -> Nothing
         Just xs -> do -- in Maybe Monad
-          info          <- lookupIntervalMap xs pos
-          (hover, _typ) <- tokenHoverAndType info
+          (hover, _typ) <- TokenMap.lookup xs pos
           return hover

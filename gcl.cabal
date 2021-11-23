@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: a58dcea2b380927310bbb692cc477897d66229b585d42e7b083e5300c61650c3
+-- hash: d486316b87f0196e88d23f00ef55e26dff538c12bd4f9ccdae26ba73251a63f9
 
 name:           gcl
 version:        0.1.0.0
@@ -53,13 +53,15 @@ library
       Render.Syntax.Common
       Server
       Server.CustomMethod
+      Server.GoToDefn
       Server.Handler
       Server.Handler.AutoCompletion
       Server.Handler.CustomMethod
-      Server.Handler.Definition
       Server.Handler.Diagnostic
+      Server.Handler.GoToDefn
       Server.Handler.Hover
       Server.Highlighting
+      Server.Hover
       Server.Monad
       Server.Pipeline
       Server.SrcLoc
@@ -194,13 +196,15 @@ test-suite gcl-test
       Render.Syntax.Common
       Server
       Server.CustomMethod
+      Server.GoToDefn
       Server.Handler
       Server.Handler.AutoCompletion
       Server.Handler.CustomMethod
-      Server.Handler.Definition
       Server.Handler.Diagnostic
+      Server.Handler.GoToDefn
       Server.Handler.Hover
       Server.Highlighting
+      Server.Hover
       Server.Monad
       Server.Pipeline
       Server.SrcLoc

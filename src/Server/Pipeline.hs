@@ -32,10 +32,13 @@ import           Pretty                         ( Pretty(pretty)
                                                 )
 import           Render
 import           Server.CustomMethod
+import           Server.GoToDefn                ( collectLocationLinks )
 import           Server.Handler.Diagnostic      ( Collect(collect) )
 import           Server.Highlighting            ( collectHighlighting )
-import           Server.TokenMap
+import           Server.Hover                   ( collectHoverInfo )
+import           Server.TokenMap                ( TokenMap )
 import qualified Syntax.Abstract               as A
+import           Syntax.Abstract                ( Type )
 import           Syntax.Concrete                ( ToAbstract(toAbstract) )
 import qualified Syntax.Concrete               as C
 import           Syntax.Parser                  ( Parser
@@ -130,7 +133,7 @@ parse source = do
 data ConvertResult = ConvertResult
   { convertedPreviousStage :: ParseResult
   , convertedProgram       :: A.Program -- abstract syntax
-  , convertedTokenMap      :: TokenMap -- scoping info
+  , convertedTokenMap      :: TokenMap J.LocationLink -- scoping info
   }
   deriving (Show, Eq)
 
@@ -144,7 +147,7 @@ convert result = do
     Right program -> return $ ConvertResult
       { convertedPreviousStage = result
       , convertedProgram       = program
-      , convertedTokenMap      = collectTokenMap program
+      , convertedTokenMap      = collectLocationLinks program
       }
   save (Converted converted) -- save the current progress
   return converted
@@ -153,7 +156,7 @@ convert result = do
 
 data TypeCheckResult = TypeCheckResult
   { typeCheckedPreviousStage :: ConvertResult
-  , typeCheckedTokenMap      :: () -- type checking info 
+  , typeCheckedTokenMap      :: TokenMap (J.Hover, Type) -- type checking info 
   }
   deriving (Show, Eq)
 
@@ -161,15 +164,16 @@ data TypeCheckResult = TypeCheckResult
 --   persists the result
 typeCheck :: ConvertResult -> PipelineM TypeCheckResult
 typeCheck result = do
-  case
-      TypeChecking.runTM (TypeChecking.checkProgram (convertedProgram result))
-    of
-      Left  e -> throwError [TypeError e]
-      Right v -> return v
+  let program = convertedProgram result
 
-  let typeChecked = TypeCheckResult { typeCheckedPreviousStage = result
-                                    , typeCheckedTokenMap      = ()
-                                    }
+  case TypeChecking.runTM (TypeChecking.checkProgram program) of
+    Left  e -> throwError [TypeError e]
+    Right v -> return v
+
+  let typeChecked = TypeCheckResult
+        { typeCheckedPreviousStage = result
+        , typeCheckedTokenMap      = collectHoverInfo program
+        }
   save (TypeChecked typeChecked) -- save the current progress
   return typeChecked
 
@@ -343,11 +347,11 @@ setErrors e = modify' $ \state -> state { pipelineErrors = e }
 save :: Stage -> PipelineM ()
 save stage = do
   case stage of
-    Raw       _ -> logText "      [ save ] Raw"
-    Parsed    _ -> logText "      [ save ] Parsed"
-    Converted _ -> logText "      [ save ] Converted"
+    Raw         _ -> logText "      [ save ] Raw"
+    Parsed      _ -> logText "      [ save ] Parsed"
+    Converted   _ -> logText "      [ save ] Converted"
     TypeChecked _ -> logText "      [ save ] TypeChecked"
-    Swept     _ -> logText "      [ save ] Swept"
+    Swept       _ -> logText "      [ save ] Swept"
   modify' $ \state -> state { pipelineErrors = [], pipelineStage = stage }
 
 setLastSelection :: Range -> PipelineM ()

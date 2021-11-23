@@ -13,15 +13,15 @@ import           Language.LSP.Server            ( Handlers
                                                 , notificationHandler
                                                 , requestHandler
                                                 )
-import           Server.Pipeline
 import           Server.Monad
+import           Server.Pipeline
 
 import           Error                          ( Error )
 import qualified Language.LSP.Types            as J
 import qualified Language.LSP.Types.Lens       as J
 import qualified Server.Handler.AutoCompletion as AutoCompletion
 import qualified Server.Handler.CustomMethod   as CustomMethod
-import qualified Server.Handler.Definition     as Definition
+import qualified Server.Handler.GoToDefn       as GoToDefn
 import qualified Server.Handler.Hover          as Hover
 
 -- handlers of the LSP server
@@ -45,27 +45,27 @@ handlers = mconcat
         then return []
         else do
           logText "\n ---> TextDocumentDidChange"
-          source    <- getSource
-          parsed    <- parse source
-          converted <- convert parsed
-          typeChecked <- typeCheck converted 
-          swept <- sweep typeChecked
+          source      <- getSource
+          parsed      <- parse source
+          converted   <- convert parsed
+          typeChecked <- typeCheck converted
+          swept       <- sweep typeChecked
           generateResponseAndDiagnostics swept
   , notificationHandler J.STextDocumentDidOpen $ \ntf -> do
     let uri    = ntf ^. (J.params . J.textDocument . J.uri)
     let source = ntf ^. (J.params . J.textDocument . J.text)
     interpret uri (customRequestToNotification uri) $ do
       logText "\n ---> TextDocumentDidOpen"
-      parsed    <- parse source
-      converted <- convert parsed
-      typeChecked <- typeCheck converted 
-      swept <- sweep typeChecked
+      parsed      <- parse source
+      converted   <- convert parsed
+      typeChecked <- typeCheck converted
+      swept       <- sweep typeChecked
       generateResponseAndDiagnostics swept
   , -- Goto Definition
     requestHandler J.STextDocumentDefinition $ \req responder -> do
     let uri = req ^. (J.params . J.textDocument . J.uri)
     let pos = req ^. (J.params . J.position)
-    Definition.handler uri pos (responder . Right . J.InR . J.InR . J.List)
+    GoToDefn.handler uri pos (responder . Right . J.InR . J.InR . J.List)
   , -- Hover
     requestHandler J.STextDocumentHover $ \req responder -> do
     let uri = req ^. (J.params . J.textDocument . J.uri)
@@ -81,14 +81,16 @@ handlers = mconcat
       stage <- load
       let
         highlightings = case stage of
-          Raw _      -> []
-          Parsed        result -> parsedHighlighings result
+          Raw    _      -> []
+          Parsed result -> parsedHighlighings result
           Converted result ->
             parsedHighlighings (convertedPreviousStage result)
-          TypeChecked result -> 
-            parsedHighlighings (convertedPreviousStage (typeCheckedPreviousStage result))
+          TypeChecked result -> parsedHighlighings
+            (convertedPreviousStage (typeCheckedPreviousStage result))
           Swept result -> parsedHighlighings
-            (convertedPreviousStage (typeCheckedPreviousStage (sweptPreviousStage result)))
+            (convertedPreviousStage
+              (typeCheckedPreviousStage (sweptPreviousStage result))
+            )
       let tokens = J.makeSemanticTokens legend highlightings
       case tokens of
         Left t -> return $ Left $ J.ResponseError J.InternalError t Nothing

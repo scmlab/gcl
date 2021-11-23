@@ -2,7 +2,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 
-module Server.Handler.Definition
+module Server.Handler.GoToDefn
   ( handler
   ) where
 
@@ -12,7 +12,7 @@ import           Language.LSP.Types      hiding ( Range )
 import           Server.Monad
 import           Server.Pipeline
 import qualified Server.SrcLoc                 as SrcLoc
-import           Server.TokenMap
+import qualified Server.TokenMap as TokenMap
 
 ignoreErrors :: ([Error], Maybe [LocationLink]) -> [LocationLink]
 ignoreErrors (_, Nothing) = []
@@ -44,6 +44,4 @@ handler uri position responder = do
 
         return $ maybeToList $ case tokenMap of
           Nothing -> Nothing
-          Just xs -> do -- in Maybe monad
-            info <- lookupIntervalMap xs pos
-            tokenLocationLink info
+          Just xs -> TokenMap.lookup xs pos
