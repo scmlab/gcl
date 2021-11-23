@@ -31,12 +31,17 @@ import           Data.Text                      ( Text )
 import           Prelude                 hiding ( lookup )
 import           Pretty
 
+
+--------------------------------------------------------------------------------
+-- IntMap for speeding up lookups 
+-- with the key of IntMap acting as the starting offset, 
+-- and the element's Int acting as the ending offset 
 newtype TokenMap token = TokenMap (IntMap (Int, token)) deriving (Eq, Monoid, Semigroup)
 
+-- Instances for debugging 
 instance Pretty token => Show (TokenMap token) where
   show = show . pretty
 
--- for debugging 
 instance Pretty token => Pretty (TokenMap token) where
   pretty (TokenMap xs) =
     vcat
@@ -46,11 +51,13 @@ instance Pretty token => Pretty (TokenMap token) where
           )
       $ IntMap.toList xs
 
+-- Constructs a TokenMap with a Range and a payload
 singleton :: Range -> token -> TokenMap token
 singleton range token = TokenMap $ IntMap.singleton
   (posCoff (rangeStart range))
   (posCoff (rangeEnd range), token)
 
+-- Given a Pos, returns the paylod if the Pos is within its Range 
 lookup :: TokenMap token -> Pos -> Maybe token
 lookup (TokenMap m) pos =
   let offset = posCoff pos
