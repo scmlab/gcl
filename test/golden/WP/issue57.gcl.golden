@@ -1,0 +1,21 @@
+### Result
+
+[]
+
+### Source
+
+con N : Int { 0 ≤ N }
+var r : Int
+
+{:  
+:}
+
+{-
+-}
+
+### Trace
+
+TraceLog "      [ save ] Parsed"
+TraceLog "      [ save ] Converted"
+TraceLog "      [ save ] TypeChecked"
+TraceLog "      [ save ] Swept"
