@@ -1,28 +1,31 @@
 module Syntax.ConstExpr where
 
-import           Data.Bifunctor                 ( bimap )
+import           Data.Char                      ( isLower )
 import           Data.List                      ( partition )
-import           Data.Maybe                     ( mapMaybe )
+import           Data.Maybe                     ( listToMaybe
+                                                , mapMaybe
+                                                )
 import qualified Data.Set                      as Set
+import qualified Data.Text                     as Text
 import           GCL.Common                     ( fv )
 import           Syntax.Abstract
-import           Syntax.Common                  ( Name )
+import           Syntax.Common                  ( Name
+                                                , nameToText
+                                                )
 
 pickGlobals :: [Declaration] -> ([Expr], [Expr])
-pickGlobals =
-    bimap (map snd) (map snd)
-        . partition isGlobalProp
-        . mapMaybe extractAssertion
+pickGlobals = partition isGlobalProp . mapMaybe extractAssertion
   where
     -- An assertion is a global prop 
-    -- if it has no free variables other than the accompanied declared names
-    isGlobalProp :: ([Name], Expr) -> Bool
-    isGlobalProp (names, assertion) =
-        fv assertion `Set.isSubsetOf` Set.fromList names
+    -- if all of its free variables are of CONSTANTS
+    isGlobalProp :: Expr -> Bool
+    isGlobalProp assertion = Set.null $ Set.filter nameIsVar (fv assertion)
+
+    nameIsVar :: Name -> Bool
+    nameIsVar name =
+        maybe False isLower (listToMaybe (Text.unpack (nameToText name)))
 
     -- Extracts both the assertion and those declared names 
-    extractAssertion :: Declaration -> Maybe ([Name], Expr)
-    extractAssertion (ConstDecl _     _ Nothing  _) = Nothing
-    extractAssertion (ConstDecl names _ (Just e) _) = Just (names, e)
-    extractAssertion (VarDecl   _     _ Nothing  _) = Nothing
-    extractAssertion (VarDecl   names _ (Just e) _) = Just (names, e)
+    extractAssertion :: Declaration -> Maybe Expr
+    extractAssertion (ConstDecl _ _ e _) = e
+    extractAssertion (VarDecl   _ _ e _) = e
