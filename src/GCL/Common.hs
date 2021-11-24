@@ -20,7 +20,7 @@ import qualified Data.Text                     as Text
 import qualified Syntax.Abstract               as A
 import           Syntax.Common.Types
 
--- Monad for generating fresh variables 
+-- Monad for generating fresh variables
 class Monad m => Fresh m where
   -- minimum requirement:
   getCounter :: m Int
@@ -32,7 +32,7 @@ class Monad m => Fresh m where
     setCounter (succ i)
     return i
 
-  -- get a fresh variable in the form of Text 
+  -- get a fresh variable in the form of Text
   freshText :: m Text
   freshText =
     (\i -> Text.pack ("?m_" ++ show i)) <$> fresh
@@ -86,7 +86,7 @@ instance Free A.Type where
   fv (A.TFunc  t1 t2 _) = fv t1 <> fv t2
   fv (A.TCon   _  ns _) = Set.fromList ns
   fv (A.TVar x _      ) = Set.singleton x
-  fv (A.TMetaVar n) = Set.singleton n
+  fv (A.TMetaVar n    ) = Set.singleton n
 
 instance Free A.Expr where
   fv (A.Var   x _  ) = Set.singleton x
@@ -104,11 +104,11 @@ instance Free A.Expr where
   fv (A.Case e cases _          ) = fv e <> Set.unions (map fv cases)
 
 instance Free A.CaseConstructor where
-  fv (A.CaseConstructor _ patts expr) = fv expr \\ fv patts
+  fv (A.CaseConstructor patt expr) = fv expr \\ fv patt
 instance Free A.Pattern where
-  fv (A.PattLit _) = mempty
-  fv (A.PattBinder n) = Set.singleton n
-  fv (A.PattWildcard _) = mempty
+  fv (A.PattLit      _      ) = mempty
+  fv (A.PattBinder   n      ) = Set.singleton n
+  fv (A.PattWildcard _      ) = mempty
   fv (A.PattConstructor _ ps) = fv ps
 
 -- class for data that is substitutable
@@ -126,8 +126,8 @@ instance Substitutable A.Type A.Type where
   subst s (A.TArray i  t  l) = A.TArray i (subst s t) l
   subst s (A.TFunc  t1 t2 l) = A.TFunc (subst s t1) (subst s t2) l
   subst _ t@A.TCon{}         = t
-  subst s t@(A.TVar x _)     = Map.findWithDefault t x s
-  subst s t@(A.TMetaVar n) = Map.findWithDefault t n s
+  subst s t@(A.TVar x _  )   = Map.findWithDefault t x s
+  subst s t@(A.TMetaVar n)   = Map.findWithDefault t n s
 
 toStateT :: Monad m => r -> RWST r w s m a -> StateT s m a
 toStateT r m = StateT

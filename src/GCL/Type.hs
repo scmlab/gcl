@@ -196,12 +196,14 @@ infer (Case expr cs _) = do
   mapM_ (unify t) ts
   return t
  where
-  inferCaseConstructor t (CaseConstructor n patts e) = do
-    subs <- inferPatts t n patts
+  inferCaseConstructor t (CaseConstructor patt e) = do
+    (subs, tPatt) <- inferPatt patt
+    unify t tPatt
     inferInEnv subs (infer e)
 
-  inferPatts :: Type -> Name -> [Pattern] -> Infer [(Name, Type)]
-  inferPatts t n patts = do
+  inferPatts :: Name -> [Pattern] -> Infer ([(Name, Type)], Type)
+  inferPatts n patts = do
+    tPatt          <- freshVar
     tn             <- lookupInferEnv n
     (subs, tpatts) <- unzip <$> mapM inferPatt patts
     let subs' = concat subs
@@ -213,8 +215,8 @@ infer (Case expr cs _) = do
       (head dups)
       (locOf . head $ dups)
 
-    unify tn (wrapTFunc tpatts t)
-    return subs'
+    unify tn (wrapTFunc tpatts tPatt)
+    return (subs', tPatt)
 
   inferPatt :: Pattern -> Infer ([(Name, Type)], Type)
   inferPatt (PattLit    x) = return ([], litTypes x (locOf x))
@@ -222,9 +224,7 @@ infer (Case expr cs _) = do
     tn <- freshVar
     return ([(n, tn)], tn)
   inferPatt (PattWildcard _         ) = ([], ) <$> freshVar
-  inferPatt (PattConstructor n patts) = do
-    tpatts <- freshVar
-    inferPatts tpatts n patts <&> (, tpatts)
+  inferPatt (PattConstructor n patts) = inferPatts n patts
 
 emptyInterval :: Interval
 emptyInterval = Interval (Including zero) (Excluding zero) NoLoc

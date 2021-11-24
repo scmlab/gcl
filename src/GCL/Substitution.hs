@@ -7,7 +7,7 @@ module GCL.Substitution
   , buildRedexMap
   , step
   , Scope
-  -- TODO: don't export these 
+  -- TODO: don't export these
   , Substitutable
   , Reducible
   , CollectRedexes
@@ -89,7 +89,7 @@ runM scope p = do
   setCounter counter'
   return output
 
--- for alpha-renaming 
+-- for alpha-renaming
 instance Fresh M where
   getCounter = get
   setCounter = put
@@ -128,7 +128,7 @@ instance CollectRedexes Expr where
     _               -> []
 
 instance CollectRedexes CaseConstructor where
-  collectRedexes (CaseConstructor _ _ x) = collectRedexes x
+  collectRedexes (CaseConstructor _ x) = collectRedexes x
 
 ------------------------------------------------------------------
 
@@ -350,13 +350,16 @@ instance Substitutable Expr where
     RedexStem name e freeVars mappings ->
       let
         removeSubstitutedVars :: Mapping -> Set Name -> Set Name
-        removeSubstitutedVars m = Set.filter (\v -> not $ Set.member (nameToText v) (Map.keysSet m))
+        removeSubstitutedVars m =
+          Set.filter (\v -> not $ Set.member (nameToText v) (Map.keysSet m))
 
-    
+
         outermostMapping = NonEmpty.head mappings
 
-        freeVars' = freeVars <> Set.unions (map fv $ Map.elems outermostMapping)
-        newFreeVars = removeSubstitutedVars mapping freeVars <> Set.unions (map fv $ Map.elems outermostMapping)
+        freeVars' =
+          freeVars <> Set.unions (map fv $ Map.elems outermostMapping)
+        newFreeVars = removeSubstitutedVars mapping freeVars
+          <> Set.unions (map fv $ Map.elems outermostMapping)
 
         shrinkedMapping =
           Map.restrictKeys mapping (Set.map nameToText freeVars')
@@ -398,8 +401,8 @@ instance Substitutable Expr where
 
     -- apply subst on body of cases only
     Case e cases l -> do
-      cases' <- forM cases $ \(CaseConstructor ctor binders body) ->
-        CaseConstructor ctor binders <$> subst mapping body
+      cases' <- forM cases $ \(CaseConstructor patt body) ->
+        CaseConstructor patt <$> subst mapping body
       return $ Case e cases' l
 
 instance Substitutable Pred where

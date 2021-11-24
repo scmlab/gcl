@@ -99,12 +99,12 @@ instance Located Expr where
   locOf (Case l _ _ r         ) = l <--> r
 
 instance Located CaseConstructor where
-  locOf (CaseConstructor l _ _ r) = l <--> r
+  locOf (CaseConstructor l _ r) = l <--> r
 
 --------------------------------------------------------------------------------
 
 instance Located Pattern where
-  locOf (PattLit l) = locOf l
+  locOf (PattLit l          ) = locOf l
   locOf (PattParen l _ r    ) = l <--> r
   locOf (PattBinder   l     ) = locOf l
   locOf (PattWildcard l     ) = locOf l

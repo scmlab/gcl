@@ -219,7 +219,7 @@ instance ToAbstract Type A.Type where
         A.TFunc  a' b' _ -> pure $ A.TFunc a' b' (locOf t)
         A.TCon   a' b' _ -> pure $ A.TCon a' b' (locOf t)
         A.TVar a' _      -> pure $ A.TVar a' (locOf t)
-        A.TMetaVar a' -> pure $ A.TMetaVar a'
+        A.TMetaVar a'    -> pure $ A.TMetaVar a'
 
 --------------------------------------------------------------------------------
 
@@ -249,11 +249,11 @@ instance ToAbstract Expr A.Expr where
       A.Case <$> toAbstract expr <*> toAbstract cases <*> pure (locOf x)
 
 instance ToAbstract CaseConstructor A.CaseConstructor where
-  toAbstract (CaseConstructor ctor binders _ body) =
-    A.CaseConstructor ctor <$> toAbstract binders <*> toAbstract body
+  toAbstract (CaseConstructor patt _ body) =
+    A.CaseConstructor <$> toAbstract patt <*> toAbstract body
 
 instance ToAbstract Pattern A.Pattern where
-  toAbstract (PattLit x) = A.PattLit <$> toAbstract x
+  toAbstract (PattLit x      ) = A.PattLit <$> toAbstract x
   toAbstract (PattParen _ x _) = toAbstract x
   toAbstract (PattBinder   x ) = return $ A.PattBinder x
   toAbstract (PattWildcard x ) = return $ A.PattWildcard (rangeOf x)

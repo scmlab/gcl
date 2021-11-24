@@ -139,7 +139,7 @@ data Expr
   | Quant Expr [Name] Expr Expr Loc
   | RedexStem -- the inner part of a Redex `name [ v \ e ... ] [ v \ e ... ]`
     Name -- the name to be substituted
-    Expr -- the expression for substituting the name 
+    Expr -- the expression for substituting the name
     (Set Name)
      -- free variables in that expression
                -- NOTE, the expression may be some definition like "P",
@@ -164,7 +164,7 @@ data Redex = Rdx
 --------------------------------------------------------------------------------
 -- | Pattern matching
 
-data CaseConstructor = CaseConstructor Name [Pattern] Expr
+data CaseConstructor = CaseConstructor Pattern Expr
   deriving (Eq, Show, Generic)
 
 data Pattern

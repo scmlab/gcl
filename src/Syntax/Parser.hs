@@ -393,12 +393,7 @@ pExprF =
     Case <$> lexCase <*> pExprF <*> lexOfF <*> pIndentBlockF pCaseConstructorF
 
   pCaseConstructorF :: ParserF CaseConstructor
-  pCaseConstructorF =
-    CaseConstructor
-      <$> lexUpperNameF
-      <*> many pPatternF
-      <*> lexArrowF
-      <*> pExprF
+  pCaseConstructorF = CaseConstructor <$> pPatternF <*> lexArrowF <*> pExprF
 
 ------------------------------------------
 -- Pattern matching
@@ -497,9 +492,7 @@ indentedItems lvl sc' p = go
     sc'
     pos  <- Lex.indentLevel
     done <- isJust <$> optional eof
-    if not done && pos == lvl
-      then (:) <$> p <*> go <|> return []
-      else return []
+    if not done && pos == lvl then (:) <$> p <*> go <|> return [] else return []
 
 lineFold :: (Parser () -> Parser a) -> Parser a
 lineFold action = do

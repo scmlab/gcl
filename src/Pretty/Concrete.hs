@@ -378,15 +378,15 @@ handleOp op = case classify op of
 -- | Pattern
 
 instance PrettyWithLoc CaseConstructor where
-  prettyWithLoc (CaseConstructor a b c d) =
-    prettyWithLoc a <> prettyWithLoc b <> prettyWithLoc c <> prettyWithLoc d
+  prettyWithLoc (CaseConstructor a b c) =
+    prettyWithLoc a <> prettyWithLoc b <> prettyWithLoc c
 
 instance Pretty Pattern where
   pretty = toDoc . prettyWithLoc
 
 instance PrettyWithLoc Pattern where
   prettyWithLoc patt = case patt of
-    PattLit a -> prettyWithLoc a
+    PattLit a           -> prettyWithLoc a
     PattParen a b c     -> prettyWithLoc a <> prettyWithLoc b <> prettyWithLoc c
     PattBinder   a      -> prettyWithLoc a
     PattWildcard a      -> prettyWithLoc a

@@ -77,11 +77,10 @@ handleExpr _ (Quant op xs r t _) =
 handleExpr n (RedexStem name _value _freeVars mappings) =
   return $ renderPrec n name <+> mappings'
  where
-  -- reverse the stack when printing it 
+  -- reverse the stack when printing it
   mappings' = punctuateE
     " "
-    (map render $ filter (not . Map.null) $ reverse $ toList mappings
-    )
+    (map render $ filter (not . Map.null) $ reverse $ toList mappings)
 handleExpr n (Redex redex   ) = return $ renderPrec n redex
 handleExpr _ (ArrIdx e1 e2 _) = return $ render e1 <> "[" <> render e2 <> "]"
 handleExpr _ (ArrUpd e1 e2 e3 _) =
@@ -103,11 +102,10 @@ instance Render Mapping where
 --------------------------------------------------------------------------------
 
 instance Render CaseConstructor where
-  render (CaseConstructor ctor binders body) =
-    render ctor <+> horzE (map render binders) <+> "->" <+> render body
+  render (CaseConstructor patt body) = render patt <+> "->" <+> render body
 
 instance Render Pattern where
-  render (PattLit a) = render a 
+  render (PattLit      a) = render a
   render (PattBinder   a) = render a
   render (PattWildcard _) = "_"
   render (PattConstructor ctor patterns) =
@@ -160,7 +158,7 @@ instance Render Type where
   render (TArray i b    _) = "array" <+> render i <+> "of" <+> render b
   render (TCon   n args _) = render n <+> horzE (map render args)
   render (TVar i _       ) = "TVar" <+> render i
-  render (TMetaVar n) = "TMetaVar" <+> render n
+  render (TMetaVar n     ) = "TMetaVar" <+> render n
 
 -- | Interval
 instance Render Interval where

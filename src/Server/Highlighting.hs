@@ -1,7 +1,8 @@
 {-# LANGUAGE LambdaCase #-}
 module Server.Highlighting
-  ( Highlighting, collectHighlighting )
- where
+  ( Highlighting
+  , collectHighlighting
+  ) where
 
 import           Data.Foldable                  ( toList )
 import           Data.Loc                       ( Located(locOf)
@@ -16,7 +17,7 @@ import           Syntax.Common
 import           Syntax.Concrete
 
 collectHighlighting :: Program -> [Highlighting]
-collectHighlighting = toList . collect 
+collectHighlighting = toList . collect
 
 type Highlighting = J.SemanticTokenAbsolute
 
@@ -28,12 +29,12 @@ toHighlighting
   -> Map Range Highlighting
 toHighlighting types modifiers x = case fromLoc (locOf x) of
   Nothing    -> mempty
-  Just range -> Map.singleton range $  J.SemanticTokenAbsolute
-                             (posLine (rangeStart range) - 1)
-                             (posCol (rangeStart range) - 1)
-                             (rangeSpan range)
-                             types
-                             modifiers
+  Just range -> Map.singleton range $ J.SemanticTokenAbsolute
+    (posLine (rangeStart range) - 1)
+    (posCol (rangeStart range) - 1)
+    (rangeSpan range)
+    types
+    modifiers
 
 --------------------------------------------------------------------------------
 
@@ -200,10 +201,8 @@ instance CollectHighlighting Expr where
         <> collect cases
 
 instance CollectHighlighting CaseConstructor where
-  collect (CaseConstructor ctor _ arrow body) =
-    collect (AsConstructor ctor)
-      <> toHighlighting J.SttMacro [] arrow
-      <> collect body
+  collect (CaseConstructor _ arrow body) =
+    toHighlighting J.SttMacro [] arrow <> collect body
 
 instance CollectHighlighting Lit where
   collect x = toHighlighting J.SttNumber [] x

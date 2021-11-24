@@ -170,7 +170,7 @@ type QuantOp' = Either Op Expr
 -- | Pattern matching
 
 -- ctor1 binder1 binder2 ... -> expr
-data CaseConstructor = CaseConstructor Name [Pattern] TokArrows Expr
+data CaseConstructor = CaseConstructor Pattern TokArrows Expr
   deriving (Eq, Show, Generic)
 
 -- NOTE: current not in use
