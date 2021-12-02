@@ -385,18 +385,19 @@ checkProg env (Program defns decls props stmts _) = do
   mapM_ (inferExpr env') props
   mapM_ (checkStmt env') stmts
 
-defnsAndDeclsToEnv :: Definitions -> [Declaration] -> TM Environment
+defnsAndDeclsToEnv :: [Definition] -> [Declaration] -> TM Environment
 defnsAndDeclsToEnv defns decls = do
   -- add type declaration and defnFuncs to enviornment
-  env <- foldM addTypeDecl mempty (defnTypes defns)
-    >>= \tds -> return $ Environment mempty tds (defnFuncs defns)
+  env <- return mempty
+  --env <- foldM addTypeDecl mempty (defnTypes defns)
+    -- >>= \tds -> return $ Environment mempty tds (defnFuncs defns)
 
   -- add var const declaration into enviornment, add type inference result of defns into enviornment
   foldM addDecl env decls >>= inferLocalContext
  where
-  addTypeDecl env (TypeDefn name binders qdcons _) = if name `Map.member` env
-    then throwError $ DuplicatedIdentifier name (locOf name)
-    else return $ Map.insert name (binders, qdcons) env
+  --addTypeDecl env (TypeDefn name binders qdcons _) = if name `Map.member` env
+    --then throwError $ DuplicatedIdentifier name (locOf name)
+    --else return $ Map.insert name (binders, qdcons) env
 
   addDecl env (ConstDecl ns t _ _) = foldM (addSingleDecl t) env ns
   addDecl env (VarDecl   ns t _ _) = foldM (addSingleDecl t) env ns

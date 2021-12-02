@@ -12,11 +12,10 @@ instance Located Declaration where
   locOf (ConstDecl _ _ _ l) = l
   locOf (VarDecl   _ _ _ l) = l
 
-instance Located FuncDefn where
-  locOf (FuncDefn _ _ l) = l
-
-instance Located TypeDefn where
-  locOf (TypeDefn _ _ _ l) = l
+instance Located Definition where
+  locOf (TypeDefn    _ _ _ r) = r
+  locOf (FuncDefnSig _ _ _ r) = r
+  locOf (FuncDefn l r       ) = l <--> r
 
 instance Located TypeDefnCtor where
   locOf (TypeDefnCtor l r) = l <--> r

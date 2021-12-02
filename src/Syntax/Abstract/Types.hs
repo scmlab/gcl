@@ -24,45 +24,20 @@ type TypeVar = Text
 --------------------------------------------------------------------------------
 -- | Program
 
-data Program = Program Definitions       -- definitions (the functional language part)
-                                   [Declaration]     -- constant and variable declarations
-                                                 [Expr]            -- global properties
-                                                        [Stmt]            -- main program
-                                                               Loc
+data Program = Program [Definition]       -- definitions (the functional language part)
+                                    [Declaration]     -- constant and variable declarations
+                                                  [Expr]            -- global properties
+                                                         [Stmt]            -- main program
+                                                                Loc
   deriving (Eq, Show)
 
 --------------------------------------------------------------------------------
--- | Definitions (the functional language part)
-
-data Definitions = Definitions
-  { defnTypes    :: Map Name TypeDefn
-  , defnFuncSigs :: Map Name FuncDefnSig
-  , defnFuncs    :: Map Name [Expr]
-  }
-  deriving (Eq, Show)
-
-instance Semigroup Definitions where
-  Definitions a b c <> Definitions d e f =
-    Definitions (a <> d) (b <> e) (c <> f)
-
-instance Monoid Definitions where
-  mempty = Definitions mempty mempty mempty
-
--- function definition
-data FuncDefn = FuncDefn
-  { funcName    :: Name
-  , funcClauses :: [([Name], Expr)]
-  , funcLoc     :: Loc
-  }
-  deriving (Eq, Show)
-
--- type signature of function definition
-data FuncDefnSig = FuncDefnSig Name Type (Maybe Expr) Loc
-  deriving (Eq, Show)
-
--- type definition
-data TypeDefn = TypeDefn Name [Name] [TypeDefnCtor] Loc
-  deriving (Eq, Show)
+-- | Definition (the functional language part)
+data Definition =
+    TypeDefn Name [Name] [TypeDefnCtor] Loc
+    | FuncDefnSig Name Type (Maybe Expr) Loc
+    | FuncDefn Name [Expr]
+    deriving (Eq, Show)
 
 -- constructor of type definition
 data TypeDefnCtor = TypeDefnCtor Name [Type]

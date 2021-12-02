@@ -10,17 +10,13 @@ module Syntax.Concrete.Instances.ToAbstract where
 import           Control.Monad.Except           ( Except
                                                 , throwError
                                                 )
-import           Data.Bifunctor                 ( second )
-import           Data.Either                    ( partitionEithers )
 import           Data.Loc                       ( (<-->)
                                                 , Loc(..)
                                                 , Located(locOf)
                                                 )
 import           Data.Loc.Range
-import qualified Data.Map                      as Map
 import qualified Syntax.Abstract               as A
 import qualified Syntax.Abstract.Operator      as A
-import qualified Syntax.Abstract.Util          as A
 import           Syntax.Abstract.Util
 import           Syntax.Common                  ( Name )
 import           Syntax.Concrete.Instances.Located
@@ -50,16 +46,8 @@ instance ToAbstract Name Name where
 
 instance ToAbstract Program A.Program where
   toAbstract prog@(Program ds stmts') = do
-    (originalDecls, defns) <- foldl (<>) ([], mempty) <$> toAbstract ds
+    (decls, defns) <- foldl (<>) ([], []) <$> toAbstract ds
 
-    let funcDefnSigsAsConstDecl =
-          foldMap A.funcDefnSigsToConstDecl (A.defnFuncSigs defns)
-    let typeDefnCtorAsConstDecl =
-          foldMap A.typeDefnCtorsToConstDecl (A.defnTypes defns)
-    let decls =
-          originalDecls
-            <> funcDefnSigsAsConstDecl -- add type of functions into declarations
-            <> typeDefnCtorAsConstDecl -- add type of constructors' into declarations
 
     let (globProps, assertions) = ConstExpr.pickGlobals decls
     let pre =
@@ -68,10 +56,10 @@ instance ToAbstract Program A.Program where
 
     return $ A.Program defns decls globProps (pre ++ stmts) (locOf prog)
 
-instance ToAbstract (Either Declaration DefinitionBlock) ([A.Declaration], A.Definitions) where
+instance ToAbstract (Either Declaration DefinitionBlock) ([A.Declaration], [A.Definition]) where
   toAbstract (Left d) = do
     decls <- toAbstract d
-    return ([decls], mempty)
+    return ([decls], [])
   toAbstract (Right defnBlock) = do
     defns <- toAbstract defnBlock
     return ([], defns)
@@ -79,41 +67,22 @@ instance ToAbstract (Either Declaration DefinitionBlock) ([A.Declaration], A.Def
 --------------------------------------------------------------------------------
 -- | Definition
 
-instance ToAbstract DefinitionBlock A.Definitions where
-  toAbstract (DefinitionBlock _ decls _) = do
-    (typeDefns, (funcDefnSigs, funcDefns)) <-
-      second partitionEithers . partitionEithers <$> toAbstract decls
+instance ToAbstract DefinitionBlock [A.Definition] where
+  toAbstract (DefinitionBlock _ defns _) =
+    combineFuncDefns . concat <$> toAbstract defns
 
-    -- invariant: there should be only ONE TypeDefn of the same name
-    let defnTypes =
-          Map.fromList $ map (\x@(A.TypeDefn name _ _ _) -> (name, x)) typeDefns
-    -- invariant: there should be only ONE FuncDefnSig of the same name
-    let defnFuncSigs = Map.fromList $ map
-          (\x@(A.FuncDefnSig name _ _ _) -> (name, x))
-          (concat funcDefnSigs)
-
-
-    return $ A.Definitions { A.defnTypes    = defnTypes
-                           , A.defnFuncSigs = defnFuncSigs
-                           , A.defnFuncs    = collectFuncDefns funcDefns
-                           }
-
-instance ToAbstract Definition (Either A.TypeDefn (Either [A.FuncDefnSig] A.FuncDefn)) where
+instance ToAbstract Definition [A.Definition] where
   toAbstract (TypeDefn tok name binders _ cons) = do
-    Left
+    (: [])
       <$> (A.TypeDefn name binders <$> toAbstract cons <*> pure (tok <--> cons))
   toAbstract (FuncDefnSig decl prop) = do
     (names, typ) <- toAbstract decl
-    Right
-      .   Left
-      <$> mapM
-            (\name -> A.FuncDefnSig name typ <$> toAbstract prop <*> pure
-              (decl <--> prop)
-            )
-            names
+    mapM
+      (\n -> A.FuncDefnSig n typ <$> toAbstract prop <*> pure (decl <--> prop))
+      names
   toAbstract (FuncDefn name args _ body) = do
     body' <- toAbstract body
-    return $ Right $ Right $ A.FuncDefn name [(args, body')] (name <--> body)
+    return [A.FuncDefn name [wrapLam args body']]
 
 instance ToAbstract TypeDefnCtor A.TypeDefnCtor where
   toAbstract (TypeDefnCtor c ts) = A.TypeDefnCtor c <$> toAbstract ts
