@@ -542,6 +542,7 @@ arithOpTypes (Disj     l) = tBool .-> tBool .-> tBool $ l
 arithOpTypes (DisjU    l) = tBool .-> tBool .-> tBool $ l
 arithOpTypes (Neg      l) = tBool .-> tBool $ l
 arithOpTypes (NegU     l) = tBool .-> tBool $ l
+arithOpTypes (NegNum l) = tInt .-> tInt $ l
 arithOpTypes (Add      l) = tInt .-> tInt .-> tInt $ l
 arithOpTypes (Sub      l) = tInt .-> tInt .-> tInt $ l
 arithOpTypes (Mul      l) = tInt .-> tInt .-> tInt $ l

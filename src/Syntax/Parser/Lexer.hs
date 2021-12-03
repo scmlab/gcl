@@ -300,6 +300,9 @@ lexNegF = Neg . locOf <$> symbol tokNeg
 lexNegUF :: LexerF ArithOp
 lexNegUF = NegU . locOf <$> symbol tokNegU
 
+lexNegNumF :: LexerF ArithOp
+lexNegNumF = NegNum . locOf <$> symbol tokSub
+
 lexAddF :: LexerF ArithOp
 lexAddF = Add . locOf <$> symbol tokAdd
 
@@ -434,6 +437,7 @@ lexTrueF = LitBool True . rangeOf <$> symbol tokTrue
 
 lexFalseF :: LexerF Lit
 lexFalseF = LitBool False . rangeOf <$> symbol tokFalse
+
 lexIntF :: LexerF Lit
 lexIntF = uncurry LitInt . second rangeOf <$> lexeme Lex.decimal
 
@@ -442,7 +446,8 @@ lexCharF = uncurry LitChar . second rangeOf <$> lexeme
   (char '\'' *> Lex.charLiteral <* char '\'')
 
 lexLitsF :: LexerF Lit
-lexLitsF = choice [lexTrueF, lexFalseF, lexIntF, lexCharF] <?> "literals"
+lexLitsF =
+  choice [lexTrueF, lexFalseF, lexIntF, lexCharF] <?> "literals"
 
 lexTypeIntF :: LexerF (Token tokTypeInt)
 lexTypeIntF = symbol tokTypeInt
