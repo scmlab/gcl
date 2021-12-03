@@ -4,14 +4,53 @@
 
 Prebuilt binaries should come with [the VS Code Extension](https://marketplace.visualstudio.com/items?itemName=scmlab.guacamole). There's no need of building this project from source unless you are using platforms other than *Windows*, *macOS*, or *Ubuntu*.
 
-### Update prebuilt binary
+## Commands
+
+<kbd>C-c</kbd> stands for "press <kbd>Ctrl</kbd> and <kbd>c</kbd> at the same time"
+
+| Command                                 |            Keymap             |
+| :-------------------------------------- | :---------------------------: |
+| resolve a Spec                          | <kbd>C-c</kbd> <kbd>C-r</kbd> |
+| restart the whole extension             | <kbd>C-x</kbd> <kbd>C-r</kbd> |
+
+
+## Unicode Input Method 
+
+Both pure ASCII characters like `->` and its corresponding Unicode symbol `→` are treated the same.
+
+To input a Unicode symbol, say `→`, press blackslash <kbd>\\</kbd> followed by <kbd>-></kbd> and then press either <kbd>enter</kbd>, <kbd>tab</kbd> or <kbd>space</kbd> to complete the input. Other input sequences like <kbd>\rightarrow</kbd> or <kbd>\r</kbd> both maps to `→` as <kbd>\-></kbd>. 
+
+Here's an exhaustive list of Uncode symbols and the corresponding input sequences:
+
+| Symbol | ASCII substitute | other sequences |
+| :----: | :--------------: | :---------------|
+| `→`    | <kbd>\\-></kbd>   |  <kbd>\\rightarrow</kbd> <kbd>\\r</kbd> |
+| `≠`    | <kbd>\\/=</kbd>   |  <kbd>\\neq</kbd> <kbd>\\!=</kbd> |
+| `≥`    | <kbd>\\>=</kbd>   |  <kbd>\\gt</kbd> <kbd>\\gte</kbd> |
+| `≤`    | <kbd>\\<=</kbd>   |  <kbd>\\lt</kbd> <kbd>\\lte</kbd> |
+| `⇒`    | <kbd>\\=></kbd>   |  <kbd>\\Rightarrow</kbd> <kbd>\\implies</kbd> <kbd>\\R</kbd> |
+| `∧`    | <kbd>\\&&</kbd>   |  <kbd>\\wedge</kbd> <kbd>\\and</kbd> |
+| `∨`    | <kbd>\\\|\|</kbd> |  <kbd>\\vee</kbd> <kbd>\\or</kbd> |
+| `¬`    | <kbd>\\~</kbd>    |  <kbd>\\neg</kbd> <kbd>\\-</kbd> |
+| `⟨`    | <kbd>\\\<\|</kbd> |  <kbd>\\langle</kbd> <kbd>\\<</kbd> |
+| `⟩`    | <kbd>\\\|\></kbd> |  <kbd>\\rangle</kbd> <kbd>\\></kbd> |
+| `↓`    | <kbd>\\min</kbd>  |  <kbd>\\downarrow</kbd> <kbd>\\d</kbd> |
+| `↑`    | <kbd>\\max</kbd>  |  <kbd>\\uparrow</kbd> <kbd>\\u</kbd> |
+| `Σ`    | <kbd>\\sum</kbd>  |  <kbd>\\Sigma</kbd> <kbd>\\sigma</kbd> <kbd>\\Gs</kbd> |
+| `∏`    | <kbd>\\product</kbd>   |  <kbd>\\Pi</kbd> <kbd>\\pi</kbd> <kbd>\\Gp</kbd> |
+| `∀`    | <kbd>\\forall</kbd>   |  <kbd>\\all</kbd> <kbd>\\A</kbd> |
+| `∃`    | <kbd>\\exists</kbd>   |  <kbd>\\ex</kbd> <kbd>\\E</kbd> |
+| `≡`    | <kbd>\\\<=\></kbd>   |  <kbd>\\equiv</kbd> <kbd>\\===</kbd> |
+ 
+  
+## Update prebuilt binary
 
 The VS Code extension will automatically download the latest prebuilt binary from GitHub when a new release is available. 
 However, the extension would only checkout the latest release once every 24hrs (to prevent GitHub from hating us).
 If you know there's a new release on GitHub and you can't wait that long, please execute `Guabao: Force check update` in the VS Code command palette.
 
-### Build from source
-
+  
+## Build from source
 
 1. If you have [`git`](https://git-scm.com/), please clone this repository from GitHub, and then checkout the latest [release](https://github.com/scmlab/gcl/releases) (e.g., `v0.0.17`): 
 ```shell
@@ -31,15 +70,6 @@ stack install
 This should install the program `gcl` in your PATH. 
 
 3. Download [VS Code](https://code.visualstudio.com/) and install this [extension](https://marketplace.visualstudio.com/items?itemName=scmlab.guacamole) from the marketplace, and you should see something when you open a file with `.gcl` file extension.
-
-## Commands
-
-<kbd>C-c</kbd> stands for "press <kbd>Ctrl</kbd> and <kbd>c</kbd> at the same time"
-
-| Command                                 |            Keymap             |
-| :-------------------------------------- | :---------------------------: |
-| resolve a Spec                          | <kbd>C-c</kbd> <kbd>C-r</kbd> |
-| restart the whole extension             | <kbd>C-x</kbd> <kbd>C-r</kbd> |
 
 
 ## Development 
