@@ -49,6 +49,7 @@ data ArithOp =
   | Neg Loc
   | NegU Loc
     -- arithmetics
+  | NegNum Loc
   | Add Loc
   | Sub Loc
   | Mul Loc
@@ -91,6 +92,7 @@ classifyArithOp (Conj     _) = InfixL 3
 classifyArithOp (ConjU    _) = InfixL 3
 classifyArithOp (Neg      _) = Prefix 6
 classifyArithOp (NegU     _) = Prefix 6
+classifyArithOp (NegNum   _) = Prefix 6
 classifyArithOp (Add      _) = InfixL 7
 classifyArithOp (Sub      _) = InfixL 7
 classifyArithOp (Mul      _) = InfixL 8
