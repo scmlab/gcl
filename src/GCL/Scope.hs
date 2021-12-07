@@ -4,10 +4,17 @@ module GCL.Scope where
 import           Syntax.Abstract
 import           Syntax.Abstract.Util
 import           Syntax.Common
-import           Server.TokenMap
+import           Server.TokenMap                ( Scope
+                                                , M
+                                                , TokenMap
+                                                , localScope
+                                                , lookupScopes
+                                                )
+import qualified Server.TokenMap               as TokenMap
 import           Control.Monad.Except
 import           Control.Monad.RWS
 import           Data.List
+import           Data.Loc.Range                 ( fromLoc )
 import           Data.Loc                       ( Loc
                                                 , (<-->)
                                                 , Located(locOf)
@@ -84,10 +91,10 @@ instance CollectIds Pattern where
   collectIds PattWildcard{}            = []
   collectIds (PattConstructor _ patts) = collectIds patts
 
-type ScopeM = M TypeInfo ()
+type ScopeM = M TypeInfo (Text, TypeInfo)
 type ScopeCheckM = ExceptT ScopeError ScopeM
 
-runScopeCheckM :: Program -> (Either ScopeError (), TokenMap ())
+runScopeCheckM :: Program -> (Either ScopeError (), TokenMap (Text, TypeInfo))
 runScopeCheckM prog =
   let (err, _, w) = runRWS (runExceptT . scopeCheck $ prog) [] () in (err, w)
 
@@ -103,7 +110,16 @@ duplicationCheck ns =
           $ DuplicatedIdentifiers (map (\(t, info) -> Name t (locOf info)) ds)
 
 generateScope :: Program -> ScopeCheckM (Scope TypeInfo)
-generateScope = duplicationCheck . collectIds
+generateScope prog = do
+  let ids = collectIds prog
+  s <- duplicationCheck ids
+  mapM_
+    (\(n, t) -> case fromLoc (locOf t) of
+      Nothing  -> return ()
+      Just rng -> tell $ TokenMap.singleton rng (n, t)
+    )
+    ids
+  return s
 
 class ScopeCheckable a where
     scopeCheck :: a -> ScopeCheckM ()
