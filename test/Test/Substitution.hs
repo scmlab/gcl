@@ -52,12 +52,13 @@ letBindings = testGroup
     runGoldenTest "./test/source/Substitution/" "./test/golden/Substitution/" ""
       $ \sourcePath source -> do
           return $ serializeTestResultValueOnly $ runTest sourcePath source $ do
-            parsed      <- parse source
-            converted   <- convert parsed
-            typeChecked <- typeCheck converted
-            result      <- sweep typeChecked
-            let scope =
-                  programToScopeForSubstitution (convertedProgram converted)
+            parsed       <- parse source
+            scopeChecked <- scopeCheck parsed
+            typeChecked  <- typeCheck scopeChecked
+            result       <- sweep typeChecked
+            let
+              scope =
+                programToScopeForSubstitution (scopeCheckedProgram scopeChecked)
             let treesFromRedexes = evalState
                   (mapM (fromRedex scope) (sweptRedexes result))
                   (sweptCounter result)

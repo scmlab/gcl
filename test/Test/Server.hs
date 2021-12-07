@@ -37,9 +37,9 @@ instantiateSpec = testGroup
     runGoldenTest "./test/source/Server/" "./test/golden/Server/" ""
       $ \sourcePath source -> do
           return $ serializeTestResult $ runTest sourcePath source $ do
-            parsed <- parse source
-            converted <- convert parsed
-            typeChecked <- typeCheck converted
+            parsed       <- parse source
+            scopeChecked <- scopeCheck parsed
+            typeChecked  <- typeCheck scopeChecked
             Right <$> sweep typeChecked
 
 
@@ -53,10 +53,10 @@ specPayloadWithoutIndentationTests = testGroup
     runGoldenTest "./test/source/Server/" "./test/golden/Server/" ""
       $ \sourcePath source -> do
           return $ serializeTestResult $ runTest sourcePath source $ do
-            parsed <- parse source
-            converted <- convert parsed
-            typeChecked <- typeCheck converted
-            result <- sweep typeChecked
+            parsed       <- parse source
+            scopeChecked <- scopeCheck parsed
+            typeChecked  <- typeCheck scopeChecked
+            result       <- sweep typeChecked
             let specs = sweptSpecs result
             return $ Right $ map
               ( map (\x -> "\"" <> x <> "\"")
@@ -71,9 +71,9 @@ refineSpecsTest = testGroup
   [ run "multiline, top-level"                  "spec-refine-1.gcl"
   , run "multiline, top-level, indented"        "spec-refine-2.gcl"
   , run "multiline, top-level, poorly indented" "spec-refine-3.gcl"
-  , run "multiline, 1 ? in IF, 1"                   "spec-refine-4.gcl"
-  , run "multiline, 2 ? in IF, 2"                   "spec-refine-5.gcl"
-  , run "multiline, 2 ? in IF, 3"                   "spec-refine-6.gcl"
+  , run "multiline, 1 ? in IF, 1"               "spec-refine-4.gcl"
+  , run "multiline, 2 ? in IF, 2"               "spec-refine-5.gcl"
+  , run "multiline, 2 ? in IF, 3"               "spec-refine-6.gcl"
   ]
  where
   run :: String -> FilePath -> TestTree
@@ -81,10 +81,10 @@ refineSpecsTest = testGroup
     runGoldenTest "./test/source/Server/" "./test/golden/Server/" ""
       $ \sourcePath source -> do
           return $ serializeTestResult $ runTest sourcePath source $ do
-            parsed <- parse source
-            converted <- convert parsed
-            typeChecked <- typeCheck converted
-            result <- sweep typeChecked
+            parsed       <- parse source
+            scopeChecked <- scopeCheck parsed
+            typeChecked  <- typeCheck scopeChecked
+            result       <- sweep typeChecked
             let specs = sweptSpecs result
             case listToMaybe specs of
               Just spec -> do

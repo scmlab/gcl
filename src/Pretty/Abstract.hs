@@ -122,6 +122,11 @@ instance PrettyPrec Redex where
   prettyPrec n (Rdx index expr) =
     "(" <> pretty index <> "," <+> prettyPrec n expr <> ")"
 
+instance Pretty Pattern where
+  pretty = prettyPrec 0
+
+instance PrettyPrec Pattern where
+  prettyPrec = fromRenderPrec
 
 --------------------------------------------------------------------------------
 

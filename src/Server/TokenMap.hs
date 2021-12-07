@@ -30,7 +30,7 @@ import           Data.Map                       ( Map )
 import qualified Data.Map                      as Map
 import           Data.Text                      ( Text )
 import           Prelude                 hiding ( lookup )
-import           Pretty
+import           Data.Text.Prettyprint.Doc
 
 
 --------------------------------------------------------------------------------

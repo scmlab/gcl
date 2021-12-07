@@ -48,11 +48,11 @@ handleRefine range = do
           let indentation =
                 Text.replicate (posCol (rangeStart (specRange spec)) - 1) " "
           in  Text.unlines $ x : map (indentation <>) xs
-  source'     <- editText (specRange spec) indentedPayload
-  parsed      <- parse source'
+  source'      <- editText (specRange spec) indentedPayload
+  parsed       <- parse source'
 
-  converted   <- convert parsed
-  typeChecked <- typeCheck converted
+  scopeChecked <- scopeCheck parsed
+  typeChecked  <- typeCheck scopeChecked
   mute False
   swept <- sweep typeChecked
 
@@ -60,11 +60,11 @@ handleRefine range = do
 
 handleInsertAnchor :: Text -> PipelineM [ResKind]
 handleInsertAnchor hash = do
-  -- mute the event listener before editing the source 
+  -- mute the event listener before editing the source
   mute True
-  -- template of proof to be appended to the source  
+  -- template of proof to be appended to the source
   let template = "{- #" <> hash <> "\n\n-}"
-  -- range for appending the template of proof 
+  -- range for appending the template of proof
   source        <- getSource
   (_, abstract) <- parseProgram source
   range         <- case fromLoc (locOf abstract) of
@@ -73,9 +73,9 @@ handleInsertAnchor hash = do
 
   source' <- editText (Range (rangeEnd range) (rangeEnd range))
                       ("\n\n" <> template)
-  parsed      <- parse source'
-  converted   <- convert parsed
-  typeChecked <- typeCheck converted
+  parsed       <- parse source'
+  scopeChecked <- scopeCheck parsed
+  typeChecked  <- typeCheck scopeChecked
   mute False
   swept <- sweep typeChecked
   generateResponseAndDiagnostics swept
@@ -84,14 +84,14 @@ handleSubst :: Int -> PipelineM [ResKind]
 handleSubst i = do
   stage <- load
   logText $ Text.pack $ "Substituting Redex " <> show i
-  -- 
+  --
   case stage of
-    Raw         _      -> return []
-    Parsed      _      -> return []
-    Converted   _      -> return []
-    TypeChecked _      -> return []
-    Swept       result -> do
-      let program = convertedProgram
+    Raw          _      -> return []
+    Parsed       _      -> return []
+    ScopeChecked _      -> return []
+    TypeChecked  _      -> return []
+    Swept        result -> do
+      let program = scopeCheckedProgram
             (typeCheckedPreviousStage (sweptPreviousStage result))
       case IntMap.lookup i (sweptRedexes result) of
         Nothing    -> return []
@@ -129,7 +129,7 @@ handler params responder = do
       responder $ CannotDecodeRequest $ show msg ++ "\n" ++ show params
     JSON.Success requests -> handleRequests requests
  where
-  -- make the type explicit to appease the type checker 
+  -- make the type explicit to appease the type checker
   handleRequests :: [Request] -> ServerM ()
   handleRequests = mapM_ handleRequest
 
@@ -141,4 +141,3 @@ handler params responder = do
       $ do
           logText $ "\n ---> Custom Reqeust: " <> Text.pack (show request)
           handleCustomMethod kind
-

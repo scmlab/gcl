@@ -3,7 +3,6 @@
 module Syntax.Abstract.Util where
 
 import           Data.Loc                       ( (<-->)
-                                                , Located(locOfList)
                                                 , locOf
                                                 , Loc(..)
                                                 )
@@ -12,6 +11,7 @@ import qualified Data.Map                      as Map
 import qualified Data.Maybe                    as Maybe
 import qualified Data.List                     as List
 import           Data.Text                      ( Text )
+import           Data.Bifunctor                 ( second )
 import           Syntax.Abstract
 import           Syntax.Common                  ( Name(..)
                                                 , nameToText
@@ -49,17 +49,22 @@ wrapLam (x : xs) body = let b = wrapLam xs body in Lam x b (x <--> b)
 -- constant/variable declaration => Nothing
 
 -- TODO:
---programToScopeForSubstitution :: Program -> Map Text (Maybe Expr)
---programToScopeForSubstitution (Program defns decls _ _ _) =
-  --Map.mapKeys nameToText $ foldMap extractDeclaration decls <> Map.map
-    --Maybe.listToMaybe
-    --(defnFuncs defns)
- --where
-  --extractDeclaration :: Declaration -> Map Name (Maybe Expr)
-  --extractDeclaration (ConstDecl names _ _ _) =
-    --Map.fromList (zip names (repeat Nothing))
-  --extractDeclaration (VarDecl names _ _ _) =
-    --Map.fromList (zip names (repeat Nothing))
+programToScopeForSubstitution :: Program -> Map Text (Maybe Expr)
+programToScopeForSubstitution (Program defns decls _ _ _) =
+  Map.mapKeys nameToText
+    $  foldMap extractDeclaration decls
+    <> ( Map.fromList
+       . map (second Maybe.listToMaybe)
+       . Maybe.mapMaybe pickFuncDefn
+       )
+         defns
+
+ where
+  extractDeclaration :: Declaration -> Map Name (Maybe Expr)
+  extractDeclaration (ConstDecl names _ _ _) =
+    Map.fromList (zip names (repeat Nothing))
+  extractDeclaration (VarDecl names _ _ _) =
+    Map.fromList (zip names (repeat Nothing))
 
 pickFuncDefn :: Definition -> Maybe (Name, [Expr])
 pickFuncDefn (FuncDefn n es) = Just (n, es)

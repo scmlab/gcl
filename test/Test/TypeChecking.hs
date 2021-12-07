@@ -431,9 +431,9 @@ blockDeclarationCheck t1 t2 = toText wrap @?= t2
  where
   wrap = do
     defns <- runParser pDefinitionBlock t1
-    let decls =
-          foldMap A.funcDefnSigsToConstDecl (defnFuncSigs defns)
-            <> foldMap A.typeDefnCtorsToConstDecl (defnTypes defns)
+    let decls = mempty
+          --foldMap A.funcDefnSigsToConstDecl (defnFuncSigs defns)
+            -- <> foldMap A.typeDefnCtorsToConstDecl (defnTypes defns)
     return $ check (\_ decls' -> defnsAndDeclsToEnv defns decls') mempty decls
 
 programCheck :: Text -> Assertion

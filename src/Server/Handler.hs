@@ -45,21 +45,21 @@ handlers = mconcat
         then return []
         else do
           logText "\n ---> TextDocumentDidChange"
-          source      <- getSource
-          parsed      <- parse source
-          converted   <- convert parsed
-          typeChecked <- typeCheck converted
-          swept       <- sweep typeChecked
+          source       <- getSource
+          parsed       <- parse source
+          scopeChecked <- scopeCheck parsed
+          typeChecked  <- typeCheck scopeChecked
+          swept        <- sweep typeChecked
           generateResponseAndDiagnostics swept
   , notificationHandler J.STextDocumentDidOpen $ \ntf -> do
     let uri    = ntf ^. (J.params . J.textDocument . J.uri)
     let source = ntf ^. (J.params . J.textDocument . J.text)
     interpret uri (customRequestToNotification uri) $ do
       logText "\n ---> TextDocumentDidOpen"
-      parsed      <- parse source
-      converted   <- convert parsed
-      typeChecked <- typeCheck converted
-      swept       <- sweep typeChecked
+      parsed       <- parse source
+      scopeChecked <- scopeCheck parsed
+      typeChecked  <- typeCheck scopeChecked
+      swept        <- sweep typeChecked
       generateResponseAndDiagnostics swept
   , -- Goto Definition
     requestHandler J.STextDocumentDefinition $ \req responder -> do
@@ -83,12 +83,12 @@ handlers = mconcat
         highlightings = case stage of
           Raw    _      -> []
           Parsed result -> parsedHighlighings result
-          Converted result ->
-            parsedHighlighings (convertedPreviousStage result)
+          ScopeChecked result ->
+            parsedHighlighings (scopeCheckedPreviousStage result)
           TypeChecked result -> parsedHighlighings
-            (convertedPreviousStage (typeCheckedPreviousStage result))
+            (scopeCheckedPreviousStage (typeCheckedPreviousStage result))
           Swept result -> parsedHighlighings
-            (convertedPreviousStage
+            (scopeCheckedPreviousStage
               (typeCheckedPreviousStage (sweptPreviousStage result))
             )
       let tokens = J.makeSemanticTokens legend highlightings

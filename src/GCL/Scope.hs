@@ -6,6 +6,7 @@ import           Syntax.Abstract.Util
 import           Syntax.Common
 import           Server.TokenMap
 import           Control.Monad.Except
+import           Control.Monad.RWS
 import           Data.List
 import           Data.Loc                       ( Loc
                                                 , (<-->)
@@ -18,10 +19,17 @@ import           Data.Text                      ( Text )
 data ScopeError =
     NotInScope Name
     | DuplicatedIdentifiers [Name]
-    | ExcessiveNames [Name]
-    | ExcessivePatterns [Pattern]
-    | ExcessiveExprs [Expr]
+    | RedundantNames [Name]
+    | RedundantPatterns [Pattern]
+    | RedundantExprs [Expr]
     deriving (Show, Eq)
+
+instance Located ScopeError where
+  locOf (NotInScope            n    ) = locOf n
+  locOf (DuplicatedIdentifiers ns   ) = locOf ns
+  locOf (RedundantNames        ns   ) = locOf ns
+  locOf (RedundantPatterns     patts) = locOf patts
+  locOf (RedundantExprs        exprs) = locOf exprs
 
 data TypeInfo =
     TypeDefnInfo [Name] Loc
@@ -79,8 +87,9 @@ instance CollectIds Pattern where
 type ScopeM = M TypeInfo ()
 type ScopeCheckM = ExceptT ScopeError ScopeM
 
-runScopeCheckM :: Program -> Either ScopeError (TokenMap ())
-runScopeCheckM prog = let m = runExceptT . scopeCheck $ prog in _
+runScopeCheckM :: Program -> (Either ScopeError (), TokenMap ())
+runScopeCheckM prog =
+  let (err, _, w) = runRWS (runExceptT . scopeCheck $ prog) [] () in (err, w)
 
 dups :: Eq a => [a] -> [a]
 dups = map head . filter ((> 1) . length) . group
@@ -116,8 +125,8 @@ instance ScopeCheckable Stmt where
     scopeCheck es
     let an = length (zip ns es)
     if
-      | an < length ns -> throwError . ExcessiveNames $ ns
-      | an < length es -> throwError . ExcessiveExprs $ es
+      | an < length ns -> throwError . RedundantNames $ ns
+      | an < length es -> throwError . RedundantExprs $ es
       | otherwise      -> return ()
   scopeCheck (AAssign e1 e2 e3 _) =
     scopeCheck e1 >> scopeCheck e2 >> scopeCheck e3
@@ -206,9 +215,9 @@ instance ScopeCheckable Pattern where
         let an = length (zip args patts)
         if
           | an < length args
-          -> throwError . ExcessiveNames . drop an $ args
+          -> throwError . RedundantNames . drop an $ args
           | an < length patts
-          -> throwError . ExcessivePatterns . drop an $ patts
+          -> throwError . RedundantPatterns . drop an $ patts
           | otherwise
           -> scopeCheck patts
       _ -> throwError $ NotInScope n

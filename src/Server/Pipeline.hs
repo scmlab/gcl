@@ -21,6 +21,7 @@ import           Error
 import           GCL.Predicate
 import           GCL.Predicate.Util             ( specPayloadWithoutIndentation
                                                 )
+import qualified GCL.Scope                     as ScopeChecking
 import qualified GCL.Type                      as TypeChecking
 import qualified GCL.WP                        as WP
 import           GCL.WP.Type                    ( StructWarning )
@@ -48,7 +49,7 @@ import           Syntax.Parser                  ( Parser
                                                 )
 
 --------------------------------------------------------------------------------
--- | Stages of the processing pipeline 
+-- | Stages of the processing pipeline
 --
 --                      ┌───────────────────┐
 --                      │        Raw        │ : Text
@@ -65,7 +66,7 @@ import           Syntax.Parser                  ( Parser
 --                                │
 --                                ▼
 --                      ┌───────────────────┐
---                      │     Converted     │ : Abstract Syntax
+--                      │   ScopeChecked    │ : Abstract Syntax
 --                      └───────────────────┘   Scoping info
 --                                │
 --           type error  ◀────────┤ typeCheck
@@ -81,21 +82,21 @@ import           Syntax.Parser                  ( Parser
 --                      ┌───────────────────┐
 --                      │       Swept       │ : POs & whatnots
 --                      └───────────────────┘
--- 
+--
 data Stage = Raw FilePath
            | Parsed ParseResult
-           | Converted ConvertResult
+           | ScopeChecked ScopeCheckResult
            | TypeChecked TypeCheckResult
            | Swept SweepResult
            deriving (Show, Eq)
 
 instance Pretty Stage where
   pretty stage = case stage of
-    Raw         filepath -> "Raw " <> pretty filepath
-    Parsed      _result  -> "Parsed"
-    Converted   _result  -> "Converted"
-    TypeChecked _result  -> "TypeChecked"
-    Swept       result   -> pretty result
+    Raw          filepath -> "Raw " <> pretty filepath
+    Parsed       _result  -> "Parsed"
+    ScopeChecked _result  -> "ScopeChecked"
+    TypeChecked  _result  -> "TypeChecked"
+    Swept        result   -> pretty result
 
 instance Pretty SweepResult where
   pretty result =
@@ -118,7 +119,7 @@ data ParseResult = ParseResult
   deriving (Show, Eq)
 
 -- | Converts raw Text to concrete syntax and Highlighting info
---   persists the result 
+--   persists the result
 parse :: Text -> PipelineM ParseResult
 parse source = do
   program <- parseWithParser pProgram source
@@ -130,41 +131,45 @@ parse source = do
 
 --------------------------------------------------------------------------------
 
-data ConvertResult = ConvertResult
-  { convertedPreviousStage :: ParseResult
-  , convertedProgram       :: A.Program -- abstract syntax
-  , convertedTokenMap      :: TokenMap J.LocationLink -- scoping info
+data ScopeCheckResult = ScopeCheckResult
+  { scopeCheckedPreviousStage :: ParseResult
+  , scopeCheckedProgram       :: A.Program -- abstract syntax
+  , scopeCheckedTokenMap      :: TokenMap J.LocationLink -- scoping info
   }
   deriving (Show, Eq)
 
 -- | Converts concrete syntax to abstract syntax and scoping info
 --   persists the result
-convert :: ParseResult -> PipelineM ConvertResult
-convert result = do
-  converted <- case runExcept (toAbstract (parsedProgram result)) of
+scopeCheck :: ParseResult -> PipelineM ScopeCheckResult
+scopeCheck result = do
+  scopeChecked <- case runExcept (toAbstract (parsedProgram result)) of
     Left (Range start end) -> -- should dig hole!
-      digHole (Range start end) >>= parse >>= convert
-    Right program -> return $ ConvertResult
-      { convertedPreviousStage = result
-      , convertedProgram       = program
-      , convertedTokenMap      = collectLocationLinks program
-      }
-  save (Converted converted) -- save the current progress
-  return converted
+      digHole (Range start end) >>= parse >>= scopeCheck
+    Right program -> do
+      let (scopeCheckedErr, _) = ScopeChecking.runScopeCheckM program
+      case scopeCheckedErr of
+        Left  err -> throwError [ScopeError err]
+        Right _   -> return $ ScopeCheckResult
+          { scopeCheckedPreviousStage = result
+          , scopeCheckedProgram       = program
+          , scopeCheckedTokenMap      = collectLocationLinks program
+          }
+  save (ScopeChecked scopeChecked) -- save the current progress
+  return scopeChecked
 
 --------------------------------------------------------------------------------
 
 data TypeCheckResult = TypeCheckResult
-  { typeCheckedPreviousStage :: ConvertResult
-  , typeCheckedTokenMap      :: TokenMap (J.Hover, Type) -- type checking info 
+  { typeCheckedPreviousStage :: ScopeCheckResult
+  , typeCheckedTokenMap      :: TokenMap (J.Hover, Type) -- type checking info
   }
   deriving (Show, Eq)
 
 -- | Converts concrete syntax to abstract syntax and scoping info
 --   persists the result
-typeCheck :: ConvertResult -> PipelineM TypeCheckResult
+typeCheck :: ScopeCheckResult -> PipelineM TypeCheckResult
 typeCheck result = do
-  let program = convertedProgram result
+  let program = scopeCheckedProgram result
 
   case TypeChecking.runTM (TypeChecking.checkProgram program) of
     Left  e -> throwError [TypeError e]
@@ -186,7 +191,7 @@ data SweepResult = SweepResult
   , sweptSpecs         :: [Spec]
     -- Global properties
   , sweptProps         :: [A.Expr]
-    -- Warnings 
+    -- Warnings
   , sweptWarnings      :: [StructWarning]
     -- Redexes waiting to be reduce by the client on demand
   , sweptRedexes       :: IntMap A.Redex
@@ -200,7 +205,7 @@ data SweepResult = SweepResult
 sweep :: TypeCheckResult -> PipelineM SweepResult
 sweep result = do
   let abstract@(A.Program _ _ globalProps _ _) =
-        convertedProgram (typeCheckedPreviousStage result)
+        scopeCheckedProgram (typeCheckedPreviousStage result)
   swept <- case WP.sweep abstract of
     Left  e -> throwError [StructError e]
     Right (pos, specs, warings, redexes, counter) -> return $ SweepResult
@@ -216,7 +221,7 @@ sweep result = do
   return swept
 
 --------------------------------------------------------------------------------
--- | Monad for handling the pipeline 
+-- | Monad for handling the pipeline
 --
 --  Side effects:
 --    Reader: FilePath
@@ -225,8 +230,8 @@ sweep result = do
 --
 --  Also, PipelineM is also a free monad of Instruction
 --  which allows us to "compile" a PipelineM program into a series of Instructions
---  We can then decide to run these compiled Instructions in the real world 
---                     or simulate them for testing 
+--  We can then decide to run these compiled Instructions in the real world
+--                     or simulate them for testing
 
 type PipelineM
   = FreeT Instruction (RWST FilePath () PipelineState (Except [Error]))
@@ -241,12 +246,12 @@ runPipelineM
 runPipelineM filepath st p = runExcept (runRWST (runFreeT p) filepath st)
 
 --------------------------------------------------------------------------------
--- | The State 
+-- | The State
 
 data PipelineState = PipelineState
   { pipelineErrors         :: [Error]
   , pipelineStage          :: Stage
-  , pipelineMute           :: Bool   -- state for indicating whether we should ignore events like `STextDocumentDidChange` 
+  , pipelineMute           :: Bool   -- state for indicating whether we should ignore events like `STextDocumentDidChange`
   , pipelineMouseSelection :: Maybe Range -- text selections (including cursor position)
   , pipelineCounter        :: Int -- counter for generating different IDs for Responses
   }
@@ -257,12 +262,12 @@ data PipelineState = PipelineState
 
 data Instruction next
   = EditText
-      Range -- ^ Range to replace 
-      Text -- ^ Text to replace with 
+      Range -- ^ Range to replace
+      Text -- ^ Text to replace with
       (Text -> next) -- ^ Continuation with the text of the whole file after the edit
   | GetSource (Text -> next) -- ^ Read the content of a file from the LSP filesystem
   | Log Text next -- ^ Make some noise
-  | SendDiagnostics [J.Diagnostic] next -- ^ Send Diagnostics 
+  | SendDiagnostics [J.Diagnostic] next -- ^ Send Diagnostics
   deriving (Functor)
 
 initState :: FilePath -> PipelineState
@@ -283,7 +288,7 @@ editText range inserted = do
   case (Text.null replaced, Text.null inserted) of
     -- no-op
     (True, True) -> return ()
-    -- deletion 
+    -- deletion
     (True, False) ->
       logText
         $  "      [ edit ] Delete "
@@ -291,7 +296,7 @@ editText range inserted = do
         <> " \""
         <> replaced
         <> "\""
-    -- insertion 
+    -- insertion
     (False, True) ->
       logText
         $  "      [ edit ] Insert "
@@ -299,7 +304,7 @@ editText range inserted = do
         <> " \""
         <> inserted
         <> "\""
-    -- replacement 
+    -- replacement
     (False, False) ->
       logText
         $  "      [ edit ] Replace "
@@ -322,11 +327,11 @@ load :: PipelineM Stage
 load = do
   stage <- gets pipelineStage
   case stage of
-    Raw         _ -> logText "      [ load ] from Raw"
-    Parsed      _ -> logText "      [ load ] from Parsed"
-    Converted   _ -> logText "      [ load ] from Converted"
-    TypeChecked _ -> logText "      [ load ] from TypeChecked"
-    Swept       _ -> logText "      [ load ] from Swept"
+    Raw          _ -> logText "      [ load ] from Raw"
+    Parsed       _ -> logText "      [ load ] from Parsed"
+    ScopeChecked _ -> logText "      [ load ] from ScopeChecked"
+    TypeChecked  _ -> logText "      [ load ] from TypeChecked"
+    Swept        _ -> logText "      [ load ] from Swept"
   return stage
 
 getErrors :: PipelineM [Error]
@@ -347,11 +352,11 @@ setErrors e = modify' $ \state -> state { pipelineErrors = e }
 save :: Stage -> PipelineM ()
 save stage = do
   case stage of
-    Raw         _ -> logText "      [ save ] Raw"
-    Parsed      _ -> logText "      [ save ] Parsed"
-    Converted   _ -> logText "      [ save ] Converted"
-    TypeChecked _ -> logText "      [ save ] TypeChecked"
-    Swept       _ -> logText "      [ save ] Swept"
+    Raw          _ -> logText "      [ save ] Raw"
+    Parsed       _ -> logText "      [ save ] Parsed"
+    ScopeChecked _ -> logText "      [ save ] ScopeChecked"
+    TypeChecked  _ -> logText "      [ save ] TypeChecked"
+    Swept        _ -> logText "      [ save ] Swept"
   modify' $ \state -> state { pipelineErrors = [], pipelineStage = stage }
 
 setLastSelection :: Range -> PipelineM ()
@@ -416,7 +421,7 @@ refine source range = do
   findPointedSpec :: PipelineM (Maybe Spec)
   findPointedSpec = do
     parsed      <- parse source
-    converted   <- convert parsed
+    converted   <- scopeCheck parsed
     typeChecked <- typeCheck converted
     swept       <- sweep typeChecked
     let specs = sweptSpecs swept

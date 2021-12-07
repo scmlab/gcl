@@ -45,7 +45,7 @@ annotateType node t = case fromLoc (locOf node) of
 
 --------------------------------------------------------------------------------
 
--- | Extracts Scopes from a Program 
+-- | Extracts Scopes from a Program
 programToScopes :: Program -> [Scope Type]
 programToScopes (Program defns decls _ _ _) = [topLevelScope]
  where
@@ -75,18 +75,19 @@ instance Collect Type (J.Hover, Type) Program where
 
 --------------------------------------------------------------------------------
 -- Definition
-
-instance Collect Type (J.Hover, Type) Definitions where
-  collect defns = do
-    -- collect (defnTypes defns)
-    collect (defnFuncSigs defns)
-    collect (defnFuncs defns)
-
-instance Collect Type (J.Hover, Type) FuncDefnSig where
-  collect (FuncDefnSig _name t prop _) = do
+instance Collect Type (J.Hover, Type) Definition where
+  collect (TypeDefn    _ _ ctors _) = collect ctors
+  collect (FuncDefnSig _ t prop  _) = do
     collect t
     collect prop
+  collect (FuncDefn n exprs) = do
+    collect n
+    collect exprs
 
+instance Collect Type (J.Hover, Type) TypeDefnCtor where
+  collect (TypeDefnCtor n ts) = do
+    collect n
+    collect ts
 --------------------------------------------------------------------------------
 -- Declaration
 
@@ -132,11 +133,11 @@ instance Collect Type (J.Hover, Type) Expr where
     Lam _ b _              -> collect b
     Quant op _args _c _d _ -> do
       collect op
-      -- TODO: push local scope of `args` onto the stack 
+      -- TODO: push local scope of `args` onto the stack
       -- localScope args $ do
       --   collect c
       --   collect d
-    -- RedexStem/Redex will only appear in proof obligations, not in code 
+    -- RedexStem/Redex will only appear in proof obligations, not in code
     RedexStem{}  -> return ()
     Redex _      -> return ()
     ArrIdx e i _ -> do
@@ -146,7 +147,7 @@ instance Collect Type (J.Hover, Type) Expr where
       collect e
       collect i
       collect f
-    -- TODO: provide types for tokens in patterns 
+    -- TODO: provide types for tokens in patterns
     Case e _ _ -> do
       collect e
       -- collect patterns
@@ -172,7 +173,7 @@ instance Collect Type (J.Hover, Type) QuantOp' where
   collect (Right expr) = collect expr
 
 --------------------------------------------------------------------------------
--- | Types 
+-- | Types
 
 instance Collect Type (J.Hover, Type) Type where
   collect = \case

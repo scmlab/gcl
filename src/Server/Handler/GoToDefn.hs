@@ -12,7 +12,7 @@ import           Language.LSP.Types      hiding ( Range )
 import           Server.Monad
 import           Server.Pipeline
 import qualified Server.SrcLoc                 as SrcLoc
-import qualified Server.TokenMap as TokenMap
+import qualified Server.TokenMap               as TokenMap
 
 ignoreErrors :: ([Error], Maybe [LocationLink]) -> [LocationLink]
 ignoreErrors (_, Nothing) = []
@@ -31,15 +31,13 @@ handler uri position responder = do
         let pos   = SrcLoc.fromLSPPosition table filepath position
 
         stage <- load
-        let
-          tokenMap = case stage of
-            Raw       _       -> Nothing
-            Parsed    _result -> Nothing
-            Converted result  -> Just $ convertedTokenMap result
-            TypeChecked result ->
-              Just $ convertedTokenMap (typeCheckedPreviousStage result)
-            Swept result ->
-              Just $ convertedTokenMap
+        let tokenMap = case stage of
+              Raw          _       -> Nothing
+              Parsed       _result -> Nothing
+              ScopeChecked result  -> Just $ scopeCheckedTokenMap result
+              TypeChecked result ->
+                Just $ scopeCheckedTokenMap (typeCheckedPreviousStage result)
+              Swept result -> Just $ scopeCheckedTokenMap
                 (typeCheckedPreviousStage (sweptPreviousStage result))
 
         return $ maybeToList $ case tokenMap of
