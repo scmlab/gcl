@@ -133,7 +133,7 @@ handler params responder = do
   handleRequests :: [Request] -> ServerM ()
   handleRequests = mapM_ handleRequest
 
-  -- convert Request to Response
+  -- convert Request to Response and Diagnostics 
   handleRequest :: Request -> ServerM ()
   handleRequest request@(Req filepath kind) =
     interpret (J.filePathToUri filepath)

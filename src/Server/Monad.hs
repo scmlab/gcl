@@ -38,14 +38,14 @@ import qualified Language.LSP.VFS              as J
 import           Pretty                         ( toText )
 import           Render
 import           Server.CustomMethod
-import           Server.Pipeline                     ( Instruction(..)
+import           Server.Handler.Diagnostic      ( collect )
+import           Server.Pipeline                ( Instruction(..)
                                                 , PipelineM
                                                 , PipelineState(..)
                                                 , initState
                                                 , runPipelineM
                                                 )
-import qualified Server.Pipeline                    as DSL
-import           Server.Handler.Diagnostic      ( collect )
+import qualified Server.Pipeline               as DSL
 import qualified Server.SrcLoc                 as SrcLoc
 
 --------------------------------------------------------------------------------
@@ -82,7 +82,7 @@ executeOneStep filepath continuation p = do
       logText "      [ event ] unmute"
       let newState =
             oldState { pipelineErrors = errors -- update errors for later inspection 
-                                         , pipelineMute = False } -- unmute on error! 
+                                              , pipelineMute = False } -- unmute on error! 
       setState filepath newState
 
       continuation (errors, Nothing)
@@ -122,7 +122,7 @@ handleCommand filepath continuation = \case
     executeOneStep filepath continuation next
   SendDiagnostics diagnostics next -> do
     -- send diagnostics
-    sendDiagnostics filepath diagnostics
+    sendDiagnosticsLSP filepath diagnostics
     executeOneStep filepath continuation next
 
 --------------------------------------------------------------------------------
@@ -163,16 +163,14 @@ logText s = do
   liftIO $ writeChan chan s
 
 -- send diagnostics
-sendDiagnostics :: FilePath -> [J.Diagnostic] -> ServerM ()
-sendDiagnostics filepath diagnostics = do
+-- NOTE: existing diagnostics would be erased if `diagnostics` is empty
+sendDiagnosticsLSP :: FilePath -> [J.Diagnostic] -> ServerM ()
+sendDiagnosticsLSP filepath diagnostics = do
   version <- bumpVersion
-  -- only send diagnostics when it's not empty
-  -- otherwise the existing diagnostics would be erased 
-  unless (null diagnostics) $ do
-    J.publishDiagnostics 100
-                         (J.toNormalizedUri (J.filePathToUri filepath))
-                         (Just version)
-                         (J.partitionBySource diagnostics)
+  J.publishDiagnostics 100
+                       (J.toNormalizedUri (J.filePathToUri filepath))
+                       (Just version)
+                       (J.partitionBySource diagnostics)
 
 bumpVersion :: ServerM Int
 bumpVersion = do
@@ -196,8 +194,9 @@ getState filepath = do
 
 --------------------------------------------------------------------------------
 
-convertErrors :: FilePath -> [Error] -> ServerM [ResKind]
-convertErrors filepath errors = do
+convertErrorsToResponsesAndDiagnostics
+  :: [Error] -> ServerM ([ResKind], [J.Diagnostic])
+convertErrorsToResponsesAndDiagnostics errors = do
 
   -- convert [Error] to [ResKind]
   version <- bumpVersion
@@ -206,9 +205,8 @@ convertErrors filepath errors = do
 
   -- collect Diagnostics from [Error] 
   let diagnostics = errors >>= collect
-  sendDiagnostics filepath diagnostics
 
-  return responses
+  return (responses, diagnostics)
 
 -- when responding to CustomMethod requests
 -- ignore `result` when there's `error`
@@ -219,29 +217,52 @@ customRequestResponder
   -> ServerM ()
 customRequestResponder filepath responder (errors, result) = if null errors
   then do
-    let responses = Maybe.fromMaybe [] result
-    responder (Res filepath responses)
+    let responsesFromResult = Maybe.fromMaybe [] result
+
+    logText
+      $  "    < Notify with "
+      <> toText (length responsesFromResult)
+      <> " custom responses"
+
+    sendDiagnosticsLSP filepath []
+    responder (Res filepath responsesFromResult)
   else do
-    responsesFromError <- convertErrors filepath errors
+    (responsesFromError, diagnosticsFromError) <-
+      convertErrorsToResponsesAndDiagnostics errors
+
+    logText
+      $  "    < Notify "
+      <> toText (length errors)
+      <> " errors with "
+      <> toText (length responsesFromError)
+      <> " custom responses and "
+      <> toText (length diagnosticsFromError)
+      <> " diagnostics"
+
+    sendDiagnosticsLSP filepath diagnosticsFromError
     responder (Res filepath responsesFromError)
 
 -- when responding to events like `STextDocumentDidChange`
 -- combine both `result` AND `error`
-customRequestToNotification :: J.Uri -> ([Error], Maybe [ResKind]) -> ServerM ()
+customRequestToNotification
+  :: J.Uri -> ([Error], Maybe [ResKind]) -> ServerM ()
 customRequestToNotification uri (errors, result) = case J.uriToFilePath uri of
   Nothing       -> pure ()
   Just filepath -> do
-    responsesFromError <- convertErrors filepath errors
-    let responses = case result of
-          Nothing -> responsesFromError
-          Just xs -> responsesFromError <> xs
+    (responsesFromError, diagnosticsFromError) <-
+      convertErrorsToResponsesAndDiagnostics errors
+    let responsesFromResult = Maybe.fromMaybe [] result
+    let responses           = responsesFromError <> responsesFromResult
 
     logText
       $  "    < Respond with "
-      <> toText (length result)
-      <> " responses and "
-      <> toText (length errors)
-      <> " errors"
+      <> toText (length responses)
+      <> " custom responses and "
+      <> toText (length diagnosticsFromError)
+      <> " diagnostics"
+
+    -- send diagnostics 
+    sendDiagnosticsLSP filepath diagnosticsFromError
     -- send responses
     J.sendNotification (J.SCustomMethod "guabao") $ JSON.toJSON $ Res
       filepath
