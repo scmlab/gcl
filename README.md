@@ -1,4 +1,4 @@
-# Backend of Guabao
+# Guabao
 
 ## Installation
 
