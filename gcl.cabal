@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 71a9abed82b0aa08e34d88b69112d856de1581ce05e8253be46ddba95e22c2e0
+-- hash: 37a35ae2ba2029a8ab8a1adb6daa874e6b7a783814288e9e5245475266e6f9ee
 
 name:           gcl
 version:        0.1.0.0
@@ -35,6 +35,7 @@ library
       GCL.Scope
       GCL.Substitution
       GCL.Type
+      GCL.Type2
       GCL.WP
       GCL.WP.Type
       Pretty
@@ -179,6 +180,7 @@ test-suite gcl-test
       GCL.Scope
       GCL.Substitution
       GCL.Type
+      GCL.Type2
       GCL.WP
       GCL.WP.Type
       Pretty

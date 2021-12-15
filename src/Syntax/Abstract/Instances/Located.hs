@@ -15,7 +15,7 @@ instance Located Declaration where
 instance Located Definition where
   locOf (TypeDefn    _ _ _ r) = r
   locOf (FuncDefnSig _ _ _ r) = r
-  locOf (FuncDefn l r       ) = l <--> r
+  locOf (FuncDefn    l r) = l <--> r
 
 instance Located TypeDefnCtor where
   locOf (TypeDefnCtor l r) = l <--> r

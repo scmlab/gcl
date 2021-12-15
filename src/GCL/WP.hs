@@ -32,8 +32,11 @@ import           Data.Loc.Range                 ( Range
                                                 )
 import qualified Data.Map                      as Map
 import qualified Data.Text                     as Text
-import           GCL.Common                     ( Fresh(..)
+import           GCL.Common                     ( fresh
                                                 , freshName'
+                                                , freshWithLabel
+                                                , freshText
+                                                , FreshState
                                                 )
 import           GCL.Predicate                  ( InfMode(..)
                                                 , Origin(..)
@@ -70,10 +73,6 @@ type WP
       Int
       TM
 
-instance Fresh WP where
-  getCounter = get
-  setCounter = put
-
 runWP
   :: WP a
   -> Substitution.Scope
@@ -104,7 +103,7 @@ sweep program@(A.Program _ _ _props stmts _) = do
 
   return (pos', specs, warnings, redexes, counter)
 
--- ugly imports 
+-- ugly imports
 substitute
   :: ( Substitution.Substitutable a
      , Substitution.Reducible a
@@ -357,14 +356,16 @@ struct (inv, Nothing) (A.Do gcmds l) post = do
   let guards = A.getGuards gcmds
   tellPO (Conjunct (inv : map (Negate . guardLoop) guards)) post (AtLoop l)
   forM_ gcmds (structGdcmdInduct inv)
-struct _ (A.Proof _ _) _ = return ()
+struct _        (A.Proof _ _)     _    = return ()
 -- TODO:
-struct _ A.Block{}     _ = return ()
+struct _        A.Block{}         _    = return ()
 struct (pre, _) s@(A.Alloc _ _ l) post = tellPO' (AtAbort l) pre =<< wp s post
-struct (pre, _) s@(A.HLookup _ _ l) post = tellPO' (AtAbort l) pre =<< wp s post
-struct (pre, _) s@(A.HMutate _ _ l) post = tellPO' (AtAbort l) pre =<< wp s post
+struct (pre, _) s@(A.HLookup _ _ l) post =
+  tellPO' (AtAbort l) pre =<< wp s post
+struct (pre, _) s@(A.HMutate _ _ l) post =
+  tellPO' (AtAbort l) pre =<< wp s post
 struct (pre, _) s@(A.Dispose _ l) post = tellPO' (AtAbort l) pre =<< wp s post
-struct _ _             _ = error "missing case in struct"
+struct _        _                 _    = error "missing case in struct"
 
 structGdcmdInduct :: Pred -> A.GdCmd -> WP ()
 structGdcmdInduct inv (A.GdCmd guard body _) =
@@ -477,7 +478,7 @@ wp (A.Dispose e _) post = do
 wp A.Block{} post = return post
 wp _         _    = error "missing case in wp"
 
-allocated :: Fresh m => A.Expr -> m A.Expr
+allocated :: MonadState FreshState m => A.Expr -> m A.Expr
 allocated e = do
   v <- freshName' "new"
   return (A.exists [v] A.true (e `A.pointsTo` A.nameVar v))

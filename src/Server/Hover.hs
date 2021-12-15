@@ -8,6 +8,8 @@ module Server.Hover
   ) where
 
 import           Control.Monad.RWS
+import           Control.Monad.Except           ( runExcept )
+import           Control.Monad.State.Lazy
 import           Data.Loc                       ( Located
                                                 , locOf
                                                 )
@@ -16,6 +18,7 @@ import           Data.Map                       ( Map )
 import qualified Data.Map                      as Map
 import           Data.Text                      ( Text )
 import qualified GCL.Type                      as TypeChecking
+import qualified GCL.Scope                     as ScopeChecking
 import qualified Language.LSP.Types            as J
 import           Pretty                         ( Pretty(..)
                                                 , toText
@@ -47,14 +50,21 @@ annotateType node t = case fromLoc (locOf node) of
 
 -- | Extracts Scopes from a Program
 programToScopes :: Program -> [Scope Type]
-programToScopes (Program defns decls _ _ _) = [topLevelScope]
+programToScopes prog = [topLevelScope]
  where
   topLevelScope :: Map Text Type
   topLevelScope =
     -- run type checking to get the types of definitions/declarations
-    case TypeChecking.runTM (TypeChecking.defnsAndDeclsToEnv defns decls) of
+    case runExcept (evalStateT (TypeChecking.generateEnv prog) 0) of
       Left  _   -> Map.empty -- ignore type errors
-      Right env -> Map.mapKeys nameToText (TypeChecking.envLocalDefns env)
+      Right env -> Map.mapMaybe
+        (\case
+          ScopeChecking.TypeDefnCtorInfo t _ -> Just t
+          ScopeChecking.FuncDefnInfo _ mt _  -> mt
+          ScopeChecking.VarTypeInfo   t _    -> Just t
+          ScopeChecking.ConstTypeInfo t _    -> Just t
+        )
+        (snd env)
 
 --------------------------------------------------------------------------------
 -- Names

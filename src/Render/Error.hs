@@ -59,9 +59,9 @@ instance RenderSection Scope.ScopeError where
     ]
 
 instance RenderSection TypeError where
-  renderSection (NotInScope name loc) = Section
+  renderSection (NotInScope name) = Section
     Red
-    [ Header "Not In Scope" (fromLoc loc)
+    [ Header "Not In Scope" (fromLoc (locOf name))
     , Paragraph $ render name <+> "is not in scope"
     ]
   renderSection (UnifyFailed s t loc) = Section
@@ -74,54 +74,10 @@ instance RenderSection TypeError where
     [ Header "Recursive type variable" (fromLoc loc)
     , Paragraph $ render name <+> "is recursive in" <+> render t
     ]
-  renderSection (NotFunction t loc) = Section
+  renderSection (UndefinedType n) = Section
     Red
-    [ Header "Not a function" (fromLoc loc)
-    , Paragraph $ "The type" <+> render t <+> "is not a function type"
-    ]
-  renderSection (NotArray t loc) = Section
-    Red
-    [ Header "Not an array" (fromLoc loc)
-    , Paragraph $ "The type" <+> render t <+> "is not an array"
-    ]
-  renderSection (NotEnoughExprsInAssigment vars loc) = Section
-    Red
-    [ Header "Not Enough Expressions" (fromLoc loc)
-    , Paragraph
-    $   "Variables"
-    <+> renderManySepByComma (toList vars)
-    <+> "do not have corresponing expressions in the assigment"
-    ]
-  renderSection (TooManyExprsInAssigment exprs loc) = Section
-    Red
-    [ Header "Too Many Expressions" (fromLoc loc)
-    , Paragraph
-    $   "Expressions"
-    <+> renderManySepByComma (toList exprs)
-    <+> "do not have corresponing variables in the assigment"
-    ]
-  renderSection (AssignToConst n loc) = Section
-    Red
-    [ Header "Assginment to Constant Declaration" (fromLoc loc)
-    , Paragraph $ "Declaration" <+> render n <+> "is a constant, not a variable"
-    ]
-  renderSection (AssignToLet n loc) = Section
-    Red
-    [ Header "Assginment to Let Declaration" (fromLoc loc)
-    , Paragraph
-    $   "Declaration"
-    <+> render n
-    <+> "is a let binding, not a variable"
-    ]
-  renderSection (UndefinedType n loc) = Section
-    Red
-    [ Header "Undefined Type" (fromLoc loc)
+    [ Header "Undefined Type" (fromLoc (locOf n))
     , Paragraph $ "Type" <+> render n <+> "is undefined"
-    ]
-  renderSection (DuplicatedIdentifier n loc) = Section
-    Red
-    [ Header "Duplicated Identifier" (fromLoc loc)
-    , Paragraph $ "Identifier" <+> render n <+> "is duplicated"
     ]
 
 instance RenderSection StructError where

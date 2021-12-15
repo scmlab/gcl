@@ -23,7 +23,7 @@ import           Language.LSP.Types      hiding ( Range
                                                 , line
                                                 )
 import           Pretty
-import qualified Server.SrcLoc as SrcLoc
+import qualified Server.SrcLoc                 as SrcLoc
 
 instance Collect StructError Diagnostic where
   collect (MissingAssertion loc) = makeError
@@ -45,8 +45,8 @@ instance Collect Error Diagnostic where
   collect _                 = []
 
 instance Collect TypeError Diagnostic where
-  collect (NotInScope name loc) =
-    makeError loc "Not in scope"
+  collect (NotInScope name) =
+    makeError (locOf name) "Not in scope"
       $  docToText
       $  "The definition "
       <> pretty name
@@ -69,57 +69,12 @@ instance Collect TypeError Diagnostic where
       <>  "in type             :"
       <+> pretty t
 
-  collect (NotFunction t loc) =
-    makeError loc "Not a function"
+  collect (UndefinedType n) =
+    makeError (locOf n) "Undefined Type"
       $   docToText
-      $   "The type"
-      <+> pretty t
-      <+> "is not a function type"
-
-  collect (NotArray t loc) =
-    makeError loc "Not an array"
-      $   docToText
-      $   "The type"
-      <+> pretty t
-      <+> "is not an array type"
-
-  collect (NotEnoughExprsInAssigment names loc) =
-    makeError loc "Not Enough Expressions"
-      $   docToText
-      $   "Variables"
-      <+> prettyList (toList names)
-      <+> "do not have corresponing expressions in the assigment"
-
-  collect (TooManyExprsInAssigment exprs loc) =
-    makeError loc "Too Many Expressions"
-      $   docToText
-      $   "Expressions"
-      <+> prettyList (toList exprs)
-      <+> "do not have corresponing variables in the assigment"
-  collect (AssignToConst n loc) =
-    makeError loc "Assginment to Constant Declaration"
-      $   docToText
-      $   "Declaration"
-      <+> pretty n
-      <+> "is a constant, not a variable"
-  collect (AssignToLet n loc) =
-    makeError loc "Assginment to Let Declaration"
-      $   docToText
-      $   "Declaration"
-      <+> pretty n
-      <+> "is a let binding, not a variable"
-  collect (UndefinedType n loc) =
-    makeError loc "Undefined Type"
-      $ docToText
-      $ "Type"
+      $   "Type"
       <+> pretty n
       <+> "is undefined"
-  collect (DuplicatedIdentifier n loc) =
-    makeError loc "Duplicated Identifier"
-      $ docToText
-      $ "Identifier"
-      <+> pretty n
-      <+> "is duplicated"
 
 instance Collect StructWarning Diagnostic where
   collect (MissingBound range) = makeWarning

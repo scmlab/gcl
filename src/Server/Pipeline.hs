@@ -146,7 +146,7 @@ scopeCheck result = do
     Left (Range start end) -> -- should dig hole!
       digHole (Range start end) >>= parse >>= scopeCheck
     Right program -> do
-      let (scopeCheckedErr, _) = ScopeChecking.runScopeCheckM program
+      let scopeCheckedErr = ScopeChecking.runScopeCheckM program
       case scopeCheckedErr of
         Left  err -> throwError [ScopeError err]
         Right _   -> return $ ScopeCheckResult
@@ -171,7 +171,7 @@ typeCheck :: ScopeCheckResult -> PipelineM TypeCheckResult
 typeCheck result = do
   let program = scopeCheckedProgram result
 
-  case TypeChecking.runTM (TypeChecking.checkProgram program) of
+  case TypeChecking.runTypeCheck program of
     Left  e -> throwError [TypeError e]
     Right v -> return v
 

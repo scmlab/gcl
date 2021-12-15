@@ -5,7 +5,6 @@ module GCL.Common where
 
 import           Control.Monad.RWS              ( RWST(..) )
 import           Control.Monad.State            ( MonadState(get, put)
-                                                , State
                                                 , StateT(..)
                                                 )
 import           Data.Loc                       ( Loc(..) )
@@ -20,37 +19,27 @@ import qualified Data.Text                     as Text
 import qualified Syntax.Abstract               as A
 import           Syntax.Common.Types
 
--- Monad for generating fresh variables
-class Monad m => Fresh m where
-  -- minimum requirement:
-  getCounter :: m Int
-  setCounter :: Int -> m ()
-  -- get a fresh variable (and bump the counter)
-  fresh :: m Int
-  fresh = do
-    i <- getCounter
-    setCounter (succ i)
-    return i
+-- get a fresh variable (and bump the counter)
+fresh :: MonadState FreshState m => m FreshState
+fresh = do
+  i <- get
+  put (succ i)
+  return i
 
   -- get a fresh variable in the form of Text
-  freshText :: m Text
-  freshText =
-    (\i -> Text.pack ("?m_" ++ show i)) <$> fresh
+freshText :: MonadState FreshState m => m Text
+freshText = (\i -> Text.pack ("?m_" ++ show i)) <$> fresh
 
   -- a more fancy `freshText`
-  freshWithLabel :: Text -> m Text
-  freshWithLabel l =
-    (\i -> Text.pack ("?" ++ Text.unpack l ++ "_" ++ show i)) <$> fresh
+freshWithLabel :: MonadState FreshState m => Text -> m Text
+freshWithLabel l =
+  (\i -> Text.pack ("?" ++ Text.unpack l ++ "_" ++ show i)) <$> fresh
 
-freshName :: Fresh m => Text -> Loc -> m Name
+freshName :: MonadState FreshState m => Text -> Loc -> m Name
 freshName prefix l = Name <$> freshWithLabel prefix <*> pure l
 
-freshName' :: Fresh m => Text -> m Name
+freshName' :: MonadState FreshState m => Text -> m Name
 freshName' prefix = freshName prefix NoLoc
-
-instance Fresh (State Int) where
-  getCounter = get
-  setCounter = put
 
 type FreshState = Int
 
