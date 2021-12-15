@@ -343,16 +343,18 @@ instance TypeCheckable Program where
     local (bimap (Map.union (fst localEnv)) (Map.union (snd localEnv)))
           (typeCheck stmts)
 
+instance TypeCheckable Declaration where
+  typeCheck (ConstDecl _ _ mexpr _) = typeCheck mexpr
+  typeCheck (VarDecl   _ _ mexpr _) = typeCheck mexpr
+
 instance TypeCheckable Definition where
   typeCheck TypeDefn{}                = return ()
   typeCheck (FuncDefnSig n t mexpr _) = do
-    env <- ask
-    case Map.lookup (nameToText n) (snd env) of
-      Just (ConstTypeInfo nt _) -> void $ solveConstraints [(t, nt, locOf n)]
-      _                         -> throwError $ NotInScope n
+    checkIsType n t
     typeCheck mexpr
-  typeCheck (FuncDefn n exprs) = return ()
-
+  typeCheck (FuncDefn n exprs) = do
+    t <- infer n
+    mapM_ (`checkIsType` t) exprs
 
 instance TypeCheckable Stmt where
   typeCheck (Skip  _       ) = return ()
