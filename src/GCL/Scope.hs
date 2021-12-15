@@ -20,9 +20,7 @@ import           Data.Loc                       ( Loc
 import qualified Data.List                     as List
 import qualified Data.Map                      as Map
 import           Data.Text                      ( Text )
-import           Data.Bifunctor                 ( bimap
-                                                , first
-                                                )
+import           Data.Bifunctor                 ( bimap )
 
 
 data ScopeError =
@@ -42,7 +40,7 @@ instance Located ScopeError where
 
 data TypeInfo =
     TypeDefnCtorInfo Type Loc
-    | FuncDefnInfo [Expr] (Maybe Type) Loc
+    | FuncDefnInfo (Maybe Type) Loc
     | ConstTypeInfo Type Loc
     | VarTypeInfo Type Loc
     deriving (Eq, Show)
@@ -52,9 +50,9 @@ data TypeDefnInfo = TypeDefnInfo [Name] Loc
 
 instance Located TypeInfo where
   locOf (TypeDefnCtorInfo _ l) = l
-  locOf (FuncDefnInfo _ _ l  ) = l
-  locOf (ConstTypeInfo _ l   ) = l
-  locOf (VarTypeInfo   _ l   ) = l
+  locOf (FuncDefnInfo     _ l) = l
+  locOf (ConstTypeInfo    _ l) = l
+  locOf (VarTypeInfo      _ l) = l
 instance Located TypeDefnInfo where
   locOf (TypeDefnInfo _ l) = l
 
@@ -79,10 +77,8 @@ instance CollectIds Definition where
                   tys
             in  ([tdInfo], tysInfo)
 
-  collectIds (FuncDefnSig (Name n l) t _ _) =
-    ([], [(n, FuncDefnInfo [] (Just t) l)])
-  collectIds (FuncDefn (Name n l) exprs) =
-    ([], [(n, FuncDefnInfo exprs Nothing l)])
+  collectIds (FuncDefnSig (Name n l) t _ _) = ([], [(n, ConstTypeInfo t l)])
+  collectIds (FuncDefn (Name n l) _) = ([], [(n, FuncDefnInfo Nothing l)])
 
 instance CollectIds Declaration where
   collectIds (ConstDecl ns t _ _) =
@@ -101,8 +97,6 @@ instance CollectIds Pattern where
   collectIds PattWildcard{}            = ([], [])
   collectIds (PattConstructor _ patts) = collectIds patts
 
-type ScopeM a
-  = forall m . (MonadReader (Scope TypeDefnInfo, Scope TypeInfo) m) => m a
 type ScopeCheckM a
   =  forall m
    . ( MonadReader (Scope TypeDefnInfo, Scope TypeInfo) m
@@ -120,29 +114,31 @@ dups = map head . filter ((> 1) . length) . group
 duplicationCheck
   :: (Eq a, Located a, MonadError ScopeError m) => [(Text, a)] -> m [(Text, a)]
 duplicationCheck ns =
-  let ds = dups ns
-  in  if null ds
-        then return ns
-        else throwError
-          $ DuplicatedIdentifiers (map (\(t, info) -> Name t (locOf info)) ds)
+  let ds = dups . map (\(t, info) -> Name t (locOf info)) $ ns
+  in  if null ds then return ns else throwError $ DuplicatedIdentifiers ds
+
+typeInfoDuplicationCheck
+  :: MonadError ScopeError m => [(Text, TypeInfo)] -> m [(Text, TypeInfo)]
+typeInfoDuplicationCheck env = do
+  let (funcDefns, infos) = List.partition pickFuncDefns env
+  (<>) <$> duplicationCheck funcDefns <*> duplicationCheck infos
+ where
+  pickFuncDefns (_, FuncDefnInfo{}) = True
+  pickFuncDefns _                   = False
+
+combineTypeInfos :: [(Text, TypeInfo)] -> Scope TypeInfo
+combineTypeInfos = Map.fromListWith combine
+ where
+  combine FuncDefnInfo{} x = x
+  combine x FuncDefnInfo{} = x
+  combine _ _ = error "duplication shouldn't happened here"
 
 generateScope :: Program -> ScopeCheckM (Scope TypeDefnInfo, Scope TypeInfo)
 generateScope prog = do
   let (tids, ids) = collectIds prog
-
-
-  (s1, s2) <- (,) <$> duplicationCheck tids <*> duplicationCheck ids
-  --foldM (\env' (t, info) ->
-        --case info of
-            --_ -> _
-    --) mempty s
-  --mapM_
-    --(\(n, t) -> case fromLoc (locOf t) of
-      --Nothing  -> return ()
-      --Just rng -> tell $ TokenMap.singleton rng (n, t)
-    --)
-    --ids
-  return (Map.fromList s1, Map.fromList s2)
+  (,)
+    <$> (Map.fromList <$> duplicationCheck tids)
+    <*> (combineTypeInfos <$> typeInfoDuplicationCheck ids)
 
 class ScopeCheckable a where
     scopeCheck :: a -> ScopeCheckM ()

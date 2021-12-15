@@ -26,13 +26,13 @@ import           GCL.Scope                      ( TypeInfo(..)
                                                 , TypeDefnInfo(..)
                                                 , lookupFst
                                                 , collectIds
+                                                , combineTypeInfos
                                                 )
 import           Server.TokenMap                ( Scope )
 import           Prelude                 hiding ( EQ
                                                 , LT
                                                 , GT
                                                 )
-import           Debug.Trace
 
 data TypeError
     = NotInScope Name
@@ -71,12 +71,12 @@ class Located a => InferType a where
   inferType :: (Scope TypeDefnInfo, Scope TypeInfo) -> a -> TypeInferM Type
 
 runInferType
-  :: (MonadError TypeError m, InferType a)
+  :: (MonadError TypeError m, MonadState FreshState m, InferType a)
   => (Scope TypeDefnInfo, Scope TypeInfo)
   -> a
   -> m (Subs Type, Type)
 runInferType env x = do
-  (t, constraints) <- evalStateT (runWriterT (inferType env x)) 0
+  (t, constraints) <- runWriterT (inferType env x)
   s                <- solveConstraints constraints
   return (s, subst s t)
 
@@ -244,11 +244,11 @@ instance InferType ArithOp where
 
 instance InferType Name where
   inferType env n = case Map.lookup (nameToText n) (snd env) of
-    Just (TypeDefnCtorInfo t _) -> return t
-    Just (FuncDefnInfo _ mt _ ) -> return . fromJust $ mt
-    Just (ConstTypeInfo t _   ) -> return t
-    Just (VarTypeInfo   t _   ) -> return t
-    _                           -> throwError (NotInScope n)
+    Just (TypeDefnCtorInfo t  _) -> return t
+    Just (FuncDefnInfo     mt _) -> return . fromJust $ mt
+    Just (ConstTypeInfo    t  _) -> return t
+    Just (VarTypeInfo      t  _) -> return t
+    _                            -> throwError (NotInScope n)
 
 --------------------------------------------------------------------------------
 -- unification
@@ -312,26 +312,14 @@ generateEnv
 generateEnv prog = do
   let (tids, ids) = collectIds prog
   ids' <- mapM
-    (\(t, info) -> case info of
-      FuncDefnInfo exprs _ l -> do
+    (\info -> case info of
+      FuncDefnInfo _ l -> do
         v <- freshVar
-        return (t, FuncDefnInfo exprs (Just v) l)
-      _ -> return (t, info)
+        return (FuncDefnInfo (Just v) l)
+      _ -> return info
     )
-    ids
-  return (Map.fromList tids, Map.fromList ids')
-  --foldM
-    --(\env' (t, info) -> case info of
-      --FuncDefnInfo exprs _ l -> do
-        --(subs, mt) <- runInferType env' exprs
-        --return $ trace ("func defn " ++ show exprs) $ Map.insert
-          --t
-          --(FuncDefnInfo exprs (Just mt) l)
-          --env'
-      --_ -> return env'
-    --)
-    --(Map.fromList envList)
-    --envList
+    (combineTypeInfos ids)
+  return (Map.fromList tids, ids')
 
 infer :: InferType a => a -> TypeCheckM Type
 infer x = ask >>= fmap snd . (`runInferType` x)

@@ -59,10 +59,10 @@ programToScopes prog = [topLevelScope]
       Left  _   -> Map.empty -- ignore type errors
       Right env -> Map.mapMaybe
         (\case
-          ScopeChecking.TypeDefnCtorInfo t _ -> Just t
-          ScopeChecking.FuncDefnInfo _ mt _  -> mt
-          ScopeChecking.VarTypeInfo   t _    -> Just t
-          ScopeChecking.ConstTypeInfo t _    -> Just t
+          ScopeChecking.TypeDefnCtorInfo t  _ -> Just t
+          ScopeChecking.FuncDefnInfo     mt _ -> mt
+          ScopeChecking.VarTypeInfo      t  _ -> Just t
+          ScopeChecking.ConstTypeInfo    t  _ -> Just t
         )
         (snd env)
 

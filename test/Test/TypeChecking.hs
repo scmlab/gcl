@@ -373,9 +373,10 @@ check env' e =
     Right x   -> Right x
 
 inferCheck :: InferType a => Scope TypeInfo -> a -> Either [Error] Type
-inferCheck env' e = case runExcept (runInferType (mempty, env') e) of
-  Left  err -> Left [TypeError err]
-  Right x   -> Right (snd x)
+inferCheck env' e =
+  case runExcept (evalStateT (runInferType (mempty, env') e) 0) of
+    Left  err -> Left [TypeError err]
+    Right x   -> Right (snd x)
 
 exprCheck :: Text -> Text -> Assertion
 exprCheck t1 t2 = toText (runParser pExpr t1 >>= inferCheck env) @?= t2
@@ -439,14 +440,8 @@ instance Pretty TypeDefnInfo where
     "TypeDefnInfo " <> hsep (punctuate "," (map pretty ns))
 
 instance Pretty TypeInfo where
-  pretty (TypeDefnCtorInfo t _) = "TypeDefnCtorInfo " <> pretty t
-  pretty (FuncDefnInfo exprs Nothing _) =
-    "FuncDefnInfo " <> hsep (punctuate "," (map pretty exprs))
-  pretty (FuncDefnInfo exprs (Just t) _) =
-    "FuncDefnInfo "
-      <> hsep (punctuate "," (map pretty exprs))
-      <> " {"
-      <> pretty t
-      <> "}"
-  pretty (ConstTypeInfo t _) = "ConstTypeInfo " <> pretty t
-  pretty (VarTypeInfo   t _) = "VarTypeInfo " <> pretty t
+  pretty (TypeDefnCtorInfo t        _) = "TypeDefnCtorInfo " <> pretty t
+  pretty (FuncDefnInfo     Nothing  _) = "FuncDefnInfo {}"
+  pretty (FuncDefnInfo (Just t) _) = "FuncDefnInfo " <> " {" <> pretty t <> "}"
+  pretty (ConstTypeInfo    t        _) = "ConstTypeInfo " <> pretty t
+  pretty (VarTypeInfo      t        _) = "VarTypeInfo " <> pretty t
