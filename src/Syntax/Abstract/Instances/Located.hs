@@ -12,8 +12,8 @@ instance Located Declaration where
   locOf (ConstDecl _ _ _ l) = l
   locOf (VarDecl   _ _ _ l) = l
 
-instance Located FuncDefn where
-  locOf (FuncDefn _ _ l) = l
+instance Located FuncDefnClause where
+  locOf (FuncDefnClause _ _ _ l) = l
 
 instance Located TypeDefn where
   locOf (TypeDefn _ _ _ l) = l

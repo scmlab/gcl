@@ -81,7 +81,7 @@ instance ToAbstract (Either Declaration DefinitionBlock) ([A.Declaration], A.Def
 
 instance ToAbstract DefinitionBlock A.Definitions where
   toAbstract (DefinitionBlock _ decls _) = do
-    (typeDefns, (funcDefnSigs, funcDefns)) <-
+    (typeDefns, (funcDefnSigs, funcDefnClauses)) <-
       second partitionEithers . partitionEithers <$> toAbstract decls
 
     -- invariant: there should be only ONE TypeDefn of the same name
@@ -95,10 +95,10 @@ instance ToAbstract DefinitionBlock A.Definitions where
 
     return $ A.Definitions { A.defnTypes    = defnTypes
                            , A.defnFuncSigs = defnFuncSigs
-                           , A.defnFuncs    = collectFuncDefns funcDefns
+                           , A.defnFuncs    = mergeFuncDefnClauses funcDefnClauses
                            }
 
-instance ToAbstract Definition (Either A.TypeDefn (Either [A.FuncDefnSig] A.FuncDefn)) where
+instance ToAbstract Definition (Either A.TypeDefn (Either [A.FuncDefnSig] A.FuncDefnClause)) where
   toAbstract (TypeDefn tok name binders _ cons) = do
     Left
       <$> (A.TypeDefn name binders <$> toAbstract cons <*> pure (tok <--> cons))
@@ -113,7 +113,7 @@ instance ToAbstract Definition (Either A.TypeDefn (Either [A.FuncDefnSig] A.Func
             names
   toAbstract (FuncDefn name args _ body) = do
     body' <- toAbstract body
-    return $ Right $ Right $ A.FuncDefn name [(args, body')] (name <--> body)
+    return $ Right $ Right $ A.FuncDefnClause name args body' (name <--> body)
 
 instance ToAbstract TypeDefnCtor A.TypeDefnCtor where
   toAbstract (TypeDefnCtor c ts) = A.TypeDefnCtor c <$> toAbstract ts

@@ -48,11 +48,13 @@ instance Semigroup Definitions where
 instance Monoid Definitions where
   mempty = Definitions mempty mempty mempty
 
--- function definition
-data FuncDefn = FuncDefn
-  { funcName    :: Name
-  , funcClauses :: [([Name], Expr)]
-  , funcLoc     :: Loc
+-- one clause of function definition
+-- a complete function definition may have many clauses
+data FuncDefnClause = FuncDefnClause
+  { funcClauseName :: Name
+  , funcClauseArgs :: [Name]
+  , funcClauseBody :: Expr 
+  , funcClauseLoc  :: Loc
   }
   deriving (Eq, Show)
 

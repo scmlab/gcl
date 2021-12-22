@@ -3,9 +3,9 @@
 module Syntax.Abstract.Util where
 
 import           Data.Loc                       ( (<-->)
+                                                , Loc(..)
                                                 , Located(locOfList)
                                                 , locOf
-                                                , Loc(..)
                                                 )
 import           Data.Map                       ( Map )
 import qualified Data.Map                      as Map
@@ -60,9 +60,10 @@ programToScopeForSubstitution (Program defns decls _ _ _) =
   extractDeclaration (VarDecl names _ _ _) =
     Map.fromList (zip names (repeat Nothing))
 
-collectFuncDefns :: [FuncDefn] -> Map Name [Expr]
-collectFuncDefns = Map.fromListWith mergeFuncDefnsOfTheSameName
-  . map (\(FuncDefn name clauses _) -> (name, map (uncurry wrapLam) clauses))
+-- merge multiple FuncDefnClause into one
+mergeFuncDefnClauses :: [FuncDefnClause] -> Map Name [Expr]
+mergeFuncDefnClauses = Map.fromListWith mergeFuncDefnsOfTheSameName
+  . map (\(FuncDefnClause name args body _) -> (name, [wrapLam args body]))
  where
   mergeFuncDefnsOfTheSameName :: [Expr] -> [Expr] -> [Expr]
   mergeFuncDefnsOfTheSameName = (<>)
