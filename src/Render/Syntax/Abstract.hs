@@ -55,6 +55,8 @@ handleExpr n (App p q _) = do
 
 handleExpr n (Lam p q _) =
   return $ parensIf n 0 $ "λ" <+> render p <+> "→" <+> render q
+handleExpr _ (Tuple ps) =
+  return $ "(" <+> punctuateE "," (map render ps) <+> ")"
 handleExpr _ (Quant op xs r t _) =
   return
     $   "⟨"
@@ -154,6 +156,7 @@ instance Render Type where
   render (TBase TInt  _  ) = "Int"
   render (TBase TBool _  ) = "Bool"
   render (TBase TChar _  ) = "Char"
+  render (TTuple es      ) = "(" <+> punctuateE "," (map render es) <+> ")"
   render (TFunc  a b    _) = render a <+> "→" <+> render b
   render (TArray i b    _) = "array" <+> render i <+> "of" <+> render b
   render (TCon   n args _) = render n <+> horzE (map render args)

@@ -51,8 +51,9 @@ instance Located Interval where
 instance Located Type where
   locOf (TBase _ l   ) = l
   locOf (TArray _ _ l) = l
-  locOf (TFunc  _ _ l) = l
-  locOf (TCon   _ _ l) = locOf l
+  locOf (TTuple _    ) = NoLoc
+  locOf (TFunc _ _ l ) = l
+  locOf (TCon  _ _ l ) = locOf l
   locOf (TVar _ l    ) = l
   locOf (TMetaVar _  ) = NoLoc
 
@@ -63,6 +64,7 @@ instance Located Expr where
   locOf (Op op             ) = locOf op
   locOf (App _ _ l         ) = l
   locOf (Lam _ _ l         ) = l
+  locOf (Tuple _           ) = NoLoc
   locOf (Quant _ _ _ _ l   ) = l
   locOf (RedexStem es _ _ _) = locOf es
   locOf (Redex x           ) = locOf x

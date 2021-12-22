@@ -12,6 +12,8 @@ import           Control.Monad.State            ( StateT(..)
                                                 , evalStateT
                                                 )
 import           Data.Aeson                     ( ToJSON )
+import           Data.Functor
+import           Data.List
 import           Data.List.NonEmpty             ( NonEmpty )
 import qualified Data.List.NonEmpty            as NE
 import           Data.Loc
@@ -19,8 +21,6 @@ import           Data.Map                       ( Map )
 import qualified Data.Map                      as Map
 import qualified Data.Maybe                    as Maybe
 import qualified Data.Set                      as Set
-import           Data.Functor
-import           Data.List
 import           GCL.Common
 import           GHC.Generics                   ( Generic )
 import           Prelude                 hiding ( Ordering(..) )
@@ -152,6 +152,9 @@ infer (Lam x e l) = do
   v <- freshVar
   t <- inferInEnv [(x, v)] (infer e)
   return (TFunc v t l)
+infer (Tuple xs) = do
+  ts <- mapM infer xs
+  return (TTuple ts)
 infer (Quant qop iters rng t l) = do
   titers <- mapM (const freshVar) iters
   tr     <- inferInEnv [ (n, tn) | n <- iters, tn <- titers ] (infer rng)
@@ -283,6 +286,7 @@ checkType env (TArray (Interval e1 e2 _) t _) = do
  where
   getEndpointExpr (Including e) = e
   getEndpointExpr (Excluding e) = e
+checkType env (  TTuple ts    ) = mapM_ (checkType env) ts
 checkType env (  TFunc t1 t2 _) = checkType env t1 >> checkType env t2
 checkType env t@(TCon  n  _  _) = do
   maybe (throwError $ UndefinedType n (locOf t))
@@ -485,12 +489,13 @@ bind x t | occurs x t = throwError $ RecursiveType x t (locOf t)
 ------------------------------------------
 
 typeWithLoc :: Type -> Loc -> Type
-typeWithLoc (TBase t _     ) l = TBase t l
-typeWithLoc (TArray i  t  _) l = TArray i (typeWithLoc t l) l
-typeWithLoc (TCon   n  bs _) l = TCon n bs l
-typeWithLoc (TFunc  t1 t2 _) l = TFunc (typeWithLoc t1 l) (typeWithLoc t2 l) l
-typeWithLoc (TVar n _      ) l = TVar n l
-typeWithLoc (TMetaVar n    ) _ = TMetaVar n
+typeWithLoc (TBase t _    ) l = TBase t l
+typeWithLoc (TArray i t _ ) l = TArray i (typeWithLoc t l) l
+typeWithLoc (TTuple ts    ) _ = TTuple ts
+typeWithLoc (TCon  n  bs _) l = TCon n bs l
+typeWithLoc (TFunc t1 t2 _) l = TFunc (typeWithLoc t1 l) (typeWithLoc t2 l) l
+typeWithLoc (TVar n _     ) l = TVar n l
+typeWithLoc (TMetaVar n   ) _ = TMetaVar n
 
 litTypes :: Lit -> Loc -> Type
 litTypes (Num _) l = tInt l
@@ -542,7 +547,7 @@ arithOpTypes (Disj     l) = tBool .-> tBool .-> tBool $ l
 arithOpTypes (DisjU    l) = tBool .-> tBool .-> tBool $ l
 arithOpTypes (Neg      l) = tBool .-> tBool $ l
 arithOpTypes (NegU     l) = tBool .-> tBool $ l
-arithOpTypes (NegNum l) = tInt .-> tInt $ l
+arithOpTypes (NegNum   l) = tInt .-> tInt $ l
 arithOpTypes (Add      l) = tInt .-> tInt .-> tInt $ l
 arithOpTypes (Sub      l) = tInt .-> tInt .-> tInt $ l
 arithOpTypes (Mul      l) = tInt .-> tInt .-> tInt $ l

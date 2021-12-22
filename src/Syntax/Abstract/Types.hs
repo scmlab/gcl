@@ -120,6 +120,8 @@ data TBase = TInt | TBool | TChar
 data Type
   = TBase TBase Loc
   | TArray Interval Type Loc
+  -- TTuple has no srcloc info because it has no conrete syntax at the moment 
+  | TTuple [Type]
   | TFunc Type Type Loc
   | TCon Name [Name] Loc
   | TVar Name Loc
@@ -136,6 +138,8 @@ data Expr
   | Op Op
   | App Expr Expr Loc
   | Lam Name Expr Loc
+  -- Tuple has no srcloc info because it has no conrete syntax at the moment 
+  | Tuple [Expr]
   | Quant Expr [Name] Expr Expr Loc
   | RedexStem -- the inner part of a Redex `name [ v \ e ... ] [ v \ e ... ]`
     Name -- the name to be substituted

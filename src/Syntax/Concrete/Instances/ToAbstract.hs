@@ -216,8 +216,9 @@ instance ToAbstract Type A.Type where
       case t' of
         A.TBase a' _     -> pure $ A.TBase a' (locOf t)
         A.TArray a' b' _ -> pure $ A.TArray a' b' (locOf t)
-        A.TFunc  a' b' _ -> pure $ A.TFunc a' b' (locOf t)
-        A.TCon   a' b' _ -> pure $ A.TCon a' b' (locOf t)
+        A.TTuple as'     -> pure $ A.TTuple as'
+        A.TFunc a' b' _  -> pure $ A.TFunc a' b' (locOf t)
+        A.TCon  a' b' _  -> pure $ A.TCon a' b' (locOf t)
         A.TVar a' _      -> pure $ A.TVar a' (locOf t)
         A.TMetaVar a'    -> pure $ A.TMetaVar a'
 

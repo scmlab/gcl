@@ -314,6 +314,10 @@ instance Substitutable Expr where
         <$> subst (alphaRenameMapping <> shrinkedMapping) body
         <*> pure l
 
+
+
+    Tuple es                      -> Tuple <$> mapM (subst mapping) es
+    
 --
 --      ns                  ~~~rename~~>    ns'
 --      a                   ~[.../...]~>    a'

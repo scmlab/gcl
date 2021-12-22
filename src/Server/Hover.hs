@@ -128,8 +128,9 @@ instance Collect Type (J.Hover, Type) Expr where
     Var   a _              -> collect a
     Const a _              -> collect a
     Op op                  -> collect op
-    App a b _              -> (<>) <$> collect a <*> collect b
+    App a b _              -> collect a >> collect b
     Lam _ b _              -> collect b
+    Tuple as               -> mapM_ collect as
     Quant op _args _c _d _ -> do
       collect op
       -- TODO: push local scope of `args` onto the stack 
@@ -178,8 +179,9 @@ instance Collect Type (J.Hover, Type) Type where
   collect = \case
     TBase _ _    -> return ()
     TArray i x _ -> collect i >> collect x
-    TFunc  x y _ -> collect x >> collect y
-    TCon   x _ _ -> collect x
+    TTuple xs    -> mapM_ collect xs
+    TFunc x y _  -> collect x >> collect y
+    TCon  x _ _  -> collect x
     TVar _ _     -> return ()
     TMetaVar _   -> return ()
 

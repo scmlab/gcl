@@ -190,8 +190,9 @@ instance Collect LocationLinkToBe LocationLink Expr where
     Var   a _           -> collect a
     Const a _           -> collect a
     Op op               -> collect op
-    App a b _           -> (<>) <$> collect a <*> collect b
+    App a b _           -> collect a >> collect b
     Lam _ b _           -> collect b
+    Tuple as            -> mapM_ collect as
     Quant op args c d _ -> do
       collect op
       localScope (scopeFromLocalBinders args) $ do
@@ -234,8 +235,9 @@ instance Collect LocationLinkToBe LocationLink Type where
   collect = \case
     TBase _ _    -> return ()
     TArray i x _ -> collect i >> collect x
-    TFunc  x y _ -> collect x >> collect y
-    TCon   x _ _ -> collect x
+    TTuple as    -> mapM_ collect as
+    TFunc x y _  -> collect x >> collect y
+    TCon  x _ _  -> collect x
     TVar _ _     -> return ()
     TMetaVar _   -> return ()
 

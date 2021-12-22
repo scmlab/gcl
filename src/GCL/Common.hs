@@ -81,12 +81,13 @@ instance Free a => Free [a] where
   fv l = foldMap fv l
 
 instance Free A.Type where
-  fv (A.TBase _ _     ) = mempty
-  fv (A.TArray _  t  _) = fv t
-  fv (A.TFunc  t1 t2 _) = fv t1 <> fv t2
-  fv (A.TCon   _  ns _) = Set.fromList ns
-  fv (A.TVar x _      ) = Set.singleton x
-  fv (A.TMetaVar n    ) = Set.singleton n
+  fv (A.TBase _ _    ) = mempty
+  fv (A.TArray _ t _ ) = fv t
+  fv (A.TTuple ts    ) = Set.unions (map fv ts)
+  fv (A.TFunc t1 t2 _) = fv t1 <> fv t2
+  fv (A.TCon  _  ns _) = Set.fromList ns
+  fv (A.TVar x _     ) = Set.singleton x
+  fv (A.TMetaVar n   ) = Set.singleton n
 
 instance Free A.Expr where
   fv (A.Var   x _  ) = Set.singleton x
@@ -95,6 +96,7 @@ instance Free A.Expr where
   fv (A.Lit _ _    ) = mempty
   fv (A.App e1 e2 _) = fv e1 <> fv e2
   fv (A.Lam x  e  _) = fv e \\ Set.singleton x
+  fv (A.Tuple xs   ) = Set.unions (map fv xs)
   fv (A.Quant op xs range term _) =
     (fv op <> fv range <> fv term) \\ Set.fromList xs
   fv (A.RedexStem _ _ freeVars _) = freeVars
@@ -122,12 +124,13 @@ instance {-# INCOHERENT #-} Substitutable a b => Substitutable a [b] where
   subst = map . subst
 
 instance Substitutable A.Type A.Type where
-  subst _ t@A.TBase{}        = t
-  subst s (A.TArray i  t  l) = A.TArray i (subst s t) l
-  subst s (A.TFunc  t1 t2 l) = A.TFunc (subst s t1) (subst s t2) l
-  subst _ t@A.TCon{}         = t
-  subst s t@(A.TVar x _  )   = Map.findWithDefault t x s
-  subst s t@(A.TMetaVar n)   = Map.findWithDefault t n s
+  subst _ t@A.TBase{}       = t
+  subst s (A.TArray i t l ) = A.TArray i (subst s t) l
+  subst s (A.TTuple ts    ) = A.TTuple (map (subst s) ts)
+  subst s (A.TFunc t1 t2 l) = A.TFunc (subst s t1) (subst s t2) l
+  subst _ t@A.TCon{}        = t
+  subst s t@(A.TVar x _  )  = Map.findWithDefault t x s
+  subst s t@(A.TMetaVar n)  = Map.findWithDefault t n s
 
 toStateT :: Monad m => r -> RWST r w s m a -> StateT s m a
 toStateT r m = StateT
