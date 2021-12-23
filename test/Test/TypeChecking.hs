@@ -233,7 +233,7 @@ definitionTests = testGroup
         \   N = 5\n\
         \   N = 6\n\
         \:}"
-    "Environment[(N, Int)][][(N, [6, 5])]"
+    "Environment[(N, Int)][][(N, [5, 6])]"
   , testCase "definition 6" $ blockDeclarationCheck
     "{:\n\
         \    G i j = i + j\n\

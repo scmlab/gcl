@@ -60,13 +60,13 @@ programToScopeForSubstitution (Program defns decls _ _ _) =
   extractDeclaration (VarDecl names _ _ _) =
     Map.fromList (zip names (repeat Nothing))
 
--- merge multiple FuncDefnClause into one
-mergeFuncDefnClauses :: [FuncDefnClause] -> Map Name [Expr]
-mergeFuncDefnClauses = Map.fromListWith mergeFuncDefnsOfTheSameName
-  . map (\(FuncDefnClause name args body _) -> (name, [wrapLam args body]))
- where
-  mergeFuncDefnsOfTheSameName :: [Expr] -> [Expr] -> [Expr]
-  mergeFuncDefnsOfTheSameName = (<>)
+-- -- merge multiple FuncDefnClause into one
+-- mergeFuncDefnClauses :: [FuncDefnClause] -> Map Name [Expr]
+-- mergeFuncDefnClauses = Map.fromListWith mergeFuncDefnsOfTheSameName
+--   . map (\(FuncDefnClause name args body _) -> (name, [wrapLam args body]))
+--  where
+--   mergeFuncDefnsOfTheSameName :: [Expr] -> [Expr] -> [Expr]
+--   mergeFuncDefnsOfTheSameName = (<>)
 
 baseToName :: TBase -> Name
 baseToName TInt  = Name "Int" NoLoc

@@ -10,8 +10,6 @@ module Syntax.Concrete.Instances.ToAbstract where
 import           Control.Monad.Except           ( Except
                                                 , throwError
                                                 )
-import           Data.Bifunctor                 ( second )
-import           Data.Either                    ( partitionEithers )
 import           Data.Loc                       ( (<-->)
                                                 , Loc(..)
                                                 , Located(locOf)
@@ -80,40 +78,44 @@ instance ToAbstract (Either Declaration DefinitionBlock) ([A.Declaration], A.Def
 -- | Definition
 
 instance ToAbstract DefinitionBlock A.Definitions where
-  toAbstract (DefinitionBlock _ decls _) = do
-    (typeDefns, (funcDefnSigs, funcDefnClauses)) <-
-      second partitionEithers . partitionEithers <$> toAbstract decls
+  toAbstract (DefinitionBlock _ decls _) = mconcat <$> mapM toAbstract decls
 
-    -- invariant: there should be only ONE TypeDefn of the same name
-    let defnTypes =
-          Map.fromList $ map (\x@(A.TypeDefn name _ _ _) -> (name, x)) typeDefns
-    -- invariant: there should be only ONE FuncDefnSig of the same name
-    let defnFuncSigs = Map.fromList $ map
-          (\x@(A.FuncDefnSig name _ _ _) -> (name, x))
-          (concat funcDefnSigs)
-
-
-    return $ A.Definitions { A.defnTypes    = defnTypes
-                           , A.defnFuncSigs = defnFuncSigs
-                           , A.defnFuncs    = mergeFuncDefnClauses funcDefnClauses
-                           }
-
-instance ToAbstract Definition (Either A.TypeDefn (Either [A.FuncDefnSig] A.FuncDefnClause)) where
+instance ToAbstract Definition A.Definitions where
   toAbstract (TypeDefn tok name binders _ cons) = do
-    Left
-      <$> (A.TypeDefn name binders <$> toAbstract cons <*> pure (tok <--> cons))
+    constructor <- toAbstract cons
+    let typeDefn = A.TypeDefn name binders constructor (tok <--> cons)
+    return $ A.Definitions { A.defnTypes    = Map.singleton name typeDefn
+                           , A.defnFuncSigs = mempty
+                           , A.defnFuncs    = mempty
+                           }
+                           
   toAbstract (FuncDefnSig decl prop) = do
     (names, typ) <- toAbstract decl
-    Right
-      .   Left
-      <$> mapM
-            (\name -> A.FuncDefnSig name typ <$> toAbstract prop <*> pure
-              (decl <--> prop)
-            )
-            names
+    prop'        <- toAbstract prop
+    let sigs =
+          map (\name -> A.FuncDefnSig name typ prop' (decl <--> prop)) names
+    return $ A.Definitions { A.defnTypes    = mempty
+                           , A.defnFuncSigs = Map.fromList (zip names sigs)
+                           , A.defnFuncs    = mempty
+                           }
+
   toAbstract (FuncDefn name args _ body) = do
     body' <- toAbstract body
-    return $ Right $ Right $ A.FuncDefnClause name args body' (name <--> body)
+    let clause = [wrapLam args body']
+
+    -- -- merge multiple FuncDefnClause into one
+    -- mergeFuncDefnClauses :: [FuncDefnClause] -> Map Name [Expr]
+    -- mergeFuncDefnClauses = Map.fromListWith mergeFuncDefnsOfTheSameName
+    --   . map (\(FuncDefnClause name args body _) -> (name, [wrapLam args body]))
+    -- where
+    --   mergeFuncDefnsOfTheSameName :: [Expr] -> [Expr] -> [Expr]
+    --   mergeFuncDefnsOfTheSameName = (<>)
+
+
+    return $ A.Definitions { A.defnTypes    = mempty
+                           , A.defnFuncSigs = mempty
+                           , A.defnFuncs    = Map.singleton name clause
+                           }
 
 instance ToAbstract TypeDefnCtor A.TypeDefnCtor where
   toAbstract (TypeDefnCtor c ts) = A.TypeDefnCtor c <$> toAbstract ts

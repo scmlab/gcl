@@ -13,6 +13,7 @@ import           Prelude                 hiding ( Ordering(..) )
 import           Syntax.Common                  ( Name
                                                 , Op
                                                 )
+import qualified Data.Map as Map
 --------------------------------------------------------------------------------
 
 type Const = Text
@@ -42,8 +43,28 @@ data Definitions = Definitions
   deriving (Eq, Show)
 
 instance Semigroup Definitions where
-  Definitions a b c <> Definitions d e f =
-    Definitions (a <> d) (b <> e) (c <> f)
+  Definitions a b c <> Definitions d e f = Definitions
+    (mergeTypeDefns a d)
+    (mergeFuncDefnSigs b e)
+    (mergeFuncDefnClauses c f)
+   where
+      -- if there are 2 TypeDefns of the same Name, the later will be ignored 
+    mergeTypeDefns
+      :: Map Name TypeDefn -> Map Name TypeDefn -> Map Name TypeDefn
+    mergeTypeDefns = (<>)
+
+    -- if there are 2 FuncDefnSigs of the same Name, the later will be ignored 
+    mergeFuncDefnSigs
+      :: Map Name FuncDefnSig -> Map Name FuncDefnSig -> Map Name FuncDefnSig
+    mergeFuncDefnSigs = (<>)
+
+    -- if there are 2 FuncDefnClause of the same Name, they will be merged 
+    mergeFuncDefnClauses
+      :: Map Name [Expr]
+      -> Map Name [Expr]
+      -> Map Name [Expr]
+    mergeFuncDefnClauses = Map.unionWith (<>)
+
 
 instance Monoid Definitions where
   mempty = Definitions mempty mempty mempty
@@ -53,7 +74,7 @@ instance Monoid Definitions where
 data FuncDefnClause = FuncDefnClause
   { funcClauseName :: Name
   , funcClauseArgs :: [Name]
-  , funcClauseBody :: Expr 
+  , funcClauseBody :: Expr
   , funcClauseLoc  :: Loc
   }
   deriving (Eq, Show)
