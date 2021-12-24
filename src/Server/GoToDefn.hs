@@ -192,6 +192,7 @@ instance Collect LocationLinkToBe LocationLink Expr where
     Op op               -> collect op
     App a b _           -> collect a >> collect b
     Lam _ b _           -> collect b
+    Func a b _           -> collect a >> collect b
     Tuple as            -> mapM_ collect as
     Quant op args c d _ -> do
       collect op
@@ -221,8 +222,9 @@ instance Collect LocationLinkToBe LocationLink Expr where
 
 instance Collect LocationLinkToBe LocationLink Op where
   collect _ = return ()
-  -- collect (ChainOp op) = collect op
-  -- collect (ArithOp op) = collect op
+
+instance Collect LocationLinkToBe LocationLink FuncClause where
+  collect _ = return ()
 
 instance Collect LocationLinkToBe LocationLink QuantOp' where
   collect (Left  op  ) = collect op

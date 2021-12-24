@@ -128,8 +128,9 @@ instance Collect Type (J.Hover, Type) Expr where
     Var   a _              -> collect a
     Const a _              -> collect a
     Op op                  -> collect op
-    App a b _              -> collect a >> collect b
-    Lam _ b _              -> collect b
+    App  a b _             -> collect a >> collect b
+    Lam  _ b _             -> collect b
+    Func a b _             -> collect a >> collect b
     Tuple as               -> mapM_ collect as
     Quant op _args _c _d _ -> do
       collect op
@@ -171,6 +172,13 @@ instance Collect Type (J.Hover, Type) ChainOp where
 instance Collect Type (J.Hover, Type) QuantOp' where
   collect (Left  op  ) = collect op
   collect (Right expr) = collect expr
+
+instance Collect Type (J.Hover, Type) FuncClause where
+  collect (FuncClause patterns body) = collect patterns >> collect body
+
+-- TODO: implement this 
+instance Collect Type (J.Hover, Type) Pattern where
+  collect _ = return ()
 
 --------------------------------------------------------------------------------
 -- | Types 

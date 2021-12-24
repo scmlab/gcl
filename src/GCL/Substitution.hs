@@ -225,15 +225,17 @@ instance Substitutable Expr where
 
     Lam binder body l -> do
 
-      -- we need to rename the binder to avoid capturing
-      -- if and only if there's a free variable in `body` that also has the same name 
+      -- we need to rename binders to avoid capturing
+      -- only the free vars that is also present in `body` will be renamed 
       let (capturableNames, shrinkedMapping) =
             getCapturableNamesAndShrinkMapping mapping body
 
-      (binder', alphaRenameMapping) <- rename capturableNames binder
+      -- rename captured binder 
+      renamings <- produceBinderRenamings capturableNames [binder]
+      let renamedBinder = renameBinder renamings binder
 
-      Lam binder'
-        <$> subst (alphaRenameMapping <> shrinkedMapping) body
+      Lam renamedBinder
+        <$> subst (renamingToMapping renamings <> shrinkedMapping) body
         <*> pure l
 
     Func name clauses l ->
@@ -242,20 +244,17 @@ instance Substitutable Expr where
     Tuple es                      -> Tuple <$> mapM (subst mapping) es
 
     Quant op binders range body l -> do
-        -- rename binders to avoid capturing only when necessary!
+      -- rename binders to avoid capturing only when necessary!
       let (capturableNames, shrinkedMapping) =
             getCapturableNamesAndShrinkMapping mapping expr
 
-      (binders', alphaRenameMapping) <-
-        unzip <$> mapM (rename capturableNames) binders
+      -- rename captured binder 
+      renamings <- produceBinderRenamings capturableNames binders
+      let renamedBinders = map (renameBinder renamings) binders
 
-      -- combine individual renamings to get a new mapping
-      -- and use that mapping to rename other stuff
-      let alphaRenameMappings = mconcat alphaRenameMapping
-
-      Quant op binders'
-        <$> subst (alphaRenameMappings <> shrinkedMapping) range
-        <*> subst (alphaRenameMappings <> shrinkedMapping) body
+      Quant op renamedBinders
+        <$> subst (renamingToMapping renamings <> shrinkedMapping) range
+        <*> subst (renamingToMapping renamings <> shrinkedMapping) body
         <*> pure l
 
         -- apply new mappings on the outside instead of merging them (Issue #54)
@@ -370,24 +369,6 @@ renamingToMapping =
 
 ------------------------------------------------------------------
 -- | Perform Alpha renaming only when necessary
-
--- rename a binder if it is in the set of "capturableNames"
--- returns the renamed binder and the mapping of alpha renaming (for renaming other stuff)
-rename :: Set Text -> Name -> M (Name, Mapping)
-rename capturableNames binder =
-  if Set.member (nameToText binder) capturableNames
-      -- CAPTURED!
-      -- returns the alpha renamed binder along with its mapping
-    then do
-      binder' <- Name <$> freshWithLabel (nameToText binder) <*> pure
-        (locOf binder)
-      return
-        ( binder'
-        , Map.singleton (nameToText binder) (Var binder' (locOf binder))
-        )
-      -- not captured, returns the original binder
-    else return (binder, Map.empty)
-
 -- returns a set of free names that is susceptible to capturing
 -- also returns a Mapping that is reduced further with only free variables in "body"
 getCapturableNamesAndShrinkMapping :: Mapping -> Expr -> (Set Text, Mapping)

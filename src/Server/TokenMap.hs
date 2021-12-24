@@ -32,6 +32,7 @@ import           Prelude                 hiding ( lookup )
 import           Pretty
 import Syntax.Concrete (SepBy)
 import Data.Foldable (toList)
+import Data.List.NonEmpty (NonEmpty)
 
 
 --------------------------------------------------------------------------------
@@ -111,6 +112,9 @@ instance Collect input output a => Collect input output (Maybe a) where
   collect (Just x) = collect x
 
 instance Collect input output a => Collect input output [a] where
+  collect = mapM_ collect
+
+instance Collect input output a => Collect input output (NonEmpty a) where
   collect = mapM_ collect
 
 instance Collect input output a => Collect input output (Map k a) where
