@@ -12,8 +12,8 @@ instance Located Declaration where
   locOf (ConstDecl _ _ _ l) = l
   locOf (VarDecl   _ _ _ l) = l
 
-instance Located FuncDefnClause where
-  locOf (FuncDefnClause _ _ _ l) = l
+-- instance Located FuncDefnClause where
+--   locOf (FuncDefnClause _ _ _ l) = l
 
 instance Located TypeDefn where
   locOf (TypeDefn _ _ _ l) = l
@@ -63,6 +63,7 @@ instance Located Expr where
   locOf (Lit   _ l         ) = l
   locOf (Op op             ) = locOf op
   locOf (App _ _ l         ) = l
+  locOf (Func _ _ l         ) = l
   locOf (Lam _ _ l         ) = l
   locOf (Tuple _           ) = NoLoc
   locOf (Quant _ _ _ _ l   ) = l
@@ -72,8 +73,8 @@ instance Located Expr where
   locOf (ArrUpd _ _ _ l    ) = l
   locOf (Case _ _ l        ) = l
 
-instance Located CaseConstructor where
-  locOf (CaseConstructor l r) = l <--> r
+instance Located CaseClause where
+  locOf (CaseClause l r) = l <--> r
 
 instance Located Pattern where
   locOf (PattLit      l     ) = locOf l

@@ -217,8 +217,8 @@ instance Collect () Highlighting Expr where
       addHighlighting J.SttKeyword [] tokB
       collect cases
 
-instance Collect () Highlighting CaseConstructor where
-  collect (CaseConstructor _ arrow body) = do
+instance Collect () Highlighting CaseClause where
+  collect (CaseClause _ arrow body) = do
     addHighlighting J.SttMacro [] arrow
     collect body
 

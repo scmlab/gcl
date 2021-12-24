@@ -16,6 +16,7 @@ import           Data.Functor
 import           Data.List
 import           Data.List.NonEmpty             ( NonEmpty )
 import qualified Data.List.NonEmpty            as NE
+import qualified Data.List.NonEmpty            as NonEmpty
 import           Data.Loc
 import           Data.Map                       ( Map )
 import qualified Data.Map                      as Map
@@ -152,6 +153,23 @@ infer (Lam x e l) = do
   v <- freshVar
   t <- inferInEnv [(x, v)] (infer e)
   return (TFunc v t l)
+
+infer (Func name clauses _) = do
+  -- infer the first clause
+  t <- inferFuncClause name (NonEmpty.head clauses)
+  -- infer other clauses 
+  ts <- mapM (inferFuncClause name) clauses
+  -- and unify them all 
+  mapM_ (unify t) ts
+  return t
+ where
+  -- infer the types of arguments and the return type
+  inferFuncClause :: Name -> FuncClause -> Infer Type 
+  inferFuncClause n (FuncClause patterns body) = do
+    (binders, t) <- inferPatterns n patterns
+    _ <- inferInEnv binders (infer body)
+    return t 
+
 infer (Tuple xs) = do
   ts <- mapM infer xs
   return (TTuple ts)
@@ -194,40 +212,41 @@ infer (ArrUpd e1 e2 e3 _) = do
   return t1
 infer (Case expr cs _) = do
   te <- infer expr
-  ts <- mapM (inferCaseConstructor te) cs
+  ts <- mapM (inferCaseClause te) cs
   t  <- freshVar
   mapM_ (unify t) ts
   return t
  where
-  inferCaseConstructor t (CaseConstructor patt e) = do
-    (subs, tPatt) <- inferPatt patt
+  inferCaseClause :: Type -> CaseClause -> Infer Type
+  inferCaseClause t (CaseClause patt e) = do
+    (subs, tPatt) <- inferPattern patt
     unify t tPatt
     inferInEnv subs (infer e)
 
-  inferPatts :: Name -> [Pattern] -> Infer ([(Name, Type)], Type)
-  inferPatts n patts = do
-    tPatt          <- freshVar
-    tn             <- lookupInferEnv n
-    (subs, tpatts) <- unzip <$> mapM inferPatt patts
-    let subs' = concat subs
-    let ns    = map fst subs'
+inferPatterns :: Name -> [Pattern] -> Infer ([(Name, Type)], Type)
+inferPatterns n patts = do
+  tPatt          <- freshVar
+  tn             <- lookupInferEnv n
+  (subs, tpatts) <- unzip <$> mapM inferPattern patts
+  let subs' = concat subs
+  let ns    = map fst subs'
 
-    -- check if there is duplicated identifier
-    let dups = map head . filter ((> 1) . length) . group $ ns
-    unless (null dups) $ throwError $ DuplicatedIdentifier
-      (head dups)
-      (locOf . head $ dups)
+  -- check if there is duplicated identifier
+  let dups = map head . filter ((> 1) . length) . group $ ns
+  unless (null dups) $ throwError $ DuplicatedIdentifier
+    (head dups)
+    (locOf . head $ dups)
 
-    unify tn (wrapTFunc tpatts tPatt)
-    return (subs', tPatt)
+  unify tn (wrapTFunc tpatts tPatt)
+  return (subs', tPatt)
 
-  inferPatt :: Pattern -> Infer ([(Name, Type)], Type)
-  inferPatt (PattLit    x) = return ([], litTypes x (locOf x))
-  inferPatt (PattBinder n) = do
-    tn <- freshVar
-    return ([(n, tn)], tn)
-  inferPatt (PattWildcard _         ) = ([], ) <$> freshVar
-  inferPatt (PattConstructor n patts) = inferPatts n patts
+inferPattern :: Pattern -> Infer ([(Name, Type)], Type)
+inferPattern (PattLit    x) = return ([], litTypes x (locOf x))
+inferPattern (PattBinder n) = do
+  tn <- freshVar
+  return ([(n, tn)], tn)
+inferPattern (PattWildcard _         ) = ([], ) <$> freshVar
+inferPattern (PattConstructor n patts) = inferPatterns n patts
 
 emptyInterval :: Interval
 emptyInterval = Interval (Including zero) (Excluding zero) NoLoc

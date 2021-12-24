@@ -213,8 +213,8 @@ instance Collect LocationLinkToBe LocationLink Expr where
       collect e
       -- collect patterns
 
--- instance Collect CaseConstructor where
---   collect (CaseConstructor ctor args body) = do
+-- instance Collect CaseClause where
+--   collect (CaseClause ctor args body) = do
 --     collect ctor
 --     localScope args $ do
 --       collect body

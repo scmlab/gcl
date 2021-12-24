@@ -391,10 +391,10 @@ pExprF =
 
   pCaseOfF :: ParserF Expr
   pCaseOfF =
-    Case <$> lexCase <*> pExprF <*> lexOfF <*> pIndentBlockF pCaseConstructorF
+    Case <$> lexCase <*> pExprF <*> lexOfF <*> pIndentBlockF pCaseClauseF
 
-  pCaseConstructorF :: ParserF CaseConstructor
-  pCaseConstructorF = CaseConstructor <$> pPatternF <*> lexArrowF <*> pExprF
+  pCaseClauseF :: ParserF CaseClause
+  pCaseClauseF = CaseClause <$> pPatternF <*> lexArrowF <*> pExprF
 
 ------------------------------------------
 -- Pattern matching

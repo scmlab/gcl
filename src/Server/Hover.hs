@@ -152,8 +152,8 @@ instance Collect Type (J.Hover, Type) Expr where
       collect e
       -- collect patterns
 
--- instance Collect Type (J.Hover, Type) CaseConstructor where
---   collect (CaseConstructor ctor args body) = do
+-- instance Collect Type (J.Hover, Type) CaseClause where
+--   collect (CaseClause ctor args body) = do
 --     collect ctor
 --     localScope args $ do
 --       collect body

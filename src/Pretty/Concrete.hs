@@ -377,8 +377,8 @@ handleOp op = case classify op of
 --------------------------------------------------------------------------------
 -- | Pattern
 
-instance PrettyWithLoc CaseConstructor where
-  prettyWithLoc (CaseConstructor a b c) =
+instance PrettyWithLoc CaseClause where
+  prettyWithLoc (CaseClause a b c) =
     prettyWithLoc a <> prettyWithLoc b <> prettyWithLoc c
 
 instance Pretty Pattern where

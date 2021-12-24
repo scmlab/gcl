@@ -6,6 +6,7 @@ import           Data.List.NonEmpty             ( NonEmpty )
 import           Data.Loc                       ( Loc )
 import           Data.Loc.Range                 ( Range )
 import           Data.Map                       ( Map )
+import qualified Data.Map                      as Map
 import           Data.Set                       ( Set )
 import           Data.Text                      ( Text )
 import           GHC.Generics                   ( Generic )
@@ -13,7 +14,6 @@ import           Prelude                 hiding ( Ordering(..) )
 import           Syntax.Common                  ( Name
                                                 , Op
                                                 )
-import qualified Data.Map as Map
 --------------------------------------------------------------------------------
 
 type Const = Text
@@ -48,36 +48,25 @@ instance Semigroup Definitions where
     (mergeFuncDefnSigs b e)
     (mergeFuncDefnClauses c f)
    where
-      -- if there are 2 TypeDefns of the same Name, the later will be ignored 
-    mergeTypeDefns
-      :: Map Name TypeDefn -> Map Name TypeDefn -> Map Name TypeDefn
-    mergeTypeDefns = (<>)
-
+    -- if there are 2 TypeDefns of the same Name, the later will be ignored 
+    mergeTypeDefns       = (<>)
     -- if there are 2 FuncDefnSigs of the same Name, the later will be ignored 
-    mergeFuncDefnSigs
-      :: Map Name FuncDefnSig -> Map Name FuncDefnSig -> Map Name FuncDefnSig
-    mergeFuncDefnSigs = (<>)
-
+    mergeFuncDefnSigs    = (<>)
     -- if there are 2 FuncDefnClause of the same Name, they will be merged 
-    mergeFuncDefnClauses
-      :: Map Name [Expr]
-      -> Map Name [Expr]
-      -> Map Name [Expr]
     mergeFuncDefnClauses = Map.unionWith (<>)
-
 
 instance Monoid Definitions where
   mempty = Definitions mempty mempty mempty
 
--- one clause of function definition
--- a complete function definition may have many clauses
-data FuncDefnClause = FuncDefnClause
-  { funcClauseName :: Name
-  , funcClauseArgs :: [Name]
-  , funcClauseBody :: Expr
-  , funcClauseLoc  :: Loc
-  }
-  deriving (Eq, Show)
+-- -- one clause of function definition
+-- -- a complete function definition may have many clauses
+-- data FuncDefnClause = FuncDefnClause
+--   { funcClauseName :: Name
+--   , funcClauseArgs :: [Name]
+--   , funcClauseBody :: Expr
+--   , funcClauseLoc  :: Loc
+--   }
+--   deriving (Eq, Show)
 
 -- type signature of function definition
 data FuncDefnSig = FuncDefnSig Name Type (Maybe Expr) Loc
@@ -161,6 +150,7 @@ data Expr
   | Op Op
   | App Expr Expr Loc
   | Lam Name Expr Loc
+  | Func Name (NonEmpty FuncClause) Loc
   -- Tuple has no srcloc info because it has no conrete syntax at the moment 
   | Tuple [Expr]
   | Quant Expr [Name] Expr Expr Loc
@@ -175,7 +165,7 @@ data Expr
   | Redex Redex
   | ArrIdx Expr Expr Loc
   | ArrUpd Expr Expr Expr Loc
-  | Case Expr [CaseConstructor] Loc
+  | Case Expr [CaseClause] Loc
   deriving (Eq, Show, Generic)
 
 type QuantOp' = Either Op Expr
@@ -191,7 +181,12 @@ data Redex = Rdx
 --------------------------------------------------------------------------------
 -- | Pattern matching
 
-data CaseConstructor = CaseConstructor Pattern Expr
+-- pattern -> expr 
+data CaseClause = CaseClause Pattern Expr
+  deriving (Eq, Show, Generic)
+
+-- pattern0 pattern1 pattern2 ... -> expr 
+data FuncClause = FuncClause [Pattern] Expr
   deriving (Eq, Show, Generic)
 
 data Pattern
@@ -200,6 +195,12 @@ data Pattern
   | PattWildcard Range -- matches anything
   | PattConstructor Name [Pattern] -- destructs a constructor
   deriving (Eq, Show, Generic)
+
+extractBinder :: Pattern -> [Name]
+extractBinder (PattLit      _      ) = []
+extractBinder (PattBinder   x      ) = [x]
+extractBinder (PattWildcard _      ) = []
+extractBinder (PattConstructor _ xs) = xs >>= extractBinder
 
 ----------------------------------------------------------------
 

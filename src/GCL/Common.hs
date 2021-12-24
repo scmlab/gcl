@@ -90,23 +90,27 @@ instance Free A.Type where
   fv (A.TMetaVar n   ) = Set.singleton n
 
 instance Free A.Expr where
-  fv (A.Var   x _  ) = Set.singleton x
-  fv (A.Const x _  ) = Set.singleton x
-  fv (A.Op _       ) = mempty
-  fv (A.Lit _ _    ) = mempty
-  fv (A.App e1 e2 _) = fv e1 <> fv e2
-  fv (A.Lam x  e  _) = fv e \\ Set.singleton x
-  fv (A.Tuple xs   ) = Set.unions (map fv xs)
+  fv (A.Var   x _        ) = Set.singleton x
+  fv (A.Const x _        ) = Set.singleton x
+  fv (A.Op _             ) = mempty
+  fv (A.Lit _ _          ) = mempty
+  fv (A.App  e1 e2      _) = fv e1 <> fv e2
+  fv (A.Func _  clauses _) = Set.unions (fmap fv clauses)
+  fv (A.Lam  x  e       _) = fv e \\ Set.singleton x
+  fv (A.Tuple xs         ) = Set.unions (map fv xs)
   fv (A.Quant op xs range term _) =
     (fv op <> fv range <> fv term) \\ Set.fromList xs
   fv (A.RedexStem _ _ freeVars _) = freeVars
   fv (A.Redex x                 ) = fv (A.redexExpr x)
   fv (A.ArrIdx e1 e2 _          ) = fv e1 <> fv e2
   fv (A.ArrUpd e1 e2 e3 _       ) = fv e1 <> fv e2 <> fv e3
-  fv (A.Case e cases _          ) = fv e <> Set.unions (map fv cases)
+  fv (A.Case e clauses _        ) = fv e <> Set.unions (map fv clauses)
 
-instance Free A.CaseConstructor where
-  fv (A.CaseConstructor patt expr) = fv expr \\ fv patt
+instance Free A.FuncClause where
+  fv (A.FuncClause patterns expr) = fv expr \\ Set.unions (map fv patterns)
+
+instance Free A.CaseClause where
+  fv (A.CaseClause patt expr) = fv expr \\ fv patt
 instance Free A.Pattern where
   fv (A.PattLit      _      ) = mempty
   fv (A.PattBinder   n      ) = Set.singleton n

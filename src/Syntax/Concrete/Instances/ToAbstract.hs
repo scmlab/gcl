@@ -88,7 +88,7 @@ instance ToAbstract Definition A.Definitions where
                            , A.defnFuncSigs = mempty
                            , A.defnFuncs    = mempty
                            }
-                           
+
   toAbstract (FuncDefnSig decl prop) = do
     (names, typ) <- toAbstract decl
     prop'        <- toAbstract prop
@@ -251,9 +251,9 @@ instance ToAbstract Expr A.Expr where
     Case _ expr _ cases ->
       A.Case <$> toAbstract expr <*> toAbstract cases <*> pure (locOf x)
 
-instance ToAbstract CaseConstructor A.CaseConstructor where
-  toAbstract (CaseConstructor patt _ body) =
-    A.CaseConstructor <$> toAbstract patt <*> toAbstract body
+instance ToAbstract CaseClause A.CaseClause where
+  toAbstract (CaseClause patt _ body) =
+    A.CaseClause <$> toAbstract patt <*> toAbstract body
 
 instance ToAbstract Pattern A.Pattern where
   toAbstract (PattLit x      ) = A.PattLit <$> toAbstract x

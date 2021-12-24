@@ -21,6 +21,7 @@ import qualified Data.List.NonEmpty            as NonEmpty
 import           Data.Loc                       ( locOf )
 import           Data.Map                       ( Map )
 import qualified Data.Map                      as Map
+import qualified Data.Maybe                    as Maybe
 import qualified Data.Set                      as Set
 import           Data.Set                       ( Set )
 import           Data.Text                      ( Text )
@@ -30,12 +31,13 @@ import           GCL.Common                     ( Free(fv)
 import           GCL.Predicate                  ( PO(PO)
                                                 , Pred(..)
                                                 )
-import           Syntax.Abstract                ( CaseConstructor
-                                                  ( CaseConstructor
-                                                  )
+import           Syntax.Abstract                ( CaseClause(..)
                                                 , Expr(..)
+                                                , FuncClause(..)
                                                 , Mapping
+                                                , Pattern(..)
                                                 , Redex(..)
+                                                , extractBinder
                                                 )
 import           Syntax.Common                  ( Name(Name)
                                                 , nameToText
@@ -127,27 +129,11 @@ instance CollectRedexes Expr where
     Case _ xs _     -> xs >>= collectRedexes
     _               -> []
 
-instance CollectRedexes CaseConstructor where
-  collectRedexes (CaseConstructor _ x) = collectRedexes x
+instance CollectRedexes CaseClause where
+  collectRedexes (CaseClause _ x) = collectRedexes x
 
 ------------------------------------------------------------------
 
-
-
---      a                  x    ~~~~~~~~~~~>    b
---             (\n . body) x    ~~~~~~~~~~~>           c
--- --------------------------------------------------------------- [reduce-App-Expand-Lam]
---      (a ===> \n . body) x    ~~~~~~~~~~~>    b ===> c
---
---
---      body                    ~[ x / n ]~>    b
--- --------------------------------------------------------------- [reduce-App-Lam]
---      (\n . body) x           ~~~~~~~~~~~>    b
---
---
--- --------------------------------------------------------------- [reduce-Others]
---      other constructs        ~~~~~~~~~~~>    other constructs
---
 
 class Reducible a where
     reduce :: a -> M a
@@ -197,35 +183,14 @@ class Substitutable a where
 instance Substitutable Expr where
   subst mapping expr = case expr of
 
---
--- ---------------------------------------------------------------[subst-Lit]
---      Lit a               ~[.../...]~>    Lit a
---
     Lit{}      -> return expr
 
---
---      a                   ~~~~~~~~~~~>    a'
--- ---------------------------------------------------------------[subst-Var-substituted]
---      Var x               ~[ a / x ]~>    a'
---
---
---      x                   is defined as   a
---      a                   ~[.../...]~>    a'
--- ---------------------------------------------------------------[subst-Var-defined]
---      Var x               ~[.../...]~>    Var x ===> a'
---
---
---      x                   is not defined
--- ---------------------------------------------------------------[subst-Var-not-defined]
---      Var x               ~[.../...]~>    Var x
---
     Var name _ -> case Map.lookup (nameToText name) mapping of
-      Just value -> return value -- [subst-Var-substituted]
+      Just value -> return value
       Nothing    -> do
         scope <- ask
         index <- fresh
         case Map.lookup (nameToText name) scope of
-            -- [subst-Var-defined]
           Just (Just binding) -> do
             let e = RedexStem
                   name
@@ -234,33 +199,15 @@ instance Substitutable Expr where
                   -- NonEmpty.singleton is only available after base-4.15
                   (NonEmpty.fromList [shrinkMapping binding mapping])
             return $ Redex (Rdx index e)
-          -- [subst-Var-defined]
           Just Nothing -> return expr
           Nothing      -> return expr
 
---
---      a                   ~~~~~~~~~~~>    a'
--- ---------------------------------------------------------------[subst-Const-substituted]
---      Const x             ~[ a / x ]~>    a'
---
---
---      x                   is defined as   a
---      a                   ~[.../...]~>    a'
--- ---------------------------------------------------------------[subst-Const-defined]
---      Const x             ~[.../...]~>    Const x ===> a'
---
---
---      x                   is not defined
--- ---------------------------------------------------------------[subst-Const-not-defined]
---      Const x             ~[.../...]~>    Const x
---
     Const name _ -> case Map.lookup (nameToText name) mapping of
-      Just value -> reduce value -- [subst-Const-substituted]
+      Just value -> reduce value
       Nothing    -> do
         scope <- ask
         index <- fresh
         case Map.lookup (nameToText name) scope of
-            -- [subst-Const-defined]
           Just (Just binding) -> do
             let e = RedexStem
                   name
@@ -269,44 +216,19 @@ instance Substitutable Expr where
                   -- NonEmpty.singleton is only available after base-4.15
                   (NonEmpty.fromList [shrinkMapping binding mapping])
             return $ Redex (Rdx index e)
-          -- [subst-Const-not-defined]
           Just Nothing -> return expr
           Nothing      -> return expr
 
---
--- ---------------------------------------------------------------[subst-Op]
---      Op a                ~[.../...]~>    Op a
---
     Op{}              -> return expr
 
---
---      a                   ~[.../...]~>    a'
---      b                   ~[.../...]~>    b'
--- ---------------------------------------------------------------[subst-Chain]
---      Chan a op b         ~[.../...]~>    Op a' op b'
---
-    --Chain a op b l ->
-        --Chain <$> subst mapping a <*> pure op <*> subst mapping b <*> pure l
-
---
---      f                   ~[.../...]~>    f'
---      x                   ~[.../...]~>    x'
---      f' x'               ~~~~~~~~~~~>    y
--- ---------------------------------------------------------------[subst-App]
---      f  x                ~[.../...]~>    y
---
     App f      x    l -> App <$> subst mapping f <*> subst mapping x <*> pure l
 
---
---      n                   ~~~rename~~>    n'
---      body                ~[.../...]~>    body'
--- ---------------------------------------------------------------[subst-Lam]
---      \n . body           ~[.../...]~>    \n' . body'
---
     Lam binder body l -> do
 
-        -- rename the binder to avoid capturing only when necessary!
-      let (capturableNames, shrinkedMapping) = getCapturableNames mapping body
+      -- we need to rename the binder to avoid capturing
+      -- if and only if there's a free variable in `body` that also has the same name 
+      let (capturableNames, shrinkedMapping) =
+            getCapturableNamesAndShrinkMapping mapping body
 
       (binder', alphaRenameMapping) <- rename capturableNames binder
 
@@ -314,20 +236,15 @@ instance Substitutable Expr where
         <$> subst (alphaRenameMapping <> shrinkedMapping) body
         <*> pure l
 
-
+    Func name clauses l ->
+      Func name <$> mapM (subst mapping) clauses <*> pure l
 
     Tuple es                      -> Tuple <$> mapM (subst mapping) es
-    
---
---      ns                  ~~~rename~~>    ns'
---      a                   ~[.../...]~>    a'
---      b                   ~[.../...]~>    b'
--- ---------------------------------------------------------------[subst-Quant]
---      Quant op ns a b     ~[.../...]~>    Quant op ns' a' b'
---
+
     Quant op binders range body l -> do
         -- rename binders to avoid capturing only when necessary!
-      let (capturableNames, shrinkedMapping) = getCapturableNames mapping expr
+      let (capturableNames, shrinkedMapping) =
+            getCapturableNamesAndShrinkMapping mapping expr
 
       (binders', alphaRenameMapping) <-
         unzip <$> mapM (rename capturableNames) binders
@@ -340,11 +257,6 @@ instance Substitutable Expr where
         <$> subst (alphaRenameMappings <> shrinkedMapping) range
         <*> subst (alphaRenameMappings <> shrinkedMapping) body
         <*> pure l
-
---
--- ---------------------------------------------------------------[subst-Subst]
---      Subst a mapping     ~[.../...]~>    Subst (Subst a mapping) mapping'
---
 
         -- apply new mappings on the outside instead of merging them (Issue #54)
         -- NOTE:
@@ -372,30 +284,12 @@ instance Substitutable Expr where
                            e
                            newFreeVars
                            (NonEmpty.cons shrinkedMapping mappings)
---
---      a                   ~[.../...]~>    a'
---      b                   ~[.../...]~>    b'
--- ---------------------------------------------------------------[subst-Expand]
---      a ===> b            ~[.../...]~>    a' ===> b'
---
+
     Redex (Rdx _ e) -> Redex <$> (Rdx <$> fresh <*> subst mapping e)
 
---
---      a                   ~[.../...]~>    a'
---      b                   ~[.../...]~>    b'
--- ---------------------------------------------------------------[subst-ArrIdx]
---      ArrIdx a b          ~[.../...]~>    ArrIdx a b
---
     ArrIdx array index l ->
       ArrIdx <$> subst mapping array <*> subst mapping index <*> pure l
 
---
---      a                   ~[.../...]~>    a'
---      b                   ~[.../...]~>    b'
---      c                   ~[.../...]~>    c'
--- ---------------------------------------------------------------[subst-ArrUpd]
---      ArrUpd a b c        ~[.../...]~>    ArrUpd a b c
---
     ArrUpd array index value l ->
       ArrUpd
         <$> subst mapping array
@@ -405,9 +299,32 @@ instance Substitutable Expr where
 
     -- apply subst on body of cases only
     Case e cases l -> do
-      cases' <- forM cases $ \(CaseConstructor patt body) ->
-        CaseConstructor patt <$> subst mapping body
+      cases' <- forM cases
+        $ \(CaseClause patt body) -> CaseClause patt <$> subst mapping body
       return $ Case e cases' l
+
+instance Substitutable FuncClause where
+  subst mapping (FuncClause patterns body) = do
+    -- we need to rename binders to avoid capturing
+    -- only the free vars that is also present in `body` will be renamed 
+    let (capturableNames, shrinkedMapping) =
+          getCapturableNamesAndShrinkMapping mapping body
+
+    -- renaming captured binders in patterns 
+    let bindersInPatterns = patterns >>= extractBinder
+    renamings <- produceBinderRenamings capturableNames bindersInPatterns
+    let renamedPatterns = map (renameBindersInPattern renamings) patterns
+
+    FuncClause renamedPatterns
+      <$> subst (renamingToMapping renamings <> shrinkedMapping) body
+
+renameBindersInPattern :: Map Name Name -> Pattern -> Pattern
+renameBindersInPattern renamings patt = case patt of
+  PattLit      _      -> patt
+  PattBinder   binder -> PattBinder $ renameBinder renamings binder
+  PattWildcard _      -> patt
+  PattConstructor name patts ->
+    PattConstructor name $ map (renameBindersInPattern renamings) patts
 
 instance Substitutable Pred where
   subst mapping = \case
@@ -422,6 +339,34 @@ instance Substitutable Pred where
     Disjunct as -> Disjunct <$> mapM (subst mapping) as
     Negate   a  -> Negate <$> subst mapping a
 
+------------------------------------------------------------------
+
+-- produce a binder "renaming", if any binder is in the set of "capturableNames"
+produceBinderRenamings :: Set Text -> [Name] -> M (Map Name Name)
+produceBinderRenamings capturableNames binders = mconcat <$> mapM go binders
+ where
+  go :: Name -> M (Map Name Name)
+  go binder = if Set.member (nameToText binder) capturableNames
+    then do
+      -- CAPTURED! returns the alpha renamed binder
+      binder' <- Name <$> freshWithLabel (nameToText binder) <*> pure
+        (locOf binder)
+      return $ Map.singleton binder binder'
+    else
+      -- not captured, returns the original binder
+         return mempty
+
+-- rename a binder with some "renaming"
+renameBinder :: Map Name Name -> Name -> Name
+renameBinder renamings binder =
+  Maybe.fromMaybe binder (Map.lookup binder renamings)
+
+-- convert a binder renaming (Map Name Name) to a Mapping (Map Text Expr)
+renamingToMapping :: Map Name Name -> Mapping
+renamingToMapping =
+  Map.fromList
+    . map (\(old, new) -> (nameToText old, Var new (locOf old)))
+    . Map.toList
 
 ------------------------------------------------------------------
 -- | Perform Alpha renaming only when necessary
@@ -444,12 +389,12 @@ rename capturableNames binder =
     else return (binder, Map.empty)
 
 -- returns a set of free names that is susceptible to capturing
--- also returns a Mapping that is reduced further with free variables in "body"
-getCapturableNames :: Mapping -> Expr -> (Set Text, Mapping)
-getCapturableNames mapping body =
+-- also returns a Mapping that is reduced further with only free variables in "body"
+getCapturableNamesAndShrinkMapping :: Mapping -> Expr -> (Set Text, Mapping)
+getCapturableNamesAndShrinkMapping mapping body =
   let
-      -- collect all free variables in "body"
-      -- and reduce the mapping further with free variables in "body"
+    -- collect all free variables in "body"
+    -- and reduce the mapping further with free variables in "body"
     shrinkedMapping = shrinkMapping body mapping
     -- collect all free varialbes in the mapped expressions
     mappedExprs     = Map.elems shrinkedMapping

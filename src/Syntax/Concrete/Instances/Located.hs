@@ -98,8 +98,8 @@ instance Located Expr where
   locOf (Quant l _ _ _ _ _ _ r) = l <--> r
   locOf (Case l _ _ r         ) = l <--> r
 
-instance Located CaseConstructor where
-  locOf (CaseConstructor l _ r) = l <--> r
+instance Located CaseClause where
+  locOf (CaseClause l _ r) = l <--> r
 
 --------------------------------------------------------------------------------
 

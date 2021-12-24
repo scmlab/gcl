@@ -161,7 +161,7 @@ data Expr
       Expr
       TokQuantEnds
   -- case expr of { ctor1 -> expr | ctor2 binder1 binder2 -> expr }
-  | Case (Token "case") Expr (Token "of") [CaseConstructor]
+  | Case (Token "case") Expr (Token "of") [CaseClause]
   deriving (Eq, Show, Generic)
 
 type QuantOp' = Either Op Expr
@@ -170,7 +170,7 @@ type QuantOp' = Either Op Expr
 -- | Pattern matching
 
 -- ctor1 binder1 binder2 ... -> expr
-data CaseConstructor = CaseConstructor Pattern TokArrows Expr
+data CaseClause = CaseClause Pattern TokArrows Expr
   deriving (Eq, Show, Generic)
 
 -- NOTE: current not in use

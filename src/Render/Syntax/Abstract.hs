@@ -103,8 +103,8 @@ instance Render Mapping where
 
 --------------------------------------------------------------------------------
 
-instance Render CaseConstructor where
-  render (CaseConstructor patt body) = render patt <+> "->" <+> render body
+instance Render CaseClause where
+  render (CaseClause patt body) = render patt <+> "->" <+> render body
 
 instance Render Pattern where
   render (PattLit      a) = render a

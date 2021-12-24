@@ -11,12 +11,14 @@ instance ToJSON TBase
 instance ToJSON Type
 instance ToJSON Redex
 instance ToJSON Expr
-instance ToJSON CaseConstructor
+instance ToJSON FuncClause 
+instance ToJSON CaseClause
 instance ToJSON Pattern
 instance ToJSON Lit
 
 instance FromJSON Expr
 instance FromJSON Redex
-instance FromJSON CaseConstructor
+instance FromJSON FuncClause 
+instance FromJSON CaseClause
 instance FromJSON Pattern
 instance FromJSON Lit
