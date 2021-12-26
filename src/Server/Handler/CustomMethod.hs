@@ -48,11 +48,11 @@ handleRefine range = do
           let indentation =
                 Text.replicate (posCol (rangeStart (specRange spec)) - 1) " "
           in  Text.unlines $ x : map (indentation <>) xs
-  source'      <- editText (specRange spec) indentedPayload
-  parsed       <- parse source'
+  source'     <- editText (specRange spec) indentedPayload
+  parsed      <- parse source'
 
-  scopeChecked <- scopeCheck parsed
-  typeChecked  <- typeCheck scopeChecked
+  converted   <- convert parsed
+  typeChecked <- typeCheck converted
   mute False
   swept <- sweep typeChecked
 
@@ -73,9 +73,9 @@ handleInsertAnchor hash = do
 
   source' <- editText (Range (rangeEnd range) (rangeEnd range))
                       ("\n\n" <> template)
-  parsed       <- parse source'
-  scopeChecked <- scopeCheck parsed
-  typeChecked  <- typeCheck scopeChecked
+  parsed      <- parse source'
+  converted   <- convert parsed
+  typeChecked <- typeCheck converted
   mute False
   swept <- sweep typeChecked
   generateResponseAndDiagnostics swept
@@ -86,12 +86,12 @@ handleSubst i = do
   logText $ Text.pack $ "Substituting Redex " <> show i
   --
   case stage of
-    Raw          _      -> return []
-    Parsed       _      -> return []
-    ScopeChecked _      -> return []
-    TypeChecked  _      -> return []
-    Swept        result -> do
-      let program = scopeCheckedProgram
+    Raw         _      -> return []
+    Parsed      _      -> return []
+    Converted   _      -> return []
+    TypeChecked _      -> return []
+    Swept       result -> do
+      let program = convertedProgram
             (typeCheckedPreviousStage (sweptPreviousStage result))
       case IntMap.lookup i (sweptRedexes result) of
         Nothing    -> return []

@@ -31,13 +31,15 @@ handler uri position responder = do
         let pos   = SrcLoc.fromLSPPosition table filepath position
 
         stage <- load
-        let tokenMap = case stage of
-              Raw          _       -> Nothing
-              Parsed       _result -> Nothing
-              ScopeChecked result  -> Just $ scopeCheckedTokenMap result
-              TypeChecked result ->
-                Just $ scopeCheckedTokenMap (typeCheckedPreviousStage result)
-              Swept result -> Just $ scopeCheckedTokenMap
+        let
+          tokenMap = case stage of
+            Raw       _       -> Nothing
+            Parsed    _result -> Nothing
+            Converted result  -> Just $ convertedTokenMap result
+            TypeChecked result ->
+              Just $ convertedTokenMap (typeCheckedPreviousStage result)
+            Swept result ->
+              Just $ convertedTokenMap
                 (typeCheckedPreviousStage (sweptPreviousStage result))
 
         return $ maybeToList $ case tokenMap of

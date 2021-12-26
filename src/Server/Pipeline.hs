@@ -21,7 +21,6 @@ import           Error
 import           GCL.Predicate
 import           GCL.Predicate.Util             ( specPayloadWithoutIndentation
                                                 )
-import qualified GCL.Scope                     as ScopeChecking
 import qualified GCL.Type                      as TypeChecking
 import qualified GCL.WP                        as WP
 import           GCL.WP.Type                    ( StructWarning )
@@ -66,7 +65,7 @@ import           Syntax.Parser                  ( Parser
 --                                │
 --                                ▼
 --                      ┌───────────────────┐
---                      │   ScopeChecked    │ : Abstract Syntax
+--                      │     Converted     │ : Abstract Syntax
 --                      └───────────────────┘   Scoping info
 --                                │
 --           type error  ◀────────┤ typeCheck
@@ -85,18 +84,18 @@ import           Syntax.Parser                  ( Parser
 --
 data Stage = Raw FilePath
            | Parsed ParseResult
-           | ScopeChecked ScopeCheckResult
+           | Converted ConvertResult
            | TypeChecked TypeCheckResult
            | Swept SweepResult
            deriving (Show, Eq)
 
 instance Pretty Stage where
   pretty stage = case stage of
-    Raw          filepath -> "Raw " <> pretty filepath
-    Parsed       _result  -> "Parsed"
-    ScopeChecked _result  -> "ScopeChecked"
-    TypeChecked  _result  -> "TypeChecked"
-    Swept        result   -> pretty result
+    Raw         filepath -> "Raw " <> pretty filepath
+    Parsed      _result  -> "Parsed"
+    Converted   _result  -> "Converted"
+    TypeChecked _result  -> "TypeChecked"
+    Swept       result   -> pretty result
 
 instance Pretty SweepResult where
   pretty result =
@@ -131,45 +130,41 @@ parse source = do
 
 --------------------------------------------------------------------------------
 
-data ScopeCheckResult = ScopeCheckResult
-  { scopeCheckedPreviousStage :: ParseResult
-  , scopeCheckedProgram       :: A.Program -- abstract syntax
-  , scopeCheckedTokenMap      :: TokenMap J.LocationLink -- scoping info
+data ConvertResult = ConvertResult
+  { convertedPreviousStage :: ParseResult
+  , convertedProgram       :: A.Program -- abstract syntax
+  , convertedTokenMap      :: TokenMap J.LocationLink -- scoping info
   }
   deriving (Show, Eq)
 
 -- | Converts concrete syntax to abstract syntax and scoping info
 --   persists the result
-scopeCheck :: ParseResult -> PipelineM ScopeCheckResult
-scopeCheck result = do
-  scopeChecked <- case runExcept (toAbstract (parsedProgram result)) of
+convert :: ParseResult -> PipelineM ConvertResult
+convert result = do
+  converted <- case runExcept (toAbstract (parsedProgram result)) of
     Left (Range start end) -> -- should dig hole!
-      digHole (Range start end) >>= parse >>= scopeCheck
-    Right program -> do
-      let scopeCheckedErr = ScopeChecking.runScopeCheckM program
-      case scopeCheckedErr of
-        Left  err -> throwError [ScopeError err]
-        Right _   -> return $ ScopeCheckResult
-          { scopeCheckedPreviousStage = result
-          , scopeCheckedProgram       = program
-          , scopeCheckedTokenMap      = collectLocationLinks program
-          }
-  save (ScopeChecked scopeChecked) -- save the current progress
-  return scopeChecked
+      digHole (Range start end) >>= parse >>= convert
+    Right program -> return $ ConvertResult
+      { convertedPreviousStage = result
+      , convertedProgram       = program
+      , convertedTokenMap      = collectLocationLinks program
+      }
+  save (Converted converted) -- save the current progress
+  return converted
 
 --------------------------------------------------------------------------------
 
 data TypeCheckResult = TypeCheckResult
-  { typeCheckedPreviousStage :: ScopeCheckResult
+  { typeCheckedPreviousStage :: ConvertResult
   , typeCheckedTokenMap      :: TokenMap (J.Hover, Type) -- type checking info
   }
   deriving (Show, Eq)
 
 -- | Converts concrete syntax to abstract syntax and scoping info
 --   persists the result
-typeCheck :: ScopeCheckResult -> PipelineM TypeCheckResult
+typeCheck :: ConvertResult -> PipelineM TypeCheckResult
 typeCheck result = do
-  let program = scopeCheckedProgram result
+  let program = convertedProgram result
 
   case TypeChecking.runTypeCheck program of
     Left  e -> throwError [TypeError e]
@@ -205,7 +200,7 @@ data SweepResult = SweepResult
 sweep :: TypeCheckResult -> PipelineM SweepResult
 sweep result = do
   let abstract@(A.Program _ _ globalProps _ _) =
-        scopeCheckedProgram (typeCheckedPreviousStage result)
+        convertedProgram (typeCheckedPreviousStage result)
   swept <- case WP.sweep abstract of
     Left  e -> throwError [StructError e]
     Right (pos, specs, warings, redexes, counter) -> return $ SweepResult
@@ -327,11 +322,11 @@ load :: PipelineM Stage
 load = do
   stage <- gets pipelineStage
   case stage of
-    Raw          _ -> logText "      [ load ] from Raw"
-    Parsed       _ -> logText "      [ load ] from Parsed"
-    ScopeChecked _ -> logText "      [ load ] from ScopeChecked"
-    TypeChecked  _ -> logText "      [ load ] from TypeChecked"
-    Swept        _ -> logText "      [ load ] from Swept"
+    Raw         _ -> logText "      [ load ] from Raw"
+    Parsed      _ -> logText "      [ load ] from Parsed"
+    Converted   _ -> logText "      [ load ] from Converted"
+    TypeChecked _ -> logText "      [ load ] from TypeChecked"
+    Swept       _ -> logText "      [ load ] from Swept"
   return stage
 
 getErrors :: PipelineM [Error]
@@ -352,11 +347,11 @@ setErrors e = modify' $ \state -> state { pipelineErrors = e }
 save :: Stage -> PipelineM ()
 save stage = do
   case stage of
-    Raw          _ -> logText "      [ save ] Raw"
-    Parsed       _ -> logText "      [ save ] Parsed"
-    ScopeChecked _ -> logText "      [ save ] ScopeChecked"
-    TypeChecked  _ -> logText "      [ save ] TypeChecked"
-    Swept        _ -> logText "      [ save ] Swept"
+    Raw         _ -> logText "      [ save ] Raw"
+    Parsed      _ -> logText "      [ save ] Parsed"
+    Converted   _ -> logText "      [ save ] Converted"
+    TypeChecked _ -> logText "      [ save ] TypeChecked"
+    Swept       _ -> logText "      [ save ] Swept"
   modify' $ \state -> state { pipelineErrors = [], pipelineStage = stage }
 
 setLastSelection :: Range -> PipelineM ()
@@ -421,7 +416,7 @@ refine source range = do
   findPointedSpec :: PipelineM (Maybe Spec)
   findPointedSpec = do
     parsed      <- parse source
-    converted   <- scopeCheck parsed
+    converted   <- convert parsed
     typeChecked <- typeCheck converted
     swept       <- sweep typeChecked
     let specs = sweptSpecs swept

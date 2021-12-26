@@ -37,9 +37,9 @@ instantiateSpec = testGroup
     runGoldenTest "./test/source/Server/" "./test/golden/Server/" ""
       $ \sourcePath source -> do
           return $ serializeTestResult $ runTest sourcePath source $ do
-            parsed       <- parse source
-            scopeChecked <- scopeCheck parsed
-            typeChecked  <- typeCheck scopeChecked
+            parsed      <- parse source
+            converted   <- convert parsed
+            typeChecked <- typeCheck converted
             Right <$> sweep typeChecked
 
 
@@ -53,10 +53,10 @@ specPayloadWithoutIndentationTests = testGroup
     runGoldenTest "./test/source/Server/" "./test/golden/Server/" ""
       $ \sourcePath source -> do
           return $ serializeTestResult $ runTest sourcePath source $ do
-            parsed       <- parse source
-            scopeChecked <- scopeCheck parsed
-            typeChecked  <- typeCheck scopeChecked
-            result       <- sweep typeChecked
+            parsed      <- parse source
+            converted   <- convert parsed
+            typeChecked <- typeCheck converted
+            result      <- sweep typeChecked
             let specs = sweptSpecs result
             return $ Right $ map
               ( map (\x -> "\"" <> x <> "\"")
@@ -81,10 +81,10 @@ refineSpecsTest = testGroup
     runGoldenTest "./test/source/Server/" "./test/golden/Server/" ""
       $ \sourcePath source -> do
           return $ serializeTestResult $ runTest sourcePath source $ do
-            parsed       <- parse source
-            scopeChecked <- scopeCheck parsed
-            typeChecked  <- typeCheck scopeChecked
-            result       <- sweep typeChecked
+            parsed      <- parse source
+            converted   <- convert parsed
+            typeChecked <- typeCheck converted
+            result      <- sweep typeChecked
             let specs = sweptSpecs result
             case listToMaybe specs of
               Just spec -> do
