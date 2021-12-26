@@ -26,6 +26,7 @@ import qualified Data.Set                      as Set
 import           Data.Set                       ( Set )
 import           Data.Text                      ( Text )
 import           GCL.Common                     ( Free(fv)
+                                                , Fresh(..)
                                                 , FreshState
                                                 , fresh
                                                 , freshWithLabel
@@ -84,6 +85,10 @@ mappingFromSubstitution xs es =
 
 type Scope = Map Text (Maybe Expr)
 type M = RWS Scope () Int
+
+instance Fresh M where
+  getCounter = get
+  setCounter = put
 
 runM :: MonadState FreshState m => Scope -> M b -> m b
 runM scope p = do

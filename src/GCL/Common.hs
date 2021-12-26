@@ -4,9 +4,7 @@
 module GCL.Common where
 
 import           Control.Monad.RWS              ( RWST(..) )
-import           Control.Monad.State            ( MonadState(get, put)
-                                                , StateT(..)
-                                                )
+import           Control.Monad.State            ( StateT(..) )
 import           Data.Loc                       ( Loc(..) )
 import           Data.Map                       ( Map )
 import qualified Data.Map                      as Map
@@ -20,25 +18,30 @@ import qualified Syntax.Abstract               as A
 import           Syntax.Common.Types
 
 -- get a fresh variable (and bump the counter)
-fresh :: MonadState FreshState m => m FreshState
-fresh = do
-  i <- get
-  put (succ i)
-  return i
+class Monad m => Fresh m where
+    getCounter :: m Int
+    setCounter :: Int -> m ()
+
+
+    fresh :: m Int
+    fresh = do
+        i <- getCounter
+        setCounter (succ i)
+        return i
 
   -- get a fresh variable in the form of Text
-freshText :: MonadState FreshState m => m Text
+freshText :: Fresh m => m Text
 freshText = (\i -> Text.pack ("?m_" ++ show i)) <$> fresh
 
   -- a more fancy `freshText`
-freshWithLabel :: MonadState FreshState m => Text -> m Text
+freshWithLabel :: Fresh m => Text -> m Text
 freshWithLabel l =
   (\i -> Text.pack ("?" ++ Text.unpack l ++ "_" ++ show i)) <$> fresh
 
-freshName :: MonadState FreshState m => Text -> Loc -> m Name
+freshName :: Fresh m => Text -> Loc -> m Name
 freshName prefix l = Name <$> freshWithLabel prefix <*> pure l
 
-freshName' :: MonadState FreshState m => Text -> m Name
+freshName' :: Fresh m => Text -> m Name
 freshName' prefix = freshName prefix NoLoc
 
 type FreshState = Int
@@ -107,15 +110,15 @@ class Substitutable a b where
 compose :: Substitutable a a => Subs a -> Subs a -> Subs a
 s1 `compose` s2 = s1 <> Map.map (subst s1) s2
 
-instance {-# INCOHERENT #-} Substitutable a b => Substitutable a [b] where
-  subst = map . subst
+instance (Substitutable a b, Functor f) => Substitutable a (f b) where
+  subst = fmap . subst
 
 instance Substitutable A.Type A.Type where
   subst _ t@A.TBase{}        = t
   subst s (A.TArray i  t  l) = A.TArray i (subst s t) l
   subst s (A.TFunc  t1 t2 l) = A.TFunc (subst s t1) (subst s t2) l
   subst _ t@A.TCon{}         = t
-  subst s t@(A.TVar x _  )   = Map.findWithDefault t x s
+  subst _ t@A.TVar{}         = t
   subst s t@(A.TMetaVar n)   = Map.findWithDefault t n s
 
 toStateT :: Monad m => r -> RWST r w s m a -> StateT s m a

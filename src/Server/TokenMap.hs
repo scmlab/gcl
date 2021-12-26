@@ -11,9 +11,13 @@ module Server.TokenMap
   , M
   , runM
   , Collect(..)
+  , insert
   , lookup
+  , lookupRng
   , lookupScopes
   , localScope
+  , split
+  , toList
   ) where
 
 import           Control.Monad.RWS
@@ -29,6 +33,7 @@ import           Data.Loc.Range                 ( Range
 import           Data.Map                       ( Map )
 import qualified Data.Map                      as Map
 import           Data.Text                      ( Text )
+import           Data.Bifunctor                 ( bimap )
 import           Prelude                 hiding ( lookup )
 import           Data.Text.Prettyprint.Doc
 
@@ -39,6 +44,9 @@ import           Data.Text.Prettyprint.Doc
 -- and the element's Int acting as the ending offset
 newtype TokenMap token = TokenMap (IntMap (Int, token)) deriving (Eq, Monoid, Semigroup)
 
+instance Functor TokenMap where
+  fmap f (TokenMap m) = TokenMap (IntMap.map (fmap f) m)
+
 -- Instances for debugging
 instance Pretty token => Show (TokenMap token) where
   show = show . pretty
@@ -46,7 +54,7 @@ instance Pretty token => Show (TokenMap token) where
 instance Pretty token => Pretty (TokenMap token) where
   pretty (TokenMap xs) =
     vcat
-      $ map
+      $ Prelude.map
           (\(start, (end, token)) ->
             "(" <> pretty start <> ", " <> pretty end <> ") => " <> pretty token
           )
@@ -58,6 +66,12 @@ singleton range token = TokenMap $ IntMap.singleton
   (posCoff (rangeStart range))
   (posCoff (rangeEnd range), token)
 
+insert :: Range -> token -> TokenMap token -> TokenMap token
+insert range token (TokenMap m) = TokenMap $ IntMap.insert
+  (posCoff (rangeStart range))
+  (posCoff (rangeEnd range), token)
+  m
+
 -- Given a Pos, returns the paylod if the Pos is within its Range
 lookup :: TokenMap token -> Pos -> Maybe token
 lookup (TokenMap m) pos =
@@ -65,6 +79,20 @@ lookup (TokenMap m) pos =
   in  case IntMap.lookupLE offset m of
         Nothing                 -> Nothing
         Just (_start, (end, x)) -> if offset <= end then Just x else Nothing
+
+lookupRng :: TokenMap token -> Range -> Maybe token
+lookupRng (TokenMap m) rng =
+  let offsetStart = posCoff (rangeStart rng)
+  in  let offsetEnd = posCoff (rangeEnd rng)
+      in  IntMap.lookupLE offsetStart m
+            >>= \(_, (end, x)) -> if offsetEnd <= end then Just x else Nothing
+
+split :: Range -> TokenMap token -> (TokenMap token, TokenMap token)
+split rng (TokenMap m) =
+  bimap TokenMap TokenMap (IntMap.split (posCoff (rangeStart rng)) m)
+
+toList :: TokenMap token -> [((Int, Int), token)]
+toList (TokenMap m) = map (\(a, (b, c)) -> ((a, b), c)) (IntMap.toList m)
 
 --------------------------------------------------------------------------------
 

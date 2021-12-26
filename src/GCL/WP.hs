@@ -32,11 +32,10 @@ import           Data.Loc.Range                 ( Range
                                                 )
 import qualified Data.Map                      as Map
 import qualified Data.Text                     as Text
-import           GCL.Common                     ( fresh
+import           GCL.Common                     ( Fresh(..)
                                                 , freshName'
                                                 , freshWithLabel
                                                 , freshText
-                                                , FreshState
                                                 )
 import           GCL.Predicate                  ( InfMode(..)
                                                 , Origin(..)
@@ -72,6 +71,11 @@ type WP
       ([PO], [Spec], [StructWarning], IntMap A.Redex)
       Int
       TM
+
+instance Fresh WP where
+  getCounter = get
+  setCounter = put
+
 
 runWP
   :: WP a
@@ -478,7 +482,7 @@ wp (A.Dispose e _) post = do
 wp A.Block{} post = return post
 wp _         _    = error "missing case in wp"
 
-allocated :: MonadState FreshState m => A.Expr -> m A.Expr
+allocated :: Fresh m => A.Expr -> m A.Expr
 allocated e = do
   v <- freshName' "new"
   return (A.exists [v] A.true (e `A.pointsTo` A.nameVar v))

@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 37a35ae2ba2029a8ab8a1adb6daa874e6b7a783814288e9e5245475266e6f9ee
+-- hash: 156205564106109a04cb72d46f966174dc430095d67b1f9a43ab324b1f772448
 
 name:           gcl
 version:        0.1.0.0
@@ -35,7 +35,6 @@ library
       GCL.Scope
       GCL.Substitution
       GCL.Type
-      GCL.Type2
       GCL.WP
       GCL.WP.Type
       Pretty
@@ -107,6 +106,7 @@ library
     , megaparsec >=8.0
     , mtl
     , multiset
+    , multistate
     , network
     , network-simple
     , parser-combinators
@@ -141,6 +141,7 @@ executable gcl
     , megaparsec >=8.0
     , mtl
     , multiset
+    , multistate
     , network
     , network-simple
     , parser-combinators
@@ -180,7 +181,6 @@ test-suite gcl-test
       GCL.Scope
       GCL.Substitution
       GCL.Type
-      GCL.Type2
       GCL.WP
       GCL.WP.Type
       Pretty
@@ -252,6 +252,7 @@ test-suite gcl-test
     , megaparsec >=8.0
     , mtl
     , multiset
+    , multistate
     , network
     , network-simple
     , parser-combinators

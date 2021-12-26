@@ -1,265 +1,380 @@
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE UndecidableInstances #-}
+
 
 module GCL.Type where
 
-import           Control.Monad.Reader
-import           Control.Monad.Writer.Lazy
-import           Control.Monad.State.Lazy
-import           Control.Monad.Except
 import           Data.Aeson                     ( ToJSON )
-import           Data.Loc
+import           Control.Monad.Except
+import           Control.Monad.State.Lazy
+import           Control.Monad.Writer.Lazy
+import           Control.Applicative.Combinators
+                                                ( (<|>) )
+import           Data.Loc                       ( Loc(..)
+                                                , Located
+                                                , locOf
+                                                , (<-->)
+                                                )
+import           Data.Loc.Range                 ( Range
+                                                , fromLoc
+                                                )
+import           Data.List
+import           Data.Map                       ( Map )
 import qualified Data.Map                      as Map
-import           Data.Maybe                     ( fromJust )
-import           Data.Bifunctor                 ( bimap
-                                                , second
-                                                )
+import           Data.Maybe                     ( fromMaybe )
+import           Data.Bifunctor                 ( first )
 import           GHC.Generics                   ( Generic )
-import           Syntax.Abstract
-import           Syntax.Abstract.Util
-import           Syntax.Common
-import           GCL.Common
-import           GCL.Scope                      ( TypeInfo(..)
-                                                , TypeDefnInfo(..)
-                                                , lookupFst
-                                                , collectIds
-                                                , combineTypeInfos
-                                                )
-import           Server.TokenMap                ( Scope )
 import           Prelude                 hiding ( EQ
                                                 , LT
                                                 , GT
                                                 )
 
+import           Server.TokenMap                ( TokenMap )
+import qualified Server.TokenMap               as TokenMap
+import           Syntax.Common
+import           Syntax.Abstract
+import           Syntax.Abstract.Util
+import           GCL.Common                     ( Fresh(..)
+                                                , FreshState
+                                                , freshName
+                                                , subst
+                                                , compose
+                                                , occurs
+                                                , Substitutable
+                                                )
+
+data ScopeTree a = ScopeTree
+  { globalScope :: Map Name a
+  , localScopes :: TokenMap (ScopeTree a)
+  }
+  deriving Eq
+
+data ScopeTreeZipper a = ScopeTreeZipper
+  { cursor  :: ScopeTree a
+  , parents :: [(Range, ScopeTree a)]
+  }
+  deriving Eq
+
+instance {-# Incoherent #-} Substitutable a b => Substitutable a (ScopeTree b) where
+  subst s ScopeTree {..} =
+    ScopeTree (subst s globalScope) (subst s localScopes)
+
+instance {-# Incoherent #-} Substitutable a b => Substitutable a (ScopeTreeZipper b) where
+  subst s ScopeTreeZipper {..} = ScopeTreeZipper (subst s cursor) parents
+
+fsRootScopeTree :: ScopeTreeZipper a -> ScopeTreeZipper a
+fsRootScopeTree s = maybe s fsRootScopeTree (fsUpScopeTree s)
+
+fsUpScopeTree :: ScopeTreeZipper a -> Maybe (ScopeTreeZipper a)
+fsUpScopeTree ScopeTreeZipper {..} = case parents of
+  ((rng, p) : ps) -> Just $ ScopeTreeZipper
+    (ScopeTree (globalScope p) (TokenMap.insert rng cursor (localScopes p)))
+    ps
+  [] -> Nothing
+
+insertScopeTree
+  :: Range -> Map Name a -> ScopeTreeZipper a -> ScopeTreeZipper a
+insertScopeTree rng m ScopeTreeZipper {..} =
+  let cursor' = ScopeTree m mempty
+  in  let parents' = (rng, cursor) : parents
+      in  ScopeTreeZipper cursor' parents'
+
+lookupScopeTree :: Name -> ScopeTreeZipper a -> Maybe a
+lookupScopeTree n s =
+  Map.lookup n (globalScope (cursor s))
+    <|> (fsUpScopeTree s >>= lookupScopeTree n)
+
 data TypeError
     = NotInScope Name
     | UnifyFailed Type Type Loc
     | RecursiveType Name Type Loc
+    | AssignToConst Name
     | UndefinedType Name
+    | DuplicatedIdentifiers [Name]
+    | RedundantNames [Name]
+    | RedundantExprs [Expr]
+    | MissingArguments [Name]
     deriving (Show, Eq, Generic)
 
 instance ToJSON TypeError
 
 instance Located TypeError where
-  locOf (NotInScope n       ) = locOf n
-  locOf (UnifyFailed   _ _ l) = l
-  locOf (RecursiveType _ _ l) = l
-  locOf (UndefinedType n    ) = locOf n
+  locOf (NotInScope n               ) = locOf n
+  locOf (UnifyFailed   _ _ l        ) = l
+  locOf (RecursiveType _ _ l        ) = l
+  locOf (AssignToConst         n    ) = locOf n
+  locOf (UndefinedType         n    ) = locOf n
+  locOf (DuplicatedIdentifiers ns   ) = locOf ns
+  locOf (RedundantNames        ns   ) = locOf ns
+  locOf (RedundantExprs        exprs) = locOf exprs
+  locOf (MissingArguments      ns   ) = locOf ns
 
-type TypeInferM a
-  =  forall m
-   . ( MonadState FreshState m
-     , MonadWriter [Constraint] m
-     , MonadError TypeError m
-     )
-  => m a
+data TypeInfo =
+    TypeDefnCtorInfo Type
+    | ConstTypeInfo Type
+    | VarTypeInfo Type
+    deriving (Eq, Show)
 
-type TypeCheckM a
-  =  forall m
-   . ( MonadReader (Scope TypeDefnInfo, Scope TypeInfo) m
-     , MonadState FreshState m
-     , MonadError TypeError m
-     )
-  => m a
+instance Substitutable Type TypeInfo where
+  subst s (TypeDefnCtorInfo t) = TypeDefnCtorInfo (subst s t)
+  subst s (ConstTypeInfo    t) = ConstTypeInfo (subst s t)
+  subst s (VarTypeInfo      t) = VarTypeInfo (subst s t)
+
+newtype TypeDefnInfo = TypeDefnInfo [Name]
+  deriving (Eq, Show)
+
+dups :: Eq a => [a] -> [a]
+dups = map head . filter ((> 1) . length) . group
+
+duplicationCheck
+  :: (Eq a, MonadError TypeError m) => [(Name, a)] -> m [(Name, a)]
+duplicationCheck ns =
+  let ds = dups ns
+  in  if null ds
+        then return ns
+        else throwError $ DuplicatedIdentifiers (map fst ds)
+
+class HasTypeDefnInfoScope m where
+    getTypeDefnInfo :: m (ScopeTreeZipper TypeDefnInfo)
+    setTypeDefnInfo :: ScopeTreeZipper TypeDefnInfo -> m ()
+
+class HasTypeInfoScope m where
+    getTypeInfo :: m (ScopeTreeZipper TypeInfo)
+    setTypeInfo :: ScopeTreeZipper TypeInfo -> m ()
 
 --------------------------------------------------------------------------------
 -- Type inference
+
+type TypeInferM = WriterT [Constraint] TypeCheckM
+
+instance Fresh TypeInferM where
+  getCounter = do
+    (i, _, _) <- get
+    return i
+  setCounter i = do
+    (_, s1, s2) <- get
+    put (i, s1, s2)
+
+instance HasTypeDefnInfoScope TypeInferM where
+  getTypeDefnInfo = do
+    (_, s, _) <- get
+    return s
+  setTypeDefnInfo s2 = do
+    (s1, _, s3) <- get
+    put (s1, s2, s3)
+
+instance HasTypeInfoScope TypeInferM where
+  getTypeInfo = do
+    (_, _, s) <- get
+    return s
+  setTypeInfo s3 = do
+    (s1, s2, _) <- get
+    put (s1, s2, s3)
+
+type Constraint = (Type, Type, Loc)
+
+checkScope :: (MonadError TypeError m, Eq a) => [(Name, a)] -> m (Map Name a)
+checkScope infos = Map.fromList <$> duplicationCheck infos
+
+newScope
+  :: (HasTypeDefnInfoScope m, HasTypeInfoScope m, MonadError TypeError m)
+  => Loc
+  -> ([(Name, TypeDefnInfo)], [(Name, TypeInfo)])
+  -> m ()
+newScope l (infos1, infos2) = do
+  m1 <- checkScope infos1
+  m2 <- checkScope infos2
+  case fromLoc l of
+    Just rng -> do
+      getTypeDefnInfo >>= setTypeDefnInfo . insertScopeTree rng m1
+      getTypeInfo >>= setTypeInfo . insertScopeTree rng m2
+    _ -> pure ()
+
+localScope
+  :: (HasTypeDefnInfoScope m, HasTypeInfoScope m, MonadError TypeError m)
+  => Loc
+  -> ([(Name, TypeDefnInfo)], [(Name, TypeInfo)])
+  -> m b
+  -> m b
+localScope l infos act = do
+  newScope l infos
+  x <- act
+  getTypeDefnInfo >>= setTypeDefnInfo . fsUpScopeTree'
+  getTypeInfo >>= setTypeInfo . fsUpScopeTree'
+  return x
+  where fsUpScopeTree' s = fromMaybe s (fsUpScopeTree s)
+
 class Located a => InferType a where
-  inferType :: (Scope TypeDefnInfo, Scope TypeInfo) -> a -> TypeInferM Type
+    inferType :: a -> TypeInferM Type
 
-runInferType
-  :: (MonadError TypeError m, MonadState FreshState m, InferType a)
-  => (Scope TypeDefnInfo, Scope TypeInfo)
-  -> a
-  -> m (Subs Type, Type)
-runInferType env x = do
-  (t, constraints) <- runWriterT (inferType env x)
-  s                <- solveConstraints constraints
-  return (s, subst s t)
-
-instance InferType a => InferType [a] where
-  inferType env xs = do
-    ts <- mapM (inferType env) xs
-    v  <- freshVar
-    mapM_ (\(t, x) -> tell [(v, t, locOf x)]) (zip ts xs)
-    return v
-
+runInferType :: InferType a => a -> TypeCheckM (Map Name Type, Type)
+runInferType x = do
+  (tx, constraints) <- runWriterT (inferType x)
+  s                 <- solveConstraints constraints
+  return (s, subst s tx)
 
 instance InferType Expr where
-  inferType _   (Lit   lit l) = return (litTypes lit l)
-  inferType env (Var   x   _) = inferType env x
-  inferType env (Const x   _) = inferType env x
-  inferType env (Op o       ) = inferType env o
-  inferType env (App (App (Op op@(ChainOp _)) e1 _) e2 l) = do
-    top <- inferType env op
+  inferType (Lit   lit l) = return (litTypes lit l)
+  inferType (Var   x   _) = inferType x
+  inferType (Const x   _) = inferType x
+  inferType (Op o       ) = inferType o
+  inferType (App (App (Op op@(ChainOp _)) e1 _) e2 l) = do
+    top <- inferType op
 
     t1  <- case e1 of
       App (App (Op (ChainOp _)) _ _) e12 _ -> do
-        _ <- inferType env e1
-        inferType env e12
-      _ -> inferType env e1
+        _ <- inferType e1
+        inferType e12
+      _ -> inferType e1
 
-    t2 <- inferType env e2
+    t2 <- inferType e2
     v  <- freshVar
     tell [(top, t1 ~-> t2 ~-> v, l)]
 
     return (tBool l)
-  inferType env (App e1 e2 l) = do
-    t1 <- inferType env e1
-    t2 <- inferType env e2
+  inferType (App e1 e2 l) = do
+    t1 <- inferType e1
+    t2 <- inferType e2
     v  <- freshVar
     tell [(t1, t2 ~-> v, l)]
     return v
-  inferType env (Lam x e l) = do
+  inferType (Lam x e l) = do
     v <- freshVar
-    t <- inferType
-      (second (Map.insert (nameToText x) (VarTypeInfo v (locOf x))) env)
-      e
+    t <- localScope l ([], [(x, VarTypeInfo v)]) (inferType e)
     return (TFunc v t l)
-  inferType env (Quant qop iters rng t l) = do
-    titers <- mapM (const freshVar) iters
-    let localEnv = second
-          (Map.fromList
-            [ (nameToText n, VarTypeInfo tn (locOf n))
-            | n  <- iters
-            , tn <- titers
-            ] `Map.union`
-          )
-          env
-    tr <- inferType localEnv rng
+  inferType (Quant qop ids rng t l) = do
+    tids     <- mapM (const freshVar) ids
+    (tr, tt) <- localScope
+      l
+      ([], [ (n, VarTypeInfo tn) | n <- ids, tn <- tids ])
+      ((,) <$> inferType rng <*> inferType t)
     tell [(tr, tBool NoLoc, locOf rng)]
-    tt <- inferType localEnv t
     case qop of
       Op (ArithOp (Hash _)) -> do
         tell [(tt, tBool NoLoc, locOf t)]
         return (tInt l)
       op -> do
-        to <- inferType env op
+        to <- inferType op
         x  <- freshVar
         tell [(to, x ~-> x ~-> x, locOf op), (tt, x, locOf t)]
         return x
-  inferType env (Redex (Rdx _ expr)) = inferType env expr
-  inferType env (RedexStem n _ _ _ ) = inferType env n
-  inferType env (ArrIdx e1 e2 _    ) = do
-    t1 <- inferType env e1
+  inferType (Redex (Rdx _ expr)) = inferType expr
+  inferType (RedexStem n _ _ _ ) = inferType n
+  inferType (ArrIdx e1 e2 _    ) = do
+    t1 <- inferType e1
     let interval = case t1 of
           TArray itv _ _ -> itv
           _              -> emptyInterval
-    t2 <- inferType env e2
+    t2 <- inferType e2
     tell [(t2, tInt NoLoc, locOf e2)]
     v <- freshVar
     tell [(t1, TArray interval v NoLoc, locOf t1)]
     return v
-  inferType env (ArrUpd e1 e2 e3 _) = do
-    t1 <- inferType env e1
+  inferType (ArrUpd e1 e2 e3 _) = do
+    t1 <- inferType e1
     let interval = case t1 of
           TArray itv _ _ -> itv
           _              -> emptyInterval
-    t2 <- inferType env e2
-    t3 <- inferType env e3
+    t2 <- inferType e2
+    t3 <- inferType e3
     tell [(t2, tInt NoLoc, locOf e2), (t1, TArray interval t3 NoLoc, locOf e1)]
     return t1
-  inferType env (Case expr cs _) = do
-    te <- inferType env expr
-    ts <- mapM (inferCaseConstructor te (locOf expr)) cs
+  inferType (Case expr cs l) = do
+    te <- inferType expr
+    ts <- mapM inferType cs
     t  <- freshVar
-    mapM_ (\(tc, c) -> tell [(t, tc, locOf c)]) (zip ts cs)
+    mapM_ (\(tc, c) -> tell [(TFunc te t l, tc, locOf c)]) (zip ts cs)
     return t
+
+instance InferType CaseConstructor where
+  inferType c@(CaseConstructor patt expr) = do
+    (pattInfos, tPatt) <- collectPattInfos patt
+    te                 <- localScope (locOf c) ([], pattInfos) (inferType expr)
+    return (TFunc tPatt te (locOf c))
    where
-    inferCaseConstructor tPatt l (CaseConstructor patt e) = do
-      (localTypeInfo, tPatt') <- inferPatt env patt
-      let localTypeInfo' =
-            Map.union
-              . Map.fromList
-              . map (\(n, t) -> (nameToText n, VarTypeInfo t (locOf n)))
-              $ localTypeInfo
-      tell [(tPatt, tPatt', l)]
-      inferType (second localTypeInfo' env) e
+    collectPattInfos :: Pattern -> TypeInferM ([(Name, TypeInfo)], Type)
+    collectPattInfos (PattLit    x) = return ([], litTypes x (locOf x))
+    collectPattInfos (PattBinder n) = do
+      tn <- freshVar
+      return ([(n, VarTypeInfo tn)], tn)
+    collectPattInfos (PattWildcard _         ) = ([], ) <$> freshVar
+    collectPattInfos (PattConstructor n patts) = do
+      tPatt           <- freshVar
+      tn              <- inferType n
+      (infos, tpatts) <- first concat . unzip <$> mapM collectPattInfos patts
 
-inferPatt
-  :: (Scope TypeDefnInfo, Scope TypeInfo)
-  -> Pattern
-  -> TypeInferM ([(Name, Type)], Type)
-inferPatt _ (PattLit    x) = return ([], litTypes x (locOf x))
-inferPatt _ (PattBinder n) = do
-  tn <- freshVar
-  return ([(n, tn)], tn)
-inferPatt _   (PattWildcard _         ) = ([], ) <$> freshVar
-inferPatt env (PattConstructor n patts) = do
-  tPatt              <- freshVar
-  tn                 <- inferType env n
-  (localEnv, tpatts) <- unzip <$> mapM (inferPatt env) patts
-
-  tell [(tn, wrapTFunc tpatts tPatt, n <--> patts)]
-  return (concat localEnv, tPatt)
-
+      tell [(tn, wrapTFunc tpatts tPatt, n <--> patts)]
+      return (infos, tPatt)
 
 instance InferType Op where
-  inferType env (ChainOp op) = inferType env op
-  inferType env (ArithOp op) = inferType env op
+  inferType (ChainOp op) = inferType op
+  inferType (ArithOp op) = inferType op
 
 instance InferType ChainOp where
-  inferType _ (EQProp  l) = return $ tBool .-> tBool .-> tBool $ l
-  inferType _ (EQPropU l) = return $ tBool .-> tBool .-> tBool $ l
-  inferType _ (EQ      l) = do
+  inferType (EQProp  l) = return $ tBool .-> tBool .-> tBool $ l
+  inferType (EQPropU l) = return $ tBool .-> tBool .-> tBool $ l
+  inferType (EQ      l) = do
     x <- freshVar
     return $ const x .-> const x .-> tBool $ l
-  inferType _ (NEQ  l) = return $ tInt .-> tInt .-> tBool $ l
-  inferType _ (NEQU l) = return $ tInt .-> tInt .-> tBool $ l
-  inferType _ (LTE  l) = return $ tInt .-> tInt .-> tBool $ l
-  inferType _ (LTEU l) = return $ tInt .-> tInt .-> tBool $ l
-  inferType _ (GTE  l) = return $ tInt .-> tInt .-> tBool $ l
-  inferType _ (GTEU l) = return $ tInt .-> tInt .-> tBool $ l
-  inferType _ (LT   l) = do
+  inferType (NEQ  l) = return $ tInt .-> tInt .-> tBool $ l
+  inferType (NEQU l) = return $ tInt .-> tInt .-> tBool $ l
+  inferType (LTE  l) = return $ tInt .-> tInt .-> tBool $ l
+  inferType (LTEU l) = return $ tInt .-> tInt .-> tBool $ l
+  inferType (GTE  l) = return $ tInt .-> tInt .-> tBool $ l
+  inferType (GTEU l) = return $ tInt .-> tInt .-> tBool $ l
+  inferType (LT   l) = do
     x <- freshVar
     return $ const x .-> const x .-> tBool $ l
-  inferType _ (GT l) = do
+  inferType (GT l) = do
     x <- freshVar
     return $ const x .-> const x .-> tBool $ l
 
 instance InferType ArithOp where
-  inferType _ (Implies  l) = return $ tBool .-> tBool .-> tBool $ l
-  inferType _ (ImpliesU l) = return $ tBool .-> tBool .-> tBool $ l
-  inferType _ (Conj     l) = return $ tBool .-> tBool .-> tBool $ l
-  inferType _ (ConjU    l) = return $ tBool .-> tBool .-> tBool $ l
-  inferType _ (Disj     l) = return $ tBool .-> tBool .-> tBool $ l
-  inferType _ (DisjU    l) = return $ tBool .-> tBool .-> tBool $ l
-  inferType _ (Neg      l) = return $ tBool .-> tBool $ l
-  inferType _ (NegU     l) = return $ tBool .-> tBool $ l
-  inferType _ (Add      l) = return $ tInt .-> tInt .-> tInt $ l
-  inferType _ (Sub      l) = return $ tInt .-> tInt .-> tInt $ l
-  inferType _ (Mul      l) = return $ tInt .-> tInt .-> tInt $ l
-  inferType _ (Div      l) = return $ tInt .-> tInt .-> tInt $ l
-  inferType _ (Mod      l) = return $ tInt .-> tInt .-> tInt $ l
-  inferType _ (Max      l) = return $ tInt .-> tInt .-> tInt $ l
-  inferType _ (Min      l) = return $ tInt .-> tInt .-> tInt $ l
-  inferType _ (Exp      l) = return $ tInt .-> tInt .-> tInt $ l
-  inferType _ (Hash     l) = return $ tBool .-> tInt $ l
-  inferType _ (PointsTo l) = return $ tInt .-> tInt .-> tInt $ l
-  inferType _ (SConj    l) = return $ tBool .-> tBool .-> tBool $ l
-  inferType _ (SImp     l) = return $ tBool .-> tBool .-> tBool $ l
+  inferType (Implies  l) = return $ tBool .-> tBool .-> tBool $ l
+  inferType (ImpliesU l) = return $ tBool .-> tBool .-> tBool $ l
+  inferType (Conj     l) = return $ tBool .-> tBool .-> tBool $ l
+  inferType (ConjU    l) = return $ tBool .-> tBool .-> tBool $ l
+  inferType (Disj     l) = return $ tBool .-> tBool .-> tBool $ l
+  inferType (DisjU    l) = return $ tBool .-> tBool .-> tBool $ l
+  inferType (Neg      l) = return $ tBool .-> tBool $ l
+  inferType (NegU     l) = return $ tBool .-> tBool $ l
+  inferType (Add      l) = return $ tInt .-> tInt .-> tInt $ l
+  inferType (Sub      l) = return $ tInt .-> tInt .-> tInt $ l
+  inferType (Mul      l) = return $ tInt .-> tInt .-> tInt $ l
+  inferType (Div      l) = return $ tInt .-> tInt .-> tInt $ l
+  inferType (Mod      l) = return $ tInt .-> tInt .-> tInt $ l
+  inferType (Max      l) = return $ tInt .-> tInt .-> tInt $ l
+  inferType (Min      l) = return $ tInt .-> tInt .-> tInt $ l
+  inferType (Exp      l) = return $ tInt .-> tInt .-> tInt $ l
+  inferType (Hash     l) = return $ tBool .-> tInt $ l
+  inferType (PointsTo l) = return $ tInt .-> tInt .-> tInt $ l
+  inferType (SConj    l) = return $ tBool .-> tBool .-> tBool $ l
+  inferType (SImp     l) = return $ tBool .-> tBool .-> tBool $ l
 
 instance InferType Name where
-  inferType env n = case Map.lookup (nameToText n) (snd env) of
-    Just (TypeDefnCtorInfo t  _) -> return t
-    Just (FuncDefnInfo     mt _) -> return . fromJust $ mt
-    Just (ConstTypeInfo    t  _) -> return t
-    Just (VarTypeInfo      t  _) -> return t
-    _                            -> throwError (NotInScope n)
+  inferType n = do
+    (_, _, s) <- get
+    case lookupScopeTree n s of
+      Just t  -> return (typeInfoToType t)
+      Nothing -> throwError $ NotInScope n
 
 --------------------------------------------------------------------------------
 -- unification
-type Constraint = (Type, Type, Loc)
-type Unifier = (Subs Type, [Constraint])
+type Unifier = (Map Name Type, [Constraint])
 
 emptyUnifier :: Unifier
-emptyUnifier = (emptySubs, [])
+emptyUnifier = (mempty, [])
 
-unifies :: MonadError TypeError m => Type -> Type -> Loc -> m (Subs Type)
-unifies (TBase t1 _) (TBase t2 _) _ | t1 == t2 = return emptySubs
+unifies :: MonadError TypeError m => Type -> Type -> Loc -> m (Map Name Type)
+unifies (TBase t1 _) (TBase t2 _) _ | t1 == t2 = return mempty
 unifies (TArray _ t1 _) (TArray _ t2 _) l = unifies t1 t2 l {-  | i1 == i2 = unifies t1 t2 -}
   -- SCM: for now, we do not check the intervals
 -- view array of type `t` as function type of `Int -> t`
@@ -270,26 +385,26 @@ unifies (TFunc t1 t2 _) (TFunc t3 t4 _) l = do
   s2 <- unifies (subst s1 t2) (subst s1 t4) l
   return (s2 `compose` s1)
 unifies (TCon n1 args1 _) (TCon n2 args2 _) _
-  | n1 == n2 && length args1 == length args2 = return emptySubs
-unifies (TVar x1 _) (TVar x2 _) _ | x1 == x2 = return emptySubs
+  | n1 == n2 && length args1 == length args2 = return mempty
+unifies (TVar x1 _) (TVar x2 _) _ | x1 == x2 = return mempty
 unifies (TVar x _) t@(TBase tb _) _ | x == baseToName tb =
   return $ Map.singleton x t
 unifies (TVar x _) t@(TCon n args _) _ | x == n && null args =
   return $ Map.singleton x t
 unifies t1 t2@(TVar _ _) l                   = unifies t2 t1 l
-unifies (TMetaVar x) (TMetaVar y) _ | x == y = return emptySubs
+unifies (TMetaVar x) (TMetaVar y) _ | x == y = return mempty
 unifies (TMetaVar x) t            l          = bind x t l
 unifies t            (TMetaVar x) l          = bind x t l
 unifies t1           t2           l          = throwError $ UnifyFailed t1 t2 l
 
-bind :: MonadError TypeError m => Name -> Type -> Loc -> m (Subs Type)
+bind :: MonadError TypeError m => Name -> Type -> Loc -> m (Map Name Type)
 bind x t l | occurs x t = throwError $ RecursiveType x t l
            | otherwise  = return (Map.singleton x t)
 
-solveConstraints :: MonadError TypeError m => [Constraint] -> m (Subs Type)
-solveConstraints cs = solveUnifier (emptySubs, cs)
+solveConstraints :: MonadError TypeError m => [Constraint] -> m (Map Name Type)
+solveConstraints cs = solveUnifier (mempty, cs)
 
-solveUnifier :: MonadError TypeError m => Unifier -> m (Subs Type)
+solveUnifier :: MonadError TypeError m => Unifier -> m (Map Name Type)
 solveUnifier (s, []              ) = return s
 solveUnifier (s, (t1, t2, l) : cs) = do
   su <- unifies t1 t2 l
@@ -298,76 +413,154 @@ solveUnifier (s, (t1, t2, l) : cs) = do
 
 --------------------------------------------------------------------------------
 -- Type check
-class TypeCheckable a where
-    typeCheck :: a -> TypeCheckM ()
+type TypeCheckM
+  = StateT
+      (FreshState, ScopeTreeZipper TypeDefnInfo, ScopeTreeZipper TypeInfo)
+      (Except TypeError)
 
-runTypeCheck :: Program -> Either TypeError ()
-runTypeCheck prog =
-  runExcept $ evalStateT (runReaderT (typeCheck prog) mempty) 0
+instance Fresh TypeCheckM where
+  getCounter = do
+    (s, _, _) <- get
+    return s
+  setCounter s1 = do
+    (_, s2, s3) <- get
+    put (s1, s2, s3)
 
-generateEnv
-  :: (MonadState FreshState m, MonadError TypeError m)
-  => Program
-  -> m (Scope TypeDefnInfo, Scope TypeInfo)
-generateEnv prog = do
-  let (tids, ids) = collectIds prog
-  ids' <- mapM
-    (\info -> case info of
-      FuncDefnInfo _ l -> do
-        v <- freshVar
-        return (FuncDefnInfo (Just v) l)
-      _ -> return info
-    )
-    (combineTypeInfos ids)
-  return (Map.fromList tids, ids')
+instance  HasTypeDefnInfoScope TypeCheckM where
+  getTypeDefnInfo = do
+    (_, s, _) <- get
+    return s
+  setTypeDefnInfo s2 = do
+    (s1, _, s3) <- get
+    put (s1, s2, s3)
+
+instance HasTypeInfoScope TypeCheckM where
+  getTypeInfo = do
+    (_, _, s) <- get
+    return s
+  setTypeInfo s3 = do
+    (s1, s2, _) <- get
+    put (s1, s2, s3)
 
 infer :: InferType a => a -> TypeCheckM Type
-infer x = ask >>= fmap snd . (`runInferType` x)
+infer x = do
+  (s, t) <- runInferType x
+  updateScopeTreeZipper s
+  return t
 
 checkIsType :: InferType a => a -> Type -> TypeCheckM ()
 checkIsType x t = do
-  te <- infer x
-  void $ solveConstraints [(t, te, locOf x)]
+  (s1, te) <- runInferType x
+  s2       <- solveConstraints [(t, te, locOf x)]
+  updateScopeTreeZipper (s2 `compose` s1)
 
-instance TypeCheckable a => TypeCheckable [a] where
+updateScopeTreeZipper :: Map Name Type -> TypeCheckM ()
+updateScopeTreeZipper s = do
+  getTypeInfo >>= setTypeInfo . subst s
+
+runTypeCheck
+  :: Program
+  -> Either
+       TypeError
+       (ScopeTreeZipper TypeDefnInfo, ScopeTreeZipper TypeInfo)
+runTypeCheck prog = do
+  let initTypeInfo     = ScopeTreeZipper (ScopeTree mempty mempty) []
+  let initTypeDefnInfo = ScopeTreeZipper (ScopeTree mempty mempty) []
+  (_, s2, s3) <- runExcept
+    (execStateT (typeCheck prog) (0, initTypeDefnInfo, initTypeInfo))
+  return (fsRootScopeTree s2, fsRootScopeTree s3)
+
+class TypeCheckable a where
+    typeCheck :: a -> TypeCheckM ()
+
+instance (TypeCheckable a, Foldable t) => TypeCheckable (t a) where
   typeCheck xs = mapM_ typeCheck xs
 
-instance TypeCheckable a => TypeCheckable (Maybe a) where
-  typeCheck m = forM_ m typeCheck
+class CollectIds a where
+    collectIds :: Fresh m => a -> m [(Name, TypeInfo)]
+
+instance CollectIds a => CollectIds [a] where
+  collectIds xs = concat <$> mapM collectIds xs
+
+instance CollectIds Definition where
+  collectIds (TypeDefn n args ctors _) = do
+    let t = TCon n args (n <--> args)
+    return $ map
+      (\(TypeDefnCtor cn ts) -> (cn, TypeDefnCtorInfo (wrapTFunc ts t)))
+      ctors
+
+  collectIds (FuncDefnSig n t _ _) = return [(n, ConstTypeInfo t)]
+  collectIds (FuncDefn n _       ) = do
+    v <- freshVar
+    return [(n, ConstTypeInfo v)]
+
+instance CollectIds Declaration where
+  collectIds (ConstDecl ns t _ _) = return $ map (, ConstTypeInfo t) ns
+  collectIds (VarDecl   ns t _ _) = return $ map (, VarTypeInfo t) ns
 
 instance TypeCheckable Program where
-  typeCheck prog@(Program _ _ exprs stmts _) = do
-    localEnv <- generateEnv prog
-    local (bimap (Map.union (fst localEnv)) (Map.union (snd localEnv)))
-          (typeCheck exprs)
-    local (bimap (Map.union (fst localEnv)) (Map.union (snd localEnv)))
-          (typeCheck stmts)
-
-instance TypeCheckable Declaration where
-  typeCheck (ConstDecl _ _ mexpr _) = typeCheck mexpr
-  typeCheck (VarDecl   _ _ mexpr _) = typeCheck mexpr
+  typeCheck (Program defns decls exprs stmts loc) = do
+    infos <- (<>) <$> collectIds defns <*> collectIds decls
+    let tcons = concatMap collectTCon defns
+    localScope
+      loc
+      (tcons, infos)
+      (do
+        typeCheck defns
+        typeCheck decls
+        typeCheck exprs
+        typeCheck stmts
+      )
+   where
+    collectTCon (TypeDefn n args _ _) = [(n, TypeDefnInfo args)]
+    collectTCon _                     = []
 
 instance TypeCheckable Definition where
-  typeCheck TypeDefn{}                = return ()
-  typeCheck (FuncDefnSig n t mexpr _) = do
-    checkIsType n t
-    typeCheck mexpr
+  typeCheck (TypeDefn _ args ctors _) = do
+    let m = Map.fromList (map (, ()) args)
+    mapM_ (\(TypeDefnCtor _ ts) -> mapM_ (scopeCheck m) ts) ctors
+    typeCheck ctors
+   where
+    scopeCheck :: MonadError TypeError m => Map Name () -> Type -> m ()
+    scopeCheck m (TCon _ args' _) = mapM_
+      (\a -> case Map.lookup a m of
+        Just _ -> return ()
+        _      -> throwError $ NotInScope a
+      )
+      args'
+    scopeCheck _ _ = return ()
+  typeCheck (FuncDefnSig _ t prop _) = do
+    typeCheck t
+    typeCheck prop
   typeCheck (FuncDefn n exprs) = do
-    t <- infer n
-    mapM_ (`checkIsType` t) exprs
+    tn <- infer n
+    mapM_ (`checkIsType` tn) exprs
+
+instance TypeCheckable TypeDefnCtor where
+  typeCheck (TypeDefnCtor _ ts) = typeCheck ts
+
+instance TypeCheckable Declaration where
+  typeCheck (ConstDecl _ t prop _) = typeCheck t >> typeCheck prop
+  typeCheck (VarDecl   _ t prop _) = typeCheck t >> typeCheck prop
 
 instance TypeCheckable Stmt where
   typeCheck (Skip  _       ) = return ()
   typeCheck (Abort _       ) = return ()
   typeCheck (Assign ns es _) = do
-    mapM_ checkAssign (zip ns es)
+    let ass = zip ns es
+    let an  = length ass
+    if
+      | an < length es -> throwError $ RedundantExprs (drop an es)
+      | an < length ns -> throwError $ RedundantNames (drop an ns)
+      | otherwise      -> mapM_ checkAssign ass
    where
     checkAssign :: (Name, Expr) -> TypeCheckM ()
     checkAssign (n, expr) = do
-      env <- ask
-      case Map.lookup (nameToText n) (snd env) of
-        Just (VarTypeInfo t _) -> checkIsType expr t
-        _                      -> throwError $ UndefinedType n
+      (_, _, s) <- get
+      case lookupScopeTree n s of
+        Just (VarTypeInfo t) -> checkIsType expr t
+        Just _               -> throwError $ AssignToConst n
+        Nothing              -> throwError $ NotInScope n
   typeCheck (AAssign x i e _) = do
     checkIsType i (tInt NoLoc)
     te <- infer e
@@ -383,20 +576,12 @@ instance TypeCheckable Stmt where
   typeCheck Spec{}         = return ()
   typeCheck Proof{}        = return ()
   typeCheck (Alloc x es _) = do
-    env <- ask
-    case Map.lookup (nameToText x) (snd env) of
-      Just (VarTypeInfo t _) -> mapM_ (`checkIsType` t) es
-      _                      -> throwError $ UndefinedType x
-  typeCheck (HLookup x e _) = do
-    env <- ask
-    case Map.lookup (nameToText x) (snd env) of
-      Just (VarTypeInfo   t _) -> checkIsType e t
-      Just (ConstTypeInfo t _) -> checkIsType e t
-      _                        -> throwError $ UndefinedType x
-  typeCheck (HMutate e1 e2 _) = do
-    infer e1 >>= checkIsType e2
-  typeCheck (Dispose e _) = checkIsType e (tInt NoLoc)
-  typeCheck (Block   p _) = typeCheck p
+    t <- infer x
+    mapM_ (`checkIsType` t) es
+  typeCheck (HLookup x  e  _) = infer x >>= checkIsType e
+  typeCheck (HMutate e1 e2 _) = infer e1 >>= checkIsType e2
+  typeCheck (Dispose e _    ) = checkIsType e (tInt NoLoc)
+  typeCheck (Block   p _    ) = typeCheck p
 
 instance TypeCheckable GdCmd where
   typeCheck (GdCmd e s _) = checkIsType e (tBool NoLoc) >> typeCheck s
@@ -405,14 +590,19 @@ instance TypeCheckable Expr where
   typeCheck = void . infer
 
 instance TypeCheckable Type where
-  typeCheck TBase{}          = return ()
-  typeCheck (TArray i  t  _) = typeCheck i >> typeCheck t
-  typeCheck (TFunc  t1 t2 _) = typeCheck t1 >> typeCheck t2
-  typeCheck (TCon   n  _  _) = do
-    info <- lookupFst n
-    case info of
-      Just _ -> return ()
-      _      -> throwError $ NotInScope n
+  typeCheck TBase{}            = return ()
+  typeCheck (TArray i  t    _) = typeCheck i >> typeCheck t
+  typeCheck (TFunc  t1 t2   _) = typeCheck t1 >> typeCheck t2
+  typeCheck (TCon   n  args _) = do
+    (_, s, _) <- get
+    case lookupScopeTree n s of
+      Just (TypeDefnInfo args') -> if
+        | length args < length args' -> throwError
+        $ MissingArguments (drop (length args) args')
+        | length args > length args' -> throwError
+        $ RedundantNames (drop (length args') args)
+        | otherwise -> return ()
+      _ -> throwError $ NotInScope n
   typeCheck TVar{}     = return ()
   typeCheck TMetaVar{} = return ()
 
@@ -423,10 +613,14 @@ instance TypeCheckable Endpoint where
   typeCheck (Including e) = typeCheck e
   typeCheck (Excluding e) = typeCheck e
 
-
 --------------------------------------------------------------------------------
 -- helper combinators
-freshVar :: MonadState FreshState m => m Type
+typeInfoToType :: TypeInfo -> Type
+typeInfoToType (TypeDefnCtorInfo t) = t
+typeInfoToType (ConstTypeInfo    t) = t
+typeInfoToType (VarTypeInfo      t) = t
+
+freshVar :: Fresh m => m Type
 freshVar = do
   TMetaVar <$> freshName "Type.metaVar" NoLoc
 

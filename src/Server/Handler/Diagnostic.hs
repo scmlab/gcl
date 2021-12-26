@@ -69,12 +69,42 @@ instance Collect TypeError Diagnostic where
       <>  "in type             :"
       <+> pretty t
 
+  collect (AssignToConst n) =
+    makeError (locOf n) "Assigned To Const"
+      $   docToText
+      $   "Assigned to constant:"
+      <+> pretty n
+
   collect (UndefinedType n) =
     makeError (locOf n) "Undefined Type"
       $   docToText
       $   "Type"
       <+> pretty n
       <+> "is undefined"
+
+  collect (DuplicatedIdentifiers ns) =
+    makeError (locOf ns) "Duplicated Identifiers"
+      $   docToText
+      $   "Duplicated identifiers"
+      <+> pretty ns
+
+  collect (RedundantNames ns) =
+    makeError (locOf ns) "Redundant Names"
+      $   docToText
+      $   "Redundant names"
+      <+> pretty ns
+
+  collect (RedundantExprs exprs) =
+    makeError (locOf exprs) "Redundant Exprs"
+      $   docToText
+      $   "Redundant exprs"
+      <+> pretty exprs
+
+  collect (MissingArguments ns) =
+    makeError (locOf ns) "Missing Arguments"
+      $   docToText
+      $   "Missing arguments"
+      <+> pretty ns
 
 instance Collect StructWarning Diagnostic where
   collect (MissingBound range) = makeWarning

@@ -55,16 +55,17 @@ programToScopes prog = [topLevelScope]
   topLevelScope :: Map Text Type
   topLevelScope =
     -- run type checking to get the types of definitions/declarations
-    case runExcept (evalStateT (TypeChecking.generateEnv prog) 0) of
-      Left  _   -> Map.empty -- ignore type errors
-      Right env -> Map.mapMaybe
-        (\case
-          ScopeChecking.TypeDefnCtorInfo t  _ -> Just t
-          ScopeChecking.FuncDefnInfo     mt _ -> mt
-          ScopeChecking.VarTypeInfo      t  _ -> Just t
-          ScopeChecking.ConstTypeInfo    t  _ -> Just t
-        )
-        (snd env)
+                  case TypeChecking.runTypeCheck prog of
+    Left  _ -> Map.empty -- ignore type errors
+    Right _ -> mempty
+    -- Map.mapMaybe
+      --(\case
+        --ScopeChecking.TypeDefnCtorInfo t  _ -> Just t
+        --ScopeChecking.FuncDefnInfo     mt _ -> mt
+        --ScopeChecking.VarTypeInfo      t  _ -> Just t
+        --ScopeChecking.ConstTypeInfo    t  _ -> Just t
+      --)
+      --(snd env)
 
 --------------------------------------------------------------------------------
 -- Names

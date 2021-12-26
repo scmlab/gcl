@@ -2,7 +2,6 @@
 
 module Render.Error where
 
-import           Data.Foldable                  ( toList )
 import           Data.Loc.Range
 import           Data.Loc                       ( locOf )
 import           Error
@@ -74,10 +73,40 @@ instance RenderSection TypeError where
     [ Header "Recursive type variable" (fromLoc loc)
     , Paragraph $ render name <+> "is recursive in" <+> render t
     ]
+  renderSection (AssignToConst n) = Section
+    Red
+    [ Header "Assigned to const declaration" (fromLoc (locOf n))
+    , Paragraph $ "Identifier" <+> render n <+> "cannot be assigned"
+    ]
   renderSection (UndefinedType n) = Section
     Red
     [ Header "Undefined Type" (fromLoc (locOf n))
     , Paragraph $ "Type" <+> render n <+> "is undefined"
+    ]
+  renderSection (DuplicatedIdentifiers ids) = Section
+    Red
+    (concatMap
+      (\n ->
+        [ Header "Duplicated Identifiers" (fromLoc (locOf n))
+        , Paragraph $ "Duplicated identifier" <+> render n
+        ]
+      )
+      ids
+    )
+  renderSection (RedundantNames ns) = Section
+    Red
+    [ Header "Redundant Names" (fromLoc (locOf ns))
+    , Paragraph $ "Redundant names" <+> renderManySepByComma ns
+    ]
+  renderSection (RedundantExprs exprs) = Section
+    Red
+    [ Header "Redundant Exprs" (fromLoc (locOf exprs))
+    , Paragraph $ "Redundant exprs" <+> renderManySepByComma exprs
+    ]
+  renderSection (MissingArguments ns) = Section
+    Red
+    [ Header "Missing arguments" (fromLoc (locOf ns))
+    , Paragraph $ "Missing arguments" <+> renderManySepByComma ns
     ]
 
 instance RenderSection StructError where

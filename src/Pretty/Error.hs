@@ -65,5 +65,14 @@ instance Pretty TypeError where
     "Cannot unify:" <+> pretty a <+> "with" <+> pretty b
   pretty (RecursiveType v a _) =
     "Recursive type variable: " <+> pretty v <+> "in" <+> pretty a
+  pretty (AssignToConst n) =
+    "The constant identifier: " <+> pretty n <+> "cannot be assigned"
   pretty (UndefinedType n) =
     "Undefined Type: " <+> "Type" <+> pretty n <+> "is undefined"
+  pretty (DuplicatedIdentifiers ns) =
+    "The identifiers:" <+> pretty ns <+> "are duplicated"
+  pretty (RedundantNames ns) = "The names: " <+> pretty ns <+> "are redundant"
+  pretty (RedundantExprs exprs) =
+    "The exprs: " <+> pretty exprs <+> "are redundant"
+  pretty (MissingArguments ns) =
+    "The arguments: " <+> pretty ns <+> "are missing"
