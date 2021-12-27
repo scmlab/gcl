@@ -31,6 +31,7 @@ import           Data.Map                       ( Map )
 import qualified Data.Map                      as Map
 import           Data.Maybe                     ( fromMaybe )
 import           Data.Bifunctor                 ( first )
+import qualified Data.Text                     as Text
 import           GHC.Generics                   ( Generic )
 import           Prelude                 hiding ( EQ
                                                 , LT
@@ -52,7 +53,7 @@ import           GCL.Common                     ( Fresh(..)
                                                 )
 
 data ScopeTree a = ScopeTree
-  { globalScope :: Map Name a
+  { globalScope :: Map Name a             -- use name or range to Name to find corresponding type infos
   , localScopes :: TokenMap (ScopeTree a)
   }
   deriving Eq
@@ -305,7 +306,9 @@ instance InferType CaseConstructor where
     collectPattInfos (PattBinder n) = do
       tn <- freshVar
       return ([(n, VarTypeInfo tn)], tn)
-    collectPattInfos (PattWildcard _         ) = ([], ) <$> freshVar
+    collectPattInfos (PattWildcard rng) = do
+      v <- freshVar
+      return ([(Name (Text.pack . show $ rng) NoLoc, VarTypeInfo v)], v)
     collectPattInfos (PattConstructor n patts) = do
       tPatt           <- freshVar
       tn              <- inferType n
@@ -459,16 +462,13 @@ updateScopeTreeZipper s = do
   getTypeInfo >>= setTypeInfo . subst s
 
 runTypeCheck
-  :: Program
-  -> Either
-       TypeError
-       (ScopeTreeZipper TypeDefnInfo, ScopeTreeZipper TypeInfo)
+  :: Program -> Either TypeError (ScopeTree TypeDefnInfo, ScopeTree TypeInfo)
 runTypeCheck prog = do
   let initTypeInfo     = ScopeTreeZipper (ScopeTree mempty mempty) []
   let initTypeDefnInfo = ScopeTreeZipper (ScopeTree mempty mempty) []
   (_, s2, s3) <- runExcept
     (execStateT (typeCheck prog) (0, initTypeDefnInfo, initTypeInfo))
-  return (fsRootScopeTree s2, fsRootScopeTree s3)
+  return (cursor (fsRootScopeTree s2), cursor (fsRootScopeTree s3))
 
 class TypeCheckable a where
     typeCheck :: a -> TypeCheckM ()
