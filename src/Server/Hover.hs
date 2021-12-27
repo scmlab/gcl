@@ -18,7 +18,6 @@ import           Data.Map                       ( Map )
 import qualified Data.Map                      as Map
 import           Data.Text                      ( Text )
 import qualified GCL.Type                      as TypeChecking
-import qualified GCL.Scope                     as ScopeChecking
 import qualified Language.LSP.Types            as J
 import           Pretty                         ( Pretty(..)
                                                 , toText

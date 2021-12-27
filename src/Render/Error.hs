@@ -5,7 +5,6 @@ module Render.Error where
 import           Data.Loc.Range
 import           Data.Loc                       ( locOf )
 import           Error
-import qualified GCL.Scope                     as Scope
 import           GCL.Type                       ( TypeError(..) )
 import           GCL.WP.Type                    ( StructError(..) )
 import           Render.Class
@@ -17,7 +16,6 @@ instance RenderSection Error where
   renderSection (SyntacticError (pos, msg)) = Section
     Red
     [Header "Parse Error" (Just $ Range pos pos), Paragraph $ render msg]
-  renderSection (ScopeError     e   ) = renderSection e
   renderSection (TypeError      e   ) = renderSection e
   renderSection (StructError    e   ) = renderSection e
   renderSection (CannotReadFile path) = Section
@@ -27,35 +25,6 @@ instance RenderSection Error where
     ]
   renderSection (Others msg) =
     Section Red [Header "Server Internal Error" Nothing, Paragraph $ render msg]
-
-instance RenderSection Scope.ScopeError where
-  renderSection (Scope.NotInScope name) = Section
-    Red
-    [ Header "Not In Scope" (fromLoc (locOf name))
-    , Paragraph $ render name <+> "is not in scope"
-    ]
-  renderSection (Scope.DuplicatedIdentifiers ns) = Section Red $ concatMap
-    (\name ->
-      [ Header "Duplicated Identifier" (fromLoc (locOf name))
-      , Paragraph $ render name
-      ]
-    )
-    ns
-  renderSection (Scope.RedundantNames ns) = Section
-    Red
-    [ Header "Redundant Names" (fromLoc (locOf ns))
-    , Paragraph $ renderManySepByComma ns
-    ]
-  renderSection (Scope.RedundantPatterns patts) = Section
-    Red
-    [ Header "Redundant Patterns" (fromLoc (locOf patts))
-    , Paragraph $ renderManySepByComma patts
-    ]
-  renderSection (Scope.RedundantExprs exprs) = Section
-    Red
-    [ Header "Redundant Exprs" (fromLoc (locOf exprs))
-    , Paragraph $ renderManySepByComma exprs
-    ]
 
 instance RenderSection TypeError where
   renderSection (NotInScope name) = Section
