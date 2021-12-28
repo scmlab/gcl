@@ -4,7 +4,6 @@
 {-# LANGUAGE FlexibleInstances #-}
 module Server.Handler.Diagnostic where
 
-import           Data.Foldable                  ( toList )
 import           Data.Loc                hiding ( fromLoc )
 import           Data.Loc.Range
 import           Data.Loc.Util                  ( translate )

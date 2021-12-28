@@ -36,6 +36,8 @@ import           Data.Text                      ( Text )
 import           Data.Bifunctor                 ( bimap )
 import           Prelude                 hiding ( lookup )
 import           Data.Text.Prettyprint.Doc
+import           Syntax.Concrete                ( SepBy )
+import qualified Data.Foldable                 as Foldable
 
 
 --------------------------------------------------------------------------------
@@ -59,6 +61,9 @@ instance Pretty token => Pretty (TokenMap token) where
             "(" <> pretty start <> ", " <> pretty end <> ") => " <> pretty token
           )
       $ IntMap.toList xs
+
+instance Foldable TokenMap where
+  foldMap f (TokenMap xs) = foldMap (f . snd) xs
 
 -- Constructs a TokenMap with a Range and a payload
 singleton :: Range -> token -> TokenMap token
@@ -140,3 +145,6 @@ instance Collect input output a => Collect input output (Map k a) where
 instance (Collect input output a, Collect input output b) => Collect input output (Either a b) where
   collect (Left  a) = collect a
   collect (Right a) = collect a
+
+instance Collect input output a => Collect input output (SepBy tok a) where
+  collect xs = forM_ (Foldable.toList xs) collect

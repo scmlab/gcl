@@ -22,9 +22,15 @@ import           Render
 
 -- | Response
 data ResKind
+  -- display stuff at the panel 
   = ResDisplay Int [Section]
+  -- mark Specs (holes) in the editor
   | ResUpdateSpecs [(Int, Text, Text, Range)]
+  -- mark Proof Obligations in the editor 
+  | ResMarkPOs [Range]
+  -- perform subsititution in expressions in the panel
   | ResSubstitute Int Inlines
+  -- emit console.log for debugging
   | ResConsoleLog Text
   deriving (Eq, Generic)
 
@@ -33,6 +39,7 @@ instance ToJSON ResKind
 instance Pretty ResKind where
   pretty (ResDisplay _ _   ) = "Display"
   pretty (ResUpdateSpecs _ ) = "UpdateSpecs"
+  pretty (ResMarkPOs     _ ) = "ResMarkPOs"
   pretty (ResSubstitute i x) = "Substitute " <> pretty i <> " : " <> pretty x
   pretty (ResConsoleLog x  ) = "ConsoleLog " <> pretty x
 

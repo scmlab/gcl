@@ -44,6 +44,7 @@ statements = testGroup
 issues :: TestTree
 issues = testGroup
   "issues"
-  [ run "issue #2: Postcondition only"           "issue2-1.gcl"
-  , run "issue #2: Postcondition + precondition" "issue2-2.gcl"
+  [ run "issue #2-1: Postcondition only"           "issue2-1.gcl"
+  , run "issue #2-2: Postcondition + precondition" "issue2-2.gcl"
+  , run "issue #57: {::} and then {--}" "issue57.gcl"
   ]

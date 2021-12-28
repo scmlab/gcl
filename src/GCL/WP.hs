@@ -137,25 +137,18 @@ progView []               = ProgViewEmpty
 progView [A.Assert pre l] = do
   ProgViewMissingPrecondition [] (Assertion pre l)
 progView stmts = do
-  case (head stmts, last (removeLastProofs stmts)) of
+  case (head stmts, last stmts) of
     (A.Assert pre l, A.Assert post m) -> do
       ProgViewOkay (Assertion pre l)
-                   (init (tail (removeLastProofs stmts)))
+                   (init (tail stmts))
                    (Assertion post m)
     (A.Assert pre l, _) -> do
       ProgViewMissingPostcondition (Assertion pre l)
-                                   (tail (removeLastProofs stmts))
+                                   (tail stmts)
     (_, A.Assert post m) -> do
       ProgViewMissingPrecondition (init stmts) (Assertion post m)
     _ -> ProgViewMissingBoth stmts
- where
-    -- ignore Proofs after the Postcondition
-  removeLastProofs :: [A.Stmt] -> [A.Stmt]
-  removeLastProofs = List.dropWhileEnd isProof
 
-  isProof :: A.Stmt -> Bool
-  isProof A.Proof{} = True
-  isProof _         = False
 
 -- alphaSubst :: (Substitutable A.Bindings b, AlphaRename WP b) => Subs A.Bindings -> b -> WP b
 -- alphaSubst sub e = do
@@ -168,7 +161,7 @@ progView stmts = do
 
 structProgram :: [A.Stmt] -> WP ()
 structProgram stmts = do
-  case progView stmts of
+  case progView (removeLastProofs stmts) of
     ProgViewEmpty -> return ()
     ProgViewOkay pre stmts' post ->
       structStmts Primary (pre, Nothing) stmts' post
@@ -178,6 +171,15 @@ structProgram stmts = do
       throwError . MissingPostcondition . locOf . last $ stmts'
     ProgViewMissingBoth stmts' ->
       throwError . MissingPostcondition . locOf . last $ stmts'
+
+  where 
+      -- ignore Proofs after the Postcondition
+      removeLastProofs :: [A.Stmt] -> [A.Stmt]
+      removeLastProofs = List.dropWhileEnd isProof
+
+      isProof :: A.Stmt -> Bool
+      isProof A.Proof{} = True
+      isProof _         = False
 
 --- grouping a sequence of statement by assertions and specs
 

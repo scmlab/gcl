@@ -67,6 +67,8 @@ expression = testGroup
   , testCase "chain op (GT)" $ run "A > B"
   , testCase "chain op (GTE)" $ run "A >= B"
   , testCase "chain op (GTEU)" $ run "A ≥ B"
+  , testCase "arith op (NegNum) 1" $ run "-1"
+  , testCase "arith op (NegNum) 2" $ run "-(3 + 5)"
   , testCase "arith op (Conj)" $ run "A && B"
   , testCase "arith op (ConjU)" $ run "A ∧ B"
   , testCase "arith op (Disj)" $ run "A || B"

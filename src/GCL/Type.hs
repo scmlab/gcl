@@ -349,6 +349,7 @@ instance InferType ArithOp where
   inferType (DisjU    l) = return $ tBool .-> tBool .-> tBool $ l
   inferType (Neg      l) = return $ tBool .-> tBool $ l
   inferType (NegU     l) = return $ tBool .-> tBool $ l
+  inferType (NegNum   l) = return $ tInt .-> tInt $ l
   inferType (Add      l) = return $ tInt .-> tInt .-> tInt $ l
   inferType (Sub      l) = return $ tInt .-> tInt .-> tInt $ l
   inferType (Mul      l) = return $ tInt .-> tInt .-> tInt $ l
@@ -670,6 +671,7 @@ arithOpTypes (Disj     l) = tBool .-> tBool .-> tBool $ l
 arithOpTypes (DisjU    l) = tBool .-> tBool .-> tBool $ l
 arithOpTypes (Neg      l) = tBool .-> tBool $ l
 arithOpTypes (NegU     l) = tBool .-> tBool $ l
+arithOpTypes (NegNum   l) = tInt .-> tInt $ l
 arithOpTypes (Add      l) = tInt .-> tInt .-> tInt $ l
 arithOpTypes (Sub      l) = tInt .-> tInt .-> tInt $ l
 arithOpTypes (Mul      l) = tInt .-> tInt .-> tInt $ l

@@ -309,6 +309,7 @@ pExprF =
   arithTable :: [[Operator ParserF Expr]]
   arithTable =
     [ [InfixL pAppF]
+    , [Prefix . pUnaryF . fmap ArithOp $ lexNegNumF]
     , [InfixN . pBinaryF . fmap ArithOp $ lexExpF]
     , [ InfixN . pBinaryF . fmap ArithOp $ lexMaxF
       , InfixN . pBinaryF . fmap ArithOp $ lexMinF

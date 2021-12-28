@@ -8,8 +8,6 @@ module Server.Hover
   ) where
 
 import           Control.Monad.RWS
-import           Control.Monad.Except           ( runExcept )
-import           Control.Monad.State.Lazy
 import           Data.Loc                       ( Located
                                                 , locOf
                                                 )

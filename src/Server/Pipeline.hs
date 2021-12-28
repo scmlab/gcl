@@ -15,6 +15,7 @@ import           Data.List                      ( find
 import qualified Data.List                     as List
 import           Data.Loc                hiding ( fromLoc )
 import           Data.Loc.Range
+import           Data.Maybe                     ( mapMaybe )
 import           Data.Text                      ( Text )
 import qualified Data.Text                     as Text
 import           Error
@@ -484,9 +485,13 @@ generateResponseAndDiagnostics result = do
         , specRange spec
         )
 
+  let rangesOfPOs = mapMaybe (fromLoc . locOf) pos
   let responses =
-        [ResDisplay version sections, ResUpdateSpecs (map encodeSpec specs)]
-  let diagnostics = concatMap collect pos ++ concatMap collect warnings
+        [ ResDisplay version sections
+        , ResUpdateSpecs (map encodeSpec specs)
+        , ResMarkPOs rangesOfPOs
+        ]
+  let diagnostics = concatMap collect warnings
   sendDiagnostics diagnostics
 
   return responses

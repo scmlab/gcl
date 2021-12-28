@@ -1,35 +1,46 @@
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+
 module Server.Highlighting
   ( Highlighting
   , collectHighlighting
   ) where
 
+import           Control.Monad.RWS
 import           Data.Foldable                  ( toList )
 import           Data.Loc                       ( Located(locOf)
                                                 , posCol
                                                 , posLine
                                                 )
 import           Data.Loc.Range
-import           Data.Map                       ( Map )
-import qualified Data.Map                      as Map
 import qualified Language.LSP.Types            as J
+import           Server.TokenMap                ( Collect(..)
+                                                , M
+                                                , runM
+                                                )
+import qualified Server.TokenMap               as TokenMap
 import           Syntax.Common
 import           Syntax.Concrete
 
-collectHighlighting :: Program -> [Highlighting]
-collectHighlighting = toList . collect
-
 type Highlighting = J.SemanticTokenAbsolute
 
-toHighlighting
+collectHighlighting :: Program -> [Highlighting]
+collectHighlighting program =
+  toList $ runM mempty (collect program :: M () Highlighting ())
+
+--------------------------------------------------------------------------------
+-- helper function for converting some syntax node to Highlighting
+
+addHighlighting
   :: Located a
   => J.SemanticTokenTypes
   -> [J.SemanticTokenModifiers]
   -> a
-  -> Map Range Highlighting
-toHighlighting types modifiers x = case fromLoc (locOf x) of
-  Nothing    -> mempty
-  Just range -> Map.singleton range $ J.SemanticTokenAbsolute
+  -> M () Highlighting ()
+addHighlighting types modifiers node = case fromLoc (locOf node) of
+  Nothing    -> return ()
+  Just range -> tell $ TokenMap.singleton range $ J.SemanticTokenAbsolute
     (posLine (rangeStart range) - 1)
     (posCol (rangeStart range) - 1)
     (rangeSpan range)
@@ -37,207 +48,226 @@ toHighlighting types modifiers x = case fromLoc (locOf x) of
     modifiers
 
 --------------------------------------------------------------------------------
-
--- | Given a Concrete syntax node, returns a mapping of Range-Highlighting
-class CollectHighlighting a where
-  collect :: a -> Map Range Highlighting
-
-instance CollectHighlighting a => CollectHighlighting (Maybe a) where
-  collect Nothing  = mempty
-  collect (Just x) = collect x
-
-instance CollectHighlighting a => CollectHighlighting [a] where
-  collect = mconcat . map collect
-
-instance CollectHighlighting a => CollectHighlighting (SepBy tok a) where
-  collect = mconcat . map collect . toList
-
-instance (CollectHighlighting a, CollectHighlighting b) => CollectHighlighting (Either a b) where
-  collect (Left  a) = collect a
-  collect (Right a) = collect a
-
-
---------------------------------------------------------------------------------
 -- newtypes for giving common datatype like `Name` different interpretations
 
 newtype AsConstructor = AsConstructor Name
 
-instance CollectHighlighting AsConstructor where
-  collect (AsConstructor a) = toHighlighting J.SttEnumMember [] a
+instance Collect () Highlighting AsConstructor where
+  collect (AsConstructor a) = addHighlighting J.SttEnumMember [] a
 
 newtype AsVariable = AsVariable Name
 
-instance CollectHighlighting AsVariable where
-  collect (AsVariable a) = toHighlighting J.SttVariable [] a
+instance Collect () Highlighting AsVariable where
+  collect (AsVariable a) = addHighlighting J.SttVariable [] a
 
 newtype AsName = AsName Name
 
-instance CollectHighlighting AsName where
-  collect (AsName a) = toHighlighting J.SttFunction [] a
+instance Collect () Highlighting AsName where
+  collect (AsName a) = addHighlighting J.SttFunction [] a
 
 --------------------------------------------------------------------------------
 -- Program
 
-instance CollectHighlighting Program where
-  collect (Program as bs) = collect as <> collect bs
+instance Collect () Highlighting Program where
+  collect (Program as bs) = do
+    collect as
+    collect bs
 
 --------------------------------------------------------------------------------
 -- Definition
 
-instance CollectHighlighting DefinitionBlock where
+instance Collect () Highlighting DefinitionBlock where
   collect (DefinitionBlock _tokA as _tokB) = collect as
 
-instance CollectHighlighting Definition where
-  collect (TypeDefn tokData name binders _tokDef bs) =
-    toHighlighting J.SttKeyword [] tokData
-      <> toHighlighting J.SttType      [] name
-      <> toHighlighting J.SttParameter [] binders
-      <> collect bs
-  collect (FuncDefnSig a b) = collect a <> collect b
-  collect (FuncDefn a bs _tok c) =
-    toHighlighting J.SttFunction [J.StmDeclaration] a
-      <> collect (fmap AsVariable bs)
-      <> collect c
+instance Collect () Highlighting Definition where
+  collect (TypeDefn tokData name binders _tokDef bs) = do
+    addHighlighting J.SttKeyword   [] tokData
+    addHighlighting J.SttType      [] name
+    addHighlighting J.SttParameter [] binders
+    collect bs
+
+  collect (FuncDefnSig a b) = do
+    collect a
+    collect b
+  collect (FuncDefn a bs _tok c) = do
+    addHighlighting J.SttFunction [J.StmDeclaration] a
+    collect (fmap AsVariable bs)
+    collect c
 
 --------------------------------------------------------------------------------
 -- Declaration
 
-instance CollectHighlighting Declaration where
-  collect (ConstDecl tok a) = toHighlighting J.SttKeyword [] tok <> collect a
-  collect (VarDecl   tok a) = toHighlighting J.SttKeyword [] tok <> collect a
+instance Collect () Highlighting Declaration where
+  collect (ConstDecl tok a) = do
+    addHighlighting J.SttKeyword [] tok
+    collect a
+  collect (VarDecl tok a) = do
+    addHighlighting J.SttKeyword [] tok
+    collect a
 
-instance CollectHighlighting TypeDefnCtor where
-  collect (TypeDefnCtor name types) = collect (AsName name) <> collect types
+instance Collect () Highlighting TypeDefnCtor where
+  collect (TypeDefnCtor name types) = do
+    collect (AsName name)
+    collect types
 
-instance CollectHighlighting DeclBase where
-  collect (DeclBase as _ b) = collect (fmap AsVariable as) <> collect b
+instance Collect () Highlighting DeclBase where
+  collect (DeclBase as _ b) = do
+    collect (fmap AsVariable as)
+    collect b
 
-instance CollectHighlighting DeclProp where
+instance Collect () Highlighting DeclProp where
   collect (DeclProp _tokA a _tokB) = collect a
-instance CollectHighlighting DeclType where
-  collect (DeclType a b) = collect a <> collect b
+instance Collect () Highlighting DeclType where
+  collect (DeclType a b) = do
+    collect a
+    collect b
 
 --------------------------------------------------------------------------------
 -- Stmt
 
-instance CollectHighlighting Stmt where
+instance Collect () Highlighting Stmt where
   collect = \case
-    Skip  x -> toHighlighting J.SttKeyword [] x
-    Abort x -> toHighlighting J.SttKeyword [] x
-    Assign as tok bs ->
+    Skip  x          -> addHighlighting J.SttKeyword [] x
+    Abort x          -> addHighlighting J.SttKeyword [] x
+    Assign as tok bs -> do
       collect (fmap AsVariable as)
-        <> toHighlighting J.SttKeyword [] tok
-        <> collect bs
-    AAssign a _ b _ tok c ->
+      addHighlighting J.SttKeyword [] tok
+      collect bs
+    AAssign a _ b _ tok c -> do
       collect (AsVariable a)
-        <> toHighlighting J.SttKeyword [] tok
-        <> collect b
-        <> collect c
-    Assert _ a _ -> collect a
-    LoopInvariant _ a _ tok _ b _ ->
-      collect a <> toHighlighting J.SttKeyword [] tok <> collect b
-    Do tokA as tokB ->
-      toHighlighting J.SttKeyword [] tokA
-        <> collect as
-        <> toHighlighting J.SttKeyword [] tokB
-    If tokA as tokB ->
-      toHighlighting J.SttKeyword [] tokA
-        <> collect as
-        <> toHighlighting J.SttKeyword [] tokB
-    SpecQM _ -> mempty
-    Spec tokA _ tokB ->
-      toHighlighting J.SttKeyword [] tokA <> toHighlighting J.SttKeyword [] tokB
-    Proof tokA _ tokB ->
-      toHighlighting J.SttKeyword [] tokA <> toHighlighting J.SttKeyword [] tokB
-    Alloc a tok tokNew _ bs _ ->
+      addHighlighting J.SttKeyword [] tok
+      collect b
+      collect c
+    Assert _ a _                  -> collect a
+    LoopInvariant _ a _ tok _ b _ -> do
+      collect a
+      addHighlighting J.SttKeyword [] tok
+      collect b
+    Do tokA as tokB -> do
+      addHighlighting J.SttKeyword [] tokA
+      collect as
+      addHighlighting J.SttKeyword [] tokB
+    If tokA as tokB -> do
+      addHighlighting J.SttKeyword [] tokA
+      collect as
+      addHighlighting J.SttKeyword [] tokB
+    SpecQM _         -> return ()
+    Spec tokA _ tokB -> do
+      addHighlighting J.SttKeyword [] tokA
+      addHighlighting J.SttKeyword [] tokB
+    Proof tokA _ tokB -> do
+      addHighlighting J.SttKeyword [] tokA
+      addHighlighting J.SttKeyword [] tokB
+    Alloc a tok tokNew _ bs _ -> do
       collect (AsVariable a)
-        <> toHighlighting J.SttKeyword []                  tok
-        <> toHighlighting J.SttKeyword [J.StmModification] tokNew
-        <> collect bs
-    HLookup a tok tokStar b ->
+      addHighlighting J.SttKeyword []                  tok
+      addHighlighting J.SttKeyword [J.StmModification] tokNew
+      collect bs
+    HLookup a tok tokStar b -> do
       collect (AsVariable a)
-        <> toHighlighting J.SttKeyword []                  tok
-        <> toHighlighting J.SttKeyword [J.StmModification] tokStar
-        <> collect b
-    HMutate tokStar a tok b ->
-      toHighlighting J.SttKeyword [J.StmModification] tokStar
-        <> collect a
-        <> toHighlighting J.SttKeyword [] tok
-        <> collect b
-    Dispose tok a -> toHighlighting J.SttKeyword [] tok <> collect a
+      addHighlighting J.SttKeyword []                  tok
+      addHighlighting J.SttKeyword [J.StmModification] tokStar
+      collect b
+    HMutate tokStar a tok b -> do
+      addHighlighting J.SttKeyword [J.StmModification] tokStar
+      collect a
+      addHighlighting J.SttKeyword [] tok
+      collect b
+    Dispose tok a -> do
+      addHighlighting J.SttKeyword [] tok
+      collect a
     -- TODO:
-    Block{}       -> mempty
+    Block{} -> return ()
 
-instance CollectHighlighting GdCmd where
-  collect (GdCmd a tok bs) =
-    collect a <> toHighlighting J.SttMacro [] tok <> collect bs
+instance Collect () Highlighting GdCmd where
+  collect (GdCmd a tok bs) = do
+    collect a
+    addHighlighting J.SttMacro [] tok
+    collect bs
 
 --------------------------------------------------------------------------------
 
-instance CollectHighlighting Expr where
+instance Collect () Highlighting Expr where
   collect = \case
-    Paren _ a _     -> collect a
-    Lit   a         -> collect a
-    Var   a         -> collect (AsVariable a)
-    Const a         -> collect (AsVariable a)
-    Op    a         -> toHighlighting J.SttOperator [] a
-    Arr a _ b _     -> collect a <> collect b
-    App a@App{}   b -> collect a <> collect b
-    App (Const a) b -> collect (AsName a) <> collect b
-    App a         b -> collect a <> collect b
-    Quant tokA op names tokB a tokC b tokD ->
-      toHighlighting J.SttKeyword [] tokA
-        <> toHighlighting J.SttOperator [] op
-        <> collect (map AsVariable names)
-        <> toHighlighting J.SttKeyword [] tokB
-        <> collect a
-        <> toHighlighting J.SttKeyword [] tokC
-        <> collect b
-        <> toHighlighting J.SttKeyword [] tokD
-    Case tokA expr tokB cases ->
-      toHighlighting J.SttKeyword [] tokA
-        <> collect expr
-        <> toHighlighting J.SttKeyword [] tokB
-        <> collect cases
+    Paren _ a _ -> collect a
+    Lit   a     -> collect a
+    Var   a     -> collect (AsVariable a)
+    Const a     -> collect (AsVariable a)
+    Op    a     -> addHighlighting J.SttOperator [] a
+    Arr a _ b _ -> do
+      collect a
+      collect b
+    App a@App{} b -> do
+      collect a
+      collect b
+    App (Const a) b -> do
+      collect (AsName a)
+      collect b
+    App a b -> do
+      collect a
+      collect b
+    Quant tokA op names tokB a tokC b tokD -> do
+      addHighlighting J.SttKeyword  [] tokA
+      addHighlighting J.SttOperator [] op
+      collect (map AsVariable names)
+      addHighlighting J.SttKeyword [] tokB
+      collect a
+      addHighlighting J.SttKeyword [] tokC
+      collect b
+      addHighlighting J.SttKeyword [] tokD
+    Case tokA expr tokB cases -> do
+      addHighlighting J.SttKeyword [] tokA
+      collect expr
+      addHighlighting J.SttKeyword [] tokB
+      collect cases
 
-instance CollectHighlighting CaseConstructor where
-  collect (CaseConstructor _ arrow body) =
-    toHighlighting J.SttMacro [] arrow <> collect body
+instance Collect () Highlighting CaseConstructor where
+  collect (CaseConstructor _ arrow body) = do
+    addHighlighting J.SttMacro [] arrow
+    collect body
 
-instance CollectHighlighting Lit where
-  collect x = toHighlighting J.SttNumber [] x
+instance Collect () Highlighting Lit where
+  collect x = addHighlighting J.SttNumber [] x
 
 --------------------------------------------------------------------------------
 
-instance CollectHighlighting EndpointOpen where
-  collect (IncludingOpening tok a) =
-    toHighlighting J.SttKeyword [] tok <> collect a
-  collect (ExcludingOpening tok a) =
-    toHighlighting J.SttKeyword [] tok <> collect a
+instance Collect () Highlighting EndpointOpen where
+  collect (IncludingOpening tok a) = do
+    addHighlighting J.SttKeyword [] tok
+    collect a
+  collect (ExcludingOpening tok a) = do
+    addHighlighting J.SttKeyword [] tok
+    collect a
 
-instance CollectHighlighting EndpointClose where
-  collect (IncludingClosing a tok) =
-    collect a <> toHighlighting J.SttKeyword [] tok
-  collect (ExcludingClosing a tok) =
-    collect a <> toHighlighting J.SttKeyword [] tok
+instance Collect () Highlighting EndpointClose where
+  collect (IncludingClosing a tok) = do
+    collect a
+    addHighlighting J.SttKeyword [] tok
+  collect (ExcludingClosing a tok) = do
+    collect a
+    addHighlighting J.SttKeyword [] tok
 
-instance CollectHighlighting Interval where
-  collect (Interval a tok b) =
-    collect a <> toHighlighting J.SttKeyword [] tok <> collect b
+instance Collect () Highlighting Interval where
+  collect (Interval a tok b) = do
+    collect a
+    addHighlighting J.SttKeyword [] tok
+    collect b
 
-instance CollectHighlighting TBase where
-  collect = toHighlighting J.SttType []
+instance Collect () Highlighting TBase where
+  collect = addHighlighting J.SttType []
 
-instance CollectHighlighting Type where
-  collect (TParen _ a _) = collect a
-  collect (TBase a     ) = collect a
-  collect (TArray tokArray a tokOf b) =
-    toHighlighting J.SttKeyword [] tokArray
-      <> collect a
-      <> toHighlighting J.SttKeyword [] tokOf
-      <> collect b
-  collect (TFunc a tok b) =
-    collect a <> toHighlighting J.SttOperator [] tok <> collect b
+instance Collect () Highlighting Type where
+  collect (TParen _ a _             ) = collect a
+  collect (TBase a                  ) = collect a
+  collect (TArray tokArray a tokOf b) = do
+    addHighlighting J.SttKeyword [] tokArray
+    collect a
+    addHighlighting J.SttKeyword [] tokOf
+    collect b
+  collect (TFunc a tok b) = do
+    collect a
+    addHighlighting J.SttOperator [] tok
+    collect b
   -- TODO: handle user defined type collect
-  collect TCon{}      = mempty
-  collect (TVar name) = toHighlighting J.SttType [] name
+  collect TCon{}      = return ()
+  collect (TVar name) = addHighlighting J.SttType [] name
