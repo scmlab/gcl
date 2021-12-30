@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 module Server.TokenMap
   ( TokenMap
@@ -10,9 +11,13 @@ module Server.TokenMap
   , M
   , runM
   , Collect(..)
+  , insert
   , lookup
+  , lookupRng
   , lookupScopes
   , localScope
+  , split
+  , toList
   ) where
 
 import           Control.Monad.RWS
@@ -28,27 +33,31 @@ import           Data.Loc.Range                 ( Range
 import           Data.Map                       ( Map )
 import qualified Data.Map                      as Map
 import           Data.Text                      ( Text )
+import           Data.Bifunctor                 ( bimap )
 import           Prelude                 hiding ( lookup )
-import           Pretty
-import Syntax.Concrete (SepBy)
-import Data.Foldable (toList)
+import           Data.Text.Prettyprint.Doc
+import           Syntax.Concrete                ( SepBy )
+import qualified Data.Foldable                 as Foldable
 import Data.List.NonEmpty (NonEmpty)
 
 
 --------------------------------------------------------------------------------
--- IntMap for speeding up lookups 
--- with the key of IntMap acting as the starting offset, 
--- and the element's Int acting as the ending offset 
+-- IntMap for speeding up lookups
+-- with the key of IntMap acting as the starting offset,
+-- and the element's Int acting as the ending offset
 newtype TokenMap token = TokenMap (IntMap (Int, token)) deriving (Eq, Monoid, Semigroup)
 
--- Instances for debugging 
+instance Functor TokenMap where
+  fmap f (TokenMap m) = TokenMap (IntMap.map (fmap f) m)
+
+-- Instances for debugging
 instance Pretty token => Show (TokenMap token) where
   show = show . pretty
 
 instance Pretty token => Pretty (TokenMap token) where
   pretty (TokenMap xs) =
     vcat
-      $ map
+      $ Prelude.map
           (\(start, (end, token)) ->
             "(" <> pretty start <> ", " <> pretty end <> ") => " <> pretty token
           )
@@ -63,7 +72,13 @@ singleton range token = TokenMap $ IntMap.singleton
   (posCoff (rangeStart range))
   (posCoff (rangeEnd range), token)
 
--- Given a Pos, returns the paylod if the Pos is within its Range 
+insert :: Range -> token -> TokenMap token -> TokenMap token
+insert range token (TokenMap m) = TokenMap $ IntMap.insert
+  (posCoff (rangeStart range))
+  (posCoff (rangeEnd range), token)
+  m
+
+-- Given a Pos, returns the paylod if the Pos is within its Range
 lookup :: TokenMap token -> Pos -> Maybe token
 lookup (TokenMap m) pos =
   let offset = posCoff pos
@@ -71,13 +86,27 @@ lookup (TokenMap m) pos =
         Nothing                 -> Nothing
         Just (_start, (end, x)) -> if offset <= end then Just x else Nothing
 
+lookupRng :: TokenMap token -> Range -> Maybe token
+lookupRng (TokenMap m) rng =
+  let offsetStart = posCoff (rangeStart rng)
+  in  let offsetEnd = posCoff (rangeEnd rng)
+      in  IntMap.lookupLE offsetStart m
+            >>= \(_, (end, x)) -> if offsetEnd <= end then Just x else Nothing
+
+split :: Range -> TokenMap token -> (TokenMap token, TokenMap token)
+split rng (TokenMap m) =
+  bimap TokenMap TokenMap (IntMap.split (posCoff (rangeStart rng)) m)
+
+toList :: TokenMap token -> [((Int, Int), token)]
+toList (TokenMap m) = map (\(a, (b, c)) -> ((a, b), c)) (IntMap.toList m)
+
 --------------------------------------------------------------------------------
 
 -- | A mapping from names to something else
 type Scope input = Map Text input
 
--- | Accumulates the result of `TokenMap` in writer 
---   Stores stack of scopes in reader 
+-- | Accumulates the result of `TokenMap` in writer
+--   Stores stack of scopes in reader
 type M input output = RWS [Scope input] (TokenMap output) ()
 
 runM :: [Scope input] -> M input output a -> TokenMap output
@@ -95,11 +124,8 @@ lookupScopes name = asks lookupScopesPrim
   findFirst (Just found) _     = Just found
   findFirst Nothing      scope = Map.lookup name scope
 
-localScope :: Scope input -> M input output a -> M input output a
-localScope = pushScope
- where
-  pushScope :: Scope input -> M input output a -> M input output a
-  pushScope scope = local (scope :)
+localScope :: MonadReader [Scope input] m => Scope input -> m a -> m a
+localScope scope = local (scope :)
 
 --------------------------------------------------------------------------------
 
@@ -125,4 +151,4 @@ instance (Collect input output a, Collect input output b) => Collect input outpu
   collect (Right a) = collect a
 
 instance Collect input output a => Collect input output (SepBy tok a) where
-  collect xs = forM_ (toList xs) collect
+  collect xs = forM_ (Foldable.toList xs) collect

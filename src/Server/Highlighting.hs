@@ -15,7 +15,10 @@ import           Data.Loc                       ( Located(locOf)
                                                 )
 import           Data.Loc.Range
 import qualified Language.LSP.Types            as J
-import           Server.TokenMap
+import           Server.TokenMap                ( Collect(..)
+                                                , M
+                                                , runM
+                                                )
 import qualified Server.TokenMap               as TokenMap
 import           Syntax.Common
 import           Syntax.Concrete
@@ -23,7 +26,8 @@ import           Syntax.Concrete
 type Highlighting = J.SemanticTokenAbsolute
 
 collectHighlighting :: Program -> [Highlighting]
-collectHighlighting program = toList $ runM mempty (collect program :: M () Highlighting ())
+collectHighlighting program =
+  toList $ runM mempty (collect program :: M () Highlighting ())
 
 --------------------------------------------------------------------------------
 -- helper function for converting some syntax node to Highlighting

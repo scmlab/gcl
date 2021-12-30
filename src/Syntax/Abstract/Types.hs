@@ -6,7 +6,6 @@ import           Data.List.NonEmpty             ( NonEmpty )
 import           Data.Loc                       ( Loc )
 import           Data.Loc.Range                 ( Range )
 import           Data.Map                       ( Map )
-import qualified Data.Map                      as Map
 import           Data.Set                       ( Set )
 import           Data.Text                      ( Text )
 import           GHC.Generics                   ( Generic )
@@ -25,56 +24,20 @@ type TypeVar = Text
 --------------------------------------------------------------------------------
 -- | Program
 
-data Program = Program Definitions       -- definitions (the functional language part)
-                                   [Declaration]     -- constant and variable declarations
-                                                 [Expr]            -- global properties
-                                                        [Stmt]            -- main program
-                                                               Loc
+data Program = Program [Definition]       -- definitions (the functional language part)
+                                    [Declaration]     -- constant and variable declarations
+                                                  [Expr]            -- global properties
+                                                         [Stmt]            -- main program
+                                                                Loc
   deriving (Eq, Show)
 
 --------------------------------------------------------------------------------
--- | Definitions (the functional language part)
-
-data Definitions = Definitions
-  { defnTypes    :: Map Name TypeDefn
-  , defnFuncSigs :: Map Name FuncDefnSig
-  , defnFuncs    :: Map Name [Expr]
-  }
-  deriving (Eq, Show)
-
-instance Semigroup Definitions where
-  Definitions a b c <> Definitions d e f = Definitions
-    (mergeTypeDefns a d)
-    (mergeFuncDefnSigs b e)
-    (mergeFuncDefnClauses c f)
-   where
-    -- if there are 2 TypeDefns of the same Name, the later will be ignored 
-    mergeTypeDefns       = (<>)
-    -- if there are 2 FuncDefnSigs of the same Name, the later will be ignored 
-    mergeFuncDefnSigs    = (<>)
-    -- if there are 2 FuncDefnClause of the same Name, they will be merged 
-    mergeFuncDefnClauses = Map.unionWith (<>)
-
-instance Monoid Definitions where
-  mempty = Definitions mempty mempty mempty
-
--- -- one clause of function definition
--- -- a complete function definition may have many clauses
--- data FuncDefnClause = FuncDefnClause
---   { funcClauseName :: Name
---   , funcClauseArgs :: [Name]
---   , funcClauseBody :: Expr
---   , funcClauseLoc  :: Loc
---   }
---   deriving (Eq, Show)
-
--- type signature of function definition
-data FuncDefnSig = FuncDefnSig Name Type (Maybe Expr) Loc
-  deriving (Eq, Show)
-
--- type definition
-data TypeDefn = TypeDefn Name [Name] [TypeDefnCtor] Loc
-  deriving (Eq, Show)
+-- | Definition (the functional language part)
+data Definition =
+    TypeDefn Name [Name] [TypeDefnCtor] Loc
+    | FuncDefnSig Name Type (Maybe Expr) Loc
+    | FuncDefn Name [Expr]
+    deriving (Eq, Show)
 
 -- constructor of type definition
 data TypeDefnCtor = TypeDefnCtor Name [Type]

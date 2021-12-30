@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 module Test.Substitution
   ( tests
@@ -6,11 +7,12 @@ module Test.Substitution
 
 import           Control.Monad.State            ( evalState
                                                 , forM
+                                                , MonadState
                                                 )
 import           Data.Foldable                  ( toList )
 import           Data.Map                       ( Map )
 import qualified Data.Map                      as Map
-import           GCL.Common                     ( Fresh )
+import           GCL.Common                     ( FreshState )
 import           GCL.Substitution               ( Scope
                                                 , buildRedexMap
                                                 , step
@@ -83,7 +85,7 @@ instance Pretty Tree where
     prettyTransition (transition, children) =
       [pretty transition, indent 2 $ vcat (map pretty children)]
 
-fromRedex :: Fresh m => Scope -> Redex -> m Tree
+fromRedex :: MonadState FreshState m => Scope -> Redex -> m Tree
 fromRedex scope (Rdx i before) = do
   trees <- do
     after <- step scope before

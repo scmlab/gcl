@@ -60,11 +60,11 @@ handleRefine range = do
 
 handleInsertAnchor :: Text -> PipelineM [ResKind]
 handleInsertAnchor hash = do
-  -- mute the event listener before editing the source 
+  -- mute the event listener before editing the source
   mute True
-  -- template of proof to be appended to the source  
+  -- template of proof to be appended to the source
   let template = "{- #" <> hash <> "\n\n-}"
-  -- range for appending the template of proof 
+  -- range for appending the template of proof
   source        <- getSource
   (_, abstract) <- parseProgram source
   range         <- case fromLoc (locOf abstract) of
@@ -84,7 +84,7 @@ handleSubst :: Int -> PipelineM [ResKind]
 handleSubst i = do
   stage <- load
   logText $ Text.pack $ "Substituting Redex " <> show i
-  -- 
+  --
   case stage of
     Raw         _      -> return []
     Parsed      _      -> return []
@@ -129,7 +129,7 @@ handler params responder = do
       responder $ CannotDecodeRequest $ show msg ++ "\n" ++ show params
     JSON.Success requests -> handleRequests requests
  where
-  -- make the type explicit to appease the type checker 
+  -- make the type explicit to appease the type checker
   handleRequests :: [Request] -> ServerM ()
   handleRequests = mapM_ handleRequest
 
@@ -141,4 +141,3 @@ handler params responder = do
       $ do
           logText $ "\n ---> Custom Reqeust: " <> Text.pack (show request)
           handleCustomMethod kind
-

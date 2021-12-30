@@ -21,10 +21,10 @@ run =
   runGoldenTest "./test/source/WP/" "./test/golden/WP/" ""
     $ \sourcePath source -> do
         return $ serializeTestResult $ runTest sourcePath source $ do
-          parsed    <- parse source
-          converted <- convert parsed
+          parsed      <- parse source
+          converted   <- convert parsed
           typeChecked <- typeCheck converted
-          result    <- sweep typeChecked
+          result      <- sweep typeChecked
           return (Right (sweptPOs result))
 
 -- | Expression

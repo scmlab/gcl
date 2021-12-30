@@ -2,11 +2,11 @@
 
 module Error where
 
-import GCL.Type (TypeError)
-import GHC.Generics
-import Syntax.Common ()
-import Syntax.Parser.Util (SyntacticError)
-import GCL.WP.Type (StructError)
+import           GCL.Type                       ( TypeError )
+import           GHC.Generics
+import           Syntax.Common                  ( )
+import           Syntax.Parser.Util             ( SyntacticError )
+import           GCL.WP.Type                    ( StructError )
 
 --------------------------------------------------------------------------------
 

@@ -2,8 +2,8 @@
 
 module Render.Error where
 
-import           Data.Foldable                  ( toList )
 import           Data.Loc.Range
+import           Data.Loc                       ( locOf )
 import           Error
 import           GCL.Type                       ( TypeError(..) )
 import           GCL.WP.Type                    ( StructError(..) )
@@ -27,9 +27,9 @@ instance RenderSection Error where
     Section Red [Header "Server Internal Error" Nothing, Paragraph $ render msg]
 
 instance RenderSection TypeError where
-  renderSection (NotInScope name loc) = Section
+  renderSection (NotInScope name) = Section
     Red
-    [ Header "Not In Scope" (fromLoc loc)
+    [ Header "Not In Scope" (fromLoc (locOf name))
     , Paragraph $ render name <+> "is not in scope"
     ]
   renderSection (UnifyFailed s t loc) = Section
@@ -42,60 +42,40 @@ instance RenderSection TypeError where
     [ Header "Recursive type variable" (fromLoc loc)
     , Paragraph $ render name <+> "is recursive in" <+> render t
     ]
-  renderSection (NotFunction t loc) = Section
+  renderSection (AssignToConst n) = Section
     Red
-    [ Header "Not a function" (fromLoc loc)
-    , Paragraph $ "The type" <+> render t <+> "is not a function type"
+    [ Header "Assigned to const declaration" (fromLoc (locOf n))
+    , Paragraph $ "Identifier" <+> render n <+> "cannot be assigned"
     ]
-  renderSection (NotArray t loc) = Section
+  renderSection (UndefinedType n) = Section
     Red
-    [ Header "Not an array" (fromLoc loc)
-    , Paragraph $ "The type" <+> render t <+> "is not an array"
+    [ Header "Undefined Type" (fromLoc (locOf n))
+    , Paragraph $ "Type" <+> render n <+> "is undefined"
     ]
-  renderSection (NotEnoughExprsInAssigment vars loc) = Section
+  renderSection (DuplicatedIdentifiers ids) = Section
     Red
-    [ Header "Not Enough Expressions" (fromLoc loc)
-    , Paragraph
-    $   "Variables"
-    <+> renderManySepByComma (toList vars)
-    <+> "do not have corresponing expressions in the assigment"
+    (concatMap
+      (\n ->
+        [ Header "Duplicated Identifiers" (fromLoc (locOf n))
+        , Paragraph $ "Duplicated identifier" <+> render n
+        ]
+      )
+      ids
+    )
+  renderSection (RedundantNames ns) = Section
+    Red
+    [ Header "Redundant Names" (fromLoc (locOf ns))
+    , Paragraph $ "Redundant names" <+> renderManySepByComma ns
     ]
-  renderSection (TooManyExprsInAssigment exprs loc) = Section
+  renderSection (RedundantExprs exprs) = Section
     Red
-    [ Header "Too Many Expressions" (fromLoc loc)
-    , Paragraph
-    $   "Expressions"
-    <+> renderManySepByComma (toList exprs)
-    <+> "do not have corresponing variables in the assigment"
+    [ Header "Redundant Exprs" (fromLoc (locOf exprs))
+    , Paragraph $ "Redundant exprs" <+> renderManySepByComma exprs
     ]
-  renderSection (AssignToConst n loc) = Section
+  renderSection (MissingArguments ns) = Section
     Red
-    [ Header "Assginment to Constant Declaration" (fromLoc loc)
-    , Paragraph $ "Declaration" <+> render n <+> "is a constant, not a variable"
-    ]
-  renderSection (AssignToLet n loc) = Section
-    Red
-    [ Header "Assginment to Let Declaration" (fromLoc loc)
-    , Paragraph
-    $   "Declaration"
-    <+> render n
-    <+> "is a let binding, not a variable"
-    ]
-  renderSection (UndefinedType n loc) = Section
-    Red
-    [ Header "Undefined Type" (fromLoc loc)
-    , Paragraph
-    $ "Type"
-    <+> render n
-    <+> "is undefined"
-    ]
-  renderSection (DuplicatedIdentifier n loc) = Section
-    Red
-    [ Header "Duplicated Identifier" (fromLoc loc)
-    , Paragraph
-    $ "Identifier"
-    <+> render n
-    <+> "is duplicated"
+    [ Header "Missing arguments" (fromLoc (locOf ns))
+    , Paragraph $ "Missing arguments" <+> renderManySepByComma ns
     ]
 
 instance RenderSection StructError where

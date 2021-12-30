@@ -34,6 +34,8 @@ import qualified Data.Map                      as Map
 import qualified Data.Text                     as Text
 import           GCL.Common                     ( Fresh(..)
                                                 , freshName'
+                                                , freshWithLabel
+                                                , freshText
                                                 )
 import           GCL.Predicate                  ( InfMode(..)
                                                 , Origin(..)
@@ -74,6 +76,7 @@ instance Fresh WP where
   getCounter = get
   setCounter = put
 
+
 runWP
   :: WP a
   -> Substitution.Scope
@@ -104,7 +107,7 @@ sweep program@(A.Program _ _ _props stmts _) = do
 
   return (pos', specs, warnings, redexes, counter)
 
--- ugly imports 
+-- ugly imports
 substitute
   :: ( Substitution.Substitutable a
      , Substitution.Reducible a
@@ -359,14 +362,16 @@ struct (inv, Nothing) (A.Do gcmds l) post = do
   let guards = A.getGuards gcmds
   tellPO (Conjunct (inv : map (Negate . guardLoop) guards)) post (AtLoop l)
   forM_ gcmds (structGdcmdInduct inv)
-struct _ (A.Proof _ _) _ = return ()
+struct _        (A.Proof _ _)     _    = return ()
 -- TODO:
-struct _ A.Block{}     _ = return ()
+struct _        A.Block{}         _    = return ()
 struct (pre, _) s@(A.Alloc _ _ l) post = tellPO' (AtAbort l) pre =<< wp s post
-struct (pre, _) s@(A.HLookup _ _ l) post = tellPO' (AtAbort l) pre =<< wp s post
-struct (pre, _) s@(A.HMutate _ _ l) post = tellPO' (AtAbort l) pre =<< wp s post
+struct (pre, _) s@(A.HLookup _ _ l) post =
+  tellPO' (AtAbort l) pre =<< wp s post
+struct (pre, _) s@(A.HMutate _ _ l) post =
+  tellPO' (AtAbort l) pre =<< wp s post
 struct (pre, _) s@(A.Dispose _ l) post = tellPO' (AtAbort l) pre =<< wp s post
-struct _ _             _ = error "missing case in struct"
+struct _        _                 _    = error "missing case in struct"
 
 structGdcmdInduct :: Pred -> A.GdCmd -> WP ()
 structGdcmdInduct inv (A.GdCmd guard body _) =

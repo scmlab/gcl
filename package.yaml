@@ -35,6 +35,7 @@ dependencies:
   - multiset
   - transformers
   - template-haskell
+  - multistate
 
 library:
   source-dirs: src

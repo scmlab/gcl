@@ -12,7 +12,7 @@ import           Language.LSP.Types      hiding ( Range )
 import           Server.Monad
 import           Server.Pipeline
 import qualified Server.SrcLoc                 as SrcLoc
-import qualified Server.TokenMap as TokenMap
+import qualified Server.TokenMap               as TokenMap
 
 ignoreErrors :: ([Error], Maybe [LocationLink]) -> [LocationLink]
 ignoreErrors (_, Nothing) = []

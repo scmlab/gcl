@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE LambdaCase #-}
 
@@ -27,6 +28,9 @@ import           Data.Set                       ( Set )
 import           Data.Text                      ( Text )
 import           GCL.Common                     ( Free(fv)
                                                 , Fresh(..)
+                                                , FreshState
+                                                , fresh
+                                                , freshWithLabel
                                                 )
 import           GCL.Predicate                  ( PO(PO)
                                                 , Pred(..)
@@ -45,7 +49,7 @@ import           Syntax.Common                  ( Name(Name)
 ------------------------------------------------------------------
 
 run
-  :: Fresh m
+  :: MonadState FreshState m
   => (Substitutable a, Reducible a, CollectRedexes a)
   => Scope -- declarations
   -- -> Int -- initial redex ID counter
@@ -64,7 +68,7 @@ buildRedexMap :: CollectRedexes a => a -> IntMap Redex
 buildRedexMap =
   IntMap.fromList . map (\redex -> (redexID redex, redex)) . collectRedexes
 
-step :: Fresh m => Scope -> Expr -> m Expr
+step :: MonadState FreshState m => Scope -> Expr -> m Expr
 step scope expr = runM scope $ go expr
  where
   go :: Expr -> M Expr
@@ -84,17 +88,16 @@ mappingFromSubstitution xs es =
 type Scope = Map Text (Maybe Expr)
 type M = RWS Scope () Int
 
-runM :: Fresh m => Scope -> M b -> m b
-runM scope p = do
-  counter <- getCounter
-  let (output, counter', _) = runRWS p scope counter
-  setCounter counter'
-  return output
-
--- for alpha-renaming
 instance Fresh M where
   getCounter = get
   setCounter = put
+
+runM :: MonadState FreshState m => Scope -> M b -> m b
+runM scope p = do
+  counter <- get
+  let (output, counter', _) = runRWS p scope counter
+  put counter'
+  return output
 
 ------------------------------------------------------------------
 

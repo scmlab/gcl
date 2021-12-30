@@ -49,7 +49,7 @@ import           Syntax.Parser                  ( Parser
                                                 )
 
 --------------------------------------------------------------------------------
--- | Stages of the processing pipeline 
+-- | Stages of the processing pipeline
 --
 --                      ┌───────────────────┐
 --                      │        Raw        │ : Text
@@ -82,7 +82,7 @@ import           Syntax.Parser                  ( Parser
 --                      ┌───────────────────┐
 --                      │       Swept       │ : POs & whatnots
 --                      └───────────────────┘
--- 
+--
 data Stage = Raw FilePath
            | Parsed ParseResult
            | Converted ConvertResult
@@ -119,7 +119,7 @@ data ParseResult = ParseResult
   deriving (Show, Eq)
 
 -- | Converts raw Text to concrete syntax and Highlighting info
---   persists the result 
+--   persists the result
 parse :: Text -> PipelineM ParseResult
 parse source = do
   program <- parseWithParser pProgram source
@@ -157,7 +157,7 @@ convert result = do
 
 data TypeCheckResult = TypeCheckResult
   { typeCheckedPreviousStage :: ConvertResult
-  , typeCheckedTokenMap      :: TokenMap (J.Hover, Type) -- type checking info 
+  , typeCheckedTokenMap      :: TokenMap (J.Hover, Type) -- type checking info
   }
   deriving (Show, Eq)
 
@@ -167,7 +167,7 @@ typeCheck :: ConvertResult -> PipelineM TypeCheckResult
 typeCheck result = do
   let program = convertedProgram result
 
-  case TypeChecking.runTM (TypeChecking.checkProgram program) of
+  _ <- case TypeChecking.runTypeCheck program of
     Left  e -> throwError [TypeError e]
     Right v -> return v
 
@@ -187,7 +187,7 @@ data SweepResult = SweepResult
   , sweptSpecs         :: [Spec]
     -- Global properties
   , sweptProps         :: [A.Expr]
-    -- Warnings 
+    -- Warnings
   , sweptWarnings      :: [StructWarning]
     -- Redexes waiting to be reduce by the client on demand
   , sweptRedexes       :: IntMap A.Redex
@@ -217,7 +217,7 @@ sweep result = do
   return swept
 
 --------------------------------------------------------------------------------
--- | Monad for handling the pipeline 
+-- | Monad for handling the pipeline
 --
 --  Side effects:
 --    Reader: FilePath
@@ -226,8 +226,8 @@ sweep result = do
 --
 --  Also, PipelineM is also a free monad of Instruction
 --  which allows us to "compile" a PipelineM program into a series of Instructions
---  We can then decide to run these compiled Instructions in the real world 
---                     or simulate them for testing 
+--  We can then decide to run these compiled Instructions in the real world
+--                     or simulate them for testing
 
 type PipelineM
   = FreeT Instruction (RWST FilePath () PipelineState (Except [Error]))
@@ -242,12 +242,12 @@ runPipelineM
 runPipelineM filepath st p = runExcept (runRWST (runFreeT p) filepath st)
 
 --------------------------------------------------------------------------------
--- | The State 
+-- | The State
 
 data PipelineState = PipelineState
   { pipelineErrors         :: [Error]
   , pipelineStage          :: Stage
-  , pipelineMute           :: Bool   -- state for indicating whether we should ignore events like `STextDocumentDidChange` 
+  , pipelineMute           :: Bool   -- state for indicating whether we should ignore events like `STextDocumentDidChange`
   , pipelineMouseSelection :: Maybe Range -- text selections (including cursor position)
   , pipelineCounter        :: Int -- counter for generating different IDs for Responses
   }
@@ -258,12 +258,12 @@ data PipelineState = PipelineState
 
 data Instruction next
   = EditText
-      Range -- ^ Range to replace 
-      Text -- ^ Text to replace with 
+      Range -- ^ Range to replace
+      Text -- ^ Text to replace with
       (Text -> next) -- ^ Continuation with the text of the whole file after the edit
   | GetSource (Text -> next) -- ^ Read the content of a file from the LSP filesystem
   | Log Text next -- ^ Make some noise
-  | SendDiagnostics [J.Diagnostic] next -- ^ Send Diagnostics 
+  | SendDiagnostics [J.Diagnostic] next -- ^ Send Diagnostics
   deriving (Functor)
 
 initState :: FilePath -> PipelineState
@@ -284,7 +284,7 @@ editText range inserted = do
   case (Text.null replaced, Text.null inserted) of
     -- no-op
     (True, True) -> return ()
-    -- deletion 
+    -- deletion
     (True, False) ->
       logText
         $  "      [ edit ] Delete "
@@ -292,7 +292,7 @@ editText range inserted = do
         <> " \""
         <> replaced
         <> "\""
-    -- insertion 
+    -- insertion
     (False, True) ->
       logText
         $  "      [ edit ] Insert "
@@ -300,7 +300,7 @@ editText range inserted = do
         <> " \""
         <> inserted
         <> "\""
-    -- replacement 
+    -- replacement
     (False, False) ->
       logText
         $  "      [ edit ] Replace "

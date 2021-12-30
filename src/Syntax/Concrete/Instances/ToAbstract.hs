@@ -15,10 +15,8 @@ import           Data.Loc                       ( (<-->)
                                                 , Located(locOf)
                                                 )
 import           Data.Loc.Range
-import qualified Data.Map                      as Map
 import qualified Syntax.Abstract               as A
 import qualified Syntax.Abstract.Operator      as A
-import qualified Syntax.Abstract.Util          as A
 import           Syntax.Abstract.Util
 import           Syntax.Common                  ( Name )
 import           Syntax.Concrete.Instances.Located
@@ -48,16 +46,8 @@ instance ToAbstract Name Name where
 
 instance ToAbstract Program A.Program where
   toAbstract prog@(Program ds stmts') = do
-    (originalDecls, defns) <- foldl (<>) ([], mempty) <$> toAbstract ds
+    (decls, defns) <- foldl (<>) ([], []) <$> toAbstract ds
 
-    let funcDefnSigsAsConstDecl =
-          foldMap A.funcDefnSigsToConstDecl (A.defnFuncSigs defns)
-    let typeDefnCtorAsConstDecl =
-          foldMap A.typeDefnCtorsToConstDecl (A.defnTypes defns)
-    let decls =
-          originalDecls
-            <> funcDefnSigsAsConstDecl -- add type of functions into declarations
-            <> typeDefnCtorAsConstDecl -- add type of constructors' into declarations
 
     let (globProps, assertions) = ConstExpr.pickGlobals decls
     let pre =
@@ -66,10 +56,10 @@ instance ToAbstract Program A.Program where
 
     return $ A.Program defns decls globProps (pre ++ stmts) (locOf prog)
 
-instance ToAbstract (Either Declaration DefinitionBlock) ([A.Declaration], A.Definitions) where
+instance ToAbstract (Either Declaration DefinitionBlock) ([A.Declaration], [A.Definition]) where
   toAbstract (Left d) = do
     decls <- toAbstract d
-    return ([decls], mempty)
+    return ([decls], [])
   toAbstract (Right defnBlock) = do
     defns <- toAbstract defnBlock
     return ([], defns)
@@ -77,45 +67,22 @@ instance ToAbstract (Either Declaration DefinitionBlock) ([A.Declaration], A.Def
 --------------------------------------------------------------------------------
 -- | Definition
 
-instance ToAbstract DefinitionBlock A.Definitions where
-  toAbstract (DefinitionBlock _ decls _) = mconcat <$> mapM toAbstract decls
+instance ToAbstract DefinitionBlock [A.Definition] where
+  toAbstract (DefinitionBlock _ defns _) =
+    combineFuncDefns . concat <$> toAbstract defns
 
-instance ToAbstract Definition A.Definitions where
+instance ToAbstract Definition [A.Definition] where
   toAbstract (TypeDefn tok name binders _ cons) = do
-    constructor <- toAbstract cons
-    let typeDefn = A.TypeDefn name binders constructor (tok <--> cons)
-    return $ A.Definitions { A.defnTypes    = Map.singleton name typeDefn
-                           , A.defnFuncSigs = mempty
-                           , A.defnFuncs    = mempty
-                           }
-
+    (: [])
+      <$> (A.TypeDefn name binders <$> toAbstract cons <*> pure (tok <--> cons))
   toAbstract (FuncDefnSig decl prop) = do
     (names, typ) <- toAbstract decl
-    prop'        <- toAbstract prop
-    let sigs =
-          map (\name -> A.FuncDefnSig name typ prop' (decl <--> prop)) names
-    return $ A.Definitions { A.defnTypes    = mempty
-                           , A.defnFuncSigs = Map.fromList (zip names sigs)
-                           , A.defnFuncs    = mempty
-                           }
-
+    mapM
+      (\n -> A.FuncDefnSig n typ <$> toAbstract prop <*> pure (decl <--> prop))
+      names
   toAbstract (FuncDefn name args _ body) = do
     body' <- toAbstract body
-    let clause = [wrapLam args body']
-
-    -- -- merge multiple FuncDefnClause into one
-    -- mergeFuncDefnClauses :: [FuncDefnClause] -> Map Name [Expr]
-    -- mergeFuncDefnClauses = Map.fromListWith mergeFuncDefnsOfTheSameName
-    --   . map (\(FuncDefnClause name args body _) -> (name, [wrapLam args body]))
-    -- where
-    --   mergeFuncDefnsOfTheSameName :: [Expr] -> [Expr] -> [Expr]
-    --   mergeFuncDefnsOfTheSameName = (<>)
-
-
-    return $ A.Definitions { A.defnTypes    = mempty
-                           , A.defnFuncSigs = mempty
-                           , A.defnFuncs    = Map.singleton name clause
-                           }
+    return [A.FuncDefn name [wrapLam args body']]
 
 instance ToAbstract TypeDefnCtor A.TypeDefnCtor where
   toAbstract (TypeDefnCtor c ts) = A.TypeDefnCtor c <$> toAbstract ts

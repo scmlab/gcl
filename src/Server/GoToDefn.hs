@@ -35,41 +35,37 @@ instance Pretty LocationLink where
 
 type LocationLinkToBe = Range -> LocationLink
 
--- | Extracts Scopes from a Program 
+-- | Extracts Scopes from a Program
 programToScopes :: Program -> [Scope LocationLinkToBe]
-programToScopes (Program (Definitions typeDefns _funcDefnSigs funcDefns) decls _ _ _)
-  = [topLevelScope]
+programToScopes (Program _defns decls _ _ _) = [topLevelScope]
  where
   topLevelScope :: Map Text LocationLinkToBe
   topLevelScope = Map.mapKeys nameToText locationLinks
 
   locationLinks :: Map Name LocationLinkToBe
-  locationLinks =
-    locationLinksFromFuncDefns
-      <> locationLinksFromDecls
-      <> locationLinksFromTypeDefns
+  locationLinks = locationLinksFromDecls
 
   locationLinksFromDecls :: Map Name LocationLinkToBe
   locationLinksFromDecls =
     makeLocationLinks $ Map.fromList $ concatMap splitDecl decls
 
-  locationLinksFromFuncDefns :: Map Name LocationLinkToBe
-  locationLinksFromFuncDefns = makeLocationLinks funcDefns
+  --locationLinksFromFuncDefns :: Map Name LocationLinkToBe
+  --locationLinksFromFuncDefns = makeLocationLinks funcDefns
 
-  locationLinksFromTypeDefns :: Map Name LocationLinkToBe
-  locationLinksFromTypeDefns = makeLocationLinks typeDefns
+  --locationLinksFromTypeDefns :: Map Name LocationLinkToBe
+  --locationLinksFromTypeDefns = makeLocationLinks typeDefns
 
   -- split a parallel declaration into many simpler declarations
   splitDecl :: Declaration -> [(Name, Declaration)]
   splitDecl decl@(ConstDecl names _ _ _) = [ (name, decl) | name <- names ]
   splitDecl decl@(VarDecl   names _ _ _) = [ (name, decl) | name <- names ]
 
---  Helper function for converting 
---      a Map of "names" and "targets" 
---   to a Map of "names" and functions 
+--  Helper function for converting
+--      a Map of "names" and "targets"
+--   to a Map of "names" and functions
 --        (which will become LocationLinks when supplied with the range of "origin")
 --
---  For example: 
+--  For example:
 --
 --    ╔═════ where the user clicks ════╗
 --    ║                                ║
@@ -137,17 +133,15 @@ instance Collect LocationLinkToBe LocationLink Program where
 
 --------------------------------------------------------------------------------
 -- Definition
-
-instance Collect LocationLinkToBe LocationLink Definitions where
-  collect defns = do
-    -- collect (defnTypes defns)
-    collect (defnFuncSigs defns)
-    collect (defnFuncs defns)
-
-instance Collect LocationLinkToBe LocationLink FuncDefnSig where
-  collect (FuncDefnSig _name t prop _) = do
+instance Collect LocationLinkToBe LocationLink Definition where
+  collect TypeDefn{}               = return ()
+  collect (FuncDefnSig n t prop _) = do
+    collect n
     collect t
     collect prop
+  collect (FuncDefn n exprs) = do
+    collect n
+    collect exprs
 
 --------------------------------------------------------------------------------
 -- Declaration
@@ -199,7 +193,7 @@ instance Collect LocationLinkToBe LocationLink Expr where
       localScope (scopeFromLocalBinders args) $ do
         collect c
         collect d
-    -- RedexStem/Redex will only appear in proof obligations, not in code 
+    -- RedexStem/Redex will only appear in proof obligations, not in code
     RedexStem{}  -> return ()
     Redex _      -> return ()
     ArrIdx e i _ -> do
@@ -209,7 +203,7 @@ instance Collect LocationLinkToBe LocationLink Expr where
       collect e
       collect i
       collect f
-    -- TODO: provide types for tokens in patterns 
+    -- TODO: provide types for tokens in patterns
     Case e _ _ -> do
       collect e
       -- collect patterns
@@ -231,7 +225,7 @@ instance Collect LocationLinkToBe LocationLink QuantOp' where
   collect (Right expr) = collect expr
 
 --------------------------------------------------------------------------------
--- | Types 
+-- | Types
 
 instance Collect LocationLinkToBe LocationLink Type where
   collect = \case

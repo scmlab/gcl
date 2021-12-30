@@ -4,42 +4,40 @@
 module Test.TypeChecking where
 
 import           Control.Monad.Except           ( runExcept )
-import           Control.Monad.State            ( evalStateT )
+import           Control.Monad.State.Lazy
 import           Data.Loc                       ( Loc(..) )
 import qualified Data.Map                      as Map
 import           Data.Map                       ( Map )
 import           Data.Text                      ( Text )
 import           Error                          ( Error(..) )
-import           GCL.Type                       ( Environment(..)
-                                                , TM
-                                                , checkEnvironment
-                                                , checkProgram
-                                                , checkStmt
-                                                , checkType
-                                                , defnsAndDeclsToEnv
-                                                , inferExpr
-                                                , runTM
+import           GCL.Type                       ( InferType(..)
+                                                , ScopeTree(..)
+                                                , ScopeTreeZipper(..)
+                                                , TypeCheckable(..)
+                                                , TypeDefnInfo(..)
+                                                , TypeInfo(..)
+                                                , runInferType
+                                                , runTypeCheck
                                                 )
+import           Pretty                         ( Pretty(pretty)
+                                                , hsep
+                                                , punctuate
+                                                , toByteString
+                                                , toText
+                                                , vsep
+                                                )
+import qualified Server.TokenMap               as TokenMap
 import           Syntax.Abstract
-import qualified Syntax.Abstract.Util          as A
 import           Syntax.Common                  ( Name(Name)
                                                 , Op
                                                 )
 import           Syntax.Concrete                ( ToAbstract(toAbstract) )
 import           Syntax.Parser                  ( Parser
-                                                , pDeclaration
-                                                , pDefinitionBlock
                                                 , pExpr
                                                 , pProgram
                                                 , pStmts
                                                 , pType
                                                 , runParse
-                                                )
-import           Pretty                         ( Pretty(pretty)
-                                                , toText
-                                                , toByteString
-                                                , punctuate
-                                                , hsep
                                                 )
 import           Test.Tasty                     ( TestTree
                                                 , testGroup
@@ -184,83 +182,67 @@ stmtTests = testGroup
       -- testCase "proof" $
       --   stmtCheck' ""
   ]
+
 declarationTests :: TestTree
 declarationTests = testGroup
   "Check Declaration"
-  [ testCase "const declaration"
-    $ declarationCheck "con C : Int" "Environment[(C, TVar Int)][][]"
+  [ testCase "const declaration" $ declarationCheck "con C : Int" "()"
   , testCase "const declaration w/ prop"
-    $ declarationCheck "con C : Int { C > 0 }" "Environment[(C, TVar Int)][][]"
-  , testCase "var declaration"
-    $ declarationCheck "var x : Bool" "Environment[(x, TVar Bool)][][]"
-  , testCase "var declaration w/ prop" $ declarationCheck
-    "var x : Bool { x = True }"
-    "Environment[(x, TVar Bool)][][]"
+    $ declarationCheck "con C : Int { C > 0 }" "()"
+  , testCase "var declaration" $ declarationCheck "var x : Bool" "()"
+  , testCase "var declaration w/ prop"
+    $ declarationCheck "var y : Bool { y = True }" "()"
   ]
 
 definitionTests :: TestTree
 definitionTests = testGroup
   ""
-  [ testCase "type definition" $ blockDeclarationCheck
-    "{:\ndata T a = Nil | Con a\n:}"
-    "Environment[(Con, TVar a → T a), (Nil, T a)][(T, ([a], [Nil , Con (TVar a)]))][]"
-  , testCase "definition 1" $ blockDeclarationCheck
+  [ testCase "type definition"
+    $ definitionCheck "{:\n data T a = Nil | Con a\n:}" "()"
+  , testCase "definition 1"
+    $ definitionCheck "{:\n\
+         \  A, B : Int\
+         \:}" "()"
+  , testCase "block declaration 2" $ definitionCheck
     "{:\n\
-        \  A, B : Int\
-        \:}"
-    "Environment[(A, TVar Int), (B, TVar Int)][][]"
-  , testCase "block declaration 2" $ blockDeclarationCheck
+         \  A, B : Int { A = 0 }\
+         \:}"
+    "()"
+  , testCase "block declaration 3" $ definitionCheck
     "{:\n\
-        \  A, B : Int { A = 0 }\
-        \:}"
-    "Environment[(A, TVar Int), (B, TVar Int)][][]"
-  , testCase "block declaration 3" $ blockDeclarationCheck
+         \  A, B : Int\n\
+         \    { A = 0 }\n\
+         \:}"
+    "()"
+  , testCase "block declaration 4" $ definitionCheck
     "{:\n\
-        \  A, B : Int\n\
-        \    { A = 0 }\n\
-        \:}"
-    "Environment[(A, TVar Int), (B, TVar Int)][][]"
-  , testCase "block declaration 4" $ blockDeclarationCheck
+         \  A, B : Int\n\
+         \    { A = 0 }\n\
+         \  F : Int -> Int -> Int\n\
+         \  P : Char -> Bool\n\
+         \:}"
+    "()"
+  , testCase "block declaration 5" $ definitionCheck
     "{:\n\
-        \  A, B : Int\n\
-        \    { A = 0 }\n\
-        \  F : Int -> Int -> Int\n\
-        \  P : Char -> Bool\n\
-        \:}"
-    "Environment[(A, TVar Int), (B, TVar Int), ( F\n, TVar Int → TVar Int → TVar Int ), (P, TVar Char → TVar Bool)][][]"
-  , testCase "block declaration 5" $ blockDeclarationCheck
+         \   N = 5\n\
+         \   N = 6\n\
+         \:}"
+    "()"
+  , testCase "definition 6"
+    $ definitionCheck "{:\n\
+         \    G i j = i + j\n\
+         \:}" "()"
+  , testCase "definition 7" $ definitionCheck
     "{:\n\
-        \   N = 5\n\
-        \   N = 6\n\
-        \:}"
-    "Environment[(N, Int)][][(N, [5, 6])]"
-  , testCase "definition 6" $ blockDeclarationCheck
-    "{:\n\
-        \    G i j = i + j\n\
-        \:}"
-    "Environment[(G, Int → Int → Int)][][(G, [λ i → λ j → i + j])]"
-  , testCase "definition 7" $ blockDeclarationCheck
-    "{:\n\
-        \   data Maybe a = Just a | Nothing\n\
-        \   G : Maybe a -> Int\n\
-        \   G x = case x of\n\
-        \             Just y -> 1\n\
-        \             Nothing -> 0\n\
-        \   A = 5\n\
-        \   F a b = a + b\n\
-        \:}"
-    "Environment[(A, Int), (F, Int → Int → Int), (G, Maybe a → Int), ( Just\n, TVar a → Maybe a ), (Nothing, Maybe a)][( Maybe\n, ([a], [Just (TVar a), Nothing ]) )][(A, [5]), (F, [λ a → λ b → a + b]), ( G\n, [λ x → case x of Just y -> 1Nothing -> 0] )]"
-  ]
-
-programTest :: TestTree
-programTest = testGroup
-  "Check program"
-  [ testCase "program check 1"
-      $ programCheck
-          "var i, j : Int\n\
-          \{: P x = i = j :}\n\
-          \{ P 1 }\n\
-          \"
+         \   data Maybe a = Just a | Nothing\n\
+         \   G : Maybe a -> Int\n\
+         \   G x = case x of\n\
+         \             Just y -> 1\n\
+         \             Nothing -> 0\n\
+         \   A = 5\n\
+         \   F a b = a + b\n\
+         \:}"
+    "()"
   ]
 
 fileTests :: TestTree
@@ -283,9 +265,9 @@ typeCheckFile dirName =
               Left  errors -> Left (map SyntacticError errors)
               Right ast    -> case runExcept (toAbstract ast) of
                 Left  _    -> Left [Others "Should dig hole"]
-                Right prog -> case runTM (checkProgram prog) of
+                Right prog -> case runTypeCheck prog of
                   Left  errors -> Left [TypeError errors]
-                  Right val    -> Right val
+                  Right _      -> Right ()
         return $ toByteString result
 
 fileCheck :: (FilePath, Text) -> Text
@@ -295,7 +277,7 @@ fileCheck (filepath, source) = toText result
     Left  errors -> Left (map SyntacticError errors)
     Right ast    -> case runExcept (toAbstract ast) of
       Left  _    -> Left [Others "Should dig hole"]
-      Right prog -> case runTM (checkProgram prog) of
+      Right prog -> case runTypeCheck prog of
         Left  errors -> Left [TypeError errors]
         Right val    -> Right val
 
@@ -347,39 +329,31 @@ var t = Var (Name t NoLoc) NoLoc
 name' :: Text -> Name
 name' t = Name t NoLoc
 
-env :: Environment
-env = Environment
-  { envLocalDefns   = Map.fromList
-    [ (name' "A"      , tint)
-    , (name' "B"      , tint)
-    , (name' "N"      , tint)
-    , (name' "Arr", tarr (Including (litNum 0)) (Excluding (cons "N")) tint)
-    , (name' "P"      , tfunc tint tbool)
-    , (name' "F"      , tfunc tint tint)
-    , (name' "G"      , tfunc tchar tbool)
-    , (name' "Max"    , tfunc tint (tfunc tint tbool))
-    , (name' "i"      , tint)
-    , (name' "j"      , tint)
-    , (name' "k"      , tint)
-    , (name' "b"      , tbool)
-    , (name' "p"      , tbool)
-    , (name' "q"      , tbool)
-    , (name' "r"      , tbool)
-    , (name' "x", TCon (name' "Maybe") [name' "a"] NoLoc)
-    , (name' "Just", tfunc tint (TCon (name' "Maybe") [name' "a"] NoLoc))
-    , (name' "Nothing", TCon (name' "Maybe") [name' "a"] NoLoc)
-    ]
-  , envTypeDefns    = Map.fromList
-                        [ ( name' "Maybe"
-                          , ( [name' "a"]
-                            , [ TypeDefnCtor (name' "Just")    [tvar "a"]
-                              , TypeDefnCtor (name' "Nothing") []
-                              ]
-                            )
-                          )
-                        ]
-  , envLocalContext = mempty
-  }
+env :: Map Name TypeInfo
+env = Map.fromList
+  [ (name' "A", ConstTypeInfo tint)
+  , (name' "B", ConstTypeInfo tint)
+  , (name' "N", ConstTypeInfo tint)
+  , ( name' "Arr"
+    , ConstTypeInfo (tarr (Including (litNum 0)) (Excluding (cons "N")) tint)
+    )
+  , (name' "P"  , ConstTypeInfo (tfunc tint tbool))
+  , (name' "F"  , ConstTypeInfo (tfunc tint tint))
+  , (name' "G"  , ConstTypeInfo (tfunc tchar tbool))
+  , (name' "Max", ConstTypeInfo (tfunc tint (tfunc tint tbool)))
+  , (name' "i"  , VarTypeInfo tint)
+  , (name' "j"  , VarTypeInfo tint)
+  , (name' "k"  , VarTypeInfo tint)
+  , (name' "b"  , VarTypeInfo tbool)
+  , (name' "p"  , VarTypeInfo tbool)
+  , (name' "q"  , VarTypeInfo tbool)
+  , (name' "r"  , VarTypeInfo tbool)
+  , (name' "x", VarTypeInfo (TCon (name' "Maybe") [name' "a"] NoLoc))
+  , ( name' "Just"
+    , TypeDefnCtorInfo (tfunc tint (TCon (name' "Maybe") [name' "a"] NoLoc))
+    )
+  , (name' "Nothing", TypeDefnCtorInfo (TCon (name' "Maybe") [name' "a"] NoLoc))
+  ]
 
 runParser :: ToAbstract a b => Parser a -> Text -> Either [Error] b
 runParser p t = case runExcept . toAbstract <$> parseTest p t of
@@ -387,72 +361,79 @@ runParser p t = case runExcept . toAbstract <$> parseTest p t of
   Right (Left  loc ) -> Left [Others (show loc)]
   Right (Right expr) -> Right expr
 
-check :: (Environment -> a -> TM b) -> Environment -> a -> Either [Error] b
-check checker env' e = case runExcept (evalStateT (checker env' e) 0) of
-  Left  err -> Left [TypeError err]
-  Right x   -> Right x
+check :: TypeCheckable a => Map Name TypeInfo -> a -> Either [Error] ()
+check env' e =
+  case
+      runExcept
+        (execStateT
+          (typeCheck e)
+          ( 0
+          , ScopeTreeZipper (ScopeTree mempty mempty) []
+          , ScopeTreeZipper (ScopeTree env' mempty)   []
+          )
+        )
+    of
+      Left  err -> Left [TypeError err]
+      Right _   -> Right ()
+
+inferCheck :: InferType a => Map Name TypeInfo -> a -> Either [Error] Type
+inferCheck env' e =
+  case
+      runExcept
+        (evalStateT
+          (runInferType e)
+          ( 0
+          , ScopeTreeZipper (ScopeTree mempty mempty) []
+          , ScopeTreeZipper (ScopeTree env' mempty)   []
+          )
+        )
+    of
+      Left  err -> Left [TypeError err]
+      Right x   -> Right (snd x)
 
 exprCheck :: Text -> Text -> Assertion
-exprCheck t1 t2 = toText (runParser pExpr t1 >>= check inferExpr env) @?= t2
+exprCheck t1 t2 = toText (runParser pExpr t1 >>= inferCheck env) @?= t2
 
-typeCheck :: Text -> Text -> Assertion
-typeCheck t1 t2 = toText (runParser pType t1 >>= check checkType env) @?= t2
+typeCheckAssert :: Text -> Text -> Assertion
+typeCheckAssert t1 t2 = toText (runParser pType t1 >>= check env) @?= t2
 
 typeCheck' :: Text -> Assertion
-typeCheck' t = typeCheck t "()"
+typeCheck' t = typeCheckAssert t "()"
 
 stmtCheck :: Text -> Text -> Assertion
-stmtCheck t1 t2 =
-  toText (runParser pStmts t1 >>= check (mapM . checkStmt) env) @?= t2
+stmtCheck t1 t2 = toText (runParser pStmts t1 >>= check env) @?= t2
 
 stmtCheck' :: Text -> Assertion
-stmtCheck' t = stmtCheck t "[()]"
-
+stmtCheck' t = stmtCheck t "()"
 
 declarationCheck :: Text -> Text -> Assertion
-declarationCheck t1 t2 = toText wrap @?= t2
- where
-  wrap = do
-    decl <- runParser pDeclaration t1
-    let decls = [decl]
-    return $ check
-      (\_ decls' -> do
-        env' <- defnsAndDeclsToEnv mempty decls'
-        checkEnvironment env'
-        return env'
-      )
-      mempty
-      decls
+declarationCheck t1 t2 = toText (runParser pProgram t1 >>= check mempty) @?= t2
 
 envCheck :: Text -> Assertion
 envCheck t = toText env @?= t
 
-blockDeclarationCheck :: Text -> Text -> Assertion
-blockDeclarationCheck t1 t2 = toText wrap @?= t2
- where
-  wrap = do
-    defns <- runParser pDefinitionBlock t1
-    let decls =
-          foldMap A.funcDefnSigsToConstDecl (defnFuncSigs defns)
-            <> foldMap A.typeDefnCtorsToConstDecl (defnTypes defns)
-    return $ check (\_ decls' -> defnsAndDeclsToEnv defns decls') mempty decls
+definitionCheck :: Text -> Text -> Assertion
+definitionCheck t1 t2 = toText (runParser pProgram t1 >>= check mempty) @?= t2
 
 programCheck :: Text -> Assertion
-programCheck t1 = toText wrap @?= "()"
- where
-    -- wrap :: Either Error ()
-  wrap = do
-    prog <- runParser pProgram t1
-    case runTM (checkProgram prog) of
-      Left  err -> Left [TypeError err]
-      Right x   -> Right x
+programCheck t1 = toText (runParser pProgram t1 >>= check mempty) @?= "()"
 
 instance (Pretty a, Pretty b) => Pretty (Map a b) where
   pretty m = "[" <> hsep (punctuate "," (map pretty (Map.toList m))) <> "]"
 
-instance Pretty Environment where
-  pretty Environment {..} =
-    "Environment"
-      <> pretty envLocalDefns
-      <> pretty envTypeDefns
-      <> pretty envLocalContext
+instance Pretty TypeDefnInfo where
+  pretty (TypeDefnInfo ns) =
+    "TypeDefnInfo " <> hsep (punctuate "," (map pretty ns))
+
+instance Pretty TypeInfo where
+  pretty (TypeDefnCtorInfo t) = "TypeDefnCtorInfo " <> pretty t
+  pretty (ConstTypeInfo    t) = "ConstTypeInfo " <> pretty t
+  pretty (VarTypeInfo      t) = "VarTypeInfo " <> pretty t
+
+instance Pretty a => Pretty (ScopeTree a) where
+  pretty ScopeTree {..} =
+    "GlobalScope " <> pretty globalScope <> "\nLocalScopes " <> vsep
+      (punctuate "," (map pretty (TokenMap.toList localScopes)))
+
+instance Pretty a => Pretty (ScopeTreeZipper a) where
+  pretty ScopeTreeZipper {..} = "Cursor " <> pretty cursor
