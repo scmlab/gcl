@@ -19,12 +19,12 @@ import           Language.LSP.Types             ( LocationLink(..) )
 import qualified Language.LSP.Types            as J
 import           Pretty                         ( Pretty(..) )
 import qualified Server.SrcLoc                 as SrcLoc
-import qualified Server.TokenMap               as TokenMap
-import           Server.TokenMap
+import qualified Server.IntervalMap               as IntervalMap
+import           Server.IntervalMap
 import           Syntax.Abstract
 import           Syntax.Common
 
-collectLocationLinks :: Program -> TokenMap LocationLink
+collectLocationLinks :: Program -> IntervalMap LocationLink
 collectLocationLinks program = runM (programToScopes program) (collect program)
 
 instance Pretty LocationLink where
@@ -120,7 +120,7 @@ instance Collect LocationLinkToBe LocationLink Name where
       Nothing               -> return ()
       Just locationLinkToBe -> case fromLoc (locOf name) of
         Nothing    -> return ()
-        Just range -> tell $ TokenMap.singleton range (locationLinkToBe range)
+        Just range -> tell $ IntervalMap.singleton range (locationLinkToBe range)
 
 --------------------------------------------------------------------------------
 -- Program

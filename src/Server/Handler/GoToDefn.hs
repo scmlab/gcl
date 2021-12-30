@@ -12,7 +12,7 @@ import           Language.LSP.Types      hiding ( Range )
 import           Server.Monad
 import           Server.Pipeline
 import qualified Server.SrcLoc                 as SrcLoc
-import qualified Server.TokenMap               as TokenMap
+import qualified Server.IntervalMap               as IntervalMap
 
 ignoreErrors :: ([Error], Maybe [LocationLink]) -> [LocationLink]
 ignoreErrors (_, Nothing) = []
@@ -35,13 +35,13 @@ handler uri position responder = do
           tokenMap = case stage of
             Raw       _       -> Nothing
             Parsed    _result -> Nothing
-            Converted result  -> Just $ convertedTokenMap result
+            Converted result  -> Just $ convertedIntervalMap result
             TypeChecked result ->
-              Just $ convertedTokenMap (typeCheckedPreviousStage result)
+              Just $ convertedIntervalMap (typeCheckedPreviousStage result)
             Swept result ->
-              Just $ convertedTokenMap
+              Just $ convertedIntervalMap
                 (typeCheckedPreviousStage (sweptPreviousStage result))
 
         return $ maybeToList $ case tokenMap of
           Nothing -> Nothing
-          Just xs -> TokenMap.lookup xs pos
+          Just xs -> IntervalMap.lookup pos xs

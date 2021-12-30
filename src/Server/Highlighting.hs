@@ -15,11 +15,11 @@ import           Data.Loc                       ( Located(locOf)
                                                 )
 import           Data.Loc.Range
 import qualified Language.LSP.Types            as J
-import           Server.TokenMap                ( Collect(..)
+import           Server.IntervalMap                ( Collect(..)
                                                 , M
                                                 , runM
                                                 )
-import qualified Server.TokenMap               as TokenMap
+import qualified Server.IntervalMap               as IntervalMap
 import           Syntax.Common
 import           Syntax.Concrete
 
@@ -40,7 +40,7 @@ addHighlighting
   -> M () Highlighting ()
 addHighlighting types modifiers node = case fromLoc (locOf node) of
   Nothing    -> return ()
-  Just range -> tell $ TokenMap.singleton range $ J.SemanticTokenAbsolute
+  Just range -> tell $ IntervalMap.singleton range $ J.SemanticTokenAbsolute
     (posLine (rangeStart range) - 1)
     (posCol (rangeStart range) - 1)
     (rangeSpan range)

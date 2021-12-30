@@ -26,7 +26,7 @@ import           Pretty                         ( Pretty(pretty)
                                                 , toText
                                                 , vsep
                                                 )
-import qualified Server.TokenMap               as TokenMap
+import qualified Server.IntervalMap               as IntervalMap
 import           Syntax.Abstract
 import           Syntax.Common                  ( Name(Name)
                                                 , Op
@@ -433,7 +433,7 @@ instance Pretty TypeInfo where
 instance Pretty a => Pretty (ScopeTree a) where
   pretty ScopeTree {..} =
     "GlobalScope " <> pretty globalScope <> "\nLocalScopes " <> vsep
-      (punctuate "," (map pretty (TokenMap.toList localScopes)))
+      (punctuate "," (map pretty (IntervalMap.toList localScopes)))
 
 instance Pretty a => Pretty (ScopeTreeZipper a) where
   pretty ScopeTreeZipper {..} = "Cursor " <> pretty cursor

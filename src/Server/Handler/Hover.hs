@@ -14,7 +14,7 @@ import           Language.LSP.Types      hiding ( Range )
 import           Pretty                         ( toText )
 import           Server.Pipeline
 import qualified Server.SrcLoc                 as SrcLoc
-import qualified Server.TokenMap               as TokenMap
+import qualified Server.IntervalMap               as IntervalMap
 
 ignoreErrors :: ([Error], Maybe (Maybe Hover)) -> Maybe Hover
 ignoreErrors (_, Nothing) = Nothing
@@ -37,13 +37,13 @@ handler uri position responder = case uriToFilePath uri of
           Raw         _      -> Nothing
           Parsed      _      -> Nothing
           Converted   _      -> Nothing
-          TypeChecked result -> Just $ typeCheckedTokenMap result
+          TypeChecked result -> Just $ typeCheckedIntervalMap result
           Swept result ->
-            Just $ typeCheckedTokenMap (sweptPreviousStage result)
+            Just $ typeCheckedIntervalMap (sweptPreviousStage result)
 
       case tokenMap of
         Nothing -> return Nothing
-        Just xs -> case TokenMap.lookup xs pos of
+        Just xs -> case IntervalMap.lookup pos xs of
           Nothing -> do
             -- logText $ toText xs
             logText "    < Hover (not found)"

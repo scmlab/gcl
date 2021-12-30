@@ -37,7 +37,7 @@ import           Server.GoToDefn                ( collectLocationLinks )
 import           Server.Handler.Diagnostic      ( Collect(collect) )
 import           Server.Highlighting            ( collectHighlighting )
 import           Server.Hover                   ( collectHoverInfo )
-import           Server.TokenMap                ( TokenMap )
+import           Server.IntervalMap                ( IntervalMap )
 import qualified Syntax.Abstract               as A
 import           Syntax.Abstract                ( Type )
 import           Syntax.Concrete                ( ToAbstract(toAbstract) )
@@ -134,7 +134,7 @@ parse source = do
 data ConvertResult = ConvertResult
   { convertedPreviousStage :: ParseResult
   , convertedProgram       :: A.Program -- abstract syntax
-  , convertedTokenMap      :: TokenMap J.LocationLink -- scoping info
+  , convertedIntervalMap      :: IntervalMap J.LocationLink -- scoping info
   }
   deriving (Show, Eq)
 
@@ -148,7 +148,7 @@ convert result = do
     Right program -> return $ ConvertResult
       { convertedPreviousStage = result
       , convertedProgram       = program
-      , convertedTokenMap      = collectLocationLinks program
+      , convertedIntervalMap      = collectLocationLinks program
       }
   save (Converted converted) -- save the current progress
   return converted
@@ -157,7 +157,7 @@ convert result = do
 
 data TypeCheckResult = TypeCheckResult
   { typeCheckedPreviousStage :: ConvertResult
-  , typeCheckedTokenMap      :: TokenMap (J.Hover, Type) -- type checking info
+  , typeCheckedIntervalMap      :: IntervalMap (J.Hover, Type) -- type checking info
   }
   deriving (Show, Eq)
 
@@ -173,7 +173,7 @@ typeCheck result = do
 
   let typeChecked = TypeCheckResult
         { typeCheckedPreviousStage = result
-        , typeCheckedTokenMap      = collectHoverInfo program
+        , typeCheckedIntervalMap      = collectHoverInfo program
         }
   save (TypeChecked typeChecked) -- save the current progress
   return typeChecked

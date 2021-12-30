@@ -41,15 +41,15 @@ import           Prelude                 hiding ( EQ
                                                 )
 
 import qualified Data.List.NonEmpty            as NonEmpty
-import           Server.TokenMap                ( TokenMap )
-import qualified Server.TokenMap               as TokenMap
+import           Server.IntervalMap                ( IntervalMap )
+import qualified Server.IntervalMap               as IntervalMap
 import           Syntax.Abstract
 import           Syntax.Abstract.Util
 import           Syntax.Common
 
 data ScopeTree a = ScopeTree
   { globalScope :: Map Name a             -- use name or range to Name to find corresponding type infos
-  , localScopes :: TokenMap (ScopeTree a)
+  , localScopes :: IntervalMap (ScopeTree a)
   }
   deriving Eq
 
@@ -72,7 +72,7 @@ fsRootScopeTree s = maybe s fsRootScopeTree (fsUpScopeTree s)
 fsUpScopeTree :: ScopeTreeZipper a -> Maybe (ScopeTreeZipper a)
 fsUpScopeTree ScopeTreeZipper {..} = case parents of
   ((rng, p) : ps) -> Just $ ScopeTreeZipper
-    (ScopeTree (globalScope p) (TokenMap.insert rng cursor (localScopes p)))
+    (ScopeTree (globalScope p) (IntervalMap.insert rng cursor (localScopes p)))
     ps
   [] -> Nothing
 

@@ -20,13 +20,13 @@ import qualified Language.LSP.Types            as J
 import           Pretty                         ( Pretty(..)
                                                 , toText
                                                 )
-import           Server.TokenMap
-import qualified Server.TokenMap               as TokenMap
+import           Server.IntervalMap
+import qualified Server.IntervalMap               as IntervalMap
 -- import qualified Server.SrcLoc                 as SrcLoc
 import           Syntax.Abstract
 import           Syntax.Common
 
-collectHoverInfo :: Program -> TokenMap (J.Hover, Type)
+collectHoverInfo :: Program -> IntervalMap (J.Hover, Type)
 collectHoverInfo program = runM (programToScopes program) (collect program)
 
 instance Pretty J.Hover where
@@ -38,7 +38,7 @@ instance Pretty J.Hover where
 annotateType :: Located a => a -> Type -> M Type (J.Hover, Type) ()
 annotateType node t = case fromLoc (locOf node) of
   Nothing    -> return ()
-  Just range -> tell $ TokenMap.singleton range (hover, t)
+  Just range -> tell $ IntervalMap.singleton range (hover, t)
  where
   hover   = J.Hover content Nothing
   content = J.HoverContents $ J.markedUpContent "gcl" (toText t)
