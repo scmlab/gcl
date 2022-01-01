@@ -15,7 +15,7 @@ instance Located Declaration where
 instance Located Definition where
   locOf (TypeDefn    _ _ _ r) = r
   locOf (FuncDefnSig _ _ _ r) = r
-  locOf (FuncDefn    l r) = l <--> r
+  locOf (FuncDefn l r       ) = l <--> r
 
 instance Located TypeDefnCtor where
   locOf (TypeDefnCtor l r) = l <--> r
@@ -61,13 +61,13 @@ instance Located Expr where
   locOf (Const _ l         ) = l
   locOf (Lit   _ l         ) = l
   locOf (Op op             ) = locOf op
-  locOf (App _ _ l         ) = l
-  locOf (Func _ _ l         ) = l
-  locOf (Lam _ _ l         ) = l
+  locOf (App  _ _ l        ) = l
+  locOf (Func _ _ l        ) = l
+  locOf (Lam  _ _ l        ) = l
   locOf (Tuple _           ) = NoLoc
   locOf (Quant _ _ _ _ l   ) = l
   locOf (RedexStem es _ _ _) = locOf es
-  locOf (Redex x           ) = locOf x
+  locOf (Redex _ x         ) = locOf x
   locOf (ArrIdx _ _ l      ) = l
   locOf (ArrUpd _ _ _ l    ) = l
   locOf (Case _ _ l        ) = l
@@ -80,9 +80,6 @@ instance Located Pattern where
   locOf (PattBinder   l     ) = locOf l
   locOf (PattWildcard l     ) = locOf l
   locOf (PattConstructor l r) = l <--> r
-
-instance Located Redex where
-  locOf = locOf . redexExpr
 
 instance Located Lit where
   locOf _ = NoLoc

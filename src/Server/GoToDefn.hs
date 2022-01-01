@@ -18,9 +18,9 @@ import           Data.Text                      ( Text )
 import           Language.LSP.Types             ( LocationLink(..) )
 import qualified Language.LSP.Types            as J
 import           Pretty                         ( Pretty(..) )
-import qualified Server.SrcLoc                 as SrcLoc
-import qualified Server.IntervalMap               as IntervalMap
+import qualified Server.IntervalMap            as IntervalMap
 import           Server.IntervalMap
+import qualified Server.SrcLoc                 as SrcLoc
 import           Syntax.Abstract
 import           Syntax.Common
 
@@ -119,8 +119,9 @@ instance Collect LocationLinkToBe LocationLink Name where
     case result of
       Nothing               -> return ()
       Just locationLinkToBe -> case fromLoc (locOf name) of
-        Nothing    -> return ()
-        Just range -> tell $ IntervalMap.singleton range (locationLinkToBe range)
+        Nothing -> return ()
+        Just range ->
+          tell $ IntervalMap.singleton range (locationLinkToBe range)
 
 --------------------------------------------------------------------------------
 -- Program
@@ -184,9 +185,9 @@ instance Collect LocationLinkToBe LocationLink Expr where
     Var   a _           -> collect a
     Const a _           -> collect a
     Op op               -> collect op
-    App a b _           -> collect a >> collect b
-    Lam _ b _           -> collect b
-    Func a b _           -> collect a >> collect b
+    App  a b _          -> collect a >> collect b
+    Lam  _ b _          -> collect b
+    Func a b _          -> collect a >> collect b
     Tuple as            -> mapM_ collect as
     Quant op args c d _ -> do
       collect op
@@ -195,7 +196,7 @@ instance Collect LocationLinkToBe LocationLink Expr where
         collect d
     -- RedexStem/Redex will only appear in proof obligations, not in code
     RedexStem{}  -> return ()
-    Redex _      -> return ()
+    Redex _ _    -> return ()
     ArrIdx e i _ -> do
       collect e
       collect i

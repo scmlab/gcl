@@ -93,7 +93,7 @@ instance Free A.Expr where
   fv (A.Quant op xs range term _) =
     (fv op <> fv range <> fv term) \\ Set.fromList xs
   fv (A.RedexStem _ _ freeVars _) = freeVars
-  fv (A.Redex x                 ) = fv (A.redexExpr x)
+  fv (A.Redex _ e               ) = fv e
   fv (A.ArrIdx e1 e2 _          ) = fv e1 <> fv e2
   fv (A.ArrUpd e1 e2 e3 _       ) = fv e1 <> fv e2 <> fv e3
   fv (A.Case e clauses _        ) = fv e <> Set.unions (map fv clauses)

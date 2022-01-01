@@ -40,7 +40,6 @@ import           Syntax.Abstract                ( CaseClause(..)
                                                 , FuncClause(..)
                                                 , Mapping
                                                 , Pattern(..)
-                                                , Redex(..)
                                                 , extractBinder
                                                 )
 import           Syntax.Common                  ( Name(Name)
@@ -56,7 +55,7 @@ run
   -> [Name] -- name of variables to be substituted
   -> [Expr] -- values to be substituted for
   -> a
-  -> m (a, IntMap Redex)
+  -> m (a, IntMap (Int, Expr))
 run scope names exprs predicate = runM scope $ do
   output <- subst mapping predicate >>= reduce
   return (output, buildRedexMap output)
@@ -64,9 +63,8 @@ run scope names exprs predicate = runM scope $ do
   mapping :: Mapping
   mapping = mappingFromSubstitution names exprs
 
-buildRedexMap :: CollectRedexes a => a -> IntMap Redex
-buildRedexMap =
-  IntMap.fromList . map (\redex -> (redexID redex, redex)) . collectRedexes
+buildRedexMap :: CollectRedexes a => a -> IntMap (Int, Expr)
+buildRedexMap = IntMap.fromList . map (\(i, e) -> (i, (i, e))) . collectRedexes
 
 step :: MonadState FreshState m => Scope -> Expr -> m Expr
 step scope expr = runM scope $ go expr
@@ -75,8 +73,8 @@ step scope expr = runM scope $ go expr
   go (App f x l) = App <$> go f <*> pure x <*> pure l >>= reduce
   go (RedexStem _ value _ mappings) =
     foldM (flip subst) value (reverse $ toList mappings) >>= reduce
-  go (Redex redex) = go (redexExpr redex)
-  go others        = return others
+  go (Redex _ e) = go e
+  go others      = return others
 
 
 mappingFromSubstitution :: [Name] -> [Expr] -> Mapping
@@ -102,7 +100,7 @@ runM scope p = do
 ------------------------------------------------------------------
 
 class CollectRedexes a where
-    collectRedexes :: a -> [Redex]
+    collectRedexes :: a -> [(Int, Expr)]
 
 instance CollectRedexes PO where
   collectRedexes (PO pre post _ _ _) =
@@ -126,7 +124,7 @@ instance CollectRedexes Expr where
     Lam _ x _       -> collectRedexes x
     Quant _ _ _ x _ -> collectRedexes x
     RedexStem{}     -> []
-    Redex redex     -> [redex]
+    Redex i e       -> [(i, e)]
     ArrIdx x y _    -> collectRedexes x <> collectRedexes y
     ArrUpd x y z _  -> collectRedexes x <> collectRedexes y <> collectRedexes z
     Case _ xs _     -> xs >>= collectRedexes
@@ -148,23 +146,20 @@ instance Reducible Expr where
       f' <- reduce f
       x' <- reduce x
       case f' of
-          -- [reduce-App-Expand-Lam]
-        Redex (Rdx _ e) -> Redex <$> (Rdx <$> fresh <*> reduce (App e x' l1))
+        -- App (Redex RedexStem) x -> Redex (App RedexStem x)
+        Redex _ e    -> Redex <$> fresh <*> reduce (App e x' l1)
         -- [reduce-App-Lam]
-        Lam n body _    -> subst (mappingFromSubstitution [n] [x']) body
+        Lam n body _ -> subst (mappingFromSubstitution [n] [x']) body
         -- [Others]
-        _               -> return $ App f' x' l1
+        _            -> return $ App f' x' l1
     Lam binder body l -> Lam binder <$> reduce body <*> return l
     Quant op binders range body l ->
       Quant op binders range <$> reduce body <*> return l
-    Redex redex          -> Redex <$> reduce redex
+    Redex i e            -> Redex i <$> reduce e
     ArrIdx array index l -> ArrIdx <$> reduce array <*> reduce index <*> pure l
     ArrUpd array index value l ->
       ArrUpd <$> reduce array <*> reduce index <*> reduce value <*> pure l
     _ -> return expr
-
-instance Reducible Redex where
-  reduce (Rdx index expr) = Rdx index <$> reduce expr
 
 instance Reducible Pred where
   reduce = \case
@@ -201,7 +196,7 @@ instance Substitutable Expr where
                   (fv binding)
                   -- NonEmpty.singleton is only available after base-4.15
                   (NonEmpty.fromList [shrinkMapping binding mapping])
-            return $ Redex (Rdx index e)
+            return $ Redex index e
           Just Nothing -> return expr
           Nothing      -> return expr
 
@@ -218,7 +213,7 @@ instance Substitutable Expr where
                   (fv binding)
                   -- NonEmpty.singleton is only available after base-4.15
                   (NonEmpty.fromList [shrinkMapping binding mapping])
-            return $ Redex (Rdx index e)
+            return $ Redex index e
           Just Nothing -> return expr
           Nothing      -> return expr
 
@@ -287,7 +282,7 @@ instance Substitutable Expr where
                            newFreeVars
                            (NonEmpty.cons shrinkedMapping mappings)
 
-    Redex (Rdx _ e) -> Redex <$> (Rdx <$> fresh <*> subst mapping e)
+    Redex _ e -> Redex <$> fresh <*> subst mapping e
 
     ArrIdx array index l ->
       ArrIdx <$> subst mapping array <*> subst mapping index <*> pure l

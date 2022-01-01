@@ -41,8 +41,8 @@ import           Prelude                 hiding ( EQ
                                                 )
 
 import qualified Data.List.NonEmpty            as NonEmpty
-import           Server.IntervalMap                ( IntervalMap )
-import qualified Server.IntervalMap               as IntervalMap
+import           Server.IntervalMap             ( IntervalMap )
+import qualified Server.IntervalMap            as IntervalMap
 import           Syntax.Abstract
 import           Syntax.Abstract.Util
 import           Syntax.Common
@@ -286,9 +286,9 @@ instance InferType Expr where
         x  <- freshVar
         tell [(to, x ~-> x ~-> x, locOf op), (tt, x, locOf t)]
         return x
-  inferType (Redex (Rdx _ expr)) = inferType expr
-  inferType (RedexStem n _ _ _ ) = inferType n
-  inferType (ArrIdx e1 e2 _    ) = do
+  inferType (Redex _ expr     ) = inferType expr
+  inferType (RedexStem n _ _ _) = inferType n
+  inferType (ArrIdx e1 e2 _   ) = do
     t1 <- inferType e1
     let interval = case t1 of
           TArray itv _ _ -> itv
@@ -610,11 +610,11 @@ instance TypeCheckable Expr where
   typeCheck = void . infer
 
 instance TypeCheckable Type where
-  typeCheck TBase{}            = return ()
-  typeCheck (TArray i  t    _) = typeCheck i >> typeCheck t
-  typeCheck (TFunc  t1 t2   _) = typeCheck t1 >> typeCheck t2
-  typeCheck (TTuple ts) = forM_ ts typeCheck
-  typeCheck (TCon   n  args _) = do
+  typeCheck TBase{}          = return ()
+  typeCheck (TArray i  t  _) = typeCheck i >> typeCheck t
+  typeCheck (TFunc  t1 t2 _) = typeCheck t1 >> typeCheck t2
+  typeCheck (TTuple ts     ) = forM_ ts typeCheck
+  typeCheck (TCon n args _ ) = do
     (_, s, _) <- get
     case lookupScopeTree n s of
       Just (TypeDefnInfo args') -> if

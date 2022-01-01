@@ -190,7 +190,7 @@ data SweepResult = SweepResult
     -- Warnings
   , sweptWarnings      :: [StructWarning]
     -- Redexes waiting to be reduce by the client on demand
-  , sweptRedexes       :: IntMap A.Redex
+  , sweptRedexes       :: IntMap (Int, A.Expr)
     -- counter for generating fresh variables
   , sweptCounter       :: Int
   }

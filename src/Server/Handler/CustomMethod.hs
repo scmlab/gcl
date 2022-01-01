@@ -19,7 +19,6 @@ import           Render                         ( Render(render) )
 import           Server.CustomMethod
 import           Server.Monad
 import           Server.Pipeline
-import           Syntax.Abstract                ( Redex(redexExpr) )
 import           Syntax.Abstract.Util           ( programToScopeForSubstitution
                                                 )
 
@@ -95,10 +94,10 @@ handleSubst i = do
             (typeCheckedPreviousStage (sweptPreviousStage result))
       case IntMap.lookup i (sweptRedexes result) of
         Nothing    -> return []
-        Just redex -> do
+        Just (_, redex) -> do
           let scope = programToScopeForSubstitution program
           let (newExpr, counter) = runState
-                (Substitution.step scope (redexExpr redex))
+                (Substitution.step scope redex)
                 (sweptCounter result)
           let redexesInNewExpr = Substitution.buildRedexMap newExpr
           let newResult = result

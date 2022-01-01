@@ -5,9 +5,9 @@ module Test.Substitution
   ( tests
   ) where
 
-import           Control.Monad.State            ( evalState
+import           Control.Monad.State            ( MonadState
+                                                , evalState
                                                 , forM
-                                                , MonadState
                                                 )
 import           Data.Foldable                  ( toList )
 import           Data.Map                       ( Map )
@@ -21,7 +21,7 @@ import           Pretty
 import           Render.Class                   ( Render(render) )
 import           Render.Element                 ( Inlines(..) )
 import           Server.Pipeline
-import           Syntax.Abstract.Types          ( Redex(..) )
+import           Syntax.Abstract.Types          ( Expr )
 import           Syntax.Abstract.Util           ( programToScopeForSubstitution
                                                 )
 import           Test.Server.Interpreter        ( runTest
@@ -85,8 +85,8 @@ instance Pretty Tree where
     prettyTransition (transition, children) =
       [pretty transition, indent 2 $ vcat (map pretty children)]
 
-fromRedex :: MonadState FreshState m => Scope -> Redex -> m Tree
-fromRedex scope (Rdx i before) = do
+fromRedex :: MonadState FreshState m => Scope -> (Int, Expr) -> m Tree
+fromRedex scope (i, before) = do
   trees <- do
     after <- step scope before
     let redexesInAfter = buildRedexMap after

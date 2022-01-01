@@ -21,7 +21,7 @@ import           Pretty                         ( Pretty(..)
                                                 , toText
                                                 )
 import           Server.IntervalMap
-import qualified Server.IntervalMap               as IntervalMap
+import qualified Server.IntervalMap            as IntervalMap
 -- import qualified Server.SrcLoc                 as SrcLoc
 import           Syntax.Abstract
 import           Syntax.Common
@@ -149,7 +149,7 @@ instance Collect Type (J.Hover, Type) Expr where
       --   collect d
     -- RedexStem/Redex will only appear in proof obligations, not in code
     RedexStem{}  -> return ()
-    Redex _      -> return ()
+    Redex _ _    -> return ()
     ArrIdx e i _ -> do
       collect e
       collect i

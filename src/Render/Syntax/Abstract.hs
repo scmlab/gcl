@@ -85,16 +85,13 @@ handleExpr n (RedexStem name _value _freeVars mappings) =
   mappings' = punctuateE
     " "
     (map render $ filter (not . Map.null) $ reverse $ toList mappings)
-handleExpr n (Redex redex   ) = return $ renderPrec n redex
-handleExpr _ (ArrIdx e1 e2 _) = return $ render e1 <> "[" <> render e2 <> "]"
+handleExpr n (Redex index expr) = return $ substE index (renderPrec n expr)
+handleExpr _ (ArrIdx e1 e2 _  ) = return $ render e1 <> "[" <> render e2 <> "]"
 handleExpr _ (ArrUpd e1 e2 e3 _) =
   return $ "(" <+> render e1 <+> ":" <+> render e2 <+> "↣" <+> render e3 <+> ")"
     -- SCM: need to print parenthesis around e1 when necessary.
 handleExpr _ (Case expr cases _) =
   return $ "case" <+> render expr <+> "of" <+> vertE (map render cases)
-
-instance Render Redex where
-  renderPrec n (Rdx index expr) = substE index (renderPrec n expr)
 
 instance Render Mapping where
   render env | null env  = mempty
