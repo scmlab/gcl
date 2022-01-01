@@ -8,6 +8,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE DeriveFunctor #-}
 
 
 module GCL.Type where
@@ -51,7 +52,7 @@ data ScopeTree a = ScopeTree
   { globalScope :: Map Name a             -- use name or range to Name to find corresponding type infos
   , localScopes :: IntervalMap (ScopeTree a)
   }
-  deriving Eq
+  deriving (Eq, Functor)
 
 data ScopeTreeZipper a = ScopeTreeZipper
   { cursor  :: ScopeTree a
@@ -250,9 +251,9 @@ instance InferType Expr where
   inferType (Func name clauses l) = do
     -- infer the first clause
     t  <- inferFuncClause name (NonEmpty.head clauses)
-    -- infer other clauses 
+    -- infer other clauses
     ts <- mapM (inferFuncClause name) clauses
-    -- and unify them all 
+    -- and unify them all
 
     let pairs = map (t, , l) (NonEmpty.toList ts)
     tell pairs
@@ -482,13 +483,13 @@ updateScopeTreeZipper s = do
   getTypeInfo >>= setTypeInfo . subst s
 
 runTypeCheck
-  :: Program -> Either TypeError (ScopeTree TypeDefnInfo, ScopeTree TypeInfo)
+  :: Program -> Either TypeError (ScopeTree TypeDefnInfo, ScopeTree Type)
 runTypeCheck prog = do
   let initTypeInfo     = ScopeTreeZipper (ScopeTree mempty mempty) []
   let initTypeDefnInfo = ScopeTreeZipper (ScopeTree mempty mempty) []
   (_, s2, s3) <- runExcept
     (execStateT (typeCheck prog) (0, initTypeDefnInfo, initTypeInfo))
-  return (cursor (fsRootScopeTree s2), cursor (fsRootScopeTree s3))
+  return (cursor (fsRootScopeTree s2), fmap typeInfoToType (cursor (fsRootScopeTree s3)))
 
 class TypeCheckable a where
     typeCheck :: a -> TypeCheckM ()
