@@ -194,7 +194,12 @@ instance Collect Type (J.Hover, Type) FuncClause where
 
 -- TODO: implement this
 instance Collect Type (J.Hover, Type) Pattern where
-  collect _ = return ()
+  collect PattLit{} = return ()
+  collect (PattBinder n) = collect n
+  collect (PattWildcard rng) = do
+    result <- TypeChecking.lookupHoleScopeTree rng <$> get
+    forM_ result (annotateType rng)
+  collect (PattConstructor _ patts) = collect patts
 
 --------------------------------------------------------------------------------
 -- | Types
