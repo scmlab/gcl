@@ -167,13 +167,13 @@ typeCheck :: ConvertResult -> PipelineM TypeCheckResult
 typeCheck result = do
   let program = convertedProgram result
 
-  _ <- case TypeChecking.runTypeCheck program of
+  (_, scopeTree) <- case TypeChecking.runTypeCheck program of
     Left  e -> throwError [TypeError e]
     Right v -> return v
 
   let typeChecked = TypeCheckResult
         { typeCheckedPreviousStage = result
-        , typeCheckedIntervalMap      = collectHoverInfo program
+        , typeCheckedIntervalMap   = collectHoverInfo program scopeTree
         }
   save (TypeChecked typeChecked) -- save the current progress
   return typeChecked

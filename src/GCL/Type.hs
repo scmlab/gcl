@@ -8,6 +8,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE DeriveFunctor #-}
 
 
 module GCL.Type where
@@ -47,17 +48,19 @@ import           Syntax.Abstract
 import           Syntax.Abstract.Util
 import           Syntax.Common
 
+data Index = Index Name | Hole Range deriving (Eq, Show, Ord)
+
 data ScopeTree a = ScopeTree
-  { globalScope :: Map Name a             -- use name or range to Name to find corresponding type infos
+  { globalScope :: Map Index a             -- use name or range to Name to find corresponding type infos
   , localScopes :: IntervalMap (ScopeTree a)
   }
-  deriving Eq
+  deriving (Eq, Functor)
 
 data ScopeTreeZipper a = ScopeTreeZipper
   { cursor  :: ScopeTree a
   , parents :: [(Range, ScopeTree a)]
   }
-  deriving Eq
+  deriving (Eq, Functor)
 
 instance {-# Incoherent #-} Substitutable a b => Substitutable a (ScopeTree b) where
   subst s ScopeTree {..} =
@@ -77,7 +80,7 @@ fsUpScopeTree ScopeTreeZipper {..} = case parents of
   [] -> Nothing
 
 insertScopeTree
-  :: Range -> Map Name a -> ScopeTreeZipper a -> ScopeTreeZipper a
+  :: Range -> Map Index a -> ScopeTreeZipper a -> ScopeTreeZipper a
 insertScopeTree rng m ScopeTreeZipper {..} =
   let cursor' = ScopeTree m mempty
   in  let parents' = (rng, cursor) : parents
@@ -85,8 +88,11 @@ insertScopeTree rng m ScopeTreeZipper {..} =
 
 lookupScopeTree :: Name -> ScopeTreeZipper a -> Maybe a
 lookupScopeTree n s =
-  Map.lookup n (globalScope (cursor s))
+  Map.lookup (Index n) (globalScope (cursor s))
     <|> (fsUpScopeTree s >>= lookupScopeTree n)
+
+lookupHoleScopeTree :: Range -> ScopeTreeZipper a -> Maybe a
+lookupHoleScopeTree rng s = Map.lookup (Hole rng) (globalScope (cursor s))
 
 data TypeError
     = NotInScope Name
@@ -131,12 +137,18 @@ dups :: Eq a => [a] -> [a]
 dups = map head . filter ((> 1) . length) . group
 
 duplicationCheck
-  :: (Eq a, MonadError TypeError m) => [(Name, a)] -> m [(Name, a)]
+  :: (Eq a, MonadError TypeError m) => [(Index, a)] -> m [(Index, a)]
 duplicationCheck ns =
   let ds = dups ns
   in  if null ds
         then return ns
-        else throwError $ DuplicatedIdentifiers (map fst ds)
+        else throwError . DuplicatedIdentifiers . map (toName . fst) . filter isName $ ds
+  where
+    isName (Index{}, _) = True
+    isName _            = False
+
+    toName (Index n) = n
+    toName (Hole rng) = Name (Text.pack (show rng)) (locOf rng)
 
 class HasTypeDefnInfoScope m where
     getTypeDefnInfo :: m (ScopeTreeZipper TypeDefnInfo)
@@ -177,13 +189,13 @@ instance HasTypeInfoScope TypeInferM where
 
 type Constraint = (Type, Type, Loc)
 
-checkScope :: (MonadError TypeError m, Eq a) => [(Name, a)] -> m (Map Name a)
+checkScope :: (MonadError TypeError m, Eq a) => [(Index, a)] -> m (Map Index a)
 checkScope infos = Map.fromList <$> duplicationCheck infos
 
 newScope
   :: (HasTypeDefnInfoScope m, HasTypeInfoScope m, MonadError TypeError m)
   => Loc
-  -> ([(Name, TypeDefnInfo)], [(Name, TypeInfo)])
+  -> ([(Index, TypeDefnInfo)], [(Index, TypeInfo)])
   -> m ()
 newScope l (infos1, infos2) = do
   m1 <- checkScope infos1
@@ -197,7 +209,7 @@ newScope l (infos1, infos2) = do
 localScope
   :: (HasTypeDefnInfoScope m, HasTypeInfoScope m, MonadError TypeError m)
   => Loc
-  -> ([(Name, TypeDefnInfo)], [(Name, TypeInfo)])
+  -> ([(Index, TypeDefnInfo)], [(Index, TypeInfo)])
   -> m b
   -> m b
 localScope l infos act = do
@@ -244,15 +256,15 @@ instance InferType Expr where
     return v
   inferType (Lam x e l) = do
     v <- freshVar
-    t <- localScope l ([], [(x, VarTypeInfo v)]) (inferType e)
+    t <- localScope l ([], [(Index x, VarTypeInfo v)]) (inferType e)
     return (TFunc v t l)
 
   inferType (Func name clauses l) = do
     -- infer the first clause
     t  <- inferFuncClause name (NonEmpty.head clauses)
-    -- infer other clauses 
+    -- infer other clauses
     ts <- mapM (inferFuncClause name) clauses
-    -- and unify them all 
+    -- and unify them all
 
     let pairs = map (t, , l) (NonEmpty.toList ts)
     tell pairs
@@ -274,7 +286,7 @@ instance InferType Expr where
     tids     <- mapM (const freshVar) ids
     (tr, tt) <- localScope
       l
-      ([], [ (n, VarTypeInfo tn) | n <- ids, tn <- tids ])
+      ([], [ (Index n, VarTypeInfo tn) | n <- ids, tn <- tids ])
       ((,) <$> inferType rng <*> inferType t)
     tell [(tr, tBool NoLoc, locOf rng)]
     case qop of
@@ -320,14 +332,14 @@ instance InferType CaseClause where
     te                 <- localScope (locOf c) ([], pattInfos) (inferType expr)
     return (TFunc tPatt te (locOf c))
 
-collectPattInfos :: Pattern -> TypeInferM ([(Name, TypeInfo)], Type)
+collectPattInfos :: Pattern -> TypeInferM ([(Index, TypeInfo)], Type)
 collectPattInfos (PattLit    x) = return ([], litTypes x (locOf x))
 collectPattInfos (PattBinder n) = do
   tn <- freshVar
-  return ([(n, VarTypeInfo tn)], tn)
+  return ([(Index n, VarTypeInfo tn)], tn)
 collectPattInfos (PattWildcard rng) = do
   v <- freshVar
-  return ([(Name (Text.pack . show $ rng) NoLoc, VarTypeInfo v)], v)
+  return ([(Hole rng, VarTypeInfo v)], v)
 collectPattInfos (PattConstructor n patts) = do
   tPatt           <- freshVar
   tn              <- inferType n
@@ -482,13 +494,13 @@ updateScopeTreeZipper s = do
   getTypeInfo >>= setTypeInfo . subst s
 
 runTypeCheck
-  :: Program -> Either TypeError (ScopeTree TypeDefnInfo, ScopeTree TypeInfo)
+  :: Program -> Either TypeError (ScopeTreeZipper TypeDefnInfo, ScopeTreeZipper Type)
 runTypeCheck prog = do
   let initTypeInfo     = ScopeTreeZipper (ScopeTree mempty mempty) []
   let initTypeDefnInfo = ScopeTreeZipper (ScopeTree mempty mempty) []
   (_, s2, s3) <- runExcept
     (execStateT (typeCheck prog) (0, initTypeDefnInfo, initTypeInfo))
-  return (cursor (fsRootScopeTree s2), cursor (fsRootScopeTree s3))
+  return (fsRootScopeTree s2, fmap typeInfoToType (fsRootScopeTree s3))
 
 class TypeCheckable a where
     typeCheck :: a -> TypeCheckM ()
@@ -497,7 +509,7 @@ instance (TypeCheckable a, Foldable t) => TypeCheckable (t a) where
   typeCheck xs = mapM_ typeCheck xs
 
 class CollectIds a where
-    collectIds :: Fresh m => a -> m [(Name, TypeInfo)]
+    collectIds :: Fresh m => a -> m [(Index, TypeInfo)]
 
 instance CollectIds a => CollectIds [a] where
   collectIds xs = concat <$> mapM collectIds xs
@@ -506,17 +518,17 @@ instance CollectIds Definition where
   collectIds (TypeDefn n args ctors _) = do
     let t = TCon n args (n <--> args)
     return $ map
-      (\(TypeDefnCtor cn ts) -> (cn, TypeDefnCtorInfo (wrapTFunc ts t)))
+      (\(TypeDefnCtor cn ts) -> (Index cn, TypeDefnCtorInfo (wrapTFunc ts t)))
       ctors
 
-  collectIds (FuncDefnSig n t _ _) = return [(n, ConstTypeInfo t)]
+  collectIds (FuncDefnSig n t _ _) = return [(Index n, ConstTypeInfo t)]
   collectIds (FuncDefn n _       ) = do
     v <- freshVar
-    return [(n, ConstTypeInfo v)]
+    return [(Index n, ConstTypeInfo v)]
 
 instance CollectIds Declaration where
-  collectIds (ConstDecl ns t _ _) = return $ map (, ConstTypeInfo t) ns
-  collectIds (VarDecl   ns t _ _) = return $ map (, VarTypeInfo t) ns
+  collectIds (ConstDecl ns t _ _) = return $ map ((, ConstTypeInfo t) . Index) ns
+  collectIds (VarDecl   ns t _ _) = return $ map ((, VarTypeInfo t) . Index) ns
 
 instance TypeCheckable Program where
   typeCheck (Program defns decls exprs stmts loc) = do
@@ -532,7 +544,7 @@ instance TypeCheckable Program where
         typeCheck stmts
       )
    where
-    collectTCon (TypeDefn n args _ _) = [(n, TypeDefnInfo args)]
+    collectTCon (TypeDefn n args _ _) = [(Index n, TypeDefnInfo args)]
     collectTCon _                     = []
 
 instance TypeCheckable Definition where

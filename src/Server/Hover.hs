@@ -12,22 +12,19 @@ import           Data.Loc                       ( Located
                                                 , locOf
                                                 )
 import           Data.Loc.Range
-import           Data.Map                       ( Map )
-import qualified Data.Map                      as Map
-import           Data.Text                      ( Text )
+import           GCL.Type                       (ScopeTreeZipper)
 import qualified GCL.Type                      as TypeChecking
 import qualified Language.LSP.Types            as J
 import           Pretty                         ( Pretty(..)
                                                 , toText
                                                 )
-import           Server.IntervalMap
-import qualified Server.IntervalMap            as IntervalMap
--- import qualified Server.SrcLoc                 as SrcLoc
+import           Server.IntervalMap             (IntervalMap)
+import qualified Server.IntervalMap             as IntervalMap
 import           Syntax.Abstract
 import           Syntax.Common
 
-collectHoverInfo :: Program -> IntervalMap (J.Hover, Type)
-collectHoverInfo program = runM (programToScopes program) (collect program)
+collectHoverInfo :: Program -> ScopeTreeZipper Type -> IntervalMap (J.Hover, Type)
+collectHoverInfo program s = runM s (collect program)
 
 instance Pretty J.Hover where
   pretty = pretty . show
@@ -46,15 +43,15 @@ annotateType node t = case fromLoc (locOf node) of
 --------------------------------------------------------------------------------
 
 -- | Extracts Scopes from a Program
-programToScopes :: Program -> [Scope Type]
-programToScopes prog = [topLevelScope]
- where
-  topLevelScope :: Map Text Type
-  topLevelScope =
+--programToScopes :: Program -> [Scope Type]
+--programToScopes prog = [topLevelScope]
+ --where
+  --topLevelScope :: Map Text Type
+  --topLevelScope =
     -- run type checking to get the types of definitions/declarations
-                  case TypeChecking.runTypeCheck prog of
-    Left  _ -> Map.empty -- ignore type errors
-    Right _ -> mempty
+                  --case TypeChecking.runTypeCheck prog of
+    --Left  _ -> Map.empty -- ignore type errors
+    --Right _ -> mempty
     -- Map.mapMaybe
       --(\case
         --ScopeChecking.TypeDefnCtorInfo t  _ -> Just t
@@ -66,10 +63,20 @@ programToScopes prog = [topLevelScope]
 
 --------------------------------------------------------------------------------
 -- Names
+type M input output = RWS () (IntervalMap output) (ScopeTreeZipper input)
+
+runM :: ScopeTreeZipper input -> M input output a -> IntervalMap output
+runM s f = let (_, _, w) = runRWS f () s in w
+
+class Collect input output a where
+  collect :: a -> M input output ()
+
+instance (Foldable t, Collect input output a) => Collect input output (t a) where
+  collect = mapM_ collect
 
 instance Collect Type (J.Hover, Type) Name where
   collect name = do
-    result <- lookupScopes (nameToText name)
+    result <- TypeChecking.lookupScopeTree name <$> get
     forM_ result (annotateType name)
 
 --------------------------------------------------------------------------------
@@ -185,9 +192,14 @@ instance Collect Type (J.Hover, Type) QuantOp' where
 instance Collect Type (J.Hover, Type) FuncClause where
   collect (FuncClause patterns body) = collect patterns >> collect body
 
--- TODO: implement this 
+-- TODO: implement this
 instance Collect Type (J.Hover, Type) Pattern where
-  collect _ = return ()
+  collect PattLit{} = return ()
+  collect (PattBinder n) = collect n
+  collect (PattWildcard rng) = do
+    result <- TypeChecking.lookupHoleScopeTree rng <$> get
+    forM_ result (annotateType rng)
+  collect (PattConstructor _ patts) = collect patts
 
 --------------------------------------------------------------------------------
 -- | Types

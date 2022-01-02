@@ -18,6 +18,7 @@ import           GCL.Type                       ( InferType(..)
                                                 , TypeInfo(..)
                                                 , runInferType
                                                 , runTypeCheck
+                                                , Index(..)
                                                 )
 import           Pretty                         ( Pretty(pretty)
                                                 , hsep
@@ -329,30 +330,33 @@ var t = Var (Name t NoLoc) NoLoc
 name' :: Text -> Name
 name' t = Name t NoLoc
 
-env :: Map Name TypeInfo
+index :: Text -> Index
+index = Index . name'
+
+env :: Map Index TypeInfo
 env = Map.fromList
-  [ (name' "A", ConstTypeInfo tint)
-  , (name' "B", ConstTypeInfo tint)
-  , (name' "N", ConstTypeInfo tint)
-  , ( name' "Arr"
+  [ (index "A", ConstTypeInfo tint)
+  , (index "B", ConstTypeInfo tint)
+  , (index "N", ConstTypeInfo tint)
+  , ( index "Arr"
     , ConstTypeInfo (tarr (Including (litNum 0)) (Excluding (cons "N")) tint)
     )
-  , (name' "P"  , ConstTypeInfo (tfunc tint tbool))
-  , (name' "F"  , ConstTypeInfo (tfunc tint tint))
-  , (name' "G"  , ConstTypeInfo (tfunc tchar tbool))
-  , (name' "Max", ConstTypeInfo (tfunc tint (tfunc tint tbool)))
-  , (name' "i"  , VarTypeInfo tint)
-  , (name' "j"  , VarTypeInfo tint)
-  , (name' "k"  , VarTypeInfo tint)
-  , (name' "b"  , VarTypeInfo tbool)
-  , (name' "p"  , VarTypeInfo tbool)
-  , (name' "q"  , VarTypeInfo tbool)
-  , (name' "r"  , VarTypeInfo tbool)
-  , (name' "x", VarTypeInfo (TCon (name' "Maybe") [name' "a"] NoLoc))
-  , ( name' "Just"
+  , (index "P"  , ConstTypeInfo (tfunc tint tbool))
+  , (index "F"  , ConstTypeInfo (tfunc tint tint))
+  , (index "G"  , ConstTypeInfo (tfunc tchar tbool))
+  , (index "Max", ConstTypeInfo (tfunc tint (tfunc tint tbool)))
+  , (index "i"  , VarTypeInfo tint)
+  , (index "j"  , VarTypeInfo tint)
+  , (index "k"  , VarTypeInfo tint)
+  , (index "b"  , VarTypeInfo tbool)
+  , (index "p"  , VarTypeInfo tbool)
+  , (index "q"  , VarTypeInfo tbool)
+  , (index "r"  , VarTypeInfo tbool)
+  , (index "x", VarTypeInfo (TCon (name' "Maybe") [name' "a"] NoLoc))
+  , ( index "Just"
     , TypeDefnCtorInfo (tfunc tint (TCon (name' "Maybe") [name' "a"] NoLoc))
     )
-  , (name' "Nothing", TypeDefnCtorInfo (TCon (name' "Maybe") [name' "a"] NoLoc))
+  , (index "Nothing", TypeDefnCtorInfo (TCon (name' "Maybe") [name' "a"] NoLoc))
   ]
 
 runParser :: ToAbstract a b => Parser a -> Text -> Either [Error] b
@@ -361,7 +365,7 @@ runParser p t = case runExcept . toAbstract <$> parseTest p t of
   Right (Left  loc ) -> Left [Others (show loc)]
   Right (Right expr) -> Right expr
 
-check :: TypeCheckable a => Map Name TypeInfo -> a -> Either [Error] ()
+check :: TypeCheckable a => Map Index TypeInfo -> a -> Either [Error] ()
 check env' e =
   case
       runExcept
@@ -376,7 +380,7 @@ check env' e =
       Left  err -> Left [TypeError err]
       Right _   -> Right ()
 
-inferCheck :: InferType a => Map Name TypeInfo -> a -> Either [Error] Type
+inferCheck :: InferType a => Map Index TypeInfo -> a -> Either [Error] Type
 inferCheck env' e =
   case
       runExcept
@@ -437,3 +441,7 @@ instance Pretty a => Pretty (ScopeTree a) where
 
 instance Pretty a => Pretty (ScopeTreeZipper a) where
   pretty ScopeTreeZipper {..} = "Cursor " <> pretty cursor
+
+instance Pretty Index where
+  pretty (Index n) = pretty n
+  pretty (Hole rng) = pretty rng
