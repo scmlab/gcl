@@ -35,7 +35,7 @@ import           Text.Megaparsec                ( (<?>)
                                                 , anySingle
                                                 , manyTill_
                                                 , parse
-                                                , tokensToChunk
+                                                , tokensToChunk, TraversableStream
                                                 )
 import           Text.Megaparsec.Char           ( eol )
 import qualified Text.Megaparsec.Char.Lexer    as Lex
@@ -485,7 +485,7 @@ pIndentBlockF p = ParseFunc
 
 -- modified from Text.Megaparsec.Char.Lexer
 -- will not parse the last newline
-indentedItems :: (MonadParsec e s m) => Pos -> m () -> m b -> m [b]
+indentedItems :: (TraversableStream s, MonadParsec e s m) => Pos -> m () -> m b -> m [b]
 indentedItems lvl sc' p = go
  where
   go = do

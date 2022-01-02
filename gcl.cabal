@@ -3,8 +3,6 @@ cabal-version: 1.12
 -- This file has been generated from package.yaml by hpack version 0.34.4.
 --
 -- see: https://github.com/sol/hpack
---
--- hash: 9099ef085c9251b28fa257cc889a39bf070096a180a4a6117ca6f90eeabcb162
 
 name:           gcl
 version:        0.1.0.0
@@ -83,6 +81,7 @@ library
       Syntax.ConstExpr
       Syntax.Parser
       Syntax.Parser.Lexer
+      Syntax.Parser.Lexer2
       Syntax.Parser.TH
       Syntax.Parser.Token
       Syntax.Parser.TokenStream
@@ -102,7 +101,7 @@ library
     , lens
     , lexer-applicative
     , lsp
-    , megaparsec >=8.0
+    , megaparsec >=9.2
     , mtl
     , multiset
     , multistate
@@ -137,7 +136,7 @@ executable gcl
     , lens
     , lexer-applicative
     , lsp
-    , megaparsec >=8.0
+    , megaparsec >=9.2
     , mtl
     , multiset
     , multistate
@@ -228,6 +227,7 @@ test-suite gcl-test
       Syntax.ConstExpr
       Syntax.Parser
       Syntax.Parser.Lexer
+      Syntax.Parser.Lexer2
       Syntax.Parser.TH
       Syntax.Parser.Token
       Syntax.Parser.TokenStream
@@ -247,7 +247,7 @@ test-suite gcl-test
     , lens
     , lexer-applicative
     , lsp
-    , megaparsec >=8.0
+    , megaparsec >=9.2
     , mtl
     , multiset
     , multistate

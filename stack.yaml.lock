@@ -72,6 +72,27 @@ packages:
       sha256: 5fe01617233b7f66ba0e2aef95b218a19225a22e4193a8ed93999a3b7c43a4f3
   original:
     hackage: constraints-extras-0.3.1.0@sha256:12016ebb91ad5ed2c82bf7e48c6bd6947d164d33c9dca5ac3965de1bb6c780c0,1777
+- completed:
+    hackage: megaparsec-9.2.0@sha256:0c272aa13b9f663dbd7b74ef81e9b1f9f05cafde50f5362ce87ffd4913046e0b,3213
+    pantry-tree:
+      size: 1518
+      sha256: 7ca5da73a72d6242375e6bf16f6868e16f5f7f02dd27a0ff12cf7a9422cf2c71
+  original:
+    hackage: megaparsec-9.2.0@sha256:0c272aa13b9f663dbd7b74ef81e9b1f9f05cafde50f5362ce87ffd4913046e0b,3213
+- completed:
+    hackage: scientific-0.3.7.0@sha256:d7edb4dfb320e7b9cc9d503ca435d22983a236db06c7b4f3e81c099a9fd4cd73,4809
+    pantry-tree:
+      size: 657
+      sha256: 7b09735385193ba6ba4cdbc9ccd2aa60989a5c913df439da23e0a87ca60576ee
+  original:
+    hackage: scientific-0.3.7.0@sha256:d7edb4dfb320e7b9cc9d503ca435d22983a236db06c7b4f3e81c099a9fd4cd73,4809
+- completed:
+    hackage: primitive-0.7.3.0@sha256:6b28a1c0572f5ca50597ba8388aeade21515842969ae192cdc6bfca81367bf56,2951
+    pantry-tree:
+      size: 1655
+      sha256: 4dd118201091c04a138a25e262ab61e8e64e811832eadd8b6b39d56504dfe045
+  original:
+    hackage: primitive-0.7.3.0@sha256:6b28a1c0572f5ca50597ba8388aeade21515842969ae192cdc6bfca81367bf56,2951
 snapshots:
 - completed:
     size: 534126

@@ -45,8 +45,6 @@ instance (Ord tok, PrettyToken tok) => Stream (TokenStream (L tok)) where
   take1_     = take1_'
   takeN_     = takeN_'
   takeWhile_ = takeWhile_'
-  showTokens Proxy = prettyTokens
-  reachOffset = reachOffset'
 
 chunkLength' :: [L tok] -> Int
 chunkLength' = length
