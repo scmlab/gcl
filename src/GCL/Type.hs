@@ -58,7 +58,7 @@ data ScopeTreeZipper a = ScopeTreeZipper
   { cursor  :: ScopeTree a
   , parents :: [(Range, ScopeTree a)]
   }
-  deriving Eq
+  deriving (Eq, Functor)
 
 instance {-# Incoherent #-} Substitutable a b => Substitutable a (ScopeTree b) where
   subst s ScopeTree {..} =
@@ -483,13 +483,13 @@ updateScopeTreeZipper s = do
   getTypeInfo >>= setTypeInfo . subst s
 
 runTypeCheck
-  :: Program -> Either TypeError (ScopeTree TypeDefnInfo, ScopeTree Type)
+  :: Program -> Either TypeError (ScopeTreeZipper TypeDefnInfo, ScopeTreeZipper Type)
 runTypeCheck prog = do
   let initTypeInfo     = ScopeTreeZipper (ScopeTree mempty mempty) []
   let initTypeDefnInfo = ScopeTreeZipper (ScopeTree mempty mempty) []
   (_, s2, s3) <- runExcept
     (execStateT (typeCheck prog) (0, initTypeDefnInfo, initTypeInfo))
-  return (cursor (fsRootScopeTree s2), fmap typeInfoToType (cursor (fsRootScopeTree s3)))
+  return (fsRootScopeTree s2, fmap typeInfoToType (fsRootScopeTree s3))
 
 class TypeCheckable a where
     typeCheck :: a -> TypeCheckM ()
