@@ -81,11 +81,14 @@ library
       Syntax.ConstExpr
       Syntax.Parser
       Syntax.Parser.Lexer
-      Syntax.Parser.Lexer2
       Syntax.Parser.TH
       Syntax.Parser.Token
       Syntax.Parser.TokenStream
       Syntax.Parser.Util
+      Syntax.Parser2
+      Syntax.Parser2.Lexer
+      Syntax.Parser2.TokenStream
+      Syntax.Parser2.Util
   other-modules:
       Paths_gcl
   hs-source-dirs:
@@ -227,11 +230,14 @@ test-suite gcl-test
       Syntax.ConstExpr
       Syntax.Parser
       Syntax.Parser.Lexer
-      Syntax.Parser.Lexer2
       Syntax.Parser.TH
       Syntax.Parser.Token
       Syntax.Parser.TokenStream
       Syntax.Parser.Util
+      Syntax.Parser2
+      Syntax.Parser2.Lexer
+      Syntax.Parser2.TokenStream
+      Syntax.Parser2.Util
       Paths_gcl
   hs-source-dirs:
       test
