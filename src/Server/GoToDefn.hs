@@ -194,10 +194,10 @@ instance Collect LocationLinkToBe LocationLink Expr where
       localScope (scopeFromLocalBinders args) $ do
         collect c
         collect d
-    -- RedexStem/Redex will only appear in proof obligations, not in code
-    RedexStem{}  -> return ()
-    Redex _ _    -> return ()
-    ArrIdx e i _ -> do
+    -- RedexKernel/RedexShell will only appear in proof obligations, not in code
+    RedexKernel{} -> return ()
+    RedexShell{}  -> return ()
+    ArrIdx e i _  -> do
       collect e
       collect i
     ArrUpd e i f _ -> do

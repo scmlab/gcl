@@ -93,12 +93,11 @@ handleSubst i = do
       let program = convertedProgram
             (typeCheckedPreviousStage (sweptPreviousStage result))
       case IntMap.lookup i (sweptRedexes result) of
-        Nothing    -> return []
+        Nothing         -> return []
         Just (_, redex) -> do
           let scope = programToScopeForSubstitution program
-          let (newExpr, counter) = runState
-                (Substitution.step scope redex)
-                (sweptCounter result)
+          let (newExpr, counter) =
+                runState (Substitution.step scope redex) (sweptCounter result)
           let redexesInNewExpr = Substitution.buildRedexMap newExpr
           let newResult = result
                 { sweptCounter = counter

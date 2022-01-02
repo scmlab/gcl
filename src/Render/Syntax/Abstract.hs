@@ -78,15 +78,16 @@ handleExpr _ (Quant op xs r t _) =
   renderQOp (Op (ArithOp (Mul   _))) = "Π"
   renderQOp (Op op'                ) = render op'
   renderQOp op'                      = render op'
-handleExpr n (RedexStem name _value _freeVars mappings) =
+handleExpr n (RedexKernel name _value _freeVars mappings) =
   return $ renderPrec n name <+> mappings'
  where
   -- reverse the stack when printing it
   mappings' = punctuateE
     " "
     (map render $ filter (not . Map.null) $ reverse $ toList mappings)
-handleExpr n (Redex index expr) = return $ substE index (renderPrec n expr)
-handleExpr _ (ArrIdx e1 e2 _  ) = return $ render e1 <> "[" <> render e2 <> "]"
+handleExpr n (RedexShell index expr) =
+  return $ substE index (renderPrec n expr)
+handleExpr _ (ArrIdx e1 e2 _) = return $ render e1 <> "[" <> render e2 <> "]"
 handleExpr _ (ArrUpd e1 e2 e3 _) =
   return $ "(" <+> render e1 <+> ":" <+> render e2 <+> "↣" <+> render e3 <+> ")"
     -- SCM: need to print parenthesis around e1 when necessary.

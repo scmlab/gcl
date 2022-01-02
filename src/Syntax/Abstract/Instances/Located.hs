@@ -57,20 +57,20 @@ instance Located Type where
   locOf (TMetaVar _  ) = NoLoc
 
 instance Located Expr where
-  locOf (Var   _ l         ) = l
-  locOf (Const _ l         ) = l
-  locOf (Lit   _ l         ) = l
-  locOf (Op op             ) = locOf op
-  locOf (App  _ _ l        ) = l
-  locOf (Func _ _ l        ) = l
-  locOf (Lam  _ _ l        ) = l
-  locOf (Tuple _           ) = NoLoc
-  locOf (Quant _ _ _ _ l   ) = l
-  locOf (RedexStem es _ _ _) = locOf es
-  locOf (Redex _ x         ) = locOf x
-  locOf (ArrIdx _ _ l      ) = l
-  locOf (ArrUpd _ _ _ l    ) = l
-  locOf (Case _ _ l        ) = l
+  locOf (Var   _ l           ) = l
+  locOf (Const _ l           ) = l
+  locOf (Lit   _ l           ) = l
+  locOf (Op op               ) = locOf op
+  locOf (App  _ _ l          ) = l
+  locOf (Func _ _ l          ) = l
+  locOf (Lam  _ _ l          ) = l
+  locOf (Tuple _             ) = NoLoc
+  locOf (Quant _ _ _ _ l     ) = l
+  locOf (RedexKernel es _ _ _) = locOf es
+  locOf (RedexShell _ x      ) = locOf x
+  locOf (ArrIdx _ _ l        ) = l
+  locOf (ArrUpd _ _ _ l      ) = l
+  locOf (Case _ _ l          ) = l
 
 instance Located CaseClause where
   locOf (CaseClause l r) = l <--> r

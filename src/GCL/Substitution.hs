@@ -71,10 +71,10 @@ step scope expr = runM scope $ go expr
  where
   go :: Expr -> M Expr
   go (App f x l) = App <$> go f <*> pure x <*> pure l >>= reduce
-  go (RedexStem _ value _ mappings) =
+  go (RedexKernel _ value _ mappings) =
     foldM (flip subst) value (reverse $ toList mappings) >>= reduce
-  go (Redex _ e) = go e
-  go others      = return others
+  go (RedexShell _ e) = go e
+  go others           = return others
 
 
 mappingFromSubstitution :: [Name] -> [Expr] -> Mapping
@@ -123,8 +123,8 @@ instance CollectRedexes Expr where
     App x y _       -> collectRedexes x <> collectRedexes y
     Lam _ x _       -> collectRedexes x
     Quant _ _ _ x _ -> collectRedexes x
-    RedexStem{}     -> []
-    Redex i e       -> [(i, e)]
+    RedexKernel{}   -> []
+    RedexShell i e  -> [(i, e)]
     ArrIdx x y _    -> collectRedexes x <> collectRedexes y
     ArrUpd x y z _  -> collectRedexes x <> collectRedexes y <> collectRedexes z
     Case _ xs _     -> xs >>= collectRedexes
@@ -146,16 +146,13 @@ instance Reducible Expr where
       f' <- reduce f
       x' <- reduce x
       case f' of
-        -- App (Redex RedexStem) x -> Redex (App RedexStem x)
-        Redex _ e    -> Redex <$> fresh <*> reduce (App e x' l1)
-        -- [reduce-App-Lam]
-        Lam n body _ -> subst (mappingFromSubstitution [n] [x']) body
-        -- [Others]
-        _            -> return $ App f' x' l1
+        RedexShell _ e -> RedexShell <$> fresh <*> reduce (App e x' l1)
+        Lam n body _   -> subst (mappingFromSubstitution [n] [x']) body
+        _              -> return $ App f' x' l1
     Lam binder body l -> Lam binder <$> reduce body <*> return l
     Quant op binders range body l ->
       Quant op binders range <$> reduce body <*> return l
-    Redex i e            -> Redex i <$> reduce e
+    RedexShell i e       -> RedexShell i <$> reduce e
     ArrIdx array index l -> ArrIdx <$> reduce array <*> reduce index <*> pure l
     ArrUpd array index value l ->
       ArrUpd <$> reduce array <*> reduce index <*> reduce value <*> pure l
@@ -190,13 +187,13 @@ instance Substitutable Expr where
         index <- fresh
         case Map.lookup (nameToText name) scope of
           Just (Just binding) -> do
-            let e = RedexStem
+            let e = RedexKernel
                   name
                   binding
                   (fv binding)
                   -- NonEmpty.singleton is only available after base-4.15
                   (NonEmpty.fromList [shrinkMapping binding mapping])
-            return $ Redex index e
+            return $ RedexShell index e
           Just Nothing -> return expr
           Nothing      -> return expr
 
@@ -207,13 +204,13 @@ instance Substitutable Expr where
         index <- fresh
         case Map.lookup (nameToText name) scope of
           Just (Just binding) -> do
-            let e = RedexStem
+            let e = RedexKernel
                   name
                   binding
                   (fv binding)
                   -- NonEmpty.singleton is only available after base-4.15
                   (NonEmpty.fromList [shrinkMapping binding mapping])
-            return $ Redex index e
+            return $ RedexShell index e
           Just Nothing -> return expr
           Nothing      -> return expr
 
@@ -260,7 +257,7 @@ instance Substitutable Expr where
         --      when shrinking the applied outer new mapping
         --      free variables occured from the inner old mapping
         --      should be taken into consideration
-    RedexStem name e freeVars mappings ->
+    RedexKernel name e freeVars mappings ->
       let
         removeSubstitutedVars :: Mapping -> Set Name -> Set Name
         removeSubstitutedVars m =
@@ -277,12 +274,12 @@ instance Substitutable Expr where
         shrinkedMapping =
           Map.restrictKeys mapping (Set.map nameToText freeVars')
       in
-        return $ RedexStem name
-                           e
-                           newFreeVars
-                           (NonEmpty.cons shrinkedMapping mappings)
+        return $ RedexKernel name
+                             e
+                             newFreeVars
+                             (NonEmpty.cons shrinkedMapping mappings)
 
-    Redex _ e -> Redex <$> fresh <*> subst mapping e
+    RedexShell _ e -> RedexShell <$> fresh <*> subst mapping e
 
     ArrIdx array index l ->
       ArrIdx <$> subst mapping array <*> subst mapping index <*> pure l

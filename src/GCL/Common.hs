@@ -14,7 +14,7 @@ import           Data.Set                       ( Set
 import qualified Data.Set                      as Set
 import           Data.Text                      ( Text )
 import qualified Data.Text                     as Text
-import qualified Syntax.Abstract               as A
+import           Syntax.Abstract
 import           Syntax.Common.Types
 
 -- get a fresh variable (and bump the counter)
@@ -72,42 +72,42 @@ instance Free a => Free (Subs a) where
 instance Free a => Free [a] where
   fv l = foldMap fv l
 
-instance Free A.Type where
-  fv (A.TBase _ _    ) = mempty
-  fv (A.TArray _ t _ ) = fv t
-  fv (A.TTuple ts    ) = Set.unions (map fv ts)
-  fv (A.TFunc t1 t2 _) = fv t1 <> fv t2
-  fv (A.TCon  _  ns _) = Set.fromList ns
-  fv (A.TVar x _     ) = Set.singleton x
-  fv (A.TMetaVar n   ) = Set.singleton n
+instance Free Type where
+  fv (TBase _ _    ) = mempty
+  fv (TArray _ t _ ) = fv t
+  fv (TTuple ts    ) = Set.unions (map fv ts)
+  fv (TFunc t1 t2 _) = fv t1 <> fv t2
+  fv (TCon  _  ns _) = Set.fromList ns
+  fv (TVar x _     ) = Set.singleton x
+  fv (TMetaVar n   ) = Set.singleton n
 
-instance Free A.Expr where
-  fv (A.Var   x _        ) = Set.singleton x
-  fv (A.Const x _        ) = Set.singleton x
-  fv (A.Op _             ) = mempty
-  fv (A.Lit _ _          ) = mempty
-  fv (A.App  e1 e2      _) = fv e1 <> fv e2
-  fv (A.Func _  clauses _) = Set.unions (fmap fv clauses)
-  fv (A.Lam  x  e       _) = fv e \\ Set.singleton x
-  fv (A.Tuple xs         ) = Set.unions (map fv xs)
-  fv (A.Quant op xs range term _) =
+instance Free Expr where
+  fv (Var   x _        ) = Set.singleton x
+  fv (Const x _        ) = Set.singleton x
+  fv (Op _             ) = mempty
+  fv (Lit _ _          ) = mempty
+  fv (App  e1 e2      _) = fv e1 <> fv e2
+  fv (Func _  clauses _) = Set.unions (fmap fv clauses)
+  fv (Lam  x  e       _) = fv e \\ Set.singleton x
+  fv (Tuple xs         ) = Set.unions (map fv xs)
+  fv (Quant op xs range term _) =
     (fv op <> fv range <> fv term) \\ Set.fromList xs
-  fv (A.RedexStem _ _ freeVars _) = freeVars
-  fv (A.Redex _ e               ) = fv e
-  fv (A.ArrIdx e1 e2 _          ) = fv e1 <> fv e2
-  fv (A.ArrUpd e1 e2 e3 _       ) = fv e1 <> fv e2 <> fv e3
-  fv (A.Case e clauses _        ) = fv e <> Set.unions (map fv clauses)
+  fv (RedexKernel _ _ freeVars _) = freeVars
+  fv (RedexShell _ e            ) = fv e
+  fv (ArrIdx e1 e2 _            ) = fv e1 <> fv e2
+  fv (ArrUpd e1 e2 e3 _         ) = fv e1 <> fv e2 <> fv e3
+  fv (Case e clauses _          ) = fv e <> Set.unions (map fv clauses)
 
-instance Free A.FuncClause where
-  fv (A.FuncClause patterns expr) = fv expr \\ Set.unions (map fv patterns)
+instance Free FuncClause where
+  fv (FuncClause patterns expr) = fv expr \\ Set.unions (map fv patterns)
 
-instance Free A.CaseClause where
-  fv (A.CaseClause patt expr) = fv expr \\ fv patt
-instance Free A.Pattern where
-  fv (A.PattLit      _      ) = mempty
-  fv (A.PattBinder   n      ) = Set.singleton n
-  fv (A.PattWildcard _      ) = mempty
-  fv (A.PattConstructor _ ps) = fv ps
+instance Free CaseClause where
+  fv (CaseClause patt expr) = fv expr \\ fv patt
+instance Free Pattern where
+  fv (PattLit      _      ) = mempty
+  fv (PattBinder   n      ) = Set.singleton n
+  fv (PattWildcard _      ) = mempty
+  fv (PattConstructor _ ps) = fv ps
 
 -- class for data that is substitutable
 class Substitutable a b where
@@ -119,14 +119,14 @@ s1 `compose` s2 = s1 <> Map.map (subst s1) s2
 instance (Substitutable a b, Functor f) => Substitutable a (f b) where
   subst = fmap . subst
 
-instance Substitutable A.Type A.Type where
-  subst _ t@A.TBase{}       = t
-  subst s (A.TArray i t l ) = A.TArray i (subst s t) l
-  subst s (A.TTuple ts    ) = A.TTuple (map (subst s) ts)
-  subst s (A.TFunc t1 t2 l) = A.TFunc (subst s t1) (subst s t2) l
-  subst _ t@A.TCon{}        = t
-  subst _ t@A.TVar{}        = t
-  subst s t@(A.TMetaVar n)  = Map.findWithDefault t n s
+instance Substitutable Type Type where
+  subst _ t@TBase{}       = t
+  subst s (TArray i t l ) = TArray i (subst s t) l
+  subst s (TTuple ts    ) = TTuple (map (subst s) ts)
+  subst s (TFunc t1 t2 l) = TFunc (subst s t1) (subst s t2) l
+  subst _ t@TCon{}        = t
+  subst _ t@TVar{}        = t
+  subst s t@(TMetaVar n)  = Map.findWithDefault t n s
 
 toStateT :: Monad m => r -> RWST r w s m a -> StateT s m a
 toStateT r m = StateT

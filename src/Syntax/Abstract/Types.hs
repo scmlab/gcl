@@ -117,17 +117,19 @@ data Expr
   -- Tuple has no srcloc info because it has no conrete syntax at the moment 
   | Tuple [Expr]
   | Quant Expr [Name] Expr Expr Loc
-  | RedexStem -- the inner part of a Redex `name [ v \ e ... ] [ v \ e ... ]`
-    Name -- the name to be substituted
-    Expr -- the expression for substituting the name
-    (Set Name)
-     -- free variables in that expression
+  -- The innermost part of a Redex 
+  -- should look something like `P [ x \ a ] [ y \ b ]`
+  | RedexKernel
+    Name -- the variable to be substituted
+    Expr -- the expression for substituting the variable
+    (Set Name) -- free variables in that expression
                -- NOTE, the expression may be some definition like "P",
               --  in that case, the free variables should be that of after it's been expanded
-    (NonEmpty Mapping) -- mapping of substitution to be displayed to users
-  | Redex 
+    (NonEmpty Mapping) -- a list of mappings of substitutions to be displayed to users
+  -- The outermost part of a Redex
+  | RedexShell
       Int -- for identifying Redexes in frontend-backend interactions 
-      Expr
+      Expr -- should either be `RedexKernel` or `App (App (App ... RedexKernel arg0) ... argn`
   | ArrIdx Expr Expr Loc
   | ArrUpd Expr Expr Expr Loc
   | Case Expr [CaseClause] Loc

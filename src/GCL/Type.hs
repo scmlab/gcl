@@ -286,9 +286,9 @@ instance InferType Expr where
         x  <- freshVar
         tell [(to, x ~-> x ~-> x, locOf op), (tt, x, locOf t)]
         return x
-  inferType (Redex _ expr     ) = inferType expr
-  inferType (RedexStem n _ _ _) = inferType n
-  inferType (ArrIdx e1 e2 _   ) = do
+  inferType (RedexShell _ expr  ) = inferType expr
+  inferType (RedexKernel n _ _ _) = inferType n
+  inferType (ArrIdx e1 e2 _     ) = do
     t1 <- inferType e1
     let interval = case t1 of
           TArray itv _ _ -> itv
