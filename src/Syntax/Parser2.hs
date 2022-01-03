@@ -552,73 +552,60 @@ pattern' = choice
   , PattConstructor <$> upper <*> many pattern'
   ]
 
--- --------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
 
--- -- | Type
--- type' :: Parser Type
--- type' = ignoreIndentations $ do
---   makeExprParser term table <?> "type"
---   where
---     table :: [[Operator Parser Type]]
---     table = [[InfixR function]]
+-- | Type
+type' :: Parser Type
+type' = ignoreIndentations $ do
+  makeExprParser term table <?> "type"
+ where
+  table :: [[Operator Parser Type]]
+  table = [[InfixR function]]
 
---     function :: Parser (Type -> Type -> Type)
---     function = ignoreIndentations $ do
---       arrow <- choice [Left <$> tokenArrow, Right <$> tokenArrowU]
---       return $ \x y -> TFunc x arrow y
+  function :: Parser (Type -> Type -> Type)
+  function = ignoreIndentations $ do
+    arrow <- tokenArrow
+    return $ \x y -> TFunc x arrow y
 
---     term :: Parser Type
---     term = ignoreIndentations $ do
---       parensType <|> array <|> base <?> "type term"
+  term :: Parser Type
+  term = ignoreIndentations $ do
+    parensType <|> array <|> try typeVar <|> typeName <?> "type term"
 
---     parensType :: Parser Type
---     parensType = TParen <$> tokenParenOpen <*> type' <*> tokenParenClose
+  parensType :: Parser Type
+  parensType = TParen <$> tokenParenOpen <*> type' <*> tokenParenClose
 
---     base :: Parser Type
---     base = TBase <$> withLoc (extract isBaseType)
---       where
---         isBaseType :: Tok -> Maybe (Loc -> TBase)
---         isBaseType (TokUpperName "Int") = Just TInt
---         isBaseType (TokUpperName "Bool") = Just TBool
---         isBaseType (TokUpperName "Char") = Just TChar
---         isBaseType _ = Nothing
 
---     array :: Parser Type
---     array = TArray <$> tokenArray <*> interval <*> tokenOf <*> type'
+  typeVar :: Parser Type
+  typeVar = TVar <$> lower
 
---     endpointOpening :: Parser EndpointOpen
---     endpointOpening =
---       choice
---         [ IncludingOpening <$> tokenBracketOpen <*> expression,
---           ExcludingOpening <$> tokenParenOpen <*> expression
---         ]
+  typeName :: Parser Type
+  typeName = TCon <$> upper <*> many lower
+  --  where
+    -- isBaseType :: Tok -> Maybe (Range -> TBase)
+    -- isBaseType (TokUpperName "Int" ) = Just TInt
+    -- isBaseType (TokUpperName "Bool") = Just TBool
+    -- isBaseType (TokUpperName "Char") = Just TChar
+    -- isBaseType _                     = Nothing
 
---     endpointClosing :: Parser EndpointClose
---     endpointClosing = do
---       expr <- expression
---       choice
---         [ IncludingClosing expr <$> tokenBracketClose,
---           ExcludingClosing expr <$> tokenParenClose
---         ]
+  array :: Parser Type
+  array = TArray <$> tokenArray <*> interval <*> tokenOf <*> type'
 
---     interval :: Parser Interval
---     interval =
---       Interval
---         <$> endpointOpening
---         <*> tokenRange
---         <*> endpointClosing
+  interval :: Parser Interval
+  interval = Interval <$> endpointOpening <*> tokenRange <*> endpointClosing
 
--- -- withLoc $ do
--- -- start <-
--- --   choice
--- --     [Excluding <$ symbol TokParenOpen, Including <$ symbol TokBracketOpen]
--- -- i <- expression
--- -- symbol TokRange
--- -- j <- expression
--- -- end <-
--- --   choice
--- --     [Excluding <$ symbol TokParenClose, Including <$ symbol TokBracketClose]
--- -- return $ Interval (start i) (end j)
+  endpointOpening :: Parser EndpointOpen
+  endpointOpening = choice
+    [ IncludingOpening <$> tokenBracketOpen <*> expression
+    , ExcludingOpening <$> tokenParenOpen <*> expression
+    ]
+
+  endpointClosing :: Parser EndpointClose
+  endpointClosing = do
+    expr <- expression
+    choice
+      [ IncludingClosing expr <$> tokenBracketClose
+      , ExcludingClosing expr <$> tokenParenClose
+      ]
 
 --------------------------------------------------------------------------------
 
@@ -708,6 +695,10 @@ lower :: Parser Name
 lower =
   withLoc (Name <$> lowerName)
     <?> "identifier that starts with a lowercase letter"
+
+identifier :: Parser Name
+identifier =
+  withLoc (choice [Name <$> lowerName, Name <$> upperName]) <?> "identifier"
 
 integer :: Parser Int
 integer = extract p <?> "integer"
