@@ -105,9 +105,10 @@ data Tok
   | TokProofOpen
   | TokProofClose
   | -- expression
+    TokUnderscore
 
     -- operators
-    TokEQ
+  | TokEQ
   | TokNEQ
   | TokNEQU
   | TokGT
@@ -182,6 +183,7 @@ instance Show Tok where
     TokArrow             -> "->"
     TokArrowU            -> "→"
     TokCase              -> "case"
+    TokUnderscore        -> "_"
     TokComma             -> ","
     TokColon             -> ":"
     TokSemi              -> ";"
@@ -326,6 +328,8 @@ tokRE =
     <|> TokProofClose
     <$  string "-}"
     -- literals
+    <|> TokUnderscore
+    <$  string "_"
     <|> TokEQ
     <$  string "="
     <|> TokNEQ
