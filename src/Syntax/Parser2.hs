@@ -11,9 +11,7 @@ import           Data.Loc.Range
 import           Data.Text                      ( Text )
 import           Data.Void
 import           Prelude                 hiding ( Ordering(..) )
-import           Syntax.Common                  ( Name(Name)
-                                                , Op
-                                                )
+import           Syntax.Common           hiding ( Fixity(..) )
 import           Syntax.Concrete         hiding ( Op )
 import           Syntax.Parser2.Lexer
 import           Syntax.Parser2.Util            ( PosLog
@@ -110,8 +108,8 @@ tokenConst = adapt TokCon "reserved word \"con\""
 tokenVar :: Parser (Token "var")
 tokenVar = adapt TokVar "reserved word \"var\""
 
-tokenLet :: Parser (Token "let")
-tokenLet = adapt TokLet "reserved word \"let\""
+tokenData :: Parser (Token "data")
+tokenData = adapt TokData "reserved word \"data\""
 
 tokenBraceOpen :: Parser (Token "{")
 tokenBraceOpen = adapt TokBraceOpen "opening curly bracket"
@@ -395,152 +393,179 @@ tokenArrowU = adapt TokArrowU "→"
 -- predicate = expression <?> "predicate"
 
 -- expression :: Parser Expr
--- expression = makeExprParser term table <?> "expression"
---   where
---     table :: [[Operator Parser Expr]]
---     table =
---       [ [Postfix application],
---         [InfixL $ binary Mod TokMod],
---         [ InfixL $ binary Mul TokMul,
---           InfixL $ binary Div TokDiv
---         ],
---         [ InfixL $ binary Add TokAdd,
---           InfixL $ binary Sub TokSub
---         ],
---         [ InfixL $ binary NEQ TokNEQ,
---           InfixL $ binary NEQU TokNEQU,
---           InfixL $ binary LT TokLT,
---           InfixL $ binary LTE TokLTE,
---           InfixL $ binary LTEU TokLTEU,
---           InfixL $ binary GT TokGT,
---           InfixL $ binary GTE TokGTE,
---           InfixL $ binary GTEU TokGTEU
---         ],
---         [InfixL $ binary EQ TokEQ],
---         [Prefix $ unary Neg TokNeg, Prefix $ unary NegU TokNegU],
---         [InfixL $ binary Conj TokConj, InfixL $ binary ConjU TokConjU],
---         [InfixL $ binary Disj TokDisj, InfixL $ binary DisjU TokDisjU],
---         [InfixR $ binary Implies TokImpl, InfixR $ binary ImpliesU TokImplU]
+-- expression = makeExprParser term chainOpTable <?> "expression"
+--  where
+--   chainOpTable :: [[Operator Parser Expr]]
+--   chainOpTable =
+--     [ -- =
+--       [InfixL $ binary (ChainOp . EQ) TokEQ]
+--       -- ~, <, <=, >, >=
+--     , [ InfixL $ binary (ChainOp . NEQ) TokNEQ
+--       , InfixL $ binary (ChainOp . NEQU) TokNEQU
+--       , InfixL $ binary (ChainOp . LT) TokLT
+--       , InfixL $ binary (ChainOp . LTE) TokLTE
+--       , InfixL $ binary (ChainOp . LTEU) TokLTEU
+--       , InfixL $ binary (ChainOp . GT) TokGT
+--       , InfixL $ binary (ChainOp . GTE) TokGTE
+--       , InfixL $ binary (ChainOp . GTEU) TokGTEU
 --       ]
+--       -- &&
+--     , [ InfixL $ binary (ArithOp . Conj) TokConj
+--       , InfixL $ binary (ArithOp . ConjU) TokConjU
+--       ]
+--       --- ||
+--     , [ InfixL $ binary (ArithOp . Disj) TokDisj
+--       , InfixL $ binary (ArithOp . DisjU) TokDisjU
+--       ]
+--       -- =>
+--     , [ InfixL $ binary (ArithOp . Implies) TokImpl
+--       , InfixL $ binary (ArithOp . ImpliesU) TokImplU
+--       ]
+--       -- <=>
+--     , [ InfixL $ binary (ChainOp . EQProp) TokEQProp
+--       , InfixL $ binary (ChainOp . EQPropU) TokEQPropU
+--       ]
+--     ]
 
---     application :: Parser (Expr -> Expr)
---     application = do
---       terms <- many term
---       return $ \func -> do
---         let app inner t = App inner t
---         foldl app func terms
+--   arithTable :: [[Operator Parser Expr]]
+--   arithTable =
+--     [ [Postfix application] -- NOTE: InfixL ?
+--     , [Prefix $ unary (ArithOp . NegNum) TokSub]
+--     , [Prefix $ unary (ArithOp . Exp) TokExp]
+--     , [InfixL $ binary Mod TokMod]
+--     , [InfixL $ binary Mul TokMul, InfixL $ binary Div TokDiv]
+--     , [InfixL $ binary Add TokAdd, InfixL $ binary Sub TokSub]
+--     , [ InfixL $ binary NEQ TokNEQ
+--       , InfixL $ binary NEQU TokNEQU
+--       , InfixL $ binary LT TokLT
+--       , InfixL $ binary LTE TokLTE
+--       , InfixL $ binary LTEU TokLTEU
+--       , InfixL $ binary GT TokGT
+--       , InfixL $ binary GTE TokGTE
+--       , InfixL $ binary GTEU TokGTEU
+--       ]
+--     , [InfixL $ binary EQ TokEQ]
+--     , [Prefix $ unary Neg TokNeg, Prefix $ unary NegU TokNegU]
+--     , [InfixL $ binary Conj TokConj, InfixL $ binary ConjU TokConjU]
+--     , [InfixL $ binary Disj TokDisj, InfixL $ binary DisjU TokDisjU]
+--     , [InfixR $ binary Implies TokImpl, InfixR $ binary ImpliesU TokImplU]
+--     ]
 
---     unary :: (Loc -> Op) -> Tok -> Parser (Expr -> Expr)
---     unary operator' tok = do
---       (op, loc) <- Util.getLoc (operator' <$ symbol tok)
---       return $ \result -> App (Op (op loc)) result
+--   application :: Parser (Expr -> Expr)
+--   application = do
+--     terms <- many term
+--     return $ \func -> do
+--       let app inner t = App inner t
+--       foldl app func terms
 
---     binary :: (Loc -> Op) -> Tok -> Parser (Expr -> Expr -> Expr)
---     binary operator' tok = do
---       (op, loc) <- Util.getLoc (operator' <$ symbol tok)
---       return $ \x y -> App (App (Op (op loc)) x) y
+--   unary :: (Loc -> Op) -> Tok -> Parser (Expr -> Expr)
+--   unary operator' tok = do
+--     (op, loc) <- Util.getLoc (operator' <$ symbol tok)
+--     return $ \result -> App (Op (op loc)) result
 
---     parensExpr :: Parser Expr
---     parensExpr =
---       Paren
---         <$> tokenParenOpen
+--   binary :: (Loc -> Op) -> Tok -> Parser (Expr -> Expr -> Expr)
+--   binary operator' tok = do
+--     (op, loc) <- Util.getLoc (operator' <$ symbol tok)
+--     return $ \x y -> App (App (Op (op loc)) x) y
+
+--   parensExpr :: Parser Expr
+--   parensExpr = Paren <$> tokenParenOpen <*> expression <*> tokenParenClose
+
+--   term :: Parser Expr
+--   term = try term' <|> parensExpr
+--    where
+--     term' :: Parser Expr
+--     term' =
+--       choice
+--           [ Var <$> lower
+--           , Const <$> upper
+--           , Lit <$> literal
+--           ,
+--           -- Op <$ symbol TokParenOpen <*> operator <* symbol TokParenClose,
+--             Quant
+--           <$> choice [Left <$> tokenQuantOpen, Right <$> tokenQuantOpenU]
+--           <*> choice [Left <$> operator, Right <$> term']
+--           <*> some lower
+--           <*> tokenColon
 --           <*> expression
---           <*> tokenParenClose
+--           <*> tokenColon
+--           <*> expression
+--           <*> choice [Left <$> tokenQuantClose, Right <$> tokenQuantCloseU]
+--           ]
+--         <?> "term"
 
---     term :: Parser Expr
---     term = try term' <|> parensExpr
---       where
---         term' :: Parser Expr
---         term' =
---           choice
---             [ Var <$> lower,
---               Const <$> upper,
---               Lit <$> literal,
---               -- Op <$ symbol TokParenOpen <*> operator <* symbol TokParenClose,
---               Quant
---                 <$> choice [Left <$> tokenQuantOpen, Right <$> tokenQuantOpenU]
---                 <*> choice [Left <$> operator, Right <$> term']
---                 <*> some lower
---                 <*> tokenColon
---                 <*> expression
---                 <*> tokenColon
---                 <*> expression
---                 <*> choice [Left <$> tokenQuantClose, Right <$> tokenQuantCloseU]
---             ]
---             <?> "term"
+--   -- quantOp :: Parser Op
+--   -- quantOp = operator <|> do
+--   --                           (_, _start) <- Util.getLoc (symbol TokParenOpen <?> "opening parenthesis")
+--   --                           op <- operator
+--   --                           (_, _end) <- Util.getLoc (symbol TokParenClose <?> "closing parenthesis")
+--   --                           return op
+--   -- choice
+--   --   [ do
+--   --       -- (_, start) <- Util.getLoc (symbol TokParenOpen <?> "opening parenthesis")
+--   --       -- (op, loc) <- Util.getLoc operator
+--   --       -- (_, end) <- Util.getLoc (symbol TokParenClose <?> "closing parenthesis")
+--   --       return $ op
+--   --     -- do
+--   --     --   op <- term
+--   --     --   return $ case op of
+--   --     --     Op (Add l) loc -> Op (Sum l) loc
+--   --     --     Op (Conj l) loc -> Op (Forall l) loc
+--   --     --     Op (Disj l) loc -> Op (Exists l) loc
+--   --     --     others -> others,
+--   --     -- parensExpr
+--   --   ]
 
---     -- quantOp :: Parser Op
---     -- quantOp = operator <|> do
---     --                           (_, _start) <- Util.getLoc (symbol TokParenOpen <?> "opening parenthesis")
---     --                           op <- operator
---     --                           (_, _end) <- Util.getLoc (symbol TokParenClose <?> "closing parenthesis")
---     --                           return op
---     -- choice
---     --   [ do
---     --       -- (_, start) <- Util.getLoc (symbol TokParenOpen <?> "opening parenthesis")
---     --       -- (op, loc) <- Util.getLoc operator
---     --       -- (_, end) <- Util.getLoc (symbol TokParenClose <?> "closing parenthesis")
---     --       return $ op
---     --     -- do
---     --     --   op <- term
---     --     --   return $ case op of
---     --     --     Op (Add l) loc -> Op (Sum l) loc
---     --     --     Op (Conj l) loc -> Op (Forall l) loc
---     --     --     Op (Disj l) loc -> Op (Exists l) loc
---     --     --     others -> others,
---     --     -- parensExpr
---     --   ]
+--   -- -- replace "+", "∧", and "∨" in Quant with "Σ", "∀", and "∃"
+--   -- quantOp :: Parser Expr
+--   -- quantOp = do
+--   --   op <- term
+--   --   return $ case op of
+--   --     Op Add loc -> Op Sum loc
+--   --     Op Conj loc -> Op Forall loc
+--   --     Op Disj loc -> Op Exists loc
+--   --     others -> others
 
---     -- -- replace "+", "∧", and "∨" in Quant with "Σ", "∀", and "∃"
---     -- quantOp :: Parser Expr
---     -- quantOp = do
---     --   op <- term
---     --   return $ case op of
---     --     Op Add loc -> Op Sum loc
---     --     Op Conj loc -> Op Forall loc
---     --     Op Disj loc -> Op Exists loc
---     --     others -> others
-
---     literal :: Parser Lit
---     literal =
---       withLoc
---         ( choice
---             [ LitBool True <$ symbol TokTrue,
---               LitBool False <$ symbol TokFalse,
---               LitInt <$> integer
---             ]
+--   literal :: Parser Lit
+--   literal =
+--     withLoc
+--         (choice
+--           [ LitBool True <$ symbol TokTrue
+--           , LitBool False <$ symbol TokFalse
+--           , LitInt <$> integer
+--           ]
 --         )
---         <?> "literal"
+--       <?> "literal"
 
---     operator :: Parser Op
---     operator =
---       withLoc
---         ( choice
---             [ EQ <$ symbol TokEQ,
---               NEQ <$ symbol TokNEQ,
---               NEQU <$ symbol TokNEQU,
---               LTE <$ symbol TokLTE,
---               LTEU <$ symbol TokLTEU,
---               GTE <$ symbol TokGTE,
---               GTEU <$ symbol TokGTEU,
---               LT <$ symbol TokLT,
---               GT <$ symbol TokGT,
---               Implies <$ symbol TokImpl,
---               ImpliesU <$ symbol TokImplU,
---               Conj <$ symbol TokConj,
---               ConjU <$ symbol TokConjU,
---               Disj <$ symbol TokDisj,
---               DisjU <$ symbol TokDisjU,
---               Neg <$ symbol TokNeg,
---               NegU <$ symbol TokNegU,
---               Add <$ symbol TokAdd,
---               Sub <$ symbol TokSub,
---               Mul <$ symbol TokMul,
---               Div <$ symbol TokDiv,
---               Mod <$ symbol TokMod
---             ]
+--   operator :: Parser Op
+--   operator =
+--     withLoc
+--         (choice
+--           [ EQ <$ symbol TokEQ
+--           , NEQ <$ symbol TokNEQ
+--           , NEQU <$ symbol TokNEQU
+--           , LTE <$ symbol TokLTE
+--           , LTEU <$ symbol TokLTEU
+--           , GTE <$ symbol TokGTE
+--           , GTEU <$ symbol TokGTEU
+--           , LT <$ symbol TokLT
+--           , GT <$ symbol TokGT
+--           , Implies <$ symbol TokImpl
+--           , ImpliesU <$ symbol TokImplU
+--           , Conj <$ symbol TokConj
+--           , ConjU <$ symbol TokConjU
+--           , Disj <$ symbol TokDisj
+--           , DisjU <$ symbol TokDisjU
+--           , Neg <$ symbol TokNeg
+--           , NegU <$ symbol TokNegU
+--           , Add <$ symbol TokAdd
+--           , Sub <$ symbol TokSub
+--           , Mul <$ symbol TokMul
+--           , Div <$ symbol TokDiv
+--           , Mod <$ symbol TokMod
+--           ]
 --         )
---         <?> "operator"
+--       <?> "operator"
 
 -- --------------------------------------------------------------------------------
 
@@ -625,20 +650,19 @@ block' constructor open parser close = do
   a <- open
   symbol TokIndent <?> "indentation"
   b <- parser
-  c <-
-    choice
-      [ do
+  c <- choice
+    [ do
           -- the ideal case
-          symbol TokDedent <?> "dedentation"
-          close,
-        do
+      symbol TokDedent <?> "dedentation"
+      close
+    , do
           -- the fucked up case:
-          --  the lexer is not capable of handling cases like "if True -> skip fi"
+          --  the tokener is not capable of handling cases like "if True -> skip fi"
           --  because it's not possible to determine the number of `TokDedent` before `TokFi`
-          c <- close
-          symbol TokDedent <?> "dedentation"
-          return c
-      ]
+      c <- close
+      symbol TokDedent <?> "dedentation"
+      return c
+    ]
   return $ constructor a b c
 
 -- consumes 0 or more newlines/indents/dedents afterwards
@@ -647,10 +671,10 @@ ignoreIndentations parser = do
   result <- parser
   void $ many (Util.ignoreP indentationRelated)
   return result
-  where
-    indentationRelated TokIndent = True
-    indentationRelated TokDedent = True
-    indentationRelated _ = False
+ where
+  indentationRelated TokIndent = True
+  indentationRelated TokDedent = True
+  indentationRelated _         = False
 
 -- consumes 1 or more newlines
 expectNewline :: Parser ()
@@ -659,7 +683,7 @@ expectNewline = do
   t <- lift Util.getLastToken
   case t of
     Just TokNewline -> return ()
-    _ -> void $ some (Util.ignore TokNewline)
+    _               -> void $ some (Util.ignore TokNewline)
 
 symbol :: Tok -> Parser ()
 symbol = Util.symbol
