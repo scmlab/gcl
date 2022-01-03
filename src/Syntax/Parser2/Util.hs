@@ -6,26 +6,30 @@ module Syntax.Parser2.Util
   , getLastToken
   , getLoc
   , withLoc
+  , getRange 
+  , withRange 
   , symbol
   , ignore
   , ignoreP
   , extract
-  )
-where
+  ) where
 
 import           Control.Monad.State
 import           Data.Loc
-import           Data.Void
-import           Data.Set                       ( Set )
-import qualified Data.Set                      as Set
+import           Data.Loc.Range
 import           Data.Map                       ( Map )
 import qualified Data.Map                      as Map
+import           Data.Set                       ( Set )
+import qualified Data.Set                      as Set
+import           Data.Void
+import           Language.Lexer.Applicative     ( TokenStream )
+import           Syntax.Parser2.TokenStream     ( PrettyToken
+                                                , getPos
+                                                )
 import           Text.Megaparsec         hiding ( Pos
                                                 , State
                                                 , between
                                                 )
-import           Language.Lexer.Applicative     ( TokenStream )
-import           Syntax.Parser2.TokenStream      ( PrettyToken )
 
 --------------------------------------------------------------------------------
 -- | Source location bookkeeping
@@ -35,11 +39,11 @@ type PosLog token = State (LocState token)
 type ID = Int
 data LocState token = LocState
   { currentLoc :: Loc         -- current Loc mark
-  , lastToken :: Maybe token  -- the last accepcted token
-  , opened :: Set ID        -- waiting to be moved to the "logged" map
+  , lastToken  :: Maybe token  -- the last accepcted token
+  , opened     :: Set ID        -- waiting to be moved to the "logged" map
                             -- when the starting position of the next token is determined
-  , logged :: Map ID Loc    -- waiting to be removed when the ending position is determined
-  , index  :: Int           -- for generating fresh IDs
+  , logged     :: Map ID Loc    -- waiting to be removed when the ending position is determined
+  , index      :: Int           -- for generating fresh IDs
   }
 
 runPosLog :: State (LocState token) a -> a
@@ -89,7 +93,7 @@ updateToken tok = modify $ \st -> st { lastToken = Just tok }
 
 type P token = ParsecT Void (TokenStream (L token)) (PosLog token)
 
--- Augment the parser with Loc
+-- Augment a parser with Loc
 getLoc :: (Ord tok, Show tok, PrettyToken tok) => P tok a -> P tok (a, Loc)
 getLoc parser = do
   i      <- lift markStart
@@ -97,10 +101,24 @@ getLoc parser = do
   loc    <- lift (markEnd i)
   return (result, loc)
 
+-- Augment a parser with Range
+getRange :: (Ord tok, Show tok, PrettyToken tok) => P tok a -> P tok (a, Range)
+getRange parser = do
+  start  <- getPos
+  result <- parser
+  end    <- getPos
+  return (result, Range start end)
+
 withLoc :: (Ord tok, Show tok, PrettyToken tok) => P tok (Loc -> a) -> P tok a
 withLoc parser = do
   (result, loc) <- getLoc parser
   return $ result loc
+
+withRange
+  :: (Ord tok, Show tok, PrettyToken tok) => P tok (Range -> a) -> P tok a
+withRange parser = do
+  (result, range) <- getRange parser
+  return $ result range
 
 --------------------------------------------------------------------------------
 -- | Combinators
@@ -123,7 +141,8 @@ ignore t = do
   return ()
 
 -- The predicate version of `ignore`
-ignoreP :: (Eq tok, Ord tok, Show tok, PrettyToken tok) => (tok -> Bool) -> P tok ()
+ignoreP
+  :: (Eq tok, Ord tok, Show tok, PrettyToken tok) => (tok -> Bool) -> P tok ()
 ignoreP p = do
   L _ tok <- satisfy (p . unLoc)
   lift $ updateToken tok

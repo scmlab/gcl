@@ -3,6 +3,8 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE DefaultSignatures #-}
+{-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE RecordWildCards #-}
 
 
 module Syntax.Parser2.TokenStream where
@@ -12,6 +14,7 @@ import           Data.List.NonEmpty             ( NonEmpty(..)
                                                 )
 import qualified Data.List.NonEmpty            as NE
 import           Data.Loc
+import qualified Data.Loc                      as Loc
 import           Data.Proxy
 import           Language.Lexer.Applicative
 import           Text.Megaparsec         hiding ( Pos )
@@ -258,3 +261,14 @@ glue (Chunk start1 body1 end1) (Chunk start2 body2 end2) = Chunk start1
           line'            = replicate colGap ' ' ++ line
           emptyLines       = NE.fromList (replicate (n - 1) "")
       in  body1 <> emptyLines <> (line' :| body2')
+
+posStateToPos :: Stream s => PosState s -> Loc.Pos
+posStateToPos PosState { pstateOffset, pstateSourcePos = SourcePos {..} } =
+  Loc.Pos sourceName (unPos sourceLine) (unPos sourceColumn) pstateOffset
+
+getPos :: (TraversableStream s, MonadParsec e s m) => m Loc.Pos
+getPos = do
+  st@State { stateOffset, statePosState } <- getParserState
+  let pst = reachOffsetNoLine stateOffset statePosState
+  setParserState st { statePosState = pst }
+  return . posStateToPos $ pst

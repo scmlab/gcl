@@ -7,16 +7,19 @@ import           Control.Monad                  ( void )
 import           Control.Monad.Combinators.Expr
 import           Control.Monad.State            ( lift )
 import           Data.Loc
-import           Data.Text.Lazy                 ( Text )
+import           Data.Loc.Range
+import           Data.Text                      ( Text )
 import           Data.Void
 import           Prelude                 hiding ( Ordering(..) )
-import           Syntax.Common                  ( Name
+import           Syntax.Common                  ( Name(Name)
                                                 , Op
                                                 )
 import           Syntax.Concrete         hiding ( Op )
 import           Syntax.Parser2.Lexer
 import           Syntax.Parser2.Util            ( PosLog
                                                 , extract
+                                                , getRange
+                                                , withLoc
                                                 )
 import qualified Syntax.Parser2.Util           as Util
 import           Text.Megaparsec         hiding ( ParseError
@@ -607,103 +610,98 @@ tokenArrowU = adapt TokArrowU "→"
 -- --     [Excluding <$ symbol TokParenClose, Including <$ symbol TokBracketClose]
 -- -- return $ Interval (start i) (end j)
 
--- --------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
 
--- -- | Combinators
--- block :: Parser a -> Parser a
--- block parser = do
---   Util.ignore TokIndent <?> "indentation"
---   result <- parser
---   Util.ignore TokDedent <?> "dedentation"
---   return result
+-- | Combinators
+block :: Parser a -> Parser a
+block parser = do
+  Util.ignore TokIndent <?> "indentation"
+  result <- parser
+  Util.ignore TokDedent <?> "dedentation"
+  return result
 
--- block' :: (l -> x -> r -> y) -> Parser l -> Parser x -> Parser r -> Parser y
--- block' constructor open parser close = do
---   a <- open
---   symbol TokIndent <?> "indentation"
---   b <- parser
---   c <-
---     choice
---       [ do
---           -- the ideal case
---           symbol TokDedent <?> "dedentation"
---           close,
---         do
---           -- the fucked up case:
---           --  the lexer is not capable of handling cases like "if True -> skip fi"
---           --  because it's not possible to determine the number of `TokDedent` before `TokFi`
---           c <- close
---           symbol TokDedent <?> "dedentation"
---           return c
---       ]
---   return $ constructor a b c
+block' :: (l -> x -> r -> y) -> Parser l -> Parser x -> Parser r -> Parser y
+block' constructor open parser close = do
+  a <- open
+  symbol TokIndent <?> "indentation"
+  b <- parser
+  c <-
+    choice
+      [ do
+          -- the ideal case
+          symbol TokDedent <?> "dedentation"
+          close,
+        do
+          -- the fucked up case:
+          --  the lexer is not capable of handling cases like "if True -> skip fi"
+          --  because it's not possible to determine the number of `TokDedent` before `TokFi`
+          c <- close
+          symbol TokDedent <?> "dedentation"
+          return c
+      ]
+  return $ constructor a b c
 
--- -- consumes 0 or more newlines/indents/dedents afterwards
--- ignoreIndentations :: Parser a -> Parser a
--- ignoreIndentations parser = do
---   result <- parser
---   void $ many (Util.ignoreP indentationRelated)
---   return result
---   where
---     indentationRelated TokIndent = True
---     indentationRelated TokDedent = True
---     indentationRelated _ = False
+-- consumes 0 or more newlines/indents/dedents afterwards
+ignoreIndentations :: Parser a -> Parser a
+ignoreIndentations parser = do
+  result <- parser
+  void $ many (Util.ignoreP indentationRelated)
+  return result
+  where
+    indentationRelated TokIndent = True
+    indentationRelated TokDedent = True
+    indentationRelated _ = False
 
--- -- consumes 1 or more newlines
--- expectNewline :: Parser ()
--- expectNewline = do
---   -- see if the latest accepcted token is TokNewline
---   t <- lift Util.getLastToken
---   case t of
---     Just TokNewline -> return ()
---     _ -> void $ some (Util.ignore TokNewline)
+-- consumes 1 or more newlines
+expectNewline :: Parser ()
+expectNewline = do
+  -- see if the latest accepcted token is TokNewline
+  t <- lift Util.getLastToken
+  case t of
+    Just TokNewline -> return ()
+    _ -> void $ some (Util.ignore TokNewline)
 
 symbol :: Tok -> Parser ()
 symbol = Util.symbol
 
--- withLoc :: Parser (Loc -> a) -> Parser a
--- withLoc = Util.withLoc
+parens :: Parser a -> Parser (a, Range)
+parens parser = do
+  (_, start) <- getRange (symbol TokParenOpen <?> "opening parenthesis")
+  result     <- parser
+  (_, end)   <- getRange (symbol TokParenClose <?> "closing parenthesis")
+  return (result, start <> end)
 
--- parens :: Parser a -> Parser (a, Loc)
--- parens parser = do
---   (_, start) <- Util.getLoc (symbol TokParenOpen <?> "opening parenthesis")
---   result <- parser
---   (_, end) <- Util.getLoc (symbol TokParenClose <?> "closing parenthesis")
---   let loc = start <--> end
---   return (result, loc)
+braces :: Parser a -> Parser (a, Range)
+braces parser = do
+  (_, start) <- getRange (symbol TokBraceOpen <?> "opening braces")
+  result     <- parser
+  (_, end)   <- getRange (symbol TokBraceClose <?> "closing braces")
+  return (result, start <> end)
 
--- braces :: Parser a -> Parser (a, Loc)
--- braces parser = do
---   (_, start) <- Util.getLoc (symbol TokBraceOpen <?> "opening braces")
---   result <- parser
---   (_, end) <- Util.getLoc (symbol TokBraceClose <?> "closing braces")
---   let loc = start <--> end
---   return (result, loc)
+upperName :: Parser Text
+upperName = extract p
+ where
+  p (TokUpperName s) = Just s
+  p _                = Nothing
 
--- upperName :: Parser Text
--- upperName = extract p
---   where
---     p (TokUpperName s) = Just s
---     p _ = Nothing
+upper :: Parser Name
+upper =
+  withLoc (Name <$> upperName)
+    <?> "identifier that starts with a uppercase letter"
 
--- upper :: Parser Name
--- upper =
---   withLoc (Name <$> upperName)
---     <?> "identifier that starts with a uppercase letter"
+lowerName :: Parser Text
+lowerName = extract p
+ where
+  p (TokLowerName s) = Just s
+  p _                = Nothing
 
--- lowerName :: Parser Text
--- lowerName = extract p
---   where
---     p (TokLowerName s) = Just s
---     p _ = Nothing
+lower :: Parser Name
+lower =
+  withLoc (Name <$> lowerName)
+    <?> "identifier that starts with a lowercase letter"
 
--- lower :: Parser Name
--- lower =
---   withLoc (Name <$> lowerName)
---     <?> "identifier that starts with a lowercase letter"
-
--- integer :: Parser Int
--- integer = extract p <?> "integer"
---   where
---     p (TokInt s) = Just s
---     p _ = Nothing
+integer :: Parser Int
+integer = extract p <?> "integer"
+ where
+  p (TokInt s) = Just s
+  p _          = Nothing
