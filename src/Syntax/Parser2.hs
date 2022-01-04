@@ -11,7 +11,12 @@ import           Data.Loc.Range
 import           Data.Text                      ( Text )
 import qualified Data.Text                     as Text
 import           Data.Void
-import           Prelude                 hiding ( Ordering(..) )
+import           Prelude                 hiding ( EQ
+                                                , GT
+                                                , LT
+                                                , Ordering
+                                                , lookup
+                                                )
 import           Syntax.Common           hiding ( Fixity(..) )
 import           Syntax.Concrete         hiding ( Op )
 import qualified Syntax.Concrete.Types         as Expr
@@ -72,10 +77,6 @@ program = undefined
 --   stmts <- many (statement <* choice [symbol TokNewline, eof]) <?> "statements"
 --   skipMany (symbol TokNewline)
 --   return $ Program decls stmts
-
--- specContent :: Parser [Stmt]
--- specContent = do
---   many statement <?> "statements"
 
 --------------------------------------------------------------------------------
 
@@ -156,6 +157,12 @@ tokenProofOpen = adapt TokProofOpen "{-"
 tokenProofClose :: Parser (Token "-}")
 tokenProofClose = adapt TokProofClose "-}"
 
+tokenBlockOpen :: Parser (Token "|[")
+tokenBlockOpen = adapt TokBlockOpen "|["
+
+tokenBlockClose :: Parser (Token "]|")
+tokenBlockClose = adapt TokBlockClose "]|"
+
 tokenColon :: Parser (Token ":")
 tokenColon = adapt TokColon "colon"
 
@@ -164,6 +171,9 @@ tokenComma = adapt TokComma "comma"
 
 tokenRange :: Parser (Token "..")
 tokenRange = adapt TokRange ".."
+
+tokenStar :: Parser (Token "*")
+tokenStar = adapt TokColon "*"
 
 tokenArray :: Parser (Token "array")
 tokenArray = adapt TokArray "reserved word \"array\""
@@ -188,6 +198,15 @@ tokenOd = adapt TokOd "reserved word \"od\""
 
 tokenCase :: Parser (Token "case")
 tokenCase = adapt TokCase "reserved word \"case\""
+
+tokenNew :: Parser (Token "new")
+tokenNew = adapt TokNew "reserved word \"new\""
+
+tokenDispose :: Parser (Token "dispose")
+tokenDispose = adapt TokDispose "reserved word \"dispose\""
+
+tokenQuestionMark :: Parser (Token "?")
+tokenQuestionMark = adapt TokQM "?"
 
 tokenAssign :: Parser (Token ":=")
 tokenAssign = adapt TokAssign ":="
@@ -278,103 +297,116 @@ tokenUnderscore = adapt TokUnderscore "underscore \"_\""
 -- variableList :: Parser (SepBy "," Name)
 -- variableList = sepByComma lower <?> "a list of variables separated by commas"
 
--- --------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
 
--- -- | Stmts
--- statement :: Parser Stmt
--- statement =
---   choice
---     [ try assign,
---       abort,
---       try assertWithBnd,
---       spec,
---       proof,
---       assert,
---       skip,
---       loop,
---       conditional,
---       hole
---     ]
---     <?> "statement"
+-- | Stmts
+statement :: Parser Stmt
+statement =
+  choice
+      [ skip
+      , proofAnchors
+      , abort
+      , try assertion
+      , loopInvariant
+      , try assignment
+      , try arrayAssignment
+      , try alloc
+      , try lookup
+      , mutate
+      , dispose
+      , loop
+      , conditional
+      , hole
+      , spec
+      , programBlock
+      ]
+    -- [ try assignment,
+    --   abort,
+    --   try loopInvariant,
+    --   spec,
+    --   proofAnchors,
+    --   assertion,
+    --   skip,
+    --   loop,
+    --   conditional,
+    --   hole
+    -- ]
+    <?> "statement"
 
--- statements :: Parser [Stmt]
--- statements = sepBy statement (symbol TokNewline)
+-- ZERO or more statements
+statements :: Parser [Stmt]
+statements = sepBy statement (symbol TokNewline)
 
--- statements1 :: Parser [Stmt]
--- statements1 = sepBy1 statement (symbol TokNewline)
+-- ONE or more statements
+statements1 :: Parser [Stmt]
+statements1 = sepBy1 statement (symbol TokNewline)
 
--- skip :: Parser Stmt
--- skip = withLoc $ Skip <$ symbol TokSkip
+skip :: Parser Stmt
+skip = withRange $ Skip <$ symbol TokSkip
 
--- abort :: Parser Stmt
--- abort = withLoc $ Abort <$ symbol TokAbort
+abort :: Parser Stmt
+abort = withRange $ Abort <$ symbol TokAbort
 
--- assert :: Parser Stmt
--- assert =
---   Assert
---     <$> tokenBraceOpen
---     <*> expression
---     <*> tokenBraceClose
+assertion :: Parser Stmt
+assertion = Assert <$> tokenBraceOpen <*> expression <*> tokenBraceClose
 
--- assertWithBnd :: Parser Stmt
--- assertWithBnd = do
---   LoopInvariant
---     <$> tokenBraceOpen
---     <*> predicate
---     <*> tokenComma
---     <*> tokenBnd
---     <*> tokenColon
---     <*> expression
---     <*> tokenBraceClose
+loopInvariant :: Parser Stmt
+loopInvariant = do
+  LoopInvariant
+    <$> tokenBraceOpen
+    <*> predicate
+    <*> tokenComma
+    <*> tokenBnd
+    <*> tokenColon
+    <*> expression
+    <*> tokenBraceClose
 
--- assign :: Parser Stmt
--- assign =
---   Assign
---     <$> sepByComma lower
---     <*> tokenAssign
---     <*> sepByComma expression
+assignment :: Parser Stmt
+assignment =
+  Assign <$> sepByComma lower <*> tokenAssign <*> sepByComma expression
 
--- loop :: Parser Stmt
--- loop =
---   block'
---     Do
---     tokenDo
---     (sepByGuardBar guardedCommand)
---     tokenOd
+arrayAssignment :: Parser Stmt
+arrayAssignment =
+  AAssign
+    <$> lower
+    <*> tokenBracketOpen
+    <*> expression
+    <*> tokenBracketClose
+    <*> tokenAssign
+    <*> expression
 
--- conditional :: Parser Stmt
--- conditional =
---   block'
---     If
---     tokenIf
---     (sepByGuardBar guardedCommand)
---     tokenFi
 
--- guardedCommands :: Parser [GdCmd]
--- guardedCommands = sepBy1 guardedCommand $ do
---   symbol TokGuardBar <?> "|"
+loop :: Parser Stmt
+loop = block' Do tokenDo (sepByGuardBar guardedCommand) tokenOd
 
--- guardedCommand :: Parser GdCmd
--- guardedCommand =
---   GdCmd
---     <$> predicate
---     <*> ((Left <$> tokenArrow) <|> (Right <$> tokenArrowU))
---     <*> block statements1
+conditional :: Parser Stmt
+conditional = block' If tokenIf (sepByGuardBar guardedCommand) tokenFi
 
--- hole :: Parser Stmt
--- hole = withLoc $ SpecQM <$ (symbol TokQM <?> "?")
+guardedCommands :: Parser [GdCmd]
+guardedCommands = sepBy1 guardedCommand $ do
+  symbol TokGuardBar <?> "|"
 
--- spec :: Parser Stmt
--- spec =
---   Spec
---     <$> tokenSpecOpen
---     <* specContent
---     <* takeWhileP (Just "anything other than '!}'") isTokSpecClose
---     <*> tokenSpecClose
---   where
---     isTokSpecClose :: L Tok -> Bool
---     isTokSpecClose (L _ TokSpecClose) = False
---     isTokSpecClose _ = True
+guardedCommand :: Parser GdCmd
+guardedCommand = GdCmd <$> predicate <*> tokenArrow <*> block statements1
+
+hole :: Parser Stmt
+hole = SpecQM <$> (rangeOf <$> tokenQuestionMark)
+
+spec :: Parser Stmt
+spec =
+  Spec
+    <$> tokenSpecOpen
+    <*> specContent
+    <*  takeWhileP (Just "anything other than '!}'") isTokSpecClose
+    <*> tokenSpecClose
+ where
+  specContent :: Parser [Stmt]
+  specContent = do
+    many statement <?> "statements"
+
+  isTokSpecClose :: L Tok -> Bool
+  isTokSpecClose (L _ TokSpecClose) = False
+  isTokSpecClose _                  = True
 
 proofAnchors :: Parser Stmt
 proofAnchors =
@@ -385,10 +417,11 @@ proofAnchors =
     (hash, range) <- getRange $ extract extractHash
     skipProof
     return $ ProofAnchor hash range
-  
+
   skipProof :: Parser ()
-  skipProof = void $ takeWhileP (Just "anything other than '-]' or another proof anchor")
-                       isTokProofCloseOrProofAnchor
+  skipProof = void $ takeWhileP
+    (Just "anything other than '-]' or another proof anchor")
+    isTokProofCloseOrProofAnchor
 
   isTokProofCloseOrProofAnchor :: L Tok -> Bool
   isTokProofCloseOrProofAnchor (L _ TokProofClose     ) = False
@@ -398,24 +431,32 @@ proofAnchors =
   extractHash (TokProofAnchor s) = Just (Text.pack s)
   extractHash _                  = Nothing
 
+alloc :: Parser Stmt
+alloc =
+  Alloc
+    <$> lower
+    <*> tokenAssign
+    <*> tokenNew
+    <*> tokenParenOpen
+    <*> sepByComma expression
+    <*> tokenParenClose
 
 
-  -- pProofAnchorsOrProofEnd = do
-  --   let anchorOrEnd =
-  --         choice [lexProofEndF >> return False, pProofAnchorF >> return True]
-  --   (_, continue) <- manyTill_ anySingle (lookAhead anchorOrEnd)
-  --   if continue
-  --     then do
-  --       x  <- pProofAnchorF
-  --       xs <- pProofAnchorsOrProofEnd
-  --       return (x : xs)
-  --     else return []
+lookup :: Parser Stmt
+lookup = HLookup <$> lower <*> tokenAssign <*> tokenStar <*> expression
 
+mutate :: Parser Stmt
+mutate = HMutate <$> tokenStar <*> expression <*> tokenAssign <*> expression
 
--- --------------------------------------------------------------------------------
-------------------------------------------
--- Expressions 
-------------------------------------------
+dispose :: Parser Stmt
+dispose = Dispose <$> tokenDispose <*> expression
+
+programBlock :: Parser Stmt
+programBlock = Block <$> tokenBlockOpen <*> block program <*> tokenBlockClose
+
+--------------------------------------------------------------------------------
+-- Expression 
+--------------------------------------------------------------------------------
 
 expressions :: Parser [Expr]
 expressions =
@@ -566,10 +607,6 @@ literal =
       )
     <?> "literal"
 
-------------------------------------------
--- Pattern matching
-------------------------------------------
-
 pattern' :: Parser Pattern
 pattern' = choice
   [ PattLit <$> literal
@@ -580,8 +617,9 @@ pattern' = choice
   ]
 
 --------------------------------------------------------------------------------
+-- Type 
+--------------------------------------------------------------------------------
 
--- | Type
 type' :: Parser Type
 type' = ignoreIndentations $ do
   makeExprParser term table <?> "type"
@@ -687,18 +725,18 @@ expectNewline = do
 symbol :: Tok -> Parser ()
 symbol = Util.symbol
 
-parens :: Parser a -> Parser (a, Range)
-parens parser = do
-  (_, start) <- getRange (symbol TokParenOpen <?> "opening parenthesis")
-  result     <- parser
-  (_, end)   <- getRange (symbol TokParenClose <?> "closing parenthesis")
-  return (result, start <> end)
+-- parens :: Parser a -> Parser a
+-- parens parser = do
+--   (_, start) <- getRange tokenParenOpen
+--   result     <- parser
+--   (_, end)   <- getRange tokenParenClose
+--   return result
 
 braces :: Parser a -> Parser (a, Range)
 braces parser = do
-  (_, start) <- getRange (symbol TokBraceOpen <?> "opening braces")
+  (_, start) <- getRange tokenBraceOpen
   result     <- parser
-  (_, end)   <- getRange (symbol TokBraceClose <?> "closing braces")
+  (_, end)   <- getRange tokenBraceClose
   return (result, start <> end)
 
 upperName :: Parser Text

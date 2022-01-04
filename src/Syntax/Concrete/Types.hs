@@ -94,7 +94,7 @@ data Stmt
   | Do (Token "do") (SepBy "|" GdCmd) (Token "od")
   | If (Token "if") (SepBy "|" GdCmd) (Token "fi")
   | SpecQM Range -- ? to be rewritten as {!!}
-  | Spec (Token "[!") Text (Token "!]")
+  | Spec (Token "[!") [Stmt] (Token "!]")
   | Proof (Token "{-") [ProofAnchor] (Token "-}")
   | Alloc Name (Token ":=") (Token "new") (Token "(") (SepBy "," Expr) (Token ")")
   | HLookup Name (Token ":=") (Token "*") Expr
