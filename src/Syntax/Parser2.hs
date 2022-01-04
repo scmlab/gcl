@@ -9,6 +9,7 @@ import           Control.Monad.State            ( lift )
 import           Data.Loc
 import           Data.Loc.Range
 import           Data.Text                      ( Text )
+import qualified Data.Text                     as Text
 import           Data.Void
 import           Prelude                 hiding ( Ordering(..) )
 import           Syntax.Common           hiding ( Fixity(..) )
@@ -375,28 +376,54 @@ tokenUnderscore = adapt TokUnderscore "underscore \"_\""
 --     isTokSpecClose (L _ TokSpecClose) = False
 --     isTokSpecClose _ = True
 
--- proof :: Parser Stmt
--- proof =
---   Proof
---     <$> tokenProofOpen
---     <* specContent
---     <* takeWhileP (Just "anything other than '-}'") isTokProofClose
---       <*> tokenProofClose
---   where
---     isTokProofClose :: L Tok -> Bool
---     isTokProofClose (L _ TokProofClose) = False
---     isTokProofClose _ = True
+proofAnchors :: Parser Stmt
+proofAnchors =
+  Proof <$> tokenProofOpen <*> many proofAnchor <*> tokenProofClose
+ where
+  proofAnchor :: Parser ProofAnchor
+  proofAnchor = do
+    (hash, range) <- getRange $ extract extractHash
+    skipProof
+    return $ ProofAnchor hash range
+  
+  skipProof :: Parser ()
+  skipProof = void $ takeWhileP (Just "anything other than '-]' or another proof anchor")
+                       isTokProofCloseOrProofAnchor
+
+  isTokProofCloseOrProofAnchor :: L Tok -> Bool
+  isTokProofCloseOrProofAnchor (L _ TokProofClose     ) = False
+  isTokProofCloseOrProofAnchor (L _ (TokProofAnchor _)) = False
+  isTokProofCloseOrProofAnchor _                        = True
+
+  extractHash (TokProofAnchor s) = Just (Text.pack s)
+  extractHash _                  = Nothing
+
+
+
+  -- pProofAnchorsOrProofEnd = do
+  --   let anchorOrEnd =
+  --         choice [lexProofEndF >> return False, pProofAnchorF >> return True]
+  --   (_, continue) <- manyTill_ anySingle (lookAhead anchorOrEnd)
+  --   if continue
+  --     then do
+  --       x  <- pProofAnchorF
+  --       xs <- pProofAnchorsOrProofEnd
+  --       return (x : xs)
+  --     else return []
+
 
 -- --------------------------------------------------------------------------------
+------------------------------------------
+-- Expressions 
+------------------------------------------
 
--- -- | Expressions
--- expressionList :: Parser [Expr]
--- expressionList =
---   sepBy1 expression (symbol TokComma)
---     <?> "a list of expressions separated by commas"
+expressions :: Parser [Expr]
+expressions =
+  sepBy1 expression (symbol TokComma)
+    <?> "a list of expressions separated by commas"
 
--- predicate :: Parser Expr
--- predicate = expression <?> "predicate"
+predicate :: Parser Expr
+predicate = expression <?> "predicate"
 
 expression :: Parser Expr
 expression = makeExprParser (term <|> caseOf) chainOpTable <?> "expression"

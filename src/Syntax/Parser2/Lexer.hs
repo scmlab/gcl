@@ -142,6 +142,7 @@ data Tok
   | TokProd
   | TokForall
   | TokExist
+  | TokProofAnchor String
   | TokHash
   | TokUpperName Text
   | TokLowerName Text
@@ -236,6 +237,7 @@ instance Show Tok where
     TokProd              -> "∏"
     TokForall            -> "∀"
     TokExist             -> "∃"
+    TokProofAnchor s     -> "#" ++ s
     TokHash              -> "#"
     TokUpperName s       -> Text.unpack s
     TokLowerName s       -> Text.unpack s
@@ -398,6 +400,8 @@ tokRE =
     <$  string "∀"
     <|> TokExist
     <$  string "∃"
+    <|> TokProofAnchor
+    <$> alphaNumRE
     <|> TokHash
     <$  string "#"
     <|> TokTrue
@@ -412,6 +416,10 @@ tokRE =
     <$> lowerNameRE
     <|> TokInt
     <$> intRE
+
+-- starts with uppercase alphabets
+alphaNumRE :: RE Char String
+alphaNumRE = (:) <$> psym isAlphaNum <*> many (psym isAlphaNum)
 
 -- starts with lowercase alphabets
 lowerNameRE :: RE Char String
