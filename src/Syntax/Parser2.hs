@@ -69,14 +69,26 @@ parse parser filepath tokenStream =
     getLoc _ = mempty
 
 program :: Parser Program
-program = undefined
+program = do
+  skipMany (symbol TokNewline)
+  declOrDefnBlocks <-
+    many declOrDefnBlock
+  skipMany (symbol TokNewline)
+  stmts <- many (statement <* choice [symbol TokNewline, eof]) <?> "statements"
+  skipMany (symbol TokNewline)
+  return $ Program declOrDefnBlocks stmts
 
---   skipMany (symbol TokNewline)
---   decls <- many (declaration <* choice [symbol TokNewline, eof]) <?> "declarations"
---   skipMany (symbol TokNewline)
---   stmts <- many (statement <* choice [symbol TokNewline, eof]) <?> "statements"
---   skipMany (symbol TokNewline)
---   return $ Program decls stmts
+ where
+  declOrDefnBlock :: Parser (Either Declaration DefinitionBlock)
+  declOrDefnBlock = do
+    skipMany (symbol TokNewline)
+    result <- choice
+      [ Left <$> declaration <?> "declaration"
+      , Right <$> definitionBlock <?> "definition block"
+      ]
+    choice [symbol TokNewline, eof]
+    return result
+
 
 --------------------------------------------------------------------------------
 
