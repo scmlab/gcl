@@ -106,6 +106,8 @@ data Tok
   | TokProofClose
   | TokBlockOpen
   | TokBlockClose
+  | TokDeclOpen
+  | TokDeclClose
   | -- expression
     TokUnderscore
 
@@ -205,8 +207,10 @@ instance Show Tok where
     TokQuantCloseU       -> "⟩"
     TokProofOpen         -> "{-"
     TokProofClose        -> "-}"
-    TokBlockOpen -> "|["
-    TokBlockClose -> "]|"
+    TokBlockOpen         -> "|["
+    TokBlockClose        -> "]|"
+    TokDeclOpen         -> "{:"
+    TokDeclClose        -> ":}"
     TokEQ                -> "="
     TokNEQ               -> "/="
     TokNEQU              -> "≠"
@@ -337,6 +341,10 @@ tokRE =
     <$  string "|["
     <|> TokBlockClose
     <$  string "]|"
+    <|> TokDeclOpen
+    <$  string "{:"
+    <|> TokDeclClose
+    <$  string ":}"
     -- literals
     <|> TokUnderscore
     <$  string "_"

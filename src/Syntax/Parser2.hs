@@ -163,6 +163,12 @@ tokenBlockOpen = adapt TokBlockOpen "|["
 tokenBlockClose :: Parser (Token "]|")
 tokenBlockClose = adapt TokBlockClose "]|"
 
+tokenDeclOpen :: Parser (Token "{:")
+tokenDeclOpen = adapt TokDeclOpen "{:"
+
+tokenDeclClose :: Parser (Token ":}")
+tokenDeclClose = adapt TokDeclClose ":}"
+
 tokenColon :: Parser (Token ":")
 tokenColon = adapt TokColon "colon"
 
@@ -224,82 +230,78 @@ tokenArrow =
 tokenUnderscore :: Parser (Token "_")
 tokenUnderscore = adapt TokUnderscore "underscore \"_\""
 
--- --------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
+-- Declaration 
+--------------------------------------------------------------------------------
 
--- -- | Declarations
--- declaration :: Parser Declaration
--- declaration =
---   choice
---     [ try constDeclWithProp,
---       constDecl,
---       try varDeclWithProp,
---       varDecl,
---       letDecl
---     ]
---     <?> "declaration"
+declaration :: Parser Declaration
+declaration = choice [constDecl, varDecl] <?> "declaration"
 
--- constDecl :: Parser Declaration
--- constDecl =
---   ConstDecl
---     <$> tokenConst
---     <*> constList
---     <*> tokenColon
---     <*> type'
+constDecl :: Parser Declaration
+constDecl = ConstDecl <$> tokenConst <*> declType upper
 
--- constDeclWithProp :: Parser Declaration
--- constDeclWithProp =
---   ConstDeclWithProp
---     <$> tokenConst
---     <*> constList
---     <*> tokenColon
---     <*> type'
---     <*> tokenBraceOpen
---     <*> expression
---     <*> tokenBraceClose
+varDecl :: Parser Declaration
+varDecl = VarDecl <$> tokenVar <*> declType lower
 
--- varDecl :: Parser Declaration
--- varDecl =
---   VarDecl
---     <$> tokenVar
---     <*> variableList
---     <*> tokenColon
---     <*> type'
+-- `n : type` | `n : type { expr }` | `T a1 a2 ... = C1 ai1 ai2 .. | C2 ... | ...` | `n args = expr`
+definition :: Parser Definition
+definition = choice [try funcDefnSig, typeDefn, funcDefnF]
+ where
 
--- varDeclWithProp :: Parser Declaration
--- varDeclWithProp =
---   VarDeclWithProp
---     <$> tokenVar
---     <*> variableList
---     <*> tokenColon
---     <*> type'
---     <*> tokenBraceOpen
---     <*> expression
---     <*> tokenBraceClose
+  funcDefnSig :: Parser Definition
+  funcDefnSig = FuncDefnSig <$> declBase identifier <*> optional declProp
 
--- letDecl :: Parser Declaration
--- letDecl =
---   LetDecl
---     <$> tokenLet
---     <*> upper
---     <*> many lower
---     <*> tokenEQ
---     <*> predicate
+  funcDefnF :: Parser Definition
+  funcDefnF = FuncDefn <$> identifier <*> many lower <*> tokenEQ <*> expression
 
--- --------------------------------------------------------------------------------
+  -- `T a1 a2 ... = C1 ai1 ai2 .. | C2 ... | ...`
+  typeDefn :: Parser Definition
+  typeDefn =
+    TypeDefn
+      <$> tokenData
+      <*> identifier
+      <*> many identifier
+      <*> tokenEQ
+      <*> sepByGuardBar typeDefnCtor
 
--- -- | Variables and stuff
+  typeDefnCtor :: Parser TypeDefnCtor
+  typeDefnCtor = TypeDefnCtor <$> identifier <*> many type'
 
--- -- separated by commas
--- constList :: Parser (SepBy "," Name)
--- constList = sepByComma upper <?> "a list of constants separated by commas"
+definitionBlock :: Parser DefinitionBlock
+definitionBlock =
+  DefinitionBlock
+    <$> tokenDeclOpen
+    <*> block (many definition)
+    <*> tokenDeclClose
 
--- -- separated by commas
--- variableList :: Parser (SepBy "," Name)
--- variableList = sepByComma lower <?> "a list of variables separated by commas"
+-- `n : type`
+declBase :: Parser Name -> Parser DeclBase
+declBase name = DeclBase <$> sepByComma name <*> tokenColon <*> type'
+
+-- `{ expr }`
+declProp :: Parser DeclProp
+declProp = DeclProp <$> tokenBraceOpen <*> expression <*> tokenBraceClose
+
+-- `n : type` | `n : type { expr }`
+declType :: Parser Name -> Parser DeclType
+declType name = DeclType <$> declBase name <*> optional declProp
 
 --------------------------------------------------------------------------------
 
--- | Stmts
+-- | Variables and stuff
+
+-- separated by commas
+constList :: Parser (SepBy "," Name)
+constList = sepByComma upper <?> "a list of constants separated by commas"
+
+-- separated by commas
+variableList :: Parser (SepBy "," Name)
+variableList = sepByComma lower <?> "a list of variables separated by commas"
+
+--------------------------------------------------------------------------------
+-- Statement 
+--------------------------------------------------------------------------------
+
 statement :: Parser Stmt
 statement =
   choice
