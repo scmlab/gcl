@@ -110,7 +110,7 @@ fillGap this next =
    in if lineDiff == 0
         then -- on the same line, just pad them with spaces
 
-          let colDiff = posCol next - posCol this
+          let colDiff = posCol next - posCol this - 1
            in mconcat (replicate colDiff space)
         else -- on different lines
           mconcat (replicate lineDiff "\n" ++ replicate (posCol next - 1) space)

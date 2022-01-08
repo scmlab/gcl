@@ -9,6 +9,7 @@ module Syntax.Parser2.Util
   , getRange 
   , withRange 
   , symbol
+  , symbol'
   , ignore
   , ignoreP
   , extract
@@ -131,6 +132,15 @@ symbol t = do
     updateLoc loc
     updateToken tok
   return ()
+
+-- Create a parser of some symbol (while respecting source locations)
+symbol' :: (Eq tok, Ord tok, Show tok, PrettyToken tok) => tok -> P tok Loc
+symbol' t = do
+  L loc tok <- satisfy (\(L _ t') -> t == t')
+  lift $ do
+    updateLoc loc
+    updateToken tok
+  return loc
 
 -- Create a parser of some symbol, that doesn't update source locations
 -- effectively excluding it from source location tracking

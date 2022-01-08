@@ -25,7 +25,6 @@ import           Data.Loc.Range
 import           Data.Text                      ( Text )
 import qualified Data.Text                     as Text
 import           Data.Void
-import           Debug.Trace                    ( traceShow )
 import           Prelude                 hiding ( EQ
                                                 , GT
                                                 , LT
@@ -36,13 +35,7 @@ import           Syntax.Common           hiding ( Fixity(..) )
 import           Syntax.Concrete         hiding ( Op )
 import qualified Syntax.Concrete.Types         as Expr
 import           Syntax.Parser2.Lexer
-import           Syntax.Parser2.Util            ( PosLog
-                                                , extract
-                                                , getRange
-                                                , withLoc
-                                                , withRange
-                                                )
-import qualified Syntax.Parser2.Util           as Util
+import           Syntax.Parser2.Util
 import           Text.Megaparsec         hiding ( ParseError
                                                 , Pos
                                                 , State
@@ -69,13 +62,13 @@ data ParseError = LexicalError Pos
 scanAndParse :: Parser a -> FilePath -> Text -> Either ParseError a
 scanAndParse parser filepath source = case scan filepath source of
   Left  err    -> throwError (LexicalError err)
-  Right tokens -> traceShow tokens $ case parse parser filepath tokens of
+  Right tokens -> case parse parser filepath tokens of
     Left  errors -> throwError (SyntacticError errors)
     Right val    -> return val
 
 parse :: Parser a -> FilePath -> TokStream -> Either (NonEmpty (Loc, String)) a
 parse parser filepath tokenStream =
-  case Util.runPosLog (runParserT parser filepath tokenStream) of
+  case runPosLog (runParserT parser filepath tokenStream) of
     Left  e -> Left (fromParseErrorBundle e)
     Right x -> Right x
  where
@@ -90,7 +83,7 @@ parse parser filepath tokenStream =
    where
     toError
       :: ShowErrorComponent e => Mega.ParseError TokStream e -> (Loc, String)
-    toError err = (getLoc err, parseErrorTextPretty err)
+    toError err = (getLoc' err, parseErrorTextPretty err)
 
     mergeErrors
       :: ShowErrorComponent e
@@ -101,10 +94,10 @@ parse parser filepath tokenStream =
       let (_, next) = reachOffset (errorOffset err) initial
       in  (next, toError err `NonEmpty.cons` accumErrs)
 
-    getLoc :: ShowErrorComponent e => Mega.ParseError TokStream e -> Loc
     -- get the Loc of all unexpected tokens
-    getLoc (TrivialError _ (Just (Tokens xs)) _) = foldMap locOf xs
-    getLoc _ = mempty
+    getLoc' :: ShowErrorComponent e => Mega.ParseError TokStream e -> Loc
+    getLoc' (TrivialError _ (Just (Tokens xs)) _) = foldMap locOf xs
+    getLoc' _ = mempty
 
 program :: Parser Program
 program = do
@@ -150,7 +143,7 @@ sepByGuardBar = sepBy' tokenGuardBar
 -- for building parsers for tokens
 adapt :: Tok -> String -> Parser (Token a)
 adapt t errMsg = do
-  (_, loc) <- Util.getLoc (symbol t <?> errMsg)
+  loc <- symbol' t <?> errMsg
   case loc of
     NoLoc   -> error "NoLoc when parsing token"
     Loc l r -> return $ Token l r
@@ -549,12 +542,12 @@ expression = makeExprParser (term <|> caseOf) chainOpTable <?> "expression"
 
   unary :: (Loc -> Op) -> Tok -> Parser (Expr -> Expr)
   unary operator' tok = do
-    (op, loc) <- Util.getLoc (operator' <$ symbol tok)
-    return $ \result -> App (Expr.Op (op loc)) result
+    loc <- symbol' tok
+    return $ \result -> App (Expr.Op (operator' loc)) result
 
   binary :: (Loc -> Op) -> Tok -> Parser (Expr -> Expr -> Expr)
   binary operator' tok = do
-    (op, loc) <- Util.getLoc (operator' <$ symbol tok)
+    (op, loc) <- getLoc (operator' <$ symbol tok)
     return $ \x y -> App (App (Expr.Op (op loc)) x) y
 
   parensExpr :: Parser Expr
@@ -717,9 +710,9 @@ type' = ignoreIndentations $ do
 -- | Combinators
 block :: Parser a -> Parser a
 block parser = do
-  Util.ignore TokIndent <?> "indentation"
+  ignore TokIndent <?> "indentation"
   result <- parser
-  Util.ignore TokDedent <?> "dedentation"
+  ignore TokDedent <?> "dedentation"
   return result
 
 block' :: (l -> x -> r -> y) -> Parser l -> Parser x -> Parser r -> Parser y
@@ -746,7 +739,7 @@ block' constructor open parser close = do
 ignoreIndentations :: Parser a -> Parser a
 ignoreIndentations parser = do
   result <- parser
-  void $ many (Util.ignoreP indentationRelated)
+  void $ many (ignoreP indentationRelated)
   return result
  where
   indentationRelated TokIndent = True
@@ -754,16 +747,13 @@ ignoreIndentations parser = do
   indentationRelated _         = False
 
 -- consumes 1 or more newlines
--- expectNewline :: Parser ()
--- expectNewline = do
---   -- see if the latest accepcted token is TokNewline
---   t <- lift Util.getLastToken
---   case t of
---     Just TokNewline -> return ()
---     _               -> void $ some (Util.ignore TokNewline)
-
-symbol :: Tok -> Parser ()
-symbol = Util.symbol
+expectNewline :: Parser ()
+expectNewline = do
+  -- see if the latest accepcted token is TokNewline
+  t <- lift getLastToken
+  case t of
+    Just TokNewline -> return ()
+    _               -> void $ some (ignore TokNewline)
 
 upperName :: Parser Text
 upperName = extract p
