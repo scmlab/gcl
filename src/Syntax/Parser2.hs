@@ -2,19 +2,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Syntax.Parser2 where
--- module Syntax.Parser2
---   ( Parser
---   , ParseError(..)
---   , scan
---   , scanAndParse
---   , program
---   , expression
---   , pattern'
---   , type'
---   , definitionBlock
---   , statements
---   , statements1
---   ) where
 
 import           Control.Monad.Combinators.Expr
 import           Control.Monad.Except
@@ -34,7 +21,7 @@ import           Syntax.Common           hiding ( Fixity(..) )
 import           Syntax.Concrete         hiding ( Op )
 import qualified Syntax.Concrete.Types         as Expr
 import           Syntax.Parser2.Lexer
-import           Syntax.Parser2.Util
+import           Syntax.Parser2.Util     hiding ( Parser )
 import           Text.Megaparsec         hiding ( ParseError
                                                 , Pos
                                                 , State
@@ -45,9 +32,8 @@ import           Text.Megaparsec         hiding ( ParseError
 import qualified Text.Megaparsec               as Mega
 
 --------------------------------------------------------------------------------
-
 -- | States for source location bookkeeping
-type Parser = ParsecT Void TokStream (PosLog Tok)
+type Parser = ParsecT Void TokStream M
 
 --------------------------------------------------------------------------------
 -- | Error 
@@ -67,7 +53,7 @@ scanAndParse parser filepath source = case scan filepath source of
 
 parse :: Parser a -> FilePath -> TokStream -> Either (NonEmpty (Loc, String)) a
 parse parser filepath tokenStream =
-  case runPosLog (runParserT parser filepath tokenStream) of
+  case runM (runParserT parser filepath tokenStream) of
     Left  e -> Left (fromParseErrorBundle e)
     Right x -> Right x
  where
@@ -77,7 +63,8 @@ parse parser filepath tokenStream =
     -> NonEmpty (Loc, String)
   fromParseErrorBundle (ParseErrorBundle errors _) = fmap toError errors
    where
-    toError :: ShowErrorComponent e => Mega.ParseError TokStream e -> (Loc, String)
+    toError
+      :: ShowErrorComponent e => Mega.ParseError TokStream e -> (Loc, String)
     toError err = (getLoc' err, parseErrorTextPretty err)
     -- get the Loc of all unexpected tokens
     getLoc' :: ShowErrorComponent e => Mega.ParseError TokStream e -> Loc
@@ -89,7 +76,8 @@ program = do
   skipMany (symbol TokNewline)
   declOrDefnBlocks <- many declOrDefnBlock
   skipMany (symbol TokNewline)
-  stmts <- many (statement <* choice [symbol TokNewline, eof]) <?> "statements"
+  stmts <-
+    many (statement <* choice [void (symbol TokNewline), eof]) <?> "statements"
   skipMany (symbol TokNewline)
   return $ Program declOrDefnBlocks stmts
 
@@ -101,7 +89,7 @@ program = do
       [ Left <$> declaration <?> "declaration"
       , Right <$> definitionBlock <?> "definition block"
       ]
-    choice [symbol TokNewline, eof]
+    choice [void (symbol TokNewline), eof]
     return result
 
 
@@ -128,7 +116,7 @@ sepByGuardBar = sepBy' tokenGuardBar
 -- for building parsers for tokens
 adapt :: Tok -> String -> Parser (Token a)
 adapt t errMsg = do
-  loc <- symbol' t <?> errMsg
+  loc <- symbol t <?> errMsg
   case loc of
     NoLoc   -> error "NoLoc when parsing token"
     Loc l r -> return $ Token l r
@@ -527,7 +515,7 @@ expression = makeExprParser (term <|> caseOf) chainOpTable <?> "expression"
 
   unary :: (Loc -> Op) -> Tok -> Parser (Expr -> Expr)
   unary operator' tok = do
-    loc <- symbol' tok
+    loc <- symbol tok
     return $ \result -> App (Expr.Op (operator' loc)) result
 
   binary :: (Loc -> Op) -> Tok -> Parser (Expr -> Expr -> Expr)
@@ -703,19 +691,19 @@ block parser = do
 block' :: (l -> x -> r -> y) -> Parser l -> Parser x -> Parser r -> Parser y
 block' constructor open parser close = do
   a <- open
-  symbol TokIndent <?> "indentation"
+  _ <- symbol TokIndent <?> "indentation"
   b <- parser
   c <- choice
     [ do
           -- the ideal case
-      symbol TokDedent <?> "dedentation"
+      _ <- symbol TokDedent <?> "dedentation"
       close
     , do
           -- the fucked up case:
           --  the tokener is not capable of handling cases like "if True -> skip fi"
           --  because it's not possible to determine the number of `TokDedent` before `TokFi`
       c <- close
-      symbol TokDedent <?> "dedentation"
+      _ <- symbol TokDedent <?> "dedentation"
       return c
     ]
   return $ constructor a b c

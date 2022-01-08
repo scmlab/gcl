@@ -1,15 +1,15 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Syntax.Parser2.Util
-  ( PosLog
-  , runPosLog
+  ( M
+  , Parser
+  , runM
   , getLastToken
   , getLoc
   , withLoc
   , getRange
   , withRange
   , symbol
-  , symbol'
   , ignore
   , ignoreP
   , extract
@@ -23,8 +23,9 @@ import qualified Data.Map                      as Map
 import           Data.Set                       ( Set )
 import qualified Data.Set                      as Set
 import           Data.Void
-import           Language.Lexer.Applicative     ( TokenStream )
-import           Syntax.Parser2.TokenStream     ( PrettyToken )
+import           Syntax.Parser2.Lexer           ( Tok
+                                                , TokStream
+                                                )
 import           Text.Megaparsec         hiding ( Pos
                                                 , State
                                                 , between
@@ -33,29 +34,29 @@ import           Text.Megaparsec         hiding ( Pos
 --------------------------------------------------------------------------------
 -- | Source location bookkeeping
 
-type PosLog token = State (LocState token)
+type M = State Bookkeeping
 
 type ID = Int
-data LocState token = LocState
+data Bookkeeping = Bookkeeping
   { currentLoc :: Loc         -- current Loc mark
-  , lastToken  :: Maybe token  -- the last accepcted token
-  , opened     :: Set ID        -- waiting to be moved to the "logged" map
-                            -- when the starting position of the next token is determined
-  , logged     :: Map ID Loc    -- waiting to be removed when the ending position is determined
-  , index      :: Int           -- for generating fresh IDs
+  , lastToken  :: Maybe Tok   -- the last accepcted token
+  , opened     :: Set ID      -- waiting to be moved to the "logged" map
+                              -- when the starting position of the next token is determined
+  , logged     :: Map ID Loc  -- waiting to be removed when the ending position is determined
+  , index      :: Int         -- for generating fresh IDs
   }
 
-runPosLog :: State (LocState token) a -> a
-runPosLog f = evalState f (LocState NoLoc Nothing Set.empty Map.empty 0)
+runM :: State Bookkeeping a -> a
+runM f = evalState f (Bookkeeping NoLoc Nothing Set.empty Map.empty 0)
 
-getCurrentLoc :: PosLog token Loc
+getCurrentLoc :: M Loc
 getCurrentLoc = gets currentLoc
 
-getLastToken :: PosLog token (Maybe token)
+getLastToken :: M (Maybe Tok)
 getLastToken = gets lastToken
 
 -- | Returns an ID (marking the start of the range of some source location)
-markStart :: PosLog token ID
+markStart :: M ID
 markStart = do
   i <- gets index
   modify $ \st -> st { index = succ i, opened = Set.insert i (opened st) }
@@ -63,7 +64,7 @@ markStart = do
 
 -- | Returns the range of some source location.
 --   The range starts from where the ID is retreived, and ends from here
-markEnd :: ID -> PosLog token Loc
+markEnd :: ID -> M Loc
 markEnd i = do
   end       <- getCurrentLoc
   loggedPos <- gets logged
@@ -74,7 +75,7 @@ markEnd i = do
   return loc
 
 -- | Updates the current source location
-updateLoc :: Loc -> PosLog token ()
+updateLoc :: Loc -> M ()
 updateLoc loc = do
   set <- gets opened
   let addedLoc = Map.fromSet (const loc) set
@@ -84,36 +85,34 @@ updateLoc loc = do
                      }
 
 -- | Updates the latest scanned token
-updateToken :: token -> PosLog token ()
+updateToken :: Tok -> M ()
 updateToken tok = modify $ \st -> st { lastToken = Just tok }
 
 --------------------------------------------------------------------------------
 -- | Helper functions
 
-type P token = ParsecT Void (TokenStream (L token)) (PosLog token)
+type Parser = ParsecT Void TokStream M
 
--- Augment a parser with Loc
-getLoc :: (Ord tok, Show tok, PrettyToken tok) => P tok a -> P tok (a, Loc)
+getLoc :: Parser a -> Parser (a, Loc)
 getLoc parser = do
   i      <- lift markStart
   result <- parser
   loc    <- lift (markEnd i)
   return (result, loc)
 
-getRange :: (Ord tok, Show tok, PrettyToken tok) => P tok a -> P tok (a, Range)
+getRange :: Parser a -> Parser (a, Range)
 getRange parser = do
   (result, loc) <- getLoc parser
   case loc of
     NoLoc         -> error "NoLoc when getting srcloc info from a token"
     Loc start end -> return (result, Range start end)
 
-withLoc :: (Ord tok, Show tok, PrettyToken tok) => P tok (Loc -> a) -> P tok a
+withLoc :: Parser (Loc -> a) -> Parser a
 withLoc parser = do
   (result, loc) <- getLoc parser
   return $ result loc
 
-withRange
-  :: (Ord tok, Show tok, PrettyToken tok) => P tok (Range -> a) -> P tok a
+withRange :: Parser (Range -> a) -> Parser a
 withRange parser = do
   (result, range) <- getRange parser
   return $ result range
@@ -122,41 +121,31 @@ withRange parser = do
 -- | Combinators
 
 -- Create a parser of some symbol (while respecting source locations)
-symbol :: (Eq tok, Ord tok, Show tok, PrettyToken tok) => tok -> P tok ()
+symbol :: Tok -> Parser Loc 
 symbol t = do
   L loc tok <- satisfy (\(L _ t') -> t == t')
   lift $ do
     updateLoc loc
     updateToken tok
-  return ()
-
--- Create a parser of some symbol (while respecting source locations)
-symbol' :: (Eq tok, Ord tok, Show tok, PrettyToken tok) => tok -> P tok Loc
-symbol' t = do
-  L loc tok <- satisfy (\(L _ t') -> t == t')
-  lift $ do
-    updateLoc loc
-    updateToken tok
-  return loc
+  return loc 
 
 -- Create a parser of some symbol, that doesn't update source locations
 -- effectively excluding it from source location tracking
-ignore :: (Eq tok, Ord tok, Show tok, PrettyToken tok) => tok -> P tok ()
+ignore :: Tok -> Parser ()
 ignore t = do
   L _ tok <- satisfy ((==) t . unLoc)
   lift $ updateToken tok
   return ()
 
 -- The predicate version of `ignore`
-ignoreP
-  :: (Eq tok, Ord tok, Show tok, PrettyToken tok) => (tok -> Bool) -> P tok ()
+ignoreP :: (Tok -> Bool) -> Parser ()
 ignoreP p = do
   L _ tok <- satisfy (p . unLoc)
   lift $ updateToken tok
   return ()
 
 -- Useful for extracting values from a Token 
-extract :: (Ord tok, Show tok, PrettyToken tok) => (tok -> Maybe a) -> P tok a
+extract :: (Tok -> Maybe a) -> Parser a
 extract f = do
   (result, tok, loc) <- token p Set.empty
   lift $ do
