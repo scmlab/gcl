@@ -10,7 +10,8 @@ import qualified Data.Map                      as Map
 import           Data.Map                       ( Map )
 import           Data.Text                      ( Text )
 import           Error                          ( Error(..) )
-import           GCL.Type                       ( InferType(..)
+import           GCL.Type                       ( Index(..)
+                                                , InferType(..)
                                                 , ScopeTree(..)
                                                 , ScopeTreeZipper(..)
                                                 , TypeCheckable(..)
@@ -18,7 +19,6 @@ import           GCL.Type                       ( InferType(..)
                                                 , TypeInfo(..)
                                                 , runInferType
                                                 , runTypeCheck
-                                                , Index(..)
                                                 )
 import           Pretty                         ( Pretty(pretty)
                                                 , hsep
@@ -27,19 +27,14 @@ import           Pretty                         ( Pretty(pretty)
                                                 , toText
                                                 , vsep
                                                 )
-import qualified Server.IntervalMap               as IntervalMap
+import qualified Server.IntervalMap            as IntervalMap
 import           Syntax.Abstract
 import           Syntax.Common                  ( Name(Name)
                                                 , Op
                                                 )
 import           Syntax.Concrete                ( ToAbstract(toAbstract) )
-import           Syntax.Parser                  ( Parser
-                                                , pExpr
-                                                , pProgram
-                                                , pStmts
-                                                , pType
-                                                , runParse
-                                                )
+import           Syntax.Parser2                 ( Parser )
+import qualified Syntax.Parser2                as Parser
 import           Test.Tasty                     ( TestTree
                                                 , testGroup
                                                 )
@@ -47,9 +42,7 @@ import           Test.Tasty.HUnit               ( (@?=)
                                                 , Assertion
                                                 , testCase
                                                 )
-import           Test.Util                      ( parseTest
-                                                , runGoldenTest
-                                                )
+import           Test.Util                      ( runGoldenTest )
 
 tests :: TestTree
 tests = testGroup
@@ -262,9 +255,9 @@ typeCheckFile dirName =
                 ".tc"
     $ \filepath source -> do
 
-        let result = case runParse pProgram filepath source of
-              Left  errors -> Left (map SyntacticError errors)
-              Right ast    -> case runExcept (toAbstract ast) of
+        let result = case Parser.scanAndParse Parser.program filepath source of
+              Left  err -> Left [ParseError err]
+              Right ast -> case runExcept (toAbstract ast) of
                 Left  _    -> Left [Others "Should dig hole"]
                 Right prog -> case runTypeCheck prog of
                   Left  errors -> Left [TypeError errors]
@@ -274,9 +267,9 @@ typeCheckFile dirName =
 fileCheck :: (FilePath, Text) -> Text
 fileCheck (filepath, source) = toText result
  where
-  result = case runParse pProgram filepath source of
-    Left  errors -> Left (map SyntacticError errors)
-    Right ast    -> case runExcept (toAbstract ast) of
+  result = case Parser.scanAndParse Parser.program filepath source of
+    Left  err -> Left [ParseError err]
+    Right ast -> case runExcept (toAbstract ast) of
       Left  _    -> Left [Others "Should dig hole"]
       Right prog -> case runTypeCheck prog of
         Left  errors -> Left [TypeError errors]
@@ -360,10 +353,11 @@ env = Map.fromList
   ]
 
 runParser :: ToAbstract a b => Parser a -> Text -> Either [Error] b
-runParser p t = case runExcept . toAbstract <$> parseTest p t of
-  Left  errs         -> Left $ map SyntacticError errs
-  Right (Left  loc ) -> Left [Others (show loc)]
-  Right (Right expr) -> Right expr
+runParser p t =
+  case runExcept . toAbstract <$> Parser.scanAndParse p "<test>" t of
+    Left  err          -> Left [ParseError err]
+    Right (Left  loc ) -> Left [Others (show loc)]
+    Right (Right expr) -> Right expr
 
 check :: TypeCheckable a => Map Index TypeInfo -> a -> Either [Error] ()
 check env' e =
@@ -396,31 +390,35 @@ inferCheck env' e =
       Right x   -> Right (snd x)
 
 exprCheck :: Text -> Text -> Assertion
-exprCheck t1 t2 = toText (runParser pExpr t1 >>= inferCheck env) @?= t2
+exprCheck t1 t2 =
+  toText (runParser Parser.expression t1 >>= inferCheck env) @?= t2
 
 typeCheckAssert :: Text -> Text -> Assertion
-typeCheckAssert t1 t2 = toText (runParser pType t1 >>= check env) @?= t2
+typeCheckAssert t1 t2 = toText (runParser Parser.type' t1 >>= check env) @?= t2
 
 typeCheck' :: Text -> Assertion
 typeCheck' t = typeCheckAssert t "()"
 
 stmtCheck :: Text -> Text -> Assertion
-stmtCheck t1 t2 = toText (runParser pStmts t1 >>= check env) @?= t2
+stmtCheck t1 t2 = toText (runParser Parser.statements t1 >>= check env) @?= t2
 
 stmtCheck' :: Text -> Assertion
 stmtCheck' t = stmtCheck t "()"
 
 declarationCheck :: Text -> Text -> Assertion
-declarationCheck t1 t2 = toText (runParser pProgram t1 >>= check mempty) @?= t2
+declarationCheck t1 t2 =
+  toText (runParser Parser.program t1 >>= check mempty) @?= t2
 
 envCheck :: Text -> Assertion
 envCheck t = toText env @?= t
 
 definitionCheck :: Text -> Text -> Assertion
-definitionCheck t1 t2 = toText (runParser pProgram t1 >>= check mempty) @?= t2
+definitionCheck t1 t2 =
+  toText (runParser Parser.program t1 >>= check mempty) @?= t2
 
 programCheck :: Text -> Assertion
-programCheck t1 = toText (runParser pProgram t1 >>= check mempty) @?= "()"
+programCheck t1 =
+  toText (runParser Parser.program t1 >>= check mempty) @?= "()"
 
 instance (Pretty a, Pretty b) => Pretty (Map a b) where
   pretty m = "[" <> hsep (punctuate "," (map pretty (Map.toList m))) <> "]"
@@ -443,5 +441,5 @@ instance Pretty a => Pretty (ScopeTreeZipper a) where
   pretty ScopeTreeZipper {..} = "Cursor " <> pretty cursor
 
 instance Pretty Index where
-  pretty (Index n) = pretty n
-  pretty (Hole rng) = pretty rng
+  pretty (Index n  ) = pretty n
+  pretty (Hole  rng) = pretty rng

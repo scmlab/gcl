@@ -2,12 +2,10 @@
 
 module Test.Parser where
 import           Data.Text                      ( Text )
-import qualified Data.Text                     as Text
 import           Data.Text.Prettyprint.Doc      ( Pretty )
 import           Pretty                         ( toByteString
                                                 , toText
                                                 )
-import           Syntax.Parser
 import           Test.Tasty                     ( TestTree
                                                 , testGroup
                                                 )
@@ -15,10 +13,11 @@ import           Test.Tasty.HUnit               ( (@?=)
                                                 , Assertion
                                                 , testCase
                                                 )
-import           Test.Util                      ( parseTest
-                                                , removeTrailingWhitespace
+import           Test.Util                      ( removeTrailingWhitespace
                                                 , runGoldenTest
                                                 )
+import Syntax.Parser2 (Parser)
+import qualified Syntax.Parser2 as Parser
 
 tests :: TestTree
 tests = testGroup
@@ -121,7 +120,7 @@ expression = testGroup
         \    Just y -> 0\n\
         \    Nothing -> 1"
   ]
-  where run = parserIso pExpr
+  where run = parserIso Parser.expression
 
 
 --------------------------------------------------------------------------------
@@ -137,7 +136,7 @@ pattern' = testGroup
   , testCase "pattern (parenthesis 2)" $ run "(a)"
   , testCase "pattern (parenthesis 3)" $ run "(Just (Just a))"
   ]
-  where run = parserIso pPattern
+  where run = parserIso Parser.pattern' 
 
 --------------------------------------------------------------------------------
 
@@ -162,7 +161,7 @@ type' = testGroup
   , testCase "array 3" $ run "array [  0 .. N  ] of     Int"
   , testCase "type decl" $ run "List a"
   ]
-  where run = parserIso pType
+  where run = parserIso Parser.type' 
 
 --------------------------------------------------------------------------------
 -- | Definition
@@ -220,7 +219,7 @@ definition = testGroup
         \  A : Int\n\
         \:}"
   ]
-  where run = parserIso pDefinitionBlock
+  where run = parserIso Parser.definitionBlock 
 
 --------------------------------------------------------------------------------
 
@@ -244,7 +243,7 @@ declaration = testGroup
   , testCase "constant keyword collision 3" $ run "con Intt : Int"
   , testCase "constant keyword collision 4" $ run "con Boola : Int"
   ]
-  where run = parserIso pDeclaration
+  where run = parserIso Parser.declaration 
 
 --------------------------------------------------------------------------------
 
@@ -277,7 +276,7 @@ statement = testGroup
   , testCase "block 1" $ run "|[]|"
   , testCase "block 2" $ run "|[ x := y ]|"
   ]
-  where run = parserIso pStmt
+  where run = parserIso Parser.statement 
 
 --------------------------------------------------------------------------------
 
@@ -293,9 +292,9 @@ parseError = testGroup
     "[(<test>:1:5, unexpected \"+) i \" expecting expression )]\n"
   ]
  where
-  runDeclaration = parserCompare pDeclaration
+  runDeclaration = parserCompare Parser.declaration  
   -- runType        = parserCompare pType
-  runExpr        = parserCompare pExpr
+  runExpr        = parserCompare Parser.expression 
 
 
 --------------------------------------------------------------------------------
@@ -325,15 +324,11 @@ parserGolden dirName =
                 ("./test/golden/" <> dirName)
                 ".ast"
     $ \sourcePath source -> do
-        return $ toByteString $ runParse pProgram sourcePath source
-
-parserShow :: Show a => Parser a -> Text -> Text -> Assertion
-parserShow parser actual expected =
-  (Text.pack . show . parseTest parser) actual @?= expected
+        return $ toByteString $ Parser.scanAndParse Parser.program sourcePath source
 
 parserCompare :: Pretty a => Parser a -> Text -> Text -> Assertion
 parserCompare parser actual expected =
-  (removeTrailingWhitespace . toText . parseTest parser) actual
+  (removeTrailingWhitespace . toText . Parser.scanAndParse parser "<test>") actual
     @?= removeTrailingWhitespace expected
 
 parserIso :: Pretty a => Parser a -> Text -> Assertion

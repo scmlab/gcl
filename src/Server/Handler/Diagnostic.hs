@@ -17,12 +17,15 @@ import           GCL.Type                       ( TypeError(..) )
 import           GCL.WP.Type                    ( StructError(..)
                                                 , StructWarning(..)
                                                 )
-import           Language.LSP.Types      hiding ( Range
+import           Language.LSP.Types      hiding ( ParseError
+                                                , Range
                                                 , TextDocumentSyncClientCapabilities(..)
                                                 , line
                                                 )
 import           Pretty
 import qualified Server.SrcLoc                 as SrcLoc
+import           Syntax.Parser2                as Parser
+                                                ( ParseError(..) )
 
 instance Collect StructError Diagnostic where
   collect (MissingAssertion loc) = makeError
@@ -37,11 +40,16 @@ instance Collect StructError Diagnostic where
     makeError loc "Assignment to Multi-Dimensional Array" "Not implemented yet"
 
 instance Collect Error Diagnostic where
-  collect (SyntacticError (pos, msg)) =
-    makeError (Loc pos pos) "Syntax error" (Text.pack msg)
+  collect (ParseError  err) = collect err
   collect (StructError err) = collect err
   collect (TypeError   err) = collect err
   collect _                 = []
+
+instance Collect Parser.ParseError Diagnostic where
+  collect (LexicalError pos) = makeError (Loc pos pos) "Lexical error" mempty
+  collect (SyntacticError pairs) = concatMap
+    (\(loc, msg) -> makeError loc "Syntactic error" (Text.pack msg))
+    pairs
 
 instance Collect TypeError Diagnostic where
   collect (NotInScope name) =

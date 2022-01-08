@@ -1,11 +1,25 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module Syntax.Parser2 where
+module Syntax.Parser2 where 
+-- module Syntax.Parser2
+--   ( Parser
+--   , ParseError(..)
+--   , scan
+--   , scanAndParse
+--   , program
+--   , expression
+--   , pattern'
+--   , type'
+--   , definitionBlock
+--   , statements
+--   , statements1
+--   ) where
 
-import           Control.Monad                  ( void )
 import           Control.Monad.Combinators.Expr
-import           Control.Monad.State            ( lift )
+import           Control.Monad.Except
+import           Data.List.NonEmpty             ( NonEmpty )
+import qualified Data.List.NonEmpty            as NonEmpty
 import           Data.Loc
 import           Data.Loc.Range
 import           Data.Text                      ( Text )
@@ -33,6 +47,7 @@ import           Text.Megaparsec         hiding ( ParseError
                                                 , State
                                                 , Token
                                                 , parse
+                                                , tokens
                                                 )
 import qualified Text.Megaparsec               as Mega
 
@@ -41,27 +56,49 @@ import qualified Text.Megaparsec               as Mega
 -- | States for source location bookkeeping
 type Parser = ParsecT Void TokStream (PosLog Tok)
 
-type SyntacticError = (Loc, String)
+--------------------------------------------------------------------------------
+-- | Error 
 
-parse :: Parser a -> FilePath -> TokStream -> Either [SyntacticError] a
+data ParseError = LexicalError Pos
+                | SyntacticError (NonEmpty (Loc, String))
+                deriving (Eq, Show)
+
+--------------------------------------------------------------------------------
+
+scanAndParse :: Parser a -> FilePath -> Text -> Either ParseError a
+scanAndParse parser filepath source = case scan filepath source of
+  Left  err    -> throwError (LexicalError err)
+  Right tokens -> case parse parser filepath tokens of
+    Left  errors -> throwError (SyntacticError errors)
+    Right val    -> return val
+
+parse :: Parser a -> FilePath -> TokStream -> Either (NonEmpty (Loc, String)) a
 parse parser filepath tokenStream =
   case Util.runPosLog (runParserT parser filepath tokenStream) of
     Left  e -> Left (fromParseErrorBundle e)
     Right x -> Right x
  where
   fromParseErrorBundle
-    :: ShowErrorComponent e => ParseErrorBundle TokStream e -> [SyntacticError]
-  fromParseErrorBundle (ParseErrorBundle errors posState) = snd
-    $ foldr f (posState, []) errors
+    :: ShowErrorComponent e
+    => ParseErrorBundle TokStream e
+    -> NonEmpty (Loc, String)
+  fromParseErrorBundle (ParseErrorBundle errors posState) = snd $ foldr
+    mergeErrors
+    (posState, toError (NonEmpty.head errors) NonEmpty.:| [])
+    errors
    where
-    f
+    toError
+      :: ShowErrorComponent e => Mega.ParseError TokStream e -> (Loc, String)
+    toError err = (getLoc err, parseErrorTextPretty err)
+
+    mergeErrors
       :: ShowErrorComponent e
       => Mega.ParseError TokStream e
-      -> (PosState TokStream, [SyntacticError])
-      -> (PosState TokStream, [SyntacticError])
-    f err (initial, accum) =
+      -> (PosState TokStream, NonEmpty (Loc, String))
+      -> (PosState TokStream, NonEmpty (Loc, String))
+    mergeErrors err (initial, accumErrs) =
       let (_, next) = reachOffset (errorOffset err) initial
-      in  (next, (getLoc err, parseErrorTextPretty err) : accum)
+      in  (next, toError err `NonEmpty.cons` accumErrs)
 
     getLoc :: ShowErrorComponent e => Mega.ParseError TokStream e -> Loc
     -- get the Loc of all unexpected tokens
@@ -71,8 +108,7 @@ parse parser filepath tokenStream =
 program :: Parser Program
 program = do
   skipMany (symbol TokNewline)
-  declOrDefnBlocks <-
-    many declOrDefnBlock
+  declOrDefnBlocks <- many declOrDefnBlock
   skipMany (symbol TokNewline)
   stmts <- many (statement <* choice [symbol TokNewline, eof]) <?> "statements"
   skipMany (symbol TokNewline)
@@ -299,18 +335,6 @@ declType :: Parser Name -> Parser DeclType
 declType name = DeclType <$> declBase name <*> optional declProp
 
 --------------------------------------------------------------------------------
-
--- | Variables and stuff
-
--- separated by commas
-constList :: Parser (SepBy "," Name)
-constList = sepByComma upper <?> "a list of constants separated by commas"
-
--- separated by commas
-variableList :: Parser (SepBy "," Name)
-variableList = sepByComma lower <?> "a list of variables separated by commas"
-
---------------------------------------------------------------------------------
 -- Statement 
 --------------------------------------------------------------------------------
 
@@ -396,9 +420,9 @@ loop = block' Do tokenDo (sepByGuardBar guardedCommand) tokenOd
 conditional :: Parser Stmt
 conditional = block' If tokenIf (sepByGuardBar guardedCommand) tokenFi
 
-guardedCommands :: Parser [GdCmd]
-guardedCommands = sepBy1 guardedCommand $ do
-  symbol TokGuardBar <?> "|"
+-- guardedCommands :: Parser [GdCmd]
+-- guardedCommands = sepBy1 guardedCommand $ do
+--   symbol TokGuardBar <?> "|"
 
 guardedCommand :: Parser GdCmd
 guardedCommand = GdCmd <$> predicate <*> tokenArrow <*> block statements1
@@ -472,10 +496,10 @@ programBlock = Block <$> tokenBlockOpen <*> block program <*> tokenBlockClose
 -- Expression 
 --------------------------------------------------------------------------------
 
-expressions :: Parser [Expr]
-expressions =
-  sepBy1 expression (symbol TokComma)
-    <?> "a list of expressions separated by commas"
+-- expressions :: Parser [Expr]
+-- expressions =
+--   sepBy1 expression (symbol TokComma)
+--     <?> "a list of expressions separated by commas"
 
 predicate :: Parser Expr
 predicate = expression <?> "predicate"
@@ -728,30 +752,16 @@ ignoreIndentations parser = do
   indentationRelated _         = False
 
 -- consumes 1 or more newlines
-expectNewline :: Parser ()
-expectNewline = do
-  -- see if the latest accepcted token is TokNewline
-  t <- lift Util.getLastToken
-  case t of
-    Just TokNewline -> return ()
-    _               -> void $ some (Util.ignore TokNewline)
+-- expectNewline :: Parser ()
+-- expectNewline = do
+--   -- see if the latest accepcted token is TokNewline
+--   t <- lift Util.getLastToken
+--   case t of
+--     Just TokNewline -> return ()
+--     _               -> void $ some (Util.ignore TokNewline)
 
 symbol :: Tok -> Parser ()
 symbol = Util.symbol
-
--- parens :: Parser a -> Parser a
--- parens parser = do
---   (_, start) <- getRange tokenParenOpen
---   result     <- parser
---   (_, end)   <- getRange tokenParenClose
---   return result
-
-braces :: Parser a -> Parser (a, Range)
-braces parser = do
-  (_, start) <- getRange tokenBraceOpen
-  result     <- parser
-  (_, end)   <- getRange tokenBraceClose
-  return (result, start <> end)
 
 upperName :: Parser Text
 upperName = extract p
