@@ -19,7 +19,6 @@ module Syntax.Parser2 where
 import           Control.Monad.Combinators.Expr
 import           Control.Monad.Except
 import           Data.List.NonEmpty             ( NonEmpty )
-import qualified Data.List.NonEmpty            as NonEmpty
 import           Data.Loc
 import           Data.Loc.Range
 import           Data.Text                      ( Text )
@@ -76,24 +75,10 @@ parse parser filepath tokenStream =
     :: ShowErrorComponent e
     => ParseErrorBundle TokStream e
     -> NonEmpty (Loc, String)
-  fromParseErrorBundle (ParseErrorBundle errors posState) = snd $ foldr
-    mergeErrors
-    (posState, toError (NonEmpty.head errors) NonEmpty.:| [])
-    errors
+  fromParseErrorBundle (ParseErrorBundle errors _) = fmap toError errors
    where
-    toError
-      :: ShowErrorComponent e => Mega.ParseError TokStream e -> (Loc, String)
+    toError :: ShowErrorComponent e => Mega.ParseError TokStream e -> (Loc, String)
     toError err = (getLoc' err, parseErrorTextPretty err)
-
-    mergeErrors
-      :: ShowErrorComponent e
-      => Mega.ParseError TokStream e
-      -> (PosState TokStream, NonEmpty (Loc, String))
-      -> (PosState TokStream, NonEmpty (Loc, String))
-    mergeErrors err (initial, accumErrs) =
-      let (_, next) = reachOffset (errorOffset err) initial
-      in  (next, toError err `NonEmpty.cons` accumErrs)
-
     -- get the Loc of all unexpected tokens
     getLoc' :: ShowErrorComponent e => Mega.ParseError TokStream e -> Loc
     getLoc' (TrivialError _ (Just (Tokens xs)) _) = foldMap locOf xs

@@ -3,18 +3,16 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE DefaultSignatures #-}
-{-# LANGUAGE NamedFieldPuns #-}
-{-# LANGUAGE RecordWildCards #-}
 
-
-module Syntax.Parser2.TokenStream where
+module Syntax.Parser2.TokenStream
+  ( PrettyToken(..)
+  ) where
 
 import           Data.List.NonEmpty             ( NonEmpty(..)
                                                 , nonEmpty
                                                 )
 import qualified Data.List.NonEmpty            as NE
 import           Data.Loc
-import qualified Data.Loc                      as Loc
 import           Data.Proxy
 import           Language.Lexer.Applicative
 import           Text.Megaparsec         hiding ( Pos )
@@ -47,9 +45,6 @@ instance Ord tok => Stream (TokenStream (L tok)) where
   take1_     = take1_'
   takeN_     = takeN_'
   takeWhile_ = takeWhile_'
-
-instance (Ord tok, PrettyToken tok) => TraversableStream (TokenStream (L tok)) where
-  reachOffset = reachOffset'
 
 instance (Ord tok, PrettyToken tok) => VisualStream (TokenStream (L tok)) where
   showTokens Proxy = prettyTokens
@@ -88,109 +83,8 @@ takeWhile_' p stream = case take1_' stream of
     then let (xs, rest') = takeWhile_' p rest in (x : xs, rest')
     else ([], stream)
 
-reachOffset'
-  :: PrettyToken tok
-  => Int
-  -> PosState (TokenStream (L tok))
-  -> (Maybe String, PosState (TokenStream (L tok)))
-reachOffset' n posState =
-  case takeN_' (n - pstateOffset posState) (pstateInput posState) of
-    Nothing          -> (Nothing, posState)
-    Just (pre, post) -> (resultLine, posState')
-     where
-      filename :: FilePath
-      filename = sourceName (pstateSourcePos posState)
-
-      currentPos :: Pos
-      currentPos = case post of
-        -- starting position of the first token of `post`
-        TsToken (L (Loc start _) _) _ -> start
-        -- end of stream, use the position of the last token from `pre` instead
-        _                             -> case (length pre, last pre) of
-          (0, _              ) -> Pos filename 1 1 0
-          (i, L NoLoc _      ) -> Pos filename 1 1 i
-          (_, L (Loc _ end) _) -> end
-
-      getLineSpan :: L tok -> Maybe (Int, Int)
-      getLineSpan (L NoLoc           _) = Nothing
-      getLineSpan (L (Loc start end) _) = Just (posLine start, posLine end)
-
-      isSameLineAsCurrentPos :: L tok -> Bool
-      isSameLineAsCurrentPos tok = case getLineSpan tok of
-        Nothing     -> False
-        Just (x, y) -> x <= posLine currentPos && y >= posLine currentPos
-
-      -- focuedTokens :: [L tok]
-      focusedTokens = dropWhile (not . isSameLineAsCurrentPos) pre
-        ++ fst (takeWhile_' isSameLineAsCurrentPos post)
-
-      focusedLines :: [(Int, String)]
-      focusedLines = showTokenLines (NE.fromList focusedTokens)
-      --
-      -- sameLineInPre :: String
-      -- sameLineInPre = case nonEmpty (dropWhile (not . isSameLineAsCurrentPos) pre) of
-      --   Nothing -> ""
-      --   Just xs -> showTokens' xs
-      --
-      --
-      -- sameLineInPost :: String
-      -- sameLineInPost = case nonEmpty (fst $ takeWhile_' isSameLineAsCurrentPos post) of
-      --   Nothing -> ""
-      --   Just xs -> showTokens' xs
-
-      resultLine :: Maybe String
-      resultLine = lookup (posLine currentPos) focusedLines
-
-      -- updated 'PosState'
-      posState'  = PosState { pstateInput      = post
-                            , pstateOffset     = max n (pstateOffset posState)
-                            , pstateSourcePos  = toSourcePos currentPos
-                            , pstateTabWidth   = pstateTabWidth posState
-                            , pstateLinePrefix = pstateLinePrefix posState
-                            }
-
-showTokens' :: PrettyToken tok => NonEmpty (L tok) -> String
-showTokens' = quote . init . unlines . map snd . showTokenLines
- where
-  quote :: String -> String
-  quote s = "\"" <> s <> "\""
-
-reachOffsetNoLine'
-  :: Int -> PosState (TokenStream (L tok)) -> PosState (TokenStream (L tok))
-reachOffsetNoLine' n posState =
-  case takeN_' (n - pstateOffset posState) (pstateInput posState) of
-    Nothing          -> posState
-    Just (pre, post) -> posState'
-     where
-      filename :: FilePath
-      filename = sourceName (pstateSourcePos posState)
-
-      currentPos :: Pos
-      currentPos = case post of
-        -- starting position of the first token of `post`
-        TsToken (L (Loc start _) _) _ -> start
-        -- end of stream, use the position of the last token from `pre` instead
-        _                             -> case (length pre, last pre) of
-          (0, _              ) -> Pos filename 1 1 0
-          (i, L NoLoc _      ) -> Pos filename 1 1 i
-          (_, L (Loc _ end) _) -> end
-
-      -- updated 'PosState'
-      posState' = PosState { pstateInput      = post
-                           , pstateOffset     = max n (pstateOffset posState)
-                           , pstateSourcePos  = toSourcePos currentPos
-                           , pstateTabWidth   = pstateTabWidth posState
-                           , pstateLinePrefix = pstateLinePrefix posState
-                           }
-
 --------------------------------------------------------------------------------
 -- Helpers
-
-toSourcePos :: Pos -> SourcePos
-toSourcePos (Pos filename line column _) =
-  SourcePos filename (mkPos line) (mkPos column)
-
-
 
 -- returns lines + line numbers of the string representation of tokens
 showTokenLines :: PrettyToken tok => NonEmpty (L tok) -> [(Int, String)]
@@ -261,14 +155,3 @@ glue (Chunk start1 body1 end1) (Chunk start2 body2 end2) = Chunk start1
           line'            = replicate colGap ' ' ++ line
           emptyLines       = NE.fromList (replicate (n - 1) "")
       in  body1 <> emptyLines <> (line' :| body2')
-
-posStateToPos :: Stream s => PosState s -> Loc.Pos
-posStateToPos PosState { pstateOffset, pstateSourcePos = SourcePos {..} } =
-  Loc.Pos sourceName (unPos sourceLine) (unPos sourceColumn) pstateOffset
-
-getPos :: (TraversableStream s, MonadParsec e s m) => m Loc.Pos
-getPos = do
-  st@State { stateOffset, statePosState } <- getParserState
-  let pst = reachOffsetNoLine stateOffset statePosState
-  setParserState st { statePosState = pst }
-  return . posStateToPos $ pst
