@@ -6,8 +6,8 @@ module Syntax.Parser2.Util
   , getLastToken
   , getLoc
   , withLoc
-  , getRange 
-  , withRange 
+  , getRange
+  , withRange
   , symbol
   , symbol'
   , ignore
@@ -24,9 +24,7 @@ import           Data.Set                       ( Set )
 import qualified Data.Set                      as Set
 import           Data.Void
 import           Language.Lexer.Applicative     ( TokenStream )
-import           Syntax.Parser2.TokenStream     ( PrettyToken
-                                                , getPos
-                                                )
+import           Syntax.Parser2.TokenStream     ( PrettyToken )
 import           Text.Megaparsec         hiding ( Pos
                                                 , State
                                                 , between
@@ -102,13 +100,12 @@ getLoc parser = do
   loc    <- lift (markEnd i)
   return (result, loc)
 
--- Augment a parser with Range
 getRange :: (Ord tok, Show tok, PrettyToken tok) => P tok a -> P tok (a, Range)
 getRange parser = do
-  start  <- getPos
-  result <- parser
-  end    <- getPos
-  return (result, Range start end)
+  (result, loc) <- getLoc parser
+  case loc of
+    NoLoc         -> error "NoLoc when getting srcloc info from a token"
+    Loc start end -> return (result, Range start end)
 
 withLoc :: (Ord tok, Show tok, PrettyToken tok) => P tok (Loc -> a) -> P tok a
 withLoc parser = do

@@ -23,13 +23,13 @@ tests :: TestTree
 tests = testGroup
   "Parser"
   [ expression
-  -- , pattern'
-  -- , type'
-  -- , definition
-  -- , declaration
-  -- , statement
-  -- , parseError
-  -- , golden
+  , pattern'
+  , type'
+  , definition
+  , declaration
+  , statement
+  , parseError
+  , golden
   ]
 
 --------------------------------------------------------------------------------
@@ -46,9 +46,9 @@ expression = testGroup
   , testCase "variable 2" $ run "Falsee"
   , testCase "constant 1" $ run "(X)"
   , testCase "constant 2" $ run "Intt"
-  -- , testCase "numeric 1" $ run "(1   \n  +  \n  (   \n   1))"
-  -- , testCase "numeric 2" $ run "A + X * Y"
-  -- , testCase "numeric 3" $ run "(A + X) * Y % 2"
+  , testCase "numeric 1" $ run "(1   \n  +  \n  (   \n   1))"
+  , testCase "numeric 2" $ run "A + X * Y"
+  , testCase "numeric 3" $ run "(A + X) * Y % 2"
   -- , testCase "equivalent (EQProp)"
   --   $ run "a + b + c\n\
   --       \≡ a + b + d\n\
@@ -57,68 +57,68 @@ expression = testGroup
   --   $ run "a + b + c\n\
   --       \<=> a + b + d\n\
   --       \<=> a + b * e"
-  -- , testCase "chain op (EQ)" $ run "A = B"
-  -- , testCase "chain op (NEQ)" $ run "A /= B"
-  -- , testCase "chain op (NEQU)" $ run "A ≠ B"
-  -- , testCase "chain op (LT)" $ run "A < B"
-  -- , testCase "chain op (LTE)" $ run "A <= B"
-  -- , testCase "chain op (LTEU)" $ run "A ≤ B"
-  -- , testCase "chain op (GT)" $ run "A > B"
-  -- , testCase "chain op (GTE)" $ run "A >= B"
-  -- , testCase "chain op (GTEU)" $ run "A ≥ B"
-  -- , testCase "arith op (NegNum) 1" $ run "-1"
-  -- , testCase "arith op (NegNum) 2" $ run "-(3 + 5)"
-  -- , testCase "arith op (Conj)" $ run "A && B"
-  -- , testCase "arith op (ConjU)" $ run "A ∧ B"
-  -- , testCase "arith op (Disj)" $ run "A || B"
-  -- , testCase "arith op (DisjU)" $ run "A ∨ B"
-  -- , testCase "arith op (Imply)" $ run "A => B"
-  -- , testCase "arith op (ImplyU)" $ run "A ⇒ B"
-  -- , testCase "arith op (Neg)" $ run "~ A"
-  -- , testCase "arith op (NegU)" $ run "¬ A"
-  -- , testCase "arith op (max)" $ run "A ↑ B"
-  -- , testCase "arith op (min)" $ run "A ↓ B"
-  -- , testCase "arith op (exp)" $ run "A ^ B"
-  -- , testCase "arith op combined 1" $ run "A || B => C"
-  -- , testCase "arith op combined 2" $ run "A || (B => C)"
-  -- , testCase "arith op combined 3" $ run "A || B && C"
-  -- , testCase "arith op combined 4" $ run "B && C || A"
-  -- , testCase "quant 1" $ run "<| + i : i > 0 : f i |>"
-  -- , testCase "quant 2" $ run "⟨     + i :   i > 0   : f i ⟩"
-  -- , testCase "quant 3" $ run "⟨ max i j : 0 ≤ i < j < n : A i - A j ⟩"
-  -- , testCase "quant 4" $ run "<| + i : 0 <= i < k : F i |>"
-  -- , testCase "quant 5" $ run "x = <| + i : 0 <= i < k : F i |>"
-  -- , testCase "quant 6 (sum)" $ run "x = <| + i : 0 < i < n : i |>\n"
-  -- , testCase "quant 7 (pi)" $ run "x = <| * i : 0 < i < n : i |>"
-  -- , testCase "quant 8 (forall)" $ run "x = <| && i : 0 < i < n : i > 0 |>"
-  -- , testCase "quant 9 (exists)" $ run "x = <| || i : 0 < i < n : i > 0 |>"
-  -- , testCase "quant 10 (hash)" $ run "x = <| # i : 0 < i < n : F i > 0 |>"
-  -- , testCase "function application 1" $ run "(f   (  x      )) y"
-  -- , testCase "function application 2" $ run "f (x y)"
-  -- , testCase "array indexing (app)" $ run "A i"
-  -- , testCase "array indexing (bracket) 1 : A[i]" $ run "A[i]"
-  -- , testCase "array indexing (bracket) 2 : A[A[i]]" $ run "A[A[i]]"
-  -- , testCase "array indexing (bracket) 3 : A[i][j]" $ run "A[i][j]"
-  -- , testCase "array indexing (bracket) 4 : (A[i])[j][k]" $ run "(A[i])[j][k]"
-  -- , testCase "array indexing (bracket) 5 : A[i][j][k]" $ run "A[i][j][k]"
-  -- , testCase "mixed 1" $ run "X * Y = N"
-  -- , testCase "mixed 2" $ run "X * Y => P = Q"
-  -- , testCase "mixed 3" $ run "X > Y && X > Y"
-  -- , testCase "mixed 4" $ run "X > (Y) && (X) > Y"
-  -- , testCase "mixed 5" $ run "1 + 2 * (3) - 4"
-  -- , testCase "mixed 6" $ run "1 + 2 * 3 = 4"
-  -- , testCase "mixed 7" $ run "1 > 2 = True"
-  -- , testCase "mixed 8" $ run "(1 + 2) * (3) = (4)"
-  -- , testCase "mixed 9" $ run "3 / (2 + X)"
-  -- , testCase "mixed 10" $ run "3 / 2 + X"
-  -- , testCase "case of 1" $ run "case x of\n\
-  --   \  Nothing -> 0\n"
-  -- , testCase "case of 2" $ run "case x of\n\
-  --   \  Just y -> 0\n"
-  -- , testCase "case of 3"
-  --   $ run "case x of\n\
-  --       \    Just y -> 0\n\
-  --       \    Nothing -> 1"
+  , testCase "chain op (EQ)" $ run "A = B"
+  , testCase "chain op (NEQ)" $ run "A /= B"
+  , testCase "chain op (NEQU)" $ run "A ≠ B"
+  , testCase "chain op (LT)" $ run "A < B"
+  , testCase "chain op (LTE)" $ run "A <= B"
+  , testCase "chain op (LTEU)" $ run "A ≤ B"
+  , testCase "chain op (GT)" $ run "A > B"
+  , testCase "chain op (GTE)" $ run "A >= B"
+  , testCase "chain op (GTEU)" $ run "A ≥ B"
+  , testCase "arith op (NegNum) 1" $ run "-1"
+  , testCase "arith op (NegNum) 2" $ run "-(3 + 5)"
+  , testCase "arith op (Conj)" $ run "A && B"
+  , testCase "arith op (ConjU)" $ run "A ∧ B"
+  , testCase "arith op (Disj)" $ run "A || B"
+  , testCase "arith op (DisjU)" $ run "A ∨ B"
+  , testCase "arith op (Imply)" $ run "A => B"
+  , testCase "arith op (ImplyU)" $ run "A ⇒ B"
+  , testCase "arith op (Neg)" $ run "~ A"
+  , testCase "arith op (NegU)" $ run "¬ A"
+  , testCase "arith op (max)" $ run "A ↑ B"
+  , testCase "arith op (min)" $ run "A ↓ B"
+  , testCase "arith op (exp)" $ run "A ^ B"
+  , testCase "arith op combined 1" $ run "A || B => C"
+  , testCase "arith op combined 2" $ run "A || (B => C)"
+  , testCase "arith op combined 3" $ run "A || B && C"
+  , testCase "arith op combined 4" $ run "B && C || A"
+  , testCase "quant 1" $ run "<| + i : i > 0 : f i |>"
+  , testCase "quant 2" $ run "⟨     + i :   i > 0   : f i ⟩"
+  , testCase "quant 3" $ run "⟨ max i j : 0 ≤ i < j < n : A i - A j ⟩"
+  , testCase "quant 4" $ run "<| + i : 0 <= i < k : F i |>"
+  , testCase "quant 5" $ run "x = <| + i : 0 <= i < k : F i |>"
+  , testCase "quant 6 (sum)" $ run "x = <| + i : 0 < i < n : i |>\n"
+  , testCase "quant 7 (pi)" $ run "x = <| * i : 0 < i < n : i |>"
+  , testCase "quant 8 (forall)" $ run "x = <| && i : 0 < i < n : i > 0 |>"
+  , testCase "quant 9 (exists)" $ run "x = <| || i : 0 < i < n : i > 0 |>"
+  , testCase "quant 10 (hash)" $ run "x = <| # i : 0 < i < n : F i > 0 |>"
+  , testCase "function application 1" $ run "(f   (  x      )) y"
+  , testCase "function application 2" $ run "f (x y)"
+  , testCase "array indexing (app)" $ run "A i"
+  , testCase "array indexing (bracket) 1 : A[i]" $ run "A[i]"
+  , testCase "array indexing (bracket) 2 : A[A[i]]" $ run "A[A[i]]"
+  , testCase "array indexing (bracket) 3 : A[i][j]" $ run "A[i][j]"
+  , testCase "array indexing (bracket) 4 : (A[i])[j][k]" $ run "(A[i])[j][k]"
+  , testCase "array indexing (bracket) 5 : A[i][j][k]" $ run "A[i][j][k]"
+  , testCase "mixed 1" $ run "X * Y = N"
+  , testCase "mixed 2" $ run "X * Y => P = Q"
+  , testCase "mixed 3" $ run "X > Y && X > Y"
+  , testCase "mixed 4" $ run "X > (Y) && (X) > Y"
+  , testCase "mixed 5" $ run "1 + 2 * (3) - 4"
+  , testCase "mixed 6" $ run "1 + 2 * 3 = 4"
+  , testCase "mixed 7" $ run "1 > 2 = True"
+  , testCase "mixed 8" $ run "(1 + 2) * (3) = (4)"
+  , testCase "mixed 9" $ run "3 / (2 + X)"
+  , testCase "mixed 10" $ run "3 / 2 + X"
+  , testCase "case of 1" $ run "case x of\n\
+    \  Nothing -> 0\n"
+  , testCase "case of 2" $ run "case x of\n\
+    \  Just y -> 0\n"
+  , testCase "case of 3"
+    $ run "case x of\n\
+        \    Just y -> 0\n\
+        \    Nothing -> 1"
   ]
   where run = parserIso Parser.expression
 
