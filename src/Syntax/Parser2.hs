@@ -1,7 +1,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module Syntax.Parser2 where 
+module Syntax.Parser2 where
 -- module Syntax.Parser2
 --   ( Parser
 --   , ParseError(..)
@@ -25,6 +25,7 @@ import           Data.Loc.Range
 import           Data.Text                      ( Text )
 import qualified Data.Text                     as Text
 import           Data.Void
+import           Debug.Trace                    ( traceShow )
 import           Prelude                 hiding ( EQ
                                                 , GT
                                                 , LT
@@ -68,7 +69,7 @@ data ParseError = LexicalError Pos
 scanAndParse :: Parser a -> FilePath -> Text -> Either ParseError a
 scanAndParse parser filepath source = case scan filepath source of
   Left  err    -> throwError (LexicalError err)
-  Right tokens -> case parse parser filepath tokens of
+  Right tokens -> traceShow tokens $ case parse parser filepath tokens of
     Left  errors -> throwError (SyntacticError errors)
     Right val    -> return val
 
@@ -641,6 +642,7 @@ literal =
         [ LitBool True <$ symbol TokTrue
         , LitBool False <$ symbol TokFalse
         , LitInt <$> integer
+        , LitChar <$> character
         ]
       )
     <?> "literal"
@@ -794,3 +796,9 @@ integer = extract p <?> "integer"
  where
   p (TokInt s) = Just s
   p _          = Nothing
+
+character :: Parser Char
+character = extract p <?> "character"
+ where
+  p (TokChar c) = Just c
+  p _           = Nothing

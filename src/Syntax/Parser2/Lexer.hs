@@ -151,6 +151,7 @@ data Tok
   | TokUpperName Text
   | TokLowerName Text
   | TokInt Int
+  | TokChar Char
   | TokTrue
   | TokFalse
   deriving (Eq, Ord)
@@ -250,6 +251,7 @@ instance Show Tok where
     TokUpperName s       -> Text.unpack s
     TokLowerName s       -> Text.unpack s
     TokInt       i       -> show i
+    TokChar      c       -> "'" <> show c <> "'"
     TokTrue              -> "True"
     TokFalse             -> "False"
 
@@ -416,10 +418,6 @@ tokRE =
     <$  string "∀"
     <|> TokExist
     <$  string "∃"
-    <|> TokProofAnchor
-    <$> alphaNumRE
-    <|> TokHash
-    <$  string "#"
     <|> TokTrue
     <$  string "True"
     <|> TokFalse
@@ -432,6 +430,12 @@ tokRE =
     <$> lowerNameRE
     <|> TokInt
     <$> intRE
+    <|> TokChar
+    <$> charRE
+    <|> TokProofAnchor
+    <$> alphaNumRE
+    <|> TokHash
+    <$  string "#"
 
 -- starts with uppercase alphabets
 alphaNumRE :: RE Char String
@@ -447,6 +451,9 @@ upperNameRE = (:) <$> psym isUpper <*> many (psym isNameChar)
 
 intRE :: RE Char Int
 intRE = read <$> some (psym isDigit)
+
+charRE :: RE Char Char
+charRE = string "'" *> psym (/= '\'') <* string "'"
 
 -- predicates
 isNewline :: Char -> Bool
