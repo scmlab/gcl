@@ -48,8 +48,8 @@ data ParseError = LexicalError Pos
 scanAndParse :: Parser a -> FilePath -> Text -> Either ParseError a
 scanAndParse parser filepath source = case scan filepath source of
   Left  err    -> throwError (LexicalError err)
+  -- Right tokens -> case parse parser filepath tokens of
   Right tokens -> traceShow tokens $ case parse parser filepath tokens of
-  -- Right tokens -> traceShow tokens $ case parse parser filepath tokens of
     Left  errors -> throwError (SyntacticError errors)
     Right val    -> return val
 
@@ -742,10 +742,10 @@ block' constructor open parser close = do
   _ <- symbol TokIndent <?> "indentation"
   b <- parser
   c <- choice
-    [ do
-          -- the ideal case
+    [ do 
       _ <- symbol TokDedent <?> "dedentation"
       close
+    , close
     , do
           -- the fucked up case:
           --  the tokener is not capable of handling cases like "if True -> skip fi"

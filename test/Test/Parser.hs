@@ -26,8 +26,9 @@ tests = testGroup
   --   expression
   -- , pattern'
   -- , type'
-   definition
-  --  definitionBlock
+  -- , definition
+  -- , 
+  definitionBlock
   -- , declaration
   -- , statement
   -- , parseError
@@ -232,14 +233,14 @@ definitionBlock = testGroup
         \   F a b = a + b\n\
         \   B, C : Int\n\
         \:}"
-  , testCase "definition 7"
-    $ run
-        "{:\n\
-        \  G x = (case x of\n\
-        \       Just y -> y\n\
-        \       Nothing -> 0)\n\
-        \  A : Int\n\
-        \:}"
+  -- , testCase "definition 7"
+  --   $ run
+  --       "{:\n\
+  --       \  G x = (case x of\n\
+  --       \       Just y -> y\n\
+  --       \       Nothing -> 0)\n\
+  --       \  A : Int\n\
+  --       \:}"
   ]
   where run = parserIso Parser.definitionBlock 
 
