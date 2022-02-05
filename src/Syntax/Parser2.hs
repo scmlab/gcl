@@ -392,7 +392,7 @@ conditional = block' If tokenIf (sepByGuardBar guardedCommand) tokenFi
 --   symbol TokGuardBar <?> "|"
 
 guardedCommand :: Parser GdCmd
-guardedCommand = GdCmd <$> predicate <*> tokenArrow <*> block statements1
+guardedCommand = GdCmd <$> predicate <*> tokenArrow <*> blockOf statement
 
 hole :: Parser Stmt
 hole = SpecQM <$> (rangeOf <$> tokenQuestionMark)
@@ -528,10 +528,11 @@ expression = makeExprParser (term <|> caseOf) chainOpTable <?> "expression"
 
   caseOf :: Parser Expr
   caseOf =
-    Case <$> tokenCase <*> expression <*> tokenOf <*> block (many caseClause)
+    Case <$> tokenCase <*> expression <*> tokenOf <*> blockOf caseClause
+
 
   caseClause :: Parser CaseClause
-  caseClause = CaseClause <$> pattern' <*> tokenArrow <*> expression
+  caseClause = CaseClause <$> pattern' <*> tokenArrow <*> block expression
 
   term :: Parser Expr
   term = makeExprParser term' arithTable
@@ -719,6 +720,14 @@ block :: Parser a -> Parser a
 block parser = do
   ignore TokIndent <?> "indentation"
   result <- parser
+  ignore TokDedent <?> "dedentation"
+  return result
+
+-- a block of indented stuff seperated by newlines
+blockOf :: Parser a -> Parser [a]
+blockOf parser = do
+  ignore TokIndent <?> "indentation"
+  result <- sepBy1 parser (symbol TokNewline)
   ignore TokDedent <?> "dedentation"
   return result
 

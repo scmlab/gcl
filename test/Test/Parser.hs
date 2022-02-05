@@ -31,6 +31,7 @@ tests = testGroup
   -- , parseError
   -- , golden
   ]
+  where run = parserIso Parser.expression
 
 --------------------------------------------------------------------------------
 
@@ -49,14 +50,14 @@ expression = testGroup
   , testCase "numeric 1" $ run "(1   \n  +  \n  (   \n   1))"
   , testCase "numeric 2" $ run "A + X * Y"
   , testCase "numeric 3" $ run "(A + X) * Y % 2"
-  -- , testCase "equivalent (EQProp)"
-  --   $ run "a + b + c\n\
-  --       \≡ a + b + d\n\
-  --       \≡ a + b * e"
-  -- , testCase "equivalent (EQPropU)"
-  --   $ run "a + b + c\n\
-  --       \<=> a + b + d\n\
-  --       \<=> a + b * e"
+  , testCase "equivalent (EQProp)"
+    $ run "a + b + c\n\
+        \ ≡ a + b + d\n\
+        \ ≡ a + b * e"
+  , testCase "equivalent (EQPropU)"
+    $ run "a + b + c\n\
+        \ <=> a + b + d\n\
+        \ <=> a + b * e"
   , testCase "chain op (EQ)" $ run "A = B"
   , testCase "chain op (NEQ)" $ run "A /= B"
   , testCase "chain op (NEQU)" $ run "A ≠ B"

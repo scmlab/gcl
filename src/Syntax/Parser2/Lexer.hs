@@ -559,6 +559,7 @@ expectingIndent TokDo     = True
 expectingIndent TokIf     = True
 expectingIndent TokArrow  = True
 expectingIndent TokArrowU = True
+expectingIndent TokOf     = True
 expectingIndent _         = False
 
 expectingDedent :: Tok -> Bool
