@@ -17,7 +17,7 @@
 #
 # resolver: ./custom-snapshot.yaml
 # resolver: https://example.com/snapshots/2018-01-01.yaml
-resolver: lts-16.31
+resolver: lts-18.21
 
 # User packages to be built.
 # Various formats can be used as shown in the example below.
@@ -63,7 +63,7 @@ extra-deps:
   - megaparsec-9.2.0@sha256:0c272aa13b9f663dbd7b74ef81e9b1f9f05cafde50f5362ce87ffd4913046e0b,3213
   - scientific-0.3.7.0@sha256:d7edb4dfb320e7b9cc9d503ca435d22983a236db06c7b4f3e81c099a9fd4cd73,4809
   - primitive-0.7.3.0@sha256:6b28a1c0572f5ca50597ba8388aeade21515842969ae192cdc6bfca81367bf56,2951
-
+  - constraints-0.12@sha256:7edf1e72a92d0a6761da634f08be9123dfcc0dcec11c269cbf465a09721c3481,2322
 # Override default flag values for local packages and extra-deps
 # flags: {}
 

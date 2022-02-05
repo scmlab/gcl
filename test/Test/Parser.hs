@@ -23,13 +23,13 @@ tests :: TestTree
 tests = testGroup
   "Parser"
   [ expression
-  , pattern'
-  , type'
-  , definition
-  , declaration
-  , statement
-  , parseError
-  , golden
+  -- , pattern'
+  -- , type'
+  -- , definition
+  -- , declaration
+  -- , statement
+  -- , parseError
+  -- , golden
   ]
 
 --------------------------------------------------------------------------------

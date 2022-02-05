@@ -595,10 +595,44 @@ expression = makeExprParser (term <|> caseOf) chainOpTable <?> "expression"
   operator = choice [ChainOp <$> chainOp, ArithOp <$> arithOp] <?> "operator"
    where
     chainOp :: Parser ChainOp
-    chainOp = choice []
+    chainOp = choice [
+        EQProp <$> symbol TokEQProp,
+        EQPropU <$> symbol TokEQPropU,
+        EQ <$> symbol TokEQ,
+        NEQ <$> symbol TokNEQ,
+        NEQU <$> symbol TokNEQU,
+        LTE <$> symbol TokLTE,
+        LTEU <$> symbol TokLTEU,
+        GTE <$> symbol TokGTE,
+        GTEU <$> symbol TokGTEU,
+        LT <$> symbol TokLT,
+        GT <$> symbol TokGT
+      ]
 
     arithOp :: Parser ArithOp
-    arithOp = choice []
+    arithOp = choice [
+        Implies <$> symbol TokImpl,
+        ImpliesU <$> symbol TokImplU,
+        Conj <$> symbol TokConj,
+        ConjU <$> symbol TokConjU,
+        Disj <$> symbol TokDisj,
+        DisjU <$> symbol TokDisjU,
+        Neg <$> symbol TokNeg,
+        NegU <$> symbol TokNegU,
+        Add <$> symbol TokAdd,
+        Sub <$> symbol TokSub,
+        Mul <$> symbol TokMul,
+        Div <$> symbol TokDiv,
+        Mod <$> symbol TokMod,
+        Max <$> symbol TokMax,
+        Min <$> symbol TokMin,
+        Exp <$> symbol TokExp,
+        Add <$> symbol TokSum,
+        Mul <$> symbol TokProd,
+        Conj <$> symbol TokForall,
+        Disj <$> symbol TokExist,
+        Hash <$> symbol TokHash
+      ]
 
 -- TODO: LitChar 
 literal :: Parser Lit
