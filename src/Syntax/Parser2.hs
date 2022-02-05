@@ -694,7 +694,7 @@ type' = ignoreIndentations $ do
     -- isBaseType _                     = Nothing
 
   array :: Parser Type
-  array = TArray <$> tokenArray <*> interval <*> tokenOf <*> type'
+  array = TArray <$> tokenArray <*> interval <*> ignoreIndentations tokenOf <*> type'
 
   interval :: Parser Interval
   interval = Interval <$> endpointOpening <*> tokenRange <*> endpointClosing

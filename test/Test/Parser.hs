@@ -23,8 +23,8 @@ tests :: TestTree
 tests = testGroup
   "Parser"
   [ expression
-  -- , pattern'
-  -- , type'
+  , pattern'
+  , type'
   -- , definition
   -- , declaration
   -- , statement
@@ -160,6 +160,8 @@ type' = testGroup
   , testCase "array 1" $ run "array [0 .. N  )   of    Int"
   , testCase "array 2" $ run "array (   0   ..  N   ] of Int"
   , testCase "array 3" $ run "array [  0 .. N  ] of     Int"
+  , testCase "array 4" $ run "array [ \n\
+                             \ 0 .. N  ] of     Int"
   , testCase "type decl" $ run "List a"
   ]
   where run = parserIso Parser.type' 
