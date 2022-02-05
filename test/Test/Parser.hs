@@ -22,16 +22,18 @@ import qualified Syntax.Parser2 as Parser
 tests :: TestTree
 tests = testGroup
   "Parser"
-  [ expression
-  , pattern'
-  , type'
-  -- , definition
+  [ 
+  --   expression
+  -- , pattern'
+  -- , type'
+   definition
+  --  definitionBlock
   -- , declaration
   -- , statement
   -- , parseError
   -- , golden
   ]
-  where run = parserIso Parser.expression
+  where run = parserIso Parser.definition
 
 --------------------------------------------------------------------------------
 
@@ -168,11 +170,28 @@ type' = testGroup
 
 --------------------------------------------------------------------------------
 -- | Definition
+
 definition :: TestTree
 definition = testGroup
   "Definitions"
-  [ testCase "type definition 1" $ run "{:\n data List a = Nil | Con a\n:}"
+  [
+    testCase "type definition 1" $ run "data A = B |\n\
+                                        \        C\n"
+  , testCase "type definition 2" $ run "data A = B\n\
+                                        \       | C\n"
+  , testCase "type definition 3" $ run "data List a = Nil | Con a"
+  , testCase "type definition 4" $ run "data List a = Node \n  (List a)"
+  ]
+  where run = parserIso Parser.definition
+
+definitionBlock :: TestTree
+definitionBlock = testGroup
+  "Definition block"
+  [ testCase "type definition 1" $ run "{:\n\
+                                       \ data List a = Nil | Con a\n\
+                                       \:}"
   , testCase "type definition 2" $ run "{:\n data List a = Node (List a)\n:}"
+  , testCase "type definition 3" $ run "{:\n data A = B\n:}"
   , testCase "definition 1" $ run "{:\n\
         \   A, B : Int\n\
         \:}"

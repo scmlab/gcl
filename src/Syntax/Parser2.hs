@@ -30,6 +30,7 @@ import           Text.Megaparsec         hiding ( ParseError
                                                 , tokens
                                                 )
 import qualified Text.Megaparsec               as Mega
+import           Debug.Trace
 
 --------------------------------------------------------------------------------
 -- | States for source location bookkeeping
@@ -47,7 +48,8 @@ data ParseError = LexicalError Pos
 scanAndParse :: Parser a -> FilePath -> Text -> Either ParseError a
 scanAndParse parser filepath source = case scan filepath source of
   Left  err    -> throwError (LexicalError err)
-  Right tokens -> case parse parser filepath tokens of
+  Right tokens -> traceShow tokens $ case parse parser filepath tokens of
+  -- Right tokens -> traceShow tokens $ case parse parser filepath tokens of
     Left  errors -> throwError (SyntacticError errors)
     Right val    -> return val
 
@@ -277,17 +279,20 @@ definition = choice [try funcDefnSig, typeDefn, funcDefnF]
       <*> identifier
       <*> many identifier
       <*> tokenEQ
-      <*> sepByGuardBar typeDefnCtor
+      <*> sepBy' ordinaryBar typeDefnCtor
 
   typeDefnCtor :: Parser TypeDefnCtor
   typeDefnCtor = TypeDefnCtor <$> identifier <*> many type'
 
 definitionBlock :: Parser DefinitionBlock
-definitionBlock =
-  DefinitionBlock
-    <$> tokenDeclOpen
-    <*> block (many definition)
-    <*> tokenDeclClose
+definitionBlock = block' DefinitionBlock tokenDeclOpen (sepBy1 definition (symbol TokNewline)) tokenDeclClose
+
+-- definitionBlock :: Parser DefinitionBlock
+-- definitionBlock =
+--   DefinitionBlock
+--     <$> tokenDeclOpen
+--     <*> blockOf definition
+--     <*> tokenDeclClose
 
 -- `n : type`
 declBase :: Parser Name -> Parser DeclBase
@@ -751,12 +756,32 @@ block' constructor open parser close = do
     ]
   return $ constructor a b c
 
--- consumes 0 or more newlines/indents/dedents afterwards
+-- consumes 0 or more indents/dedents afterwards
 ignoreIndentations :: Parser a -> Parser a
 ignoreIndentations parser = do
   result <- parser
   void $ many (ignoreP indentationRelated)
   return result
+ where
+  indentationRelated TokIndent = True
+  indentationRelated TokDedent = True
+  indentationRelated _         = False
+
+-- consumes 0 or more indents/dedents before
+ignoreIndentations2 :: Parser a -> Parser a
+ignoreIndentations2 parser = do
+  void $ many (ignoreP indentationRelated)
+  parser
+ where
+  indentationRelated TokIndent = True
+  indentationRelated TokDedent = True
+  indentationRelated _         = False
+
+-- remove TokIndent/TokDedent before TokGuardBar
+ordinaryBar :: Parser (Token "|")
+ordinaryBar = do 
+  void $ many (ignoreP indentationRelated)
+  tokenGuardBar
  where
   indentationRelated TokIndent = True
   indentationRelated TokDedent = True

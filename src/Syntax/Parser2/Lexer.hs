@@ -32,6 +32,8 @@ import qualified Language.Lexer.Applicative    as Lex
 import           Syntax.Concrete                ( Token )
 import           Syntax.Parser2.TokenStream     ( PrettyToken(..) )
 import           Text.Regex.Applicative
+-- import           Debug.Trace
+import qualified Data.Maybe as Maybe 
 
 --------------------------------------------------------------------------------
 
@@ -522,7 +524,7 @@ data PPState = PPState
     ppIndentStack  :: [Int]
   ,
     -- set as the number of indentation after processing tokens like `TokNewlineAndWhitespace`
-    -- the second field is set to True if it's `TokNewlineAndWhitespaceAndBar`
+    -- the second field is set to Just if it's `TokNewlineAndWhitespaceAndBar`
     ppIndentation  :: Maybe (Int, Maybe Loc)
   ,
     -- set to True if expected to be followed by a `TokIndent` (e.g. `TokDo`)
@@ -555,18 +557,20 @@ popStack = modify $ \(PPState xs i b l) -> PPState
   l
 
 expectingIndent :: Tok -> Bool
-expectingIndent TokDo     = True
-expectingIndent TokIf     = True
-expectingIndent TokArrow  = True
-expectingIndent TokArrowU = True
-expectingIndent TokOf     = True
-expectingIndent _         = False
+expectingIndent TokDo       = True
+expectingIndent TokIf       = True
+expectingIndent TokArrow    = True
+expectingIndent TokArrowU   = True
+expectingIndent TokOf       = True
+expectingIndent TokDeclOpen = True
+expectingIndent _           = False
 
 expectingDedent :: Tok -> Bool
-expectingDedent TokOd       = True
-expectingDedent TokFi       = True
-expectingDedent TokGuardBar = True
-expectingDedent _           = False
+expectingDedent TokOd         = True
+expectingDedent TokFi         = True
+expectingDedent TokGuardBar   = True
+expectingDedent TokDeclClose  = True
+expectingDedent _             = False
 
 data Comparison = CmpNoop | CmpIndent Int | CmpNewline (Maybe Loc) | CmpDedent
   deriving (Show)
@@ -587,7 +591,9 @@ compareIndentation = do
         -- the indentation is the same as the current level
         EQ -> CmpNewline hasBar
         -- the indentation is greater than the current level
-        GT -> CmpIndent indentation
+        GT -> if Maybe.isJust hasBar
+              then CmpNewline hasBar 
+              else CmpIndent indentation -- an ordinary bar '|'
     Nothing -> return CmpNoop
 
 data Override = ShouldIndent Int | ShouldDedent | DontCare

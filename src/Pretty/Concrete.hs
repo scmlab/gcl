@@ -177,6 +177,9 @@ instance PrettyWithLoc DefinitionBlock where
   prettyWithLoc (DefinitionBlock l decls r) =
     prettyWithLoc l <> prettyWithLoc decls <> prettyWithLoc r
 
+instance Pretty Definition where
+  pretty = toDoc . prettyWithLoc
+
 instance PrettyWithLoc Definition where
   prettyWithLoc (TypeDefn dat name binders eq qdcons) =
     prettyWithLoc dat

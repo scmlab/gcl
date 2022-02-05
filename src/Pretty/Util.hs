@@ -78,11 +78,10 @@ instance Monoid (DocWithLoc ann) where
   mempty  = Empty
 
 fromDoc :: Loc -> Doc ann -> DocWithLoc ann
-fromDoc NoLoc     _ = Empty
+fromDoc NoLoc     _ = Empty  
 fromDoc (Loc a b) x = DocWithLoc x a b
 
 toDoc :: DocWithLoc ann -> Doc ann
--- toDoc (DocWithLoc d a _) = fillGap (Pos (posFile a) 1 0 0) a <> d
 toDoc (DocWithLoc d _ _) = d
 toDoc Empty              = mempty
 
