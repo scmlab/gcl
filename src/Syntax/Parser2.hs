@@ -198,7 +198,7 @@ tokenRange :: Parser (Token "..")
 tokenRange = adapt TokRange ".."
 
 tokenStar :: Parser (Token "*")
-tokenStar = adapt TokColon "*"
+tokenStar = adapt TokMul "*"
 
 tokenArray :: Parser (Token "array")
 tokenArray = adapt TokArray "reserved word \"array\""
