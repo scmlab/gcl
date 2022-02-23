@@ -11,6 +11,7 @@ import           Data.Loc.Range
 import           Data.Text                      ( Text )
 import qualified Data.Text                     as Text
 import           Data.Void
+import           Language.Lexer.Applicative     ( TokenStream(TsEof, TsToken) )
 import           Prelude                 hiding ( EQ
                                                 , GT
                                                 , LT
@@ -69,6 +70,14 @@ parse parser filepath tokenStream =
     getLoc' :: ShowErrorComponent e => Mega.ParseError TokStream e -> Loc
     getLoc' (TrivialError _ (Just (Tokens xs)) _) = foldMap locOf xs
     getLoc' _ = mempty
+
+parseWithTokList
+  :: Parser a -> FilePath -> [L Tok] -> Either (NonEmpty (Loc, String)) a
+parseWithTokList parser filepath = parse parser filepath . convert
+ where
+  convert :: [L Tok] -> TokStream
+  convert (x : xs) = TsToken x (convert xs)
+  convert []       = TsEof
 
 program :: Parser Program
 program = do
