@@ -2,7 +2,7 @@
 
 module Test.Parser where
 import           Data.Text                      ( Text )
-import           Data.Text.Prettyprint.Doc      ( Pretty )
+import           Prettyprinter      ( Pretty )
 import           Pretty                         ( toByteString
                                                 , toText
                                                 )
@@ -34,7 +34,6 @@ tests = testGroup
   -- , parseError
   -- , golden
   ]
-  where run = parserIso Parser.definition
 
 --------------------------------------------------------------------------------
 

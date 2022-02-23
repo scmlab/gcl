@@ -1,6 +1,6 @@
 module Pretty.Common where
 
-import Data.Text.Prettyprint.Doc (Pretty (pretty))
+import Prettyprinter (Pretty (pretty))
 import Pretty.Util
 import Syntax.Common
 import Prelude hiding (Ordering (..))

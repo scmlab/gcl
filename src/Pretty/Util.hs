@@ -26,8 +26,8 @@ import           Data.Loc
 import           Data.Text                      ( Text )
 import qualified Data.Text                     as Text
 import qualified Data.Text.Encoding            as Text
-import           Data.Text.Prettyprint.Doc
-import qualified Data.Text.Prettyprint.Doc.Render.Text
+import           Prettyprinter
+import qualified Prettyprinter.Render.Text
                                                as Text
 import           Prelude                 hiding ( Ordering(..) )
 import           Render

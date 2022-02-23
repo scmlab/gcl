@@ -1,6 +1,6 @@
 module Pretty.Variadic where
 
-import           Data.Text.Prettyprint.Doc
+import           Prettyprinter
 import           Control.Monad                  ( (>=>) )
 
 data Variadic a b = Expect (a -> Variadic a b) | Complete b

@@ -36,7 +36,7 @@ import           Data.Loc.Range                 ( Range
 import           Data.Map                       ( Map )
 import qualified Data.Map                      as Map
 import           Data.Text                      ( Text )
-import           Data.Text.Prettyprint.Doc
+import           Prettyprinter
 import           Prelude                 hiding ( lookup )
 import           Syntax.Concrete                ( SepBy )
 

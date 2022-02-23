@@ -14,9 +14,9 @@ import qualified Data.Text as Text
 import Data.Text (Text)
 import Data.Loc.Range (fromLoc)
 import Data.Loc (Loc)
-import Data.Text.Prettyprint.Doc (Doc)
-import qualified Data.Text.Prettyprint.Doc.Render.Text as Text
-import qualified Data.Text.Prettyprint.Doc as Doc
+import Prettyprinter (Doc)
+import qualified Prettyprinter.Render.Text as Text
+import qualified Prettyprinter as Doc
 
 --------------------------------------------------------------------------------
 

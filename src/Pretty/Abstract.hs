@@ -3,7 +3,7 @@
 module Pretty.Abstract
   () where
 
-import           Data.Text.Prettyprint.Doc
+import           Prettyprinter
 import           Prelude                 hiding ( Ordering(..) )
 import           Pretty.Common                  ( )
 import           Pretty.Util

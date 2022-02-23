@@ -11,7 +11,7 @@ import           Data.Loc                       ( (<-->)
                                                 , locOf
                                                 )
 import           Data.Loc.Util                  ( translateLoc )
-import           Data.Text.Prettyprint.Doc      ( Pretty(pretty) )
+import           Prettyprinter      ( Pretty(pretty) )
 import           Prelude                 hiding ( Ordering(..) )
 import           Pretty.Common                  ( )
 import           Pretty.Util

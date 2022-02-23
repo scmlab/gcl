@@ -13,8 +13,8 @@ import           Data.List.NonEmpty             ( NonEmpty )
 import qualified Data.List.NonEmpty            as NE
 import           Data.Loc                hiding ( fromLoc )
 import           Data.Maybe                     ( mapMaybe )
-import           Data.Text.Prettyprint.Doc      ( Pretty(pretty) )
 import           GHC.Generics                   ( Generic )
+import           Prettyprinter                  ( Pretty(pretty) )
 
 -- | Represents an interval of two source locations
 --

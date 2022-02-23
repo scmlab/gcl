@@ -5,7 +5,7 @@ module Pretty.Error where
 
 import           Data.Foldable                  ( toList )
 import           Data.Loc
-import           Data.Text.Prettyprint.Doc
+import           Prettyprinter
 import           Error
 import           GCL.Type                       ( TypeError(..) )
 import           GCL.WP.Type                    ( StructError(..)
