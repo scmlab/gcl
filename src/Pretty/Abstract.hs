@@ -3,10 +3,13 @@
 module Pretty.Abstract
   () where
 
-import           Prettyprinter
 import           Prelude                 hiding ( Ordering(..) )
 import           Pretty.Common                  ( )
 import           Pretty.Util
+import           Prettyprinter
+import           Render.Error                   ( )
+import           Render.Predicate               ( )
+import           Render.Syntax.Common           ( )
 import           Syntax.Abstract
 
 --------------------------------------------------------------------------------

@@ -30,7 +30,8 @@ import           Prettyprinter
 import qualified Prettyprinter.Render.Text
                                                as Text
 import           Prelude                 hiding ( Ordering(..) )
-import           Render
+import Render.Class ( RenderSection(renderSection), Render(..) ) 
+-- import           Render
 
 docToText :: Doc ann -> Text
 docToText = Text.renderStrict . layoutPretty defaultLayoutOptions
@@ -105,7 +106,7 @@ fromRenderSection x = pretty (renderSection x)
 
 -- generates newlines and spaces to fill the gap between to Pos
 fillGap :: Pos -> Pos -> Doc ann
-fillGap this next =
+fillGap this next = 
   let lineDiff = posLine next - posLine this
   in  if lineDiff == 0
         then -- on the same line, just pad them with spaces

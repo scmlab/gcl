@@ -7,15 +7,12 @@ module Pretty.Concrete where
 
 -- import Syntax.Parser.Lexer (Tok (..))
 
-import           Data.Loc                       ( (<-->)
-                                                , locOf
-                                                )
-import           Data.Loc.Util                  ( translateLoc )
-import           Prettyprinter      ( Pretty(pretty) )
+import           Data.Loc                       ( locOf )
 import           Prelude                 hiding ( Ordering(..) )
 import           Pretty.Common                  ( )
 import           Pretty.Util
 import           Pretty.Variadic
+import           Prettyprinter                  ( Pretty(pretty) )
 import           Syntax.Common
 import           Syntax.Concrete
 import           Syntax.Parser.Token
@@ -275,9 +272,10 @@ instance PrettyWithLoc Stmt where
   prettyWithLoc (SpecQM l) = fromDoc (locOf l) (pretty tokQM)
   prettyWithLoc (Spec l s r) =
     prettyWithLoc l
-      <> fromDoc
-           (translateLoc 2 0 (locOf l) <--> translateLoc 0 (-2) (locOf r))
-           (pretty s)
+      <> prettyWithLoc (map (fmap show) s)
+        -- fromDoc
+        --    (translateLoc 2 0 (locOf l) <--> translateLoc 0 (-2) (locOf r))
+        --    (pretty s)
       <> prettyWithLoc r
   prettyWithLoc (Proof l anchors r) =
     prettyWithLoc l <> prettyWithLoc anchors <> prettyWithLoc r

@@ -18,10 +18,6 @@ import           Prelude                 hiding ( EQ
                                                 , Ordering
                                                 , lookup
                                                 )
-import           Pretty.Util                    ( docToText
-                                                , prettyWithLoc
-                                                , toDoc
-                                                )
 import           Syntax.Common           hiding ( Fixity(..) )
 import           Syntax.Concrete         hiding ( Op )
 import qualified Syntax.Concrete.Types         as Expr
@@ -412,13 +408,12 @@ hole :: Parser Stmt
 hole = SpecQM <$> (rangeOf <$> tokenQuestionMark)
 
 spec :: Parser Stmt
-spec = Spec <$> tokenSpecOpen <*> specContent <*> tokenSpecClose
+spec =
+  Spec
+    <$> tokenSpecOpen
+    <*> takeWhileP (Just "anything other than '!]'") isTokSpecClose
+    <*> tokenSpecClose
  where
-  specContent :: Parser Text
-  specContent = do
-    tokens <- takeWhileP (Just "anything other than '!]'") isTokSpecClose
-    return $ docToText $ toDoc $ prettyWithLoc $ map (fmap show) tokens
-
   isTokSpecClose :: L Tok -> Bool
   isTokSpecClose (L _ TokSpecClose) = False
   isTokSpecClose _                  = True

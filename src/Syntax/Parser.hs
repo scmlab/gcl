@@ -18,7 +18,6 @@ import           Control.Monad.Combinators.Expr ( Operator(..)
                                                 , makeExprParser
                                                 )
 import           Control.Monad.Trans            ( lift )
-import           Data.Data                      ( Proxy(Proxy) )
 import           Data.Loc.Range                 ( rangeOf )
 import           Data.Maybe                     ( isJust )
 import qualified Data.Ord                      as Ord
@@ -35,7 +34,7 @@ import           Text.Megaparsec                ( (<?>)
                                                 , anySingle
                                                 , manyTill_
                                                 , parse
-                                                , tokensToChunk, TraversableStream
+                                                , TraversableStream
                                                 )
 import           Text.Megaparsec.Char           ( eol )
 import qualified Text.Megaparsec.Char.Lexer    as Lex
@@ -214,8 +213,9 @@ pStmtF =
   pSpecQMF = SpecQM . rangeOf <$> lexQMF
 
   pSpecF   = do
-    (ts, t, te) <- pBlockTextF lexSpecStartF anySingle lexSpecEndF
-    return $ Spec ts  (tokensToChunk (Proxy :: Proxy Text) t) te
+    (ts, _, te) <- pBlockTextF lexSpecStartF anySingle lexSpecEndF
+    return $ Spec ts [] te
+    -- return $ Spec ts  (tokensToChunk (Proxy :: Proxy Text) t) te
 
   pProofAnchorF = uncurry ProofAnchor <$> lexProofAnchorF
 

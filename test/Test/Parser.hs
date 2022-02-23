@@ -287,9 +287,8 @@ statement = testGroup
   , testCase "loop body 1" $ run "do True -> skip od"
   , testCase "loop body 2" $ run "do True    →       skip od"
   , testCase "spec QM" $ run "?"
-  , 
-    testCase "spec 1" $ run "[!!]"
-  -- , testCase "spec 2" $ run "[!\n   !]"
+  , testCase "spec 1" $ run "[!!]"
+  , testCase "spec 2" $ run "[!\n   !]"
   -- , testCase "proof" $ run "{-   -}"
   -- , testCase "alloc 1" $ run "p := new(e1)"
   -- , testCase "alloc 2" $ run "p := new(e1, e2)"
