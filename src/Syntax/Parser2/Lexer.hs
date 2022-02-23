@@ -1,8 +1,5 @@
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE DeriveFunctor #-}
-{-# LANGUAGE DeriveFoldable #-}
--- -- {-# LANGUAGE OverloadedStrings #-}
 
 module Syntax.Parser2.Lexer
   ( scan
@@ -25,29 +22,13 @@ import           Data.Loc
 import           Data.Maybe                     ( fromMaybe )
 import           Data.Text                      ( Text )
 import qualified Data.Text                     as Text
-import           GHC.Base                       ( Symbol )
 import           Language.Lexer.Applicative
                                          hiding ( LexicalError )
 import qualified Language.Lexer.Applicative    as Lex
-import           Syntax.Concrete                ( Token )
 import           Syntax.Parser2.TokenStream     ( PrettyToken(..) )
 import           Text.Regex.Applicative
 -- import           Debug.Trace
 import qualified Data.Maybe as Maybe 
-
---------------------------------------------------------------------------------
-
--- | A non-empty list of stuff seperated by some delimeter
-data SepBy (sep :: Symbol) a = Head a | Delim a (Token sep) (SepBy sep a)
-  deriving (Eq, Show, Functor, Foldable)
-
--- fromSepBy :: SepBy sep a -> [a]
--- fromSepBy (Head a) = [a]
--- fromSepBy (Delim a _ as) = a : fromSepBy as
-
-instance Located a => Located (SepBy sep a) where
-  locOf (Head a      ) = locOf a
-  locOf (Delim a _ as) = a <--> locOf as
 
 --------------------------------------------------------------------------------
 

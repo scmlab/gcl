@@ -38,6 +38,8 @@ type TokQuantEnds = Either (Token "|>") (Token "⟩")
 
 type TokArrows = Either (Token "->") (Token "→")
 
+--------------------------------------------------------------------------------
+
 -- | A non-empty list of stuff seperated by some delimeter
 data SepBy (sep :: Symbol) a = Head a | Delim a (Token sep) (SepBy sep a)
   deriving (Eq, Show, Functor, Foldable)
