@@ -62,7 +62,7 @@ data Stmt
   | LoopInvariant Expr Expr Loc
   | Do [GdCmd] Loc
   | If [GdCmd] Loc
-  | Spec [Stmt] Range
+  | Spec Text Range
   | Proof [ProofAnchor] Loc
     -- pointer operations
   | Alloc   Name [Expr] Loc    --  p := new (e1,e2,..,en)

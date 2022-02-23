@@ -17,9 +17,14 @@ import           Prelude                 hiding ( EQ
                                                 , Ordering
                                                 , lookup
                                                 )
+import           Pretty.Util                    ( docToText
+                                                , prettyWithLoc
+                                                , toDoc
+                                                )
 import           Syntax.Common           hiding ( Fixity(..) )
 import           Syntax.Concrete         hiding ( Op )
 import qualified Syntax.Concrete.Types         as Expr
+import           Syntax.Parser2.Error
 import           Syntax.Parser2.Lexer
 import           Syntax.Parser2.Util     hiding ( Parser )
 import           Text.Megaparsec         hiding ( ParseError
@@ -30,18 +35,10 @@ import           Text.Megaparsec         hiding ( ParseError
                                                 , tokens
                                                 )
 import qualified Text.Megaparsec               as Mega
-import           Debug.Trace
 
 --------------------------------------------------------------------------------
 -- | States for source location bookkeeping
 type Parser = ParsecT Void TokStream M
-
---------------------------------------------------------------------------------
--- | Error 
-
-data ParseError = LexicalError Pos
-                | SyntacticError (NonEmpty (Loc, String))
-                deriving (Eq, Show)
 
 --------------------------------------------------------------------------------
 
@@ -49,7 +46,7 @@ scanAndParse :: Parser a -> FilePath -> Text -> Either ParseError a
 scanAndParse parser filepath source = case scan filepath source of
   Left  err    -> throwError (LexicalError err)
   -- Right tokens -> case parse parser filepath tokens of
-  Right tokens -> traceShow tokens $ case parse parser filepath tokens of
+  Right tokens -> case parse parser filepath tokens of
     Left  errors -> throwError (SyntacticError errors)
     Right val    -> return val
 
@@ -285,7 +282,10 @@ definition = choice [try funcDefnSig, typeDefn, funcDefnF]
   typeDefnCtor = TypeDefnCtor <$> identifier <*> many type'
 
 definitionBlock :: Parser DefinitionBlock
-definitionBlock = block' DefinitionBlock tokenDeclOpen (sepBy1 definition (symbol TokNewline)) tokenDeclClose
+definitionBlock = block' DefinitionBlock
+                         tokenDeclOpen
+                         (sepBy1 definition (symbol TokNewline))
+                         tokenDeclClose
 
 -- definitionBlock :: Parser DefinitionBlock
 -- definitionBlock =
@@ -403,16 +403,12 @@ hole :: Parser Stmt
 hole = SpecQM <$> (rangeOf <$> tokenQuestionMark)
 
 spec :: Parser Stmt
-spec =
-  Spec
-    <$> tokenSpecOpen
-    <*> specContent
-    <*  takeWhileP (Just "anything other than '!}'") isTokSpecClose
-    <*> tokenSpecClose
+spec = Spec <$> tokenSpecOpen <*> specContent <*> tokenSpecClose
  where
-  specContent :: Parser [Stmt]
+  specContent :: Parser Text
   specContent = do
-    many statement <?> "statements"
+    tokens <- takeWhileP (Just "anything other than '!]'") isTokSpecClose
+    return $ docToText $ toDoc $ prettyWithLoc $ map (fmap show) tokens
 
   isTokSpecClose :: L Tok -> Bool
   isTokSpecClose (L _ TokSpecClose) = False
@@ -532,8 +528,7 @@ expression = makeExprParser (term <|> caseOf) chainOpTable <?> "expression"
   parensExpr = Paren <$> tokenParenOpen <*> expression <*> tokenParenClose
 
   caseOf :: Parser Expr
-  caseOf =
-    Case <$> tokenCase <*> expression <*> tokenOf <*> blockOf caseClause
+  caseOf = Case <$> tokenCase <*> expression <*> tokenOf <*> blockOf caseClause
 
 
   caseClause :: Parser CaseClause
@@ -601,43 +596,43 @@ expression = makeExprParser (term <|> caseOf) chainOpTable <?> "expression"
   operator = choice [ChainOp <$> chainOp, ArithOp <$> arithOp] <?> "operator"
    where
     chainOp :: Parser ChainOp
-    chainOp = choice [
-        EQProp <$> symbol TokEQProp,
-        EQPropU <$> symbol TokEQPropU,
-        EQ <$> symbol TokEQ,
-        NEQ <$> symbol TokNEQ,
-        NEQU <$> symbol TokNEQU,
-        LTE <$> symbol TokLTE,
-        LTEU <$> symbol TokLTEU,
-        GTE <$> symbol TokGTE,
-        GTEU <$> symbol TokGTEU,
-        LT <$> symbol TokLT,
-        GT <$> symbol TokGT
+    chainOp = choice
+      [ EQProp <$> symbol TokEQProp
+      , EQPropU <$> symbol TokEQPropU
+      , EQ <$> symbol TokEQ
+      , NEQ <$> symbol TokNEQ
+      , NEQU <$> symbol TokNEQU
+      , LTE <$> symbol TokLTE
+      , LTEU <$> symbol TokLTEU
+      , GTE <$> symbol TokGTE
+      , GTEU <$> symbol TokGTEU
+      , LT <$> symbol TokLT
+      , GT <$> symbol TokGT
       ]
 
     arithOp :: Parser ArithOp
-    arithOp = choice [
-        Implies <$> symbol TokImpl,
-        ImpliesU <$> symbol TokImplU,
-        Conj <$> symbol TokConj,
-        ConjU <$> symbol TokConjU,
-        Disj <$> symbol TokDisj,
-        DisjU <$> symbol TokDisjU,
-        Neg <$> symbol TokNeg,
-        NegU <$> symbol TokNegU,
-        Add <$> symbol TokAdd,
-        Sub <$> symbol TokSub,
-        Mul <$> symbol TokMul,
-        Div <$> symbol TokDiv,
-        Mod <$> symbol TokMod,
-        Max <$> symbol TokMax,
-        Min <$> symbol TokMin,
-        Exp <$> symbol TokExp,
-        Add <$> symbol TokSum,
-        Mul <$> symbol TokProd,
-        Conj <$> symbol TokForall,
-        Disj <$> symbol TokExist,
-        Hash <$> symbol TokHash
+    arithOp = choice
+      [ Implies <$> symbol TokImpl
+      , ImpliesU <$> symbol TokImplU
+      , Conj <$> symbol TokConj
+      , ConjU <$> symbol TokConjU
+      , Disj <$> symbol TokDisj
+      , DisjU <$> symbol TokDisjU
+      , Neg <$> symbol TokNeg
+      , NegU <$> symbol TokNegU
+      , Add <$> symbol TokAdd
+      , Sub <$> symbol TokSub
+      , Mul <$> symbol TokMul
+      , Div <$> symbol TokDiv
+      , Mod <$> symbol TokMod
+      , Max <$> symbol TokMax
+      , Min <$> symbol TokMin
+      , Exp <$> symbol TokExp
+      , Add <$> symbol TokSum
+      , Mul <$> symbol TokProd
+      , Conj <$> symbol TokForall
+      , Disj <$> symbol TokExist
+      , Hash <$> symbol TokHash
       ]
 
 -- TODO: LitChar 
@@ -699,7 +694,8 @@ type' = ignoreIndentations $ do
     -- isBaseType _                     = Nothing
 
   array :: Parser Type
-  array = TArray <$> tokenArray <*> interval <*> ignoreIndentations tokenOf <*> type'
+  array =
+    TArray <$> tokenArray <*> interval <*> ignoreIndentations tokenOf <*> type'
 
   interval :: Parser Interval
   interval = Interval <$> endpointOpening <*> tokenRange <*> endpointClosing
@@ -742,7 +738,7 @@ block' constructor open parser close = do
   _ <- symbol TokIndent <?> "indentation"
   b <- parser
   c <- choice
-    [ do 
+    [ do
       _ <- symbol TokDedent <?> "dedentation"
       close
     , close
@@ -779,7 +775,7 @@ ignoreIndentations2 parser = do
 
 -- remove TokIndent/TokDedent before TokGuardBar
 ordinaryBar :: Parser (Token "|")
-ordinaryBar = do 
+ordinaryBar = do
   void $ many (ignoreP indentationRelated)
   tokenGuardBar
  where

@@ -15,12 +15,11 @@ import           Prelude                 hiding ( Ordering(..) )
 import           Pretty.Abstract                ( )
 import           Pretty.Predicate               ( )
 import           Pretty.Util                    ( )
-import           Syntax.Parser2                 ( ParseError(..) )
+import           Syntax.Parser2.Error           ( ParseError(..) )
 
 -- | Error
 instance Pretty Error where
-  pretty (ParseError err) =
-    "Parse Error" <+> line <> pretty err
+  pretty (ParseError err) = "Parse Error" <+> line <> pretty err
   pretty (TypeError err) =
     "Type Error" <+> pretty (locOf err) <> line <> pretty err
   pretty (StructError err) =

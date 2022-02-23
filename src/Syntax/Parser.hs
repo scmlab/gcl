@@ -214,9 +214,8 @@ pStmtF =
   pSpecQMF = SpecQM . rangeOf <$> lexQMF
 
   pSpecF   = do
-    (ts, _, te) <- pBlockTextF lexSpecStartF anySingle lexSpecEndF
-    return $ Spec ts [] te
-    -- return $ Spec ts  (tokensToChunk (Proxy :: Proxy Text) t) te
+    (ts, t, te) <- pBlockTextF lexSpecStartF anySingle lexSpecEndF
+    return $ Spec ts  (tokensToChunk (Proxy :: Proxy Text) t) te
 
   pProofAnchorF = uncurry ProofAnchor <$> lexProofAnchorF
 

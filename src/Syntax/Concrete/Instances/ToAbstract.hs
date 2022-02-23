@@ -117,7 +117,7 @@ instance ToAbstract Stmt A.Stmt where
     Do _ a _           -> A.Do <$> toAbstract a <*> pure (locOf stmt)
     If _ a _           -> A.If <$> toAbstract a <*> pure (locOf stmt)
     SpecQM l           -> throwError l
-    Spec  l xs       r  -> A.Spec <$> toAbstract xs <*> pure (rangeOf l <> rangeOf r)
+    Spec  l xs       r  -> pure (A.Spec xs (rangeOf l <> rangeOf r))
     Proof _ anchors _  -> A.Proof <$> toAbstract anchors <*> pure (locOf stmt)
     Alloc p _ _ _ es _ -> A.Alloc p <$> toAbstract es <*> pure (locOf stmt)
     HLookup x _ _ e    -> A.HLookup x <$> toAbstract e <*> pure (locOf stmt)

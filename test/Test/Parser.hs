@@ -27,10 +27,10 @@ tests = testGroup
   -- , pattern'
   -- , type'
   -- , definition
-  -- , 
-  definitionBlock
+  -- , definitionBlock
   -- , declaration
-  -- , statement
+  -- , 
+  statement
   -- , parseError
   -- , golden
   ]
@@ -274,7 +274,8 @@ declaration = testGroup
 statement :: TestTree
 statement = testGroup
   "Single statement"
-  [ testCase "abort" $ run "abort"
+  [ 
+    testCase "abort" $ run "abort"
   , testCase "skip" $ run "skip"
   , testCase "assignment" $ run "x := 0"
   , testCase "assignment (parallel)" $ run "x   , y  := 0    ,    1"
@@ -287,17 +288,18 @@ statement = testGroup
   , testCase "loop body 1" $ run "do True -> skip od"
   , testCase "loop body 2" $ run "do True    →       skip od"
   , testCase "spec QM" $ run "?"
-  , testCase "spec 1" $ run "[!!]"
-  , testCase "spec 2" $ run "[!\n   !]"
-  , testCase "proof" $ run "{-   -}"
-  , testCase "alloc 1" $ run "p := new(e1)"
-  , testCase "alloc 2" $ run "p := new(e1, e2)"
-  , testCase "alloc 3" $ run "p := new(e1, e2, e3)"
-  , testCase "hlookup" $ run "x := *e"
-  , testCase "hmutate" $ run "*e1 := e2"
-  , testCase "dispose" $ run "dispose e"
-  , testCase "block 1" $ run "|[]|"
-  , testCase "block 2" $ run "|[ x := y ]|"
+  , 
+    testCase "spec 1" $ run "[!!]"
+  -- , testCase "spec 2" $ run "[!\n   !]"
+  -- , testCase "proof" $ run "{-   -}"
+  -- , testCase "alloc 1" $ run "p := new(e1)"
+  -- , testCase "alloc 2" $ run "p := new(e1, e2)"
+  -- , testCase "alloc 3" $ run "p := new(e1, e2, e3)"
+  -- , testCase "hlookup" $ run "x := *e"
+  -- , testCase "hmutate" $ run "*e1 := e2"
+  -- , testCase "dispose" $ run "dispose e"
+  -- , testCase "block 1" $ run "|[]|"
+  -- , testCase "block 2" $ run "|[ x := y ]|"
   ]
   where run = parserIso Parser.statement 
 

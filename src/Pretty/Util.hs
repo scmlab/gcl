@@ -139,6 +139,10 @@ instance (Pretty a, Pretty b) => Pretty (Either a b) where
 
 instance PrettyWithLoc a => PrettyWithLoc [a] where
   prettyWithLoc = mconcat . map prettyWithLoc
+
+instance (Pretty a) => PrettyWithLoc (L a) where
+  prettyWithLoc (L loc x) = fromDoc loc (pretty x)
+
 --------------------------------------------------------------------------------
 
 -- datatype for printing a list of items vertically without delimiters and enclosings

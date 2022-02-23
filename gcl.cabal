@@ -86,6 +86,7 @@ library
       Syntax.Parser.TokenStream
       Syntax.Parser.Util
       Syntax.Parser2
+      Syntax.Parser2.Error
       Syntax.Parser2.Lexer
       Syntax.Parser2.TokenStream
       Syntax.Parser2.Util
@@ -235,6 +236,7 @@ test-suite gcl-test
       Syntax.Parser.TokenStream
       Syntax.Parser.Util
       Syntax.Parser2
+      Syntax.Parser2.Error
       Syntax.Parser2.Lexer
       Syntax.Parser2.TokenStream
       Syntax.Parser2.Util

@@ -6,7 +6,7 @@ import           GCL.Type                       ( TypeError )
 import           GCL.WP.Type                    ( StructError )
 import           GHC.Generics
 import           Syntax.Common                  ( )
-import           Syntax.Parser2                 ( ParseError )
+import           Syntax.Parser2.Error           ( ParseError )
 
 --------------------------------------------------------------------------------
 

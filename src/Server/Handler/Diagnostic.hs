@@ -24,7 +24,7 @@ import           Language.LSP.Types      hiding ( ParseError
                                                 )
 import           Pretty
 import qualified Server.SrcLoc                 as SrcLoc
-import           Syntax.Parser2                as Parser
+import           Syntax.Parser2.Error          as Parser
                                                 ( ParseError(..) )
 
 instance Collect StructError Diagnostic where
