@@ -296,8 +296,12 @@ statement = testGroup
   , testCase "hlookup" $ run "x := *e"
   , testCase "hmutate" $ run "*e1 := e2"
   , testCase "dispose" $ run "dispose e"
-  -- , testCase "block 1" $ run "|[]|"
-  -- , testCase "block 2" $ run "|[ x := y ]|"
+  , testCase "block empty 1" $ run "|[]|"
+  , testCase "block empty 2" $ run "|[\n]|"
+  , testCase "block empty 3" $ run "|[\n\n]|"
+  , testCase "block inline 1" $ run "|[ x := y ]|"
+  , testCase "block proper 1" $ run "|[\n  x := y\n]|"
+  , testCase "block proper 2" $ run "|[\n  x := y\n\n  x := y\n\n]|"
   ]
   where run = parserIso Parser.statement 
 

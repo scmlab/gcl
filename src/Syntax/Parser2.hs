@@ -85,16 +85,15 @@ program = do
   skipMany (symbol TokNewline)
   return $ Program declOrDefnBlocks stmts
 
- where
-  declOrDefnBlock :: Parser (Either Declaration DefinitionBlock)
-  declOrDefnBlock = do
-    skipMany (symbol TokNewline)
-    result <- choice
-      [ Left <$> declaration <?> "declaration"
-      , Right <$> definitionBlock <?> "definition block"
-      ]
-    choice [void (symbol TokNewline), eof]
-    return result
+declOrDefnBlock :: Parser (Either Declaration DefinitionBlock)
+declOrDefnBlock = do
+  skipMany (symbol TokNewline)
+  result <- choice
+    [ Left <$> declaration <?> "declaration"
+    , Right <$> definitionBlock <?> "definition block"
+    ]
+  choice [void (symbol TokNewline), eof]
+  return result
 
 
 --------------------------------------------------------------------------------
@@ -462,7 +461,22 @@ dispose :: Parser Stmt
 dispose = Dispose <$> tokenDispose <*> expression
 
 programBlock :: Parser Stmt
-programBlock = Block <$> tokenBlockOpen <*> block program <*> tokenBlockClose
+programBlock = do
+  Block
+    <$> tokenBlockOpen
+    <*  many (ignoreP indentationRelated)
+    <*> program'
+    <*  many (ignoreP indentationRelated)
+    <*> tokenBlockClose
+
+ where
+  program' = Program <$> sepBy declOrDefnBlock (symbol TokNewline) <*> sepBy
+    statement
+    (symbol TokNewline)
+
+  indentationRelated TokIndent = True
+  indentationRelated TokDedent = True
+  indentationRelated _         = False
 
 --------------------------------------------------------------------------------
 -- Expression 

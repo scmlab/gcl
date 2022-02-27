@@ -544,6 +544,7 @@ expectingIndent TokArrow    = True
 expectingIndent TokArrowU   = True
 expectingIndent TokOf       = True
 expectingIndent TokDeclOpen = True
+expectingIndent TokBlockOpen = True
 expectingIndent _           = False
 
 expectingDedent :: Tok -> Bool
@@ -551,6 +552,7 @@ expectingDedent TokOd         = True
 expectingDedent TokFi         = True
 expectingDedent TokGuardBar   = True
 expectingDedent TokDeclClose  = True
+expectingDedent TokBlockClose  = True
 expectingDedent _             = False
 
 data Comparison = CmpNoop | CmpIndent Int | CmpNewline (Maybe Loc) | CmpDedent
