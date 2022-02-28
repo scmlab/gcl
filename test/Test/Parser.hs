@@ -2,10 +2,12 @@
 
 module Test.Parser where
 import           Data.Text                      ( Text )
-import           Prettyprinter      ( Pretty )
 import           Pretty                         ( toByteString
                                                 , toText
                                                 )
+import           Prettyprinter                  ( Pretty )
+import           Syntax.Parser2                 ( Parser )
+import qualified Syntax.Parser2                as Parser
 import           Test.Tasty                     ( TestTree
                                                 , testGroup
                                                 )
@@ -16,24 +18,21 @@ import           Test.Tasty.HUnit               ( (@?=)
 import           Test.Util                      ( removeTrailingWhitespace
                                                 , runGoldenTest
                                                 )
-import Syntax.Parser2 (Parser)
-import qualified Syntax.Parser2 as Parser
 
 tests :: TestTree
-tests = testGroup
-  "Parser"
-  [ 
+tests = testGroup "Parser"
+                  [
   --   expression
   -- , pattern'
   -- , type'
   -- , definition
   -- , definitionBlock
   -- , declaration
+  -- , statement
   -- , 
-  statement
-  -- , parseError
+                   parseError
   -- , golden
-  ]
+                             ]
 
 --------------------------------------------------------------------------------
 
@@ -139,7 +138,7 @@ pattern' = testGroup
   , testCase "pattern (parenthesis 2)" $ run "(a)"
   , testCase "pattern (parenthesis 3)" $ run "(Just (Just a))"
   ]
-  where run = parserIso Parser.pattern' 
+  where run = parserIso Parser.pattern'
 
 --------------------------------------------------------------------------------
 
@@ -162,11 +161,12 @@ type' = testGroup
   , testCase "array 1" $ run "array [0 .. N  )   of    Int"
   , testCase "array 2" $ run "array (   0   ..  N   ] of Int"
   , testCase "array 3" $ run "array [  0 .. N  ] of     Int"
-  , testCase "array 4" $ run "array [ \n\
+  , testCase "array 4"
+    $ run "array [ \n\
                              \ 0 .. N  ] of     Int"
   , testCase "type decl" $ run "List a"
   ]
-  where run = parserIso Parser.type' 
+  where run = parserIso Parser.type'
 
 --------------------------------------------------------------------------------
 -- | Definition
@@ -174,10 +174,11 @@ type' = testGroup
 definition :: TestTree
 definition = testGroup
   "Definitions"
-  [
-    testCase "type definition 1" $ run "data A = B |\n\
+  [ testCase "type definition 1"
+    $ run "data A = B |\n\
                                         \        C\n"
-  , testCase "type definition 2" $ run "data A = B\n\
+  , testCase "type definition 2"
+    $ run "data A = B\n\
                                         \       | C\n"
   , testCase "type definition 3" $ run "data List a = Nil | Con a"
   , testCase "type definition 4" $ run "data List a = Node \n  (List a)"
@@ -187,7 +188,9 @@ definition = testGroup
 definitionBlock :: TestTree
 definitionBlock = testGroup
   "Definition block"
-  [ testCase "type definition 1" $ run "{:\n\
+  [ testCase "type definition 1"
+    $ run
+        "{:\n\
                                        \ data List a = Nil | Con a\n\
                                        \:}"
   , testCase "type definition 2" $ run "{:\n data List a = Node (List a)\n:}"
@@ -241,7 +244,7 @@ definitionBlock = testGroup
   --       \  A : Int\n\
   --       \:}"
   ]
-  where run = parserIso Parser.definitionBlock 
+  where run = parserIso Parser.definitionBlock
 
 --------------------------------------------------------------------------------
 
@@ -265,7 +268,7 @@ declaration = testGroup
   , testCase "constant keyword collision 3" $ run "con Intt : Int"
   , testCase "constant keyword collision 4" $ run "con Boola : Int"
   ]
-  where run = parserIso Parser.declaration 
+  where run = parserIso Parser.declaration
 
 --------------------------------------------------------------------------------
 
@@ -273,8 +276,7 @@ declaration = testGroup
 statement :: TestTree
 statement = testGroup
   "Single statement"
-  [ 
-    testCase "abort" $ run "abort"
+  [ testCase "abort" $ run "abort"
   , testCase "skip" $ run "skip"
   , testCase "assignment" $ run "x := 0"
   , testCase "assignment (parallel)" $ run "x   , y  := 0    ,    1"
@@ -303,7 +305,7 @@ statement = testGroup
   , testCase "block proper 1" $ run "|[\n  x := y\n]|"
   , testCase "block proper 2" $ run "|[\n  x := y\n\n  x := y\n\n]|"
   ]
-  where run = parserIso Parser.statement 
+  where run = parserIso Parser.statement
 
 --------------------------------------------------------------------------------
 
@@ -313,15 +315,15 @@ parseError = testGroup
   "Parse error"
   [ testCase "variable keyword collision" $ runDeclaration
     "var if : Int"
-    "[(<test>:1:5, using keyword as variable name )]\n"
+    "Syntactic Error <test>:1:5-6 unexpected 'if'\nexpecting identifier that starts with a lowercase letter\n"
   , testCase "quant with parentheses" $ runExpr
     "<| (+) i : i > 0 : f i |>"
-    "[(<test>:1:5, unexpected \"+) i \" expecting expression )]\n"
+    "Syntactic Error <test>:1:5 unexpected '+'\nexpecting expression\n"
   ]
  where
-  runDeclaration = parserCompare Parser.declaration  
+  runDeclaration = parserCompare Parser.declaration
   -- runType        = parserCompare pType
-  runExpr        = parserCompare Parser.expression 
+  runExpr        = parserCompare Parser.expression
 
 
 --------------------------------------------------------------------------------
@@ -351,11 +353,14 @@ parserGolden dirName =
                 ("./test/golden/" <> dirName)
                 ".ast"
     $ \sourcePath source -> do
-        return $ toByteString $ Parser.scanAndParse Parser.program sourcePath source
+        return $ toByteString $ Parser.scanAndParse Parser.program
+                                                    sourcePath
+                                                    source
 
 parserCompare :: Pretty a => Parser a -> Text -> Text -> Assertion
 parserCompare parser actual expected =
-  (removeTrailingWhitespace . toText . Parser.scanAndParse parser "<test>") actual
+  (removeTrailingWhitespace . toText . Parser.scanAndParse parser "<test>")
+      actual
     @?= removeTrailingWhitespace expected
 
 parserIso :: Pretty a => Parser a -> Text -> Assertion
