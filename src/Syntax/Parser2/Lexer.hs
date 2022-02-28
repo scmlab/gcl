@@ -20,6 +20,8 @@ import           Data.List.NonEmpty             ( NonEmpty(..) )
 import qualified Data.List.NonEmpty            as NE
 import           Data.Loc
 import           Data.Maybe                     ( fromMaybe )
+-- import           Debug.Trace
+import qualified Data.Maybe                    as Maybe
 import           Data.Text                      ( Text )
 import qualified Data.Text                     as Text
 import           Language.Lexer.Applicative
@@ -27,8 +29,6 @@ import           Language.Lexer.Applicative
 import qualified Language.Lexer.Applicative    as Lex
 import           Syntax.Parser2.TokenStream     ( PrettyToken(..) )
 import           Text.Regex.Applicative
--- import           Debug.Trace
-import qualified Data.Maybe as Maybe 
 
 --------------------------------------------------------------------------------
 
@@ -193,8 +193,8 @@ instance Show Tok where
     TokProofClose        -> "-}"
     TokBlockOpen         -> "|["
     TokBlockClose        -> "]|"
-    TokDeclOpen         -> "{:"
-    TokDeclClose        -> ":}"
+    TokDeclOpen          -> "{:"
+    TokDeclClose         -> ":}"
     TokEQ                -> "="
     TokNEQ               -> "/="
     TokNEQU              -> "≠"
@@ -416,13 +416,15 @@ tokRE =
     <|> TokChar
     <$> charRE
     <|> TokProofAnchor
-    <$> alphaNumRE
+    <$> proofAnchorRE
     <|> TokHash
     <$  string "#"
 
+
 -- starts with uppercase alphabets
-alphaNumRE :: RE Char String
-alphaNumRE = (:) <$> psym isAlphaNum <*> many (psym isAlphaNum)
+proofAnchorRE :: RE Char String
+proofAnchorRE =
+  string "#" *> ((:) <$> psym isAlphaNum <*> many (psym isAlphaNum))
 
 -- starts with lowercase alphabets
 lowerNameRE :: RE Char String
@@ -538,21 +540,21 @@ popStack = modify $ \(PPState xs i b l) -> PPState
   l
 
 expectingIndent :: Tok -> Bool
-expectingIndent TokDo       = True
-expectingIndent TokIf       = True
-expectingIndent TokArrow    = True
-expectingIndent TokArrowU   = True
-expectingIndent TokOf       = True
-expectingIndent TokDeclOpen = True
+expectingIndent TokDo        = True
+expectingIndent TokIf        = True
+expectingIndent TokArrow     = True
+expectingIndent TokArrowU    = True
+expectingIndent TokOf        = True
+expectingIndent TokDeclOpen  = True
 expectingIndent TokBlockOpen = True
-expectingIndent _           = False
+expectingIndent _            = False
 
 expectingDedent :: Tok -> Bool
 expectingDedent TokOd         = True
 expectingDedent TokFi         = True
 expectingDedent TokGuardBar   = True
 expectingDedent TokDeclClose  = True
-expectingDedent TokBlockClose  = True
+expectingDedent TokBlockClose = True
 expectingDedent _             = False
 
 data Comparison = CmpNoop | CmpIndent Int | CmpNewline (Maybe Loc) | CmpDedent
@@ -575,8 +577,8 @@ compareIndentation = do
         EQ -> CmpNewline hasBar
         -- the indentation is greater than the current level
         GT -> if Maybe.isJust hasBar
-              then CmpNewline hasBar 
-              else CmpIndent indentation -- an ordinary bar '|'
+          then CmpNewline hasBar
+          else CmpIndent indentation -- an ordinary bar '|'
     Nothing -> return CmpNoop
 
 data Override = ShouldIndent Int | ShouldDedent | DontCare

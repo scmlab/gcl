@@ -11,6 +11,7 @@ import           Data.Loc.Range
 import           Data.Text                      ( Text )
 import qualified Data.Text                     as Text
 import           Data.Void
+import           Debug.Trace
 import           Language.Lexer.Applicative     ( TokenStream(TsEof, TsToken) )
 import           Prelude                 hiding ( EQ
                                                 , GT
@@ -42,8 +43,7 @@ type Parser = ParsecT Void TokStream M
 scanAndParse :: Parser a -> FilePath -> Text -> Either ParseError a
 scanAndParse parser filepath source = case scan filepath source of
   Left  err    -> throwError (LexicalError err)
-  -- Right tokens -> case parse parser filepath tokens of
-  Right tokens -> case parse parser filepath tokens of
+  Right tokens -> traceShow tokens $ case parse parser filepath tokens of
     Left  errors -> throwError (SyntacticError errors)
     Right val    -> return val
 
@@ -75,31 +75,11 @@ parseWithTokList parser filepath = parse parser filepath . convert
   convert (x : xs) = TsToken x (convert xs)
   convert []       = TsEof
 
-program :: Parser Program
-program = do
-  prog <- program'
-
-  -- choice [void (symbol TokNewline), eof]
-
-  return prog
-
-  -- skipMany (symbol TokNewline)
-  -- declOrDefnBlocks <- many declOrDefnBlock
-  -- skipMany (symbol TokNewline)
-  -- stmts <-
-  --   many (statement <* choice [void (symbol TokNewline), eof]) <?> "statements"
-  -- skipMany (symbol TokNewline)
-  -- return $ Program declOrDefnBlocks stmts
-
 declOrDefnBlock :: Parser (Either Declaration DefinitionBlock)
-declOrDefnBlock = do
-  skipMany (symbol TokNewline)
-  result <- choice
-    [ Left <$> declaration <?> "declaration"
-    , Right <$> definitionBlock <?> "definition block"
-    ]
-  choice [void (symbol TokNewline), eof]
-  return result
+declOrDefnBlock = choice
+  [ Left <$> declaration <?> "declaration"
+  , Right <$> definitionBlock <?> "definition block"
+  ]
 
 
 --------------------------------------------------------------------------------
@@ -294,7 +274,7 @@ definition = choice [try funcDefnSig, typeDefn, funcDefnF]
 definitionBlock :: Parser DefinitionBlock
 definitionBlock = block' DefinitionBlock
                          tokenDeclOpen
-                         (sepBy1 definition (symbol TokNewline))
+                         (sepBy1 definition newlines)
                          tokenDeclClose
 
 -- definitionBlock :: Parser DefinitionBlock
@@ -355,11 +335,11 @@ statement =
 
 -- ZERO or more statements
 statements :: Parser [Stmt]
-statements = sepBy statement (symbol TokNewline)
+statements = sepBy statement newlines
 
 -- ONE or more statements
 statements1 :: Parser [Stmt]
-statements1 = sepBy1 statement (symbol TokNewline)
+statements1 = sepBy1 statement newlines
 
 skip :: Parser Stmt
 skip = withRange $ Skip <$ symbol TokSkip
@@ -436,12 +416,12 @@ proofAnchors =
   skipProof :: Parser ()
   skipProof = void $ takeWhileP
     (Just "anything other than '-]' or another proof anchor")
-    isTokProofCloseOrProofAnchor
+    notTokProofCloseOrProofAnchor
 
-  isTokProofCloseOrProofAnchor :: L Tok -> Bool
-  isTokProofCloseOrProofAnchor (L _ TokProofClose     ) = False
-  isTokProofCloseOrProofAnchor (L _ (TokProofAnchor _)) = False
-  isTokProofCloseOrProofAnchor _                        = True
+  notTokProofCloseOrProofAnchor :: L Tok -> Bool
+  notTokProofCloseOrProofAnchor (L _ TokProofClose     ) = False
+  notTokProofCloseOrProofAnchor (L _ (TokProofAnchor _)) = False
+  notTokProofCloseOrProofAnchor _                        = True
 
   extractHash (TokProofAnchor s) = Just (Text.pack s)
   extractHash _                  = Nothing
@@ -467,26 +447,25 @@ dispose :: Parser Stmt
 dispose = Dispose <$> tokenDispose <*> expression
 
 programBlock :: Parser Stmt
-programBlock = do
+programBlock =
   Block
     <$> tokenBlockOpen
     <*  many (ignoreP indentationRelated)
-    <*> program'
+    <*> program
     <*  many (ignoreP indentationRelated)
     <*> tokenBlockClose
-
  where
 
   indentationRelated TokIndent = True
   indentationRelated TokDedent = True
   indentationRelated _         = False
 
-program' :: ParsecT Void TokStream M Program
-program' =
-  Program
-    <$> sepBy declOrDefnBlock (many (symbol TokNewline))
-    <*  many (symbol TokNewline)
-    <*> sepBy statement (many (symbol TokNewline))
+program :: Parser Program
+program =
+  Program <$> many (declOrDefnBlock <* newlines) <*> sepBy statement newlines
+
+newlines :: Parser ()
+newlines = void $ some (symbol TokNewline)
 
 --------------------------------------------------------------------------------
 -- Expression 
@@ -756,7 +735,7 @@ block parser = do
 blockOf :: Parser a -> Parser [a]
 blockOf parser = do
   ignore TokIndent <?> "indentation"
-  result <- sepBy1 parser (many (symbol TokNewline))
+  result <- sepBy1 parser newlines
   ignore TokDedent <?> "dedentation"
   return result
 
@@ -782,7 +761,8 @@ block' constructor open parser close = do
 
 -- consumes 0 or more indents/dedents afterwards
 ignoreIndentations :: Parser a -> Parser a
-ignoreIndentations parser = do
+ignoreIndentations parser = 
+  do
   result <- parser
   void $ many (ignoreP indentationRelated)
   return result

@@ -22,17 +22,18 @@ import           Test.Util                      ( removeTrailingWhitespace
 tests :: TestTree
 tests = testGroup "Parser"
                   [
-  --   expression
+    -- expression
   -- , pattern'
   -- , type'
   -- , definition
   -- , definitionBlock
   -- , declaration
-  -- , statement
+  -- , 
+                   statement
   -- , parseError
   -- , 
-  golden
-                             ]
+  -- golden
+                            ]
 
 --------------------------------------------------------------------------------
 
@@ -301,9 +302,11 @@ statement = testGroup
   , testCase "block empty 1" $ run "|[]|"
   , testCase "block empty 2" $ run "|[\n]|"
   , testCase "block empty 3" $ run "|[\n\n]|"
+  , testCase "block empty 4" $ run "|[\n  \n   ]|\n"
   , testCase "block inline 1" $ run "|[ x := y ]|"
-  , testCase "block proper 1" $ run "|[\n  x := y\n]|"
-  , testCase "block proper 2" $ run "|[\n  x := y\n\n  x := y\n\n]|"
+  , testCase "block inline 2" $ run "|[ var x : Int ]|"
+  , testCase "block proper 2" $ run "|[\n  x := y\n]|"
+  , testCase "block proper 3" $ run "|[\n  x := y\n\n  x := y\n\n]|"
   ]
   where run = parserIso Parser.statement
 
@@ -332,8 +335,8 @@ parseError = testGroup
 golden :: TestTree
 golden = testGroup
   "Program"
-  [ 
-  --   parserGolden ""          "empty"    "empty.gcl"
+  [
+  --    parserGolden ""          "empty"    "empty.gcl"
   -- , parserGolden ""          "2"        "2.gcl"
   -- , parserGolden ""          "comment"  "comment.gcl"
   -- , parserGolden ""          "issue 1"  "issue1.gcl"
@@ -344,9 +347,9 @@ golden = testGroup
   -- , parserGolden ""          "quant 1"  "quant1.gcl"
   -- , parserGolden ""          "spec"     "spec.gcl"
   -- , parserGolden "examples/" "gcd"      "gcd.gcl"
+  -- , parserGolden "examples/" "proof"    "proof.gcl"
   -- , 
-  parserGolden "examples/" "proof"    "proof.gcl"
-  -- , parserGolden "examples/" "block"    "block.gcl"
+  parserGolden "examples/" "block"    "block.gcl"
   ]
 
 parserGolden :: String -> FilePath -> FilePath -> TestTree
