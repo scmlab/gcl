@@ -77,13 +77,19 @@ parseWithTokList parser filepath = parse parser filepath . convert
 
 program :: Parser Program
 program = do
-  skipMany (symbol TokNewline)
-  declOrDefnBlocks <- many declOrDefnBlock
-  skipMany (symbol TokNewline)
-  stmts <-
-    many (statement <* choice [void (symbol TokNewline), eof]) <?> "statements"
-  skipMany (symbol TokNewline)
-  return $ Program declOrDefnBlocks stmts
+  prog <- program'
+
+  -- choice [void (symbol TokNewline), eof]
+
+  return prog
+
+  -- skipMany (symbol TokNewline)
+  -- declOrDefnBlocks <- many declOrDefnBlock
+  -- skipMany (symbol TokNewline)
+  -- stmts <-
+  --   many (statement <* choice [void (symbol TokNewline), eof]) <?> "statements"
+  -- skipMany (symbol TokNewline)
+  -- return $ Program declOrDefnBlocks stmts
 
 declOrDefnBlock :: Parser (Either Declaration DefinitionBlock)
 declOrDefnBlock = do
@@ -410,12 +416,12 @@ spec :: Parser Stmt
 spec =
   Spec
     <$> tokenSpecOpen
-    <*> takeWhileP (Just "anything other than '!]'") isTokSpecClose
+    <*> takeWhileP (Just "anything other than '!]'") notTokSpecClose
     <*> tokenSpecClose
  where
-  isTokSpecClose :: L Tok -> Bool
-  isTokSpecClose (L _ TokSpecClose) = False
-  isTokSpecClose _                  = True
+  notTokSpecClose :: L Tok -> Bool
+  notTokSpecClose (L _ TokSpecClose) = False
+  notTokSpecClose _                  = True
 
 proofAnchors :: Parser Stmt
 proofAnchors =
@@ -470,13 +476,17 @@ programBlock = do
     <*> tokenBlockClose
 
  where
-  program' = Program <$> sepBy declOrDefnBlock (symbol TokNewline) <*> sepBy
-    statement
-    (symbol TokNewline)
 
   indentationRelated TokIndent = True
   indentationRelated TokDedent = True
   indentationRelated _         = False
+
+program' :: ParsecT Void TokStream M Program
+program' =
+  Program
+    <$> sepBy declOrDefnBlock (many (symbol TokNewline))
+    <*  many (symbol TokNewline)
+    <*> sepBy statement (many (symbol TokNewline))
 
 --------------------------------------------------------------------------------
 -- Expression 
@@ -746,7 +756,7 @@ block parser = do
 blockOf :: Parser a -> Parser [a]
 blockOf parser = do
   ignore TokIndent <?> "indentation"
-  result <- sepBy1 parser (symbol TokNewline)
+  result <- sepBy1 parser (many (symbol TokNewline))
   ignore TokDedent <?> "dedentation"
   return result
 

@@ -16,6 +16,7 @@ import           Prettyprinter                  ( Pretty(pretty) )
 import           Syntax.Common
 import           Syntax.Concrete
 import           Syntax.Parser.Token
+import Syntax.Parser2.Lexer (Tok(..))
 
 --------------------------------------------------------------------------------
 
@@ -272,11 +273,17 @@ instance PrettyWithLoc Stmt where
   prettyWithLoc (SpecQM l) = fromDoc (locOf l) (pretty tokQM)
   prettyWithLoc (Spec l s r) =
     prettyWithLoc l
-      <> prettyWithLoc (map (fmap show) s)
-        -- fromDoc
-        --    (translateLoc 2 0 (locOf l) <--> translateLoc 0 (-2) (locOf r))
-        --    (pretty s)
+      <> prettyWithLoc (map (fmap show') s)
       <> prettyWithLoc r
+      where 
+        -- don't show tokens like <newline> or <indent>
+        show' tok = case tok of 
+          TokNewlineAndWhitespace _ -> ""
+          TokNewlineAndWhitespaceAndBar _ -> ""
+          TokIndent            -> ""
+          TokDedent            -> ""
+          TokNewline           -> ""
+          _ -> show tok 
   prettyWithLoc (Proof l anchors r) =
     prettyWithLoc l <> prettyWithLoc anchors <> prettyWithLoc r
   prettyWithLoc (Alloc p a n l es r) =

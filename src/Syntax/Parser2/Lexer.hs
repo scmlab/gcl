@@ -141,12 +141,12 @@ data Tok
 
 instance Show Tok where
   show tok = case tok of
-    TokNewlineAndWhitespace n -> "newline + " ++ show n ++ " whitespaces"
+    TokNewlineAndWhitespace n -> "<newline + " ++ show n ++ " whitespaces>"
     TokNewlineAndWhitespaceAndBar n ->
-      "newline + " ++ show n ++ " whitespaces and a guard bar"
-    TokIndent            -> "indent"
-    TokDedent            -> "dedent"
-    TokNewline           -> "newline"
+      "<newline + " ++ show n ++ " whitespaces and a guard bar>"
+    TokIndent            -> "<indent>"
+    TokDedent            -> "<dedent>"
+    TokNewline           -> "<newline>"
     TokWhitespace        -> " "
     TokEOF               -> ""
     TokLineComment s     -> "-- " ++ Text.unpack s
@@ -177,8 +177,8 @@ instance Show Tok where
     TokColon             -> ":"
     TokSemi              -> ";"
     TokAssign            -> ":="
-    TokSpecOpen          -> "{!"
-    TokSpecClose         -> "!}"
+    TokSpecOpen          -> "[!"
+    TokSpecClose         -> "!]"
     TokParenOpen         -> "("
     TokParenClose        -> ")"
     TokBracketOpen       -> "["

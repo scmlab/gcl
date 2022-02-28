@@ -29,9 +29,9 @@ tests = testGroup "Parser"
   -- , definitionBlock
   -- , declaration
   -- , statement
+  -- , parseError
   -- , 
-                   parseError
-  -- , golden
+  golden
                              ]
 
 --------------------------------------------------------------------------------
@@ -332,19 +332,21 @@ parseError = testGroup
 golden :: TestTree
 golden = testGroup
   "Program"
-  [ parserGolden ""          "empty"    "empty.gcl"
-  , parserGolden ""          "2"        "2.gcl"
-  , parserGolden ""          "comment"  "comment.gcl"
-  , parserGolden ""          "issue 1"  "issue1.gcl"
-  , parserGolden ""          "issue 14" "issue14.gcl"
-  , parserGolden ""          "no-decl"  "no-decl.gcl"
-  , parserGolden ""          "no-stmt"  "no-stmt.gcl"
-  , parserGolden ""          "assign"   "assign.gcl"
-  , parserGolden ""          "quant 1"  "quant1.gcl"
-  , parserGolden ""          "spec"     "spec.gcl"
-  , parserGolden "examples/" "gcd"      "gcd.gcl"
-  , parserGolden "examples/" "proof"    "proof.gcl"
-  , parserGolden "examples/" "block"    "block.gcl"
+  [ 
+  --   parserGolden ""          "empty"    "empty.gcl"
+  -- , parserGolden ""          "2"        "2.gcl"
+  -- , parserGolden ""          "comment"  "comment.gcl"
+  -- , parserGolden ""          "issue 1"  "issue1.gcl"
+  -- , parserGolden ""          "issue 14" "issue14.gcl"
+  -- , parserGolden ""          "no-decl"  "no-decl.gcl"
+  -- , parserGolden ""          "no-stmt"  "no-stmt.gcl"
+  -- , parserGolden ""          "assign"   "assign.gcl"
+  -- , parserGolden ""          "quant 1"  "quant1.gcl"
+  -- , parserGolden ""          "spec"     "spec.gcl"
+  -- , parserGolden "examples/" "gcd"      "gcd.gcl"
+  -- , 
+  parserGolden "examples/" "proof"    "proof.gcl"
+  -- , parserGolden "examples/" "block"    "block.gcl"
   ]
 
 parserGolden :: String -> FilePath -> FilePath -> TestTree
