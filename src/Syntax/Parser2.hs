@@ -5,13 +5,13 @@ module Syntax.Parser2 where
 
 import           Control.Monad.Combinators.Expr
 import           Control.Monad.Except
+import qualified Data.Either                   as Either
 import           Data.List.NonEmpty             ( NonEmpty )
 import           Data.Loc
 import           Data.Loc.Range
 import           Data.Text                      ( Text )
 import qualified Data.Text                     as Text
 import           Data.Void
-import           Debug.Trace
 import           Language.Lexer.Applicative     ( TokenStream(TsEof, TsToken) )
 import           Prelude                 hiding ( EQ
                                                 , GT
@@ -43,13 +43,13 @@ type Parser = ParsecT Void TokStream M
 scanAndParse :: Parser a -> FilePath -> Text -> Either ParseError a
 scanAndParse parser filepath source = case scan filepath source of
   Left  err    -> throwError (LexicalError err)
-  Right tokens -> traceShow tokens $ case parse parser filepath tokens of
+  Right tokens -> case parse parser filepath tokens of
     Left  errors -> throwError (SyntacticError errors)
     Right val    -> return val
 
 parse :: Parser a -> FilePath -> TokStream -> Either (NonEmpty (Loc, String)) a
 parse parser filepath tokenStream =
-  case runM (runParserT (parser <* eof) filepath tokenStream) of
+  case runM (runParserT (parser <* many dedent <* eof) filepath tokenStream) of
     Left  e -> Left (fromParseErrorBundle e)
     Right x -> Right x
  where
@@ -461,24 +461,45 @@ programBlock =
   indentationRelated _         = False
 
 program :: Parser Program
-program = choice
-  [ try
-  $   Program []
-  <$  optional newlines
-  <*> sepBy statement newlines
-  <*  optional newlines
-  , try
-  $   Program
-  <$> sepBy declOrDefnBlock newlines
-  <*  optional dedent
-  <*> pure []
-  , Program
-  <$  optional newlines
-  <*> many (declOrDefnBlock <* newlines)
-  <*  optional newlines
-  <*> sepBy statement newlines
-  <*  optional newlines
-  ]
+program = do
+  void $ optional newlines
+
+
+  mixed <- sepBy (choice [Left <$> declOrDefnBlock, Right <$> statement])
+                 newlines
+
+  -- decls <- sepBy declOrDefnBlock newlines
+
+  -- void $ optional newlines
+
+  -- stmts <- sepBy statement newlines
+
+  let (decls, stmts) = Either.partitionEithers mixed
+
+  void $ optional newlines
+
+  return $ Program decls stmts
+
+
+
+  -- choice
+  -- [ try
+  --  $   Program []
+  -- <$  optional newlines
+  -- <*> sepBy statement newlines
+  -- <*  optional newlines
+  -- , try
+  --  $   Program
+  -- <$> sepBy declOrDefnBlock newlines
+  -- <*  optional dedent
+  -- <*> pure []
+  -- , Program
+  -- <$  optional newlines
+  -- <*> many (declOrDefnBlock <* newlines)
+  -- <*  optional newlines
+  -- <*> sepBy statement newlines
+  -- <*  optional newlines
+  -- ]
 
   -- try $ Program [] <$ optional newlines <*> sepBy statement newlines <* optional newlines
   -- , 
@@ -689,7 +710,7 @@ pattern' = choice
 --------------------------------------------------------------------------------
 
 type' :: Parser Type
-type' = ignoreIndentations $ do
+type' = do
   result <- makeExprParser term table <?> "type"
   void $ many dedent
   return result
@@ -698,14 +719,14 @@ type' = ignoreIndentations $ do
   table = [[InfixR function]]
 
   function :: Parser (Type -> Type -> Type)
-  function = ignoreIndentations $ do
+  function = do
     -- an <indent> will be inserted after an <arrow>
     arrow <- tokenArrow
     indent
     return $ \x y -> TFunc x arrow y
 
   term :: Parser Type
-  term = ignoreIndentations $ do
+  term = do
     parensType <|> array <|> try typeVar <|> typeName <?> "type term"
 
   parensType :: Parser Type
@@ -724,7 +745,7 @@ type' = ignoreIndentations $ do
     TArray
       <$> tokenArray
       <*> interval
-      <*> ignoreIndentations tokenOf
+      <*> tokenOf
       <*  indent
       <*> type'
 
@@ -752,7 +773,7 @@ block :: Parser a -> Parser a
 block parser = do
   ignore TokIndent <?> "indentation"
   result <- parser
-  void $ optional (ignore TokDedent <?> "dedentation 3")
+  void $ optional (ignore TokDedent <?> "dedentation")
   return result
 
 -- a block of indented stuff seperated by newlines
@@ -760,7 +781,7 @@ blockOf :: Parser a -> Parser [a]
 blockOf parser = do
   ignore TokIndent <?> "indentation"
   result <- sepBy1 parser newlines
-  void $ optional (ignore TokDedent <?> "dedentation 2")
+  void $ optional (ignore TokDedent <?> "dedentation")
   return result
 
 block' :: (l -> x -> r -> y) -> Parser l -> Parser x -> Parser r -> Parser y
@@ -770,7 +791,7 @@ block' constructor open parser close = do
   b <- parser
   c <- choice
     [ do
-      _ <- symbol TokDedent <?> "dedentation 1"
+      _ <- symbol TokDedent <?> "dedentation"
       close
     , close
     , do
@@ -782,17 +803,6 @@ block' constructor open parser close = do
       return c
     ]
   return $ constructor a b c
-
--- consumes 0 or more indents/dedents afterwards
-ignoreIndentations :: Parser a -> Parser a
-ignoreIndentations parser = parser
-  -- result <- parser
-  -- void $ many (ignoreP indentationRelated)
-  -- return result
- where
-  indentationRelated TokIndent = True
-  indentationRelated TokDedent = False
-  indentationRelated _         = False
 
 -- remove TokIndent/TokDedent before TokGuardBar
 ordinaryBar :: Parser (Token "|")

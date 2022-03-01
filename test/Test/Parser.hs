@@ -20,19 +20,18 @@ import           Test.Util                      ( removeTrailingWhitespace
                                                 )
 
 tests :: TestTree
-tests = testGroup "Parser"
-                  [
-  --   expression
-  -- , pattern'
-  -- , type'
-  -- , definition
-  -- , definitionBlock
-  -- , declaration
-  -- , 
-  --                  statement
-  -- , parseError
-  -- , 
-                   golden]
+tests = testGroup
+  "Parser"
+  [ expression
+  , pattern'
+  , type'
+  , definition
+  , definitionBlock
+  , declaration
+  , statement
+  , parseError
+  , golden
+  ]
 
 --------------------------------------------------------------------------------
 
@@ -299,14 +298,14 @@ statement = testGroup
   , testCase "hlookup" $ run "x := *e"
   , testCase "hmutate" $ run "*e1 := e2"
   , testCase "dispose" $ run "dispose e"
-  -- , testCase "block empty 1" $ run "|[]|"
-  -- , testCase "block empty 2" $ run "|[\n]|"
-  -- , testCase "block empty 3" $ run "|[\n\n]|"
-  -- , testCase "block empty 4" $ run "|[\n  \n   ]|\n"
-  -- , testCase "block inline 1" $ run "|[ x := y ]|"
-  -- , testCase "block inline 2" $ run "|[ var x : Int ]|"
-  -- , testCase "block proper 2" $ run "|[\n  x := y\n]|"
-  -- , testCase "block proper 3" $ run "|[\n  x := y\n\n  x := y\n\n]|"
+  , testCase "block empty 1" $ run "|[]|"
+  , testCase "block empty 2" $ run "|[\n]|"
+  , testCase "block empty 3" $ run "|[\n\n]|"
+  , testCase "block empty 4" $ run "|[\n  \n   ]|\n"
+  , testCase "block inline 1" $ run "|[ x := y ]|"
+  , testCase "block inline 2" $ run "|[ var x : Int ]|"
+  , testCase "block proper 2" $ run "|[\n  x := y\n]|"
+  , testCase "block proper 3" $ run "|[\n  x := y\n\n  x := y\n\n]|"
   ]
   where run = parserIso Parser.statement
 
@@ -333,25 +332,22 @@ parseError = testGroup
 
 -- | Golden Tests
 golden :: TestTree
-golden = testGroup "Program"
-                   [
-  --   runGolden ""          "empty"    "empty.gcl"
-  -- , runGolden ""          "2"        "2.gcl"
-  -- , runGolden ""          "comment"  "comment.gcl"
-  -- , runGolden ""          "issue 1"  "issue1.gcl"
-  -- , 
-  runGolden ""          "issue 14" "issue14.gcl"
-  -- , 
-  --                   runGolden "" "no-decl" "no-decl.gcl"
-  -- , 
-  -- runGolden ""          "no-stmt"  "no-stmt.gcl"
-  -- , runGolden ""          "assign"   "assign.gcl"
-  -- , runGolden ""          "quant 1"  "quant1.gcl"
-  -- , runGolden ""          "spec"     "spec.gcl"
-  -- , runGolden "examples/" "gcd"      "gcd.gcl"
-  -- , runGolden "examples/" "proof"    "proof.gcl"
+golden = testGroup
+  "Program"
+  [ runGolden ""          "empty"    "empty.gcl"
+  , runGolden ""          "2"        "2.gcl"
+  , runGolden ""          "comment"  "comment.gcl"
+  , runGolden ""          "issue 1"  "issue1.gcl"
+  , runGolden ""          "issue 14" "issue14.gcl"
+  , runGolden ""          "no-decl"  "no-decl.gcl"
+  , runGolden ""          "no-stmt"  "no-stmt.gcl"
+  , runGolden ""          "assign"   "assign.gcl"
+  , runGolden ""          "quant 1"  "quant1.gcl"
+  , runGolden ""          "spec"     "spec.gcl"
+  , runGolden "examples/" "gcd"      "gcd.gcl"
+  , runGolden "examples/" "proof"    "proof.gcl"
   -- , runGolden "examples/" "block"    "block.gcl"
-                                                        ]
+  ]
 
 runGolden :: String -> FilePath -> FilePath -> TestTree
 runGolden dirName =

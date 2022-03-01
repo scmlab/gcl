@@ -65,10 +65,8 @@ data DocWithLoc ann
 
 -- | Appends two DocWithLoc in a srcloc-respecting way
 append :: DocWithLoc ann -> DocWithLoc ann -> DocWithLoc ann
-append Empty Empty = Empty
-append Empty (DocWithLoc y c d) =
-  let start = Pos (posFile c) 1 1 0
-  in  DocWithLoc (fillGap start c <> y) start d
+append Empty              Empty              = Empty
+append Empty              (DocWithLoc y c d) = DocWithLoc y c d
 append (DocWithLoc x a b) Empty              = DocWithLoc x a b
 append (DocWithLoc x a b) (DocWithLoc y c d) = if c >= b
   then DocWithLoc (x <> fillGap b c <> y) a d
@@ -85,9 +83,11 @@ fromDoc :: Loc -> Doc ann -> DocWithLoc ann
 fromDoc NoLoc     _ = Empty
 fromDoc (Loc a b) x = DocWithLoc x a b
 
+-- fill the spaces in front before converting to `Doc` 
 toDoc :: DocWithLoc ann -> Doc ann
-toDoc (DocWithLoc d _ _) = d
-toDoc Empty              = mempty
+toDoc (DocWithLoc d x _) =
+  let start = Pos (posFile x) 1 1 0 in fillGap start x <> d
+toDoc Empty = mempty
 
 -- | If something can be rendered, then make it a Doc
 fromRender :: Render a => a -> Doc ann
