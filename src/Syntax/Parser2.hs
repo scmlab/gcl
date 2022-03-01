@@ -49,7 +49,7 @@ scanAndParse parser filepath source = case scan filepath source of
 
 parse :: Parser a -> FilePath -> TokStream -> Either (NonEmpty (Loc, String)) a
 parse parser filepath tokenStream =
-  case runM (runParserT parser filepath tokenStream) of
+  case runM (runParserT (parser <* eof) filepath tokenStream) of
     Left  e -> Left (fromParseErrorBundle e)
     Right x -> Right x
  where
@@ -461,20 +461,40 @@ programBlock =
   indentationRelated _         = False
 
 program :: Parser Program
-program =
-  Program <$> many (declOrDefnBlock <* newlines) <*> sepBy statement newlines
+program = choice
+  [ try
+  $   Program []
+  <$  optional newlines
+  <*> sepBy statement newlines
+  <*  optional newlines
+  , try
+  $   Program
+  <$> sepBy declOrDefnBlock newlines
+  <*  optional dedent
+  <*> pure []
+  , Program
+  <$  optional newlines
+  <*> many (declOrDefnBlock <* newlines)
+  <*  optional newlines
+  <*> sepBy statement newlines
+  <*  optional newlines
+  ]
+
+  -- try $ Program [] <$ optional newlines <*> sepBy statement newlines <* optional newlines
+  -- , 
 
 newlines :: Parser ()
 newlines = void $ some (symbol TokNewline)
 
+dedent :: Parser ()
+dedent = void $ symbol TokDedent
+
+indent :: Parser ()
+indent = void $ symbol TokIndent
+
 --------------------------------------------------------------------------------
 -- Expression 
 --------------------------------------------------------------------------------
-
--- expressions :: Parser [Expr]
--- expressions =
---   sepBy1 expression (symbol TokComma)
---     <?> "a list of expressions separated by commas"
 
 predicate :: Parser Expr
 predicate = expression <?> "predicate"
@@ -670,14 +690,18 @@ pattern' = choice
 
 type' :: Parser Type
 type' = ignoreIndentations $ do
-  makeExprParser term table <?> "type"
+  result <- makeExprParser term table <?> "type"
+  void $ many dedent
+  return result
  where
   table :: [[Operator Parser Type]]
   table = [[InfixR function]]
 
   function :: Parser (Type -> Type -> Type)
   function = ignoreIndentations $ do
+    -- an <indent> will be inserted after an <arrow>
     arrow <- tokenArrow
+    indent
     return $ \x y -> TFunc x arrow y
 
   term :: Parser Type
@@ -693,16 +717,16 @@ type' = ignoreIndentations $ do
 
   typeName :: Parser Type
   typeName = TCon <$> upper <*> many lower
-  --  where
-    -- isBaseType :: Tok -> Maybe (Range -> TBase)
-    -- isBaseType (TokUpperName "Int" ) = Just TInt
-    -- isBaseType (TokUpperName "Bool") = Just TBool
-    -- isBaseType (TokUpperName "Char") = Just TChar
-    -- isBaseType _                     = Nothing
 
+  -- an <indent> will be inserted after an <of>
   array :: Parser Type
   array =
-    TArray <$> tokenArray <*> interval <*> ignoreIndentations tokenOf <*> type'
+    TArray
+      <$> tokenArray
+      <*> interval
+      <*> ignoreIndentations tokenOf
+      <*  indent
+      <*> type'
 
   interval :: Parser Interval
   interval = Interval <$> endpointOpening <*> tokenRange <*> endpointClosing
@@ -728,7 +752,7 @@ block :: Parser a -> Parser a
 block parser = do
   ignore TokIndent <?> "indentation"
   result <- parser
-  ignore TokDedent <?> "dedentation"
+  void $ optional (ignore TokDedent <?> "dedentation 3")
   return result
 
 -- a block of indented stuff seperated by newlines
@@ -736,7 +760,7 @@ blockOf :: Parser a -> Parser [a]
 blockOf parser = do
   ignore TokIndent <?> "indentation"
   result <- sepBy1 parser newlines
-  ignore TokDedent <?> "dedentation"
+  void $ optional (ignore TokDedent <?> "dedentation 2")
   return result
 
 block' :: (l -> x -> r -> y) -> Parser l -> Parser x -> Parser r -> Parser y
@@ -746,7 +770,7 @@ block' constructor open parser close = do
   b <- parser
   c <- choice
     [ do
-      _ <- symbol TokDedent <?> "dedentation"
+      _ <- symbol TokDedent <?> "dedentation 1"
       close
     , close
     , do
@@ -761,24 +785,13 @@ block' constructor open parser close = do
 
 -- consumes 0 or more indents/dedents afterwards
 ignoreIndentations :: Parser a -> Parser a
-ignoreIndentations parser = 
-  do
-  result <- parser
-  void $ many (ignoreP indentationRelated)
-  return result
+ignoreIndentations parser = parser
+  -- result <- parser
+  -- void $ many (ignoreP indentationRelated)
+  -- return result
  where
   indentationRelated TokIndent = True
-  indentationRelated TokDedent = True
-  indentationRelated _         = False
-
--- consumes 0 or more indents/dedents before
-ignoreIndentations2 :: Parser a -> Parser a
-ignoreIndentations2 parser = do
-  void $ many (ignoreP indentationRelated)
-  parser
- where
-  indentationRelated TokIndent = True
-  indentationRelated TokDedent = True
+  indentationRelated TokDedent = False
   indentationRelated _         = False
 
 -- remove TokIndent/TokDedent before TokGuardBar

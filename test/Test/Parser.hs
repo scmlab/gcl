@@ -22,18 +22,17 @@ import           Test.Util                      ( removeTrailingWhitespace
 tests :: TestTree
 tests = testGroup "Parser"
                   [
-    -- expression
+  --   expression
   -- , pattern'
   -- , type'
   -- , definition
   -- , definitionBlock
   -- , declaration
   -- , 
-                   statement
+  --                  statement
   -- , parseError
   -- , 
-  -- golden
-                            ]
+                   golden]
 
 --------------------------------------------------------------------------------
 
@@ -236,14 +235,15 @@ definitionBlock = testGroup
         \   F a b = a + b\n\
         \   B, C : Int\n\
         \:}"
-  -- , testCase "definition 7"
-  --   $ run
-  --       "{:\n\
-  --       \  G x = (case x of\n\
-  --       \       Just y -> y\n\
-  --       \       Nothing -> 0)\n\
-  --       \  A : Int\n\
-  --       \:}"
+  , testCase "definition 7"
+    $ run
+        "{:\n\
+        \  G x = (case x of\n\
+        \       Just y -> y\n\
+        \       Nothing -> 0\n\
+        \     )\n\
+        \  A : Int\n\
+        \:}"
   ]
   where run = parserIso Parser.definitionBlock
 
@@ -299,14 +299,14 @@ statement = testGroup
   , testCase "hlookup" $ run "x := *e"
   , testCase "hmutate" $ run "*e1 := e2"
   , testCase "dispose" $ run "dispose e"
-  , testCase "block empty 1" $ run "|[]|"
-  , testCase "block empty 2" $ run "|[\n]|"
-  , testCase "block empty 3" $ run "|[\n\n]|"
-  , testCase "block empty 4" $ run "|[\n  \n   ]|\n"
-  , testCase "block inline 1" $ run "|[ x := y ]|"
-  , testCase "block inline 2" $ run "|[ var x : Int ]|"
-  , testCase "block proper 2" $ run "|[\n  x := y\n]|"
-  , testCase "block proper 3" $ run "|[\n  x := y\n\n  x := y\n\n]|"
+  -- , testCase "block empty 1" $ run "|[]|"
+  -- , testCase "block empty 2" $ run "|[\n]|"
+  -- , testCase "block empty 3" $ run "|[\n\n]|"
+  -- , testCase "block empty 4" $ run "|[\n  \n   ]|\n"
+  -- , testCase "block inline 1" $ run "|[ x := y ]|"
+  -- , testCase "block inline 2" $ run "|[ var x : Int ]|"
+  -- , testCase "block proper 2" $ run "|[\n  x := y\n]|"
+  -- , testCase "block proper 3" $ run "|[\n  x := y\n\n  x := y\n\n]|"
   ]
   where run = parserIso Parser.statement
 
@@ -333,27 +333,28 @@ parseError = testGroup
 
 -- | Golden Tests
 golden :: TestTree
-golden = testGroup
-  "Program"
-  [
-  --    parserGolden ""          "empty"    "empty.gcl"
-  -- , parserGolden ""          "2"        "2.gcl"
-  -- , parserGolden ""          "comment"  "comment.gcl"
-  -- , parserGolden ""          "issue 1"  "issue1.gcl"
-  -- , parserGolden ""          "issue 14" "issue14.gcl"
-  -- , parserGolden ""          "no-decl"  "no-decl.gcl"
-  -- , parserGolden ""          "no-stmt"  "no-stmt.gcl"
-  -- , parserGolden ""          "assign"   "assign.gcl"
-  -- , parserGolden ""          "quant 1"  "quant1.gcl"
-  -- , parserGolden ""          "spec"     "spec.gcl"
-  -- , parserGolden "examples/" "gcd"      "gcd.gcl"
-  -- , parserGolden "examples/" "proof"    "proof.gcl"
+golden = testGroup "Program"
+                   [
+  --   runGolden ""          "empty"    "empty.gcl"
+  -- , runGolden ""          "2"        "2.gcl"
+  -- , runGolden ""          "comment"  "comment.gcl"
+  -- , runGolden ""          "issue 1"  "issue1.gcl"
   -- , 
-  parserGolden "examples/" "block"    "block.gcl"
-  ]
+  runGolden ""          "issue 14" "issue14.gcl"
+  -- , 
+  --                   runGolden "" "no-decl" "no-decl.gcl"
+  -- , 
+  -- runGolden ""          "no-stmt"  "no-stmt.gcl"
+  -- , runGolden ""          "assign"   "assign.gcl"
+  -- , runGolden ""          "quant 1"  "quant1.gcl"
+  -- , runGolden ""          "spec"     "spec.gcl"
+  -- , runGolden "examples/" "gcd"      "gcd.gcl"
+  -- , runGolden "examples/" "proof"    "proof.gcl"
+  -- , runGolden "examples/" "block"    "block.gcl"
+                                                        ]
 
-parserGolden :: String -> FilePath -> FilePath -> TestTree
-parserGolden dirName =
+runGolden :: String -> FilePath -> FilePath -> TestTree
+runGolden dirName =
   runGoldenTest ("./test/source/" <> dirName)
                 ("./test/golden/" <> dirName)
                 ".ast"

@@ -26,11 +26,12 @@ import           Data.Loc
 import           Data.Text                      ( Text )
 import qualified Data.Text                     as Text
 import qualified Data.Text.Encoding            as Text
-import           Prettyprinter
-import qualified Prettyprinter.Render.Text
-                                               as Text
 import           Prelude                 hiding ( Ordering(..) )
-import Render.Class ( RenderSection(renderSection), Render(..) ) 
+import           Prettyprinter
+import qualified Prettyprinter.Render.Text     as Text
+import           Render.Class                   ( Render(..)
+                                                , RenderSection(renderSection)
+                                                )
 -- import           Render
 
 docToText :: Doc ann -> Text
@@ -64,8 +65,10 @@ data DocWithLoc ann
 
 -- | Appends two DocWithLoc in a srcloc-respecting way
 append :: DocWithLoc ann -> DocWithLoc ann -> DocWithLoc ann
-append Empty              Empty              = Empty
-append Empty              (DocWithLoc y c d) = DocWithLoc y c d
+append Empty Empty = Empty
+append Empty (DocWithLoc y c d) =
+  let start = Pos (posFile c) 1 1 0
+  in  DocWithLoc (fillGap start c <> y) start d
 append (DocWithLoc x a b) Empty              = DocWithLoc x a b
 append (DocWithLoc x a b) (DocWithLoc y c d) = if c >= b
   then DocWithLoc (x <> fillGap b c <> y) a d
@@ -79,7 +82,7 @@ instance Monoid (DocWithLoc ann) where
   mempty  = Empty
 
 fromDoc :: Loc -> Doc ann -> DocWithLoc ann
-fromDoc NoLoc     _ = Empty  
+fromDoc NoLoc     _ = Empty
 fromDoc (Loc a b) x = DocWithLoc x a b
 
 toDoc :: DocWithLoc ann -> Doc ann
@@ -104,9 +107,9 @@ fromRenderAndLocated x = case locOf x of
 fromRenderSection :: RenderSection a => a -> Doc ann
 fromRenderSection x = pretty (renderSection x)
 
--- generates newlines and spaces to fill the gap between to Pos
+-- generates newlines and spaces to fill the gap between 2 Pos
 fillGap :: Pos -> Pos -> Doc ann
-fillGap this next = 
+fillGap this next =
   let lineDiff = posLine next - posLine this
   in  if lineDiff == 0
         then -- on the same line, just pad them with spaces
