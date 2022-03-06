@@ -48,7 +48,7 @@ instance Collect Error Diagnostic where
 instance Collect Parser.ParseError Diagnostic where
   collect (LexicalError pos) = makeError (Loc pos pos) "Lexical error" mempty
   collect (SyntacticError pairs) = concatMap
-    (\(loc, msg) -> makeError loc "Syntactic error" (Text.pack msg))
+    (\(loc, msg) -> makeError loc "Parse error" (Text.pack msg))
     pairs
 
 instance Collect TypeError Diagnostic where

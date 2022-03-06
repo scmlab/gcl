@@ -17,7 +17,7 @@ tests :: TestTree
 tests = testGroup
     "Tests"
     [ Parser.tests
-    -- , Substitution.tests
+    , Substitution.tests
     -- , WP.tests
     -- , TypeChecking.tests
     -- , SrcLoc.tests

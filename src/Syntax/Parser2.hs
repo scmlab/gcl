@@ -272,17 +272,13 @@ definition = choice [try funcDefnSig, typeDefn, funcDefnF]
   typeDefnCtor = TypeDefnCtor <$> identifier <*> many type'
 
 definitionBlock :: Parser DefinitionBlock
-definitionBlock = block' DefinitionBlock
-                         tokenDeclOpen
-                         (sepBy1 definition newlines)
-                         tokenDeclClose
-
--- definitionBlock :: Parser DefinitionBlock
--- definitionBlock =
---   DefinitionBlock
---     <$> tokenDeclOpen
---     <*> blockOf definition
---     <*> tokenDeclClose
+definitionBlock =
+  DefinitionBlock
+    <$> tokenDeclOpen
+    <*  many (ignoreP indentationRelated)
+    <*> sepBy definition newlines
+    <*  many (ignoreP indentationRelated)
+    <*> tokenDeclClose
 
 -- `n : type`
 declBase :: Parser Name -> Parser DeclBase
@@ -405,7 +401,11 @@ spec =
 
 proofAnchors :: Parser Stmt
 proofAnchors =
-  Proof <$> tokenProofOpen <*> many proofAnchor <*> tokenProofClose
+  Proof
+    <$> tokenProofOpen
+    <*> many proofAnchor
+    <*  optional newlines
+    <*> tokenProofClose
  where
   proofAnchor :: Parser ProofAnchor
   proofAnchor = do
@@ -454,25 +454,18 @@ programBlock =
     <*> program
     <*  many (ignoreP indentationRelated)
     <*> tokenBlockClose
- where
 
-  indentationRelated TokIndent = True
-  indentationRelated TokDedent = True
-  indentationRelated _         = False
+indentationRelated :: Tok -> Bool
+indentationRelated TokIndent = True
+indentationRelated TokDedent = True
+indentationRelated _         = False
 
 program :: Parser Program
 program = do
   void $ optional newlines
 
-
   mixed <- sepBy (choice [Left <$> declOrDefnBlock, Right <$> statement])
                  newlines
-
-  -- decls <- sepBy declOrDefnBlock newlines
-
-  -- void $ optional newlines
-
-  -- stmts <- sepBy statement newlines
 
   let (decls, stmts) = Either.partitionEithers mixed
 
@@ -481,28 +474,6 @@ program = do
   return $ Program decls stmts
 
 
-
-  -- choice
-  -- [ try
-  --  $   Program []
-  -- <$  optional newlines
-  -- <*> sepBy statement newlines
-  -- <*  optional newlines
-  -- , try
-  --  $   Program
-  -- <$> sepBy declOrDefnBlock newlines
-  -- <*  optional dedent
-  -- <*> pure []
-  -- , Program
-  -- <$  optional newlines
-  -- <*> many (declOrDefnBlock <* newlines)
-  -- <*  optional newlines
-  -- <*> sepBy statement newlines
-  -- <*  optional newlines
-  -- ]
-
-  -- try $ Program [] <$ optional newlines <*> sepBy statement newlines <* optional newlines
-  -- , 
 
 newlines :: Parser ()
 newlines = void $ some (symbol TokNewline)
@@ -741,13 +712,7 @@ type' = do
 
   -- an <indent> will be inserted after an <of>
   array :: Parser Type
-  array =
-    TArray
-      <$> tokenArray
-      <*> interval
-      <*> tokenOf
-      <*  indent
-      <*> type'
+  array = TArray <$> tokenArray <*> interval <*> tokenOf <* indent <*> type'
 
   interval :: Parser Interval
   interval = Interval <$> endpointOpening <*> tokenRange <*> endpointClosing
@@ -809,10 +774,6 @@ ordinaryBar :: Parser (Token "|")
 ordinaryBar = do
   void $ many (ignoreP indentationRelated)
   tokenGuardBar
- where
-  indentationRelated TokIndent = True
-  indentationRelated TokDedent = True
-  indentationRelated _         = False
 
 -- consumes 1 or more newlines
 expectNewline :: Parser ()

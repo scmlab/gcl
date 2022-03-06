@@ -29,7 +29,7 @@ instance Pretty Error where
 
 instance Pretty ParseError where
   pretty (LexicalError   pos  ) = "Lexical Error" <+> pretty (displayPos pos)
-  pretty (SyntacticError pairs) = "Syntactic Error" <+> vsep
+  pretty (SyntacticError pairs) = "Parse Error" <+> vsep
     (map (\(loc, msg) -> pretty (displayLoc loc) <+> pretty msg) $ toList pairs)
 
 instance Pretty StructWarning where

@@ -194,6 +194,8 @@ definitionBlock = testGroup
                                        \:}"
   , testCase "type definition 2" $ run "{:\n data List a = Node (List a)\n:}"
   , testCase "type definition 3" $ run "{:\n data A = B\n:}"
+  , testCase "type definition 4 (empty)" $ run "{::}"
+  , testCase "type definition 5 (empty)" $ run "{:\n:}"
   , testCase "definition 1" $ run "{:\n\
         \   A, B : Int\n\
         \:}"
@@ -291,7 +293,9 @@ statement = testGroup
   , testCase "spec QM" $ run "?"
   , testCase "spec 1" $ run "[!!]"
   , testCase "spec 2" $ run "[!\n   !]"
-  , testCase "proof" $ run "{-   -}"
+  , testCase "proof 1 (empty)" $ run "{-   -}"
+  , testCase "proof 2 (empty)" $ run "{-\n-}"
+  , testCase "proof 3" $ run "{- #123456\n-}"
   , testCase "alloc 1" $ run "p := new(e1)"
   , testCase "alloc 2" $ run "p := new(e1, e2)"
   , testCase "alloc 3" $ run "p := new(e1, e2, e3)"
@@ -317,10 +321,10 @@ parseError = testGroup
   "Parse error"
   [ testCase "variable keyword collision" $ runDeclaration
     "var if : Int"
-    "Syntactic Error <test>:1:5-6 unexpected 'if'\nexpecting identifier that starts with a lowercase letter\n"
+    "Parse Error <test>:1:5-6 unexpected 'if'\nexpecting identifier that starts with a lowercase letter\n"
   , testCase "quant with parentheses" $ runExpr
     "<| (+) i : i > 0 : f i |>"
-    "Syntactic Error <test>:1:5 unexpected '+'\nexpecting expression\n"
+    "Parse Error <test>:1:5 unexpected '+'\nexpecting expression\n"
   ]
  where
   runDeclaration = parserCompare Parser.declaration
