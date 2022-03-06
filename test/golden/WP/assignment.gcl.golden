@@ -1,7 +1,8 @@
 ### Result
 
-[ Type Error ./test/source/WP/assignment.gcl:2:1-2
-The definition x is not in scope ]
+[ Type Error ./test/source/WP/assignment.gcl:2:1
+The definition 
+x is not in scope ]
 
 ### Source
 

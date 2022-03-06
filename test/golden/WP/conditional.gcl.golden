@@ -1,11 +1,11 @@
 ### Result
 
-[ Skip at ./test/source/WP/conditional.gcl [12-16] 1:13-17 #4a0e2f09c70bea20
+[ Skip at ./test/source/WP/conditional.gcl [12-15] 1:13-16 #4a0e2f09c70bea20
 `True ∧False
 ⇒
 True`
 explanation not available
-, Conditional at ./test/source/WP/conditional.gcl [0-20] 1:1-2:3 #4ea8b990688e819d
+, Conditional at ./test/source/WP/conditional.gcl [0-19] 1:1-2:2 #4ea8b990688e819d
 `True
 ⇒
 False`

@@ -8,6 +8,7 @@ module Pretty.Util
   , toByteString
   , docToString
   , toString
+  , prefixSpaces
   , PrettyPrec(..)
   , PrettyWithLoc(..)
   , DocWithLoc(..)
@@ -83,11 +84,16 @@ fromDoc :: Loc -> Doc ann -> DocWithLoc ann
 fromDoc NoLoc     _ = Empty
 fromDoc (Loc a b) x = DocWithLoc x a b
 
--- fill the spaces in front before converting to `Doc` 
+-- prefixing spaces are ignored before converting to `Doc` 
 toDoc :: DocWithLoc ann -> Doc ann
-toDoc (DocWithLoc d x _) =
-  let start = Pos (posFile x) 1 1 0 in fillGap start x <> d
-toDoc Empty = mempty
+toDoc (DocWithLoc d _ _) = d
+toDoc Empty              = mempty
+
+prefixSpaces :: DocWithLoc ann -> DocWithLoc ann
+prefixSpaces (DocWithLoc d x y) =
+  let start = Pos (posFile x) 1 1 0
+  in  DocWithLoc (fillGap start x <> d) start y
+prefixSpaces Empty = mempty
 
 -- | If something can be rendered, then make it a Doc
 fromRender :: Render a => a -> Doc ann
