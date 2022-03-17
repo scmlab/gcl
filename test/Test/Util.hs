@@ -5,12 +5,15 @@ import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
 import Test.Tasty (TestTree)
 import Prelude hiding (readFile)
-import Pretty ()
+import Pretty (Pretty, toString)
 import Syntax.Parser (Parser, runParse)
 import Syntax.Parser.Util (SyntacticError)
 import Data.ByteString.Lazy (ByteString)
 import qualified Test.Tasty.Golden as Golden
 import qualified Data.ByteString.Lazy as BSL
+
+import System.Directory (createDirectoryIfMissing)
+import System.FilePath (takeDirectory)
 
 -- goldenFileTest :: String -> 
 --   String -> 
@@ -74,5 +77,31 @@ runGoldenTest sourceDir goldenDir ext test name fileName = do
     sourceText <- Text.decodeUtf8 . BSL.toStrict <$> BSL.readFile sourcePath
     test sourcePath sourceText
 
+{- |
+  Pretty a
+  => FilePath -- source directory
+  -> FilePath -- golden file directory
+  -> FilePath -- generated log directory
+  -> FilePath -- ext
+  -> (FilePath -> Text -> a) -- test 
+  -> String   -- test name
+  -> FilePath -- the specific source file
+  -> TestTree
+-}
+runGoldenTestWithGeneratedLog 
+  :: Pretty a  => FilePath -> FilePath -> FilePath -> FilePath -> (FilePath -> Text -> a) -> String -> FilePath -> TestTree
+runGoldenTestWithGeneratedLog sourceDir goldenDir genDir ext test name fileName =
+  let goldenPath = goldenDir <> fileName <> ext <> ".golden"
+      sourcePath = sourceDir <> fileName
+      genPath = genDir <> fileName  <> ".txt"
+  in
+    Golden.goldenVsFile name goldenPath genPath $ do
+      sourceText <- Text.decodeUtf8 . BSL.toStrict <$> BSL.readFile sourcePath
+      createAndWriteFile genPath $ toString $ test sourcePath sourceText
 
 
+-- taken from https://stackoverflow.com/questions/58682357/how-to-create-a-file-and-its-parent-directories-in-haskellv
+createAndWriteFile :: FilePath -> String -> IO ()
+createAndWriteFile path content = do
+  createDirectoryIfMissing True $ takeDirectory path
+  writeFile path content
