@@ -5,7 +5,6 @@ import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
 import Test.Tasty (TestTree)
 import Prelude hiding (readFile)
-import Pretty (Pretty, toString)
 import Syntax.Parser (Parser, runParse)
 import Syntax.Parser.Util (SyntacticError)
 import Data.ByteString.Lazy (ByteString)
@@ -77,31 +76,38 @@ runGoldenTest sourceDir goldenDir ext test name fileName = do
     sourceText <- Text.decodeUtf8 . BSL.toStrict <$> BSL.readFile sourcePath
     test sourcePath sourceText
 
-{- |
-  Pretty a
-  => FilePath -- source directory
-  -> FilePath -- golden file directory
-  -> FilePath -- generated log directory
-  -> FilePath -- ext
-  -> (FilePath -> Text -> a) -- test 
-  -> String   -- test name
-  -> FilePath -- the specific source file
-  -> TestTree
+{- | added one more argument to 'runGoldenTest': the first argument, receiving the test module name.
+  Example usage: 
+    @runGoldenTest ".\/test\/source\/TheTestModule/" ".\/test\/golden\/TheTestModule\/" "" ...@
+    becomes:
+    @runGoldenTestWithLog "TheTestModule" ".\/test\/source\/TheTestModule\/" ".\/test\/golden\/TheTestModule/" "" ...@
 -}
-runGoldenTestWithGeneratedLog 
-  :: Pretty a  => FilePath -> FilePath -> FilePath -> FilePath -> (FilePath -> Text -> a) -> String -> FilePath -> TestTree
-runGoldenTestWithGeneratedLog sourceDir goldenDir genDir ext test name fileName =
+runGoldenTestWithLog :: FilePath -> FilePath -> FilePath -> FilePath -> (FilePath -> Text -> IO ByteString) -> String -> FilePath -> TestTree
+runGoldenTestWithLog modName sourceDir goldenDir ext test name fileName =
   let goldenPath = goldenDir <> fileName <> ext <> ".golden"
       sourcePath = sourceDir <> fileName
-      genPath = genDir <> fileName  <> ".txt"
+      genPath = logPath modName fileName
   in
     Golden.goldenVsFile name goldenPath genPath $ do
       sourceText <- Text.decodeUtf8 . BSL.toStrict <$> BSL.readFile sourcePath
-      createAndWriteFile genPath $ toString $ test sourcePath sourceText
+      str <- test sourcePath sourceText
+      loggingBS modName fileName str
 
-
--- taken from https://stackoverflow.com/questions/58682357/how-to-create-a-file-and-its-parent-directories-in-haskellv
-createAndWriteFile :: FilePath -> String -> IO ()
-createAndWriteFile path content = do
+-- | Receiving a module name, a file name and the content to log. The exact logging directoy is defined by 'logPath'.
+logging :: Show a => FilePath -> FilePath -> a -> IO ()
+logging modName fileName content = do
+  let path = logPath modName fileName
   createDirectoryIfMissing True $ takeDirectory path
-  writeFile path content
+  writeFile path (show content)
+
+
+-- | The ByteString version of logging. Adapting with previous uses of ByteStings (such as 'runGoldenTest').
+loggingBS :: FilePath -> FilePath -> ByteString -> IO ()
+loggingBS modName fileName content = do
+  let path = logPath modName fileName
+  createDirectoryIfMissing True $ takeDirectory path
+  BSL.writeFile path content
+
+-- | Defines the exact log directory.
+logPath :: FilePath -> FilePath -> FilePath
+logPath modName fileName = "./temp-test-generation/" <> modName <> "/" <> fileName  <> ".log"
