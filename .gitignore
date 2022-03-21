@@ -19,5 +19,6 @@ cabal.sandbox.config
 .stack-work/
 cabal.project.local
 .HTF/
+temp-test-generation/
 
 **/.DS_Store
