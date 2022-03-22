@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 9099ef085c9251b28fa257cc889a39bf070096a180a4a6117ca6f90eeabcb162
+-- hash: 281faf0e79d45976cbeb623378f350da4eddd4d78dc65be513087c32bbf705b3
 
 name:           gcl
 version:        0.1.0.0
@@ -242,6 +242,8 @@ test-suite gcl-test
     , base >=4.7 && <5
     , bytestring
     , containers
+    , directory
+    , filepath
     , free
     , hashable
     , lens
