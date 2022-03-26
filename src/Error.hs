@@ -3,16 +3,16 @@
 module Error where
 
 import           GCL.Type                       ( TypeError )
+import           GCL.WP.Type                    ( StructError )
 import           GHC.Generics
 import           Syntax.Common                  ( )
-import           Syntax.Parser.Util             ( SyntacticError )
-import           GCL.WP.Type                    ( StructError )
+import           Syntax.Parser2.Error           ( ParseError )
 
 --------------------------------------------------------------------------------
 
 -- | Error
 data Error
-  = SyntacticError SyntacticError
+  = ParseError ParseError
   | TypeError TypeError
   | StructError StructError
   | CannotReadFile FilePath

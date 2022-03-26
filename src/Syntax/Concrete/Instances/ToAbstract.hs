@@ -15,6 +15,10 @@ import           Data.Loc                       ( (<-->)
                                                 , Located(locOf)
                                                 )
 import           Data.Loc.Range
+import           Pretty.Util                    ( PrettyWithLoc(prettyWithLoc)
+                                                , docToText
+                                                , toDoc
+                                                )
 import qualified Syntax.Abstract               as A
 import qualified Syntax.Abstract.Operator      as A
 import           Syntax.Abstract.Util
@@ -114,10 +118,12 @@ instance ToAbstract Stmt A.Stmt where
     Assert _ a _ -> A.Assert <$> toAbstract a <*> pure (locOf stmt)
     LoopInvariant _ a _ _ _ b _ ->
       A.LoopInvariant <$> toAbstract a <*> toAbstract b <*> pure (locOf stmt)
-    Do _ a _           -> A.Do <$> toAbstract a <*> pure (locOf stmt)
-    If _ a _           -> A.If <$> toAbstract a <*> pure (locOf stmt)
-    SpecQM l           -> throwError l
-    Spec  l t       r  -> pure (A.Spec t (rangeOf l <> rangeOf r))
+    Do _ a _    -> A.Do <$> toAbstract a <*> pure (locOf stmt)
+    If _ a _    -> A.If <$> toAbstract a <*> pure (locOf stmt)
+    SpecQM l    -> throwError l
+    Spec l xs r -> do
+      let text = docToText $ toDoc $ prettyWithLoc (map (fmap show) xs)
+      pure (A.Spec text (rangeOf l <> rangeOf r))
     Proof _ anchors _  -> A.Proof <$> toAbstract anchors <*> pure (locOf stmt)
     Alloc p _ _ _ es _ -> A.Alloc p <$> toAbstract es <*> pure (locOf stmt)
     HLookup x _ _ e    -> A.HLookup x <$> toAbstract e <*> pure (locOf stmt)

@@ -28,7 +28,7 @@ import           Text.Megaparsec                ( MonadParsec(..)
                                                 , errorOffset
                                                 , mkPos
                                                 , setParserState
-                                                , unPos
+                                                , unPos, TraversableStream (reachOffsetNoLine)
                                                 )
 import           Text.Megaparsec.Error          ( parseErrorTextPretty )
 
@@ -88,14 +88,14 @@ posStateToPos :: Stream s => PosState s -> Loc.Pos
 posStateToPos PosState { pstateOffset, pstateSourcePos = SourcePos {..} } =
   Loc.Pos sourceName (unPos sourceLine) (unPos sourceColumn) pstateOffset
 
-getCurPos :: (MonadParsec e s m) => m Loc.Pos
+getCurPos :: (TraversableStream s, MonadParsec e s m) => m Loc.Pos
 getCurPos = do
   st@State { stateOffset, statePosState } <- getParserState
   let pst = reachOffsetNoLine stateOffset statePosState
   setParserState st { statePosState = pst }
   return . posStateToPos $ pst
 
-getEndPos :: (MonadParsec e s m) => m Loc.Pos
+getEndPos :: (TraversableStream s, MonadParsec e s m) => m Loc.Pos
 getEndPos = do
   st@State { stateOffset, statePosState } <- getParserState
   let pst = reachOffsetNoLine stateOffset statePosState

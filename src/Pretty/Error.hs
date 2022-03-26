@@ -3,8 +3,9 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 module Pretty.Error where
 
+import           Data.Foldable                  ( toList )
 import           Data.Loc
-import           Data.Text.Prettyprint.Doc
+import           Prettyprinter
 import           Error
 import           GCL.Type                       ( TypeError(..) )
 import           GCL.WP.Type                    ( StructError(..)
@@ -14,18 +15,22 @@ import           Prelude                 hiding ( Ordering(..) )
 import           Pretty.Abstract                ( )
 import           Pretty.Predicate               ( )
 import           Pretty.Util                    ( )
-
+import           Syntax.Parser2.Error           ( ParseError(..) )
 
 -- | Error
 instance Pretty Error where
-  pretty (SyntacticError (pos, msg)) =
-    "Syntactic Error" <+> pretty (displayPos pos) <+> pretty msg
+  pretty (ParseError err) = "Parse Error" <+> line <> pretty err
   pretty (TypeError err) =
     "Type Error" <+> pretty (locOf err) <> line <> pretty err
   pretty (StructError err) =
     "Struct Error" <+> pretty (locOf err) <> line <> pretty err
   pretty (CannotReadFile path) = "CannotReadFile" <+> pretty path
   pretty (Others         msg ) = "Others" <+> pretty msg
+
+instance Pretty ParseError where
+  pretty (LexicalError   pos  ) = "Lexical Error" <+> pretty (displayPos pos)
+  pretty (SyntacticError pairs) = "Syntactic Error" <+> vsep
+    (map (\(loc, msg) -> pretty (displayLoc loc) <+> pretty msg) $ toList pairs)
 
 instance Pretty StructWarning where
   pretty (MissingBound loc) = "Missing Bound" <+> pretty loc
