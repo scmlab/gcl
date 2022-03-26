@@ -155,6 +155,12 @@ tokenSpecOpen = adapt TokSpecOpen "[!"
 tokenSpecClose :: Parser (Token "!]")
 tokenSpecClose = adapt TokSpecClose "!]"
 
+tokenPitOpen :: Parser (Token "{!")
+tokenPitOpen = adapt TokPitOpen "{!"
+
+tokenPitClose :: Parser (Token "!}")
+tokenPitClose = adapt TokPitClose "!}"
+
 tokenProofOpen :: Parser (Token "{-")
 tokenProofOpen = adapt TokProofOpen "{-"
 
@@ -235,7 +241,7 @@ tokenUnderscore :: Parser (Token "_")
 tokenUnderscore = adapt TokUnderscore "underscore \"_\""
 
 --------------------------------------------------------------------------------
--- Declaration 
+-- Declaration
 --------------------------------------------------------------------------------
 
 declaration :: Parser Declaration
@@ -297,7 +303,7 @@ declType :: Parser Name -> Parser DeclType
 declType name = DeclType <$> declBase name <*> optional declProp
 
 --------------------------------------------------------------------------------
--- Statement 
+-- Statement
 --------------------------------------------------------------------------------
 
 statement :: Parser Stmt
@@ -502,7 +508,7 @@ program = do
   -- ]
 
   -- try $ Program [] <$ optional newlines <*> sepBy statement newlines <* optional newlines
-  -- , 
+  -- ,
 
 newlines :: Parser ()
 newlines = void $ some (symbol TokNewline)
@@ -514,7 +520,7 @@ indent :: Parser ()
 indent = void $ symbol TokIndent
 
 --------------------------------------------------------------------------------
--- Expression 
+-- Expression
 --------------------------------------------------------------------------------
 
 predicate :: Parser Expr
@@ -622,6 +628,8 @@ expression = makeExprParser (term <|> caseOf) chainOpTable <?> "expression"
           <*> tokenColon
           <*> expression
           <*> choice [Left <$> tokenQuantClose, Right <$> tokenQuantCloseU]
+          , pitQM
+          , pit
           ]
         <?> "term"
 
@@ -639,6 +647,21 @@ expression = makeExprParser (term <|> caseOf) chainOpTable <?> "expression"
       helper :: Expr -> [(Token "[", Expr, Token "]")] -> Expr
       helper a []               = a
       helper a ((o, x, c) : xs) = helper (Arr a o x c) xs
+
+
+    pitQM :: Parser Expr
+    pitQM = PitQM <$> (rangeOf <$> tokenQuestionMark)
+
+    pit :: Parser Expr
+    pit =
+        Pit
+          <$> tokenPitOpen
+          <*> takeWhileP (Just "anything other than '!]'") notTokSpecClose
+          <*> tokenPitClose
+       where
+        notTokSpecClose :: L Tok -> Bool
+        notTokSpecClose (L _ TokSpecClose) = False
+        notTokSpecClose _                  = True
 
   operator :: Parser Op
   operator = choice [ChainOp <$> chainOp, ArithOp <$> arithOp] <?> "operator"
@@ -683,7 +706,7 @@ expression = makeExprParser (term <|> caseOf) chainOpTable <?> "expression"
       , Hash <$> symbol TokHash
       ]
 
--- TODO: LitChar 
+-- TODO: LitChar
 literal :: Parser Lit
 literal =
   withRange
@@ -706,7 +729,7 @@ pattern' = choice
   ]
 
 --------------------------------------------------------------------------------
--- Type 
+-- Type
 --------------------------------------------------------------------------------
 
 type' :: Parser Type

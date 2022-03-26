@@ -97,6 +97,8 @@ instance Located Expr where
   locOf (App x y              ) = x <--> y
   locOf (Quant l _ _ _ _ _ _ r) = l <--> r
   locOf (Case l _ _ r         ) = l <--> r
+  locOf (PitQM l              ) = locOf l
+  locOf (Pit  l _ r           ) = l <--> r
 
 instance Located CaseClause where
   locOf (CaseClause l _ r) = l <--> r

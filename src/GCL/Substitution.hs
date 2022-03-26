@@ -297,7 +297,7 @@ instance Substitutable Expr where
         $ \(CaseClause patt body) -> CaseClause patt <$> subst mapping body
       return $ Case e cases' l
 
-    Pit _ _ -> return expr
+    Pit _ _ _ -> return expr
 
 instance Substitutable FuncClause where
   subst mapping (FuncClause patterns body) = do

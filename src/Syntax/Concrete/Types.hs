@@ -96,7 +96,7 @@ data Stmt
   | LoopInvariant (Token "{") Expr (Token ",") (Token "bnd") (Token ":") Expr (Token "}")
   | Do (Token "do") (SepBy "|" GdCmd) (Token "od")
   | If (Token "if") (SepBy "|" GdCmd) (Token "fi")
-  | SpecQM Range -- ? to be rewritten as {!!}
+  | SpecQM Range -- ? to be rewritten as [!!]
   | Spec (Token "[!") [L Tok] (Token "!]")
   | Proof (Token "{-") [ProofAnchor] (Token "-}")
   | Alloc Name (Token ":=") (Token "new") (Token "(") (SepBy "," Expr) (Token ")")
@@ -165,6 +165,8 @@ data Expr
       TokQuantEnds
   -- case expr of { ctor1 -> expr | ctor2 binder1 binder2 -> expr }
   | Case (Token "case") Expr (Token "of") [CaseClause]
+  | PitQM Range -- ? to be rewritten as [!!]
+  | Pit (Token "{!") [L Tok] (Token "!}")
   deriving (Eq, Show, Generic)
 
 type QuantOp' = Either Op Expr

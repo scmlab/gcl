@@ -103,6 +103,12 @@ instance PrettyWithLoc (Token "[!") where
 instance PrettyWithLoc (Token "!]") where
   prettyWithLoc (Token l r) = DocWithLoc (pretty tokSpecEnd) l r
 
+instance PrettyWithLoc (Token "{!") where
+  prettyWithLoc (Token l r) = DocWithLoc (pretty tokSpecStart) l r
+
+instance PrettyWithLoc (Token "!}") where
+  prettyWithLoc (Token l r) = DocWithLoc (pretty tokSpecEnd) l r
+
 instance PrettyWithLoc (Token "(") where
   prettyWithLoc (Token l r) = DocWithLoc (pretty tokParenStart) l r
 
@@ -275,15 +281,15 @@ instance PrettyWithLoc Stmt where
     prettyWithLoc l
       <> prettyWithLoc (map (fmap show') s)
       <> prettyWithLoc r
-      where 
+      where
         -- don't show tokens like <newline> or <indent>
-        show' tok = case tok of 
+        show' tok = case tok of
           TokNewlineAndWhitespace _ -> ""
           TokNewlineAndWhitespaceAndBar _ -> ""
           TokIndent            -> ""
           TokDedent            -> ""
           TokNewline           -> ""
-          _ -> show tok 
+          _ -> show tok
   prettyWithLoc (Proof l anchors r) =
     prettyWithLoc l <> prettyWithLoc anchors <> prettyWithLoc r
   prettyWithLoc (Alloc p a n l es r) =
@@ -360,6 +366,22 @@ handleExpr (Case a expr b cases) =
     <> prettyWithLoc expr
     <> prettyWithLoc b
     <> prettyWithLoc cases
+handleExpr (PitQM l) = return $ fromDoc (locOf l) (pretty tokQM)
+handleExpr (Pit l s r) =
+  return $
+      prettyWithLoc l
+        <> prettyWithLoc (map (fmap show') s)
+        <> prettyWithLoc r
+        where
+          -- don't show tokens like <newline> or <indent>
+          show' tok = case tok of
+            TokNewlineAndWhitespace _ -> ""
+            TokNewlineAndWhitespaceAndBar _ -> ""
+            TokIndent            -> ""
+            TokDedent            -> ""
+            TokNewline           -> ""
+            _ -> show tok
+
 
 handleOp :: Op -> Variadic Expr (DocWithLoc ann)
 handleOp op = case classify op of

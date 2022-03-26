@@ -220,6 +220,10 @@ instance Collect () Highlighting Expr where
       collect expr
       addHighlighting J.SttKeyword [] tokB
       collect cases
+    PitQM _ -> return ()
+    Pit tokA _ tokB -> do
+      addHighlighting J.SttKeyword [] tokA
+      addHighlighting J.SttKeyword [] tokB
 
 instance Collect () Highlighting CaseClause where
   collect (CaseClause _ arrow body) = do

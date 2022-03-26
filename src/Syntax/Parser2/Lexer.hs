@@ -55,7 +55,7 @@ data Tok
   | TokIf
   | TokFi
   | TokBnd
-  | TokQM -- question mark ? for digging holes 
+  | TokQM -- question mark ? for digging holes
   | TokVar
   | TokCon
   | TokData
@@ -75,6 +75,8 @@ data Tok
   | TokAssign
   | TokSpecOpen
   | TokSpecClose
+  | TokPitOpen
+  | TokPitClose
   | TokParenOpen
   | TokParenClose
   | TokBracketOpen
@@ -179,6 +181,8 @@ instance Show Tok where
     TokAssign            -> ":="
     TokSpecOpen          -> "[!"
     TokSpecClose         -> "!]"
+    TokPitOpen           -> "{!"
+    TokPitClose          -> "!}"
     TokParenOpen         -> "("
     TokParenClose        -> ")"
     TokBracketOpen       -> "["
@@ -298,6 +302,10 @@ tokRE =
     <$  string "[!"
     <|> TokSpecClose
     <$  string "!]"
+    <|> TokPitOpen
+    <$  string "{!"
+    <|> TokPitClose
+    <$  string "!}"
     <|> TokParenOpen
     <$  string "("
     <|> TokParenClose

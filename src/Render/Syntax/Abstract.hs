@@ -93,10 +93,10 @@ handleExpr _ (ArrUpd e1 e2 e3 _) =
     -- SCM: need to print parenthesis around e1 when necessary.
 handleExpr _ (Case expr cases _) =
   return $ "case" <+> render expr <+> "of" <+> vertE (map render cases)
-handleExpr _ (Pit Nothing l) =
-  return $ tempHandleLoc l "{! !}"
-handleExpr _ (Pit (Just i) l) =
-  return $ tempHandleLoc l ("{! !}" <> render i)
+handleExpr _ (Pit cnt Nothing _) =
+  return $ "{!" <> render cnt <> "!}"
+handleExpr _ (Pit cnt (Just i) _) =
+  return $ "{!" <> render cnt <> "!}" <> render i
 
 instance Render Mapping where
   render env | null env  = mempty

@@ -208,7 +208,7 @@ instance Collect LocationLinkToBe LocationLink Expr where
     Case e _ _ -> do
       collect e
       -- collect patterns
-    Pit _ _ -> return ()
+    Pit _ _ _ -> return ()
 
 -- instance Collect CaseClause where
 --   collect (CaseClause ctor args body) = do

@@ -14,6 +14,7 @@ import           Data.Loc                       ( (<-->)
                                                 , Loc(..)
                                                 , Located(locOf)
                                                 )
+import           Data.Text                      (pack)
 import           Data.Loc.Range
 import           Pretty.Util                    ( PrettyWithLoc(prettyWithLoc)
                                                 , docToText
@@ -223,6 +224,10 @@ instance ToAbstract Expr A.Expr where
         Right expr -> toAbstract expr
     Case _ expr _ cases ->
       A.Case <$> toAbstract expr <*> toAbstract cases <*> pure (locOf x)
+    PitQM l    -> pure $ A.Pit (pack "") Nothing (rangeOf l) -- was: throwError l
+    Pit l xs r -> do
+        let text = docToText $ toDoc $ prettyWithLoc (map (fmap show) xs)
+        pure (A.Pit text Nothing (rangeOf l <> rangeOf r))
 
 instance ToAbstract CaseClause A.CaseClause where
   toAbstract (CaseClause patt _ body) =

@@ -133,7 +133,7 @@ data Expr
   | ArrIdx Expr Expr Loc
   | ArrUpd Expr Expr Expr Loc
   | Case Expr [CaseClause] Loc
-  | Pit (Maybe Int) Loc -- holes in expressions.  
+  | Pit Text (Maybe Int) Range -- holes in expressions, with a number.
   deriving (Eq, Show, Generic)
 
 type QuantOp' = Either Op Expr
