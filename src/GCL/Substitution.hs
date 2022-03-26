@@ -221,11 +221,11 @@ instance Substitutable Expr where
     Lam binder body l -> do
 
       -- we need to rename binders to avoid capturing
-      -- only the free vars that is also present in `body` will be renamed 
+      -- only the free vars that is also present in `body` will be renamed
       let (capturableNames, shrinkedMapping) =
             getCapturableNamesAndShrinkMapping mapping body
 
-      -- rename captured binder 
+      -- rename captured binder
       renamings <- produceBinderRenamings capturableNames [binder]
       let renamedBinder = renameBinder renamings binder
 
@@ -243,7 +243,7 @@ instance Substitutable Expr where
       let (capturableNames, shrinkedMapping) =
             getCapturableNamesAndShrinkMapping mapping expr
 
-      -- rename captured binder 
+      -- rename captured binder
       renamings <- produceBinderRenamings capturableNames binders
       let renamedBinders = map (renameBinder renamings) binders
 
@@ -297,14 +297,16 @@ instance Substitutable Expr where
         $ \(CaseClause patt body) -> CaseClause patt <$> subst mapping body
       return $ Case e cases' l
 
+    Pit _ _ -> return expr
+
 instance Substitutable FuncClause where
   subst mapping (FuncClause patterns body) = do
     -- we need to rename binders to avoid capturing
-    -- only the free vars that is also present in `body` will be renamed 
+    -- only the free vars that is also present in `body` will be renamed
     let (capturableNames, shrinkedMapping) =
           getCapturableNamesAndShrinkMapping mapping body
 
-    -- renaming captured binders in patterns 
+    -- renaming captured binders in patterns
     let bindersInPatterns = patterns >>= extractBinder
     renamings <- produceBinderRenamings capturableNames bindersInPatterns
     let renamedPatterns = map (renameBindersInPattern renamings) patterns

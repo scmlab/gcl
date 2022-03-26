@@ -55,7 +55,7 @@ handleExpr n (App p q _) = do
 
 handleExpr n (Lam p q _) =
   return $ parensIf n 0 $ "λ" <+> render p <+> "→" <+> render q
-handleExpr _ (Func name _ _) = -- display only a Func's name 
+handleExpr _ (Func name _ _) = -- display only a Func's name
   return $ render name
 handleExpr _ (Tuple ps) =
   return $ "(" <+> punctuateE "," (map render ps) <+> ")"
@@ -93,6 +93,10 @@ handleExpr _ (ArrUpd e1 e2 e3 _) =
     -- SCM: need to print parenthesis around e1 when necessary.
 handleExpr _ (Case expr cases _) =
   return $ "case" <+> render expr <+> "of" <+> vertE (map render cases)
+handleExpr _ (Pit Nothing l) =
+  return $ tempHandleLoc l "{! !}"
+handleExpr _ (Pit (Just i) l) =
+  return $ tempHandleLoc l ("{! !}" <> render i)
 
 instance Render Mapping where
   render env | null env  = mempty

@@ -168,6 +168,7 @@ instance Collect Type (J.Hover, Type) Expr where
     Case e _ _ -> do
       collect e
       -- collect patterns
+    Pit _ _ -> return ()
 
 -- instance Collect Type (J.Hover, Type) CaseClause where
 --   collect (CaseClause ctor args body) = do

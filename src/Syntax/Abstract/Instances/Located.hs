@@ -71,6 +71,7 @@ instance Located Expr where
   locOf (ArrIdx _ _ l        ) = l
   locOf (ArrUpd _ _ _ l      ) = l
   locOf (Case _ _ l          ) = l
+  locOf (Pit  _ l            ) = l
 
 instance Located CaseClause where
   locOf (CaseClause l r) = l <--> r

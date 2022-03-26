@@ -97,6 +97,7 @@ instance Free Expr where
   fv (ArrIdx e1 e2 _            ) = fv e1 <> fv e2
   fv (ArrUpd e1 e2 e3 _         ) = fv e1 <> fv e2 <> fv e3
   fv (Case e clauses _          ) = fv e <> Set.unions (map fv clauses)
+  fv (Pit _ _) = mempty
 
 instance Free FuncClause where
   fv (FuncClause patterns expr) = fv expr \\ Set.unions (map fv patterns)

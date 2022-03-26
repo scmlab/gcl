@@ -325,6 +325,7 @@ instance InferType Expr where
     t  <- freshVar
     mapM_ (\(tc, c) -> tell [(TFunc te t l, tc, locOf c)]) (zip ts cs)
     return t
+  inferType (Pit _ _) = freshVar -- SCM: that's it?
 
 instance InferType CaseClause where
   inferType c@(CaseClause patt expr) = do
