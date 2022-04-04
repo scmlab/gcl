@@ -37,13 +37,13 @@ jobs:
         key: ${{ runner.os }}-stack-work-${{ hashFiles('**.yaml') }}
         restore-keys: |
              ${{ runner.os }}-stack-work
-    - name: 💾 Cache gcl/.stack-work
-      uses: actions/cache@v2
-      with:
-        path: gcl/.stack-work
-        key: ${{ runner.os }}-gcl-stack-work-${{ hashFiles('gcl/package.yaml') }}
-        restore-keys: |
-             ${{ runner.os }}-gcl-stack-work
+    # - name: 💾 Cache gcl/.stack-work
+    #   uses: actions/cache@v2
+    #   with:
+    #     path: gcl/.stack-work
+    #     key: ${{ runner.os }}-gcl-stack-work-${{ hashFiles('gcl/package.yaml') }}
+    #     restore-keys: |
+    #          ${{ runner.os }}-gcl-stack-work
 
     # actions:
 
