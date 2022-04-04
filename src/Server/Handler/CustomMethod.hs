@@ -24,6 +24,11 @@ import           Syntax.Abstract.Util           ( programToScopeForSubstitution
 
 import qualified Language.LSP.Types            as J
 
+handleSolve :: PipelineM [ResKind]
+handleSolve = do
+  logText "SOLVE!"
+  return []
+
 handleInspect :: Range -> PipelineM [ResKind]
 handleInspect range = do
   setLastSelection range
@@ -112,6 +117,7 @@ handleCustomMethod = \case
   ReqRefine       range -> handleRefine range
   ReqInsertAnchor hash  -> handleInsertAnchor hash
   ReqSubstitute   i     -> handleSubst i
+  ReqSolve              -> handleSolve
   ReqDebug              -> return $ error "crash!"
 
 handler :: JSON.Value -> (Response -> ServerM ()) -> ServerM ()
