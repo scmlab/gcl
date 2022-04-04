@@ -697,8 +697,9 @@ type' = do
     return $ \x y -> TFunc x arrow y
 
   term :: Parser Type
-  term = do
-    parensType <|> array <|> try typeVar <|> typeName <?> "type term"
+  term = parensType <|> array <|>
+         try typeVar <|> try baseType <|>
+         typeName <?> "type term"
 
   parensType :: Parser Type
   parensType = TParen <$> tokenParenOpen <*> type' <*> tokenParenClose
@@ -706,6 +707,14 @@ type' = do
 
   typeVar :: Parser Type
   typeVar = TVar <$> lower
+
+  baseType :: Parser Type
+  baseType = do (uname, range) <- getRange upperName
+                case uname of
+                  "Int"  -> return $ TBase (TInt range)
+                  "Bool" -> return $ TBase (TBool range)
+                  "Char" -> return $ TBase (TChar range)
+                  _ ->  mzero
 
   typeName :: Parser Type
   typeName = TCon <$> upper <*> many lower
