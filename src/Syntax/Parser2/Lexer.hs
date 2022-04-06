@@ -31,6 +31,18 @@ import           Syntax.Parser2.TokenStream     ( PrettyToken(..) )
 import           Text.Regex.Applicative
 
 --------------------------------------------------------------------------------
+{-
+Main components of this module: 
+  - 'scan': Turning the source into a token stream, according to the only 'Lexer' of this module, 'lexer'.
+  - 'lexer': Defined with the set of valid tokens of gcl (the type 'Tok') and 
+      their recognizers (the type 'RE Char Tok', defining how tokens are recognized from an input string).
+  - preprocessing: In the process of scanning, it recognizes indentation informations 
+      from the primitive lexing result and replaces them into three new tokens: TokIndent,TokDedent,TokNewline
+      to form the final token stream.
+  
+  The form of the token stream: 'TokenStream (L Tok)' were decided by 'runLexer''s return type: 'TokenStream (L tok)'.
+-}
+--------------------------------------------------------------------------------
 
 -- | Tok & TokStream
 data Tok
