@@ -465,8 +465,6 @@ comment =
     <* string "--"
     -- expects any chars but newline
     <* many (psym (not . isNewline))
-    -- expects newline
-    <* psym isNewline
 
 -- for indentation bookkeeping
 newlineAndWhitespace :: RE Char Tok
