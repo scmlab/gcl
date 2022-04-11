@@ -526,13 +526,6 @@ expression = makeExprParser (term <|> caseOf) chainOpTable <?> "expression"
       ]
     ]
 
-  application :: Parser (Expr -> Expr)
-  application = do
-    terms <- many term
-    return $ \func -> do
-      let app inner t = App inner t
-      foldl app func terms
-
   unary :: (Loc -> Op) -> Tok -> Parser (Expr -> Expr)
   unary operator' tok = do
     loc <- symbol tok
@@ -558,8 +551,7 @@ expression = makeExprParser (term <|> caseOf) chainOpTable <?> "expression"
    where
     arithTable :: [[Operator Parser Expr]]
     arithTable =
-      [ [Postfix application] -- NOTE: InfixL ?
-      , [Prefix $ unary (ArithOp . NegNum) TokSub]
+      [ [Prefix $ unary (ArithOp . NegNum) TokSub]
       , [InfixN $ binary (ArithOp . Exp) TokExp]
       , [ InfixN $ binary (ArithOp . Max) TokMax
         , InfixN $ binary (ArithOp . Min) TokMin
@@ -574,6 +566,7 @@ expression = makeExprParser (term <|> caseOf) chainOpTable <?> "expression"
       , [ Prefix $ unary (ArithOp . Neg) TokNeg
         , Prefix $ unary (ArithOp . NegU) TokNegU
         ]
+      , [InfixL (return App)] --parsing application
       ]
 
     term' :: Parser Expr
