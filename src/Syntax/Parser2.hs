@@ -242,10 +242,10 @@ declaration :: Parser Declaration
 declaration = choice [constDecl, varDecl] <?> "declaration"
 
 constDecl :: Parser Declaration
-constDecl = ConstDecl <$> tokenConst <*> declType upper
+constDecl = ConstDecl <$> tokenConst <*> declType identifier
 
 varDecl :: Parser Declaration
-varDecl = VarDecl <$> tokenVar <*> declType lower
+varDecl = VarDecl <$> tokenVar <*> declType identifier
 
 -- `n : type` | `n : type { expr }` | `T a1 a2 ... = C1 ai1 ai2 .. | C2 ... | ...` | `n args = expr`
 definition :: Parser Definition
