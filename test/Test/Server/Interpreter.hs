@@ -51,11 +51,13 @@ serializeTestResultValueOnly =
 
 --------------------------------------------------------------------------------
 
+-- for logging side-effects 
 data Trace
   = TraceEditText Range Text
   | TraceGetSource
   | TraceLog Text
   | TraceSendDiagnostics [Diagnostic]
+  | TraceSolve
   deriving (Eq, Show)
 
 type TestM a = RWS FilePath [Trace] (Text, PipelineState) a
@@ -111,3 +113,6 @@ go = \case
   SendDiagnostics diagnostics next -> do
     tell [TraceSendDiagnostics diagnostics]
     interpret next
+  Solve next -> do
+    tell [TraceSolve]
+    interpret (next ())

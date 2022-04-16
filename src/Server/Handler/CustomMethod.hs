@@ -27,6 +27,7 @@ import qualified Language.LSP.Types            as J
 handleSolve :: PipelineM [ResKind]
 handleSolve = do
   logText "SOLVE!"
+  solve
   return []
 
 handleInspect :: Range -> PipelineM [ResKind]

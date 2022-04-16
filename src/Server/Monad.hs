@@ -124,6 +124,11 @@ handleCommand filepath continuation = \case
     -- send diagnostics
     sendDiagnosticsLSP filepath diagnostics
     executeOneStep filepath continuation next
+  Solve next -> do
+    liftIO $ print ("INTERACT WITH SOLVER SOMEHOW" :: String)
+     -- pass the result from the solver down 
+    let result = ()
+    executeOneStep filepath continuation (next result)
 
 --------------------------------------------------------------------------------
 
