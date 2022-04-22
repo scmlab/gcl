@@ -17,6 +17,7 @@ import           Syntax.Common
 import           Syntax.Concrete
 import           Syntax.Parser.Token
 import Syntax.Parser2.Lexer (Tok(..))
+import Data.Text (unpack)
 
 --------------------------------------------------------------------------------
 
@@ -381,6 +382,63 @@ handleOp op = case classify op of
   Postfix _ -> do
     p <- var
     return $ prettyWithLoc p <> prettyWithLoc op
+
+showWithParentheses :: Expr -> String
+showWithParentheses expr = case handleExpr' expr of
+  Expect _ -> error "strange case in printWithParenses"
+  Complete s -> s
+  where
+    handleExpr' :: Expr -> Variadic Expr String
+    handleExpr' (Paren _ x _) = handleExpr' x
+    handleExpr' (Var   x) = return $ unpack $ nameToText x
+    handleExpr' (Const x) = return $ unpack $ nameToText x
+    handleExpr' (Lit   x) = case x of
+      LitInt n _ -> return $ show n
+      LitBool b _ -> return $ show b
+      LitChar c _ -> return $ show c
+    handleExpr' (Op    x) = handleOp' x
+    handleExpr' (Arr arr _ i _) = do
+      arrs <- handleExpr' arr
+      inds   <- handleExpr' i
+      return $  arrs <> "[" <> inds <> "]"
+    handleExpr' (App p q) = case handleExpr' p of
+      Expect   f -> f q
+      Complete s -> do
+        t <- handleExpr' q
+        return $ "(" <> s <> " " <> t <> ")"
+    handleExpr' q@(Quant open op xs m r n t close) =
+      return $ show $ pretty q
+    handleExpr' c@(Case a expr b cases) =
+      return $ show $ pretty c
+
+    handleOp' :: Op -> Variadic Expr String
+    handleOp' op = case classify op of
+      Infix _ -> do
+        p <- var
+        q <- var
+        ps <- handleExpr' p
+        qs <- handleExpr' q
+        return $ "(" <> ps <> show (pretty op) <> qs <> ")"
+      InfixL _ -> do
+        p <- var
+        q <- var
+        ps <- handleExpr' p
+        qs <- handleExpr' q
+        return $ "(" <> ps <> show (pretty op) <> qs <> ")"
+      InfixR _ -> do
+        p <- var
+        q <- var
+        ps <- handleExpr' p
+        qs <- handleExpr' q
+        return $ "(" <> ps <> show (pretty op) <> qs <> ")"
+      Prefix _ -> do
+        p <- var
+        ps <- handleExpr' p
+        return $ "(" <> show (pretty op) <> ps <> ")"
+      Postfix _ -> do
+        p <- var
+        ps <- handleExpr' p
+        return $ "(" <> ps <> show (pretty op) <> ")"
 
 --------------------------------------------------------------------------------
 -- | Pattern
