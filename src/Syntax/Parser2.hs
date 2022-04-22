@@ -566,11 +566,34 @@ expression = makeExprParser (term <|> caseOf) chainOpTable <?> "expression"
       , [ Prefix $ unary (ArithOp . Neg) TokNeg
         , Prefix $ unary (ArithOp . NegU) TokNegU
         ]
-      , [InfixL (return App)] --parsing application
       ]
 
     term' :: Parser Expr
     term' =
+      choice
+          [ Lit <$> literal
+          , try array
+          , combineWithApp <$> parensExpr <*> many singleterm'
+          , combineWithApp <$> (Var <$> lower) <*> many singleterm'
+          , combineWithApp <$> (Const <$> upper) <*> many singleterm'
+          , Quant
+          <$> choice [Left <$> tokenQuantOpen, Right <$> tokenQuantOpenU]
+          <*> choice [Left <$> operator, Right <$> term']
+          <*> some lower
+          <*> tokenColon
+          <*> expression
+          <*> tokenColon
+          <*> expression
+          <*> choice [Left <$> tokenQuantClose, Right <$> tokenQuantCloseU]
+          ]
+        <?> "term"
+      where
+        -- | Handling application,e.g., letting "f 1+2" to be parsed as '(f 1)+2'
+        combineWithApp :: Expr -> [Expr] -> Expr
+        combineWithApp = foldl App
+    
+    singleterm' :: Parser Expr
+    singleterm' =
       choice
           [ Lit <$> literal
           , try array
