@@ -264,7 +264,7 @@ data Instruction next
   | GetSource (Text -> next) -- ^ Read the content of a file from the LSP filesystem
   | Log Text next -- ^ Make some noise
   | SendDiagnostics [J.Diagnostic] next -- ^ Send Diagnostics
-  | Solve (() -> next) -- ^ Interact with the solver somehow
+  | Solve Text (Text -> next) -- ^ Interact with the solver somehow
   deriving (Functor)
 
 initState :: FilePath -> PipelineState
@@ -374,8 +374,8 @@ getLastSelection = do
 logText :: Text -> PipelineM ()
 logText text = liftF (Log text ())
 
-solve :: PipelineM ()
-solve = liftF (Solve id)
+solve :: Text -> PipelineM ()
+solve hash = liftF (Solve hash (const ()))
 
 bumpVersion :: PipelineM Int
 bumpVersion = do

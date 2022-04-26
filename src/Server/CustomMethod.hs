@@ -65,7 +65,7 @@ data ReqKind
   | ReqRefine Range
   | ReqInsertAnchor Text
   | ReqSubstitute Int
-  | ReqSolve
+  | ReqSolve Text
   | ReqDebug
   deriving (Generic)
 
@@ -76,7 +76,7 @@ instance Show ReqKind where
   show (ReqRefine       range) = "Refine " <> show (ShortRange range)
   show (ReqInsertAnchor hash ) = "InsertAnchor " <> show hash
   show (ReqSubstitute   i    ) = "Substitute " <> show i
-  show ReqSolve                = "Solve"
+  show (ReqSolve        hash ) = "Solve" <> show hash
   show ReqDebug                = "Debug"
 
 data Request = Req FilePath ReqKind

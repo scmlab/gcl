@@ -47,6 +47,7 @@ import           Server.Pipeline                ( Instruction(..)
                                                 )
 import qualified Server.Pipeline               as DSL
 import qualified Server.SrcLoc                 as SrcLoc
+import qualified Data.Text as Text
 
 --------------------------------------------------------------------------------
 
@@ -124,10 +125,10 @@ handleCommand filepath continuation = \case
     -- send diagnostics
     sendDiagnosticsLSP filepath diagnostics
     executeOneStep filepath continuation next
-  Solve next -> do
-    liftIO $ print ("INTERACT WITH SOLVER SOMEHOW" :: String)
+  Solve hash next -> do
+    liftIO $ print ("INTERACT WITH SOLVER SOMEHOW (hash of PO: " ++ Text.unpack hash ++ ")")
      -- pass the result from the solver down 
-    let result = ()
+    let result = "some result"
     executeOneStep filepath continuation (next result)
 
 --------------------------------------------------------------------------------

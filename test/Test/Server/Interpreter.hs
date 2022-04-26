@@ -57,7 +57,7 @@ data Trace
   | TraceGetSource
   | TraceLog Text
   | TraceSendDiagnostics [Diagnostic]
-  | TraceSolve
+  | TraceSolve Text
   deriving (Eq, Show)
 
 type TestM a = RWS FilePath [Trace] (Text, PipelineState) a
@@ -113,6 +113,6 @@ go = \case
   SendDiagnostics diagnostics next -> do
     tell [TraceSendDiagnostics diagnostics]
     interpret next
-  Solve next -> do
-    tell [TraceSolve]
-    interpret (next ())
+  Solve hash next -> do
+    tell [TraceSolve hash]
+    interpret (next "some result")
