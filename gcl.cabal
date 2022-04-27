@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 9737fa07463018d2347f245a6caade6f8a713126c35325b6818059582c74098d
+-- hash: b27fd6f7c9445c3c9133b32754d81b2b903f47d5b7d68fca4951ae02520a9c01
 
 name:           gcl
 version:        0.1.0.0
@@ -37,6 +37,7 @@ library
       GCL.WP
       GCL.WP.Explanation
       GCL.WP.Type
+      InGHCI
       Pretty
       Pretty.Abstract
       Pretty.Common
@@ -67,6 +68,7 @@ library
       Server.Monad
       Server.Pipeline
       Server.SrcLoc
+      SMT.Prove
       Syntax.Abstract
       Syntax.Abstract.Instances.Json
       Syntax.Abstract.Instances.Located
@@ -88,6 +90,8 @@ library
       Syntax.Parser.Token
       Syntax.Parser.TokenStream
       Syntax.Parser.Util
+      TryExceptT
+      TryProve
   other-modules:
       Paths_gcl
   hs-source-dirs:
@@ -113,6 +117,7 @@ library
     , prettyprinter
     , random
     , regex-applicative
+    , sbv
     , srcloc
     , template-haskell
     , text
@@ -148,6 +153,7 @@ executable gcl
     , prettyprinter
     , random
     , regex-applicative
+    , sbv
     , srcloc
     , template-haskell
     , text
@@ -183,6 +189,7 @@ test-suite gcl-test
       GCL.WP
       GCL.WP.Explanation
       GCL.WP.Type
+      InGHCI
       Pretty
       Pretty.Abstract
       Pretty.Common
@@ -213,6 +220,7 @@ test-suite gcl-test
       Server.Monad
       Server.Pipeline
       Server.SrcLoc
+      SMT.Prove
       Syntax.Abstract
       Syntax.Abstract.Instances.Json
       Syntax.Abstract.Instances.Located
@@ -234,6 +242,8 @@ test-suite gcl-test
       Syntax.Parser.Token
       Syntax.Parser.TokenStream
       Syntax.Parser.Util
+      TryExceptT
+      TryProve
       Paths_gcl
   hs-source-dirs:
       test
@@ -259,6 +269,7 @@ test-suite gcl-test
     , prettyprinter
     , random
     , regex-applicative
+    , sbv
     , srcloc
     , tasty
     , tasty-golden
