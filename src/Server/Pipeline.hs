@@ -47,6 +47,11 @@ import           Syntax.Parser                  ( Parser
                                                 , pStmts
                                                 , runParse
                                                 )
+import           Data.SBV                       ( ThmResult
+                                                , Symbolic
+                                                , SBool
+                                                )
+import           SMT.Prove                      ( makeProvable )
 
 --------------------------------------------------------------------------------
 -- | Stages of the processing pipeline
@@ -264,7 +269,7 @@ data Instruction next
   | GetSource (Text -> next) -- ^ Read the content of a file from the LSP filesystem
   | Log Text next -- ^ Make some noise
   | SendDiagnostics [J.Diagnostic] next -- ^ Send Diagnostics
-  | Solve Text (Text -> next) -- ^ Interact with the solver somehow
+  | Solve (Symbolic SBool) (ThmResult -> next) -- ^ Send the provable function
   deriving (Functor)
 
 initState :: FilePath -> PipelineState
@@ -375,7 +380,22 @@ logText :: Text -> PipelineM ()
 logText text = liftF (Log text ())
 
 solve :: Text -> PipelineM ()
-solve hash = liftF (Solve hash (const ()))
+--solve hash = liftF (Solve hash (const ()))
+solve hash = do
+  pps <- gets pipelineStage
+  case pps of 
+    Swept result -> 
+      let pos = sweptPOs result
+          maybePo = findPO pos
+          props = sweptProps result
+      in case maybePo of
+        Nothing -> return ()
+        Just po -> liftF (Solve (makeProvable po props) (const ()))
+            
+    _            -> return ()
+
+  where findPO :: [PO] -> Maybe PO
+        findPO pos = find ((hash ==) . poAnchorHash) pos
 
 bumpVersion :: PipelineM Int
 bumpVersion = do

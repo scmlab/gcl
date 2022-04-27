@@ -26,7 +26,7 @@ import qualified Language.LSP.Types            as J
 
 handleSolve :: Text -> PipelineM [ResKind]
 handleSolve hash = do
-  logText $ "SOLVE " <> hash
+  --logText $ "SOLVE " <> hash
   solve hash
   return []
 

@@ -47,7 +47,7 @@ import           Server.Pipeline                ( Instruction(..)
                                                 )
 import qualified Server.Pipeline               as DSL
 import qualified Server.SrcLoc                 as SrcLoc
-import qualified Data.Text as Text
+import           Data.SBV                       ( prove )
 
 --------------------------------------------------------------------------------
 
@@ -125,10 +125,13 @@ handleCommand filepath continuation = \case
     -- send diagnostics
     sendDiagnosticsLSP filepath diagnostics
     executeOneStep filepath continuation next
-  Solve hash next -> do
-    liftIO $ print ("INTERACT WITH SOLVER SOMEHOW (hash of PO: " ++ Text.unpack hash ++ ")")
+  Solve provable next -> do
      -- pass the result from the solver down 
-    let result = "some result"
+     -- the result is of type ThmResult
+     -- see https://hackage.haskell.org/package/sbv-8.17/docs/Data-SBV.html#t:ThmResult
+     -- for more information
+    result <- liftIO $ prove provable
+    liftIO $ print result
     executeOneStep filepath continuation (next result)
 
 --------------------------------------------------------------------------------
