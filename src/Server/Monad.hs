@@ -47,7 +47,10 @@ import           Server.Pipeline                ( Instruction(..)
                                                 )
 import qualified Server.Pipeline               as DSL
 import qualified Server.SrcLoc                 as SrcLoc
-import           Data.SBV                       ( prove )
+import Data.SBV                                 ( prove,
+                                                  defaultSMTCfg,
+                                                  SMTResult(ProofError),
+                                                  ThmResult(ThmResult) )                       
 
 --------------------------------------------------------------------------------
 
@@ -125,14 +128,18 @@ handleCommand filepath continuation = \case
     -- send diagnostics
     sendDiagnosticsLSP filepath diagnostics
     executeOneStep filepath continuation next
-  Solve provable next -> do
+  Solve provable next ->
      -- pass the result from the solver down 
      -- the result is of type ThmResult
      -- see https://hackage.haskell.org/package/sbv-8.17/docs/Data-SBV.html#t:ThmResult
      -- for more information
-    result <- liftIO $ prove provable
-    liftIO $ print result
-    executeOneStep filepath continuation (next result)
+    case provable of
+      Nothing -> 
+        executeOneStep filepath continuation (next (ThmResult (ProofError defaultSMTCfg ["hash not found"] Nothing)))
+      (Just x) -> do
+        result <- liftIO $ prove x
+        --liftIO $ print result
+        executeOneStep filepath continuation (next result)
 
 --------------------------------------------------------------------------------
 

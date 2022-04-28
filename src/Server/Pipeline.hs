@@ -269,7 +269,7 @@ data Instruction next
   | GetSource (Text -> next) -- ^ Read the content of a file from the LSP filesystem
   | Log Text next -- ^ Make some noise
   | SendDiagnostics [J.Diagnostic] next -- ^ Send Diagnostics
-  | Solve (Symbolic SBool) (ThmResult -> next) -- ^ Send the provable function
+  | Solve (Maybe (Symbolic SBool)) (ThmResult -> next) -- ^ Send the provable function
   deriving (Functor)
 
 initState :: FilePath -> PipelineState
@@ -379,7 +379,7 @@ getLastSelection = do
 logText :: Text -> PipelineM ()
 logText text = liftF (Log text ())
 
-solve :: Text -> PipelineM ()
+solve :: Text -> PipelineM ThmResult
 --solve hash = liftF (Solve hash (const ()))
 solve hash = do
   pps <- gets pipelineStage
@@ -389,10 +389,10 @@ solve hash = do
           maybePo = findPO pos
           props = sweptProps result
       in case maybePo of
-        Nothing -> return ()
-        Just po -> liftF (Solve (makeProvable po props) (const ()))
+        Nothing -> liftF (Solve Nothing id)
+        Just po -> liftF (Solve (Just (makeProvable po props)) id)
             
-    _            -> return ()
+    _            -> undefined --should be unreachable case
 
   where findPO :: [PO] -> Maybe PO
         findPO pos = find ((hash ==) . poAnchorHash) pos
