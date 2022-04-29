@@ -558,7 +558,7 @@ generateSolveAndDiagnostics result hash solveResult = do
             getHash (Section _ (HeaderWithButtons _ _ h _:_)) = h
             getHash _ = undefined -- should be unreachable case
             replaceTheSolved sec@(Section deco blocks)
-              | ((hash==) $ getHash sec) = Section deco $ init blocks <> [Paragraph (render solveResult)]
+              | ((hash==) $ getHash sec) = Section deco $ init blocks <> [Paragraph (render solveResult)] <> [last blocks]
               | otherwise = sec
         in map replaceTheSolved ori_sections
   let sections = mconcat
