@@ -519,3 +519,66 @@ generateResponseAndDiagnostics result = do
   sendDiagnostics diagnostics
 
   return responses
+
+
+-----------
+generateSolveAndDiagnostics :: SweepResult -> Text -> String -> PipelineM [ResKind]
+generateSolveAndDiagnostics result hash solveResult = do
+  let (SweepResult _ pos specs globalProps warnings _redexes _) = result
+
+  -- get Specs around the mouse selection
+  lastSelection <- getLastSelection
+  let overlappedSpecs = case lastSelection of
+        Nothing        -> specs
+        Just selection -> filter (withinRange selection) specs
+  -- get POs around the mouse selection (including their corresponding Proofs)
+
+  let withinPOrange sel po = case poAnchorLoc po of
+        Nothing     -> withinRange sel po
+        Just anchor -> withinRange sel po || withinRange sel anchor
+
+  let overlappedPOs = case lastSelection of
+        Nothing        -> pos
+        Just selection -> filter (withinPOrange selection) pos
+  -- render stuff
+  let warningsSections =
+        if null warnings then [] else map renderSection warnings
+  let globalPropsSections = if null globalProps
+        then []
+        else map
+          (\expr -> Section
+            Plain
+            [Header "Property" (fromLoc (locOf expr)), Code (render expr)]
+          )
+          globalProps
+  let specsSections =
+        if null overlappedSpecs then [] else map renderSection overlappedSpecs
+  let poSections =
+        let ori_sections = if null overlappedPOs then [] else map renderSection overlappedPOs
+            getHash (Section _ (HeaderWithButtons _ _ h _:_)) = h
+            getHash _ = undefined -- should be unreachable case
+            replaceTheSolved sec@(Section deco blocks)
+              | ((hash==) $ getHash sec) = Section deco $ init blocks <> [Paragraph (render solveResult)]
+              | otherwise = sec
+        in map replaceTheSolved ori_sections
+  let sections = mconcat
+        [warningsSections, specsSections, poSections, globalPropsSections]
+
+  version <- bumpVersion
+  let encodeSpec spec =
+        ( specID spec
+        , toText $ render (specPreCond spec)
+        , toText $ render (specPostCond spec)
+        , specRange spec
+        )
+
+  let rangesOfPOs = mapMaybe (fromLoc . locOf) pos
+  let responses =
+        [ ResDisplay version sections
+        , ResUpdateSpecs (map encodeSpec specs)
+        , ResMarkPOs rangesOfPOs
+        ]
+  let diagnostics = concatMap collect warnings
+  sendDiagnostics diagnostics
+
+  return responses

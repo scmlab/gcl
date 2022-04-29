@@ -28,8 +28,11 @@ handleSolve :: Text -> PipelineM [ResKind]
 handleSolve hash = do
   logText $ "SOLVE " <> hash
   resultFromSolver <- solve hash
-  logText $ "RESULT FROM SOLVER:  " <> resultFromSolver
-  return [ResConsoleLog resultFromSolver]
+  logText $ "RESULT FROM SOLVER:  " <> Text.pack (show resultFromSolver)
+  stage <- load
+  case stage of
+    Swept swept -> generateSolveAndDiagnostics swept hash (show resultFromSolver)
+    _           -> return []
 
 handleInspect :: Range -> PipelineM [ResKind]
 handleInspect range = do
