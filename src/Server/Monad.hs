@@ -47,10 +47,11 @@ import           Server.Pipeline                ( Instruction(..)
                                                 )
 import qualified Server.Pipeline               as DSL
 import qualified Server.SrcLoc                 as SrcLoc
-import Data.SBV                                 ( prove,
-                                                  defaultSMTCfg,
-                                                  SMTResult(ProofError),
-                                                  ThmResult(ThmResult) )                       
+import Data.SBV                                 ( prove
+                                                , defaultSMTCfg
+                                                , SMTResult(ProofError)
+                                                , ThmResult(ThmResult)
+                                                , getAvailableSolvers )                       
 
 --------------------------------------------------------------------------------
 
@@ -137,6 +138,10 @@ handleCommand filepath continuation = \case
       Nothing -> 
         executeOneStep filepath continuation (next (ThmResult (ProofError defaultSMTCfg ["hash not found"] Nothing)))
       (Just x) -> do
+        solvers <- liftIO getAvailableSolvers
+        case solvers of
+          [] -> executeOneStep filepath continuation (next (ThmResult (ProofError defaultSMTCfg ["SMT solver not found"] Nothing)))
+          _  -> return ()
         result <- liftIO $ prove x
         --liftIO $ print result
         executeOneStep filepath continuation (next result)
