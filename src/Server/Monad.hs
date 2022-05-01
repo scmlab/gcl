@@ -51,7 +51,7 @@ import Data.SBV                                 ( prove
                                                 , defaultSMTCfg
                                                 , SMTResult(ProofError)
                                                 , ThmResult(ThmResult)
-                                                , getAvailableSolvers )                       
+                                                , getAvailableSolvers, proveWith, sbvCheckSolverInstallation, z3 )
 
 --------------------------------------------------------------------------------
 
@@ -135,14 +135,13 @@ handleCommand filepath continuation = \case
      -- see https://hackage.haskell.org/package/sbv-8.17/docs/Data-SBV.html#t:ThmResult
      -- for more information
     case provable of
-      Nothing -> 
+      Nothing ->
         executeOneStep filepath continuation (next (ThmResult (ProofError defaultSMTCfg ["hash not found"] Nothing)))
       (Just x) -> do
-        solvers <- liftIO getAvailableSolvers
-        case solvers of
-          [] -> executeOneStep filepath continuation (next (ThmResult (ProofError defaultSMTCfg ["SMT solver not found"] Nothing)))
-          _  -> return ()
-        result <- liftIO $ prove x
+        hasZ3 <- liftIO $ sbvCheckSolverInstallation z3
+        result <- if hasZ3
+          then liftIO $ proveWith z3 x
+          else return $ ThmResult (ProofError defaultSMTCfg ["SMT solver not found"] Nothing)
         --liftIO $ print result
         executeOneStep filepath continuation (next result)
 
