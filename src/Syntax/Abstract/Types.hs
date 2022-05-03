@@ -125,7 +125,9 @@ data Expr
     (Set Name) -- free variables in that expression
                -- NOTE, the expression may be some definition like "P",
               --  in that case, the free variables should be that of after it's been expanded
-    (NonEmpty Mapping) -- a list of mappings of substitutions to be displayed to users
+    (NonEmpty Mapping) 
+      -- a list of mappings of substitutions to be displayed to users (the `[ x \ a ] [ y \ b ]` part)
+      -- The order is reflected.
   -- The outermost part of a Redex
   | RedexShell
       Int -- for identifying Redexes in frontend-backend interactions 

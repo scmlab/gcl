@@ -392,7 +392,7 @@ solve hash = do
         Nothing -> liftF (Solve Nothing id)
         Just po -> liftF (Solve (Just (makeProvable po props)) id)
             
-    _            -> undefined --should be unreachable case
+    _            -> throwError [Others "An unconsidered case in Server.Pipeline.solve"]
 
   where findPO :: [PO] -> Maybe PO
         findPO pos = find ((hash ==) . poAnchorHash) pos
@@ -556,7 +556,7 @@ generateSolveAndDiagnostics result hash solveResult = do
   let poSections =
         let ori_sections = if null overlappedPOs then [] else map renderSection overlappedPOs
             getHash (Section _ (HeaderWithButtons _ _ h _:_)) = h
-            getHash _ = undefined -- should be unreachable case
+            getHash _ = error "Entered a strange case in Server.Pipeline.generateSolveAndDiagnostics"
             replaceTheSolved sec@(Section deco blocks)
               | ((hash==) $ getHash sec) = Section deco $ init blocks <> [Paragraph (render solveResult)] <> [last blocks]
               | otherwise = sec
