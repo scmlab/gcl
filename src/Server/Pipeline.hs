@@ -47,11 +47,9 @@ import           Syntax.Parser                  ( Parser
                                                 , pStmts
                                                 , runParse
                                                 )
-import           Data.SBV                       ( ThmResult
-                                                , Symbolic
-                                                , SBool
-                                                )
-import           SMT.Prove                      ( makeProvable )
+import qualified SMT.Prove                     as P
+                                               ( makeProvable, Error(..), provableIsOriginal )
+import Data.SBV (Symbolic, SBool)
 
 --------------------------------------------------------------------------------
 -- | Stages of the processing pipeline
@@ -269,7 +267,7 @@ data Instruction next
   | GetSource (Text -> next) -- ^ Read the content of a file from the LSP filesystem
   | Log Text next -- ^ Make some noise
   | SendDiagnostics [J.Diagnostic] next -- ^ Send Diagnostics
-  | Solve (Maybe (Symbolic SBool)) (ThmResult -> next) -- ^ Send the provable function
+  | Solve (Either P.Error (Symbolic SBool, Bool)) (String -> next) -- ^ Send the provable function
   deriving (Functor)
 
 initState :: FilePath -> PipelineState
@@ -379,7 +377,7 @@ getLastSelection = do
 logText :: Text -> PipelineM ()
 logText text = liftF (Log text ())
 
-solve :: Text -> PipelineM ThmResult
+solve :: Text -> PipelineM String
 --solve hash = liftF (Solve hash (const ()))
 solve hash = do
   pps <- gets pipelineStage
@@ -389,8 +387,9 @@ solve hash = do
           maybePo = findPO pos
           props = sweptProps result
       in case maybePo of
-        Nothing -> liftF (Solve Nothing id)
-        Just po -> liftF (Solve (Just (makeProvable po props)) id)
+        Nothing -> liftF (Solve (Left P.PONotFoundError) id)
+        Just po -> do
+          liftF (Solve (Right (P.makeProvable po props, P.provableIsOriginal po props)) id)
             
     _            -> undefined --should be unreachable case
 

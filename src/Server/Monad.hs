@@ -47,11 +47,10 @@ import           Server.Pipeline                ( Instruction(..)
                                                 )
 import qualified Server.Pipeline               as DSL
 import qualified Server.SrcLoc                 as SrcLoc
-import Data.SBV                                 ( prove
-                                                , defaultSMTCfg
-                                                , SMTResult(ProofError)
+import Data.SBV                                 ( defaultSMTCfg
+                                                , SMTResult(ProofError, Unsatisfiable, Satisfiable)
                                                 , ThmResult(ThmResult)
-                                                , getAvailableSolvers, proveWith, sbvCheckSolverInstallation, z3 )
+                                                , proveWith, sbvCheckSolverInstallation, z3 )
 
 --------------------------------------------------------------------------------
 
@@ -135,15 +134,22 @@ handleCommand filepath continuation = \case
      -- see https://hackage.haskell.org/package/sbv-8.17/docs/Data-SBV.html#t:ThmResult
      -- for more information
     case provable of
-      Nothing ->
-        executeOneStep filepath continuation (next (ThmResult (ProofError defaultSMTCfg ["hash not found"] Nothing)))
-      (Just x) -> do
+      Left e ->
+        executeOneStep filepath continuation (next $ show e)
+      Right (p, original) -> do
         hasZ3 <- liftIO $ sbvCheckSolverInstallation z3
-        result <- if hasZ3
-          then liftIO $ proveWith z3 x
-          else return $ ThmResult (ProofError defaultSMTCfg ["SMT solver not found"] Nothing)
-        --liftIO $ print result
+        ThmResult proveResult <- if not hasZ3
+          then return $ ThmResult (ProofError defaultSMTCfg ["z3 is not installed"] Nothing)
+          else liftIO $ proveWith z3 p
+        result <- case proveResult of
+          Unsatisfiable _ _ -> return $ show (ThmResult proveResult)
+          Satisfiable   _ _ -> 
+            if original
+              then return "Falsifiable"
+              else return "Unknown"
+          _ -> return "Uncatched case"
         executeOneStep filepath continuation (next result)
+
 
 --------------------------------------------------------------------------------
 
