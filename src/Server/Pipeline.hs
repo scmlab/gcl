@@ -399,7 +399,7 @@ solve hash = do
         Just po -> do
           -- Preprocess to reduce the redexes shown in the exprs into normal exprs.
           po' <- preProcPO po 
-          props' <- mapM eliminateRedexes props
+          props' <- mapM (eliminateRedexes 20) props
           liftF (Solve (Right (P.makeProvable po' props', P.provableIsOriginal po' props')) id)
 
     _            -> throwError [Others "An unconsidered case in Server.Pipeline.solve"]
@@ -422,8 +422,8 @@ solve hash = do
           Negate pr -> Negate <$> mapExprOnPred f pr
         preProcPO :: PO -> PipelineM PO
         preProcPO (PO prePred postPred a b c) = do
-          prePred' <- mapExprOnPred eliminateRedexes prePred
-          postPred' <- mapExprOnPred eliminateRedexes postPred
+          prePred' <- mapExprOnPred (eliminateRedexes 20) prePred
+          postPred' <- mapExprOnPred (eliminateRedexes 20) postPred
           return (PO prePred' postPred' a b c)
 
 bumpVersion :: PipelineM Int
@@ -643,21 +643,24 @@ reduceRedex i = do
 
 -- | The returned Expr should contain no redex(any RedexShell or RedexKernel).
 -- But this requirement isn't satisfied yet (see TODO in function definition).
-eliminateRedexes :: A.Expr -> PipelineM A.Expr
-eliminateRedexes (A.RedexShell n _) = reduceRedex n >>= eliminateRedexes
-eliminateRedexes (A.App ex1 ex2 l) = do
+eliminateRedexes :: Int -> A.Expr -> PipelineM A.Expr
+eliminateRedexes steps expr 
+  | steps <= 0 = return expr
+  | otherwise = case expr of
+    A.RedexShell n _ -> reduceRedex n >>= eliminateRedexes (steps-1)
+    A.App ex1 ex2 l -> do
       -- this case might not be this simple?
-      ex1' <- eliminateRedexes ex1
-      ex2' <- eliminateRedexes ex2
+      ex1' <- eliminateRedexes (steps-1) ex1
+      ex2' <- eliminateRedexes (steps-1) ex2
       return (A.App ex1' ex2' l)
-eliminateRedexes (A.Lam n ex l) = do
-      ex' <- eliminateRedexes ex
+    A.Lam n ex l -> do
+      ex' <- eliminateRedexes (steps-1) ex
       return $ A.Lam n ex' l
--- TODO: complete cases below:
--- eliminateRedexes (Func n cls l) = undefined
--- eliminateRedexes (Tuple exs)              = undefined
--- eliminateRedexes (Quant ex nas ex' ex2 l) = undefined
--- eliminateRedexes (ArrIdx ex ex' l)        = undefined
--- eliminateRedexes (ArrUpd ex ex' ex2 l)    = undefined 
--- eliminateRedexes (Case ex css l)          = undefined
-eliminateRedexes x                = return x
+    -- TODO: complete cases below:
+    -- A.Func na ne loc -> _
+    -- A.Tuple exs -> _
+    -- A.Quant ex nas ex' ex3 loc -> _
+    -- A.ArrIdx ex ex' loc -> _
+    -- A.ArrUpd ex ex' ex3 loc -> _
+    -- A.Case ex ccs loc -> _
+    _ -> return expr
