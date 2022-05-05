@@ -385,7 +385,6 @@ logText :: Text -> PipelineM ()
 logText text = liftF (Log text ())
 
 solve :: Text -> PipelineM String
---solve hash = liftF (Solve hash (const ()))
 solve hash = do
   pps <- gets pipelineStage
   case pps of
@@ -650,11 +649,11 @@ eliminateRedexes steps expr
     A.RedexShell n _ -> reduceRedex n >>= eliminateRedexes (steps-1)
     A.App ex1 ex2 l -> do
       -- this case might not be this simple?
-      ex1' <- eliminateRedexes (steps-1) ex1
-      ex2' <- eliminateRedexes (steps-1) ex2
+      ex1' <- eliminateRedexes steps ex1
+      ex2' <- eliminateRedexes steps ex2
       return (A.App ex1' ex2' l)
     A.Lam n ex l -> do
-      ex' <- eliminateRedexes (steps-1) ex
+      ex' <- eliminateRedexes steps ex
       return $ A.Lam n ex' l
     -- TODO: complete cases below:
     -- A.Func na ne loc -> _
