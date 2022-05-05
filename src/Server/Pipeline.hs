@@ -21,6 +21,7 @@ import qualified Data.Text                     as Text
 import           Error
 import           GCL.Predicate
 import           GCL.Predicate.Util             ( specPayloadWithoutIndentation
+                                                , toExpr
                                                 )
 import qualified GCL.Type                      as TypeChecking
 import qualified GCL.WP                        as WP
@@ -50,6 +51,12 @@ import           Syntax.Parser                  ( Parser
 import qualified SMT.Prove                     as P
                                                ( makeProvable, Error(..), provableIsOriginal )
 import Data.SBV (Symbolic, SBool)
+----added for eliminateRedexes
+import qualified Data.IntMap                   as IntMap
+import qualified GCL.Substitution              as Substitution
+import           Syntax.Abstract.Util           ( programToScopeForSubstitution
+                                                )
+import           Control.Monad.State            ( runState )
 
 --------------------------------------------------------------------------------
 -- | Stages of the processing pipeline
@@ -381,20 +388,43 @@ solve :: Text -> PipelineM String
 --solve hash = liftF (Solve hash (const ()))
 solve hash = do
   pps <- gets pipelineStage
-  case pps of 
-    Swept result -> 
+  case pps of
+    Swept result -> do
       let pos = sweptPOs result
           maybePo = findPO pos
           props = sweptProps result
-      in case maybePo of
+          --need to preprocess the PO, and props
+      case maybePo of
         Nothing -> liftF (Solve (Left P.PONotFoundError) id)
         Just po -> do
-          liftF (Solve (Right (P.makeProvable po props, P.provableIsOriginal po props)) id)
-            
+          -- Preprocess to reduce the redexes shown in the exprs into normal exprs.
+          po' <- preProcPO po 
+          props' <- mapM eliminateRedexes props
+          liftF (Solve (Right (P.makeProvable po' props', P.provableIsOriginal po' props')) id)
+
     _            -> throwError [Others "An unconsidered case in Server.Pipeline.solve"]
 
   where findPO :: [PO] -> Maybe PO
         findPO pos = find ((hash ==) . poAnchorHash) pos
+        mapExprOnPred :: (A.Expr -> PipelineM A.Expr) -> Pred -> PipelineM Pred
+        mapExprOnPred f pred = case pred of
+          Constant ex -> Constant <$> f ex
+          GuardIf ex loc -> (`GuardIf` loc) <$> f ex
+          GuardLoop ex loc -> (`GuardLoop` loc) <$> f ex
+          Assertion ex loc -> (`Assertion` loc) <$> f ex
+          LoopInvariant ex1 ex2 loc -> do
+            ex1' <- f ex1
+            ex2' <- f ex2
+            return $ LoopInvariant ex1' ex2' loc
+          Bound ex loc -> (`Bound` loc) <$> f ex
+          Conjunct prs -> Conjunct <$> mapM (mapExprOnPred f) prs
+          Disjunct prs -> Disjunct <$> mapM (mapExprOnPred f) prs
+          Negate pr -> mapExprOnPred f pr
+        preProcPO :: PO -> PipelineM PO
+        preProcPO (PO prePred postPred a b c) = do
+          prePred' <- mapExprOnPred eliminateRedexes prePred
+          postPred' <- mapExprOnPred eliminateRedexes postPred
+          return (PO prePred' postPred' a b c)
 
 bumpVersion :: PipelineM Int
 bumpVersion = do
@@ -581,3 +611,53 @@ generateSolveAndDiagnostics result hash solveResult = do
   sendDiagnostics diagnostics
 
   return responses
+
+
+----------------
+
+reduceRedex :: Int -> PipelineM A.Expr
+reduceRedex i = do
+  stage <- load
+  logText $ Text.pack $ "Substituting Redex " <> show i
+  --
+  case stage of
+    Swept  result -> do
+      let program = convertedProgram
+            (typeCheckedPreviousStage (sweptPreviousStage result))
+      case IntMap.lookup i (sweptRedexes result) of
+        Nothing         -> throwError [Others $ "Cannot find the redex with index: "<>show i]
+        Just (_, redex) -> do
+          let scope = programToScopeForSubstitution program
+          let (newExpr, counter) =
+                runState (Substitution.step scope redex) (sweptCounter result)
+          let redexesInNewExpr = Substitution.buildRedexMap newExpr
+          let newResult = result
+                { sweptCounter = counter
+                , sweptRedexes = sweptRedexes result <> redexesInNewExpr
+                }
+          save (Swept newResult)
+          return newExpr
+
+    _      -> throwError [Others "Invoked reduceRedex in a wrong stage."]
+    -- TODO: extend applicable stages
+
+-- | The returned Expr should contain no redex(any RedexShell or RedexKernel).
+-- But this requirement isn't satisfied yet (see TODO in function definition).
+eliminateRedexes :: A.Expr -> PipelineM A.Expr
+eliminateRedexes (A.RedexShell n _) = reduceRedex n >>= eliminateRedexes
+eliminateRedexes (A.App ex1 ex2 l) = do
+      -- this case might not be this simple?
+      ex1' <- eliminateRedexes ex1
+      ex2' <- eliminateRedexes ex2
+      return (A.App ex1' ex2' l)
+eliminateRedexes (A.Lam n ex l) = do
+      ex' <- eliminateRedexes ex
+      return $ A.Lam n ex' l
+-- TODO: complete cases below:
+-- eliminateRedexes (Func n cls l) = undefined
+-- eliminateRedexes (Tuple exs)              = undefined
+-- eliminateRedexes (Quant ex nas ex' ex2 l) = undefined
+-- eliminateRedexes (ArrIdx ex ex' l)        = undefined
+-- eliminateRedexes (ArrUpd ex ex' ex2 l)    = undefined 
+-- eliminateRedexes (Case ex css l)          = undefined
+eliminateRedexes x                = return x

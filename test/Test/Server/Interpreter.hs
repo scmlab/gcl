@@ -118,4 +118,4 @@ go = \case
     -- not sure what I should do with this
     -- just some placeholder to make the code compile
     tell [TraceSolve "Solve !"]
-    interpret (next (ThmResult (Unsatisfiable defaultSMTCfg Nothing)))
+    interpret (next "Nothing here yet")
