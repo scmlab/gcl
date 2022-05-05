@@ -141,13 +141,13 @@ handleCommand filepath continuation = \case
         ThmResult proveResult <- if not hasZ3
           then return $ ThmResult (ProofError defaultSMTCfg ["z3 is not installed"] Nothing)
           else liftIO $ proveWith z3 p
-        result <- case proveResult of
-          Unsatisfiable _ _ -> return $ show (ThmResult proveResult)
-          Satisfiable   _ _ -> 
-            if original
-              then return "Falsifiable"
-              else return "Unknown"
-          _ -> return "Uncatched case"
+        let result = case proveResult of
+              Unsatisfiable _ _ -> show (ThmResult proveResult)
+              Satisfiable   _ _ -> 
+                if original
+                  then "Falsifiable"
+                  else "Unknown"
+              _ -> "Uncatched case"
         executeOneStep filepath continuation (next result)
 
 
