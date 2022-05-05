@@ -419,7 +419,7 @@ solve hash = do
           Bound ex loc -> (`Bound` loc) <$> f ex
           Conjunct prs -> Conjunct <$> mapM (mapExprOnPred f) prs
           Disjunct prs -> Disjunct <$> mapM (mapExprOnPred f) prs
-          Negate pr -> mapExprOnPred f pr
+          Negate pr -> Negate <$> mapExprOnPred f pr
         preProcPO :: PO -> PipelineM PO
         preProcPO (PO prePred postPred a b c) = do
           prePred' <- mapExprOnPred eliminateRedexes prePred
