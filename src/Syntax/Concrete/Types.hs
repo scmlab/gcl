@@ -167,7 +167,7 @@ data Expr
   | Case (Token "case") Expr (Token "of") [CaseClause]
   deriving (Eq, Show, Generic)
 
-type QuantOp' = Either Op Expr
+type QuantOp' = Either Op Name
 
 --------------------------------------------------------------------------------
 -- | Pattern matching

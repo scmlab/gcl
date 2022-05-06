@@ -22,7 +22,7 @@ import           Pretty.Util                    ( PrettyWithLoc(prettyWithLoc)
 import qualified Syntax.Abstract               as A
 import qualified Syntax.Abstract.Operator      as A
 import           Syntax.Abstract.Util
-import           Syntax.Common                  ( Name )
+import           Syntax.Common                  ( Name(..) )
 import           Syntax.Concrete.Instances.Located
                                                 ( )
 import           Syntax.Concrete.Types
@@ -220,7 +220,7 @@ instance ToAbstract Expr A.Expr where
      where
       toAbstractQOp qop = case qop of
         Left  op   -> return (A.Op op)
-        Right expr -> toAbstract expr
+        Right n@(Name _ l) -> return $ A.Const n l
     Case _ expr _ cases ->
       A.Case <$> toAbstract expr <*> toAbstract cases <*> pure (locOf x)
 

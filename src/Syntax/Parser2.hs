@@ -578,7 +578,7 @@ expression = makeExprParser (term <|> caseOf) chainOpTable <?> "expression"
           , combineWithApp <$> (Const <$> upper) <*> many singleterm'
           , Quant
           <$> choice [Left <$> tokenQuantOpen, Right <$> tokenQuantOpenU]
-          <*> choice [Left <$> operator, Right <$> term']
+          <*> choice [Left <$> operator, Right <$> identifier]
           <*> some lower
           <*> tokenColon
           <*> expression
@@ -602,7 +602,7 @@ expression = makeExprParser (term <|> caseOf) chainOpTable <?> "expression"
           , Const <$> upper
           , Quant
           <$> choice [Left <$> tokenQuantOpen, Right <$> tokenQuantOpenU]
-          <*> choice [Left <$> operator, Right <$> term']
+          <*> choice [Left <$> operator, Right <$> identifier]
           <*> some lower
           <*> tokenColon
           <*> expression
