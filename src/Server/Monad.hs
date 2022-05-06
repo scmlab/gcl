@@ -139,14 +139,14 @@ handleCommand filepath continuation = \case
       Right (p, original) -> do
         hasZ3 <- liftIO $ sbvCheckSolverInstallation z3
         ThmResult proveResult <- if not hasZ3
-          then return $ ThmResult (ProofError defaultSMTCfg ["z3 is not installed"] Nothing)
+          then return $ ThmResult (ProofError defaultSMTCfg ["Z3 is not found. This functionality is powered by the Z3 theorem prover, please install it on your computer."] Nothing)
           else liftIO $ proveWith z3 p
         let result = case proveResult of
               Unsatisfiable _ _ -> show (ThmResult proveResult)
               Satisfiable   _ _ -> 
                 if original
-                  then "Falsifiable"
-                  else "Unknown"
+                  then "This PO is falsifiable."
+                  else "This PO contains expressions we can't solve yet."
               _ -> "Uncatched case"
         executeOneStep filepath continuation (next result)
 
