@@ -47,7 +47,10 @@ import           Server.Pipeline                ( Instruction(..)
                                                 )
 import qualified Server.Pipeline               as DSL
 import qualified Server.SrcLoc                 as SrcLoc
-import qualified Data.Text as Text
+import Data.SBV                                 ( defaultSMTCfg
+                                                , SMTResult(ProofError, Unsatisfiable, Satisfiable)
+                                                , ThmResult(ThmResult)
+                                                , proveWith, sbvCheckSolverInstallation, z3 )
 
 --------------------------------------------------------------------------------
 
@@ -125,11 +128,28 @@ handleCommand filepath continuation = \case
     -- send diagnostics
     sendDiagnosticsLSP filepath diagnostics
     executeOneStep filepath continuation next
-  Solve hash next -> do
-    liftIO $ print ("INTERACT WITH SOLVER SOMEHOW (hash of PO: " ++ Text.unpack hash ++ ")")
+  Solve provable next ->
      -- pass the result from the solver down 
-    let result = "some result"
-    executeOneStep filepath continuation (next result)
+     -- the result is of type ThmResult
+     -- see https://hackage.haskell.org/package/sbv-8.17/docs/Data-SBV.html#t:ThmResult
+     -- for more information
+    case provable of
+      Left e ->
+        executeOneStep filepath continuation (next $ show e)
+      Right (p, original) -> do
+        hasZ3 <- liftIO $ sbvCheckSolverInstallation z3
+        ThmResult proveResult <- if not hasZ3
+          then return $ ThmResult (ProofError defaultSMTCfg ["Z3 is not found. This functionality is powered by the Z3 theorem prover, please install it on your computer."] Nothing)
+          else liftIO $ proveWith z3 p
+        let result = case proveResult of
+              Unsatisfiable _ _ -> show (ThmResult proveResult)
+              Satisfiable   _ _ -> 
+                if original
+                  then "This PO is falsifiable."
+                  else "This PO contains expressions we can't solve yet."
+              _ -> "Uncatched case"
+        executeOneStep filepath continuation (next result)
+
 
 --------------------------------------------------------------------------------
 

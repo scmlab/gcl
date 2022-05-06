@@ -59,6 +59,8 @@ extra-deps:
   - dependent-sum-template-0.1.0.3@sha256:0bbbacdfbd3abf2a15aaf0cf2c27e5bdd159b519441fec39e1e6f2f54424adde,1682
   - unliftio-core-0.2.0.1@sha256:9b3e44ea9aacacbfc35b3b54015af450091916ac3618a41868ebf6546977659a,1082
   - constraints-extras-0.3.1.0@sha256:12016ebb91ad5ed2c82bf7e48c6bd6947d164d33c9dca5ac3965de1bb6c780c0,1777
+  - sbv-8.17@sha256:3e36afa44ee597b213843495e666d88e604e429f0fcec1bbca05ae847bb752a2,29096
+  - libBF-0.6.3@sha256:ad38e44a038b8da62c82a58b8a762331097569c27a5978258caed8b28cda73e2,1770
 
 
 # Override default flag values for local packages and extra-deps

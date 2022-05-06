@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 9737fa07463018d2347f245a6caade6f8a713126c35325b6818059582c74098d
+-- hash: 15163c27cdc8efdcaae48404222894f59528b4fa537f86871c765fc874347b94
 
 name:           gcl
 version:        0.1.0.0
@@ -67,6 +67,7 @@ library
       Server.Monad
       Server.Pipeline
       Server.SrcLoc
+      SMT.Prove
       Syntax.Abstract
       Syntax.Abstract.Instances.Json
       Syntax.Abstract.Instances.Located
@@ -113,6 +114,7 @@ library
     , prettyprinter
     , random
     , regex-applicative
+    , sbv
     , srcloc
     , template-haskell
     , text
@@ -148,6 +150,7 @@ executable gcl
     , prettyprinter
     , random
     , regex-applicative
+    , sbv
     , srcloc
     , template-haskell
     , text
@@ -213,6 +216,7 @@ test-suite gcl-test
       Server.Monad
       Server.Pipeline
       Server.SrcLoc
+      SMT.Prove
       Syntax.Abstract
       Syntax.Abstract.Instances.Json
       Syntax.Abstract.Instances.Located
@@ -259,6 +263,7 @@ test-suite gcl-test
     , prettyprinter
     , random
     , regex-applicative
+    , sbv
     , srcloc
     , tasty
     , tasty-golden

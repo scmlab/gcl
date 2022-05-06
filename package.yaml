@@ -36,6 +36,7 @@ dependencies:
   - transformers
   - template-haskell
   - multistate
+  - sbv
 
 library:
   source-dirs: src

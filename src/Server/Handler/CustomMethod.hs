@@ -27,8 +27,12 @@ import qualified Language.LSP.Types            as J
 handleSolve :: Text -> PipelineM [ResKind]
 handleSolve hash = do
   logText $ "SOLVE " <> hash
-  solve hash
-  return []
+  resultFromSolver <- solve hash
+  logText $ "RESULT FROM SOLVER:  " <> Text.pack resultFromSolver
+  stage <- load
+  case stage of
+    Swept swept -> generateSolveAndDiagnostics swept hash resultFromSolver
+    _           -> return []
 
 handleInspect :: Range -> PipelineM [ResKind]
 handleInspect range = do

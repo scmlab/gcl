@@ -21,6 +21,7 @@ import qualified Data.Text                     as Text
 import           Error
 import           GCL.Predicate
 import           GCL.Predicate.Util             ( specPayloadWithoutIndentation
+                                                , toExpr
                                                 )
 import qualified GCL.Type                      as TypeChecking
 import qualified GCL.WP                        as WP
@@ -47,6 +48,15 @@ import           Syntax.Parser                  ( Parser
                                                 , pStmts
                                                 , runParse
                                                 )
+import qualified SMT.Prove                     as P
+                                               ( makeProvable, Error(..), provableIsOriginal )
+import Data.SBV (Symbolic, SBool)
+----added for eliminateRedexes
+import qualified Data.IntMap                   as IntMap
+import qualified GCL.Substitution              as Substitution
+import           Syntax.Abstract.Util           ( programToScopeForSubstitution
+                                                )
+import           Control.Monad.State            ( runState )
 
 --------------------------------------------------------------------------------
 -- | Stages of the processing pipeline
@@ -264,7 +274,7 @@ data Instruction next
   | GetSource (Text -> next) -- ^ Read the content of a file from the LSP filesystem
   | Log Text next -- ^ Make some noise
   | SendDiagnostics [J.Diagnostic] next -- ^ Send Diagnostics
-  | Solve Text (Text -> next) -- ^ Interact with the solver somehow
+  | Solve (Either P.Error (Symbolic SBool, Bool)) (String -> next) -- ^ Send the provable function
   deriving (Functor)
 
 initState :: FilePath -> PipelineState
@@ -374,8 +384,46 @@ getLastSelection = do
 logText :: Text -> PipelineM ()
 logText text = liftF (Log text ())
 
-solve :: Text -> PipelineM ()
-solve hash = liftF (Solve hash (const ()))
+solve :: Text -> PipelineM String
+solve hash = do
+  pps <- gets pipelineStage
+  case pps of
+    Swept result -> do
+      let pos = sweptPOs result
+          maybePo = findPO pos
+          props = sweptProps result
+          --need to preprocess the PO, and props
+      case maybePo of
+        Nothing -> liftF (Solve (Left P.PONotFoundError) id)
+        Just po -> do
+          -- Preprocess to reduce the redexes shown in the exprs into normal exprs.
+          po' <- preProcPO po 
+          props' <- mapM (eliminateRedexes 20) props
+          liftF (Solve (Right (P.makeProvable po' props', P.provableIsOriginal po' props')) id)
+
+    _            -> throwError [Others "An unconsidered case in Server.Pipeline.solve"]
+
+  where findPO :: [PO] -> Maybe PO
+        findPO pos = find ((hash ==) . poAnchorHash) pos
+        mapExprOnPred :: (A.Expr -> PipelineM A.Expr) -> Pred -> PipelineM Pred
+        mapExprOnPred f pred = case pred of
+          Constant ex -> Constant <$> f ex
+          GuardIf ex loc -> (`GuardIf` loc) <$> f ex
+          GuardLoop ex loc -> (`GuardLoop` loc) <$> f ex
+          Assertion ex loc -> (`Assertion` loc) <$> f ex
+          LoopInvariant ex1 ex2 loc -> do
+            ex1' <- f ex1
+            ex2' <- f ex2
+            return $ LoopInvariant ex1' ex2' loc
+          Bound ex loc -> (`Bound` loc) <$> f ex
+          Conjunct prs -> Conjunct <$> mapM (mapExprOnPred f) prs
+          Disjunct prs -> Disjunct <$> mapM (mapExprOnPred f) prs
+          Negate pr -> Negate <$> mapExprOnPred f pr
+        preProcPO :: PO -> PipelineM PO
+        preProcPO (PO prePred postPred a b c) = do
+          prePred' <- mapExprOnPred (eliminateRedexes 20) prePred
+          postPred' <- mapExprOnPred (eliminateRedexes 20) postPred
+          return (PO prePred' postPred' a b c)
 
 bumpVersion :: PipelineM Int
 bumpVersion = do
@@ -499,3 +547,119 @@ generateResponseAndDiagnostics result = do
   sendDiagnostics diagnostics
 
   return responses
+
+
+-----------
+generateSolveAndDiagnostics :: SweepResult -> Text -> String -> PipelineM [ResKind]
+generateSolveAndDiagnostics result hash solveResult = do
+  let (SweepResult _ pos specs globalProps warnings _redexes _) = result
+
+  -- get Specs around the mouse selection
+  lastSelection <- getLastSelection
+  let overlappedSpecs = case lastSelection of
+        Nothing        -> specs
+        Just selection -> filter (withinRange selection) specs
+  -- get POs around the mouse selection (including their corresponding Proofs)
+
+  let withinPOrange sel po = case poAnchorLoc po of
+        Nothing     -> withinRange sel po
+        Just anchor -> withinRange sel po || withinRange sel anchor
+
+  let overlappedPOs = case lastSelection of
+        Nothing        -> pos
+        Just selection -> filter (withinPOrange selection) pos
+  -- render stuff
+  let warningsSections =
+        if null warnings then [] else map renderSection warnings
+  let globalPropsSections = if null globalProps
+        then []
+        else map
+          (\expr -> Section
+            Plain
+            [Header "Property" (fromLoc (locOf expr)), Code (render expr)]
+          )
+          globalProps
+  let specsSections =
+        if null overlappedSpecs then [] else map renderSection overlappedSpecs
+  let poSections =
+        let ori_sections = if null overlappedPOs then [] else map renderSection overlappedPOs
+            getHash (Section _ (HeaderWithButtons _ _ h _:_)) = h
+            getHash _ = error "Entered a strange case in Server.Pipeline.generateSolveAndDiagnostics"
+            replaceTheSolved sec@(Section deco blocks)
+              | ((hash==) $ getHash sec) = Section deco $ init blocks <> [Paragraph (render solveResult)] <> [last blocks]
+              | otherwise = sec
+        in map replaceTheSolved ori_sections
+  let sections = mconcat
+        [warningsSections, specsSections, poSections, globalPropsSections]
+
+  version <- bumpVersion
+  let encodeSpec spec =
+        ( specID spec
+        , toText $ render (specPreCond spec)
+        , toText $ render (specPostCond spec)
+        , specRange spec
+        )
+
+  let rangesOfPOs = mapMaybe (fromLoc . locOf) pos
+  let responses =
+        [ ResDisplay version sections
+        , ResUpdateSpecs (map encodeSpec specs)
+        , ResMarkPOs rangesOfPOs
+        ]
+  let diagnostics = concatMap collect warnings
+  sendDiagnostics diagnostics
+
+  return responses
+
+
+----------------
+
+reduceRedex :: Int -> PipelineM A.Expr
+reduceRedex i = do
+  stage <- load
+  logText $ Text.pack $ "Substituting Redex " <> show i
+  --
+  case stage of
+    Swept  result -> do
+      let program = convertedProgram
+            (typeCheckedPreviousStage (sweptPreviousStage result))
+      case IntMap.lookup i (sweptRedexes result) of
+        Nothing         -> throwError [Others $ "Cannot find the redex with index: "<>show i]
+        Just (_, redex) -> do
+          let scope = programToScopeForSubstitution program
+          let (newExpr, counter) =
+                runState (Substitution.step scope redex) (sweptCounter result)
+          let redexesInNewExpr = Substitution.buildRedexMap newExpr
+          let newResult = result
+                { sweptCounter = counter
+                , sweptRedexes = sweptRedexes result <> redexesInNewExpr
+                }
+          save (Swept newResult)
+          return newExpr
+
+    _      -> throwError [Others "Invoked reduceRedex in a wrong stage."]
+    -- TODO: extend applicable stages
+
+-- | The returned Expr should contain no redex(any RedexShell or RedexKernel).
+-- But this requirement isn't satisfied yet (see TODO in function definition).
+eliminateRedexes :: Int -> A.Expr -> PipelineM A.Expr
+eliminateRedexes steps expr 
+  | steps <= 0 = return expr
+  | otherwise = case expr of
+    A.RedexShell n _ -> reduceRedex n >>= eliminateRedexes (steps-1)
+    A.App ex1 ex2 l -> do
+      -- this case might not be this simple?
+      ex1' <- eliminateRedexes steps ex1
+      ex2' <- eliminateRedexes steps ex2
+      return (A.App ex1' ex2' l)
+    A.Lam n ex l -> do
+      ex' <- eliminateRedexes steps ex
+      return $ A.Lam n ex' l
+    -- TODO: complete cases below:
+    -- A.Func na ne loc -> _
+    -- A.Tuple exs -> _
+    -- A.Quant ex nas ex' ex3 loc -> _
+    -- A.ArrIdx ex ex' loc -> _
+    -- A.ArrUpd ex ex' ex3 loc -> _
+    -- A.Case ex ccs loc -> _
+    _ -> return expr

@@ -35,7 +35,7 @@ explainAssignment pre post vars exprs l = Explain
 
 explainAfterLoop :: Pred -> [Expr] -> Loc -> Origin
 explainAfterLoop inv guards l = Explain
-      { originHeader           = "After Loop"
+      { originHeader           = "InvBase"
       , originExplanation      = "The loop invariant"
                                  <> (codeE . render) inv
                                  <> "should remain true while all the guards"
@@ -48,7 +48,7 @@ explainAfterLoop inv guards l = Explain
 
 explainTermination :: Pred -> [Expr] -> Expr -> Loc -> Origin
 explainTermination inv guards bnd l = Explain
-      { originHeader           = "Loop Termination"
+      { originHeader           = "TermBase"
       , originExplanation      =
         "When the loop invariant"
         <> (codeE . render) inv
