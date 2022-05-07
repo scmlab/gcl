@@ -96,6 +96,7 @@ expression = testGroup
   , testCase "quant 10 (hash)" $ run "x = <| # i : 0 < i < n : F i > 0 |>"
   , testCase "function application 1" $ run "(f   (  x      )) y"
   , testCase "function application 2" $ run "f (x y)"
+  , testCase "function application 3" $ run "f x + g y"
   , testCase "array indexing (app)" $ run "A i"
   , testCase "array indexing (bracket) 1 : A[i]" $ run "A[i]"
   , testCase "array indexing (bracket) 2 : A[A[i]]" $ run "A[A[i]]"
@@ -321,10 +322,10 @@ parseError = testGroup
   "Parse error"
   [ testCase "variable keyword collision" $ runDeclaration
     "var if : Int"
-    "Parse Error <test>:1:5-6 unexpected 'if'\nexpecting identifier that starts with a lowercase letter\n"
+    "Parse Error <test>:1:5-7 unexpected 'if'\nexpecting identifier\n"
   , testCase "quant with parentheses" $ runExpr
     "<| (+) i : i > 0 : f i |>"
-    "Parse Error <test>:1:5 unexpected '+'\nexpecting expression\n"
+    "Parse Error <test>:1:4-5 unexpected '+'\nexpecting identifier or operator\n"
   ]
  where
   runDeclaration = parserCompare Parser.declaration
