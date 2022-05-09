@@ -111,3 +111,6 @@ loggingBS modName fileName content = do
   createDirectoryIfMissing True $ takeDirectory path
   BSL.writeFile path content
 
+-- | Defines the exact log directory.
+logPath :: FilePath -> FilePath -> FilePath
+logPath modName fileName = "./temp-test-generation/" <> modName <> "/" <> fileName  <> ".log"

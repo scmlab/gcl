@@ -72,6 +72,9 @@ tests:
       - tasty-hunit
       - tasty-golden
       - tasty-quickcheck
+      - directory
+      - filepath
+      - pretty-simple
 
     ghc-options:
       - -Wall

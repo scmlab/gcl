@@ -250,6 +250,8 @@ test-suite gcl-test
     , base >=4.7 && <5
     , bytestring
     , containers
+    , directory
+    , filepath
     , free
     , hashable
     , lens
@@ -262,6 +264,7 @@ test-suite gcl-test
     , network
     , network-simple
     , parser-combinators
+    , pretty-simple
     , prettyprinter
     , random
     , regex-applicative
