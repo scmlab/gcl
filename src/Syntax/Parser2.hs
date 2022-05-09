@@ -263,13 +263,13 @@ definition = choice [try funcDefnSig, typeDefn, funcDefnF]
   typeDefn =
     TypeDefn
       <$> tokenData
-      <*> identifier
-      <*> many identifier
+      <*> upper
+      <*> many lower
       <*> tokenEQ
       <*> sepBy' ordinaryBar typeDefnCtor
 
   typeDefnCtor :: Parser TypeDefnCtor
-  typeDefnCtor = TypeDefnCtor <$> identifier <*> many type'
+  typeDefnCtor = TypeDefnCtor <$> upper <*> many type'
 
 definitionBlock :: Parser DefinitionBlock
 definitionBlock =
