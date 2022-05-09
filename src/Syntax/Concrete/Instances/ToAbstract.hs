@@ -4,6 +4,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Syntax.Concrete.Instances.ToAbstract where
 
@@ -177,6 +178,8 @@ instance ToAbstract TBase A.TBase where
   toAbstract (TChar _) = pure A.TChar
 
 -- | Type
+-- Base types were recognized as TCon (because Base types and TCon are identical at the syntactical level),
+-- and to be converted to TBase here.
 instance ToAbstract Type A.Type where
   toAbstract t = case t of
     (TBase a) -> A.TBase <$> toAbstract a <*> pure (locOf t)
@@ -184,7 +187,11 @@ instance ToAbstract Type A.Type where
       A.TArray <$> toAbstract a <*> toAbstract b <*> pure (locOf t)
     (TFunc a _ b) ->
       A.TFunc <$> toAbstract a <*> toAbstract b <*> pure (locOf t)
-    (TCon a b    ) -> return $ A.TCon a b (a <--> b)
+    (TCon n@(Name tn l) ns    ) 
+      | tn == "Int"  && null ns -> return $ A.TBase A.TInt l
+      | tn == "Bool" && null ns -> return $ A.TBase A.TBool l
+      | tn == "Char" && null ns -> return $ A.TBase A.TChar l
+      | otherwise -> return $ A.TCon n ns (n <--> ns)
     (TVar a      ) -> pure $ A.TVar a (locOf t)
     (TParen _ a _) -> do
       t' <- toAbstract a
