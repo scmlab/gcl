@@ -5,12 +5,12 @@ Sweep Result { POs: [ Loop Invariant at ./test/source/Server/spec-qm-5.gcl [53-7
                     ⇒
                     f[n] = 0`
                     explanation not available
-                    , After Loop at ./test/source/Server/spec-qm-5.gcl [78-146] 6:1-10:3 #10b2d1130ba729f6
+                    , InvBase at ./test/source/Server/spec-qm-5.gcl [78-146] 6:1-10:3 #10b2d1130ba729f6
                     `f[n] = 0 ∧¬ n ≠ N
                     ⇒
                     True`
                     The loop invariant f[n] = 0 should remain true while all the guards n ≠ N become false after executing the loop
-                    , Loop Termination at ./test/source/Server/spec-qm-5.gcl [78-146] 6:1-10:3 #762377d90313a209
+                    , TermBase at ./test/source/Server/spec-qm-5.gcl [78-146] 6:1-10:3 #762377d90313a209
                     `f[n] = 0 ∧n ≠ N
                     ⇒
                     N - n ≥ 0`
