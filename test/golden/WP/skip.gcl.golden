@@ -1,6 +1,6 @@
 ### Result
 
-[ Skip at ./test/source/WP/skip.gcl [9-12] 2:1-4 #299397966446b76f
+[ Skip at ./test/source/WP/skip.gcl [9-13] 2:1-5 #299397966446b76f
 `True
 ⇒
 0 = 0`
