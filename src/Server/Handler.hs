@@ -2,6 +2,8 @@
 {-# LANGUAGE DisambiguateRecordFields #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PolyKinds #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+{-# HLINT ignore "Use lambda-case" #-}
 
 module Server.Handler
   ( handlers
@@ -27,7 +29,10 @@ import qualified Server.Handler.Hover          as Hover
 -- handlers of the LSP server
 handlers :: Handlers ServerM
 handlers = mconcat
-  [ -- autocompletion
+  [ notificationHandler J.SInitialized $ \_not -> do
+      pure ()
+  , 
+    -- autocompletion
     requestHandler J.STextDocumentCompletion $ \req responder -> do
     let completionContext = req ^. J.params . J.context
     let position          = req ^. J.params . J.position
