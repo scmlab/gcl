@@ -526,6 +526,7 @@ expression = makeExprParser (term <|> caseOf) chainOpTable <?> "expression"
       ]
     ]
 
+
   unary :: (Loc -> Op) -> Tok -> Parser (Expr -> Expr)
   unary operator' tok = do
     loc <- symbol tok
@@ -549,9 +550,13 @@ expression = makeExprParser (term <|> caseOf) chainOpTable <?> "expression"
   term :: Parser Expr
   term = makeExprParser term' arithTable
    where
+
     arithTable :: [[Operator Parser Expr]]
     arithTable =
-      [ [Prefix $ unary (ArithOp . NegNum) TokSub]
+      [ [ Prefix $ foldr1 (.) <$> some (unary (ArithOp . Neg) TokNeg 
+                                       <|> unary (ArithOp . NegU) TokNegU)
+        ]
+      , [InfixL (return App)]
       , [InfixN $ binary (ArithOp . Exp) TokExp]
       , [ InfixN $ binary (ArithOp . Max) TokMax
         , InfixN $ binary (ArithOp . Min) TokMin
@@ -563,37 +568,11 @@ expression = makeExprParser (term <|> caseOf) chainOpTable <?> "expression"
       , [ InfixL $ binary (ArithOp . Add) TokAdd
         , InfixL $ binary (ArithOp . Sub) TokSub
         ]
-      , [ Prefix $ unary (ArithOp . Neg) TokNeg
-        , Prefix $ unary (ArithOp . NegU) TokNegU
-        ]
+      , [Prefix $ unary (ArithOp . NegNum) TokSub]
       ]
 
     term' :: Parser Expr
     term' =
-      choice
-          [ Lit <$> literal
-          , try array
-          , combineWithApp <$> parensExpr <*> many singleterm'
-          , combineWithApp <$> (Var <$> lower) <*> many singleterm'
-          , combineWithApp <$> (Const <$> upper) <*> many singleterm'
-          , Quant
-          <$> choice [Left <$> tokenQuantOpen, Right <$> tokenQuantOpenU]
-          <*> choice [Left <$> operator, Right <$> identifier]
-          <*> some lower
-          <*> tokenColon
-          <*> expression
-          <*> tokenColon
-          <*> expression
-          <*> choice [Left <$> tokenQuantClose, Right <$> tokenQuantCloseU]
-          ]
-        <?> "term"
-      where
-        -- | Handling application,e.g., letting "f 1+2" to be parsed as '(f 1)+2'
-        combineWithApp :: Expr -> [Expr] -> Expr
-        combineWithApp = foldl App
-    
-    singleterm' :: Parser Expr
-    singleterm' =
       choice
           [ Lit <$> literal
           , try array
@@ -713,8 +692,7 @@ type' = do
     return $ \x y -> TFunc x arrow y
 
   term :: Parser Type
-  term = do
-    parensType <|> array <|> try typeVar <|> typeName <?> "type term"
+  term = parensType <|> array <|> try typeVar <|> typeName <?> "type term"
 
   parensType :: Parser Type
   parensType = TParen <$> tokenParenOpen <*> type' <*> tokenParenClose
