@@ -2,11 +2,12 @@
 {-# LANGUAGE DataKinds #-}
 
 module Syntax.Parser2.Lexer
-  ( scan
-  , LexicalError
-  , Tok(..)
-  , TokStream
-  ) where
+  -- ( scan
+  -- , LexicalError
+  -- , Tok(..)
+  -- , TokStream
+  -- ) 
+  where
 
 import           Control.Monad.Except
 import           Control.Monad.State.Lazy
@@ -59,6 +60,8 @@ data Tok
     TokIndent
   | TokDedent
   | TokNewline
+  -- | ATokOd
+  -- | ATokFi
   | -- keywords
     TokSkip
   | TokAbort
@@ -478,6 +481,12 @@ comment =
     -- expects any chars but newline
     <* many (psym (not . isNewline))
 
+comment' :: RE Char String
+comment' = do
+  let oneLine = string "--" <* many (psym (not . isNewline))
+      multLine = string "{{" *> many anySym *> string "}}"
+  oneLine <|> multLine
+
 -- for indentation bookkeeping
 newlineAndWhitespace :: RE Char Tok
 newlineAndWhitespace =
@@ -499,15 +508,51 @@ lexer :: Lexer Tok
 lexer = mconcat
   [ -- meaning tokens that are sent to the parser
     token (longest tokRE)
-  , token (longest newlineAndWhitespaceAndBar)
-  , token (longest newlineAndWhitespace)
+  --, token (longest newlineAndWhitespaceAndBar)
+  --, token (longest newlineAndWhitespace)
   ,
       -- meaningless tokens that are to be dumped
     whitespace (longest whitespaceButNewlineRE)
-  , whitespace (longest comment)
+  , whitespace (longest comment')
+  , whitespace (longest newlineAndWhitespace) --added
   ]
 
 --------------------------------------------------------------------------------
+
+{-
+My plan of preprocessing:
+1. processing comments (maybe not now)
+2. process indent structure, without considering any ad-hoc construct, like do,if,caseOf
+  producing tokens: <indent><align><dedent>
+3. detailed cases:
+  - some <indent> should just be wiped out?
+-}
+
+-- data PPState' = PPState'
+--   {
+--     ppIndentStack' :: [Int]
+--   }
+-- type PreprocessM' = ExceptT Lex.LexicalError (State PPState')
+
+-- initPPState' = PPState'
+--   {
+--     ppIndentStack' = [0]
+--   }
+
+preprocess' :: TokenStream (L Tok) -> ExceptT Lex.LexicalError (State [Int]) TokStream
+preprocess' (TsToken l@(L loc tok) ts) = case tok of
+  TokNewlineAndWhitespace n -> do
+    lastLevel <- gets head
+    undefined
+      
+  -- todos: compare with the stack, insert <indent><newline><dedent>, insert or popping the stack
+  -- TokIndent
+  -- TokDedent
+  -- TokNewline
+  _ -> TsToken l <$> preprocess' ts
+preprocess' (TsEof) = undefined --popping the whole stack and complete the dedents
+  -- consider the ending conditions:straight end or newline+spaces
+preprocess' (TsError le) = throwError le
 
 -- | scan
 type LexicalError = Pos
