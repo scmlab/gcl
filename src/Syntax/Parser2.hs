@@ -33,6 +33,7 @@ import           Text.Megaparsec         hiding ( ParseError
                                                 , tokens
                                                 )
 import qualified Text.Megaparsec               as Mega
+import Debug.Trace
 
 --------------------------------------------------------------------------------
 -- | States for source location bookkeeping
@@ -95,6 +96,16 @@ sepBy' delim parser = do
         xs  <- sepBy' delim parser
         return $ Delim x sep xs
   try g <|> f
+
+sepByAlignment :: Parser a -> Parser [a]
+sepByAlignment p =
+  try (do
+    (r, posToAlign) <- getLeftBound p
+    rs <- many $ alignWith posToAlign (lookAhead anySymbol) *> p
+    return (r:rs))
+  <|>
+  return []
+
 
 sepByComma :: Parser a -> Parser (SepBy "," a)
 sepByComma = sepBy' tokenComma
@@ -176,6 +187,9 @@ tokenDeclClose = adapt TokDeclClose ":}"
 tokenColon :: Parser (Token ":")
 tokenColon = adapt TokColon "colon"
 
+tokenSemi :: Parser (Token ";")
+tokenSemi = adapt TokSemi "semi"
+
 tokenComma :: Parser (Token ",")
 tokenComma = adapt TokComma "comma"
 
@@ -256,29 +270,35 @@ definition = choice [try funcDefnSig, typeDefn, funcDefnF]
   funcDefnSig = FuncDefnSig <$> declBase identifier <*> optional declProp
 
   funcDefnF :: Parser Definition
-  funcDefnF = FuncDefn <$> identifier <*> many lower <*> tokenEQ <*> expression
+  funcDefnF = do --FuncDefn <$> identifier <*> many lower <*> tokenEQ <*> expression
+    -- the expression part should be indented, so to not confused with next possible decl/def
+    -- because we rely on linebreak, alignment to denote the end of the expression, instead of symbols like ";"
+    (pId, leftBound) <- getLeftBound identifier
+    FuncDefn pId <$> many lower <*> tokenEQ <*> indentTo leftBound expression
+    -- lowers <- many lower
+    -- tEQ <- tokenEQ
+    -- expr <- indentTo leftBound expression
+    -- return $ FuncDefn pId lowers tEQ expr
+
 
   -- `T a1 a2 ... = C1 ai1 ai2 .. | C2 ... | ...`
   typeDefn :: Parser Definition
-  typeDefn =
-    TypeDefn
-      <$> tokenData
-      <*> upper
-      <*> many lower
-      <*> tokenEQ
-      <*> sepBy' ordinaryBar typeDefnCtor
+  typeDefn = do --TypeDefn <$> tokenData <*> upper <*> many lower <*> tokenEQ <*> sepBy' ordinaryBar typeDefnCtor
+    -- The end of Ctor list is rely on linebreak instead of symbols like ";", so it needs to be indented.
+    (tData, leftBound) <- getLeftBound tokenData
+    TypeDefn tData <$> upper <*> many lower <*> tokenEQ <*>  indentTo leftBound (sepByGuardBar typeDefnCtor)
 
   typeDefnCtor :: Parser TypeDefnCtor
   typeDefnCtor = TypeDefnCtor <$> upper <*> many type'
 
 definitionBlock :: Parser DefinitionBlock
-definitionBlock =
-  DefinitionBlock
-    <$> tokenDeclOpen
-    <*  many (ignoreP indentationRelated)
-    <*> sepBy definition newlines
-    <*  many (ignoreP indentationRelated)
-    <*> tokenDeclClose
+definitionBlock = DefinitionBlock <$> tokenDeclOpen <*> sepByAlignment definition <*> tokenDeclClose
+  -- DefinitionBlock
+  --   <$> tokenDeclOpen
+  --   <*  many (ignoreP indentationRelated)
+  --   <*> sepBy definition newlines
+  --   <*  many (ignoreP indentationRelated)
+  --   <*> tokenDeclClose
 
 -- `n : type`
 declBase :: Parser Name -> Parser DeclBase
@@ -553,7 +573,7 @@ expression = makeExprParser (term <|> caseOf) chainOpTable <?> "expression"
 
     arithTable :: [[Operator Parser Expr]]
     arithTable =
-      [ [ Prefix $ foldr1 (.) <$> some (unary (ArithOp . Neg) TokNeg 
+      [ [ Prefix $ foldr1 (.) <$> some (unary (ArithOp . Neg) TokNeg
                                        <|> unary (ArithOp . NegU) TokNegU)
         ]
       , [InfixL (return App)]

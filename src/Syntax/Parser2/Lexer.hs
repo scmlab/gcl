@@ -674,7 +674,7 @@ deviceAction CmpNoop                 DontCare         = Noop
 
 scan :: FilePath -> Text -> Either LexicalError TokStream
 scan filepath =
-  translateLoc . runPreprocess . preprocess . runLexer lexer filepath . Text.unpack
+  translateLoc . Right . runLexer lexer filepath . Text.unpack
  where
   -- According to the document in Data.Loc.Range, the original meaning of Loc is
   -- different from how we use it as Range (to simply put, Range extends 1 in col and charOffset).
