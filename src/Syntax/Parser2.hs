@@ -97,15 +97,6 @@ sepBy' delim parser = do
         return $ Delim x sep xs
   try g <|> f
 
-sepByAlignment :: Parser a -> Parser [a]
-sepByAlignment p =
-  try (do
-    (r, posToAlign) <- getLeftBound p
-    rs <- many $ alignWith posToAlign (lookAhead anySymbol) *> p
-    return (r:rs))
-  <|>
-  return []
-
 
 sepByComma :: Parser a -> Parser (SepBy "," a)
 sepByComma = sepBy' tokenComma
@@ -270,29 +261,36 @@ definition = choice [try funcDefnSig, typeDefn, funcDefnF]
   funcDefnSig = FuncDefnSig <$> declBase identifier <*> optional declProp
 
   funcDefnF :: Parser Definition
-  funcDefnF = do --FuncDefn <$> identifier <*> many lower <*> tokenEQ <*> expression
+  funcDefnF = FuncDefn <$> identifier <*> many lower <*> tokenEQ <*> expression
     -- the expression part should be indented, so to not confused with next possible decl/def
     -- because we rely on linebreak, alignment to denote the end of the expression, instead of symbols like ";"
-    (pId, leftBound) <- getLeftBound identifier
-    FuncDefn pId <$> many lower <*> tokenEQ <*> indentTo leftBound expression
-    -- lowers <- many lower
-    -- tEQ <- tokenEQ
-    -- expr <- indentTo leftBound expression
-    -- return $ FuncDefn pId lowers tEQ expr
+    -- (pId, leftBound) <- getLeftBound identifier
+    -- FuncDefn pId <$> many lower <*> tokenEQ <*> indentTo leftBound expression
+    -- traceM "0"
+    -- x <- identifier
+    -- traceM "1"
+    -- ys <- many lower
+    -- traceM "2"
+    -- z <- tokenEQ
+    -- traceM "3"
+    -- expr <- expression
+    -- traceM "4"
+    -- return $ FuncDefn x ys z expr
 
 
-  -- `T a1 a2 ... = C1 ai1 ai2 .. | C2 ... | ...`
+
+  -- `data T a1 a2 ... = C1 ai1 ai2 .. | C2 ... | ...`
   typeDefn :: Parser Definition
-  typeDefn = do --TypeDefn <$> tokenData <*> upper <*> many lower <*> tokenEQ <*> sepBy' ordinaryBar typeDefnCtor
+  typeDefn = TypeDefn <$> tokenData <*> upper <*> many lower <*> tokenEQ <*> sepBy' ordinaryBar typeDefnCtor
     -- The end of Ctor list is rely on linebreak instead of symbols like ";", so it needs to be indented.
-    (tData, leftBound) <- getLeftBound tokenData
-    TypeDefn tData <$> upper <*> many lower <*> tokenEQ <*>  indentTo leftBound (sepByGuardBar typeDefnCtor)
+    -- (tData, leftBound) <- getLeftBound tokenData
+    -- TypeDefn tData <$> upper <*> many lower <*> tokenEQ <*>  indentTo leftBound (sepByGuardBar typeDefnCtor)
 
   typeDefnCtor :: Parser TypeDefnCtor
   typeDefnCtor = TypeDefnCtor <$> upper <*> many type'
 
 definitionBlock :: Parser DefinitionBlock
-definitionBlock = DefinitionBlock <$> tokenDeclOpen <*> sepByAlignment definition <*> tokenDeclClose
+definitionBlock = DefinitionBlock <$> tokenDeclOpen <*> sepByAlignmentOrSemi definition <*> tokenDeclClose
   -- DefinitionBlock
   --   <$> tokenDeclOpen
   --   <*  many (ignoreP indentationRelated)

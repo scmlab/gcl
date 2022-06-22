@@ -10,13 +10,13 @@ module Syntax.Parser2.Util
   , getRange
   , withRange
   , symbol
-  , anySymbol
   , extract
   , ignore
   , ignoreP
-  , getLeftBound
-  , alignWith
-  , indentTo
+  , sepByAlignment
+  , sepByAlignment1
+  , sepByAlignmentOrSemi
+  , sepByAlignmentOrSemi1
   ) where
 
 import           Control.Monad.State
@@ -27,7 +27,7 @@ import qualified Data.Map                      as Map
 import           Data.Set                       ( Set )
 import qualified Data.Set                      as Set
 import           Data.Void
-import           Syntax.Parser2.Lexer           ( Tok
+import           Syntax.Parser2.Lexer           ( Tok(..)
                                                 , TokStream
                                                 )
 import           Text.Megaparsec         hiding ( Pos
@@ -35,6 +35,7 @@ import           Text.Megaparsec         hiding ( Pos
                                                 , between
                                                 )
 import qualified Data.List.NonEmpty as NEL
+import Debug.Trace
 
 --------------------------------------------------------------------------------
 -- | Source location bookkeeping
@@ -49,7 +50,7 @@ data Bookkeeping = Bookkeeping
                               -- when the starting position of the next token is determined
   , logged     :: Map ID Loc  -- waiting to be removed when the ending position is determined
   , index      :: Int         -- for generating fresh IDs
-  , indentStack:: [Pos]       -- Recording required indentation while parsing.
+  , indentStack:: [(Pos,Bool)] -- Recording required indentation while parsing.
   }
 
 runM :: State Bookkeeping a -> a
@@ -123,26 +124,19 @@ withRange parser = do
   (result, range) <- getRange parser
   return $ result range
 
--- next functions are for indentation
+-- Functions below are for indentation.
 
-getLeftBound :: Parser a -> Parser (a, Pos)
-getLeftBound p = do
-        (r, Range s _) <- getRange p
-        return (r, s)
-
-lastIndentReq :: Parser (Maybe Pos)
-lastIndentReq = do
+insertAlignIndentReq :: Pos -> Parser ()
+insertAlignIndentReq pos = do
   stack <- gets indentStack
-  case stack of
-    [] -> return Nothing
-    p : _ -> return (Just p)
+  modify $ \st->st { indentStack = (pos,False):stack }
 
 insertIndentReq :: Pos -> Parser ()
 insertIndentReq pos = do
   stack <- gets indentStack
-  modify $ \st->st { indentStack = pos:stack }
+  modify $ \st->st { indentStack = (pos,True):stack }
 
-popIndentReq :: Parser (Maybe Pos)
+popIndentReq :: Parser (Maybe (Pos,Bool))
 popIndentReq = do
   stack <- gets indentStack
   case stack of
@@ -153,35 +147,39 @@ popIndentReq = do
 
 -- | See this part of 'symbol' as an example:
 -- > do
--- >   ir <- lastIndentReq
--- >   L loc tok <- satisfy (\(L loc t') -> t == t' && (loc `fitsIndentReq` ir) )
---   ...
-fitsIndentReq :: Loc -> Maybe Pos -> Bool
-fitsIndentReq (Loc start _) indentReq =
-  case indentReq of
-    Nothing -> True
-    Just leftbound -> posCol start > posCol leftbound
-fitsIndentReq NoLoc _ = True
+-- >   L loc tok <- satisfy (\(L loc t') -> t == t' )
+-- >   checkIndentReq loc
+-- >  ...
+checkIndentReq :: Loc -> Parser ()
+checkIndentReq (Loc left _) = return ()
+  --do
+  -- x <- gets indentStack
+  -- case x of
+  --   -- No indentation required.
+  --   [] -> return ()
+  --   -- Has a requirement; 
+  --   -- If hasLeftTipAligned==True, every token parsed between insert...pop should be indented to the requirement.
+  --   -- If hasLeftTipAligned==False, the next token should align to the requirement.
+  --   (leftBound,hasLeftTipAligned):restOfStack -> 
+  --     if hasLeftTipAligned
+  --       then if posCol left > posCol leftBound
+  --         then return ()
+  --         else failure Nothing (Set.fromList [Label (NEL.fromList $ "item indent to column:"<>show (posCol leftBound)<>"given:"<>show (posCol left))])
+  --       else if posCol left == posCol leftBound
+  --         then modify $ \st->st {indentStack = (leftBound,True):restOfStack}
+  --         else failure Nothing (Set.fromList [Label (NEL.fromList $ "item align to column:"<>show (posCol leftBound))])
+checkIndentReq NoLoc = return ()
 --------------------------------------------------------------------------------
 -- | Combinators
 
--- Parsing with bookkeeping actions: symbol, anySymbol, extract
+-- Parsing with bookkeeping actions: symbol, extract
 -- Any parser should be built upon these combinators.
 
 -- Create a parser of some symbol (while respecting source locations)
 symbol :: Tok -> Parser Loc
 symbol t = do
-  ir <- lastIndentReq
-  L loc tok <- satisfy (\(L loc t') -> t == t' && (loc `fitsIndentReq` ir) )
-  lift $ do
-    updateLoc loc
-    updateToken tok
-  return loc
-
-anySymbol :: Parser Loc
-anySymbol = do
-  ir <- lastIndentReq
-  L loc tok <- satisfy (\(L loc _) -> loc `fitsIndentReq` ir )
+  L loc tok <- satisfy (\(L _ t') -> t == t')
+  checkIndentReq loc
   lift $ do
     updateLoc loc
     updateToken tok
@@ -190,13 +188,11 @@ anySymbol = do
 -- Useful for extracting values from a Token 
 extract :: (Tok -> Maybe a) -> Parser a
 extract f = do
-  ir <- lastIndentReq
-  let predicate (L loc tok') = case f tok' of
-        Just result -> if loc `fitsIndentReq` ir
-          then Just (result, tok', loc)
-          else Nothing
-        Nothing     -> Nothing
-  (result, tok, loc) <- token predicate Set.empty
+  let p (L loc tok') = (\result->(result,tok',loc)) <$> f tok'
+  (result, tok, loc) <- token p Set.empty
+  traceM $ "extracted " <> show tok
+  checkIndentReq loc
+  traceM "checked the extracted"
   lift $ do
     updateLoc loc
     updateToken tok
@@ -222,22 +218,55 @@ ignoreP p = do
 -- combinators for indentation
 -- the design principle of indentation constraints is to reduce ambiguity
 
--- | The input Parser should be built from either 'symbol' or 'extract', or it'll raise NoLoc error when doing 'getRange'.
+-- The input Parser should be built from either 'symbol' or 'extract', or it'll raise NoLoc error when doing 'getRange'.
 -- This is because the loc being extracted inside 'getRange'(and 'getLoc') is generated by bookkeeping actions: updateLoc,
 -- which is only been done in 'symbol' and 'extract'.
 -- So parsers supported by Megaparsec like 'anySingle' cannot be used here.
-alignWith :: Pos -> Parser a -> Parser a
-alignWith pos p = do
-  (r, leftBound) <- getLeftBound p
-  if posCol pos == posCol leftBound
-    then return r
-    else failure Nothing (Set.fromList [Label (NEL.fromList "aligned symbol")])
 
--- | The input Parser should be built from either 'symbol' or 'extract'.
-indentTo :: Pos -> Parser a -> Parser a
-indentTo pos p = do
+indentTo :: Parser a -> Pos -> Parser a
+indentTo p pos = do
   insertIndentReq pos
   r <- p
   _ <- popIndentReq
   return r
 
+alignAndIndentBodyTo :: Parser a -> Pos -> Parser a
+alignAndIndentBodyTo p pos = do
+  insertAlignIndentReq pos
+  r <- p --the first token should align to pos
+  _ <- popIndentReq
+  return r
+
+sepByAlignment :: Parser a -> Parser [a]
+sepByAlignment p = do
+  L loc _ <- lookAhead anySingle
+  case loc of
+    NoLoc -> return []
+    Loc leftBound _ -> many $ p `alignAndIndentBodyTo` leftBound
+
+sepByAlignment1 :: Parser a -> Parser [a]
+sepByAlignment1 p = do
+  L loc _ <- lookAhead anySingle
+  case loc of
+    NoLoc -> failure Nothing (Set.fromList [Label (NEL.fromList "at least one item to align")])
+    Loc leftBound _ -> some $ p `alignAndIndentBodyTo` leftBound
+
+sepByAlignmentOrSemi :: Parser a -> Parser [a]
+sepByAlignmentOrSemi p = do
+  L loc _ <- lookAhead anySingle
+  case loc of
+    NoLoc -> return []
+    Loc leftBound _ -> many $ oneLeadByAlign <|> oneLeadBySemi --need to consider the order
+      where 
+        oneLeadByAlign = p `alignAndIndentBodyTo` leftBound
+        oneLeadBySemi =  symbol TokSemi *> p `indentTo` leftBound
+
+sepByAlignmentOrSemi1 :: Parser a -> Parser [a]
+sepByAlignmentOrSemi1 p = do
+  L loc _ <- lookAhead anySingle
+  case loc of
+    NoLoc -> failure Nothing (Set.fromList [Label (NEL.fromList "at least one item to align")])
+    Loc leftBound _ -> some $ oneLeadByAlign <|> oneLeadBySemi
+      where 
+        oneLeadByAlign = p `alignAndIndentBodyTo` leftBound
+        oneLeadBySemi =  symbol TokSemi *> p `indentTo` leftBound
