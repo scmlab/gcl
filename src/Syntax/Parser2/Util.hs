@@ -1,4 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+{-# HLINT ignore "Use camelCase" #-}
 
 module Syntax.Parser2.Util
   ( M
@@ -50,7 +52,7 @@ data Bookkeeping = Bookkeeping
                               -- when the starting position of the next token is determined
   , logged     :: Map ID Loc  -- waiting to be removed when the ending position is determined
   , index      :: Int         -- for generating fresh IDs
-  , indentStack:: [(Pos,Bool)] -- Recording required indentation while parsing.
+  , indentStack:: [L Tok]     -- Recording the tokens to indent/align to.
   }
 
 runM :: State Bookkeeping a -> a
@@ -126,17 +128,17 @@ withRange parser = do
 
 -- Functions below are for indentation.
 
-insertAlignIndentReq :: Pos -> Parser ()
-insertAlignIndentReq pos = do
-  stack <- gets indentStack
-  modify $ \st->st { indentStack = (pos,False):stack }
+-- insertAlignIndentReq :: Pos -> Parser ()
+-- insertAlignIndentReq pos = do
+--   stack <- gets indentStack
+--   modify $ \st->st { indentStack = (pos,False):stack }
 
-insertIndentReq :: Pos -> Parser ()
-insertIndentReq pos = do
+insertIndentReq :: L Tok -> Parser ()
+insertIndentReq tok = do
   stack <- gets indentStack
-  modify $ \st->st { indentStack = (pos,True):stack }
+  modify $ \st->st { indentStack = tok:stack }
 
-popIndentReq :: Parser (Maybe (Pos,Bool))
+popIndentReq :: Parser (Maybe (L Tok))
 popIndentReq = do
   stack <- gets indentStack
   case stack of
@@ -145,30 +147,52 @@ popIndentReq = do
       modify $ \st->st {indentStack = ps}
       return (Just p)
 
+lastIndentReq :: Parser (Maybe (L Tok))
+lastIndentReq = do
+  stack <- gets indentStack
+  case stack of
+    [] -> return Nothing
+    tok : _ -> return (Just tok)
+
+fitsIndentReq :: L Tok -> Maybe (L Tok) -> Bool
+fitsIndentReq tokToCheck indentReq = case indentReq of
+  Nothing -> True
+  Just tokToAlign ->
+    (tokToCheck == tokToAlign) 
+      --If the token is the same to the leftTip(the token to align/indent to).
+      -- This could happen when backtracking happens;
+      -- For example, in 'definition = choice [try funcDefnSig, typeDefn, funcDefnF]',
+      -- the starts of both funcDefnSig and funcDefnF are identifiers, when funcDefnSig fails then goes to funcDefnF,
+      -- the starting identifier would be checked another once.
+    || 
+    (colOf tokToCheck > colOf tokToAlign)
+  where
+    colOf = posCol . (\(Loc s _)->s) . locOf
+
 -- | See this part of 'symbol' as an example:
 -- > do
 -- >   L loc tok <- satisfy (\(L loc t') -> t == t' )
 -- >   checkIndentReq loc
 -- >  ...
-checkIndentReq :: Loc -> Parser ()
-checkIndentReq (Loc left _) = return ()
-  --do
-  -- x <- gets indentStack
-  -- case x of
-  --   -- No indentation required.
-  --   [] -> return ()
-  --   -- Has a requirement; 
-  --   -- If hasLeftTipAligned==True, every token parsed between insert...pop should be indented to the requirement.
-  --   -- If hasLeftTipAligned==False, the next token should align to the requirement.
-  --   (leftBound,hasLeftTipAligned):restOfStack -> 
-  --     if hasLeftTipAligned
-  --       then if posCol left > posCol leftBound
-  --         then return ()
-  --         else failure Nothing (Set.fromList [Label (NEL.fromList $ "item indent to column:"<>show (posCol leftBound)<>"given:"<>show (posCol left))])
-  --       else if posCol left == posCol leftBound
-  --         then modify $ \st->st {indentStack = (leftBound,True):restOfStack}
-  --         else failure Nothing (Set.fromList [Label (NEL.fromList $ "item align to column:"<>show (posCol leftBound))])
-checkIndentReq NoLoc = return ()
+-- checkIndentReq :: Loc -> Parser ()
+-- checkIndentReq (Loc left _) = return ()
+--   --do
+--   -- x <- gets indentStack
+--   -- case x of
+--   --   -- No indentation required.
+--   --   [] -> return ()
+--   --   -- Has a requirement; 
+--   --   -- If hasLeftTipAligned==True, every token parsed between insert...pop should be indented to the requirement.
+--   --   -- If hasLeftTipAligned==False, the next token should align to the requirement.
+--   --   (leftBound,hasLeftTipAligned):restOfStack -> 
+--   --     if hasLeftTipAligned
+--   --       then if posCol left > posCol leftBound
+--   --         then return ()
+--   --         else failure Nothing (Set.fromList [Label (NEL.fromList $ "item indent to column:"<>show (posCol leftBound)<>"given:"<>show (posCol left))])
+--   --       else if posCol left == posCol leftBound
+--   --         then modify $ \st->st {indentStack = (leftBound,True):restOfStack}
+--   --         else failure Nothing (Set.fromList [Label (NEL.fromList $ "item align to column:"<>show (posCol leftBound))])
+-- checkIndentReq NoLoc = return ()
 --------------------------------------------------------------------------------
 -- | Combinators
 
@@ -178,8 +202,8 @@ checkIndentReq NoLoc = return ()
 -- Create a parser of some symbol (while respecting source locations)
 symbol :: Tok -> Parser Loc
 symbol t = do
-  L loc tok <- satisfy (\(L _ t') -> t == t')
-  checkIndentReq loc
+  ir <- lastIndentReq
+  L loc tok <- satisfy (\loctok@(L _ t') -> t == t' && loctok `fitsIndentReq` ir)
   lift $ do
     updateLoc loc
     updateToken tok
@@ -188,11 +212,12 @@ symbol t = do
 -- Useful for extracting values from a Token 
 extract :: (Tok -> Maybe a) -> Parser a
 extract f = do
-  let p (L loc tok') = (\result->(result,tok',loc)) <$> f tok'
+  ir <- lastIndentReq
+  let p loctok@(L loc tok') = do
+        guard $ loctok `fitsIndentReq` ir
+        (\result->(result,tok',loc)) <$> f tok'
   (result, tok, loc) <- token p Set.empty
   traceM $ "extracted " <> show tok
-  checkIndentReq loc
-  traceM "checked the extracted"
   lift $ do
     updateLoc loc
     updateToken tok
@@ -223,50 +248,42 @@ ignoreP p = do
 -- which is only been done in 'symbol' and 'extract'.
 -- So parsers supported by Megaparsec like 'anySingle' cannot be used here.
 
-indentTo :: Parser a -> Pos -> Parser a
-indentTo p pos = do
-  insertIndentReq pos
+indentTo :: Parser a -> L Tok -> Parser a
+indentTo p tok = do
+  insertIndentReq tok
   r <- p
   _ <- popIndentReq
   return r
 
-alignAndIndentBodyTo :: Parser a -> Pos -> Parser a
-alignAndIndentBodyTo p pos = do
-  insertAlignIndentReq pos
-  r <- p --the first token should align to pos
-  _ <- popIndentReq
-  return r
+-- alignAndIndentBodyTo :: Parser a -> L Tok -> Parser a
+-- alignAndIndentBodyTo p tok = do
+--   insertIndentReq tok
+--   r <- p
+--   _ <- popIndentReq
+--   return r
 
+-- | The requirements of using this combinator:
 sepByAlignment :: Parser a -> Parser [a]
-sepByAlignment p = do
-  L loc _ <- lookAhead anySingle
-  case loc of
-    NoLoc -> return []
-    Loc leftBound _ -> many $ p `alignAndIndentBodyTo` leftBound
+sepByAlignment p = sepByAlignHelper p many
 
 sepByAlignment1 :: Parser a -> Parser [a]
-sepByAlignment1 p = do
-  L loc _ <- lookAhead anySingle
-  case loc of
-    NoLoc -> failure Nothing (Set.fromList [Label (NEL.fromList "at least one item to align")])
-    Loc leftBound _ -> some $ p `alignAndIndentBodyTo` leftBound
+sepByAlignment1 p = sepByAlignHelper p some
+
+sepByAlignHelper :: Parser a -> (Parser a -> Parser [a]) -> Parser [a]
+sepByAlignHelper p comb = do
+  tok <- lookAhead anySingle
+  comb $ p `indentTo` tok
+
 
 sepByAlignmentOrSemi :: Parser a -> Parser [a]
-sepByAlignmentOrSemi p = do
-  L loc _ <- lookAhead anySingle
-  case loc of
-    NoLoc -> return []
-    Loc leftBound _ -> many $ oneLeadByAlign <|> oneLeadBySemi --need to consider the order
-      where 
-        oneLeadByAlign = p `alignAndIndentBodyTo` leftBound
-        oneLeadBySemi =  symbol TokSemi *> p `indentTo` leftBound
+sepByAlignmentOrSemi p = sepByAlignmentOrSemiHelper p many
 
 sepByAlignmentOrSemi1 :: Parser a -> Parser [a]
-sepByAlignmentOrSemi1 p = do
-  L loc _ <- lookAhead anySingle
-  case loc of
-    NoLoc -> failure Nothing (Set.fromList [Label (NEL.fromList "at least one item to align")])
-    Loc leftBound _ -> some $ oneLeadByAlign <|> oneLeadBySemi
-      where 
-        oneLeadByAlign = p `alignAndIndentBodyTo` leftBound
-        oneLeadBySemi =  symbol TokSemi *> p `indentTo` leftBound
+sepByAlignmentOrSemi1 p = sepByAlignmentOrSemiHelper p some
+
+sepByAlignmentOrSemiHelper :: Parser a -> (Parser a -> Parser [a]) -> Parser [a]
+sepByAlignmentOrSemiHelper p comb = do
+  tok <- lookAhead anySingle
+  let oneLeadByAlign = p `indentTo` tok
+      oneLeadBySemi =  symbol TokSemi *> p `indentTo` tok
+  comb (try oneLeadBySemi <|> oneLeadByAlign)        
