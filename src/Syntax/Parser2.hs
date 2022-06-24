@@ -281,7 +281,7 @@ definition = choice [try funcDefnSig, typeDefn, funcDefnF]
 
   -- `data T a1 a2 ... = C1 ai1 ai2 .. | C2 ... | ...`
   typeDefn :: Parser Definition
-  typeDefn = TypeDefn <$> tokenData <*> upper <*> many lower <*> tokenEQ <*> sepBy' ordinaryBar typeDefnCtor
+  typeDefn = TypeDefn <$> tokenData <*> upper <*> many lower <*> tokenEQ <*> sepByGuardBar typeDefnCtor
     -- The end of Ctor list is rely on linebreak instead of symbols like ";", so it needs to be indented.
     -- (tData, leftBound) <- getLeftBound tokenData
     -- TypeDefn tData <$> upper <*> many lower <*> tokenEQ <*>  indentTo leftBound (sepByGuardBar typeDefnCtor)
@@ -349,11 +349,11 @@ statement =
 
 -- ZERO or more statements
 statements :: Parser [Stmt]
-statements = sepBy statement newlines
+statements = sepByAlignmentOrSemi statement --sepBy statement newlines
 
 -- ONE or more statements
 statements1 :: Parser [Stmt]
-statements1 = sepBy1 statement newlines
+statements1 = sepByAlignmentOrSemi1 statement --sepBy1 statement newlines
 
 skip :: Parser Stmt
 skip = withRange $ Skip <$ symbol TokSkip
@@ -390,18 +390,20 @@ arrayAssignment =
     <*> expression
 
 
+-- loop :: Parser Stmt
+-- loop = block' Do tokenDo (sepByGuardBar guardedCommand) tokenOd
+
 loop :: Parser Stmt
-loop = block' Do tokenDo (sepByGuardBar guardedCommand) tokenOd
+loop = Do <$> tokenDo <* optional tokenGuardBar <*> sepByGuardBar guardedCommand <*> tokenOd
+
+-- conditional :: Parser Stmt
+-- conditional = block' If tokenIf (sepByGuardBar guardedCommand) tokenFi
 
 conditional :: Parser Stmt
-conditional = block' If tokenIf (sepByGuardBar guardedCommand) tokenFi
-
--- guardedCommands :: Parser [GdCmd]
--- guardedCommands = sepBy1 guardedCommand $ do
---   symbol TokGuardBar <?> "|"
+conditional = If <$> tokenIf <* optional tokenGuardBar <*> sepByGuardBar guardedCommand <*> tokenFi
 
 guardedCommand :: Parser GdCmd
-guardedCommand = GdCmd <$> predicate <*> tokenArrow <*> blockOf statement
+guardedCommand = GdCmd <$> predicate <*> tokenArrow <*> sepByAlignmentOrSemi1 statement --blockOf statement
 
 hole :: Parser Stmt
 hole = SpecQM <$> (rangeOf <$> tokenQuestionMark)
@@ -411,6 +413,8 @@ spec =
   Spec
     <$> tokenSpecOpen
     <*> takeWhileP (Just "anything other than '!]'") notTokSpecClose
+      -- Although here we directly use mega's method instead of our 'symbol' and 'extract',
+      -- it is enclosed by parsers built with 'symbol'.
     <*> tokenSpecClose
  where
   notTokSpecClose :: L Tok -> Bool
@@ -422,7 +426,7 @@ proofAnchors =
   Proof
     <$> tokenProofOpen
     <*> many proofAnchor
-    <*  optional newlines
+    -- <*  optional newlines
     <*> tokenProofClose
  where
   proofAnchor :: Parser ProofAnchor
@@ -468,9 +472,9 @@ programBlock :: Parser Stmt
 programBlock =
   Block
     <$> tokenBlockOpen
-    <*  many (ignoreP indentationRelated)
+    -- <*  many (ignoreP indentationRelated)
     <*> program
-    <*  many (ignoreP indentationRelated)
+    -- <*  many (ignoreP indentationRelated)
     <*> tokenBlockClose
 
 indentationRelated :: Tok -> Bool
@@ -480,14 +484,15 @@ indentationRelated _         = False
 
 program :: Parser Program
 program = do
-  void $ optional newlines
+  -- void $ optional newlines
 
-  mixed <- sepBy (choice [Left <$> declOrDefnBlock, Right <$> statement])
-                 newlines
+  mixed <- sepByAlignmentOrSemi (choice [Left <$> declOrDefnBlock, Right <$> statement])
+  -- mixed <- sepBy (choice [Left <$> declOrDefnBlock, Right <$> statement])
+  --                newlines
 
   let (decls, stmts) = Either.partitionEithers mixed
 
-  void $ optional newlines
+  -- void $ optional newlines
 
   return $ Program decls stmts
 
@@ -559,11 +564,11 @@ expression = makeExprParser (term <|> caseOf) chainOpTable <?> "expression"
   parensExpr = Paren <$> tokenParenOpen <*> expression <*> tokenParenClose
 
   caseOf :: Parser Expr
-  caseOf = Case <$> tokenCase <*> expression <*> tokenOf <*> blockOf caseClause
+  caseOf = Case <$> tokenCase <*> expression <*> tokenOf <*> sepByAlignmentOrSemi1 caseClause --blockOf caseClause
 
 
   caseClause :: Parser CaseClause
-  caseClause = CaseClause <$> pattern' <*> tokenArrow <*> block expression
+  caseClause = CaseClause <$> pattern' <*> tokenArrow <*> expression --block expression
 
   term :: Parser Expr
   term = makeExprParser term' arithTable
@@ -696,7 +701,7 @@ pattern' = choice
 type' :: Parser Type
 type' = do
   result <- makeExprParser term table <?> "type"
-  void $ many dedent
+  -- void $ many dedent
   return result
  where
   table :: [[Operator Parser Type]]
@@ -706,7 +711,7 @@ type' = do
   function = do
     -- an <indent> will be inserted after an <arrow>
     arrow <- tokenArrow
-    indent
+    -- indent
     return $ \x y -> TFunc x arrow y
 
   term :: Parser Type
@@ -723,8 +728,9 @@ type' = do
   typeName = TCon <$> upper <*> many lower
 
   -- an <indent> will be inserted after an <of>
+  --  was: tokenOf <* indent <*> type'
   array :: Parser Type
-  array = TArray <$> tokenArray <*> interval <*> tokenOf <* indent <*> type'
+  array = TArray <$> tokenArray <*> interval <*> tokenOf <*> type'
 
   interval :: Parser Interval
   interval = Interval <$> endpointOpening <*> tokenRange <*> endpointClosing
