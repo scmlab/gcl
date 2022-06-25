@@ -15,8 +15,6 @@ module Syntax.Parser2.Util
   , extract
   , ignore
   , ignoreP
-  , sepByAlignment
-  , sepByAlignment1
   , sepByAlignmentOrSemi
   , sepByAlignmentOrSemi1
   ) where
@@ -203,7 +201,9 @@ fitsIndentReq tokToCheck indentReq = case indentReq of
 symbol :: Tok -> Parser Loc
 symbol t = do
   ir <- lastIndentReq
+  -- traceM $ "before checking symbol:'"<>show t<>"' with IR:"<>show ir
   L loc tok <- satisfy (\loctok@(L _ t') -> t == t' && loctok `fitsIndentReq` ir)
+  -- traceM $ "accepted symbol:"<>show tok
   lift $ do
     updateLoc loc
     updateToken tok
@@ -213,11 +213,12 @@ symbol t = do
 extract :: (Tok -> Maybe a) -> Parser a
 extract f = do
   ir <- lastIndentReq
+  -- traceM $ "before extracting with IR:"<>show ir
   let p loctok@(L loc tok') = do
         guard $ loctok `fitsIndentReq` ir
         (\result->(result,tok',loc)) <$> f tok'
   (result, tok, loc) <- token p Set.empty
-  traceM $ "extracted " <> show tok
+  -- traceM $ "extracted:" <> show tok
   lift $ do
     updateLoc loc
     updateToken tok
@@ -251,39 +252,44 @@ ignoreP p = do
 indentTo :: Parser a -> L Tok -> Parser a
 indentTo p tok = do
   insertIndentReq tok
-  r <- p
-  _ <- popIndentReq
-  return r
+  x <- observing p
+  _ <- popIndentReq 
+  -- The requirement needs to be popped no matter the parser went successfully or not,
+  -- because Bookkeeping is not back-trackable (cannot just undo insertion of IndentReq).
+  case x of
+    Left pe -> case pe of
+      TrivialError _ m_ei set -> failure m_ei set
+      FancyError _ set -> fancyFailure set
+    Right r -> return r
 
--- alignAndIndentBodyTo :: Parser a -> L Tok -> Parser a
--- alignAndIndentBodyTo p tok = do
---   insertIndentReq tok
---   r <- p
---   _ <- popIndentReq
---   return r
-
--- | The requirements of using this combinator:
-sepByAlignment :: Parser a -> Parser [a]
-sepByAlignment p = sepByAlignHelper p many
-
-sepByAlignment1 :: Parser a -> Parser [a]
-sepByAlignment1 p = sepByAlignHelper p some
-
-sepByAlignHelper :: Parser a -> (Parser a -> Parser [a]) -> Parser [a]
-sepByAlignHelper p comb = do
+alignAndIndentBodyTo :: Parser a -> L Tok -> Parser a
+alignAndIndentBodyTo p tokToAlign = do
   tok <- lookAhead anySingle
-  comb $ p `indentTo` tok
+  if colOf tok == colOf tokToAlign
+    then p `indentTo` tok
+    else failure Nothing (Set.fromList [Label (NEL.fromList $ "token align to the token:'"<>show tokToAlign<>"'")])
+  where 
+    colOf = posCol . (\(Loc s _)->s) . locOf
+
 
 
 sepByAlignmentOrSemi :: Parser a -> Parser [a]
-sepByAlignmentOrSemi p = sepByAlignmentOrSemiHelper p many
+sepByAlignmentOrSemi parser = do
+  let canLookAhead = do
+        tok <- lookAhead anySingle
+        sepByAlignmentOrSemiHelper tok parser
+  try canLookAhead <|> return []
 
 sepByAlignmentOrSemi1 :: Parser a -> Parser [a]
-sepByAlignmentOrSemi1 p = sepByAlignmentOrSemiHelper p some
+sepByAlignmentOrSemi1 parser = do
+  tokToAlign <- lookAhead anySingle
+  x <- parser `indentTo` tokToAlign
+  xs <- sepByAlignmentOrSemiHelper tokToAlign parser
+  return (x:xs)
 
-sepByAlignmentOrSemiHelper :: Parser a -> (Parser a -> Parser [a]) -> Parser [a]
-sepByAlignmentOrSemiHelper p comb = do
-  tok <- lookAhead anySingle
-  let oneLeadByAlign = p `indentTo` tok
-      oneLeadBySemi =  symbol TokSemi *> p `indentTo` tok
-  comb (try oneLeadBySemi <|> oneLeadByAlign)        
+sepByAlignmentOrSemiHelper :: L Tok -> Parser a -> Parser [a]
+sepByAlignmentOrSemiHelper tokToAlign parser = do
+  let oneLeadByAlign = parser `alignAndIndentBodyTo` tokToAlign
+      oneLeadBySemi =  symbol TokSemi *> parser `indentTo` tokToAlign
+  many (try oneLeadBySemi <|> oneLeadByAlign)
+          
