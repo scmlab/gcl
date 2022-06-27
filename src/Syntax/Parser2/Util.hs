@@ -223,7 +223,9 @@ extract f = do
   if not $ (L loc tok) `fitsIndentReq` ir
     then do
       traceM "failed checking IR"
-      empty
+      case ir of
+        Nothing -> error "impossible case"
+        Just tokToAlign -> failure Nothing (Set.fromList [Label (NEL.fromList $ "token indent to the token:"<>show tokToAlign)])
     else do
       traceM $ "extracted:" <> show tok
       lift $ do
@@ -282,10 +284,8 @@ alignAndIndentBodyTo p tokToAlign = do
 
 sepByAlignmentOrSemi :: Parser a -> Parser [a]
 sepByAlignmentOrSemi parser = do
-  let canLookAhead = do
-        tok <- lookAhead anySingle
-        sepByAlignmentOrSemiHelper tok True parser
-  try canLookAhead <|> return []
+  tok <- lookAhead anySingle
+  sepByAlignmentOrSemiHelper tok True parser
 
 sepByAlignmentOrSemi1 :: Parser a -> Parser [a]
 sepByAlignmentOrSemi1 parser = do
@@ -298,15 +298,13 @@ sepByAlignmentOrSemiHelper :: L Tok -> Bool -> Parser a -> Parser [a]
 sepByAlignmentOrSemiHelper tokToAlign useSemi parser = do
   let oneLeadByAlign = parser `alignAndIndentBodyTo` tokToAlign
       oneLeadBySemi =  symbol TokSemi *> parser `indentTo` tokToAlign
-  let semiParser = if useSemi then try oneLeadBySemi else empty
+  let semiParser = if useSemi then oneLeadBySemi else empty
   many (semiParser <|> oneLeadByAlign)
 
 sepByAlignment :: Parser a -> Parser [a]
 sepByAlignment parser = do
-  let canLookAhead = do
-        tok <- lookAhead anySingle
-        sepByAlignmentOrSemiHelper tok False parser
-  try canLookAhead <|> return []
+  tok <- lookAhead anySingle
+  sepByAlignmentOrSemiHelper tok False parser
 
 sepByAlignment1 :: Parser a -> Parser [a]
 sepByAlignment1 parser = do
