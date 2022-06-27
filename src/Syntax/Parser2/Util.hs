@@ -17,6 +17,8 @@ module Syntax.Parser2.Util
   , ignoreP
   , sepByAlignmentOrSemi
   , sepByAlignmentOrSemi1
+  , sepByAlignment
+  , sepByAlignment1
   ) where
 
 import           Control.Monad.State
@@ -201,9 +203,9 @@ fitsIndentReq tokToCheck indentReq = case indentReq of
 symbol :: Tok -> Parser Loc
 symbol t = do
   ir <- lastIndentReq
-  -- traceM $ "before checking symbol:'"<>show t<>"' with IR:"<>show ir
+  traceM $ "before checking symbol:'"<>show t<>"' with IR:"<>show ir
   L loc tok <- satisfy (\loctok@(L _ t') -> t == t' && loctok `fitsIndentReq` ir)
-  -- traceM $ "accepted symbol:"<>show tok
+  traceM $ "accepted symbol:"<>show tok
   lift $ do
     updateLoc loc
     updateToken tok
@@ -213,17 +215,22 @@ symbol t = do
 extract :: (Tok -> Maybe a) -> Parser a
 extract f = do
   ir <- lastIndentReq
-  -- traceM $ "before extracting with IR:"<>show ir
   let p loctok@(L loc tok') = do
-        guard $ loctok `fitsIndentReq` ir
+        -- guard $ loctok `fitsIndentReq` ir
         (\result->(result,tok',loc)) <$> f tok'
   (result, tok, loc) <- token p Set.empty
-  -- traceM $ "extracted:" <> show tok
-  lift $ do
-    updateLoc loc
-    updateToken tok
+  traceM $ "before extracting tok:'"<>show tok<>"' with IR:"<>show ir
+  if not $ (L loc tok) `fitsIndentReq` ir
+    then do
+      traceM "failed checking IR"
+      empty
+    else do
+      traceM $ "extracted:" <> show tok
+      lift $ do
+        updateLoc loc
+        updateToken tok
 
-  return result
+      return result
 
 -- Create a parser of some symbol, that doesn't update source locations
 -- effectively excluding it from source location tracking
@@ -277,19 +284,33 @@ sepByAlignmentOrSemi :: Parser a -> Parser [a]
 sepByAlignmentOrSemi parser = do
   let canLookAhead = do
         tok <- lookAhead anySingle
-        sepByAlignmentOrSemiHelper tok parser
+        sepByAlignmentOrSemiHelper tok True parser
   try canLookAhead <|> return []
 
 sepByAlignmentOrSemi1 :: Parser a -> Parser [a]
 sepByAlignmentOrSemi1 parser = do
   tokToAlign <- lookAhead anySingle
   x <- parser `indentTo` tokToAlign
-  xs <- sepByAlignmentOrSemiHelper tokToAlign parser
+  xs <- sepByAlignmentOrSemiHelper tokToAlign True parser
   return (x:xs)
 
-sepByAlignmentOrSemiHelper :: L Tok -> Parser a -> Parser [a]
-sepByAlignmentOrSemiHelper tokToAlign parser = do
+sepByAlignmentOrSemiHelper :: L Tok -> Bool -> Parser a -> Parser [a]
+sepByAlignmentOrSemiHelper tokToAlign useSemi parser = do
   let oneLeadByAlign = parser `alignAndIndentBodyTo` tokToAlign
       oneLeadBySemi =  symbol TokSemi *> parser `indentTo` tokToAlign
-  many (try oneLeadBySemi <|> oneLeadByAlign)
-          
+  let semiParser = if useSemi then try oneLeadBySemi else empty
+  many (semiParser <|> oneLeadByAlign)
+
+sepByAlignment :: Parser a -> Parser [a]
+sepByAlignment parser = do
+  let canLookAhead = do
+        tok <- lookAhead anySingle
+        sepByAlignmentOrSemiHelper tok False parser
+  try canLookAhead <|> return []
+
+sepByAlignment1 :: Parser a -> Parser [a]
+sepByAlignment1 parser = do
+  tokToAlign <- lookAhead anySingle
+  x <- parser `indentTo` tokToAlign
+  xs <- sepByAlignmentOrSemiHelper tokToAlign False parser
+  return (x:xs)
