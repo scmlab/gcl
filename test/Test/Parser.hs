@@ -22,7 +22,8 @@ import           Test.Util                      ( removeTrailingWhitespace
 tests :: TestTree
 tests = testGroup
   "Parser"
-  [ expression
+  [ 
+    expression
   , pattern'
   , type'
   , definition
@@ -191,8 +192,8 @@ definitionBlock = testGroup
   [ testCase "type definition 1"
     $ run
         "{:\n\
-                                       \ data List a = Nil | Con a\n\
-                                       \:}"
+        \ data List a = Nil | Con a\n\
+        \:}"
   , testCase "type definition 2" $ run "{:\n data List a = Node (List a)\n:}"
   , testCase "type definition 3" $ run "{:\n data A = B\n:}"
   , testCase "type definition 4 (empty)" $ run "{::}"
@@ -246,6 +247,19 @@ definitionBlock = testGroup
         \     )\n\
         \  A : Int\n\
         \:}"
+  -- , testCase "split with ';' 1" 
+  --   $ run
+  --       "{:\n\
+  --       \f a = b; g = 5+\n\
+  --       \ 2\n\
+  --       \:}"
+  -- , testCase "split with ';' 2"
+  --   $ run 
+  --       "{:\n\
+  --       \f a = b\n\
+  --       \g = 1;h=2\n\
+  --       \e b d  = True\n\
+  --       \:}"
   ]
   where run = parserIso Parser.definitionBlock
 
@@ -325,7 +339,7 @@ parseError = testGroup
     "Parse Error <test>:1:5-7 unexpected 'if'\nexpecting identifier\n"
   , testCase "quant with parentheses" $ runExpr
     "<| (+) i : i > 0 : f i |>"
-    "Parse Error <test>:1:4-5 unexpected '+'\nexpecting identifier or operator\n"
+    "Parse Error <test>:1:4-5 unexpected '('\nexpecting identifier or operator\n"
   ]
  where
   runDeclaration = parserCompare Parser.declaration
