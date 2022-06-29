@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Use camelCase" #-}
+{-# LANGUAGE RecordWildCards #-}
 
 module Syntax.Parser2.Util
   ( M
@@ -36,6 +37,7 @@ import           Text.Megaparsec         hiding ( Pos
                                                 , State
                                                 , between
                                                 )
+import qualified Text.Megaparsec    as Mega
 import qualified Data.List.NonEmpty as NEL
 import Debug.Trace
 
@@ -169,30 +171,52 @@ fitsIndentReq tokToCheck indentReq = case indentReq of
   where
     colOf = posCol . (\(Loc s _)->s) . locOf
 
--- | See this part of 'symbol' as an example:
--- > do
--- >   L loc tok <- satisfy (\(L loc t') -> t == t' )
--- >   checkIndentReq loc
--- >  ...
--- checkIndentReq :: Loc -> Parser ()
--- checkIndentReq (Loc left _) = return ()
---   --do
---   -- x <- gets indentStack
---   -- case x of
---   --   -- No indentation required.
---   --   [] -> return ()
---   --   -- Has a requirement; 
---   --   -- If hasLeftTipAligned==True, every token parsed between insert...pop should be indented to the requirement.
---   --   -- If hasLeftTipAligned==False, the next token should align to the requirement.
---   --   (leftBound,hasLeftTipAligned):restOfStack -> 
---   --     if hasLeftTipAligned
---   --       then if posCol left > posCol leftBound
---   --         then return ()
---   --         else failure Nothing (Set.fromList [Label (NEL.fromList $ "item indent to column:"<>show (posCol leftBound)<>"given:"<>show (posCol left))])
---   --       else if posCol left == posCol leftBound
---   --         then modify $ \st->st {indentStack = (leftBound,True):restOfStack}
---   --         else failure Nothing (Set.fromList [Label (NEL.fromList $ "item align to column:"<>show (posCol leftBound))])
--- checkIndentReq NoLoc = return ()
+checkIndentation :: L Tok -> Mega.State TokStream Void -> Parser ()
+checkIndentation loctok@(L _ _) st = do
+  stack <- gets indentStack
+  case stack of
+    [] -> return ()
+    ir : _ -> do
+      let colOf = posCol . (\(Loc s _)->s) . locOf
+      if colOf loctok > colOf ir || loctok == ir
+      then return ()
+      else do
+        setParserState st
+        failure (Just $ Label (NEL.fromList $ "token '"<>show loctok<>"' not indent to token:"<> show ir )) Set.empty
+
+extractWithIndentCheck :: (L Tok -> Maybe (L Tok,a)) -> Parser a
+extractWithIndentCheck tokpred = do
+  ir <- lastIndentReq
+  let f (lt,a) = do
+        guard $ lt `fitsIndentReq` ir
+        return a
+  ltok <- lookAhead anySingle
+  r <- observing $ token (tokpred >=> f) Set.empty
+  case r of
+    Left pe -> case pe of
+      TrivialError _ m_ei set -> 
+        if ltok `fitsIndentReq` ir
+        then -- errors other than indentation error
+          failure m_ei set
+        else -- add an "unexpect" indentation error message
+          failure (Just $ Label (NEL.fromList $ "token '"<>show ltok<>"' not indent to token:'"<> show (fromJust ir)<>"'")) set
+      FancyError _ set -> fancyFailure set --We're not handling fancy errors yet.
+    Right a -> return a
+  where 
+    fromJust Nothing = error "An error that shouldn't happen here: fitsIndentReq==False implies that 'ir' is a Just."
+    fromJust (Just x)= x
+
+    
+  -- (ltok, a) <- token tokpred Set.empty
+  -- ir <- lastIndentReq
+  -- if ltok `fitsIndentReq` ir
+  -- then return a
+  -- else do
+  --   setParserState st
+  --   registerFailure (Just $ Label (NEL.fromList $ "token '"<>show ltok<>"' not indent to token:"<> show ir )) Set.empty
+  --   snd <$> token (const Nothing) Set.empty
+
+
 --------------------------------------------------------------------------------
 -- | Combinators
 
@@ -202,10 +226,9 @@ fitsIndentReq tokToCheck indentReq = case indentReq of
 -- Create a parser of some symbol (while respecting source locations)
 symbol :: Tok -> Parser Loc
 symbol t = do
-  ir <- lastIndentReq
-  traceM $ "before checking symbol:'"<>show t<>"' with IR:"<>show ir
-  L loc tok <- satisfy (\loctok@(L _ t') -> t == t' && loctok `fitsIndentReq` ir)
-  traceM $ "accepted symbol:"<>show tok
+  -- ir <- lastIndentReq
+  -- loctok@(L loc tok) <- satisfy (\lt@(L _ t') -> t == t' && lt `fitsIndentReq` ir)
+  (loc, tok) <- extractWithIndentCheck (\lt@(L l t') -> if t == t' then Just (lt,(l,t')) else Nothing)
   lift $ do
     updateLoc loc
     updateToken tok
@@ -214,25 +237,16 @@ symbol t = do
 -- Useful for extracting values from a Token 
 extract :: (Tok -> Maybe a) -> Parser a
 extract f = do
-  ir <- lastIndentReq
-  let p loctok@(L loc tok') = do
-        -- guard $ loctok `fitsIndentReq` ir
-        (\result->(result,tok',loc)) <$> f tok'
-  (result, tok, loc) <- token p Set.empty
-  traceM $ "before extracting tok:'"<>show tok<>"' with IR:"<>show ir
-  if not $ (L loc tok) `fitsIndentReq` ir
-    then do
-      traceM "failed checking IR"
-      case ir of
-        Nothing -> error "impossible case"
-        Just tokToAlign -> failure Nothing (Set.fromList [Label (NEL.fromList $ "token indent to the token:"<>show tokToAlign)])
-    else do
-      traceM $ "extracted:" <> show tok
-      lift $ do
-        updateLoc loc
-        updateToken tok
-
-      return result
+  -- ir <- lastIndentReq
+  let p loctok@(L l tok') = do
+        --guard $ loctok `fitsIndentReq` ir
+        (\result->(loctok, (result,l,tok'))) <$> f tok'
+  -- (result, loctok@(L loc tok)) <- token p Set.empty
+  (result, loc, tok) <- extractWithIndentCheck p 
+  lift $ do
+    updateLoc loc
+    updateToken tok
+  return result
 
 -- Create a parser of some symbol, that doesn't update source locations
 -- effectively excluding it from source location tracking
@@ -267,7 +281,7 @@ indentTo p tok = do
   -- because Bookkeeping is not back-trackable (cannot just undo insertion of IndentReq).
   case x of
     Left pe -> case pe of
-      TrivialError _ m_ei set -> failure m_ei set
+      TrivialError _ m_ei set -> failure m_ei (Set.insert (Label (NEL.fromList $ "token indent to the token:'"<>show tok<>"'")) set)
       FancyError _ set -> fancyFailure set
     Right r -> return r
 
