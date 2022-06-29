@@ -172,42 +172,51 @@ fitsIndentReq tokToCheck indentReq = case indentReq of
     colOf = posCol . (\(Loc s _)->s) . locOf
     strictEq (L l1 t1) (L l2 t2) = l1==l2 && t1==t2
 
-checkIndentation :: L Tok -> Mega.State TokStream Void -> Parser ()
-checkIndentation loctok@(L _ _) st = do
-  stack <- gets indentStack
-  case stack of
-    [] -> return ()
-    ir : _ -> do
-      let colOf = posCol . (\(Loc s _)->s) . locOf
-      if colOf loctok > colOf ir || loctok == ir
-      then return ()
-      else do
-        setParserState st
-        failure (Just $ Label (NEL.fromList $ "token '"<>show loctok<>"' not indent to token:"<> show ir )) Set.empty
 
+-- an ideal method which doesn't work: 
+-- * parse -> if success, indentCheck(without touching parser state), manually fail it when indentCheck fails
 extractWithIndentCheck :: (L Tok -> Maybe (L Tok,a)) -> Parser a
 extractWithIndentCheck tokpred = do
   ir <- lastIndentReq
   let f (lt,a) = do
         guard $ lt `fitsIndentReq` ir
         return a
-  ltok <- lookAhead anySingle
-  r <- observing $ token (tokpred >=> f) Set.empty
-  case r of
-    Left pe -> case pe of
-      TrivialError _ m_ei set -> 
-        if ltok `fitsIndentReq` ir
-        then -- errors other than indentation error
-          failure m_ei set
-        else -- add an "unexpect" indentation error message
-          failure (Just $ Label (NEL.fromList $ "token '"<>show ltok<>"' not indent to token:'"<> show (fromJust ir)<>"'")) set
-      FancyError _ set -> fancyFailure set --We're not handling fancy errors yet.
-    Right a -> return a
-  where 
-    fromJust Nothing = error "An error that shouldn't happen here: fitsIndentReq==False implies that 'ir' is a Just."
-    fromJust (Just x)= x
+  pr <- observing $ lookAhead anySingle --later indent check needs a token
+  case pr of
+    Left _ -> do -- safe to assume that indentation won't be involved since there's no next token
+      (_,a) <- token tokpred Set.empty
+      return a
+    Right ltok -> do
+      -- token (tokpred >=> f) Set.empty
+      r <- observing $ token (tokpred >=> f) Set.empty
+      case r of
+        Left pe -> case pe of -- the extraction failed
+          TrivialError _ m_ei set -> do
+            if ltok `fitsIndentReq` ir
+            then -- not caused by indentation error
+              failure m_ei set
+            else -- caused by indentation error, we need to proceed to adding error msg
+              case m_ei of -- getting original error position
+              Nothing -> failureWithoutLoc
+              Just ei -> case ei of
+                Tokens ((L loc errtok) NEL.:| tos) -> 
+                  failure (Just$Tokens (newErrLTok loc errtok NEL.:| tos) ) set
+                Label _ -> failureWithoutLoc --might need to change in the future
+                EndOfInput -> failureWithoutLoc --a case that might not going to happen, for we filtered out the case at 'observing $ lookAhead anySingle'
+              where 
+                fromJust Nothing = error "An error that shouldn't happen here: fitsIndentReq==False implies that 'ir' is a Just."
+                fromJust (Just x)= x
+                irtok = fromJust ir
+                lineNum = posLine $ (\(Loc s _)->s) $ locOf irtok
+                newMsg = NEL.fromList $ "token '"<>show ltok<>"' not indent to '"<> show irtok<>"' of line "<>show lineNum
+                newErrLTok loc errtok = L loc (ErrTokIndent errtok (unLoc irtok) lineNum)
+                failureWithoutLoc = failure (Just$Label newMsg) set
+          FancyError _ set -> fancyFailure set --We're not handling fancy errors yet.
+        
+        Right a -> return a -- successfully extract a will-indented token
+      
 
-    
+  -- st <- getParserState
   -- (ltok, a) <- token tokpred Set.empty
   -- ir <- lastIndentReq
   -- if ltok `fitsIndentReq` ir
@@ -282,7 +291,9 @@ indentTo p tok = do
   -- because Bookkeeping is not back-trackable (cannot just undo insertion of IndentReq).
   case x of
     Left pe -> case pe of
-      TrivialError _ m_ei set -> failure m_ei (Set.insert (Label (NEL.fromList $ "token indent to the token:'"<>show tok<>"'")) set)
+      TrivialError _ m_ei set -> failure m_ei (Set.insert (Label (NEL.fromList $ "token indent to '"<>show tok<>"' of line "<>show lineNum)) set)
+        where
+          lineNum = posLine $ (\(Loc s _)->s) $ locOf tok
       FancyError _ set -> fancyFailure set
     Right r -> return r
 
@@ -291,9 +302,10 @@ alignAndIndentBodyTo p tokToAlign = do
   tok <- lookAhead anySingle
   if colOf tok == colOf tokToAlign
     then p `indentTo` tok
-    else failure Nothing (Set.fromList [Label (NEL.fromList $ "token align to the token:'"<>show tokToAlign<>"'")])
+    else failure Nothing (Set.fromList [Label (NEL.fromList $ "token align to '"<>show tokToAlign<>"' of line "<>show lineNum)])
   where 
     colOf = posCol . (\(Loc s _)->s) . locOf
+    lineNum = posLine $ (\(Loc s _)->s) $ locOf tokToAlign
 
 
 
@@ -307,7 +319,7 @@ sepByAlignmentOrSemi parser =
 
 sepByAlignmentOrSemi1 :: Parser a -> Parser [a]
 sepByAlignmentOrSemi1 parser = do
-  tokToAlign <- lookAhead anySingle
+  tokToAlign <- lookAhead anySingle <?> "anything to start the block"
   x <- parser `indentTo` tokToAlign
   xs <- sepByAlignmentOrSemiHelper tokToAlign True parser
   return (x:xs)
@@ -329,7 +341,7 @@ sepByAlignment parser = do
 
 sepByAlignment1 :: Parser a -> Parser [a]
 sepByAlignment1 parser = do
-  tokToAlign <- lookAhead anySingle
+  tokToAlign <- lookAhead anySingle <?> "anything to start the block"
   x <- parser `indentTo` tokToAlign
   xs <- sepByAlignmentOrSemiHelper tokToAlign False parser
   return (x:xs)

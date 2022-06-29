@@ -60,6 +60,8 @@ data Tok
     TokIndent
   | TokDedent
   | TokNewline
+  | ErrTokIndent Tok Tok Int -- The err token, the token to indent to, the line number of the second Tok
+      -- a token generated for parsing error messages, won't appear in the stream
   -- | ATokOd
   -- | ATokFi
   | -- keywords
@@ -162,6 +164,7 @@ instance Show Tok where
     TokIndent            -> "<indent>"
     TokDedent            -> "<dedent>"
     TokNewline           -> "<newline>"
+    ErrTokIndent _ indT ln -> "token not indent to '"<>show indT<>"' of line "<>show ln
     TokWhitespace        -> " "
     TokEOF               -> ""
     TokLineComment s     -> "-- " ++ Text.unpack s
