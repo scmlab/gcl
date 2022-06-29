@@ -298,9 +298,12 @@ alignAndIndentBodyTo p tokToAlign = do
 
 
 sepByAlignmentOrSemi :: Parser a -> Parser [a]
-sepByAlignmentOrSemi parser = do
-  tok <- lookAhead anySingle
-  sepByAlignmentOrSemiHelper tok True parser
+sepByAlignmentOrSemi parser = 
+    do
+      tok <- try $ lookAhead anySingle
+      sepByAlignmentOrSemiHelper tok True parser
+  <|>
+    return []
 
 sepByAlignmentOrSemi1 :: Parser a -> Parser [a]
 sepByAlignmentOrSemi1 parser = do
@@ -318,8 +321,11 @@ sepByAlignmentOrSemiHelper tokToAlign useSemi parser = do
 
 sepByAlignment :: Parser a -> Parser [a]
 sepByAlignment parser = do
-  tok <- lookAhead anySingle
-  sepByAlignmentOrSemiHelper tok False parser
+    do
+      tok <- try $ lookAhead anySingle
+      sepByAlignmentOrSemiHelper tok False parser
+  <|>
+    return []
 
 sepByAlignment1 :: Parser a -> Parser [a]
 sepByAlignment1 parser = do
