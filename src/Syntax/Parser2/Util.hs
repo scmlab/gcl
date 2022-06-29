@@ -160,7 +160,7 @@ fitsIndentReq :: L Tok -> Maybe (L Tok) -> Bool
 fitsIndentReq tokToCheck indentReq = case indentReq of
   Nothing -> True
   Just tokToAlign ->
-    (tokToCheck == tokToAlign) 
+    (tokToCheck `strictEq` tokToAlign) 
       --If the token is the same to the leftTip(the token to align/indent to).
       -- This could happen when backtracking happens;
       -- For example, in 'definition = choice [try funcDefnSig, typeDefn, funcDefnF]',
@@ -170,6 +170,7 @@ fitsIndentReq tokToCheck indentReq = case indentReq of
     (colOf tokToCheck > colOf tokToAlign)
   where
     colOf = posCol . (\(Loc s _)->s) . locOf
+    strictEq (L l1 t1) (L l2 t2) = l1==l2 && t1==t2
 
 checkIndentation :: L Tok -> Mega.State TokStream Void -> Parser ()
 checkIndentation loctok@(L _ _) st = do
