@@ -274,17 +274,17 @@ instance PrettyWithLoc Stmt where
   prettyWithLoc (SpecQM l) = fromDoc (locOf l) (pretty tokQM)
   prettyWithLoc (Spec l s r) =
     prettyWithLoc l
-      <> prettyWithLoc (map (fmap show') s)
+      <> prettyWithLoc (map (fmap show) s)
       <> prettyWithLoc r
-      where 
+      -- where 
         -- don't show tokens like <newline> or <indent>
-        show' tok = case tok of 
-          TokNewlineAndWhitespace _ -> ""
-          TokNewlineAndWhitespaceAndBar _ -> ""
-          TokIndent            -> ""
-          TokDedent            -> ""
-          TokNewline           -> ""
-          _ -> show tok 
+        -- show' tok = case tok of 
+        --   TokNewlineAndWhitespace _ -> ""
+        --   TokNewlineAndWhitespaceAndBar _ -> ""
+        --   TokIndent            -> ""
+        --   TokDedent            -> ""
+        --   TokNewline           -> ""
+        --   _ -> show tok 
   prettyWithLoc (Proof l anchors r) =
     prettyWithLoc l <> prettyWithLoc anchors <> prettyWithLoc r
   prettyWithLoc (Alloc p a n l es r) =

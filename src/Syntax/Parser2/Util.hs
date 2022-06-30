@@ -129,12 +129,11 @@ withRange parser = do
   (result, range) <- getRange parser
   return $ result range
 
+
+
+
 -- Functions below are for indentation.
 
--- insertAlignIndentReq :: Pos -> Parser ()
--- insertAlignIndentReq pos = do
---   stack <- gets indentStack
---   modify $ \st->st { indentStack = (pos,False):stack }
 
 insertIndentReq :: L Tok -> Parser ()
 insertIndentReq tok = do
@@ -171,7 +170,7 @@ fitsIndentReq tokToCheck indentReq = case indentReq of
       -- This could happen when backtracking happens;
       -- For example, in 'definition = choice [try funcDefnSig, typeDefn, funcDefnF]',
       -- the starts of both funcDefnSig and funcDefnF are identifiers, when funcDefnSig fails then goes to funcDefnF,
-      -- the starting identifier would be checked another once.
+      -- the starting identifier would be checked again.
      || 
     (unLoc tokToCheck `elem` 
      [ TokFi          -- 'fi'
@@ -182,15 +181,19 @@ fitsIndentReq tokToCheck indentReq = case indentReq of
      , TokProofClose  -- '-}'
      , TokDeclClose   -- ':}'
      ])
-      -- Special cases: structural delimiters don't need to aligne/indent to anything
+      -- Special cases: structural delimiters don't need to align/indent to anything
       -- or if they're not aligned, will it cause any trouble?
-      -- Array's ']', quant's '|>' are considered parts of an expression, thus not on the list
+      -- Array's ']', quant's '|>' are considered parts of an expression, therefore not on the list.
   where
     strictEq (L l1 t1) (L l2 t2) = l1==l2 && t1==t2
 
 
 -- an ideal method which doesn't work: 
 -- * parse -> if success, indentCheck(without touching parser state), manually fail it when indentCheck fails
+-- So the current solution is: 
+-- * parse(Mega.token) with indentation check, if failed, see if the failure was caused by indentation error,
+--   if so, add the indentation error message. The parsing and indentation error checking(actually the second checking)
+--   each needs a 'lookAhead anySingle', which enlarged the complexity of this solution.
 extractWithIndentCheck :: (L Tok -> Maybe (L Tok,a)) -> Parser a
 extractWithIndentCheck tokpred = do
   ir <- lastIndentReq
@@ -202,16 +205,16 @@ extractWithIndentCheck tokpred = do
     Left _ -> do -- safe to assume that indentation won't be involved since there's no next token
       (_,a) <- token tokpred Set.empty
       return a
-    Right ltok -> do
-      -- token (tokpred >=> f) Set.empty
+    Right ltok -> do -- now do the real extraction we need
       r <- observing $ token (tokpred >=> f) Set.empty
       case r of
+        Right a -> return a -- successfully extract a will-indented token
         Left pe -> case pe of -- the extraction failed
           TrivialError _ m_ei set -> do
             if ltok `fitsIndentReq` ir
-            then -- not caused by indentation error
+            then -- the failure was not caused by indentation error
               failure m_ei set
-            else -- caused by indentation error, we need to proceed to adding error msg
+            else -- the failure was caused by indentation error, we need to proceed to adding error msg
               case m_ei of -- getting original error position
               Nothing -> failureWithoutLoc
               Just ei -> case ei of
@@ -227,21 +230,7 @@ extractWithIndentCheck tokpred = do
                 newMsg = NEL.fromList $ "token '"<>show ltok<>"' not indent to '"<> show irtok<>"' of line "<>show lineNum
                 newErrLTok loc errtok = L loc (ErrTokIndent errtok (unLoc irtok) lineNum)
                 failureWithoutLoc = failure (Just$Label newMsg) set
-          FancyError _ set -> fancyFailure set --We're not handling fancy errors yet.
-        
-        Right a -> return a -- successfully extract a will-indented token
-      
-
-  -- st <- getParserState
-  -- (ltok, a) <- token tokpred Set.empty
-  -- ir <- lastIndentReq
-  -- if ltok `fitsIndentReq` ir
-  -- then return a
-  -- else do
-  --   setParserState st
-  --   registerFailure (Just $ Label (NEL.fromList $ "token '"<>show ltok<>"' not indent to token:"<> show ir )) Set.empty
-  --   snd <$> token (const Nothing) Set.empty
-
+          FancyError _ set -> fancyFailure set --We're not handling fancy errors yet.  
 
 --------------------------------------------------------------------------------
 -- | Combinators
@@ -308,10 +297,26 @@ indentTo p tok = do
   case x of
     Left pe -> case pe of
       TrivialError _ m_ei set -> failure m_ei (Set.insert (Label (NEL.fromList $ "token indent to '"<>show tok<>"' of line "<>show lineNum)) set)
+        -- The message here is "expecting indented token", while in 'extractWithIndentCheck', it's "unexpected unindented token".
+        -- Is this message really needed?
         where
           lineNum = posLine $ (\(Loc s _)->s) $ locOf tok
       FancyError _ set -> fancyFailure set
     Right r -> return r
+
+alignTo :: Parser a -> L Tok -> Parser a
+alignTo parser tokToAlign = 
+    do
+      tok <- try $ lookAhead anySingle
+      let lineNum = posLine $ (\(Loc s _)->s) $ locOf tokToAlign
+      if colOf tok == colOf tokToAlign
+      then parser
+      else failure Nothing (Set.fromList [Label (NEL.fromList $ "token align to '"<>show tokToAlign<>"' of line "<>show lineNum)])
+  <|>
+    parser 
+    -- If there's no token to lookahead, let the parser decides whether this should fail, and the failing message, 
+    -- instead of what would be done by 'lookAhead anySingle'.
+    -- If this is the case, it's implied that eof satisfies any indentation requirement.
 
 alignAndIndentBodyTo :: Parser a -> L Tok -> Parser a
 alignAndIndentBodyTo p tokToAlign = do
@@ -322,7 +327,7 @@ alignAndIndentBodyTo p tokToAlign = do
   where 
     lineNum = posLine $ (\(Loc s _)->s) $ locOf tokToAlign
 
-
+-- | Only see if each item is aligned to the first, no indentation check in the body.
 simpleSepByAlign :: Parser a -> Parser [a]
 simpleSepByAlign parser = do
     do

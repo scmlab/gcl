@@ -53,17 +53,15 @@ data Tok
   | TokLineComment Text
   | TokBlockCommentOpen
   | TokBlockCommentClose
-  | TokNewlineAndWhitespace Int
-  | TokNewlineAndWhitespaceAndBar Int
-  | -- the following 3 kinds of tokens will be generated from `TokNewlineAndWhitespace`
-    -- and inserted to the TokenStream instead
-    TokIndent
-  | TokDedent
-  | TokNewline
+  --  | TokNewlineAndWhitespace Int
+  --  | TokNewlineAndWhitespaceAndBar Int
+  --  | -- the following 3 kinds of tokens will be generated from `TokNewlineAndWhitespace`
+  --   -- and inserted to the TokenStream instead
+  --   TokIndent
+  --  | TokDedent
+  --  | TokNewline
   | ErrTokIndent Tok Tok Int -- The err token, the token to indent to, the line number of the second Tok
       -- a token generated for parsing error messages, won't appear in the stream
-  -- | ATokOd
-  -- | ATokFi
   | -- keywords
     TokSkip
   | TokAbort
@@ -158,12 +156,12 @@ data Tok
 
 instance Show Tok where
   show tok = case tok of
-    TokNewlineAndWhitespace n -> "<newline + " ++ show n ++ " whitespaces>"
-    TokNewlineAndWhitespaceAndBar n ->
-      "<newline + " ++ show n ++ " whitespaces and a guard bar>"
-    TokIndent            -> "<indent>"
-    TokDedent            -> "<dedent>"
-    TokNewline           -> "<newline>"
+    -- TokNewlineAndWhitespace n -> "<newline + " ++ show n ++ " whitespaces>"
+    -- TokNewlineAndWhitespaceAndBar n ->
+    --   "<newline + " ++ show n ++ " whitespaces and a guard bar>"
+    -- TokIndent            -> "<indent>"
+    -- TokDedent            -> "<dedent>"
+    -- TokNewline           -> "<newline>"
     ErrTokIndent _ indT ln -> "token not indent to '"<>show indT<>"' of line "<>show ln
     TokWhitespace        -> " "
     TokEOF               -> ""
@@ -475,14 +473,14 @@ whitespaceButNewlineRE :: RE Char Tok
 whitespaceButNewlineRE =
   msym $ \c -> if isSpaceButNewline c then Just TokWhitespace else Nothing
 
-comment :: RE Char String
-comment =
-  -- expects spaces
-  many (psym isSpace)
-    -- expects "--"
-    <* string "--"
-    -- expects any chars but newline
-    <* many (psym (not . isNewline))
+-- comment :: RE Char String
+-- comment =
+--   -- expects spaces
+--   many (psym isSpace)
+--     -- expects "--"
+--     <* string "--"
+--     -- expects any chars but newline
+--     <* many (psym (not . isNewline))
 
 comment' :: RE Char String
 comment' = do
@@ -491,21 +489,21 @@ comment' = do
   oneLine <|> multLine
 
 -- for indentation bookkeeping
-newlineAndWhitespace :: RE Char Tok
-newlineAndWhitespace =
-  TokNewlineAndWhitespace
-    <$  psym isNewline -- matches a newline
-    <*  many comment -- skip lines of comments
-    <*> reFoldl Greedy (\n _ -> succ n) 0 (psym isSpaceButNewline)
+-- newlineAndWhitespace :: RE Char Tok
+-- newlineAndWhitespace =
+--   TokNewlineAndWhitespace
+--     <$  psym isNewline -- matches a newline
+--     <*  many comment -- skip lines of comments
+--     <*> reFoldl Greedy (\n _ -> succ n) 0 (psym isSpaceButNewline)
 
--- for indentation bookkeeping
-newlineAndWhitespaceAndBar :: RE Char Tok
-newlineAndWhitespaceAndBar =
-  TokNewlineAndWhitespaceAndBar
-    <$  psym isNewline -- matches a newline
-    <*  many comment -- skip lines of comments
-    <*> reFoldl Greedy (\n _ -> succ n) 2 (psym isSpaceButNewline)
-    <*  string "| "
+-- -- for indentation bookkeeping
+-- newlineAndWhitespaceAndBar :: RE Char Tok
+-- newlineAndWhitespaceAndBar =
+--   TokNewlineAndWhitespaceAndBar
+--     <$  psym isNewline -- matches a newline
+--     <*  many comment -- skip lines of comments
+--     <*> reFoldl Greedy (\n _ -> succ n) 2 (psym isSpaceButNewline)
+--     <*  string "| "
 
 lexer :: Lexer Tok
 lexer = mconcat
@@ -513,35 +511,37 @@ lexer = mconcat
     token (longest tokRE)
   --, token (longest newlineAndWhitespaceAndBar)
   --, token (longest newlineAndWhitespace)
-  ,
+  
       -- meaningless tokens that are to be dumped
-    whitespace (longest whitespaceButNewlineRE)
+    -- whitespace (longest whitespaceButNewlineRE)
   , whitespace (longest comment')
-  , whitespace (longest newlineAndWhitespace) --added
+  , whitespace (longest $ psym isSpace)
+  -- , whitespace (longest newlineAndWhitespace) --added
   ]
 
 --------------------------------------------------------------------------------
+type LexicalError = Pos
 
+scan :: FilePath -> Text -> Either LexicalError TokStream
+scan filepath =
+  translateLoc . Right . runLexer lexer filepath . Text.unpack
+ where
+  -- According to the document in Data.Loc.Range, the original meaning of Loc is
+  -- different from how we use it as Range (to simply put, Range extends 1 in col and charOffset).
+  -- The lexer records tokens' ranges in Loc, and we use translateLoc to make it Range.
+  translateLoc :: Either LexicalError TokStream -> Either LexicalError TokStream
+  translateLoc (Left x) = Left x
+  translateLoc (Right toks) = Right (f toks)
+    where
+      f (TsToken (L loc x) rest) = TsToken (L (update loc) x) (f rest)
+        where update NoLoc = NoLoc
+              update (Loc start (Pos path l c co)) = Loc start (Pos path l (c+1) (co+1))
+      f TsEof = TsEof 
+      f (TsError e) = TsError e
+
+--------------------------------------------------------------------------------
+-- banacorn's method of generating <indent>,<newline>,<dedent> tokens
 {-
-My plan of preprocessing:
-1. processing comments (maybe not now)
-2. process indent structure, without considering any ad-hoc construct, like do,if,caseOf
-  producing tokens: <indent><align><dedent>
-3. detailed cases:
-  - some <indent> should just be wiped out?
--}
-
--- data PPState' = PPState'
---   {
---     ppIndentStack' :: [Int]
---   }
--- type PreprocessM' = ExceptT Lex.LexicalError (State PPState')
-
--- initPPState' = PPState'
---   {
---     ppIndentStack' = [0]
---   }
-
 preprocess' :: TokenStream (L Tok) -> ExceptT Lex.LexicalError (State [Int]) TokStream
 preprocess' (TsToken l@(L loc tok) ts) = case tok of
   TokNewlineAndWhitespace n -> do
@@ -557,8 +557,7 @@ preprocess' (TsEof) = undefined --popping the whole stack and complete the deden
   -- consider the ending conditions:straight end or newline+spaces
 preprocess' (TsError le) = throwError le
 
--- | scan
-type LexicalError = Pos
+
 
 data PPState = PPState
   { -- stack of indentation levels
@@ -677,11 +676,8 @@ deviceAction CmpNoop                 DontCare         = Noop
 
 scan :: FilePath -> Text -> Either LexicalError TokStream
 scan filepath =
-  translateLoc . Right . runLexer lexer filepath . Text.unpack
+  translateLoc . preprocess . runLexer lexer filepath . Text.unpack
  where
-  -- According to the document in Data.Loc.Range, the original meaning of Loc is
-  -- different from how we use it as Range (to simply put, Range extends 1 in col and charOffset).
-  -- The lexer records tokens' ranges in Loc, and we use translateLoc to make it Range.
   translateLoc :: Either LexicalError TokStream -> Either LexicalError TokStream
   translateLoc (Left x) = Left x
   translateLoc (Right toks) = Right (f toks)
@@ -754,7 +750,7 @@ scan filepath =
         TsToken currentToken <$> preprocess xs
 
 --------------------------------------------------------------------------------
-
+-}
 -- | Instances of PrettyToken
 instance PrettyToken Tok where
   prettyTokens (x :| []) =
@@ -769,7 +765,8 @@ instance PrettyToken Tok where
 -- otherwise 'Nothing'. This is an internal helper.
 prettyToken' :: Tok -> Maybe String
 prettyToken' tok = case tok of
-  TokNewlineAndWhitespace n -> Just $ "indent [" ++ show n ++ "]"
-  TokWhitespace             -> Just "space"
+  -- TokNewlineAndWhitespace n -> Just $ "indent [" ++ show n ++ "]"
+  -- TokWhitespace             -> Just "space"
   TokEOF                    -> Just "end of file"
   _                         -> Nothing
+

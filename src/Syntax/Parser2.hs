@@ -50,7 +50,7 @@ scanAndParse parser filepath source = case scan filepath source of
 
 parse :: Parser a -> FilePath -> TokStream -> Either (NonEmpty (Loc, String)) a
 parse parser filepath tokenStream =
-  case runM (runParserT (parser <* many dedent <* eof) filepath tokenStream) of
+  case runM (runParserT (parser <* eof) filepath tokenStream) of
     Left  e -> Left (fromParseErrorBundle e)
     Right x -> Right x
  where
@@ -477,10 +477,10 @@ programBlock =
     -- <*  many (ignoreP indentationRelated)
     <*> tokenBlockClose
 
-indentationRelated :: Tok -> Bool
-indentationRelated TokIndent = True
-indentationRelated TokDedent = True
-indentationRelated _         = False
+-- indentationRelated :: Tok -> Bool
+-- indentationRelated TokIndent = True
+-- indentationRelated TokDedent = True
+-- indentationRelated _         = False
 
 program :: Parser Program
 program = do
@@ -498,14 +498,14 @@ program = do
 
 
 
-newlines :: Parser ()
-newlines = void $ some (symbol TokNewline)
+-- newlines :: Parser ()
+-- newlines = void $ some (symbol TokNewline)
 
-dedent :: Parser ()
-dedent = void $ symbol TokDedent
+-- dedent :: Parser ()
+-- dedent = void $ symbol TokDedent
 
-indent :: Parser ()
-indent = void $ symbol TokIndent
+-- indent :: Parser ()
+-- indent = void $ symbol TokIndent
 
 --------------------------------------------------------------------------------
 -- Expression 
@@ -751,56 +751,56 @@ type' = do
 
 --------------------------------------------------------------------------------
 
--- | Combinators
-block :: Parser a -> Parser a
-block parser = do
-  ignore TokIndent <?> "indentation"
-  result <- parser
-  void $ optional (ignore TokDedent <?> "dedentation")
-  return result
+-- -- | Combinators
+-- block :: Parser a -> Parser a
+-- block parser = do
+--   ignore TokIndent <?> "indentation"
+--   result <- parser
+--   void $ optional (ignore TokDedent <?> "dedentation")
+--   return result
 
--- a block of indented stuff seperated by newlines
-blockOf :: Parser a -> Parser [a]
-blockOf parser = do
-  ignore TokIndent <?> "indentation"
-  result <- sepBy1 parser newlines
-  void $ optional (ignore TokDedent <?> "dedentation")
-  return result
+-- -- a block of indented stuff seperated by newlines
+-- blockOf :: Parser a -> Parser [a]
+-- blockOf parser = do
+--   ignore TokIndent <?> "indentation"
+--   result <- sepBy1 parser newlines
+--   void $ optional (ignore TokDedent <?> "dedentation")
+--   return result
 
-block' :: (l -> x -> r -> y) -> Parser l -> Parser x -> Parser r -> Parser y
-block' constructor open parser close = do
-  a <- open
-  _ <- symbol TokIndent <?> "indentation"
-  b <- parser
-  c <- choice
-    [ do
-      _ <- symbol TokDedent <?> "dedentation"
-      close
-    , close
-    , do
-          -- the fucked up case:
-          --  the tokener is not capable of handling cases like "if True -> skip fi"
-          --  because it's not possible to determine the number of `TokDedent` before `TokFi`
-      c <- close
-      _ <- symbol TokDedent <?> "dedentation"
-      return c
-    ]
-  return $ constructor a b c
+-- block' :: (l -> x -> r -> y) -> Parser l -> Parser x -> Parser r -> Parser y
+-- block' constructor open parser close = do
+--   a <- open
+--   _ <- symbol TokIndent <?> "indentation"
+--   b <- parser
+--   c <- choice
+--     [ do
+--       _ <- symbol TokDedent <?> "dedentation"
+--       close
+--     , close
+--     , do
+--           -- the fucked up case:
+--           --  the tokener is not capable of handling cases like "if True -> skip fi"
+--           --  because it's not possible to determine the number of `TokDedent` before `TokFi`
+--       c <- close
+--       _ <- symbol TokDedent <?> "dedentation"
+--       return c
+--     ]
+--   return $ constructor a b c
 
--- remove TokIndent/TokDedent before TokGuardBar
-ordinaryBar :: Parser (Token "|")
-ordinaryBar = do
-  void $ many (ignoreP indentationRelated)
-  tokenGuardBar
+-- -- remove TokIndent/TokDedent before TokGuardBar
+-- ordinaryBar :: Parser (Token "|")
+-- ordinaryBar = do
+--   void $ many (ignoreP indentationRelated)
+--   tokenGuardBar
 
--- consumes 1 or more newlines
-expectNewline :: Parser ()
-expectNewline = do
-  -- see if the latest accepcted token is TokNewline
-  t <- lift getLastToken
-  case t of
-    Just TokNewline -> return ()
-    _               -> void $ some (ignore TokNewline)
+-- -- consumes 1 or more newlines
+-- expectNewline :: Parser ()
+-- expectNewline = do
+--   -- see if the latest accepcted token is TokNewline
+--   t <- lift getLastToken
+--   case t of
+--     Just TokNewline -> return ()
+--     _               -> void $ some (ignore TokNewline)
 
 upperName :: Parser Text
 upperName = extract p
