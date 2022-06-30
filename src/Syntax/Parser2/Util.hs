@@ -20,6 +20,7 @@ module Syntax.Parser2.Util
   , sepByAlignmentOrSemi1
   , sepByAlignment
   , sepByAlignment1
+  , simpleSepByAlign
   ) where
 
 import           Control.Monad.State
@@ -156,20 +157,26 @@ lastIndentReq = do
     [] -> return Nothing
     tok : _ -> return (Just tok)
 
+colOf :: L Tok -> Int
+colOf = posCol . (\(Loc s _)->s) . locOf
+
 fitsIndentReq :: L Tok -> Maybe (L Tok) -> Bool
 fitsIndentReq tokToCheck indentReq = case indentReq of
   Nothing -> True
   Just tokToAlign ->
+    (colOf tokToCheck > colOf tokToAlign)
+    ||
     (tokToCheck `strictEq` tokToAlign) 
       --If the token is the same to the leftTip(the token to align/indent to).
       -- This could happen when backtracking happens;
       -- For example, in 'definition = choice [try funcDefnSig, typeDefn, funcDefnF]',
       -- the starts of both funcDefnSig and funcDefnF are identifiers, when funcDefnSig fails then goes to funcDefnF,
       -- the starting identifier would be checked another once.
-    || 
-    (colOf tokToCheck > colOf tokToAlign)
+     || 
+    (unLoc tokToCheck `elem` [TokFi, TokOd, TokBlockClose, TokGuardBar])
+      -- special cases: structural delimiters don't need to aligne/indent to anything
+      -- or if they're not aligned, will it cause any trouble?
   where
-    colOf = posCol . (\(Loc s _)->s) . locOf
     strictEq (L l1 t1) (L l2 t2) = l1==l2 && t1==t2
 
 
@@ -304,10 +311,23 @@ alignAndIndentBodyTo p tokToAlign = do
     then p `indentTo` tok
     else failure Nothing (Set.fromList [Label (NEL.fromList $ "token align to '"<>show tokToAlign<>"' of line "<>show lineNum)])
   where 
-    colOf = posCol . (\(Loc s _)->s) . locOf
     lineNum = posLine $ (\(Loc s _)->s) $ locOf tokToAlign
 
 
+simpleSepByAlign :: Parser a -> Parser [a]
+simpleSepByAlign parser = do
+    do
+      tokToAlign <- try $ lookAhead anySingle
+      let lineNum = posLine $ (\(Loc s _)->s) $ locOf tokToAlign
+      let helper = do
+            tok <- lookAhead anySingle
+            if colOf tok == colOf tokToAlign
+            then parser
+            else failure Nothing (Set.fromList [Label (NEL.fromList $ "token align to '"<>show tokToAlign<>"' of line "<>show lineNum)])
+      many helper
+  <|>
+    return []
+  
 
 sepByAlignmentOrSemi :: Parser a -> Parser [a]
 sepByAlignmentOrSemi parser = 
