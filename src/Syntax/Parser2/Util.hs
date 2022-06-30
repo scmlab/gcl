@@ -173,9 +173,18 @@ fitsIndentReq tokToCheck indentReq = case indentReq of
       -- the starts of both funcDefnSig and funcDefnF are identifiers, when funcDefnSig fails then goes to funcDefnF,
       -- the starting identifier would be checked another once.
      || 
-    (unLoc tokToCheck `elem` [TokFi, TokOd, TokBlockClose, TokGuardBar])
-      -- special cases: structural delimiters don't need to aligne/indent to anything
+    (unLoc tokToCheck `elem` 
+     [ TokFi          -- 'fi'
+     , TokOd          -- 'od'
+     , TokBlockClose  -- ']|'
+     , TokGuardBar    -- '|'
+     , TokSpecClose   -- '!]'
+     , TokProofClose  -- '-}'
+     , TokDeclClose   -- ':}'
+     ])
+      -- Special cases: structural delimiters don't need to aligne/indent to anything
       -- or if they're not aligned, will it cause any trouble?
+      -- Array's ']', quant's '|>' are considered parts of an expression, thus not on the list
   where
     strictEq (L l1 t1) (L l2 t2) = l1==l2 && t1==t2
 
