@@ -33,7 +33,6 @@ import           Text.Megaparsec         hiding ( ParseError
                                                 , tokens
                                                 )
 import qualified Text.Megaparsec               as Mega
-import Debug.Trace
 
 --------------------------------------------------------------------------------
 -- | States for source location bookkeeping
@@ -262,29 +261,10 @@ definition = choice [try funcDefnSig, typeDefn, funcDefnF]
 
   funcDefnF :: Parser Definition
   funcDefnF = FuncDefn <$> identifier <*> many lower <*> tokenEQ <*> expression
-    -- the expression part should be indented, so to not confused with next possible decl/def
-    -- because we rely on linebreak, alignment to denote the end of the expression, instead of symbols like ";"
-    -- (pId, leftBound) <- getLeftBound identifier
-    -- FuncDefn pId <$> many lower <*> tokenEQ <*> indentTo leftBound expression
-    -- traceM "0"
-    -- x <- identifier
-    -- traceM "1"
-    -- ys <- many lower
-    -- traceM "2"
-    -- z <- tokenEQ
-    -- traceM "3"
-    -- expr <- expression
-    -- traceM "4"
-    -- return $ FuncDefn x ys z expr
-
-
 
   -- `data T a1 a2 ... = C1 ai1 ai2 .. | C2 ... | ...`
   typeDefn :: Parser Definition
   typeDefn = TypeDefn <$> tokenData <*> upper <*> many lower <*> tokenEQ <*> sepByGuardBar typeDefnCtor
-    -- The end of Ctor list is rely on linebreak instead of symbols like ";", so it needs to be indented.
-    -- (tData, leftBound) <- getLeftBound tokenData
-    -- TypeDefn tData <$> upper <*> many lower <*> tokenEQ <*>  indentTo leftBound (sepByGuardBar typeDefnCtor)
 
   typeDefnCtor :: Parser TypeDefnCtor
   typeDefnCtor = TypeDefnCtor <$> upper <*> many type'
