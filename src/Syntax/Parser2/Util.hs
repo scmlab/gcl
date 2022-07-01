@@ -38,9 +38,7 @@ import           Text.Megaparsec         hiding ( Pos
                                                 , State
                                                 , between
                                                 )
-import qualified Text.Megaparsec    as Mega
 import qualified Data.List.NonEmpty as NEL
-import Debug.Trace
 
 --------------------------------------------------------------------------------
 -- | Source location bookkeeping
@@ -56,6 +54,7 @@ data Bookkeeping = Bookkeeping
   , logged     :: Map ID Loc  -- waiting to be removed when the ending position is determined
   , index      :: Int         -- for generating fresh IDs
   , indentStack:: [L Tok]     -- Recording the tokens to indent/align to.
+                                -- see the section: "## State (Bookkeeping) actions for indentation"
   }
 
 runM :: State Bookkeeping a -> a
@@ -132,7 +131,17 @@ withRange parser = do
 
 
 --------------------------------------------------------------------------------
--- State (Bookkeeping) actions for indentation.
+-- ## State (Bookkeeping) actions for indentation.
+
+-- See the section "## Combinators for indentation" below for explanations 
+-- of the concept of indentation parsing.
+
+-- About the state actions for indentation:
+-- An indentation requirement--a token--is inserted to and popped from the stack 'indentStack'
+-- only by the combinator 'indentTo'.
+-- When any indentation requirement being on top of the stack, the atomic token extractors: 
+-- 'symbol' and 'extract', of which all parsers are based upon, would check if the incoming
+-- token is indent to that requirement (through 'extractWithIndentCheck' function).
 
 insertIndentReq :: L Tok -> Parser ()
 insertIndentReq tok = do
@@ -191,8 +200,7 @@ fitsIndentReq tokToCheck indentReq = case indentReq of
 -- * parse -> if success, indentCheck(without touching parser state), manually fail it when indentCheck fails
 -- So the current solution is: 
 -- * parse(Mega.token) with indentation check, if failed, see if the failure was caused by indentation error,
---   if so, add the indentation error message. The parsing and indentation error checking(actually the second checking)
---   each needs a 'lookAhead anySingle', which enlarged the complexity of this solution.
+--   if so, add the indentation error message. 
 extractWithIndentCheck :: (L Tok -> Maybe (L Tok,a)) -> Parser a
 extractWithIndentCheck tokpred = do
   ir <- lastIndentReq
@@ -206,15 +214,17 @@ extractWithIndentCheck tokpred = do
       return a
     Right ltok -> do -- now do the real extraction we need
       r <- observing $ token (tokpred >=> f) Set.empty
+        -- delay the failure so we can add error messages for indentation
       case r of
         Right a -> return a -- successfully extract a will-indented token
+
         Left pe -> case pe of -- the extraction failed
           TrivialError _ m_ei set -> do
             if ltok `fitsIndentReq` ir
             then -- the failure was not caused by indentation error
               failure m_ei set
             else -- the failure was caused by indentation error, we need to proceed to adding error msg
-              case m_ei of -- getting original error position
+              case m_ei of -- trying to utilize the original unexpected token's loc information
               Nothing -> failureWithoutLoc
               Just ei -> case ei of
                 Tokens ((L loc errtok) NEL.:| tos) -> 
@@ -279,7 +289,11 @@ ignoreP p = do
 
 
 -- ## Combinators for indentation
--- The design principle of indentation constraints is to reduce ambiguity of newline and alignment ()
+-- The design principle of indentation constraints is to reduce ambiguity of newline and alignment.
+-- (if the new line is indented, then it's the continuation of the last line; if it's aligned, 
+--  then it's a parallel item.)
+-- This idea is fulfilled by the combinator(s) 'sepByAlignment', which tries to run the input parser
+-- as many as possible, while each result is aligned one by one, and the body of each is indented to the aligned column.
 
 -- The input Parser should be built from either 'symbol' or 'extract', for our parsers are all built on these functions, 
 -- and each checks the indentation correctness of the token to be consumed.
