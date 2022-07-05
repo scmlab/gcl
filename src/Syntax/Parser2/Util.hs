@@ -12,6 +12,8 @@ module Syntax.Parser2.Util
   , withLoc
   , getRange
   , withRange
+  , logIfSuccess
+  , withLog
   , symbol
   , extract
   , ignore
@@ -24,6 +26,7 @@ module Syntax.Parser2.Util
   ) where
 
 import           Control.Monad.State
+import           Control.Monad.Writer           ( Writer, runWriter, tell)
 import           Data.Loc
 import           Data.Loc.Range
 import           Data.Map                       ( Map )
@@ -39,11 +42,15 @@ import           Text.Megaparsec         hiding ( Pos
                                                 , between
                                                 )
 import qualified Data.List.NonEmpty as NEL
+import           Data.List                      (intercalate)
+import           Data.Monoid                    ( Endo(..))
 
 --------------------------------------------------------------------------------
 -- | Source location bookkeeping
 
-type M = State Bookkeeping
+type M = StateT Bookkeeping (Writer (Endo [String]))
+-- About the Endo stuff, the reference: https://stackoverflow.com/questions/53785921/how-efficient-is-the-writer-monad-for-lists
+--  and see the "## Logging" section.
 
 type ID = Int
 data Bookkeeping = Bookkeeping
@@ -57,8 +64,11 @@ data Bookkeeping = Bookkeeping
                                 -- see the section: "## State (Bookkeeping) actions for indentation"
   }
 
-runM :: State Bookkeeping a -> a
-runM f = evalState f (Bookkeeping NoLoc Nothing Set.empty Map.empty 0 [])
+runM :: StateT Bookkeeping (Writer (Endo [String])) a -> (a,String)
+runM f = 
+  let (a, pl) = runWriter $ evalStateT f (Bookkeeping NoLoc Nothing Set.empty Map.empty 0 [])
+  in (a, intercalate "\n" $ appEndo pl ["\n"])
+
 
 getCurrentLoc :: M Loc
 getCurrentLoc = gets currentLoc
@@ -128,7 +138,19 @@ withRange parser = do
   (result, range) <- getRange parser
   return $ result range
 
+--------------------------------------------------------------------------------
+-- ## Logging
 
+-- | Log after the parser successes.
+logIfSuccess :: (a -> String) -> Parser a -> Parser a
+logIfSuccess msgF p = do
+  x <- p
+  lift $ tell $ Endo ([msgF x]++)
+  return x
+
+-- | Log before running the parser.
+withLog :: String -> Parser a -> Parser a
+withLog msg p = lift (tell $ Endo ([msg]++)) >> p
 
 --------------------------------------------------------------------------------
 -- ## State (Bookkeeping) actions for indentation.
@@ -173,14 +195,14 @@ fitsIndentReq tokToCheck indentReq = case indentReq of
   Just tokToAlign ->
     (colOf tokToCheck > colOf tokToAlign)
     ||
-    (tokToCheck `strictEq` tokToAlign) 
+    (tokToCheck `strictEq` tokToAlign)
       --If the token is the same to the leftTip(the token to align/indent to).
       -- This could happen when backtracking happens;
       -- For example, in 'definition = choice [try funcDefnSig, typeDefn, funcDefnF]',
       -- the starts of both funcDefnSig and funcDefnF are identifiers, when funcDefnSig fails then goes to funcDefnF,
       -- the starting identifier would be checked again.
-     || 
-    (unLoc tokToCheck `elem` 
+     ||
+    (unLoc tokToCheck `elem`
      [ TokFi          -- 'fi'
      , TokOd          -- 'od'
      , TokBlockClose  -- ']|'
@@ -227,11 +249,11 @@ extractWithIndentCheck tokpred = do
               case m_ei of -- trying to utilize the original unexpected token's loc information
               Nothing -> failureWithoutLoc
               Just ei -> case ei of
-                Tokens ((L loc errtok) NEL.:| tos) -> 
+                Tokens ((L loc errtok) NEL.:| tos) ->
                   failure (Just$Tokens (newErrLTok loc errtok NEL.:| tos) ) set
                 Label _ -> failureWithoutLoc --might need to change in the future
                 EndOfInput -> failureWithoutLoc --a case that might not going to happen, for we filtered out the case at 'observing $ lookAhead anySingle'
-              where 
+              where
                 fromJust Nothing = error "An error that shouldn't happen here: fitsIndentReq==False implies that 'ir' is a Just."
                 fromJust (Just x)= x
                 irtok = fromJust ir
@@ -266,7 +288,7 @@ extract f = do
         --guard $ loctok `fitsIndentReq` ir
         (\result->(loctok, (result,l,tok'))) <$> f tok'
   -- (result, loctok@(L loc tok)) <- token p Set.empty
-  (result, loc, tok) <- extractWithIndentCheck p 
+  (result, loc, tok) <- extractWithIndentCheck p
   lift $ do
     updateLoc loc
     updateToken tok
@@ -306,7 +328,7 @@ indentTo :: Parser a -> L Tok -> Parser a
 indentTo p tok = do
   insertIndentReq tok
   x <- observing p
-  _ <- popIndentReq 
+  _ <- popIndentReq
   -- The requirement needs to be popped no matter the parser went successfully or not,
   -- because Bookkeeping is not back-trackable (cannot just undo insertion of IndentReq).
   case x of
@@ -321,7 +343,7 @@ indentTo p tok = do
 
 -- considering to export this method
 alignTo :: Parser a -> L Tok -> Parser a
-alignTo parser tokToAlign = 
+alignTo parser tokToAlign =
     do
       tok <- try $ lookAhead anySingle
       let lineNum = posLine $ (\(Loc s _)->s) $ locOf tokToAlign
@@ -329,13 +351,13 @@ alignTo parser tokToAlign =
       then parser
       else failure Nothing (Set.fromList [Label (NEL.fromList $ "token align to '"<>show tokToAlign<>"' of line "<>show lineNum)])
   <|>
-    parser 
+    parser
     -- If there's no token to lookahead, let the parser decides whether this should fail and the failing message, 
     -- instead of what would be done by 'lookAhead anySingle'.
     -- If this is the case, it's implied that eof satisfies any indentation requirement.
 
 alignAndIndentBodyTo :: Parser a -> L Tok -> Parser a
-alignAndIndentBodyTo p tokToAlign = do 
+alignAndIndentBodyTo p tokToAlign = do
   let notEof = do
         tok <- try $ lookAhead anySingle
         alignTo (p `indentTo` tok) tokToAlign
@@ -355,10 +377,10 @@ simpleSepByAlign parser = do
         tokToAlign <- try $ lookAhead anySingle
         many $ alignTo parser tokToAlign
   notEof <|> return []
-  
+
 
 sepByAlignmentOrSemi :: Parser a -> Parser [a]
-sepByAlignmentOrSemi parser = 
+sepByAlignmentOrSemi parser =
     do
       tok <- try $ lookAhead anySingle
       sepByAlignmentOrSemiHelper tok True parser

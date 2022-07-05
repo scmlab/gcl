@@ -44,14 +44,14 @@ scanAndParse :: Parser a -> FilePath -> Text -> Either ParseError a
 scanAndParse parser filepath source = case scan filepath source of
   Left  err    -> throwError (LexicalError err)
   Right tokens -> case parse parser filepath tokens of
-    Left  errors -> throwError (SyntacticError errors)
-    Right val    -> return val
+    Left  (errors,logMsg) -> throwError (SyntacticError errors logMsg)
+    Right val             -> return val
 
-parse :: Parser a -> FilePath -> TokStream -> Either (NonEmpty (Loc, String)) a
+parse :: Parser a -> FilePath -> TokStream -> Either (NonEmpty (Loc, String), String) a
 parse parser filepath tokenStream =
   case runM (runParserT (parser <* eof) filepath tokenStream) of
-    Left  e -> Left (fromParseErrorBundle e)
-    Right x -> Right x
+    (Left  e, logMsg) -> Left (fromParseErrorBundle e, logMsg)
+    (Right x, _) -> Right x
  where
   fromParseErrorBundle
     :: ShowErrorComponent e
@@ -68,7 +68,7 @@ parse parser filepath tokenStream =
     getLoc' _ = mempty
 
 parseWithTokList
-  :: Parser a -> FilePath -> [L Tok] -> Either (NonEmpty (Loc, String)) a
+  :: Parser a -> FilePath -> [L Tok] -> Either (NonEmpty (Loc, String), String) a
 parseWithTokList parser filepath = parse parser filepath . convert
  where
   convert :: [L Tok] -> TokStream

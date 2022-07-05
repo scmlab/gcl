@@ -29,8 +29,9 @@ instance Pretty Error where
 
 instance Pretty ParseError where
   pretty (LexicalError   pos  ) = "Lexical Error" <+> pretty (displayPos pos)
-  pretty (SyntacticError pairs) = "Parse Error" <+> vsep
+  pretty (SyntacticError pairs _) = "Parse Error" <+> vsep
     (map (\(loc, msg) -> pretty (displayLoc loc) <+> pretty msg) $ toList pairs)
+    -- the second argument was parsing log, used for debugging
 
 instance Pretty StructWarning where
   pretty (MissingBound loc) = "Missing Bound" <+> pretty loc

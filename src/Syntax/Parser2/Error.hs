@@ -9,5 +9,5 @@ import           Data.Loc                       ( Loc
 -- | Error 
 
 data ParseError = LexicalError Pos
-                | SyntacticError (NonEmpty (Loc, String))
+                | SyntacticError (NonEmpty (Loc, String)) String -- The second argument is for parsing log.
                 deriving (Eq, Show)

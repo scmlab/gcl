@@ -29,7 +29,7 @@ instance RenderSection Error where
 instance RenderSection ParseError where
   renderSection (LexicalError pos) =
     Section Red [Header "Lex Error" (Just $ Range pos pos)]
-  renderSection (SyntacticError pairs) =
+  renderSection (SyntacticError pairs _) = -- the logMsg (the second arg) was used for debugging
     Section Red
       $ mconcat
       $ map
