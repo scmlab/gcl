@@ -75,7 +75,7 @@ exprTests = testGroup
   , testCase "Arith 6" $ exprCheck "p ⇒ q" "Bool"
   , testCase "Arith 7" $ exprCheck "p ∧ q" "Bool"
   , testCase "Arith 8" $ exprCheck "p ∨ q" "Bool"
-  , testCase "Arith 9" $ exprCheck "p ¬ q" "Bool"
+  -- , testCase "Arith 9" $ exprCheck "p ¬ q" "Bool"
   , testCase "Arith 10" $ exprCheck "i ↑ j" "Int"
   , testCase "Arith 11" $ exprCheck "i ↓ j" "Int"
   , testCase "Arith 12" $ exprCheck "-i" "Int"
