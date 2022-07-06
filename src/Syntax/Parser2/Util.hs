@@ -14,6 +14,7 @@ module Syntax.Parser2.Util
   , withRange
   , logIfSuccess
   , withLog
+  , clampLog
   , symbol
   , extract
   , ignore
@@ -65,9 +66,9 @@ data Bookkeeping = Bookkeeping
   }
 
 runM :: StateT Bookkeeping (Writer (Endo [String])) a -> (a,String)
-runM f = 
+runM f =
   let (a, pl) = runWriter $ evalStateT f (Bookkeeping NoLoc Nothing Set.empty Map.empty 0 [])
-  in (a, intercalate "\n" $ appEndo pl ["\n"])
+  in (a, "parsing log:\n" <> intercalate "\n" (appEndo pl []))
 
 
 getCurrentLoc :: M Loc
@@ -151,6 +152,12 @@ logIfSuccess msgF p = do
 -- | Log before running the parser.
 withLog :: String -> Parser a -> Parser a
 withLog msg p = lift (tell $ Endo ([msg]++)) >> p
+
+clampLog :: String -> (a->String) -> Parser a -> Parser a
+clampLog before after = logIfSuccess after . withLog before
+
+plog :: String -> Parser ()
+plog msg = lift $ tell $ Endo ([msg]++)
 
 --------------------------------------------------------------------------------
 -- ## State (Bookkeeping) actions for indentation.
@@ -321,9 +328,8 @@ ignoreP p = do
 -- and each checks the indentation correctness of the token to be consumed.
 
 ----------------------------------------------------------------------------------------
--- ### Combinators for current internal use: indentTo, alignTo, alignAndIndentBodyTo
+-- ### Combinators for current internal use: indentTo, alignmentCheck, alignTo, alignAndIndentBodyTo
 
--- considering to export this method
 indentTo :: Parser a -> L Tok -> Parser a
 indentTo p tok = do
   insertIndentReq tok
@@ -332,16 +338,26 @@ indentTo p tok = do
   -- The requirement needs to be popped no matter the parser went successfully or not,
   -- because Bookkeeping is not back-trackable (cannot just undo insertion of IndentReq).
   case x of
-    Left pe -> case pe of
-      TrivialError _ m_ei set -> failure m_ei (Set.insert (Label (NEL.fromList $ "token indent to '"<>show tok<>"' of line "<>show lineNum)) set)
-        -- The message here is "expecting indented token", while in 'extractWithIndentCheck', it's "unexpected unindented token".
-        -- Is this message really needed?
-        where
-          lineNum = posLine $ (\(Loc s _)->s) $ locOf tok
-      FancyError _ set -> fancyFailure set
+    Left pe -> do
+      case pe of
+        TrivialError _ m_ei set -> failure m_ei (Set.insert (Label (NEL.fromList $ "token indent to '"<>show tok<>"' of line "<>show lineNum)) set)
+          -- The message here is "expecting indented token", while in 'extractWithIndentCheck', it's "unexpected unindented token".
+          -- Is this message really needed?
+          where
+            lineNum = posLine $ (\(Loc s _)->s) $ locOf tok
+        FancyError _ set -> fancyFailure set
     Right r -> return r
 
--- considering to export this method
+alignmentCheck :: L Tok -> L Tok -> Parser ()
+alignmentCheck ltok tokToAlign = do
+  let lineNum = posLine $ (\(Loc s _)->s) $ locOf tokToAlign
+  if colOf ltok == colOf tokToAlign
+  then return ()
+  else failure Nothing (Set.fromList [Label (NEL.fromList $ "token align to '"<>show tokToAlign<>"' of line "<>show lineNum)])
+
+
+-- Do not use it like: "alignTo (p `indentTo` tok) tokToAlign", the wrong order of alignTo and indentTo would cause error,
+-- use "alignmentCheck >> (p `indentTo` tok)" instead.
 alignTo :: Parser a -> L Tok -> Parser a
 alignTo parser tokToAlign =
     do
@@ -360,7 +376,8 @@ alignAndIndentBodyTo :: Parser a -> L Tok -> Parser a
 alignAndIndentBodyTo p tokToAlign = do
   let notEof = do
         tok <- try $ lookAhead anySingle
-        alignTo (p `indentTo` tok) tokToAlign
+        alignmentCheck tok tokToAlign
+        p `indentTo` tok
   notEof <|> p
   -- NOT 'try notEof <|> p' !!!
   --   this will make the meaningful failures slip away.
@@ -383,35 +400,32 @@ sepByAlignmentOrSemi :: Parser a -> Parser [a]
 sepByAlignmentOrSemi parser =
     do
       tok <- try $ lookAhead anySingle
-      sepByAlignmentOrSemiHelper tok True parser
+      sepByAlignmentOrSemiHelper tok True False parser --"True False" means "useSemi","not atLeastOne"
   <|>
     return []
 
 sepByAlignmentOrSemi1 :: Parser a -> Parser [a]
 sepByAlignmentOrSemi1 parser = do
   tokToAlign <- lookAhead anySingle <?> "anything to start the block"
-  x <- parser `indentTo` tokToAlign
-  xs <- sepByAlignmentOrSemiHelper tokToAlign True parser
-  return (x:xs)
+  sepByAlignmentOrSemiHelper tokToAlign True True parser --"True True" means "useSemi","atLeastOne"
 
-sepByAlignmentOrSemiHelper :: L Tok -> Bool -> Parser a -> Parser [a]
-sepByAlignmentOrSemiHelper tokToAlign useSemi parser = do
+sepByAlignmentOrSemiHelper :: L Tok -> Bool -> Bool -> Parser a -> Parser [a]
+sepByAlignmentOrSemiHelper tokToAlign useSemi atLeastOne parser = do
   let oneLeadByAlign = parser `alignAndIndentBodyTo` tokToAlign
       oneLeadBySemi =  symbol TokSemi *> parser `indentTo` tokToAlign
   let semiParser = if useSemi then oneLeadBySemi else empty
-  many (semiParser <|> oneLeadByAlign)
+  let comb       = if atLeastOne then some else many
+  comb (semiParser <|> oneLeadByAlign)
 
 sepByAlignment :: Parser a -> Parser [a]
 sepByAlignment parser = do
     do
       tok <- try $ lookAhead anySingle
-      sepByAlignmentOrSemiHelper tok False parser
+      sepByAlignmentOrSemiHelper tok False False parser --"False False" means "not useSemi","not atLeastOne"
   <|>
     return []
 
 sepByAlignment1 :: Parser a -> Parser [a]
 sepByAlignment1 parser = do
   tokToAlign <- lookAhead anySingle <?> "anything to start the block"
-  x <- parser `indentTo` tokToAlign
-  xs <- sepByAlignmentOrSemiHelper tokToAlign False parser
-  return (x:xs)
+  sepByAlignmentOrSemiHelper tokToAlign False True parser --"False True" means "not useSemi","atLeastOne"
