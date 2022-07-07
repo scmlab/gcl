@@ -328,7 +328,7 @@ ignoreP p = do
 -- and each checks the indentation correctness of the token to be consumed.
 
 ----------------------------------------------------------------------------------------
--- ### Combinators for current internal use: indentTo, alignmentCheck, alignTo, alignAndIndentBodyTo
+-- ### Combinators for current internal use: indentTo, alignmentCheck
 
 indentTo :: Parser a -> L Tok -> Parser a
 indentTo p tok = do
@@ -366,29 +366,17 @@ alignTo parser tokToAlign = do
       -- Let 'parser' decide if eof should fail or not, and the failure message.
       -- This implies eof satisfies any indentation requirements.
     Right tok -> do
-      let lineNum = posLine $ (\(Loc s _)->s) $ locOf tokToAlign
-      if colOf tok == colOf tokToAlign
-      then parser
-      else failure Nothing (Set.fromList [Label (NEL.fromList $ "token align to '"<>show tokToAlign<>"' of line "<>show lineNum)])
-
-alignAndIndentBodyTo :: Parser a -> L Tok -> Parser a
-alignAndIndentBodyTo p tokToAlign = do
-  r <- observing $ lookAhead anySingle
-  case r of
-    Left _ -> p
-      -- Let 'p' decide if eof should fail or not, and the failure message.
-      -- This implies eof satisfies any indentation requirements.
-    Right tok -> do
       alignmentCheck tok tokToAlign
-      p `indentTo` tok
-  -- let notEof = do
+      parser
+ -- let notEof = do
   --       tok <- lookAhead anySingle
   --       alignmentCheck tok tokToAlign
-  --       p `indentTo` tok
+  --       p
   -- notEof <|>  p
   -- The method above doesn't work, because alignmentCheck doesn't change the parser state (Mega.State, 
   -- not our bookkeeping state), so the failure of alignment would just let it fails 'notEof' and then
   -- tries p, instead of returning the failure.
+
 
 ----------------------------------------------------------------------------------------
 -- Helpers for efficient list append
@@ -406,29 +394,17 @@ toList x = appEndo x []
 
 
 sepByAlignmentOrSemi :: Parser a -> Parser [a]
-sepByAlignmentOrSemi parser =
-    do
-      tok <- lookAhead anySingle
-      sepByAlignmentOrSemiHelper tok True False parser --"True False" means "useSemi","not atLeastOne"
-  <|>
-    return []
+sepByAlignmentOrSemi = sepByAlignmentOrSemiHelper True False
+                                               --"True False" means "useSemi","not atLeastOne"
 
 sepByAlignmentOrSemi1 :: Parser a -> Parser [a]
-sepByAlignmentOrSemi1 parser = do
-  tokToAlign <- lookAhead anySingle <?> "anything to start the block"
-  sepByAlignmentOrSemiHelper tokToAlign True True parser --"True True" means "useSemi","atLeastOne"
+sepByAlignmentOrSemi1 = sepByAlignmentOrSemiHelper True True
+                                                --"True True" means "useSemi","atLeastOne"
 
-sepByAlignmentOrSemiHelper :: L Tok -> Bool -> Bool -> Parser a -> Parser [a]
-sepByAlignmentOrSemiHelper tokToAlign useSemi atLeastOne parser = do
-  let oneLeadByAlign = parser `alignAndIndentBodyTo` tokToAlign
-      oneLeadBySemi =  symbol TokSemi *> parser `indentTo` tokToAlign
-  let semiParser = if useSemi then oneLeadBySemi else empty
-  let comb       = if atLeastOne then some else many
-  comb (semiParser <|> oneLeadByAlign)
 
 -- -- Tried an more general version
-sepByAlignmentOrSemiHelper' :: Bool -> Bool -> Parser a -> Parser [a]
-sepByAlignmentOrSemiHelper' useSemi atLeastOne' parser' = do
+sepByAlignmentOrSemiHelper :: Bool -> Bool -> Parser a -> Parser [a]
+sepByAlignmentOrSemiHelper useSemi atLeastOne' parser' = do
   toList <$> helper Nothing atLeastOne' parser' emptyList'
   where
     helper :: Maybe (L Tok) -> Bool -> Parser a -> List' a -> Parser (List' a)
@@ -452,19 +428,14 @@ sepByAlignmentOrSemiHelper' useSemi atLeastOne' parser' = do
             else optional onePass
           case parseOnce of
             Nothing -> return accResult
-            Just rs -> helper (Just leadTok) False parser (list' rs)
+            Just rs -> helper (Just leadTok) False parser (accResult <> list' rs)
                         -- Let the leadTok be the tokToAlign for the next parallel item.
 
 
 sepByAlignment :: Parser a -> Parser [a]
-sepByAlignment parser = do
-    do
-      tok <- lookAhead anySingle
-      sepByAlignmentOrSemiHelper tok False False parser --"False False" means "not useSemi","not atLeastOne"
-  <|>
-    return []
+sepByAlignment = sepByAlignmentOrSemiHelper False False
+                                         --"False False" means "not useSemi","not atLeastOne"
 
 sepByAlignment1 :: Parser a -> Parser [a]
-sepByAlignment1 parser = do
-  tokToAlign <- lookAhead anySingle <?> "anything to start the block"
-  sepByAlignmentOrSemiHelper tokToAlign False True parser --"False True" means "not useSemi","atLeastOne"
+sepByAlignment1 = sepByAlignmentOrSemiHelper False True 
+                                          --"False True" means "not useSemi","atLeastOne"
