@@ -83,7 +83,7 @@ runGoldenTest sourceDir goldenDir ext test name fileName = do
   Example usage: 
     @runGoldenTest ".\/test\/source\/TheTestModule/" ".\/test\/golden\/TheTestModule\/" "" ...@
     becomes:
-    @runGoldenTestWithLog "TheTestModule" ".\/test\/source\/TheTestModule\/" ".\/test\/golden\/TheTestModule/" "" ...@
+    @runGoldenTestWithLog \"TheTestModule\" ".\/test\/source\/TheTestModule\/" ".\/test\/golden\/TheTestModule/" "" ...@
 -}
 runGoldenTestWithLog :: FilePath -> FilePath -> FilePath -> FilePath -> (FilePath -> Text -> IO ByteString) -> String -> FilePath -> TestTree
 runGoldenTestWithLog modName sourceDir goldenDir ext test name fileName =
