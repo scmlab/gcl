@@ -23,9 +23,9 @@ module Syntax.Parser2.Util
   , sepByAlignmentOrSemi1
   , sepByAlignment
   , sepByAlignment1
-  , simpleSepByAlign
   ) where
 
+-- import           Control.Monad
 import           Control.Monad.State
 import           Control.Monad.Writer           ( Writer, runWriter, tell)
 import           Data.Loc
@@ -359,47 +359,56 @@ alignmentCheck ltok tokToAlign = do
 -- Do not use it like: "alignTo (p `indentTo` tok) tokToAlign", the wrong order of alignTo and indentTo would cause error,
 -- use "alignmentCheck >> (p `indentTo` tok)" instead.
 alignTo :: Parser a -> L Tok -> Parser a
-alignTo parser tokToAlign =
-    do
-      tok <- try $ lookAhead anySingle
+alignTo parser tokToAlign = do
+  r <- observing $ lookAhead anySingle
+  case r of
+    Left _ -> parser
+      -- Let 'parser' decide if eof should fail or not, and the failure message.
+      -- This implies eof satisfies any indentation requirements.
+    Right tok -> do
       let lineNum = posLine $ (\(Loc s _)->s) $ locOf tokToAlign
       if colOf tok == colOf tokToAlign
       then parser
       else failure Nothing (Set.fromList [Label (NEL.fromList $ "token align to '"<>show tokToAlign<>"' of line "<>show lineNum)])
-  <|>
-    parser
-    -- If there's no token to lookahead, let the parser decides whether this should fail and the failing message, 
-    -- instead of what would be done by 'lookAhead anySingle'.
-    -- If this is the case, it's implied that eof satisfies any indentation requirement.
 
 alignAndIndentBodyTo :: Parser a -> L Tok -> Parser a
 alignAndIndentBodyTo p tokToAlign = do
-  let notEof = do
-        tok <- try $ lookAhead anySingle
-        alignmentCheck tok tokToAlign
-        p `indentTo` tok
-  notEof <|> p
-  -- NOT 'try notEof <|> p' !!!
-  --   this will make the meaningful failures slip away.
+  r <- observing $ lookAhead anySingle
+  case r of
+    Left _ -> p
+      -- Let 'p' decide if eof should fail or not, and the failure message.
+      -- This implies eof satisfies any indentation requirements.
+    Right tok -> do
+      alignmentCheck tok tokToAlign
+      p `indentTo` tok
+  -- let notEof = do
+  --       tok <- lookAhead anySingle
+  --       alignmentCheck tok tokToAlign
+  --       p `indentTo` tok
+  -- notEof <|>  p
+  -- The method above doesn't work, because alignmentCheck doesn't change the parser state (Mega.State, 
+  -- not our bookkeeping state), so the failure of alignment would just let it fails 'notEof' and then
+  -- tries p, instead of returning the failure.
 
+----------------------------------------------------------------------------------------
+-- Helpers for efficient list append
+
+type List' a = Endo [a]
+emptyList' :: List' a
+emptyList' = Endo ([]++)
+list' :: [a] -> List' a
+list' xs = Endo (xs++)
+toList :: List' a -> [a]
+toList x = appEndo x []
 
 ----------------------------------------------------------------------------------------
 -- ### Exported alignment combinators
 
 
--- | Only see if each item is aligned to the first, no indentation check in the body.
-simpleSepByAlign :: Parser a -> Parser [a]
-simpleSepByAlign parser = do
-  let notEof = do
-        tokToAlign <- try $ lookAhead anySingle
-        many $ alignTo parser tokToAlign
-  notEof <|> return []
-
-
 sepByAlignmentOrSemi :: Parser a -> Parser [a]
 sepByAlignmentOrSemi parser =
     do
-      tok <- try $ lookAhead anySingle
+      tok <- lookAhead anySingle
       sepByAlignmentOrSemiHelper tok True False parser --"True False" means "useSemi","not atLeastOne"
   <|>
     return []
@@ -417,10 +426,40 @@ sepByAlignmentOrSemiHelper tokToAlign useSemi atLeastOne parser = do
   let comb       = if atLeastOne then some else many
   comb (semiParser <|> oneLeadByAlign)
 
+-- -- Tried an more general version
+sepByAlignmentOrSemiHelper' :: Bool -> Bool -> Parser a -> Parser [a]
+sepByAlignmentOrSemiHelper' useSemi atLeastOne' parser' = do
+  toList <$> helper Nothing atLeastOne' parser' emptyList'
+  where
+    helper :: Maybe (L Tok) -> Bool -> Parser a -> List' a -> Parser (List' a)
+    helper m_tokToAlign atLeastOne parser accResult = do
+      a <- observing $ lookAhead anySingle
+        -- see if there exists a next token to check alignment
+      case a of
+        Left _ -> if atLeastOne
+          then (accResult<>) . list' <$> some parser -- Let 'some parser' decide if eof should fail or not, and the failure message.
+          else (accResult<>) . list' <$> many parser -- Let 'many parser' decide if eof should fail or not, and the failure message.
+          -- These cases above imply that eof satisfies any indentation/alignment requirement.
+        Right leadTok -> do
+          let oneLeadByAlign = do
+                mapM_ (alignmentCheck leadTok) m_tokToAlign -- Check alignment if there's a token to align to.
+                parser `indentTo` leadTok
+          let oneLeadBySemi =  symbol TokSemi *> parser `indentTo` leadTok
+          let semiParser = if useSemi then oneLeadBySemi else empty
+          let onePass = (:) <$> oneLeadByAlign <*> many semiParser
+          parseOnce <- if atLeastOne
+            then Just <$> onePass
+            else optional onePass
+          case parseOnce of
+            Nothing -> return accResult
+            Just rs -> helper (Just leadTok) False parser (list' rs)
+                        -- Let the leadTok be the tokToAlign for the next parallel item.
+
+
 sepByAlignment :: Parser a -> Parser [a]
 sepByAlignment parser = do
     do
-      tok <- try $ lookAhead anySingle
+      tok <- lookAhead anySingle
       sepByAlignmentOrSemiHelper tok False False parser --"False False" means "not useSemi","not atLeastOne"
   <|>
     return []
