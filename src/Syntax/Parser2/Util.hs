@@ -405,10 +405,10 @@ sepByAlignmentOrSemi1 = sepByAlignmentOrSemiHelper True True
 -- -- Tried an more general version
 sepByAlignmentOrSemiHelper :: Bool -> Bool -> Parser a -> Parser [a]
 sepByAlignmentOrSemiHelper useSemi atLeastOne' parser' = do
-  toList <$> helper Nothing atLeastOne' parser' emptyList'
+  toList <$> recursion Nothing atLeastOne' parser' emptyList'
   where
-    helper :: Maybe (L Tok) -> Bool -> Parser a -> List' a -> Parser (List' a)
-    helper m_tokToAlign atLeastOne parser accResult = do
+    recursion :: Maybe (L Tok) -> Bool -> Parser a -> List' a -> Parser (List' a)
+    recursion m_tokToAlign atLeastOne parser accResult = do
       a <- observing $ lookAhead anySingle
         -- see if there exists a next token to check alignment
       case a of
@@ -417,18 +417,18 @@ sepByAlignmentOrSemiHelper useSemi atLeastOne' parser' = do
           else (accResult<>) . list' <$> many parser -- Let 'many parser' decide if eof should fail or not, and the failure message.
           -- These cases above imply that eof satisfies any indentation/alignment requirement.
         Right leadTok -> do
-          let oneLeadByAlign = do
+          let alignAndIndentBody = do
                 mapM_ (alignmentCheck leadTok) m_tokToAlign -- Check alignment if there's a token to align to.
                 parser `indentTo` leadTok
           let oneLeadBySemi =  symbol TokSemi *> parser `indentTo` leadTok
           let semiParser = if useSemi then oneLeadBySemi else empty
-          let onePass = (:) <$> oneLeadByAlign <*> many semiParser
+          let onePass = (:) <$> alignAndIndentBody <*> many semiParser
           parseOnce <- if atLeastOne
-            then Just <$> onePass
+            then Just <$> onePass -- If onePass doesn't success, parsing failure happens, because at least one result is needed.
             else optional onePass
           case parseOnce of
             Nothing -> return accResult
-            Just rs -> helper (Just leadTok) False parser (accResult <> list' rs)
+            Just rs -> recursion (Just leadTok) False parser (accResult <> list' rs)
                         -- Let the leadTok be the tokToAlign for the next parallel item.
 
 
