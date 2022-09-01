@@ -3,7 +3,7 @@
 module Pretty.Predicate where
 
 import Data.Loc (unLoc)
-import Data.Text.Prettyprint.Doc
+import Prettyprinter
 import Pretty.Abstract ()
 import Pretty.Util
 import GCL.Predicate

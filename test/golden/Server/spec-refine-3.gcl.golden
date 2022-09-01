@@ -1,14 +1,16 @@
 ### Result
 
-[ Syntactic Error ./test/source/Server/spec-refine-3.gcl:2:1 unexpected 'a'
-expecting end of input
+[ Parse Error 
+Parse Error ./test/source/Server/spec-refine-3.gcl:2:1-6 unexpected 'abort'
+expecting end of input or token align to 'skip' of line 1
  ]
 
 ### Source
 
+[!
     skip
 abort
-
+!]
 
 { True }
 
@@ -26,6 +28,3 @@ TraceLog "      [ save ] Converted"
 TraceLog "      [ save ] TypeChecked"
 TraceLog "      [ save ] Swept"
 TraceGetSource
-TraceGetSource
-TraceLog "      [ edit ] Replace ./test/source/Server/spec-refine-3.gcl [0-20] 1:1-4:3 \"[!\n    skip\nabort\n!]\" \n      with \"    skip\nabort\n\""
-TraceEditText ./test/source/Server/spec-refine-3.gcl [0-20] 1:1-4:3 "    skip\nabort\n"

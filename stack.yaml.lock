@@ -86,9 +86,37 @@ packages:
       sha256: ec79a086512a8526e825787a4ab2afbd4aba33cc0092a631e3426864beda0aeb
   original:
     hackage: libBF-0.6.3@sha256:ad38e44a038b8da62c82a58b8a762331097569c27a5978258caed8b28cda73e2,1770
+- completed:
+    hackage: megaparsec-9.2.0@sha256:0c272aa13b9f663dbd7b74ef81e9b1f9f05cafde50f5362ce87ffd4913046e0b,3213
+    pantry-tree:
+      size: 1518
+      sha256: 7ca5da73a72d6242375e6bf16f6868e16f5f7f02dd27a0ff12cf7a9422cf2c71
+  original:
+    hackage: megaparsec-9.2.0@sha256:0c272aa13b9f663dbd7b74ef81e9b1f9f05cafde50f5362ce87ffd4913046e0b,3213
+- completed:
+    hackage: scientific-0.3.7.0@sha256:d7edb4dfb320e7b9cc9d503ca435d22983a236db06c7b4f3e81c099a9fd4cd73,4809
+    pantry-tree:
+      size: 657
+      sha256: 7b09735385193ba6ba4cdbc9ccd2aa60989a5c913df439da23e0a87ca60576ee
+  original:
+    hackage: scientific-0.3.7.0@sha256:d7edb4dfb320e7b9cc9d503ca435d22983a236db06c7b4f3e81c099a9fd4cd73,4809
+- completed:
+    hackage: primitive-0.7.3.0@sha256:6b28a1c0572f5ca50597ba8388aeade21515842969ae192cdc6bfca81367bf56,2951
+    pantry-tree:
+      size: 1655
+      sha256: 4dd118201091c04a138a25e262ab61e8e64e811832eadd8b6b39d56504dfe045
+  original:
+    hackage: primitive-0.7.3.0@sha256:6b28a1c0572f5ca50597ba8388aeade21515842969ae192cdc6bfca81367bf56,2951
+- completed:
+    hackage: constraints-0.12@sha256:7edf1e72a92d0a6761da634f08be9123dfcc0dcec11c269cbf465a09721c3481,2322
+    pantry-tree:
+      size: 867
+      sha256: c3422b7121927dd912d2b2b40d12f8addd991b83933d9f1415dfac883ada0c46
+  original:
+    hackage: constraints-0.12@sha256:7edf1e72a92d0a6761da634f08be9123dfcc0dcec11c269cbf465a09721c3481,2322
 snapshots:
 - completed:
-    size: 534126
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/16/31.yaml
-    sha256: 637fb77049b25560622a224845b7acfe81a09fdb6a96a3c75997a10b651667f6
-  original: lts-16.31
+    size: 586110
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/18/21.yaml
+    sha256: ce4fb8d44f3c6c6032060a02e0ebb1bd29937c9a70101c1517b92a87d9515160
+  original: lts-18.21

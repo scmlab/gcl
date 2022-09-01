@@ -38,16 +38,11 @@ import           Server.GoToDefn                ( collectLocationLinks )
 import           Server.Handler.Diagnostic      ( Collect(collect) )
 import           Server.Highlighting            ( collectHighlighting )
 import           Server.Hover                   ( collectHoverInfo )
-import           Server.IntervalMap                ( IntervalMap )
+import           Server.IntervalMap             ( IntervalMap )
 import qualified Syntax.Abstract               as A
 import           Syntax.Abstract                ( Type )
 import           Syntax.Concrete                ( ToAbstract(toAbstract) )
 import qualified Syntax.Concrete               as C
-import           Syntax.Parser                  ( Parser
-                                                , pProgram
-                                                , pStmts
-                                                , runParse
-                                                )
 import qualified SMT.Prove                     as P
                                                ( makeProvable, Error(..), provableIsOriginal )
 import Data.SBV (Symbolic, SBool)
@@ -57,6 +52,8 @@ import qualified GCL.Substitution              as Substitution
 import           Syntax.Abstract.Util           ( programToScopeForSubstitution
                                                 )
 import           Control.Monad.State            ( runState )
+import qualified Syntax.Parser2                as Parser
+import           Syntax.Parser2                 ( Parser )
 
 --------------------------------------------------------------------------------
 -- | Stages of the processing pipeline
@@ -132,7 +129,7 @@ data ParseResult = ParseResult
 --   persists the result
 parse :: Text -> PipelineM ParseResult
 parse source = do
-  program <- parseWithParser pProgram source
+  program <- parseWithParser Parser.program source
   let parsed = ParseResult { parsedProgram      = program
                            , parsedHighlighings = collectHighlighting program
                            }
@@ -144,7 +141,7 @@ parse source = do
 data ConvertResult = ConvertResult
   { convertedPreviousStage :: ParseResult
   , convertedProgram       :: A.Program -- abstract syntax
-  , convertedIntervalMap      :: IntervalMap J.LocationLink -- scoping info
+  , convertedIntervalMap   :: IntervalMap J.LocationLink -- scoping info
   }
   deriving (Show, Eq)
 
@@ -158,7 +155,7 @@ convert result = do
     Right program -> return $ ConvertResult
       { convertedPreviousStage = result
       , convertedProgram       = program
-      , convertedIntervalMap      = collectLocationLinks program
+      , convertedIntervalMap   = collectLocationLinks program
       }
   save (Converted converted) -- save the current progress
   return converted
@@ -167,7 +164,7 @@ convert result = do
 
 data TypeCheckResult = TypeCheckResult
   { typeCheckedPreviousStage :: ConvertResult
-  , typeCheckedIntervalMap      :: IntervalMap (J.Hover, Type) -- type checking info
+  , typeCheckedIntervalMap   :: IntervalMap (J.Hover, Type) -- type checking info
   }
   deriving (Show, Eq)
 
@@ -463,7 +460,7 @@ refine source range = do
       let payloadIsEmpty = Text.null (Text.strip payload)
       if payloadIsEmpty
         then return ()
-        else void $ parseWithParser pStmts payload
+        else void $ parseWithParser Parser.statements1 payload
       return (spec, specPayloadWithoutIndentation source' spec)
  where
   findPointedSpec :: PipelineM (Maybe Spec)
@@ -478,15 +475,15 @@ refine source range = do
 --------------------------------------------------------------------------------
 
 parseWithParser :: Parser a -> Text -> PipelineM a
-parseWithParser p source = do
+parseWithParser parser source = do
   filepath <- getFilePath
-  case runParse p filepath source of
-    Left  errors -> throwError $ map SyntacticError errors
-    Right val    -> return val
+  case Parser.scanAndParse parser filepath source of
+    Left  err -> throwError [ParseError err]
+    Right val -> return val
 
 parseProgram :: Text -> PipelineM (C.Program, A.Program)
 parseProgram source = do
-  concrete <- parseWithParser pProgram source
+  concrete <- parseWithParser Parser.program source
   case runExcept (toAbstract concrete) of
     Left  (Range start end) -> digHole (Range start end) >>= parseProgram
     Right abstract          -> return (concrete, abstract)

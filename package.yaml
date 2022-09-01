@@ -16,7 +16,7 @@ dependencies:
   - aeson
   - bytestring
   - containers
-  - megaparsec >= 8.0
+  - megaparsec >= 9.2
   - free
   - hashable
   - parser-combinators
@@ -73,6 +73,9 @@ tests:
       - tasty-hunit
       - tasty-golden
       - tasty-quickcheck
+      - directory
+      - filepath
+      - pretty-simple
 
     ghc-options:
       - -Wall

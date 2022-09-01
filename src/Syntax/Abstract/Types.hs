@@ -137,6 +137,7 @@ data Expr
   | Case Expr [CaseClause] Loc
   deriving (Eq, Show, Generic)
 
+-- QuantOp' seems not being used at current version of abstract?
 type QuantOp' = Either Op Expr
 
 type Mapping = Map Text Expr

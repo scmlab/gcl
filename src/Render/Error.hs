@@ -2,8 +2,9 @@
 
 module Render.Error where
 
-import           Data.Loc.Range
+import           Data.Foldable                  ( toList )
 import           Data.Loc                       ( locOf )
+import           Data.Loc.Range
 import           Error
 import           GCL.Type                       ( TypeError(..) )
 import           GCL.WP.Type                    ( StructError(..) )
@@ -11,11 +12,10 @@ import           Render.Class
 import           Render.Element
 import           Render.Syntax.Abstract         ( )
 import           Render.Syntax.Common           ( )
+import           Syntax.Parser2.Error           ( ParseError(..) )
 
 instance RenderSection Error where
-  renderSection (SyntacticError (pos, msg)) = Section
-    Red
-    [Header "Parse Error" (Just $ Range pos pos), Paragraph $ render msg]
+  renderSection (ParseError     e   ) = renderSection e
   renderSection (TypeError      e   ) = renderSection e
   renderSection (StructError    e   ) = renderSection e
   renderSection (CannotReadFile path) = Section
@@ -25,6 +25,18 @@ instance RenderSection Error where
     ]
   renderSection (Others msg) =
     Section Red [Header "Server Internal Error" Nothing, Paragraph $ render msg]
+
+instance RenderSection ParseError where
+  renderSection (LexicalError pos) =
+    Section Red [Header "Lex Error" (Just $ Range pos pos)]
+  renderSection (SyntacticError pairs _) = -- the logMsg (the second arg) was used for debugging
+    Section Red
+      $ mconcat
+      $ map
+          (\(loc, msg) ->
+            [Header "Parse Error" (fromLoc loc), Paragraph $ render msg]
+          )
+      $ toList pairs
 
 instance RenderSection TypeError where
   renderSection (NotInScope name) = Section

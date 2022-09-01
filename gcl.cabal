@@ -3,8 +3,6 @@ cabal-version: 1.12
 -- This file has been generated from package.yaml by hpack version 0.34.4.
 --
 -- see: https://github.com/sol/hpack
---
--- hash: 15163c27cdc8efdcaae48404222894f59528b4fa537f86871c765fc874347b94
 
 name:           gcl
 version:        0.1.0.0
@@ -89,6 +87,11 @@ library
       Syntax.Parser.Token
       Syntax.Parser.TokenStream
       Syntax.Parser.Util
+      Syntax.Parser2
+      Syntax.Parser2.Error
+      Syntax.Parser2.Lexer
+      Syntax.Parser2.TokenStream
+      Syntax.Parser2.Util
   other-modules:
       Paths_gcl
   hs-source-dirs:
@@ -104,7 +107,7 @@ library
     , lens
     , lexer-applicative
     , lsp
-    , megaparsec >=8.0
+    , megaparsec >=9.2
     , mtl
     , multiset
     , multistate
@@ -140,7 +143,7 @@ executable gcl
     , lens
     , lexer-applicative
     , lsp
-    , megaparsec >=8.0
+    , megaparsec >=9.2
     , mtl
     , multiset
     , multistate
@@ -238,6 +241,11 @@ test-suite gcl-test
       Syntax.Parser.Token
       Syntax.Parser.TokenStream
       Syntax.Parser.Util
+      Syntax.Parser2
+      Syntax.Parser2.Error
+      Syntax.Parser2.Lexer
+      Syntax.Parser2.TokenStream
+      Syntax.Parser2.Util
       Paths_gcl
   hs-source-dirs:
       test
@@ -248,18 +256,21 @@ test-suite gcl-test
     , base >=4.7 && <5
     , bytestring
     , containers
+    , directory
+    , filepath
     , free
     , hashable
     , lens
     , lexer-applicative
     , lsp
-    , megaparsec >=8.0
+    , megaparsec >=9.2
     , mtl
     , multiset
     , multistate
     , network
     , network-simple
     , parser-combinators
+    , pretty-simple
     , prettyprinter
     , random
     , regex-applicative

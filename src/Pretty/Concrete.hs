@@ -7,18 +7,17 @@ module Pretty.Concrete where
 
 -- import Syntax.Parser.Lexer (Tok (..))
 
-import           Data.Loc                       ( (<-->)
-                                                , locOf
-                                                )
-import           Data.Loc.Util                  ( translateLoc )
-import           Data.Text.Prettyprint.Doc      ( Pretty(pretty) )
+import           Data.Loc                       ( locOf )
 import           Prelude                 hiding ( Ordering(..) )
 import           Pretty.Common                  ( )
 import           Pretty.Util
 import           Pretty.Variadic
+import           Prettyprinter                  ( Pretty(pretty) )
 import           Syntax.Common
 import           Syntax.Concrete
 import           Syntax.Parser.Token
+import Syntax.Parser2.Lexer (Tok(..))
+import Data.Text (unpack)
 
 --------------------------------------------------------------------------------
 
@@ -177,6 +176,9 @@ instance PrettyWithLoc DefinitionBlock where
   prettyWithLoc (DefinitionBlock l decls r) =
     prettyWithLoc l <> prettyWithLoc decls <> prettyWithLoc r
 
+instance Pretty Definition where
+  pretty = toDoc . prettyWithLoc
+
 instance PrettyWithLoc Definition where
   prettyWithLoc (TypeDefn dat name binders eq qdcons) =
     prettyWithLoc dat
@@ -272,10 +274,17 @@ instance PrettyWithLoc Stmt where
   prettyWithLoc (SpecQM l) = fromDoc (locOf l) (pretty tokQM)
   prettyWithLoc (Spec l s r) =
     prettyWithLoc l
-      <> fromDoc
-           (translateLoc 2 0 (locOf l) <--> translateLoc 0 (-2) (locOf r))
-           (pretty s)
+      <> prettyWithLoc (map (fmap show) s)
       <> prettyWithLoc r
+      -- where 
+        -- don't show tokens like <newline> or <indent>
+        -- show' tok = case tok of 
+        --   TokNewlineAndWhitespace _ -> ""
+        --   TokNewlineAndWhitespaceAndBar _ -> ""
+        --   TokIndent            -> ""
+        --   TokDedent            -> ""
+        --   TokNewline           -> ""
+        --   _ -> show tok 
   prettyWithLoc (Proof l anchors r) =
     prettyWithLoc l <> prettyWithLoc anchors <> prettyWithLoc r
   prettyWithLoc (Alloc p a n l es r) =
@@ -373,6 +382,63 @@ handleOp op = case classify op of
   Postfix _ -> do
     p <- var
     return $ prettyWithLoc p <> prettyWithLoc op
+
+showWithParentheses :: Expr -> String
+showWithParentheses expr = case handleExpr' expr of
+  Expect _ -> error "strange case in printWithParenses"
+  Complete s -> s
+  where
+    handleExpr' :: Expr -> Variadic Expr String
+    handleExpr' (Paren _ x _) = handleExpr' x
+    handleExpr' (Var   x) = return $ unpack $ nameToText x
+    handleExpr' (Const x) = return $ unpack $ nameToText x
+    handleExpr' (Lit   x) = case x of
+      LitInt n _ -> return $ show n
+      LitBool b _ -> return $ show b
+      LitChar c _ -> return $ show c
+    handleExpr' (Op    x) = handleOp' x
+    handleExpr' (Arr arr _ i _) = do
+      arrs <- handleExpr' arr
+      inds   <- handleExpr' i
+      return $  arrs <> "[" <> inds <> "]"
+    handleExpr' (App p q) = case handleExpr' p of
+      Expect   f -> f q
+      Complete s -> do
+        t <- handleExpr' q
+        return $ "(" <> s <> " " <> t <> ")"
+    handleExpr' q@(Quant open op xs m r n t close) =
+      return $ show $ pretty q
+    handleExpr' c@(Case a expr b cases) =
+      return $ show $ pretty c
+
+    handleOp' :: Op -> Variadic Expr String
+    handleOp' op = case classify op of
+      Infix _ -> do
+        p <- var
+        q <- var
+        ps <- handleExpr' p
+        qs <- handleExpr' q
+        return $ "(" <> ps <> show (pretty op) <> qs <> ")"
+      InfixL _ -> do
+        p <- var
+        q <- var
+        ps <- handleExpr' p
+        qs <- handleExpr' q
+        return $ "(" <> ps <> show (pretty op) <> qs <> ")"
+      InfixR _ -> do
+        p <- var
+        q <- var
+        ps <- handleExpr' p
+        qs <- handleExpr' q
+        return $ "(" <> ps <> show (pretty op) <> qs <> ")"
+      Prefix _ -> do
+        p <- var
+        ps <- handleExpr' p
+        return $ "(" <> show (pretty op) <> ps <> ")"
+      Postfix _ -> do
+        p <- var
+        ps <- handleExpr' p
+        return $ "(" <> ps <> show (pretty op) <> ")"
 
 --------------------------------------------------------------------------------
 -- | Pattern

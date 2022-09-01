@@ -12,6 +12,7 @@ import qualified Test.WP                       as WP
 main :: IO ()
 main = defaultMain tests
 
+-- TODO: un-un-comment other tests, after fixing parse errors
 tests :: TestTree
 tests = testGroup
     "Tests"

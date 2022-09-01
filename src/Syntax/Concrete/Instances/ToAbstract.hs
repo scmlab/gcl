@@ -4,6 +4,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Syntax.Concrete.Instances.ToAbstract where
 
@@ -15,10 +16,14 @@ import           Data.Loc                       ( (<-->)
                                                 , Located(locOf)
                                                 )
 import           Data.Loc.Range
+import           Pretty.Util                    ( PrettyWithLoc(prettyWithLoc)
+                                                , docToText
+                                                , toDoc
+                                                )
 import qualified Syntax.Abstract               as A
 import qualified Syntax.Abstract.Operator      as A
 import           Syntax.Abstract.Util
-import           Syntax.Common                  ( Name )
+import           Syntax.Common                  ( Name(..) )
 import           Syntax.Concrete.Instances.Located
                                                 ( )
 import           Syntax.Concrete.Types
@@ -114,10 +119,12 @@ instance ToAbstract Stmt A.Stmt where
     Assert _ a _ -> A.Assert <$> toAbstract a <*> pure (locOf stmt)
     LoopInvariant _ a _ _ _ b _ ->
       A.LoopInvariant <$> toAbstract a <*> toAbstract b <*> pure (locOf stmt)
-    Do _ a _           -> A.Do <$> toAbstract a <*> pure (locOf stmt)
-    If _ a _           -> A.If <$> toAbstract a <*> pure (locOf stmt)
-    SpecQM l           -> throwError l
-    Spec  l t       r  -> pure (A.Spec t (rangeOf l <> rangeOf r))
+    Do _ a _    -> A.Do <$> toAbstract a <*> pure (locOf stmt)
+    If _ a _    -> A.If <$> toAbstract a <*> pure (locOf stmt)
+    SpecQM l    -> throwError l
+    Spec l xs r -> do
+      let text = docToText $ toDoc $ prettyWithLoc (map (fmap show) xs)
+      pure (A.Spec text (rangeOf l <> rangeOf r))
     Proof _ anchors _  -> A.Proof <$> toAbstract anchors <*> pure (locOf stmt)
     Alloc p _ _ _ es _ -> A.Alloc p <$> toAbstract es <*> pure (locOf stmt)
     HLookup x _ _ e    -> A.HLookup x <$> toAbstract e <*> pure (locOf stmt)
@@ -171,6 +178,8 @@ instance ToAbstract TBase A.TBase where
   toAbstract (TChar _) = pure A.TChar
 
 -- | Type
+-- Base types were recognized as TCon (because Base types and TCon are identical at the syntactical level),
+-- and to be converted to TBase here.
 instance ToAbstract Type A.Type where
   toAbstract t = case t of
     (TBase a) -> A.TBase <$> toAbstract a <*> pure (locOf t)
@@ -178,7 +187,11 @@ instance ToAbstract Type A.Type where
       A.TArray <$> toAbstract a <*> toAbstract b <*> pure (locOf t)
     (TFunc a _ b) ->
       A.TFunc <$> toAbstract a <*> toAbstract b <*> pure (locOf t)
-    (TCon a b    ) -> return $ A.TCon a b (a <--> b)
+    (TCon n@(Name tn l) ns    ) 
+      | tn == "Int"  && null ns -> return $ A.TBase A.TInt l
+      | tn == "Bool" && null ns -> return $ A.TBase A.TBool l
+      | tn == "Char" && null ns -> return $ A.TBase A.TChar l
+      | otherwise -> return $ A.TCon n ns (n <--> ns)
     (TVar a      ) -> pure $ A.TVar a (locOf t)
     (TParen _ a _) -> do
       t' <- toAbstract a
@@ -214,7 +227,7 @@ instance ToAbstract Expr A.Expr where
      where
       toAbstractQOp qop = case qop of
         Left  op   -> return (A.Op op)
-        Right expr -> toAbstract expr
+        Right n@(Name _ l) -> return $ A.Const n l
     Case _ expr _ cases ->
       A.Case <$> toAbstract expr <*> toAbstract cases <*> pure (locOf x)
 

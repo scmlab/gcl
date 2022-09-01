@@ -35,8 +35,8 @@ import qualified Data.Sequence                 as Seq
 import           Data.String                    ( IsString(..) )
 import           Data.Text                      ( Text )
 import qualified Data.Text                     as Text
-import           Data.Text.Prettyprint.Doc      ( Pretty(..) )
-import qualified Data.Text.Prettyprint.Doc     as Pretty
+import           Prettyprinter      ( Pretty(..) )
+import qualified Prettyprinter     as Pretty
 import           GHC.Generics                   ( Generic )
 
 --------------------------------------------------------------------------------

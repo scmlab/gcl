@@ -1,15 +1,18 @@
 module Pretty.Common where
 
-import Data.Text.Prettyprint.Doc (Pretty (pretty))
-import Pretty.Util
-import Syntax.Common
-import Prelude hiding (Ordering (..))
+import           Prelude                 hiding ( Ordering(..) )
+import           Pretty.Util
+import           Prettyprinter                  ( Pretty(pretty) )
+import           Syntax.Common
 
+import           Render.Error                   ( )
+import           Render.Predicate               ( )
+import           Render.Syntax.Common           ( )
 
 -- | Name
 instance Pretty Name where
   pretty = toDoc . prettyWithLoc
-  
+
 instance PrettyWithLoc Name where
   prettyWithLoc = fromRenderAndLocated
 
