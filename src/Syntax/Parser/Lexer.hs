@@ -1,510 +1,779 @@
+{-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# OPTIONS_GHC -Wno-unused-imports #-}
 
-module Syntax.Parser.Lexer where
+module Syntax.Parser.Lexer
+  -- ( scan
+  -- , LexicalError
+  -- , Tok(..)
+  -- , TokStream
+  -- ) 
+  where
 
-import           Control.Applicative.Combinators
-                                                ( choice
-                                                , many
-                                                , skipMany
-                                                , some
-                                                , (<|>)
-                                                )
-import           Control.Monad                  ( void )
-import           Data.Char                      ( isAlpha
-                                                , isAlphaNum
+import           Control.Monad.Except
+import           Control.Monad.State.Lazy
+import           Data.Char                      ( isAlphaNum
+                                                , isDigit
+                                                , isLower
                                                 , isSpace
-                                                , isSymbol
+                                                , isUpper
                                                 )
-import           Data.Loc                       ( Loc(..)
-                                                , Located(..)
-                                                , Pos
-                                                , (<-->)
-                                                )
-import           Data.Loc.Range                 ( Range(Range)
-                                                , Ranged(rangeOf)
-                                                )
-import           Data.Proxy                     ( Proxy(Proxy) )
+import           Data.List.NonEmpty             ( NonEmpty(..) )
+import qualified Data.List.NonEmpty            as NE
+import           Data.Loc
+import           Data.Maybe                     ( fromMaybe )
+-- import           Debug.Trace
+import qualified Data.Maybe                    as Maybe
 import           Data.Text                      ( Text )
-import           Data.Void                      ( Void )
-import           Syntax.Common
-import           Syntax.Concrete                ( Lit(..)
-                                                , Token(..)
-                                                )
-import           Syntax.Parser.Token
-import           Syntax.Parser.Util
-import           Text.Megaparsec                ( MonadParsec
-                                                  ( notFollowedBy
-                                                  , tokens
-                                                  , try
-                                                  )
-                                                , Parsec
-                                                , Stream(tokensToChunk)
-                                                , getOffset
-                                                , getSourcePos
-                                                , satisfy
-                                                , setOffset
-                                                , (<?>)
-                                                )
-import           Text.Megaparsec.Char           ( alphaNumChar
-                                                , char
-                                                , lowerChar
-                                                , space1
-                                                , string
-                                                , upperChar
-                                                )
-import qualified Text.Megaparsec.Char.Lexer    as Lex
-import           Data.Bifunctor                 ( second )
 import qualified Data.Text                     as Text
-
-type Lexer = Parsec Void Text
-
-type LexerF = ParseFunc Lexer
-
-spaceNotNewline :: Lexer Char
-spaceNotNewline =
-  satisfy (\t -> isSpace t && t /= '\n' && t /= '\r' && t /= '\f' && t /= '\v')
-
-scn :: Lexer ()
-scn = Lex.space space1 skipLineComment skipBlockComment
-
-sc :: Lexer ()
-sc = Lex.space (void $ some spaceNotNewline) skipLineComment skipBlockComment
-
--- Note: Should consume the newline character or not ?
-skipLineComment :: Lexer ()
-skipLineComment = Lex.skipLineComment tokLineComment
-
--- NOTE: Not sure what the symbol of block comment will be
-skipBlockComment :: Lexer ()
-skipBlockComment = Lex.skipBlockComment tokBlockCommentStart tokBlockCommentEnd
-
--- wrapper of tokens
-
-lexeme :: Lexer a -> LexerF (a, Range)
-lexeme p = ParseFunc (\sc' -> Lex.lexeme (try sc' <|> sc) . getRange $ p)
-
-symbol :: Text -> LexerF (Token a)
-symbol t = do
-  (_, Range l r) <- lexeme . string $ t
-  return $ Token l r
-
-------------------------------------------
--- lexical token
-------------------------------------------
-lexSkipF :: LexerF (Token tokSkip)
-lexSkipF = symbol tokSkip
-
-lexAbortF :: LexerF (Token tokAbort)
-lexAbortF = symbol tokAbort
-
-lexDoF :: LexerF (Token tokDo)
-lexDoF = symbol tokDo
-
-lexOdF :: LexerF (Token tokOd)
-lexOdF = symbol tokOd
-
-lexIfF :: LexerF (Token tokIf)
-lexIfF = symbol tokIf
-
-lexFiF :: LexerF (Token tokFi)
-lexFiF = symbol tokFi
-
-lexBndF :: LexerF (Token tokBnd)
-lexBndF = symbol tokBnd
-
-lexQMF :: LexerF (Token tokQM)
-lexQMF = symbol tokQM
-
-lexConF :: LexerF (Token tokCon)
-lexConF = symbol tokCon
-
-lexVarF :: LexerF (Token tokVar)
-lexVarF = symbol tokVar
-
-lexLetF :: LexerF (Token tokLet)
-lexLetF = symbol tokLet
-
-lexDataF :: LexerF (Token tokData)
-lexDataF = symbol tokData
-
-lexArrayF :: LexerF (Token tokArray)
-lexArrayF = symbol tokArray
-
-lexOfF :: LexerF (Token tokOf)
-lexOfF = symbol tokOf
-
-lexNewF :: LexerF (Token tokNew)
-lexNewF = symbol tokNew
-
-lexDisposeF :: LexerF (Token tokDispose)
-lexDisposeF = symbol tokDispose
-
-lexRangeF :: LexerF (Token tokRange)
-lexRangeF = symbol tokRange
-
-lexGuardBarF :: LexerF (Token tokGuardBar)
-lexGuardBarF = symbol tokGuardBar
-
-lexArrowF :: LexerF (Either (Token tokArrow) (Token tokArrowU))
-lexArrowF = choice [Left <$> symbol tokArrow, Right <$> symbol tokArrowU]
-
-lexStarF :: LexerF (Token tokStar)
-lexStarF = symbol tokStar
-
-lexEqualF :: LexerF (Token tokEQ)
-lexEqualF = symbol tokEQ
-
-------------------------------------------
--- delimiters
-------------------------------------------
-
-lexSpaceF :: LexerF (Token tokSpace)
-lexSpaceF = symbol tokSpace
-
-lexCommaF :: LexerF (Token tokComma)
-lexCommaF = symbol tokComma
-
-lexColonF :: LexerF (Token tokColon)
-lexColonF = symbol tokColon
-
-lexSemiF :: LexerF (Token tokSemi)
-lexSemiF = symbol tokSemi
-
-lexAssignF :: LexerF (Token tokAssign)
-lexAssignF = symbol tokAssign
-
-lexSpecStartF :: LexerF (Token tokSpecStart)
-lexSpecStartF = symbol tokSpecStart
-
-lexSpecEndF :: LexerF (Token tokSpecEnd)
-lexSpecEndF = symbol tokSpecEnd
-
-lexParenStartF :: LexerF (Token tokParenStart)
-lexParenStartF = symbol tokParenStart
-
-lexParenEndF :: LexerF (Token tokParenEnd)
-lexParenEndF = symbol tokParenEnd
-
-lexBracketStartF :: LexerF (Token tokBracketStart)
-lexBracketStartF = symbol tokBracketStart
-
-lexBracketEndF :: LexerF (Token tokBracketEnd)
-lexBracketEndF = symbol tokBracketEnd
-
-lexBraceStartF :: LexerF (Token tokBraceStart)
-lexBraceStartF = symbol tokBraceStart
-
-lexBraceEndF :: LexerF (Token tokBraceEnd)
-lexBraceEndF = symbol tokBraceEnd
-
-lexQuantStartsF
-  :: LexerF (Either (Token tokQuantStarts) (Token tokQuantStartU))
-lexQuantStartsF =
-  choice [Left <$> symbol tokQuantStarts, Right <$> symbol tokQuantStartU]
-
-lexQuantEndsF :: LexerF (Either (Token tokQuantEnds) (Token tokQuantEndU))
-lexQuantEndsF =
-  choice [Left <$> symbol tokQuantEnds, Right <$> symbol tokQuantEndU]
-
-lexProofStartF :: LexerF (Token tokProofStart)
-lexProofStartF = symbol tokProofStart
-
-lexProofEndF :: LexerF (Token tokProofEnd)
-lexProofEndF = symbol tokProofEnd
-
-
--- expects someting like #3ab4bd33e7a32de7
--- the range coverts the whole thing, but the text includes only the alphanum part (that is, without prefix '#')
-lexProofAnchorF :: LexerF (Text, Range)
-lexProofAnchorF = lexeme $ do
-  _    <- char '#'
-  hash <- many . satisfy $ isAlphaNum
-  return $ Text.pack hash
-
-lexBackSlashF :: LexerF (Token tokBackSlash)
-lexBackSlashF = symbol tokBackSlash
-
-lexDeclStartF :: LexerF (Token tokDeclStart)
-lexDeclStartF = symbol tokDeclStart
-
-lexDeclEndF :: LexerF (Token tokDeclEnd)
-lexDeclEndF = symbol tokDeclEnd
-
-lexBlockStartF :: LexerF (Token tokBlockStart)
-lexBlockStartF = symbol tokBlockStart
-
-lexBlockEndF :: LexerF (Token tokBlockEnd)
-lexBlockEndF = symbol tokBlockEnd
-
-------------------------------------------
--- Operators
-------------------------------------------
-
-lexEQPropF :: LexerF ChainOp
-lexEQPropF = EQProp . locOf <$> symbol tokEQProp
-
-lexEQPropUF :: LexerF ChainOp
-lexEQPropUF = EQPropU . locOf <$> symbol tokEQPropU
-
-
-lexEQF :: LexerF ChainOp
-lexEQF = Syntax.Common.EQ . locOf <$> symbol tokEQ
-
-lexNEQF :: LexerF ChainOp
-lexNEQF = NEQ . locOf <$> symbol tokNEQ
-
-lexNEQUF :: LexerF ChainOp
-lexNEQUF = NEQU . locOf <$> symbol tokNEQU
-
-lexGTF :: LexerF ChainOp
-lexGTF = Syntax.Common.GT . locOf <$> symbol tokGT
-
-lexGTEF :: LexerF ChainOp
-lexGTEF = GTE . locOf <$> symbol tokGTE
-
-lexGTEUF :: LexerF ChainOp
-lexGTEUF = GTEU . locOf <$> symbol tokGTEU
-
-lexLTF :: LexerF ChainOp
-lexLTF = Syntax.Common.LT . locOf <$> symbol tokLT
-
-lexLTEF :: LexerF ChainOp
-lexLTEF = LTE . locOf <$> symbol tokLTE
-
-lexLTEUF :: LexerF ChainOp
-lexLTEUF = LTEU . locOf <$> symbol tokLTEU
-
-lexImplF :: LexerF ArithOp
-lexImplF = Implies . locOf <$> symbol tokImpl
-
-lexImplUF :: LexerF ArithOp
-lexImplUF = ImpliesU . locOf <$> symbol tokImplU
-
-lexConjF :: LexerF ArithOp
-lexConjF = Conj . locOf <$> symbol tokConj
-
-lexConjUF :: LexerF ArithOp
-lexConjUF = ConjU . locOf <$> symbol tokConjU
-
-lexDisjF :: LexerF ArithOp
-lexDisjF = Disj . locOf <$> symbol tokDisj
-
-lexDisjUF :: LexerF ArithOp
-lexDisjUF = DisjU . locOf <$> symbol tokDisjU
-
-lexNegF :: LexerF ArithOp
-lexNegF = Neg . locOf <$> symbol tokNeg
-
-lexNegUF :: LexerF ArithOp
-lexNegUF = NegU . locOf <$> symbol tokNegU
-
-lexNegNumF :: LexerF ArithOp
-lexNegNumF = NegNum . locOf <$> symbol tokSub
-
-lexAddF :: LexerF ArithOp
-lexAddF = Add . locOf <$> symbol tokAdd
-
-lexSubF :: LexerF ArithOp
-lexSubF = Sub . locOf <$> symbol tokSub
-
-lexMulF :: LexerF ArithOp
-lexMulF = Mul . locOf <$> symbol tokMul
-
-lexDivF :: LexerF ArithOp
-lexDivF = Div . locOf <$> symbol tokDiv
-
-lexModF :: LexerF ArithOp
-lexModF = Mod . locOf <$> symbol tokMod
-
-lexMaxF :: LexerF ArithOp
-lexMaxF = Max . locOf <$> symbol tokMax
-
-lexMinF :: LexerF ArithOp
-lexMinF = Min . locOf <$> symbol tokMin
-
-lexExpF :: LexerF ArithOp
-lexExpF = Exp . locOf <$> symbol tokExp
-
-lexSumF :: LexerF ArithOp
-lexSumF = Add . locOf <$> symbol tokSum
-
-lexPiF :: LexerF ArithOp
-lexPiF = Mul . locOf <$> symbol tokPi
-
-lexForallF :: LexerF ArithOp
-lexForallF = Conj . locOf <$> symbol tokForall
-
-lexExistsF :: LexerF ArithOp
-lexExistsF = Disj . locOf <$> symbol tokExists
-
-lexHashF :: LexerF ArithOp
-lexHashF = Hash . locOf <$> symbol tokHash
-
-lexChainOpsF :: LexerF ChainOp
-lexChainOpsF = choice
-  [ lexEQPropF
-  , lexEQPropUF
-  , lexEQF
-  , lexNEQF
-  , lexNEQUF
-  , lexGTF
-  , lexGTEF
-  , lexGTEUF
-  , lexLTF
-  , lexLTEF
-  , lexLTEUF
+import           Language.Lexer.Applicative
+                                         hiding ( LexicalError )
+import qualified Language.Lexer.Applicative    as Lex
+import           Syntax.Parser.TokenStream     ( PrettyToken(..) )
+import           Text.Regex.Applicative
+
+--------------------------------------------------------------------------------
+{-
+Main components of this module: 
+  - 'scan': Turning the source into a token stream, according to the only 'Lexer' of this module, 'lexer'.
+  - 'lexer': Defined with the set of valid tokens of gcl (the type 'Tok') and 
+      their recognizers (the type 'RE Char Tok', defining how tokens are recognized from an input string).
+  - preprocessing: In the process of scanning, it recognizes indentation informations 
+      from the primitive lexing result and replaces them into three new tokens: TokIndent,TokDedent,TokNewline
+      to form the final token stream.
+  
+  The form of the token stream: 'TokenStream (L Tok)' were decided by 'runLexer''s return type: 'TokenStream (L tok)'.
+-}
+--------------------------------------------------------------------------------
+
+-- | Tok & TokStream
+data Tok
+  = -- the following tokens will not be sent to the parser
+    TokWhitespace
+  | TokEOF
+  | TokLineComment Text
+  | TokBlockCommentOpen
+  | TokBlockCommentClose
+  --  | TokNewlineAndWhitespace Int
+  --  | TokNewlineAndWhitespaceAndBar Int
+  --  | -- the following 3 kinds of tokens will be generated from `TokNewlineAndWhitespace`
+  --   -- and inserted to the TokenStream instead
+  --   TokIndent
+  --  | TokDedent
+  --  | TokNewline
+  | ErrTokIndent Tok Tok Int -- The err token, the token to indent to, the line number of the second Tok
+      -- a token generated for parsing error messages, won't appear in the stream
+  | -- keywords
+    TokSkip
+  | TokAbort
+  | TokDo
+  | TokOd
+  | TokIf
+  | TokFi
+  | TokBnd
+  | TokQM -- question mark ? for digging holes 
+  | TokVar
+  | TokCon
+  | TokData
+  | TokArray
+  | TokOf
+  | TokNew
+  | TokDispose
+  | TokRange
+  | TokGuardBar
+  | TokArrow
+  | TokArrowU
+  | TokCase
+  | -- delimiters
+    TokComma
+  | TokColon
+  | TokSemi
+  | TokAssign
+  | TokSpecOpen
+  | TokSpecClose
+  | TokParenOpen
+  | TokParenClose
+  | TokBracketOpen
+  | TokBracketClose
+  | TokBraceOpen
+  | TokBraceClose
+  | TokQuantOpen
+  | TokQuantClose
+  | TokQuantOpenU
+  | TokQuantCloseU
+  | TokProofOpen
+  | TokProofClose
+  | TokBlockOpen
+  | TokBlockClose
+  | TokDeclOpen
+  | TokDeclClose
+  | -- expression
+    TokUnderscore
+
+    -- operators
+  | TokEQ
+  | TokNEQ
+  | TokNEQU
+  | TokGT
+  | TokGTE
+  | TokGTEU
+  | TokLT
+  | TokLTE
+  | TokLTEU
+  | TokEQProp
+  | TokEQPropU
+  | TokImpl
+  | TokImplU
+  | TokConj
+  | TokConjU
+  | TokDisj
+  | TokDisjU
+  | TokNeg
+  | TokNegU
+  | TokAdd
+  | TokSub
+  | TokMul
+  | TokDiv
+  | TokMod
+  | TokExp
+  | TokMax
+  | TokMin
+  | TokPointsTo
+  | TokPointsToU
+  | TokSConj
+  | TokLolipop
+  | TokSum
+  | TokProd
+  | TokForall
+  | TokExist
+  | TokProofAnchor String
+  | TokHash
+  | TokUpperName Text
+  | TokLowerName Text
+  | TokInt Int
+  | TokChar Char
+  | TokTrue
+  | TokFalse
+  deriving (Eq, Ord)
+
+instance Show Tok where
+  show tok = case tok of
+    -- TokNewlineAndWhitespace n -> "<newline + " ++ show n ++ " whitespaces>"
+    -- TokNewlineAndWhitespaceAndBar n ->
+    --   "<newline + " ++ show n ++ " whitespaces and a guard bar>"
+    -- TokIndent            -> "<indent>"
+    -- TokDedent            -> "<dedent>"
+    -- TokNewline           -> "<newline>"
+    ErrTokIndent _ indT ln -> "token not indent to '"<>show indT<>"' of line "<>show ln
+    TokWhitespace        -> " "
+    TokEOF               -> ""
+    TokLineComment s     -> "-- " ++ Text.unpack s
+    TokBlockCommentOpen  -> "{{"
+    TokBlockCommentClose -> "}}"
+    TokSkip              -> "skip"
+    TokAbort             -> "abort"
+    TokDo                -> "do"
+    TokOd                -> "od"
+    TokIf                -> "if"
+    TokFi                -> "fi"
+    TokBnd               -> "bnd"
+    TokQM                -> "?"
+    TokVar               -> "var"
+    TokCon               -> "con"
+    TokData              -> "data"
+    TokArray             -> "array"
+    TokOf                -> "of"
+    TokNew               -> "new"
+    TokDispose           -> "dispose"
+    TokRange             -> ".."
+    TokGuardBar          -> "|"
+    TokArrow             -> "->"
+    TokArrowU            -> "→"
+    TokCase              -> "case"
+    TokUnderscore        -> "_"
+    TokComma             -> ","
+    TokColon             -> ":"
+    TokSemi              -> ";"
+    TokAssign            -> ":="
+    TokSpecOpen          -> "[!"
+    TokSpecClose         -> "!]"
+    TokParenOpen         -> "("
+    TokParenClose        -> ")"
+    TokBracketOpen       -> "["
+    TokBracketClose      -> "]"
+    TokBraceOpen         -> "{"
+    TokBraceClose        -> "}"
+    TokQuantOpen         -> "<|"
+    TokQuantClose        -> "|>"
+    TokQuantOpenU        -> "⟨"
+    TokQuantCloseU       -> "⟩"
+    TokProofOpen         -> "{-"
+    TokProofClose        -> "-}"
+    TokBlockOpen         -> "|["
+    TokBlockClose        -> "]|"
+    TokDeclOpen          -> "{:"
+    TokDeclClose         -> ":}"
+    TokEQ                -> "="
+    TokNEQ               -> "/="
+    TokNEQU              -> "≠"
+    TokGT                -> ">"
+    TokGTE               -> ">="
+    TokGTEU              -> "≥"
+    TokLT                -> "<"
+    TokLTE               -> "<="
+    TokLTEU              -> "≤"
+    TokEQProp            -> "<=>"
+    TokEQPropU           -> "≡"
+    TokImpl              -> "=>"
+    TokImplU             -> "⇒"
+    TokConj              -> "&&"
+    TokConjU             -> "∧"
+    TokDisj              -> "||"
+    TokDisjU             -> "∨"
+    TokNeg               -> "~"
+    TokNegU              -> "¬"
+    TokAdd               -> "+"
+    TokSub               -> "-"
+    TokMul               -> "*"
+    TokDiv               -> "/"
+    TokMod               -> "%"
+    TokExp               -> "^"
+    TokMax               -> "↑"
+    TokMin               -> "↓"
+    TokPointsTo          -> "|->"
+    TokPointsToU         -> "↦"
+    TokSConj             -> "٭"
+    TokLolipop           -> "-*"
+    TokSum               -> "Σ"
+    TokProd              -> "∏"
+    TokForall            -> "∀"
+    TokExist             -> "∃"
+    TokProofAnchor s     -> "#" ++ s
+    TokHash              -> "#"
+    TokUpperName s       -> Text.unpack s
+    TokLowerName s       -> Text.unpack s
+    TokInt       i       -> show i
+    TokChar      c       -> "'" <> show c <> "'"
+    TokTrue              -> "True"
+    TokFalse             -> "False"
+
+type TokStream = TokenStream (L Tok)
+
+--------------------------------------------------------------------------------
+
+-- | Regular expressions & the lexer
+tokRE :: RE Char Tok
+tokRE =
+  TokSkip
+    <$  string "skip"
+    <|> TokAbort
+    <$  string "abort"
+    <|> TokDo
+    <$  string "do"
+    <|> TokOd
+    <$  string "od"
+    <|> TokIf
+    <$  string "if"
+    <|> TokFi
+    <$  string "fi"
+    <|> TokBnd
+    <$  string "bnd"
+    <|> TokQM
+    <$  string "?"
+    <|> TokCon
+    <$  string "con"
+    <|> TokVar
+    <$  string "var"
+    <|> TokData
+    <$  string "data"
+    <|> TokArray
+    <$  string "array"
+    <|> TokOf
+    <$  string "of"
+    <|> TokNew
+    <$  string "new"
+    <|> TokDispose
+    <$  string "dispose"
+    <|> TokRange
+    <$  string ".."
+    <|> TokGuardBar
+    <$  string "|"
+    <|> TokArrow
+    <$  string "->"
+    <|> TokArrowU
+    <$  string "→"
+    <|> TokCase
+    <$  string "case"
+    -- delimiters
+    <|> TokComma
+    <$  string ","
+    <|> TokColon
+    <$  string ":"
+    <|> TokSemi
+    <$  string ";"
+    <|> TokAssign
+    <$  string ":="
+    <|> TokSpecOpen
+    <$  string "[!"
+    <|> TokSpecClose
+    <$  string "!]"
+    <|> TokParenOpen
+    <$  string "("
+    <|> TokParenClose
+    <$  string ")"
+    <|> TokBracketOpen
+    <$  string "["
+    <|> TokBracketClose
+    <$  string "]"
+    <|> TokBraceOpen
+    <$  string "{"
+    <|> TokBraceClose
+    <$  string "}"
+    <|> TokQuantOpen
+    <$  string "<|"
+    <|> TokQuantClose
+    <$  string "|>"
+    <|> TokQuantOpenU
+    <$  string "⟨"
+    <|> TokQuantCloseU
+    <$  string "⟩"
+    <|> TokProofOpen
+    <$  string "{-"
+    <|> TokProofClose
+    <$  string "-}"
+    <|> TokBlockOpen
+    <$  string "|["
+    <|> TokBlockClose
+    <$  string "]|"
+    <|> TokDeclOpen
+    <$  string "{:"
+    <|> TokDeclClose
+    <$  string ":}"
+    -- literals
+    <|> TokUnderscore
+    <$  string "_"
+    <|> TokEQ
+    <$  string "="
+    <|> TokNEQ
+    <$  string "/="
+    <|> TokNEQU
+    <$  string "≠"
+    <|> TokGT
+    <$  string ">"
+    <|> TokGTE
+    <$  string ">="
+    <|> TokGTEU
+    <$  string "≥"
+    <|> TokLT
+    <$  string "<"
+    <|> TokLTE
+    <$  string "<="
+    <|> TokLTEU
+    <$  string "≤"
+    <|> TokEQProp
+    <$  string "<=>"
+    <|> TokEQPropU
+    <$  string "≡"
+    <|> TokImpl
+    <$  string "=>"
+    <|> TokImplU
+    <$  string "⇒"
+    <|> TokConj
+    <$  string "&&"
+    <|> TokConjU
+    <$  string "∧"
+    <|> TokDisj
+    <$  string "||"
+    <|> TokDisjU
+    <$  string "∨"
+    <|> TokNeg
+    <$  string "~"
+    <|> TokNegU
+    <$  string "¬"
+    <|> TokAdd
+    <$  string "+"
+    <|> TokSub
+    <$  string "-"
+    <|> TokMul
+    <$  string "*"
+    <|> TokDiv
+    <$  string "/"
+    <|> TokMod
+    <$  string "%"
+    <|> TokExp
+    <$  string "^"
+    <|> TokMax
+    <$  string "↑"
+    <|> TokMin
+    <$  string "↓"
+    <|> TokPointsTo
+    <$  string "|->"
+    <|> TokPointsToU
+    <$  string "↦"
+    <|> TokSConj
+    <$ string "٭"
+    <|> TokLolipop
+    <$  string "-*"
+    <|> TokSum
+    <$  string "Σ"
+    <|> TokProd
+    <$  string "∏"
+    <|> TokForall
+    <$  string "∀"
+    <|> TokExist
+    <$  string "∃"
+    <|> TokTrue
+    <$  string "True"
+    <|> TokFalse
+    <$  string "False"
+    <|> TokUpperName
+    .   Text.pack
+    <$> upperNameRE
+    <|> TokLowerName
+    .   Text.pack
+    <$> lowerNameRE
+    <|> TokInt
+    <$> intRE
+    <|> TokChar
+    <$> charRE
+    <|> TokProofAnchor
+    <$> proofAnchorRE
+    <|> TokHash
+    <$  string "#"
+
+
+-- starts with uppercase alphabets
+proofAnchorRE :: RE Char String
+proofAnchorRE =
+  string "#" *> ((:) <$> psym isAlphaNum <*> many (psym isAlphaNum))
+
+-- starts with lowercase alphabets
+lowerNameRE :: RE Char String
+lowerNameRE = (:) <$> psym isLower <*> many (psym isNameChar)
+
+-- starts with uppercase alphabets
+upperNameRE :: RE Char String
+upperNameRE = (:) <$> psym isUpper <*> many (psym isNameChar)
+
+intRE :: RE Char Int
+intRE = read <$> some (psym isDigit)
+
+charRE :: RE Char Char
+charRE = string "'" *> psym (/= '\'') <* string "'"
+
+-- predicates
+isNewline :: Char -> Bool
+isNewline '\n' = True
+isNewline '\r' = True
+isNewline _    = False
+
+isNameChar :: Char -> Bool
+isNameChar c = isAlphaNum c || c == '_' || c == '\''
+
+isSpaceButNewline :: Char -> Bool
+isSpaceButNewline c = isSpace c && not (isNewline c)
+
+-- for ignoring white spaces
+whitespaceButNewlineRE :: RE Char Tok
+whitespaceButNewlineRE =
+  msym $ \c -> if isSpaceButNewline c then Just TokWhitespace else Nothing
+
+-- comment :: RE Char String
+-- comment =
+--   -- expects spaces
+--   many (psym isSpace)
+--     -- expects "--"
+--     <* string "--"
+--     -- expects any chars but newline
+--     <* many (psym (not . isNewline))
+
+comment' :: RE Char String
+comment' = do
+  let oneLine = string "--" <* many (psym (not . isNewline))
+      multLine = string "{{" *> many anySym *> string "}}"
+  oneLine <|> multLine
+
+-- for indentation bookkeeping
+-- newlineAndWhitespace :: RE Char Tok
+-- newlineAndWhitespace =
+--   TokNewlineAndWhitespace
+--     <$  psym isNewline -- matches a newline
+--     <*  many comment -- skip lines of comments
+--     <*> reFoldl Greedy (\n _ -> succ n) 0 (psym isSpaceButNewline)
+
+-- -- for indentation bookkeeping
+-- newlineAndWhitespaceAndBar :: RE Char Tok
+-- newlineAndWhitespaceAndBar =
+--   TokNewlineAndWhitespaceAndBar
+--     <$  psym isNewline -- matches a newline
+--     <*  many comment -- skip lines of comments
+--     <*> reFoldl Greedy (\n _ -> succ n) 2 (psym isSpaceButNewline)
+--     <*  string "| "
+
+lexer :: Lexer Tok
+lexer = mconcat
+  [ -- meaning tokens that are sent to the parser
+    token (longest tokRE)
+  --, token (longest newlineAndWhitespaceAndBar)
+  --, token (longest newlineAndWhitespace)
+  
+      -- meaningless tokens that are to be dumped
+    -- whitespace (longest whitespaceButNewlineRE)
+  , whitespace (longest comment')
+  , whitespace (longest $ psym isSpace)
+  -- , whitespace (longest newlineAndWhitespace) --added
   ]
 
-lexArithOpsF :: LexerF ArithOp
-lexArithOpsF = choice
-  [ lexImplF
-  , lexImplUF
-  , lexConjF
-  , lexConjUF
-  , lexDisjF
-  , lexDisjUF
-  , lexNegF
-  , lexNegUF
-  , lexAddF
-  , lexSubF
-  , lexMulF
-  , lexDivF
-  , lexModF
-  , lexMaxF
-  , lexMinF
-  , lexExpF
-  , lexSumF
-  , lexPiF
-  , lexForallF
-  , lexExistsF
-  , lexHashF
-  ]
+--------------------------------------------------------------------------------
+type LexicalError = Pos
 
-lexOpsF :: LexerF Op
-lexOpsF =
-  choice [ChainOp <$> lexChainOpsF, ArithOp <$> lexArithOpsF] <?> "operators"
+scan :: FilePath -> Text -> Either LexicalError TokStream
+scan filepath =
+  translateLoc . Right . runLexer lexer filepath . Text.unpack
+ where
+  -- According to the document in Data.Loc.Range, the original meaning of Loc is
+  -- different from how we use it as Range (to simply put, Range extends 1 in col and charOffset).
+  -- The lexer records tokens' ranges in Loc, and we use translateLoc to make it Range.
+  translateLoc :: Either LexicalError TokStream -> Either LexicalError TokStream
+  translateLoc (Left x) = Left x
+  translateLoc (Right toks) = Right (f toks)
+    where
+      f (TsToken (L loc x) rest) = TsToken (L (update loc) x) (f rest)
+        where update NoLoc = NoLoc
+              update (Loc start (Pos path l c co)) = Loc start (Pos path l (c+1) (co+1))
+      f TsEof = TsEof 
+      f (TsError e) = TsError e
 
-------------------------------------------
--- literals
-------------------------------------------
 
--- name start with uppercase letter which is not a keyword
-lexUpperNameF :: LexerF Name
-lexUpperNameF =
-  lexTextToNameF
-    .   lexeme
-    .   try
-    .   withPredicate notUpperKeywords
-    $   upperChar
-    >>= lexTextWithHd
+-- | Instances of PrettyToken
+instance PrettyToken Tok where
+  prettyTokens (x :| []) =
+    fromMaybe ("'" <> show (unLoc x) <> "'") (prettyToken' (unLoc x))
+  prettyTokens xs = "\"" <> concatMap (f . unLoc) (NE.toList xs) <> "\""
+   where
+    f tok = case prettyToken' tok of
+      Nothing     -> show tok
+      Just pretty -> "<" <> pretty <> ">"
 
--- name start with lowercase letter which is not a keyword
-lexLowerNameF :: LexerF Name
-lexLowerNameF =
-  lexTextToNameF
-    .   lexeme
-    .   try
-    .   withPredicate notLowerKeywords
-    $   lowerChar
-    >>= lexTextWithHd
+-- | If the given character has a pretty representation, return that,
+-- otherwise 'Nothing'. This is an internal helper.
+prettyToken' :: Tok -> Maybe String
+prettyToken' tok = case tok of
+  -- TokNewlineAndWhitespace n -> Just $ "indent [" ++ show n ++ "]"
+  -- TokWhitespace             -> Just "space"
+  TokEOF                    -> Just "end of file"
+  _                         -> Nothing
 
--- name which is not a keyword
-lexNameF :: LexerF Name
-lexNameF =
-  lexTextToNameF
-    .   lexeme
-    .   try
-    .   withPredicate notLowerKeywords
-    $   satisfy isAlpha
-    >>= lexTextWithHd
 
--- name with no restriction
-lexAnyNameF :: LexerF Name
-lexAnyNameF = lexTextToNameF . lexeme . try $ satisfy isAlpha >>= lexTextWithHd
 
-lexTextToNameF :: LexerF (Text, Range) -> LexerF Name
-lexTextToNameF l = uncurry Name . second locOf <$> l
+--------------------------------------------------------------------------------
+-- banacorn's method of generating <indent>,<newline>,<dedent> tokens
+{-
+preprocess' :: TokenStream (L Tok) -> ExceptT Lex.LexicalError (State [Int]) TokStream
+preprocess' (TsToken l@(L loc tok) ts) = case tok of
+  TokNewlineAndWhitespace n -> do
+    lastLevel <- gets head
+    undefined
+      
+  -- todos: compare with the stack, insert <indent><newline><dedent>, insert or popping the stack
+  -- TokIndent
+  -- TokDedent
+  -- TokNewline
+  _ -> TsToken l <$> preprocess' ts
+preprocess' (TsEof) = undefined --popping the whole stack and complete the dedents
+  -- consider the ending conditions:straight end or newline+spaces
+preprocess' (TsError le) = throwError le
 
-lexTextWithHd :: Char -> Lexer Text
-lexTextWithHd x = do
-  xs <- many . satisfy $ (\c -> isAlphaNum c || c == '_' || c == '\'')
-  return $ tokensToChunk (Proxy :: Proxy Text) (x : xs)
 
-lexTrueF :: LexerF Lit
-lexTrueF = LitBool True . rangeOf <$> symbol tokTrue
 
-lexFalseF :: LexerF Lit
-lexFalseF = LitBool False . rangeOf <$> symbol tokFalse
+data PPState = PPState
+  { -- stack of indentation levels
+    ppIndentStack  :: [Int]
+  ,
+    -- set as the number of indentation after processing tokens like `TokNewlineAndWhitespace`
+    -- the second field is set to Just if it's `TokNewlineAndWhitespaceAndBar`
+    ppIndentation  :: Maybe (Int, Maybe Loc)
+  ,
+    -- set to True if expected to be followed by a `TokIndent` (e.g. `TokDo`)
+    ppExpectIndent :: Bool
+  ,
+    -- Loc of the previous token
+    ppPrevLoc      :: Loc
+  }
 
-lexIntF :: LexerF Lit
-lexIntF = uncurry LitInt . second rangeOf <$> lexeme Lex.decimal
+type PreprocessM = ExceptT LexicalError (State PPState)
 
-lexCharF :: LexerF Lit
-lexCharF = uncurry LitChar . second rangeOf <$> lexeme
-  (char '\'' *> Lex.charLiteral <* char '\'')
+runPreprocess :: PreprocessM a -> Either LexicalError a
+runPreprocess program =
+  evalState (runExceptT program) (PPState [0] Nothing False NoLoc)
 
-lexLitsF :: LexerF Lit
-lexLitsF =
-  choice [lexTrueF, lexFalseF, lexIntF, lexCharF] <?> "literals"
+setIdentation :: Maybe (Int, Maybe Loc) -> PreprocessM ()
+setIdentation i = modify (\(PPState xs _ b l) -> PPState xs i b l)
 
-lexTypeIntF :: LexerF (Token tokTypeInt)
-lexTypeIntF = symbol tokTypeInt
+pushStack :: Int -> PreprocessM ()
+pushStack level = modify (\(PPState xs i b l) -> PPState (level : xs) i b l)
 
-lexTypeBoolF :: LexerF (Token tokTypeBool)
-lexTypeBoolF = symbol tokTypeBool
+popStack :: PreprocessM ()
+popStack = modify $ \(PPState xs i b l) -> PPState
+  (case xs of
+    []       -> []
+    (_ : ts) -> ts
+  )
+  i
+  b
+  l
 
-lexTypeCharF :: LexerF (Token tokTypeChar)
-lexTypeCharF = symbol tokTypeChar
+expectingIndent :: Tok -> Bool
+expectingIndent TokDo        = True
+expectingIndent TokIf        = True
+expectingIndent TokArrow     = True
+expectingIndent TokArrowU    = True
+expectingIndent TokOf        = True
+expectingIndent TokDeclOpen  = True
+expectingIndent TokBlockOpen = True
+expectingIndent _            = False
 
-lexUnderscore :: LexerF (Token lexUnderscore)
-lexUnderscore = symbol tokUnderscore
+expectingDedent :: Tok -> Bool
+expectingDedent TokOd         = True
+expectingDedent TokFi         = True
+expectingDedent TokGuardBar   = True
+expectingDedent TokDeclClose  = True
+expectingDedent TokBlockClose = True
+expectingDedent _             = False
 
-lexCase :: LexerF (Token lexCase)
-lexCase = symbol tokCase
+data Comparison = CmpNoop | CmpIndent Int | CmpNewline (Maybe Loc) | CmpDedent
+  deriving (Show)
 
-------------------------------------------
--- helper combinators
-------------------------------------------
+compareIndentation :: PreprocessM Comparison
+compareIndentation = do
+  indentation' <- gets ppIndentation
+  case indentation' of
+    Just (indentation, hasBar) -> do
+      -- analyse the stack of indentation levels
+      stack <- gets ppIndentStack
+      let level = case stack of
+            []      -> 0
+            (x : _) -> x
+      return $ case indentation `compare` level of
+        -- the indentation is lesser than the current level
+        LT -> CmpDedent
+        -- the indentation is the same as the current level
+        EQ -> CmpNewline hasBar
+        -- the indentation is greater than the current level
+        GT -> if Maybe.isJust hasBar
+          then CmpNewline hasBar
+          else CmpIndent indentation -- an ordinary bar '|'
+    Nothing -> return CmpNoop
 
-getLoc :: Lexer a -> Lexer (a, Loc)
-getLoc m = do
-  start <- getCurPos
-  x     <- m
-  end   <- getEndPos
-  return (x, Loc start end)
+data Override = ShouldIndent Int | ShouldDedent | DontCare
+  deriving (Show)
 
-getRange :: Lexer a -> Lexer (a, Range)
-getRange m = do
-  start <- getCurPos
-  x     <- m
-  end   <- getEndPos
-  return (x, Range start end)
-
-withLoc :: Located a => Lexer a -> Lexer (a, Loc)
-withLoc p = do
-  x   <- p
-  loc <- locOf <$> p
-  return (x, loc)
-
-withRange :: Ranged a => Lexer a -> Lexer (a, Range)
-withRange p = do
-  x     <- p
-  range <- rangeOf <$> p
-  return (x, range)
-
--- NOTE : make sure no space consumed after parser m
-notFollowedBySymbolF :: LexerF a -> LexerF a
-notFollowedBySymbolF m = ParseFunc
-  (\sc' -> unParseFunc m (return ()) <* notFollowedBy (satisfy isSymbol) <* sc')
-
-withPredicate :: (a -> Bool) -> Lexer a -> Lexer a
-withPredicate f p = do
-  o <- getOffset
-  x <- p
-  if f x
-    then return x
+computeOverride :: L Tok -> PreprocessM Override
+computeOverride currentToken = do
+  if expectingDedent (unLoc currentToken)
+    then return ShouldDedent
     else do
-      setOffset o
-      fail "using keyword as variable name"
+      expectsIndent <- gets ppExpectIndent
+      return $ if expectsIndent
+        then ShouldIndent $ case locOf currentToken of
+          NoLoc   -> 0
+          Loc p _ -> posCol p - 1
+        else DontCare
+
+data Action = Noop | Indent Int | Newline | Bar Loc | Dedent | DedentRepeat
+  deriving (Show)
+
+deviceAction :: Comparison -> Override -> Action
+deviceAction (CmpIndent  _         ) ShouldDedent     = Dedent
+deviceAction (CmpIndent  i         ) (ShouldIndent _) = Indent i
+deviceAction (CmpIndent  _         ) DontCare         = Noop
+deviceAction (CmpNewline _         ) ShouldDedent     = Noop
+deviceAction (CmpNewline Nothing   ) (ShouldIndent _) = Newline
+deviceAction (CmpNewline (Just loc)) (ShouldIndent _) = Bar loc
+deviceAction (CmpNewline Nothing   ) DontCare         = Newline
+deviceAction (CmpNewline (Just loc)) DontCare         = Bar loc
+deviceAction CmpDedent               ShouldDedent     = DedentRepeat
+deviceAction CmpDedent               (ShouldIndent _) = DedentRepeat
+deviceAction CmpDedent               DontCare         = DedentRepeat
+deviceAction CmpNoop                 ShouldDedent     = Dedent
+deviceAction CmpNoop                 (ShouldIndent i) = Indent i
+deviceAction CmpNoop                 DontCare         = Noop
+
+
+
+scan :: FilePath -> Text -> Either LexicalError TokStream
+scan filepath =
+  translateLoc . preprocess . runLexer lexer filepath . Text.unpack
+ where
+  translateLoc :: Either LexicalError TokStream -> Either LexicalError TokStream
+  translateLoc (Left x) = Left x
+  translateLoc (Right toks) = Right (f toks)
+    where
+      f (TsToken (L loc x) rest) = TsToken (L (update loc) x) (f rest)
+        where update NoLoc = NoLoc
+              update (Loc start (Pos path l c co)) = Loc start (Pos path l (c+1) (co+1))
+      f TsEof = TsEof 
+      f (TsError e) = TsError e
+
+  preprocess :: TokenStream (L Tok) -> PreprocessM TokStream
+  preprocess TsEof = do
+    stack <- gets ppIndentStack
+    loc   <- locEnd <$> gets ppPrevLoc
+    if length stack > 1
+      then do
+        popStack
+        TsToken (L loc TokDedent) <$> preprocess TsEof
+      else return TsEof
+  preprocess (TsError (Lex.LexicalError pos)              ) = throwError pos
+  preprocess (TsToken (L _ (TokNewlineAndWhitespace n)) xs) = do
+    setIdentation (Just (n, Nothing))
+    preprocess xs
+  preprocess (TsToken (L loc (TokNewlineAndWhitespaceAndBar n)) xs) = do
+    let loc' = case loc of
+          NoLoc -> NoLoc
+          Loc _ (Pos f l c o) ->
+            Loc (Pos f l (c - 1) (o - 1)) (Pos f l (c - 1) (o - 1))
+
+    setIdentation (Just (n, Just loc'))
+    preprocess xs
+  preprocess (TsToken currentToken xs) = do
+    -- devise the next Action
+    comparison <- compareIndentation
+    override   <- computeOverride currentToken
+    let action = deviceAction comparison override
+
+    -- update state
+    PPState stack i _ _ <- get
+    put $ PPState stack
+                  i
+                  (expectingIndent (unLoc currentToken))
+                  (locOf currentToken)
+    case comparison of
+      CmpIndent  _ -> setIdentation Nothing
+      CmpNewline _ -> setIdentation Nothing
+      CmpDedent    -> return ()
+      CmpNoop      -> return ()
+
+    -- interpret the Action
+    case action of
+      Indent indentation -> do
+        pushStack indentation
+        loc <- locEnd <$> gets ppPrevLoc
+        TsToken (L loc TokIndent) . TsToken currentToken <$> preprocess xs
+      Newline -> do
+        loc <- locEnd <$> gets ppPrevLoc
+        TsToken (L loc TokNewline) . TsToken currentToken <$> preprocess xs
+      Bar loc -> do
+        TsToken (L loc TokGuardBar) . TsToken currentToken <$> preprocess xs
+      Dedent -> do
+        popStack
+        loc <- locEnd <$> gets ppPrevLoc
+        TsToken (L loc TokDedent) . TsToken currentToken <$> preprocess xs
+      DedentRepeat -> do
+        popStack
+        loc <- locEnd <$> gets ppPrevLoc
+        TsToken (L loc TokDedent) <$> preprocess (TsToken currentToken xs)
+      Noop -> do
+        TsToken currentToken <$> preprocess xs
+
+--------------------------------------------------------------------------------
+-}

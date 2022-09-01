@@ -6,8 +6,8 @@ import           Pretty                         ( toByteString
                                                 , toText
                                                 )
 import           Prettyprinter                  ( Pretty )
-import           Syntax.Parser2                 ( Parser )
-import qualified Syntax.Parser2                as Parser
+import           Syntax.Parser                 ( Parser )
+import qualified Syntax.Parser                as Parser
 import           Test.Tasty                     ( TestTree
                                                 , testGroup
                                                 )

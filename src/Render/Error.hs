@@ -12,7 +12,7 @@ import           Render.Class
 import           Render.Element
 import           Render.Syntax.Abstract         ( )
 import           Render.Syntax.Common           ( )
-import           Syntax.Parser2.Error           ( ParseError(..) )
+import           Syntax.Parser.Error           ( ParseError(..) )
 
 instance RenderSection Error where
   renderSection (ParseError     e   ) = renderSection e

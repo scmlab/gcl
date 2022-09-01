@@ -2,47 +2,47 @@ module Render.Syntax.Common where
 
 import           Render.Class
 import           Syntax.Common
-import           Syntax.Parser.Token
+import           Syntax.Parser.Lexer
 import           Prelude                 hiding ( Ordering(..) )
 
 instance Render Name where
   render (Name n l) = tempHandleLoc l (render n)
 
 instance Render ChainOp where
-  render (EQProp  l) = tempHandleLoc l $ render tokEQProp
-  render (EQPropU l) = tempHandleLoc l $ render tokEQPropU
-  render (EQ      l) = tempHandleLoc l $ render tokEQ
-  render (NEQ     l) = tempHandleLoc l $ render tokNEQ
-  render (NEQU    l) = tempHandleLoc l $ render tokNEQU
-  render (LTE     l) = tempHandleLoc l $ render tokLTE
-  render (LTEU    l) = tempHandleLoc l $ render tokLTEU
-  render (GTE     l) = tempHandleLoc l $ render tokGTE
-  render (GTEU    l) = tempHandleLoc l $ render tokGTEU
-  render (LT      l) = tempHandleLoc l $ render tokLT
-  render (GT      l) = tempHandleLoc l $ render tokGT
+  render (EQProp  l) = tempHandleLoc l $ render (show TokEQProp)
+  render (EQPropU l) = tempHandleLoc l $ render (show TokEQPropU)
+  render (EQ      l) = tempHandleLoc l $ render (show TokEQ)
+  render (NEQ     l) = tempHandleLoc l $ render (show TokNEQ)
+  render (NEQU    l) = tempHandleLoc l $ render (show TokNEQU)
+  render (LTE     l) = tempHandleLoc l $ render (show TokLTE)
+  render (LTEU    l) = tempHandleLoc l $ render (show TokLTEU)
+  render (GTE     l) = tempHandleLoc l $ render (show TokGTE)
+  render (GTEU    l) = tempHandleLoc l $ render (show TokGTEU)
+  render (LT      l) = tempHandleLoc l $ render (show TokLT)
+  render (GT      l) = tempHandleLoc l $ render (show TokGT)
 
 instance Render ArithOp where
-  render (Implies  l) = tempHandleLoc l $ render tokImpl
-  render (ImpliesU l) = tempHandleLoc l $ render tokImplU
-  render (Conj     l) = tempHandleLoc l $ render tokConj
-  render (ConjU    l) = tempHandleLoc l $ render tokConjU
-  render (Disj     l) = tempHandleLoc l $ render tokDisj
-  render (DisjU    l) = tempHandleLoc l $ render tokDisjU
-  render (Neg      l) = tempHandleLoc l $ render tokNeg
-  render (NegU     l) = tempHandleLoc l $ render tokNegU
-  render (NegNum   l) = tempHandleLoc l $ render tokSub
-  render (Add      l) = tempHandleLoc l $ render tokAdd
-  render (Sub      l) = tempHandleLoc l $ render tokSub
-  render (Mul      l) = tempHandleLoc l $ render tokMul
-  render (Div      l) = tempHandleLoc l $ render tokDiv
-  render (Mod      l) = tempHandleLoc l $ render tokMod
-  render (Max      l) = tempHandleLoc l $ render tokMax
-  render (Min      l) = tempHandleLoc l $ render tokMin
-  render (Exp      l) = tempHandleLoc l $ render tokExp
-  render (Hash     l) = tempHandleLoc l $ render tokHash
-  render (PointsTo l) = tempHandleLoc l $ render tokPointsTo
-  render (SConj    l) = tempHandleLoc l $ render tokSConj
-  render (SImp     l) = tempHandleLoc l $ render tokSImp
+  render (Implies  l) = tempHandleLoc l $ render (show TokImpl)
+  render (ImpliesU l) = tempHandleLoc l $ render (show TokImplU)
+  render (Conj     l) = tempHandleLoc l $ render (show TokConj)
+  render (ConjU    l) = tempHandleLoc l $ render (show TokConjU)
+  render (Disj     l) = tempHandleLoc l $ render (show TokDisj)
+  render (DisjU    l) = tempHandleLoc l $ render (show TokDisjU)
+  render (Neg      l) = tempHandleLoc l $ render (show TokNeg)
+  render (NegU     l) = tempHandleLoc l $ render (show TokNegU)
+  render (NegNum   l) = tempHandleLoc l $ render (show TokSub)
+  render (Add      l) = tempHandleLoc l $ render (show TokAdd)
+  render (Sub      l) = tempHandleLoc l $ render (show TokSub)
+  render (Mul      l) = tempHandleLoc l $ render (show TokMul)
+  render (Div      l) = tempHandleLoc l $ render (show TokDiv)
+  render (Mod      l) = tempHandleLoc l $ render (show TokMod)
+  render (Max      l) = tempHandleLoc l $ render (show TokMax)
+  render (Min      l) = tempHandleLoc l $ render (show TokMin)
+  render (Exp      l) = tempHandleLoc l $ render (show TokExp)
+  render (Hash     l) = tempHandleLoc l $ render (show TokHash)
+  render (PointsTo l) = tempHandleLoc l $ render (show TokPointsTo)
+  render (SConj    l) = tempHandleLoc l $ render (show TokSConj)
+  render (SImp     l) = tempHandleLoc l $ render (show TokLolipop)
 
 
 instance Render Op where

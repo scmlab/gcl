@@ -33,8 +33,8 @@ import           Syntax.Common                  ( Name(Name)
                                                 , Op
                                                 )
 import           Syntax.Concrete                ( ToAbstract(toAbstract) )
-import           Syntax.Parser2                 ( Parser )
-import qualified Syntax.Parser2                as Parser
+import           Syntax.Parser                 ( Parser )
+import qualified Syntax.Parser                as Parser
 import           Test.Tasty                     ( TestTree
                                                 , testGroup
                                                 )

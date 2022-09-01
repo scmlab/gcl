@@ -15,7 +15,7 @@ import           Prelude                 hiding ( Ordering(..) )
 import           Pretty.Abstract                ( )
 import           Pretty.Predicate               ( )
 import           Pretty.Util                    ( )
-import           Syntax.Parser2.Error           ( ParseError(..) )
+import           Syntax.Parser.Error           ( ParseError(..) )
 
 -- | Error
 instance Pretty Error where

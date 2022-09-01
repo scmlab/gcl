@@ -52,8 +52,8 @@ import qualified GCL.Substitution              as Substitution
 import           Syntax.Abstract.Util           ( programToScopeForSubstitution
                                                 )
 import           Control.Monad.State            ( runState )
-import qualified Syntax.Parser2                as Parser
-import           Syntax.Parser2                 ( Parser )
+import qualified Syntax.Parser                as Parser
+import           Syntax.Parser                 ( Parser )
 
 --------------------------------------------------------------------------------
 -- | Stages of the processing pipeline

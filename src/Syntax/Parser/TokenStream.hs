@@ -4,18 +4,18 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE DefaultSignatures #-}
 
+module Syntax.Parser.TokenStream
+  ( PrettyToken(..)
+  ) where
 
-module Syntax.Parser.TokenStream where
-
-import           Data.Loc
 import           Data.List.NonEmpty             ( NonEmpty(..)
                                                 , nonEmpty
                                                 )
 import qualified Data.List.NonEmpty            as NE
+import           Data.Loc
 import           Data.Proxy
 import           Language.Lexer.Applicative
 import           Text.Megaparsec         hiding ( Pos )
-import qualified Data.Maybe
 
 
 -- | How to print tokens
@@ -34,7 +34,7 @@ class PrettyToken tok where
 instance Ord tok => Ord (TokenStream (L tok)) where
   compare _ _ = EQ
 
-instance (Ord tok, PrettyToken tok) => Stream (TokenStream (L tok)) where
+instance Ord tok => Stream (TokenStream (L tok)) where
   type Token (TokenStream (L tok)) = L tok
   type Tokens (TokenStream (L tok)) = [L tok]
   tokenToChunk Proxy tok = [tok]
@@ -45,6 +45,9 @@ instance (Ord tok, PrettyToken tok) => Stream (TokenStream (L tok)) where
   take1_     = take1_'
   takeN_     = takeN_'
   takeWhile_ = takeWhile_'
+
+instance (Ord tok, PrettyToken tok) => VisualStream (TokenStream (L tok)) where
+  showTokens Proxy = prettyTokens
 
 chunkLength' :: [L tok] -> Int
 chunkLength' = length
@@ -80,110 +83,8 @@ takeWhile_' p stream = case take1_' stream of
     then let (xs, rest') = takeWhile_' p rest in (x : xs, rest')
     else ([], stream)
 
-reachOffset'
-  :: PrettyToken tok
-  => Int
-  -> PosState (TokenStream (L tok))
-  -> (String, PosState (TokenStream (L tok)))
-reachOffset' n posState =
-  case takeN_' (n - pstateOffset posState) (pstateInput posState) of
-    Nothing          -> ("<empty line>", posState)
-    Just (pre, post) -> (resultLine, posState')
-     where
-      filename :: FilePath
-      filename = sourceName (pstateSourcePos posState)
-
-      currentPos :: Pos
-      currentPos = case post of
-        -- starting position of the first token of `post`
-        TsToken (L (Loc start _) _) _ -> start
-        -- end of stream, use the position of the last token from `pre` instead
-        _                             -> case (length pre, last pre) of
-          (0, _              ) -> Pos filename 1 1 0
-          (i, L NoLoc _      ) -> Pos filename 1 1 i
-          (_, L (Loc _ end) _) -> end
-
-      getLineSpan :: L tok -> Maybe (Int, Int)
-      getLineSpan (L NoLoc           _) = Nothing
-      getLineSpan (L (Loc start end) _) = Just (posLine start, posLine end)
-
-      isSameLineAsCurrentPos :: L tok -> Bool
-      isSameLineAsCurrentPos tok = case getLineSpan tok of
-        Nothing     -> False
-        Just (x, y) -> x <= posLine currentPos && y >= posLine currentPos
-
-      -- focuedTokens :: [L tok]
-      focusedTokens = dropWhile (not . isSameLineAsCurrentPos) pre
-        ++ fst (takeWhile_' isSameLineAsCurrentPos post)
-
-      focusedLines :: [(Int, String)]
-      focusedLines = showTokenLines (NE.fromList focusedTokens)
-      --
-      -- sameLineInPre :: String
-      -- sameLineInPre = case nonEmpty (dropWhile (not . isSameLineAsCurrentPos) pre) of
-      --   Nothing -> ""
-      --   Just xs -> showTokens' xs
-      --
-      --
-      -- sameLineInPost :: String
-      -- sameLineInPost = case nonEmpty (fst $ takeWhile_' isSameLineAsCurrentPos post) of
-      --   Nothing -> ""
-      --   Just xs -> showTokens' xs
-
-      resultLine :: String
-      resultLine = Data.Maybe.fromMaybe
-        "<line not found>" (lookup (posLine currentPos) focusedLines)
-
-      -- updated 'PosState'
-      posState' = PosState { pstateInput      = post
-                           , pstateOffset     = max n (pstateOffset posState)
-                           , pstateSourcePos  = toSourcePos currentPos
-                           , pstateTabWidth   = pstateTabWidth posState
-                           , pstateLinePrefix = pstateLinePrefix posState
-                           }
-
-showTokens' :: PrettyToken tok => NonEmpty (L tok) -> String
-showTokens' = quote . init . unlines . map snd . showTokenLines
- where
-  quote :: String -> String
-  quote s = "\"" <> s <> "\""
-
-reachOffsetNoLine'
-  :: Int -> PosState (TokenStream (L tok)) -> PosState (TokenStream (L tok))
-reachOffsetNoLine' n posState =
-  case takeN_' (n - pstateOffset posState) (pstateInput posState) of
-    Nothing          -> posState
-    Just (pre, post) -> posState'
-     where
-      filename :: FilePath
-      filename = sourceName (pstateSourcePos posState)
-
-      currentPos :: Pos
-      currentPos = case post of
-        -- starting position of the first token of `post`
-        TsToken (L (Loc start _) _) _ -> start
-        -- end of stream, use the position of the last token from `pre` instead
-        _                             -> case (length pre, last pre) of
-          (0, _              ) -> Pos filename 1 1 0
-          (i, L NoLoc _      ) -> Pos filename 1 1 i
-          (_, L (Loc _ end) _) -> end
-
-      -- updated 'PosState'
-      posState' = PosState { pstateInput      = post
-                           , pstateOffset     = max n (pstateOffset posState)
-                           , pstateSourcePos  = toSourcePos currentPos
-                           , pstateTabWidth   = pstateTabWidth posState
-                           , pstateLinePrefix = pstateLinePrefix posState
-                           }
-
 --------------------------------------------------------------------------------
 -- Helpers
-
-toSourcePos :: Pos -> SourcePos
-toSourcePos (Pos filename line column _) =
-  SourcePos filename (mkPos line) (mkPos column)
-
-
 
 -- returns lines + line numbers of the string representation of tokens
 showTokenLines :: PrettyToken tok => NonEmpty (L tok) -> [(Int, String)]
@@ -197,11 +98,10 @@ showTokenLines (x :| xs) = zip lineNumbers (NE.toList body)
   lineNumbers :: [Int]
   lineNumbers = [fst start + 1 ..]
 
-data Chunk = Chunk
-                (Int, Int)        -- ^ start, counting from 0
-                (NonEmpty String) -- ^ payload
-                (Int, Int)        -- ^ end, counting from 0
-                deriving (Show)
+data Chunk = Chunk (Int, Int)        -- ^ start, counting from 0
+                              (NonEmpty String) -- ^ payload
+                                                (Int, Int)        -- ^ end, counting from 0
+  deriving Show
 
 
 toChunk :: PrettyToken tok => L tok -> Chunk

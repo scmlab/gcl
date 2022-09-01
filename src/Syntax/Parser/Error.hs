@@ -1,4 +1,4 @@
-module Syntax.Parser2.Error where
+module Syntax.Parser.Error where
 import           Data.List.NonEmpty             ( NonEmpty )
 import           Data.Loc                       ( Loc
                                                 , Pos

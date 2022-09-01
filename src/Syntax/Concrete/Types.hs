@@ -14,7 +14,7 @@ import GHC.Generics (Generic)
 import Syntax.Common (Name, Op)
 import Prelude hiding (Ordering (..))
 import Data.Loc (Located (locOf), Pos, Loc (Loc), L)
-import Syntax.Parser2.Lexer (Tok)
+import Syntax.Parser.Lexer (Tok)
 
 --------------------------------------------------------------------------------
 
