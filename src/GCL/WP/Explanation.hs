@@ -3,11 +3,13 @@
 module GCL.WP.Explanation where
 
 import Data.Loc
+import Data.Text (Text)
 import Syntax.Abstract
 import Syntax.Common                  ( Name(..) )
 import GCL.Predicate
 import Render
 
+emptyExplain :: Text -> Loc -> Origin
 emptyExplain title l = Explain
          { originHeader           = title
          , originExplanation      = mempty

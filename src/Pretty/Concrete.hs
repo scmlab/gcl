@@ -5,8 +5,6 @@
 
 module Pretty.Concrete where
 
--- import Syntax.Parser.Lexer (Tok (..))
-
 import           Data.Loc                       ( locOf )
 import           Prelude                 hiding ( Ordering(..) )
 import           Pretty.Common                  ( )
@@ -16,7 +14,7 @@ import           Prettyprinter                  ( Pretty(pretty) )
 import           Syntax.Common
 import           Syntax.Concrete
 import           Syntax.Parser.Lexer (Tok(..))
-import           Data.Text (Text, unpack)
+import           Data.Text (unpack)
 
 --------------------------------------------------------------------------------
 
@@ -402,9 +400,9 @@ showWithParentheses expr = case handleExpr' expr of
       Complete s -> do
         t <- handleExpr' q
         return $ "(" <> s <> " " <> t <> ")"
-    handleExpr' q@(Quant open op xs m r n t close) =
+    handleExpr' q@Quant {} =
       return $ show $ pretty q
-    handleExpr' c@(Case a expr b cases) =
+    handleExpr' c@Case {} =
       return $ show $ pretty c
 
     handleOp' :: Op -> Variadic Expr String

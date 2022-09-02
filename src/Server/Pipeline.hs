@@ -21,7 +21,7 @@ import qualified Data.Text                     as Text
 import           Error
 import           GCL.Predicate
 import           GCL.Predicate.Util             ( specPayloadWithoutIndentation
-                                                , toExpr
+                                                --, toExpr
                                                 )
 import qualified GCL.Type                      as TypeChecking
 import qualified GCL.WP                        as WP
@@ -403,7 +403,7 @@ solve hash = do
   where findPO :: [PO] -> Maybe PO
         findPO pos = find ((hash ==) . poAnchorHash) pos
         mapExprOnPred :: (A.Expr -> PipelineM A.Expr) -> Pred -> PipelineM Pred
-        mapExprOnPred f pred = case pred of
+        mapExprOnPred f pred' = case pred' of
           Constant ex -> Constant <$> f ex
           GuardIf ex loc -> (`GuardIf` loc) <$> f ex
           GuardLoop ex loc -> (`GuardLoop` loc) <$> f ex

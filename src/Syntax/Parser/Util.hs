@@ -1,7 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Use camelCase" #-}
-{-# LANGUAGE RecordWildCards #-}
 
 module Syntax.Parser.Util
   ( M
@@ -15,6 +14,7 @@ module Syntax.Parser.Util
   , logIfSuccess
   , withLog
   , clampLog
+  , plog
   , symbol
   , extract
   , ignore
@@ -51,7 +51,7 @@ import           Data.Monoid                    ( Endo(..))
 
 type M = StateT Bookkeeping (Writer (Endo [String]))
 -- About the Endo stuff, the reference: https://stackoverflow.com/questions/53785921/how-efficient-is-the-writer-monad-for-lists
---  and see the "## Logging" section.
+--  and see the "## Logging" section in this file.
 
 type ID = Int
 data Bookkeeping = Bookkeeping
@@ -156,6 +156,7 @@ withLog msg p = lift (tell $ Endo ([msg]++)) >> p
 clampLog :: String -> (a->String) -> Parser a -> Parser a
 clampLog before after = logIfSuccess after . withLog before
 
+-- for debugging, a simple log
 plog :: String -> Parser ()
 plog msg = lift $ tell $ Endo ([msg]++)
 
@@ -356,26 +357,27 @@ alignmentCheck ltok tokToAlign = do
   else failure Nothing (Set.fromList [Label (NEL.fromList $ "token align to '"<>show tokToAlign<>"' of line "<>show lineNum)])
 
 
--- Do not use it like: "alignTo (p `indentTo` tok) tokToAlign", the wrong order of alignTo and indentTo would cause error,
--- use "alignmentCheck >> (p `indentTo` tok)" instead.
-alignTo :: Parser a -> L Tok -> Parser a
-alignTo parser tokToAlign = do
-  r <- observing $ lookAhead anySingle
-  case r of
-    Left _ -> parser
-      -- Let 'parser' decide if eof should fail or not, and the failure message.
-      -- This implies eof satisfies any indentation requirements.
-    Right tok -> do
-      alignmentCheck tok tokToAlign
-      parser
- -- let notEof = do
-  --       tok <- lookAhead anySingle
-  --       alignmentCheck tok tokToAlign
-  --       p
-  -- notEof <|>  p
-  -- The method above doesn't work, because alignmentCheck doesn't change the parser state (Mega.State, 
-  -- not our bookkeeping state), so the failure of alignment would just let it fails 'notEof' and then
-  -- tries p, instead of returning the failure.
+-- A previous method, might be ok to export?
+-- -- Do not use it like: "alignTo (p `indentTo` tok) tokToAlign", the wrong order of alignTo and indentTo would cause error,
+-- -- use "alignmentCheck >> (p `indentTo` tok)" instead.
+-- alignTo :: Parser a -> L Tok -> Parser a
+-- alignTo parser tokToAlign = do
+--   r <- observing $ lookAhead anySingle
+--   case r of
+--     Left _ -> parser
+--       -- Let 'parser' decide if eof should fail or not, and the failure message.
+--       -- This implies eof satisfies any indentation requirements.
+--     Right tok -> do
+--       alignmentCheck tok tokToAlign
+--       parser
+--  -- let notEof = do
+--   --       tok <- lookAhead anySingle
+--   --       alignmentCheck tok tokToAlign
+--   --       p
+--   -- notEof <|>  p
+--   -- The method above doesn't work, because alignmentCheck doesn't change the parser state (Mega.State, 
+--   -- not our bookkeeping state), so the failure of alignment would just let it fails 'notEof' and then
+--   -- tries p, instead of returning the failure.
 
 
 ----------------------------------------------------------------------------------------
