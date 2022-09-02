@@ -271,12 +271,6 @@ definition = choice [try funcDefnSig, typeDefn, funcDefnF]
 
 definitionBlock :: Parser DefinitionBlock
 definitionBlock = DefinitionBlock <$> tokenDeclOpen <*> sepByAlignmentOrSemi definition <*> tokenDeclClose
-  -- DefinitionBlock
-  --   <$> tokenDeclOpen
-  --   <*  many (ignoreP indentationRelated)
-  --   <*> sepBy definition newlines
-  --   <*  many (ignoreP indentationRelated)
-  --   <*> tokenDeclClose
 
 -- `n : type`
 declBase :: Parser Name -> Parser DeclBase
@@ -314,26 +308,15 @@ statement =
       , spec
       , programBlock
       ]
-    -- [ try assignment,
-    --   abort,
-    --   try loopInvariant,
-    --   spec,
-    --   proofAnchors,
-    --   assertion,
-    --   skip,
-    --   loop,
-    --   conditional,
-    --   hole
-    -- ]
     <?> "statement"
 
 -- ZERO or more statements
 statements :: Parser [Stmt]
-statements = sepByAlignmentOrSemi statement --sepBy statement newlines
+statements = sepByAlignmentOrSemi statement
 
 -- ONE or more statements
 statements1 :: Parser [Stmt]
-statements1 = sepByAlignmentOrSemi1 statement --sepBy1 statement newlines
+statements1 = sepByAlignmentOrSemi1 statement
 
 skip :: Parser Stmt
 skip = withRange $ Skip <$ symbol TokSkip
@@ -370,14 +353,8 @@ arrayAssignment =
     <*> expression
 
 
--- loop :: Parser Stmt
--- loop = block' Do tokenDo (sepByGuardBar guardedCommand) tokenOd
-
 loop :: Parser Stmt
 loop = Do <$> tokenDo <* optional tokenGuardBar <*> sepByGuardBar guardedCommand <*> tokenOd
-
--- conditional :: Parser Stmt
--- conditional = block' If tokenIf (sepByGuardBar guardedCommand) tokenFi
 
 conditional :: Parser Stmt
 conditional = If <$> tokenIf <* optional tokenGuardBar <*> sepByGuardBar guardedCommand <*> tokenFi
@@ -406,7 +383,6 @@ proofAnchors =
   Proof
     <$> tokenProofOpen
     <*> many proofAnchor
-    -- <*  optional newlines
     <*> tokenProofClose
  where
   proofAnchor :: Parser ProofAnchor
@@ -452,40 +428,17 @@ programBlock :: Parser Stmt
 programBlock =
   Block
     <$> tokenBlockOpen
-    -- <*  many (ignoreP indentationRelated)
     <*> program
-    -- <*  many (ignoreP indentationRelated)
     <*> tokenBlockClose
-
--- indentationRelated :: Tok -> Bool
--- indentationRelated TokIndent = True
--- indentationRelated TokDedent = True
--- indentationRelated _         = False
 
 program :: Parser Program
 program = do
-  -- void $ optional newlines
 
   mixed <- sepByAlignmentOrSemi (choice [Left <$> declOrDefnBlock, Right <$> statement])
-  -- mixed <- sepBy (choice [Left <$> declOrDefnBlock, Right <$> statement])
-  --                newlines
 
   let (decls, stmts) = Either.partitionEithers mixed
 
-  -- void $ optional newlines
-
   return $ Program decls stmts
-
-
-
--- newlines :: Parser ()
--- newlines = void $ some (symbol TokNewline)
-
--- dedent :: Parser ()
--- dedent = void $ symbol TokDedent
-
--- indent :: Parser ()
--- indent = void $ symbol TokIndent
 
 --------------------------------------------------------------------------------
 -- Expression 
@@ -680,18 +633,14 @@ pattern' = choice
 
 type' :: Parser Type
 type' = do
-  result <- makeExprParser term table <?> "type"
-  -- void $ many dedent
-  return result
+  makeExprParser term table <?> "type"
  where
   table :: [[Operator Parser Type]]
   table = [[InfixR function]]
 
   function :: Parser (Type -> Type -> Type)
   function = do
-    -- an <indent> will be inserted after an <arrow>
     arrow <- tokenArrow
-    -- indent
     return $ \x y -> TFunc x arrow y
 
   term :: Parser Type
@@ -707,8 +656,6 @@ type' = do
   typeName :: Parser Type
   typeName = TCon <$> upper <*> many lower
 
-  -- an <indent> will be inserted after an <of>
-  --  was: tokenOf <* indent <*> type'
   array :: Parser Type
   array = TArray <$> tokenArray <*> interval <*> tokenOf <*> type'
 
@@ -730,57 +677,6 @@ type' = do
       ]
 
 --------------------------------------------------------------------------------
-
--- -- | Combinators
--- block :: Parser a -> Parser a
--- block parser = do
---   ignore TokIndent <?> "indentation"
---   result <- parser
---   void $ optional (ignore TokDedent <?> "dedentation")
---   return result
-
--- -- a block of indented stuff seperated by newlines
--- blockOf :: Parser a -> Parser [a]
--- blockOf parser = do
---   ignore TokIndent <?> "indentation"
---   result <- sepBy1 parser newlines
---   void $ optional (ignore TokDedent <?> "dedentation")
---   return result
-
--- block' :: (l -> x -> r -> y) -> Parser l -> Parser x -> Parser r -> Parser y
--- block' constructor open parser close = do
---   a <- open
---   _ <- symbol TokIndent <?> "indentation"
---   b <- parser
---   c <- choice
---     [ do
---       _ <- symbol TokDedent <?> "dedentation"
---       close
---     , close
---     , do
---           -- the fucked up case:
---           --  the tokener is not capable of handling cases like "if True -> skip fi"
---           --  because it's not possible to determine the number of `TokDedent` before `TokFi`
---       c <- close
---       _ <- symbol TokDedent <?> "dedentation"
---       return c
---     ]
---   return $ constructor a b c
-
--- -- remove TokIndent/TokDedent before TokGuardBar
--- ordinaryBar :: Parser (Token "|")
--- ordinaryBar = do
---   void $ many (ignoreP indentationRelated)
---   tokenGuardBar
-
--- -- consumes 1 or more newlines
--- expectNewline :: Parser ()
--- expectNewline = do
---   -- see if the latest accepcted token is TokNewline
---   t <- lift getLastToken
---   case t of
---     Just TokNewline -> return ()
---     _               -> void $ some (ignore TokNewline)
 
 upperName :: Parser Text
 upperName = extract p
