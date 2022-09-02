@@ -2,15 +2,13 @@
 {-# LANGUAGE DataKinds #-}
 
 module Syntax.Parser.Lexer
-  -- ( scan
-  -- , LexicalError
-  -- , Tok(..)
-  -- , TokStream
-  -- ) 
+  ( scan
+  , LexicalError
+  , Tok(..)
+  , TokStream
+  ) 
   where
 
-import           Control.Monad.Except
-import           Control.Monad.State.Lazy
 import           Data.Char                      ( isAlphaNum
                                                 , isDigit
                                                 , isLower
@@ -21,15 +19,11 @@ import           Data.List.NonEmpty             ( NonEmpty(..) )
 import qualified Data.List.NonEmpty            as NE
 import           Data.Loc
 import           Data.Maybe                     ( fromMaybe )
--- import           Debug.Trace
-import qualified Data.Maybe                    as Maybe
 import           Data.Text                      ( Text )
 import qualified Data.Text                     as Text
-import           Language.Lexer.Applicative
-                                         hiding ( LexicalError )
-import qualified Language.Lexer.Applicative    as Lex
+import Language.Lexer.Applicative              ( TokenStream(..), longest, runLexer, token, whitespace, Lexer )
 import           Syntax.Parser.TokenStream     ( PrettyToken(..) )
-import           Text.Regex.Applicative
+import Text.Regex.Applicative                  ( Alternative((<|>), some, many), RE, anySym, psym, string )
 
 --------------------------------------------------------------------------------
 {-
@@ -37,9 +31,6 @@ Main components of this module:
   - 'scan': Turning the source into a token stream, according to the only 'Lexer' of this module, 'lexer'.
   - 'lexer': Defined with the set of valid tokens of gcl (the type 'Tok') and 
       their recognizers (the type 'RE Char Tok', defining how tokens are recognized from an input string).
-  - preprocessing: In the process of scanning, it recognizes indentation informations 
-      from the primitive lexing result and replaces them into three new tokens: TokIndent,TokDedent,TokNewline
-      to form the final token stream.
   
   The form of the token stream: 'TokenStream (L Tok)' were decided by 'runLexer''s return type: 'TokenStream (L tok)'.
 -}
@@ -48,20 +39,11 @@ Main components of this module:
 -- | Tok & TokStream
 data Tok
   = -- the following tokens will not be sent to the parser
-    TokWhitespace
-  | TokEOF
-  | TokLineComment Text
-  | TokBlockCommentOpen
-  | TokBlockCommentClose
-  --  | TokNewlineAndWhitespace Int
-  --  | TokNewlineAndWhitespaceAndBar Int
-  --  | -- the following 3 kinds of tokens will be generated from `TokNewlineAndWhitespace`
-  --   -- and inserted to the TokenStream instead
-  --   TokIndent
-  --  | TokDedent
-  --  | TokNewline
-  | ErrTokIndent Tok Tok Int -- The err token, the token to indent to, the line number of the second Tok
-      -- a token generated for parsing error messages, won't appear in the stream
+    TokEOF -- might not actually be used?
+
+  | ErrTokIndent Tok Tok Int -- Args: the token to indent to, the line number of the second Tok
+      -- This token is only generated when a parser failed, and is used for error messages, 
+      -- it does not appear in the stream.
   | -- keywords
     TokSkip
   | TokAbort
@@ -157,18 +139,8 @@ data Tok
 
 instance Show Tok where
   show tok = case tok of
-    -- TokNewlineAndWhitespace n -> "<newline + " ++ show n ++ " whitespaces>"
-    -- TokNewlineAndWhitespaceAndBar n ->
-    --   "<newline + " ++ show n ++ " whitespaces and a guard bar>"
-    -- TokIndent            -> "<indent>"
-    -- TokDedent            -> "<dedent>"
-    -- TokNewline           -> "<newline>"
     ErrTokIndent _ indT ln -> "token not indent to '"<>show indT<>"' of line "<>show ln
-    TokWhitespace        -> " "
     TokEOF               -> ""
-    TokLineComment s     -> "-- " ++ Text.unpack s
-    TokBlockCommentOpen  -> "{{"
-    TokBlockCommentClose -> "}}"
     TokSkip              -> "skip"
     TokAbort             -> "abort"
     TokDo                -> "do"
@@ -469,58 +441,20 @@ isNewline _    = False
 isNameChar :: Char -> Bool
 isNameChar c = isAlphaNum c || c == '_' || c == '\''
 
-isSpaceButNewline :: Char -> Bool
-isSpaceButNewline c = isSpace c && not (isNewline c)
-
--- for ignoring white spaces
-whitespaceButNewlineRE :: RE Char Tok
-whitespaceButNewlineRE =
-  msym $ \c -> if isSpaceButNewline c then Just TokWhitespace else Nothing
-
--- comment :: RE Char String
--- comment =
---   -- expects spaces
---   many (psym isSpace)
---     -- expects "--"
---     <* string "--"
---     -- expects any chars but newline
---     <* many (psym (not . isNewline))
-
 comment' :: RE Char String
 comment' = do
   let oneLine = string "--" <* many (psym (not . isNewline))
       multLine = string "{{" *> many anySym *> string "}}"
   oneLine <|> multLine
 
--- for indentation bookkeeping
--- newlineAndWhitespace :: RE Char Tok
--- newlineAndWhitespace =
---   TokNewlineAndWhitespace
---     <$  psym isNewline -- matches a newline
---     <*  many comment -- skip lines of comments
---     <*> reFoldl Greedy (\n _ -> succ n) 0 (psym isSpaceButNewline)
-
--- -- for indentation bookkeeping
--- newlineAndWhitespaceAndBar :: RE Char Tok
--- newlineAndWhitespaceAndBar =
---   TokNewlineAndWhitespaceAndBar
---     <$  psym isNewline -- matches a newline
---     <*  many comment -- skip lines of comments
---     <*> reFoldl Greedy (\n _ -> succ n) 2 (psym isSpaceButNewline)
---     <*  string "| "
-
 lexer :: Lexer Tok
 lexer = mconcat
-  [ -- meaning tokens that are sent to the parser
+  [ -- tokens to be sent to the parser
     token (longest tokRE)
-  --, token (longest newlineAndWhitespaceAndBar)
-  --, token (longest newlineAndWhitespace)
   
-      -- meaningless tokens that are to be dumped
-    -- whitespace (longest whitespaceButNewlineRE)
+    -- meaningless tokens that are to be dumped
   , whitespace (longest comment')
   , whitespace (longest $ psym isSpace)
-  -- , whitespace (longest newlineAndWhitespace) --added
   ]
 
 --------------------------------------------------------------------------------
@@ -558,222 +492,6 @@ instance PrettyToken Tok where
 -- otherwise 'Nothing'. This is an internal helper.
 prettyToken' :: Tok -> Maybe String
 prettyToken' tok = case tok of
-  -- TokNewlineAndWhitespace n -> Just $ "indent [" ++ show n ++ "]"
-  -- TokWhitespace             -> Just "space"
   TokEOF                    -> Just "end of file"
   _                         -> Nothing
 
-
-
---------------------------------------------------------------------------------
--- banacorn's method of generating <indent>,<newline>,<dedent> tokens
-{-
-preprocess' :: TokenStream (L Tok) -> ExceptT Lex.LexicalError (State [Int]) TokStream
-preprocess' (TsToken l@(L loc tok) ts) = case tok of
-  TokNewlineAndWhitespace n -> do
-    lastLevel <- gets head
-    undefined
-      
-  -- todos: compare with the stack, insert <indent><newline><dedent>, insert or popping the stack
-  -- TokIndent
-  -- TokDedent
-  -- TokNewline
-  _ -> TsToken l <$> preprocess' ts
-preprocess' (TsEof) = undefined --popping the whole stack and complete the dedents
-  -- consider the ending conditions:straight end or newline+spaces
-preprocess' (TsError le) = throwError le
-
-
-
-data PPState = PPState
-  { -- stack of indentation levels
-    ppIndentStack  :: [Int]
-  ,
-    -- set as the number of indentation after processing tokens like `TokNewlineAndWhitespace`
-    -- the second field is set to Just if it's `TokNewlineAndWhitespaceAndBar`
-    ppIndentation  :: Maybe (Int, Maybe Loc)
-  ,
-    -- set to True if expected to be followed by a `TokIndent` (e.g. `TokDo`)
-    ppExpectIndent :: Bool
-  ,
-    -- Loc of the previous token
-    ppPrevLoc      :: Loc
-  }
-
-type PreprocessM = ExceptT LexicalError (State PPState)
-
-runPreprocess :: PreprocessM a -> Either LexicalError a
-runPreprocess program =
-  evalState (runExceptT program) (PPState [0] Nothing False NoLoc)
-
-setIdentation :: Maybe (Int, Maybe Loc) -> PreprocessM ()
-setIdentation i = modify (\(PPState xs _ b l) -> PPState xs i b l)
-
-pushStack :: Int -> PreprocessM ()
-pushStack level = modify (\(PPState xs i b l) -> PPState (level : xs) i b l)
-
-popStack :: PreprocessM ()
-popStack = modify $ \(PPState xs i b l) -> PPState
-  (case xs of
-    []       -> []
-    (_ : ts) -> ts
-  )
-  i
-  b
-  l
-
-expectingIndent :: Tok -> Bool
-expectingIndent TokDo        = True
-expectingIndent TokIf        = True
-expectingIndent TokArrow     = True
-expectingIndent TokArrowU    = True
-expectingIndent TokOf        = True
-expectingIndent TokDeclOpen  = True
-expectingIndent TokBlockOpen = True
-expectingIndent _            = False
-
-expectingDedent :: Tok -> Bool
-expectingDedent TokOd         = True
-expectingDedent TokFi         = True
-expectingDedent TokGuardBar   = True
-expectingDedent TokDeclClose  = True
-expectingDedent TokBlockClose = True
-expectingDedent _             = False
-
-data Comparison = CmpNoop | CmpIndent Int | CmpNewline (Maybe Loc) | CmpDedent
-  deriving (Show)
-
-compareIndentation :: PreprocessM Comparison
-compareIndentation = do
-  indentation' <- gets ppIndentation
-  case indentation' of
-    Just (indentation, hasBar) -> do
-      -- analyse the stack of indentation levels
-      stack <- gets ppIndentStack
-      let level = case stack of
-            []      -> 0
-            (x : _) -> x
-      return $ case indentation `compare` level of
-        -- the indentation is lesser than the current level
-        LT -> CmpDedent
-        -- the indentation is the same as the current level
-        EQ -> CmpNewline hasBar
-        -- the indentation is greater than the current level
-        GT -> if Maybe.isJust hasBar
-          then CmpNewline hasBar
-          else CmpIndent indentation -- an ordinary bar '|'
-    Nothing -> return CmpNoop
-
-data Override = ShouldIndent Int | ShouldDedent | DontCare
-  deriving (Show)
-
-computeOverride :: L Tok -> PreprocessM Override
-computeOverride currentToken = do
-  if expectingDedent (unLoc currentToken)
-    then return ShouldDedent
-    else do
-      expectsIndent <- gets ppExpectIndent
-      return $ if expectsIndent
-        then ShouldIndent $ case locOf currentToken of
-          NoLoc   -> 0
-          Loc p _ -> posCol p - 1
-        else DontCare
-
-data Action = Noop | Indent Int | Newline | Bar Loc | Dedent | DedentRepeat
-  deriving (Show)
-
-deviceAction :: Comparison -> Override -> Action
-deviceAction (CmpIndent  _         ) ShouldDedent     = Dedent
-deviceAction (CmpIndent  i         ) (ShouldIndent _) = Indent i
-deviceAction (CmpIndent  _         ) DontCare         = Noop
-deviceAction (CmpNewline _         ) ShouldDedent     = Noop
-deviceAction (CmpNewline Nothing   ) (ShouldIndent _) = Newline
-deviceAction (CmpNewline (Just loc)) (ShouldIndent _) = Bar loc
-deviceAction (CmpNewline Nothing   ) DontCare         = Newline
-deviceAction (CmpNewline (Just loc)) DontCare         = Bar loc
-deviceAction CmpDedent               ShouldDedent     = DedentRepeat
-deviceAction CmpDedent               (ShouldIndent _) = DedentRepeat
-deviceAction CmpDedent               DontCare         = DedentRepeat
-deviceAction CmpNoop                 ShouldDedent     = Dedent
-deviceAction CmpNoop                 (ShouldIndent i) = Indent i
-deviceAction CmpNoop                 DontCare         = Noop
-
-
-
-scan :: FilePath -> Text -> Either LexicalError TokStream
-scan filepath =
-  translateLoc . preprocess . runLexer lexer filepath . Text.unpack
- where
-  translateLoc :: Either LexicalError TokStream -> Either LexicalError TokStream
-  translateLoc (Left x) = Left x
-  translateLoc (Right toks) = Right (f toks)
-    where
-      f (TsToken (L loc x) rest) = TsToken (L (update loc) x) (f rest)
-        where update NoLoc = NoLoc
-              update (Loc start (Pos path l c co)) = Loc start (Pos path l (c+1) (co+1))
-      f TsEof = TsEof 
-      f (TsError e) = TsError e
-
-  preprocess :: TokenStream (L Tok) -> PreprocessM TokStream
-  preprocess TsEof = do
-    stack <- gets ppIndentStack
-    loc   <- locEnd <$> gets ppPrevLoc
-    if length stack > 1
-      then do
-        popStack
-        TsToken (L loc TokDedent) <$> preprocess TsEof
-      else return TsEof
-  preprocess (TsError (Lex.LexicalError pos)              ) = throwError pos
-  preprocess (TsToken (L _ (TokNewlineAndWhitespace n)) xs) = do
-    setIdentation (Just (n, Nothing))
-    preprocess xs
-  preprocess (TsToken (L loc (TokNewlineAndWhitespaceAndBar n)) xs) = do
-    let loc' = case loc of
-          NoLoc -> NoLoc
-          Loc _ (Pos f l c o) ->
-            Loc (Pos f l (c - 1) (o - 1)) (Pos f l (c - 1) (o - 1))
-
-    setIdentation (Just (n, Just loc'))
-    preprocess xs
-  preprocess (TsToken currentToken xs) = do
-    -- devise the next Action
-    comparison <- compareIndentation
-    override   <- computeOverride currentToken
-    let action = deviceAction comparison override
-
-    -- update state
-    PPState stack i _ _ <- get
-    put $ PPState stack
-                  i
-                  (expectingIndent (unLoc currentToken))
-                  (locOf currentToken)
-    case comparison of
-      CmpIndent  _ -> setIdentation Nothing
-      CmpNewline _ -> setIdentation Nothing
-      CmpDedent    -> return ()
-      CmpNoop      -> return ()
-
-    -- interpret the Action
-    case action of
-      Indent indentation -> do
-        pushStack indentation
-        loc <- locEnd <$> gets ppPrevLoc
-        TsToken (L loc TokIndent) . TsToken currentToken <$> preprocess xs
-      Newline -> do
-        loc <- locEnd <$> gets ppPrevLoc
-        TsToken (L loc TokNewline) . TsToken currentToken <$> preprocess xs
-      Bar loc -> do
-        TsToken (L loc TokGuardBar) . TsToken currentToken <$> preprocess xs
-      Dedent -> do
-        popStack
-        loc <- locEnd <$> gets ppPrevLoc
-        TsToken (L loc TokDedent) . TsToken currentToken <$> preprocess xs
-      DedentRepeat -> do
-        popStack
-        loc <- locEnd <$> gets ppPrevLoc
-        TsToken (L loc TokDedent) <$> preprocess (TsToken currentToken xs)
-      Noop -> do
-        TsToken currentToken <$> preprocess xs
-
---------------------------------------------------------------------------------
--}
