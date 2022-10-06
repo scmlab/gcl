@@ -3,67 +3,26 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase #-}
 
-module GCL.WP
-  ( WP(..), TM(..)
-  , sweep
-  ) where
+module GCL.WP (WP, TM, sweep) where
 
-import           Control.Arrow                  ( first )
-import           Control.Monad.Except           ( Except
-                                                , MonadError(throwError)
-                                                , forM
-                                                , forM_
+import           Control.Monad.Except           ( MonadError(throwError)
                                                 , runExcept
-                                                , unless
                                                 )
-import           Control.Monad.RWS              ( MonadReader(ask)
-                                                , MonadState(..)
-                                                , MonadWriter(..)
-                                                , RWST(runRWST)
-                                                , withRWST
-                                                )
-import qualified Data.Hashable                 as Hashable
+import           Control.Monad.RWS              ( RWST(runRWST) )
 import           Data.IntMap                    ( IntMap )
 import qualified Data.List                     as List
-import           Data.Loc                       ( Loc(..)
-                                                , Located(..)
-                                                )
-import           Data.Loc.Range                 ( Range
-                                                , fromLoc
-                                                )
+import           Data.Loc                       ( Located(..) )
 import qualified Data.Map                      as Map
-import qualified Data.Text                     as Text
-import           GCL.Common                     ( Fresh(..)
-                                                , freshName'
-                                                , freshWithLabel
-                                                , freshText
-                                                )
 import           GCL.Predicate                  ( InfMode(..)
-                                                , Origin(..)
                                                 , PO(..)
                                                 , Pred(..)
-                                                , Spec(Specification)
-                                                )
-import           GCL.Predicate.Util             ( conjunct
-                                                , disjunct
-                                                , guardIf
-                                                , guardLoop
-                                                , toExpr
+                                                , Spec(..)
                                                 )
 import qualified GCL.Substitution              as Substitution
 import           GCL.WP.Type
-import           GCL.WP.Explanation
-import           Numeric                        ( showHex )
-import           Pretty                         ( toString
-                                                , toText
-                                                )
 import qualified Syntax.Abstract               as A
 import qualified Syntax.Abstract.Operator      as A
 import qualified Syntax.Abstract.Util          as A
-import           Syntax.Common                  ( Name(Name)
-                                                , nameToText
-                                                )
-import GCL.WP.Util
 import GCL.WP.Struct
 import GCL.WP.WP
 import GCL.WP.SP
@@ -152,7 +111,8 @@ structProgram stmts = do
 
 structStmts :: InfMode -> (Pred, Maybe A.Expr) -> [A.Stmt] -> Pred -> WP ()
 structStmts = this
-  where (this, structSegs, struct) =
-            structFunctions (wpSegs, wpSStmts, wp, spSStmts)
-        (wpSegs, wpSStmts, wp) = wpFunctions structSegs
-        spSStmts = spFunctions (structSegs, struct)
+  where
+    (this, structSegs, struct) = structFunctions (wpSegs, wpSStmts,
+                                                  wp, spSStmts)
+    (wpSegs, wpSStmts, wp)     = wpFunctions structSegs
+    spSStmts                   = spFunctions (structSegs, struct)

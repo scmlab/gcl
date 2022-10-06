@@ -9,21 +9,11 @@ import           Data.Loc                       ( Loc(..)
 import           Data.Loc.Range                 ( fromLoc )
 import           GCL.Predicate                  ( InfMode(..)
                                                 , Origin(..)
-                                                -- , PO(..)
                                                 , Pred(..)
-                                                -- , Spec(Specification)
                                                 )
-import           GCL.Predicate.Util             ( -- conjunct
-                                                -- , disjunct
-                                                  guardIf
+import           GCL.Predicate.Util             ( guardIf
                                                 , guardLoop
-                                                -- , toExpr
                                                 )
--- import           GCL.Common                     ( Fresh(..)
---                                                 , freshName'
---                                                 , freshWithLabel
---                                                 , freshText
---                                                 )
 import GCL.WP.Type
 import           GCL.WP.Explanation
 import GCL.WP.Util

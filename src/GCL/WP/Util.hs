@@ -2,58 +2,40 @@
 
 module GCL.WP.Util where
 
-import           Control.Monad.Except           ( Except
-                                                , MonadError(throwError)
-                                                , forM
-                                                , forM_
-                                                , runExcept
+import           Control.Monad.Except           ( forM
                                                 , unless
                                                 )
 import           Control.Monad.RWS              ( MonadReader(ask)
-                                                , MonadState(..)
                                                 , MonadWriter(..)
-                                                , RWST(runRWST)
                                                 , withRWST
                                                 )
 
 import qualified Data.Map                      as Map
-import           Data.Loc                       ( Loc(..)
-                                                , Located(..)
-                                                )
-import           Data.Loc.Range                 ( Range
-                                                , fromLoc
-                                                )                                              
+import           Data.Loc                       ( Loc(..) )
+import           Data.Loc.Range                 ( Range )
 import qualified Data.Text                     as Text
 import qualified Data.Hashable                 as Hashable
-import           GCL.Predicate                  ( InfMode(..)
-                                                , Origin(..)
+import           GCL.Predicate                  ( Origin(..)
                                                 , PO(..)
                                                 , Pred(..)
                                                 , Spec(Specification)
-                                                )    
-import           GCL.Predicate.Util             ( conjunct
-                                                , disjunct
+                                                )
+import           GCL.Predicate.Util             ( disjunct
                                                 , guardIf
-                                                , guardLoop
                                                 , toExpr
-                                                )                                                                                            
+                                                )
 import           GCL.Common                     ( Fresh(..)
                                                 , freshName'
-                                                , freshWithLabel
-                                                , freshText
                                                 )
 
 import qualified Syntax.Abstract               as A
-import qualified Syntax.Abstract.Operator      as A
 import qualified Syntax.Abstract.Util          as A
-import           Syntax.Common                  ( Name(Name)
+import           Syntax.Common                  ( Name(..)
                                                 , nameToText
                                                 )
 import qualified GCL.Substitution              as Substitution
 import           Numeric                        ( showHex )
-import           Pretty                         ( toString
-                                                , toText
-                                                )
+import           Pretty                         ( toString )
 import           GCL.WP.Type
 
 -- Syntax Manipulation

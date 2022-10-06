@@ -2,29 +2,17 @@
 
 module GCL.WP.WP where
 
-import           Control.Monad.Except           ( -- Except
-                                                  MonadError(throwError)
+import           Control.Monad.Except           ( MonadError(throwError)
                                                 , forM
-                                                -- , forM_
-                                                -- , runExcept
-                                                -- , unless
                                                 )
-import           Data.Loc                       ( Loc(..)
-                                                -- , Located(..)
-                                                )
-import           GCL.Predicate                  ( -- InfMode(..)
-                                                -- , Origin(..)
-                                                -- , PO(..)
-                                                  Pred(..)
-                                                -- , Spec(Specification)
-                                                )
+import           Data.Loc                       ( Loc(..) )
+import           GCL.Predicate                  ( Pred(..) )
 import           GCL.Predicate.Util             ( conjunct
-                                                -- , disjunct
                                                 , toExpr
                                                 )
 import           GCL.Common                     ( Fresh(..)
-                                                 , freshName'
-                                                 )
+                                                , freshName'
+                                                )
 import           Pretty                         ( toText )
 import GCL.WP.Type
 import GCL.WP.Util

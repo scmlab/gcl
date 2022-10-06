@@ -3,31 +3,15 @@
 module GCL.WP.SP where
 
 import           Control.Arrow                  ( first )
-import           Control.Monad.Except           ( -- Except
-                                                  MonadError(throwError)
-                                                , forM
-                                                -- , forM_
-                                                -- , runExcept
-                                                -- , unless
-                                                )
-import           Data.Loc                       ( Loc(..)
-                                                -- , Located(..)
-                                                )
-import           GCL.Predicate                  ( -- InfMode(..)
-                                                -- , Origin(..)
-                                                -- , PO(..)
-                                                  Pred(..)
-                                                -- , Spec(Specification)
-                                                )
-import           GCL.Predicate.Util             ( conjunct
-                                                , disjunct
-                                                , guardIf
+import           Control.Monad.Except           ( MonadError(throwError)
+                                                , forM )
+import           Data.Loc                       ( Loc(..) )
+import           GCL.Predicate                  ( Pred(..) )
+import           GCL.Predicate.Util             ( disjunct
                                                 , guardLoop
                                                 , toExpr
                                                 )
-import           GCL.Common                     ( Fresh(..)
-                                                , freshName'
-                                                , freshWithLabel
+import           GCL.Common                     ( freshWithLabel
                                                 , freshText
                                                 )
 import           Pretty                         ( toText )
@@ -36,9 +20,7 @@ import GCL.WP.Util
 import qualified Syntax.Abstract               as A
 import qualified Syntax.Abstract.Operator      as A
 import qualified Syntax.Abstract.Util          as A
-import           Syntax.Common                  ( Name(Name)
-                                                , nameToText
-                                                )
+import           Syntax.Common                  ( Name(Name) )
 
 spFunctions :: (TstructSegs, Tstruct) -> TspSStmts
 spFunctions (structSegs, struct) = spSStmts
