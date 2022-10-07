@@ -38,6 +38,9 @@ instance Collect StructError Diagnostic where
     "The last statement of the program should be an assertion"
   collect (MultiDimArrayAsgnNotImp loc) =
     makeError loc "Assignment to Multi-Dimensional Array" "Not implemented yet"
+  collect (LocalVarExceedScope loc) =
+    makeError loc "Local variable(s) exceeded scope"
+      "Variables defined in a block must not remain in preconditions out of the block"
 
 instance Collect Error Diagnostic where
   collect (ParseError  err) = collect err

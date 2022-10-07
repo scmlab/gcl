@@ -6,12 +6,14 @@ import           Control.Monad.Except           ( MonadError(throwError)
                                                 , forM
                                                 )
 import           Data.Loc                       ( Loc(..) )
+import           Data.Set                       ( member )
 import           GCL.Predicate                  ( Pred(..) )
 import           GCL.Predicate.Util             ( conjunct
                                                 , toExpr
                                                 )
 import           GCL.Common                     ( Fresh(..)
                                                 , freshName'
+                                                , fv
                                                 )
 import           Pretty                         ( toText )
 import GCL.WP.Type
@@ -117,8 +119,19 @@ wpFunctions structSegs = (wpSegs, wpSStmts, wp)
   e_allocated <- allocated e
   return $ Constant (e_allocated `A.sConj` toExpr post)
 -- TODO:
- wp A.Block{} post = return post
+ wp (A.Block prog _) post = wpBlock prog post
  wp _         _    = error "missing case in wp"
+
+ wpBlock :: A.Program -> Pred -> WP Pred
+ wpBlock (A.Program _ decls props stmts l) post = do
+   pre <- wpStmts stmts post
+   let fs = fv pre
+   if any (`member` fs) declared
+     then throwError (LocalVarExceedScope l)
+     else return pre
+  where declared = concat . map extractNames $ decls
+        extractNames (A.ConstDecl ns _ _ _) = ns
+        extractNames (A.VarDecl   ns _ _ _) = ns
 
 allocated :: Fresh m => A.Expr -> m A.Expr
 allocated e = do

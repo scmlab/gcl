@@ -42,6 +42,8 @@ instance Pretty StructError where
   pretty (MissingPostcondition loc) = "Missing Postcondition" <+> pretty loc
   pretty (MultiDimArrayAsgnNotImp loc) =
     "Assignment to Multi-Dimensional Array" <+> pretty loc
+  pretty (LocalVarExceedScope loc) =
+    "Local Variable(s) Exceeded Scope" <+> pretty loc
 
 instance Pretty TypeError where
   pretty (NotInScope name) =

@@ -121,7 +121,7 @@ structFunctions (wpSegs, wpSStmts, wp, spSStmts) =
   forM_ gcmds (structGdcmdInduct inv)
  struct _        (A.Proof _ _)     _    = return ()
  -- TODO:
- struct _        A.Block{}         _    = return ()
+ struct (pre, _) (A.Block prog _)  post = structBlock pre prog post
  struct (pre, _) s@(A.Alloc _ _ l) post =
    tellPO' (AtAbort l) pre =<< wp s post
  struct (pre, _) s@(A.HLookup _ _ l) post =
@@ -138,9 +138,12 @@ structFunctions (wpSegs, wpSStmts, wp, spSStmts) =
 
  structGdcmdBnd :: Pred -> A.Expr -> A.GdCmd -> WP ()
  structGdcmdBnd inv bnd (A.GdCmd guard body _) = withFreshVar $ \oldbnd -> do
-  -- oldbnd <- freshVar
   structStmts
     Secondary
     (Conjunct [inv, Bound (bnd `A.eqq` oldbnd) NoLoc, guardLoop guard], Nothing)
     body
     (Bound (bnd `A.lt` oldbnd) NoLoc)
+
+ structBlock :: Pred -> A.Program -> Pred -> WP ()
+ structBlock pre (A.Program _ decls props stmts _) post =
+   structStmts Primary (pre, Nothing) stmts post

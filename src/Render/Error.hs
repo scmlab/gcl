@@ -106,3 +106,8 @@ instance RenderSection StructError where
     [ Header "Assignment to Multi-Dimensional Array" (fromLoc loc)
     , Paragraph "Not implemented yet"
     ]
+  renderSection (LocalVarExceedScope loc) = Section
+    Red
+    [ Header "Local variable(s) exceeded scope" (fromLoc loc)
+    , Paragraph "Variables defined in a block must not remain in preconditions out of the block"
+    ]
