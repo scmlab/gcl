@@ -2,11 +2,13 @@
 
 module GCL.WP.WP where
 
+import           Control.Arrow                  (first, second)
 import           Control.Monad.Except           ( MonadError(throwError)
                                                 , forM
                                                 )
-import           Data.Loc                       ( Loc(..) )
+import           Data.Loc                       ( Loc(..), locOf )
 import           Data.Set                       ( member )
+import           Data.Map                       ( fromList )
 import           GCL.Predicate                  ( Pred(..) )
 import           GCL.Predicate.Util             ( conjunct
                                                 , toExpr
@@ -21,6 +23,8 @@ import GCL.WP.Util
 import qualified Syntax.Abstract               as A
 import qualified Syntax.Abstract.Operator      as A
 import qualified Syntax.Abstract.Util          as A
+import Syntax.Common.Types                     ( Name(..)
+                                               , nameToText )
 
 wpFunctions :: TstructSegs
             -> (TwpSegs, TwpSStmts, Twp)
@@ -124,14 +128,29 @@ wpFunctions structSegs = (wpSegs, wpSStmts, wp)
 
  wpBlock :: A.Program -> Pred -> WP Pred
  wpBlock (A.Program _ decls props stmts l) post = do
-   pre <- wpStmts stmts post
-   let fs = fv pre
-   if any (`member` fs) declared
-     then throwError (LocalVarExceedScope l)
-     else return pre
-  where declared = concat . map extractNames $ decls
-        extractNames (A.ConstDecl ns _ _ _) = ns
-        extractNames (A.VarDecl   ns _ _ _) = ns
+   let localNames = declaredNames decls
+   (xs, ys) <- withLocalScopes (\scopes ->
+                 calcLocalRenaming (concat scopes) localNames)
+   -- let ys' = toMapping ys
+     -- SCM: should rename stmts'. TODO.
+   withScopeExtension (xs ++ (map snd ys))
+     (wpStmts stmts post)
+   -- if any (`member` (fv pre)) (declaredNames decls)
+   --   then throwError (LocalVarExceedScope l)
+   --   else return pre
+
+calcLocalRenaming :: [Name] -> [Name] -> WP ([Name], [(Name, Name)])
+calcLocalRenaming _ [] = return ([], [])
+calcLocalRenaming scope (x:xs)
+  | x `elem` scope = do
+        x' <- freshName' (nameToText x)
+        second ((x,x') :) <$> calcLocalRenaming scope xs
+  | otherwise =
+        first (x:) <$> calcLocalRenaming scope xs
+
+toMapping :: [(Name, Name)] -> A.Mapping
+toMapping = fromList . map cvt
+  where cvt (x, y) = (nameToText x, A.Var y (locOf y))
 
 allocated :: Fresh m => A.Expr -> m A.Expr
 allocated e = do

@@ -8,6 +8,7 @@ import           Control.Monad.Except           ( forM
 import           Control.Monad.RWS              ( MonadReader(ask)
                                                 , MonadWriter(..)
                                                 , withRWST
+                                                , local
                                                 )
 
 import qualified Data.Map                      as Map
@@ -115,8 +116,8 @@ substitute
   -> a
   -> WP a
 substitute xs es expr = do
-  scope             <- ask
-  (result, redexes) <- Substitution.run scope xs es expr
+  (decls, _)        <- ask
+  (result, redexes) <- Substitution.run decls xs es expr
   tell ([], [], [], redexes)
   return result
 
@@ -126,5 +127,21 @@ withFreshVar :: (A.Expr -> WP a) -> WP a
 withFreshVar f = do
   name <- freshName' "bnd"
   let var = A.Var name NoLoc
-  withRWST (\scope st -> (Map.insert (nameToText name) Nothing scope, st))
-           (f var)
+  withRWST
+    (\(decls, scopes) st ->
+       ((Map.insert (nameToText name) Nothing decls, scopes), st))
+    (f var)
+
+withLocalScopes :: ([[Name]] -> WP a) -> WP a
+withLocalScopes f = do
+  (_, scopes) <- ask
+  f scopes
+
+withScopeExtension :: [Name] -> WP a -> WP a
+withScopeExtension names =
+  local (\(defns, scopes) -> (defns, names:scopes))
+
+declaredNames :: [A.Declaration] -> [Name]
+declaredNames decls = concat . map extractNames $ decls
+  where extractNames (A.ConstDecl ns _ _ _) = ns
+        extractNames (A.VarDecl   ns _ _ _) = ns
