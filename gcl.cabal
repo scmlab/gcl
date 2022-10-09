@@ -34,7 +34,11 @@ library
       GCL.Type
       GCL.WP
       GCL.WP.Explanation
+      GCL.WP.SP
+      GCL.WP.Struct
       GCL.WP.Type
+      GCL.WP.Util
+      GCL.WP.WP
       Pretty
       Pretty.Abstract
       Pretty.Common
@@ -182,7 +186,11 @@ test-suite gcl-test
       GCL.Type
       GCL.WP
       GCL.WP.Explanation
+      GCL.WP.SP
+      GCL.WP.Struct
       GCL.WP.Type
+      GCL.WP.Util
+      GCL.WP.WP
       Pretty
       Pretty.Abstract
       Pretty.Common
