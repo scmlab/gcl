@@ -15,7 +15,7 @@ import           GCL.Predicate.Util             ( conjunct
                                                 )
 import           GCL.Common                     ( Fresh(..)
                                                 , freshName'
-                                                , fv
+                                                , freeVars
                                                 )
 import           Pretty                         ( toText )
 import GCL.WP.Type
@@ -25,6 +25,8 @@ import qualified Syntax.Abstract.Operator      as A
 import qualified Syntax.Abstract.Util          as A
 import Syntax.Common.Types                     ( Name(..)
                                                , nameToText )
+import Syntax.Substitution
+import Debug.Trace
 
 wpFunctions :: TstructSegs
             -> (TwpSegs, TwpSStmts, Twp)

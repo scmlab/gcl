@@ -36,15 +36,15 @@ data Pred
 instance ToJSON Pred
 
 instance Free Pred where
-  fv (Constant e) = fv e
-  fv (GuardIf e _) = fv e
-  fv (GuardLoop e _) = fv e
-  fv (Assertion e _) = fv e
-  fv (LoopInvariant e1 e2 _) = fv e1 <> fv e2 -- predicate & bound
-  fv (Bound e _) = fv e
-  fv (Conjunct es) = Set.unions $ map fv es
-  fv (Disjunct es) = Set.unions $ map fv es
-  fv (Negate e) = fv e
+  freeVars (Constant e) = freeVars e
+  freeVars (GuardIf e _) = freeVars e
+  freeVars (GuardLoop e _) = freeVars e
+  freeVars (Assertion e _) = freeVars e
+  freeVars (LoopInvariant e1 e2 _) = freeVars e1 <> freeVars e2 -- predicate & bound
+  freeVars (Bound e _) = freeVars e
+  freeVars (Conjunct es) = Set.unions $ map freeVars es
+  freeVars (Disjunct es) = Set.unions $ map freeVars es
+  freeVars (Negate e) = freeVars e
 
 --------------------------------------------------------------------------------
 
