@@ -2,7 +2,7 @@
 
 module GCL.WP.WP where
 
-import           Control.Arrow                  (first, second)
+import           Control.Arrow                  ( first, second )
 import           Control.Monad.Except           ( MonadError(throwError)
                                                 , forM
                                                 )
@@ -26,7 +26,10 @@ import qualified Syntax.Abstract.Util          as A
 import Syntax.Common.Types                     ( Name(..)
                                                , nameToText )
 import Syntax.Substitution
-import Debug.Trace
+
+-- import Debug.Trace
+-- import Prettyprinter
+-- import Prettyprinter.Render.String
 
 wpFunctions :: TstructSegs
             -> (TwpSegs, TwpSStmts, Twp)
@@ -129,17 +132,18 @@ wpFunctions structSegs = (wpSegs, wpSStmts, wp)
  wp _         _    = error "missing case in wp"
 
  wpBlock :: A.Program -> Pred -> WP Pred
- wpBlock (A.Program _ decls props stmts l) post = do
+ wpBlock (A.Program _ decls _props stmts _) post = do
    let localNames = declaredNames decls
    (xs, ys) <- withLocalScopes (\scopes ->
                  calcLocalRenaming (concat scopes) localNames)
-   -- let ys' = toMapping ys
-     -- SCM: should rename stmts'. TODO.
+   stmts' <- subst (toSubst ys) stmts
    withScopeExtension (xs ++ (map snd ys))
-     (wpStmts stmts post)
+     (wpStmts stmts' post)
    -- if any (`member` (fv pre)) (declaredNames decls)
    --   then throwError (LocalVarExceedScope l)
    --   else return pre
+  where toSubst = fromList . map (\(n, n') ->
+                    (nameToText n, A.Var n' (locOf n)))
 
 calcLocalRenaming :: [Name] -> [Name] -> WP ([Name], [(Name, Name)])
 calcLocalRenaming _ [] = return ([], [])
@@ -159,3 +163,7 @@ allocated e = do
   v <- freshName' "new"
   return (A.exists [v] A.true (e `A.pointsTo` A.nameVar v))
   -- allocated e = e -> _
+
+-- debugging
+-- pp :: Pretty a => a -> String
+-- pp = renderString . layoutPretty defaultLayoutOptions . pretty
