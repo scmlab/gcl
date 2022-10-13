@@ -16,6 +16,7 @@ import GCL.Predicate                           ( InfMode(..)
                                                , PO(..), Pred(..), Spec (..))
 import qualified GCL.Substitution              as Substitution
 import qualified Syntax.Abstract               as A
+import           Syntax.Common.Types           ( Name )
 import GHC.Generics (Generic)
 
 -- The WP monad.
@@ -24,7 +25,7 @@ type TM = Except StructError
 
 type WP
   = RWST
-      Substitution.Scope
+      (Substitution.Decls, [[Name]])
       ([PO], [Spec], [StructWarning], IntMap (Int, A.Expr))
       Int
       TM
@@ -70,11 +71,13 @@ data StructError
   | MultiDimArrayAsgnNotImp Loc
      -- Assignment to multi-dimensional array not implemented.
      -- SCM: will remove this when we figure out how.
+  | LocalVarExceedScope Loc
   deriving (Eq, Show, Generic)
 
 instance Located StructError where
   locOf (MissingAssertion l) = l
   locOf (MissingPostcondition l) = l
   locOf (MultiDimArrayAsgnNotImp l) = l
+  locOf (LocalVarExceedScope l) = l
 
 instance ToJSON StructError

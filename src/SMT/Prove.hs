@@ -31,8 +31,8 @@ makeImplication e1 e2 props = do
     lift (print $ pretty e2)
 
     -- capture free variables
-    let propVarSet = Set.unions $ map fv props
-        varList = Set.toList $ Set.map nameToText (fv e1 <> fv e2 <> propVarSet)
+    let propVarSet = Set.unions $ map freeVars props
+        varList = Set.toList $ Set.map nameToText (freeVars e1 <> freeVars e2 <> propVarSet)
         len = length varList
 
     -- create symbolic bindings
@@ -48,13 +48,13 @@ makeImplication e1 e2 props = do
 --         .=> runReader p2 environment
     let maybeConclusion = runTranslator (toSBool e2) environment
     case maybeConclusion of
-        (Left e) -> do 
+        (Left e) -> do
             lift $ print e
             return $ literal False
         (Right conclusion) -> do
             return conclusion
 
-    
+
     where constrain' :: Either Error SBool -> SymbolicT IO ()
           constrain' (Left _) = return ()
           constrain' (Right b) = constrain b
@@ -64,7 +64,7 @@ type Name2Bol = Map.Map Text SBool
 type Name2Chr = Map.Map Text SChar
 
 -- Error "function name" "first parameter"
-data Error = 
+data Error =
     NotDefinedError Text |
     PONotFoundError |
     Z3NotFoundError
@@ -117,7 +117,7 @@ toSInteger (App (Op (ArithOp op)) e _) =
     handleUnaryArithNumOp op e
 toSInteger (App (App (Op (ArithOp op)) e1 _) e2 _) =
     handleBinaryArithNumOp op e1 e2
-toSInteger e                  = throwError (NotDefinedError $ toText e <>  toText "toSInteger") 
+toSInteger e                  = throwError (NotDefinedError $ toText e <>  toText "toSInteger")
 
 -- takes an expression that evaluates to a boolean value
 -- and convert it to a function of the environment
@@ -246,7 +246,7 @@ checkSBool (App (App (Op (ArithOp op)) e1 _) e2 _) =
 checkSBool _                  = False
 
 checkHandleChainOp :: ChainOp -> Expr -> Expr -> Bool
-checkHandleChainOp (EQProp _) e1 e2 = 
+checkHandleChainOp (EQProp _) e1 e2 =
     case e1 of
         App (App (Op (ChainOp _)) _ _) e12 _ ->
             checkSBool e12 && checkSBool e2

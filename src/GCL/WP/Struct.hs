@@ -2,11 +2,13 @@
 
 module GCL.WP.Struct where
 
+import           Control.Arrow                  ( first, second )
 import           Control.Monad.Except           ( forM_ )
 import           Data.Loc                       ( Loc(..)
                                                 , Located(..)
                                                 )
 import           Data.Loc.Range                 ( fromLoc )
+import           Data.Map                       ( fromList )
 import           GCL.Predicate                  ( InfMode(..)
                                                 , Origin(..)
                                                 , Pred(..)
@@ -14,12 +16,23 @@ import           GCL.Predicate                  ( InfMode(..)
 import           GCL.Predicate.Util             ( guardIf
                                                 , guardLoop
                                                 )
+import           GCL.Common                     ( Fresh(..)
+                                                , freshName'
+                                                , freeVars
+                                                )
 import GCL.WP.Type
-import           GCL.WP.Explanation
+import GCL.WP.Explanation
 import GCL.WP.Util
 import qualified Syntax.Abstract               as A
 import qualified Syntax.Abstract.Operator      as A
 import qualified Syntax.Abstract.Util          as A
+import Syntax.Common.Types                     ( Name(..)
+                                               , nameToText )
+import Syntax.Substitution
+
+-- import Debug.Trace
+-- import Prettyprinter
+-- import Prettyprinter.Render.String
 
 type RecFns = (TwpSegs, TwpSStmts, Twp, TspSStmts)
 
@@ -59,7 +72,8 @@ structFunctions (wpSegs, wpSStmts, wp, spSStmts) =
    startsWithDo (SStmts (A.Do _ _ : _) : _) = True
    startsWithDo _                           = False
    origin = if startsWithDo segs then AtLoop l else AtAssertion l
- structSegs (pre, bnd) [SStmts ss] post = structSStmts (pre, bnd) ss post
+ structSegs (pre, bnd) [SStmts ss] post =
+   structSStmts (pre, bnd) ss post
  structSegs (pre, bnd) (SStmts ss : SAsrt (A.Assert p l) : segs) post = do
   structSStmts (pre, bnd) ss (Assertion p l)
   structSegs (Assertion p l, Nothing) segs post
@@ -121,7 +135,7 @@ structFunctions (wpSegs, wpSStmts, wp, spSStmts) =
   forM_ gcmds (structGdcmdInduct inv)
  struct _        (A.Proof _ _)     _    = return ()
  -- TODO:
- struct _        A.Block{}         _    = return ()
+ struct (pre, _) (A.Block prog _)  post = structBlock pre prog post
  struct (pre, _) s@(A.Alloc _ _ l) post =
    tellPO' (AtAbort l) pre =<< wp s post
  struct (pre, _) s@(A.HLookup _ _ l) post =
@@ -138,9 +152,33 @@ structFunctions (wpSegs, wpSStmts, wp, spSStmts) =
 
  structGdcmdBnd :: Pred -> A.Expr -> A.GdCmd -> WP ()
  structGdcmdBnd inv bnd (A.GdCmd guard body _) = withFreshVar $ \oldbnd -> do
-  -- oldbnd <- freshVar
   structStmts
     Secondary
     (Conjunct [inv, Bound (bnd `A.eqq` oldbnd) NoLoc, guardLoop guard], Nothing)
     body
     (Bound (bnd `A.lt` oldbnd) NoLoc)
+
+ structBlock :: Pred -> A.Program -> Pred -> WP ()
+ structBlock pre (A.Program _ decls props stmts _) post = do
+   let localNames = declaredNames decls
+   (xs, ys) <- withLocalScopes (\scopes ->
+                 calcLocalRenaming (concat scopes) localNames)
+   stmts' <- subst (toSubst ys) stmts
+   withScopeExtension (xs ++ (map snd ys))
+     (structStmts Primary (pre, Nothing) stmts' post)
+  where toSubst = fromList . map (\(n, n') ->
+                     (nameToText n, A.Var n' (locOf n)))
+
+
+calcLocalRenaming :: [Name] -> [Name] -> WP ([Name], [(Name, Name)])
+calcLocalRenaming _ [] = return ([], [])
+calcLocalRenaming scope (x:xs)
+  | x `elem` scope = do
+        x' <- freshName' (nameToText x)
+        second ((x,x') :) <$> calcLocalRenaming scope xs
+  | otherwise =
+        first (x:) <$> calcLocalRenaming scope xs
+-- debugging
+
+-- pp :: Pretty a => a -> String
+-- pp = renderString . layoutPretty defaultLayoutOptions . pretty

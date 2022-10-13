@@ -716,3 +716,26 @@ arithOpTypes (Hash     l) = tBool .-> tInt $ l
 arithOpTypes (PointsTo l) = tInt .-> tInt .-> tInt $ l
 arithOpTypes (SConj    l) = tBool .-> tBool .-> tBool $ l
 arithOpTypes (SImp     l) = tBool .-> tBool .-> tBool $ l
+
+-- A class for substitution not needing a Fresh monad.
+-- Used only in this module.
+-- Moved from GCL.Common to here.
+--  SCM: think about integrating it with the other substitution.
+
+class Substitutable a b where
+  subst :: Subs a -> b -> b
+
+compose :: Substitutable a a => Subs a -> Subs a -> Subs a
+s1 `compose` s2 = s1 <> Map.map (subst s1) s2
+
+instance (Substitutable a b, Functor f) => Substitutable a (f b) where
+  subst = fmap . subst
+
+instance Substitutable Type Type where
+  subst _ t@TBase{}       = t
+  subst s (TArray i t l ) = TArray i (subst s t) l
+  subst s (TTuple ts    ) = TTuple (map (subst s) ts)
+  subst s (TFunc t1 t2 l) = TFunc (subst s t1) (subst s t2) l
+  subst _ t@TCon{}        = t
+  subst _ t@TVar{}        = t
+  subst s t@(TMetaVar n)  = Map.findWithDefault t n s

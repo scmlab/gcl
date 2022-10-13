@@ -2,16 +2,20 @@
 
 module GCL.WP.WP where
 
+import           Control.Arrow                  ( first, second )
 import           Control.Monad.Except           ( MonadError(throwError)
                                                 , forM
                                                 )
-import           Data.Loc                       ( Loc(..) )
+import           Data.Loc                       ( Loc(..), locOf )
+import           Data.Set                       ( member )
+import           Data.Map                       ( fromList )
 import           GCL.Predicate                  ( Pred(..) )
 import           GCL.Predicate.Util             ( conjunct
                                                 , toExpr
                                                 )
 import           GCL.Common                     ( Fresh(..)
                                                 , freshName'
+                                                , freeVars
                                                 )
 import           Pretty                         ( toText )
 import GCL.WP.Type
@@ -19,6 +23,13 @@ import GCL.WP.Util
 import qualified Syntax.Abstract               as A
 import qualified Syntax.Abstract.Operator      as A
 import qualified Syntax.Abstract.Util          as A
+import Syntax.Common.Types                     ( Name(..)
+                                               , nameToText )
+import Syntax.Substitution
+
+-- import Debug.Trace
+-- import Prettyprinter
+-- import Prettyprinter.Render.String
 
 wpFunctions :: TstructSegs
             -> (TwpSegs, TwpSStmts, Twp)
@@ -117,11 +128,42 @@ wpFunctions structSegs = (wpSegs, wpSStmts, wp)
   e_allocated <- allocated e
   return $ Constant (e_allocated `A.sConj` toExpr post)
 -- TODO:
- wp A.Block{} post = return post
+ wp (A.Block prog _) post = wpBlock prog post
  wp _         _    = error "missing case in wp"
+
+ wpBlock :: A.Program -> Pred -> WP Pred
+ wpBlock (A.Program _ decls _props stmts _) post = do
+   let localNames = declaredNames decls
+   (xs, ys) <- withLocalScopes (\scopes ->
+                 calcLocalRenaming (concat scopes) localNames)
+   stmts' <- subst (toSubst ys) stmts
+   withScopeExtension (xs ++ (map snd ys))
+     (wpStmts stmts' post)
+   -- if any (`member` (fv pre)) (declaredNames decls)
+   --   then throwError (LocalVarExceedScope l)
+   --   else return pre
+  where toSubst = fromList . map (\(n, n') ->
+                    (nameToText n, A.Var n' (locOf n)))
+
+calcLocalRenaming :: [Name] -> [Name] -> WP ([Name], [(Name, Name)])
+calcLocalRenaming _ [] = return ([], [])
+calcLocalRenaming scope (x:xs)
+  | x `elem` scope = do
+        x' <- freshName' (nameToText x)
+        second ((x,x') :) <$> calcLocalRenaming scope xs
+  | otherwise =
+        first (x:) <$> calcLocalRenaming scope xs
+
+toMapping :: [(Name, Name)] -> A.Mapping
+toMapping = fromList . map cvt
+  where cvt (x, y) = (nameToText x, A.Var y (locOf y))
 
 allocated :: Fresh m => A.Expr -> m A.Expr
 allocated e = do
   v <- freshName' "new"
   return (A.exists [v] A.true (e `A.pointsTo` A.nameVar v))
   -- allocated e = e -> _
+
+-- debugging
+-- pp :: Pretty a => a -> String
+-- pp = renderString . layoutPretty defaultLayoutOptions . pretty

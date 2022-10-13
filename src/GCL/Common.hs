@@ -22,7 +22,6 @@ class Monad m => Fresh m where
     getCounter :: m Int
     setCounter :: Int -> m ()
 
-
     fresh :: m Int
     fresh = do
         i <- getCounter
@@ -33,7 +32,7 @@ class Monad m => Fresh m where
 freshText :: Fresh m => m Text
 freshText = (\i -> Text.pack ("?m_" ++ show i)) <$> fresh
 
-  -- a more fancy `freshText`
+  -- a fancier `freshText`
 freshWithLabel :: Fresh m => Text -> m Text
 freshWithLabel l =
   (\i -> Text.pack ("?" ++ Text.unpack l ++ "_" ++ show i)) <$> fresh
@@ -58,75 +57,106 @@ emptySubs = mempty
 emptyEnv :: Env a
 emptyEnv = mempty
 
--- Monad for free variable
+-- A class of types for which we may compute their free variables.
 class Free a where
-  fv :: a -> Set Name
+  freeVars :: a -> Set Name
+  freeVarsT :: a -> Set Text
+
+  freeVarsT = Set.map nameToText . freeVars
 
 occurs :: Free a => Name -> a -> Bool
-occurs n x = n `Set.member` fv x
+occurs n x = n `Set.member` freeVars x
 
 instance Free a => Free (Subs a) where
-  fv = Set.unions . Map.map fv
+  freeVars = Set.unions . Map.map freeVars
 
 
 instance Free a => Free [a] where
-  fv l = foldMap fv l
+  freeVars l = foldMap freeVars l
+
+instance (Free a, Free b) => Free (a, b) where
+  freeVars (x,y) = freeVars x <> freeVars y
+
+instance (Free a, Free b, Free c) => Free (a, b, c) where
+  freeVars (x,y,z) = freeVars x <> freeVars y <> freeVars z
+
+instance Free a => Free (Maybe a) where
+  freeVars = maybe mempty freeVars
 
 instance Free Type where
-  fv (TBase _ _    ) = mempty
-  fv (TArray _ t _ ) = fv t
-  fv (TTuple ts    ) = Set.unions (map fv ts)
-  fv (TFunc t1 t2 _) = fv t1 <> fv t2
-  fv (TCon  _  ns _) = Set.fromList ns
-  fv (TVar x _     ) = Set.singleton x
-  fv (TMetaVar n   ) = Set.singleton n
+  freeVars (TBase _ _    ) = mempty
+  freeVars (TArray _ t _ ) = freeVars t
+  freeVars (TTuple ts    ) = Set.unions (map freeVars ts)
+  freeVars (TFunc t1 t2 _) = freeVars t1 <> freeVars t2
+  freeVars (TCon  _  ns _) = Set.fromList ns
+  freeVars (TVar x _     ) = Set.singleton x
+  freeVars (TMetaVar n   ) = Set.singleton n
 
 instance Free Expr where
-  fv (Var   x _        ) = Set.singleton x
-  fv (Const x _        ) = Set.singleton x
-  fv (Op _             ) = mempty
-  fv (Lit _ _          ) = mempty
-  fv (App  e1 e2      _) = fv e1 <> fv e2
-  fv (Func _  clauses _) = Set.unions (fmap fv clauses)
-  fv (Lam  x  e       _) = fv e \\ Set.singleton x
-  fv (Tuple xs         ) = Set.unions (map fv xs)
-  fv (Quant op xs range term _) =
-    (fv op <> fv range <> fv term) \\ Set.fromList xs
-  fv (RedexKernel _ _ freeVars _) = freeVars
-  fv (RedexShell _ e            ) = fv e
-  fv (ArrIdx e1 e2 _            ) = fv e1 <> fv e2
-  fv (ArrUpd e1 e2 e3 _         ) = fv e1 <> fv e2 <> fv e3
-  fv (Case e clauses _          ) = fv e <> Set.unions (map fv clauses)
+  freeVars (Var   x _        ) = Set.singleton x
+  freeVars (Const x _        ) = Set.singleton x
+  freeVars (Op _             ) = mempty
+  freeVars (Lit _ _          ) = mempty
+  freeVars (App  e1 e2      _) = freeVars e1 <> freeVars e2
+  freeVars (Func _  clauses _) = Set.unions (fmap freeVars clauses)
+  freeVars (Lam  x  e       _) = freeVars e \\ Set.singleton x
+  freeVars (Tuple xs         ) = Set.unions (map freeVars xs)
+  freeVars (Quant op xs range term _) =
+    (freeVars op <> freeVars range <> freeVars term) \\ Set.fromList xs
+  freeVars (RedexKernel _ _ fv _) = fv
+  freeVars (RedexShell _ e      ) = freeVars e
+  freeVars (ArrIdx e1 e2 _      ) = freeVars e1 <> freeVars e2
+  freeVars (ArrUpd e1 e2 e3 _   ) = freeVars e1 <> freeVars e2 <> freeVars e3
+  freeVars (Case e clauses _    ) = freeVars e <> Set.unions (map freeVars clauses)
+
 
 instance Free FuncClause where
-  fv (FuncClause patterns expr) = fv expr \\ Set.unions (map fv patterns)
+  freeVars (FuncClause patterns expr) = freeVars expr \\ Set.unions (map freeVars patterns)
 
 instance Free CaseClause where
-  fv (CaseClause patt expr) = fv expr \\ fv patt
+  freeVars (CaseClause patt expr) = freeVars expr \\ freeVars patt
+
 instance Free Pattern where
-  fv (PattLit      _      ) = mempty
-  fv (PattBinder   n      ) = Set.singleton n
-  fv (PattWildcard _      ) = mempty
-  fv (PattConstructor _ ps) = fv ps
+  freeVars (PattLit      _      ) = mempty
+  freeVars (PattBinder   n      ) = Set.singleton n
+  freeVars (PattWildcard _      ) = mempty
+  freeVars (PattConstructor _ ps) = freeVars ps
 
--- class for data that is substitutable
-class Substitutable a b where
-  subst :: Subs a -> b -> b
+instance Free Declaration where
+  freeVars (ConstDecl ns t expr _) =
+    Set.fromList ns <> freeVars t <> freeVars expr
+  freeVars (VarDecl   ns t expr _) =
+    Set.fromList ns <> freeVars t <> freeVars expr
 
-compose :: Substitutable a a => Subs a -> Subs a -> Subs a
-s1 `compose` s2 = s1 <> Map.map (subst s1) s2
+instance Free Stmt where
+  freeVars (Skip  _) = mempty
+  freeVars (Abort _) = mempty
+  freeVars (Assign ns es _) =
+    Set.fromList ns <> Set.unions (map freeVars es)
+  freeVars (AAssign a i e _) =
+    freeVars a <> freeVars i <> freeVars e
+  freeVars (Assert p _) = freeVars p
+  freeVars (LoopInvariant p b _) = freeVars p <> freeVars b
+  freeVars (Do gdcmds _) = Set.unions (map freeVars gdcmds)
+  freeVars (If gdcmds _) = Set.unions (map freeVars gdcmds)
+  freeVars (Spec  _ _) = mempty
+  freeVars (Proof _ _) = mempty
+  freeVars (Alloc x es _) =
+     Set.singleton x <> Set.unions (map freeVars es)
+  freeVars (HLookup x e _) =
+     Set.singleton x <> freeVars e
+  freeVars (HMutate e1 e2 _) = freeVars e1 <> freeVars e2
+  freeVars (Dispose e _) = freeVars e
+  freeVars (Block prog _) = freeVars prog
 
-instance (Substitutable a b, Functor f) => Substitutable a (f b) where
-  subst = fmap . subst
+instance Free GdCmd where
+  freeVars (GdCmd g stmts _) =
+    freeVars g <> Set.unions (map freeVars stmts)
 
-instance Substitutable Type Type where
-  subst _ t@TBase{}       = t
-  subst s (TArray i t l ) = TArray i (subst s t) l
-  subst s (TTuple ts    ) = TTuple (map (subst s) ts)
-  subst s (TFunc t1 t2 l) = TFunc (subst s t1) (subst s t2) l
-  subst _ t@TCon{}        = t
-  subst _ t@TVar{}        = t
-  subst s t@(TMetaVar n)  = Map.findWithDefault t n s
+instance Free Program where
+  freeVars (Program _defns decls props stmts _) =
+    freeVars decls <> freeVars props <> freeVars stmts
+   -- SCM: TODO: deal with defns later.
 
 toStateT :: Monad m => r -> RWST r w s m a -> StateT s m a
 toStateT r m = StateT

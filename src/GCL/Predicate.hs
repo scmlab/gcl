@@ -13,7 +13,9 @@ import           Data.Loc.Range                 ( Range
                                                 , within
                                                 )
 import           Data.Text                      ( Text )
+import qualified Data.Set                      as Set
 import           GHC.Generics                   ( Generic )
+import           GCL.Common
 import           Render.Element
 import           Syntax.Abstract                ( Expr )
 import           Syntax.Common                  ( Name )
@@ -32,6 +34,17 @@ data Pred
   deriving (Eq, Show, Generic)
 
 instance ToJSON Pred
+
+instance Free Pred where
+  freeVars (Constant e) = freeVars e
+  freeVars (GuardIf e _) = freeVars e
+  freeVars (GuardLoop e _) = freeVars e
+  freeVars (Assertion e _) = freeVars e
+  freeVars (LoopInvariant e1 e2 _) = freeVars e1 <> freeVars e2 -- predicate & bound
+  freeVars (Bound e _) = freeVars e
+  freeVars (Conjunct es) = Set.unions $ map freeVars es
+  freeVars (Disjunct es) = Set.unions $ map freeVars es
+  freeVars (Negate e) = freeVars e
 
 --------------------------------------------------------------------------------
 
@@ -82,10 +95,10 @@ instance Eq Stmt where
 
 -- | Proof obligation
 data PO = PO
-  { poPre        :: Pred -- precondition 
-  , poPost       :: Pred -- post-condition 
+  { poPre        :: Pred -- precondition
+  , poPost       :: Pred -- post-condition
   , poAnchorHash :: Text -- anchor hash
-  , poAnchorLoc  :: Maybe Range -- anchor location, if it exists in the source 
+  , poAnchorLoc  :: Maybe Range -- anchor location, if it exists in the source
   , poOrigin     :: Origin -- whereabouts
   }
   deriving (Eq, Show, Generic)
@@ -109,7 +122,7 @@ data Origin
   | AtIf Loc
   | AtLoop Loc
   | AtTermination Loc
-  | Explain { originHeader :: Text -- the text you see on the top of a PO 
+  | Explain { originHeader :: Text -- the text you see on the top of a PO
             , originExplanation :: Inlines -- the text you see at the bottom of a PO (after clicking the header)
             , originInfMode :: InfMode
             , originHighlightPartial :: Bool -- for highlighting only "if" in conditionals and "do" in loops
@@ -117,10 +130,10 @@ data Origin
             }
   deriving (Eq, Show, Generic)
 
--- | This ordering would affect how they are presented to the user 
--- | A PO should be placed in front of another PO when: 
--- |  1. its range is within another PO 
--- |  2. its range is ahead of that of another PO 
+-- | This ordering would affect how they are presented to the user
+-- | A PO should be placed in front of another PO when:
+-- |  1. its range is within another PO
+-- |  2. its range is ahead of that of another PO
 instance Ord Origin where
   compare x y = case fromLoc (locOf x) of
     Nothing -> LT

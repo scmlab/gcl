@@ -23,13 +23,15 @@ import           GCL.WP.Type
 import qualified Syntax.Abstract               as A
 import qualified Syntax.Abstract.Operator      as A
 import qualified Syntax.Abstract.Util          as A
+import           Syntax.Common.Types           ( Name )
 import GCL.WP.Struct
 import GCL.WP.WP
 import GCL.WP.SP
+import GCL.WP.Util
 
 runWP
   :: WP a
-  -> Substitution.Scope
+  -> (Substitution.Decls, [[Name]])
   -> Either
        StructError
        (a, Int, ([PO], [Spec], [StructWarning], IntMap (Int, A.Expr)))
@@ -38,10 +40,11 @@ runWP p decls = runExcept $ runRWST p decls 0
 sweep
   :: A.Program
   -> Either StructError ([PO], [Spec], [StructWarning], IntMap (Int, A.Expr), Int)
-sweep program@(A.Program _ _ _props stmts _) = do
-  let scope = A.programToScopeForSubstitution program
-  (_, counter, (pos, specs, warnings, redexes)) <- runWP (structProgram stmts)
-                                                         scope
+sweep program@(A.Program _ decs _props stmts _) = do
+  let decls = A.programToScopeForSubstitution program
+  let dnames = [declaredNames decs]
+  (_, counter, (pos, specs, warnings, redexes)) <-
+           runWP (structProgram stmts) (decls, dnames)
   -- update Proof Obligations with corresponding Proof Anchors
   let proofAnchors = stmts >>= \case
         A.Proof anchors _ -> anchors

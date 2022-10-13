@@ -7,7 +7,7 @@ module GCL.Substitution
   ( run
   , buildRedexMap
   , step
-  , Scope
+  , Decls
   -- TODO: don't export these
   , Substitutable
   , Reducible
@@ -26,7 +26,7 @@ import qualified Data.Maybe                    as Maybe
 import qualified Data.Set                      as Set
 import           Data.Set                       ( Set )
 import           Data.Text                      ( Text )
-import           GCL.Common                     ( Free(fv)
+import           GCL.Common                     ( Free(freeVars)
                                                 , Fresh(..)
                                                 , FreshState
                                                 , fresh
@@ -50,13 +50,13 @@ import           Syntax.Common                  ( Name(Name)
 run
   :: MonadState FreshState m
   => (Substitutable a, Reducible a, CollectRedexes a)
-  => Scope -- declarations
+  => Decls -- declarations
   -- -> Int -- initial redex ID counter
   -> [Name] -- name of variables to be substituted
   -> [Expr] -- values to be substituted for
   -> a
   -> m (a, IntMap (Int, Expr))
-run scope names exprs predicate = runM scope $ do
+run decls names exprs predicate = runM decls $ do
   output <- subst mapping predicate >>= reduce
   return (output, buildRedexMap output)
  where
@@ -66,8 +66,8 @@ run scope names exprs predicate = runM scope $ do
 buildRedexMap :: CollectRedexes a => a -> IntMap (Int, Expr)
 buildRedexMap = IntMap.fromList . map (\(i, e) -> (i, (i, e))) . collectRedexes
 
-step :: MonadState FreshState m => Scope -> Expr -> m Expr
-step scope expr = runM scope $ go expr
+step :: MonadState FreshState m => Decls -> Expr -> m Expr
+step decls expr = runM decls $ go expr
  where
   go :: Expr -> M Expr
   go (App f x l) = App <$> go f <*> pure x <*> pure l >>= reduce
@@ -83,17 +83,17 @@ mappingFromSubstitution xs es =
 
 ------------------------------------------------------------------
 
-type Scope = Map Text (Maybe Expr)
-type M = RWS Scope () Int
+type Decls = Map Text (Maybe Expr)
+type M = RWS Decls () Int
 
 instance Fresh M where
   getCounter = get
   setCounter = put
 
-runM :: MonadState FreshState m => Scope -> M b -> m b
-runM scope p = do
+runM :: MonadState FreshState m => Decls -> M b -> m b
+runM decls p = do
   counter <- get
-  let (output, counter', _) = runRWS p scope counter
+  let (output, counter', _) = runRWS p decls counter
   put counter'
   return output
 
@@ -183,14 +183,14 @@ instance Substitutable Expr where
     Var name _ -> case Map.lookup (nameToText name) mapping of
       Just value -> return value
       Nothing    -> do
-        scope <- ask
+        decls <- ask
         index <- fresh
-        case Map.lookup (nameToText name) scope of
+        case Map.lookup (nameToText name) decls of
           Just (Just binding) -> do
             let e = RedexKernel
                   name
                   binding
-                  (fv binding)
+                  (freeVars binding)
                   -- NonEmpty.singleton is only available after base-4.15
                   (NonEmpty.fromList [shrinkMapping binding mapping])
             return $ RedexShell index e
@@ -200,14 +200,14 @@ instance Substitutable Expr where
     Const name _ -> case Map.lookup (nameToText name) mapping of
       Just value -> reduce value
       Nothing    -> do
-        scope <- ask
+        decls <- ask
         index <- fresh
-        case Map.lookup (nameToText name) scope of
+        case Map.lookup (nameToText name) decls of
           Just (Just binding) -> do
             let e = RedexKernel
                   name
                   binding
-                  (fv binding)
+                  (freeVars binding)
                   -- NonEmpty.singleton is only available after base-4.15
                   (NonEmpty.fromList [shrinkMapping binding mapping])
             return $ RedexShell index e
@@ -221,11 +221,11 @@ instance Substitutable Expr where
     Lam binder body l -> do
 
       -- we need to rename binders to avoid capturing
-      -- only the free vars that is also present in `body` will be renamed 
+      -- only the free vars that is also present in `body` will be renamed
       let (capturableNames, shrinkedMapping) =
             getCapturableNamesAndShrinkMapping mapping body
 
-      -- rename captured binder 
+      -- rename captured binder
       renamings <- produceBinderRenamings capturableNames [binder]
       let renamedBinder = renameBinder renamings binder
 
@@ -243,7 +243,7 @@ instance Substitutable Expr where
       let (capturableNames, shrinkedMapping) =
             getCapturableNamesAndShrinkMapping mapping expr
 
-      -- rename captured binder 
+      -- rename captured binder
       renamings <- produceBinderRenamings capturableNames binders
       let renamedBinders = map (renameBinder renamings) binders
 
@@ -257,7 +257,7 @@ instance Substitutable Expr where
         --      when shrinking the applied outer new mapping
         --      free variables occured from the inner old mapping
         --      should be taken into consideration
-    RedexKernel name e freeVars mappings ->
+    RedexKernel name e fv mappings ->
       let
         removeSubstitutedVars :: Mapping -> Set Name -> Set Name
         removeSubstitutedVars m =
@@ -266,13 +266,13 @@ instance Substitutable Expr where
 
         outermostMapping = NonEmpty.head mappings
 
-        freeVars' =
-          freeVars <> Set.unions (map fv $ Map.elems outermostMapping)
-        newFreeVars = removeSubstitutedVars mapping freeVars
-          <> Set.unions (map fv $ Map.elems outermostMapping)
+        fv' =
+          fv <> Set.unions (map freeVars $ Map.elems outermostMapping)
+        newFreeVars = removeSubstitutedVars mapping fv
+          <> Set.unions (map freeVars $ Map.elems outermostMapping)
 
         shrinkedMapping =
-          Map.restrictKeys mapping (Set.map nameToText freeVars')
+          Map.restrictKeys mapping (Set.map nameToText fv')
       in
         return $ RedexKernel name
                              e
@@ -300,11 +300,11 @@ instance Substitutable Expr where
 instance Substitutable FuncClause where
   subst mapping (FuncClause patterns body) = do
     -- we need to rename binders to avoid capturing
-    -- only the free vars that is also present in `body` will be renamed 
+    -- only the free vars that is also present in `body` will be renamed
     let (capturableNames, shrinkedMapping) =
           getCapturableNamesAndShrinkMapping mapping body
 
-    -- renaming captured binders in patterns 
+    -- renaming captured binders in patterns
     let bindersInPatterns = patterns >>= extractBinder
     renamings <- produceBinderRenamings capturableNames bindersInPatterns
     let renamedPatterns = map (renameBindersInPattern renamings) patterns
@@ -375,7 +375,7 @@ getCapturableNamesAndShrinkMapping mapping body =
     -- collect all free varialbes in the mapped expressions
     mappedExprs     = Map.elems shrinkedMapping
     freeVarsInMappedExprs =
-      Set.map nameToText $ Set.unions (map fv mappedExprs)
+      Set.map nameToText $ Set.unions (map freeVars mappedExprs)
   in
     (freeVarsInMappedExprs, shrinkedMapping)
 
@@ -387,6 +387,6 @@ shrinkMapping :: Expr -> Mapping -> Mapping
 shrinkMapping expr mapping =
   let
       -- collect all free variables in the expression
-      freeVars = Set.map nameToText (fv expr)
+      fv = Set.map nameToText (freeVars expr)
       -- restrict the mapping with only free variables
-  in  Map.restrictKeys mapping freeVars
+  in  Map.restrictKeys mapping fv
