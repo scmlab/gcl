@@ -11,16 +11,15 @@ import           GCL.Predicate.Util             ( disjunct
                                                 , guardLoop
                                                 , toExpr
                                                 )
-import           GCL.Common                     ( freshWithLabel
-                                                , freshText
-                                                )
+import           GCL.Common
 import           Pretty                         ( toText )
 import GCL.WP.Type
 import GCL.WP.Util
 import qualified Syntax.Abstract               as A
 import qualified Syntax.Abstract.Operator      as A
 import qualified Syntax.Abstract.Util          as A
-import           Syntax.Common                  ( Name(Name) )
+import           Syntax.Common                  ( Name(Name)
+                                                , nameToText )
 
 spFunctions :: (TstructSegs, Tstruct) -> TspSStmts
 spFunctions (structSegs, struct) = spSStmts
@@ -74,7 +73,7 @@ spFunctions (structSegs, struct) = spSStmts
       -- {P} x := E { (exists x' :: x = E[x'/x] && P[x'/x]) }
   -- generate fresh names from the assignees "xs"
   freshNames <- forM xs $ \x -> do
-    x' <- freshWithLabel (toText x)
+    x' <- freshPre (toText x)
     return $ Name x' NoLoc
   let freshVars = map (`A.Var` l) freshNames
   -- substitute "xs"s with fresh names in "pre"
@@ -90,7 +89,7 @@ spFunctions (structSegs, struct) = spSStmts
 
  sp (pre, _) (A.AAssign (A.Var x _) i e _) = do
   -- {P} x[I] := E { (exist x' :: x = x'[I[x'/x] -> E[x'/x]] && P[x'/x]) }
-  x'   <- freshText
+  x'   <- freshPre (nameToText x)
 
   pre' <- substitute [x] [A.variable x'] (toExpr pre)
   i'   <- substitute [x] [A.variable x'] i

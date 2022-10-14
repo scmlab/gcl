@@ -11,7 +11,7 @@ import Data.IntMap                              ( IntMap )
 import Data.Aeson (ToJSON)
 import Data.Loc (Loc (..), Located (..))
 import Data.Loc.Range (Range)
-import GCL.Common (Fresh(..))
+import GCL.Common
 import GCL.Predicate                           ( InfMode(..)
                                                , PO(..), Pred(..), Spec (..))
 import qualified GCL.Substitution              as Substitution
@@ -30,9 +30,10 @@ type WP
       Int
       TM
 
-instance Fresh WP where
-  getCounter = get
-  setCounter = put
+instance Counterous WP where
+  countUp = do i <- get
+               put (succ i)
+               return i
 
 ---
 

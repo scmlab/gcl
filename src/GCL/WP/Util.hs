@@ -26,6 +26,7 @@ import           GCL.Predicate.Util             ( disjunct
                                                 , toExpr
                                                 )
 import           GCL.Common                     ( Fresh(..)
+                                                , Counterous(..)
                                                 , freshName'
                                                 )
 
@@ -98,7 +99,7 @@ tellSpec :: Pred -> Pred -> Range -> WP ()
 tellSpec p q l = do
   p' <- substitute [] [] p
   q' <- substitute [] [] q
-  i  <- fresh
+  i  <- countUp
   tell ([], [Specification i p' q' l], [], mempty)
 
 throwWarning :: StructWarning -> WP ()
