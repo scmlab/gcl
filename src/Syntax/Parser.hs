@@ -448,14 +448,30 @@ predicate :: Parser Expr
 predicate = expression <?> "predicate"
 
 expression :: Parser Expr
-expression = makeExprParser (term <|> caseOf) chainOpTable <?> "expression"
+expression = makeExprParser (term <|> caseOf) opTable <?> "expression"
  where
-  chainOpTable :: [[Operator Parser Expr]]
-  chainOpTable =
-    [ -- =
-      [InfixL $ binary (ChainOp . EQ) TokEQ]
+  opTable :: [[Operator Parser Expr]]
+  opTable =
+    [ 
+      [InfixL (return App)] 
+    , [ InfixL $ binary (ArithOp . Mod) TokMod
+      , InfixL $ binary (ArithOp . Mul) TokMul
+      , InfixL $ binary (ArithOp . Div) TokDiv
+      , InfixN $ binary (ArithOp . Exp) TokExp
+      ]
+
+    , [ InfixL $ binary (ArithOp . Add) TokAdd
+      , InfixL $ binary (ArithOp . Sub) TokSub
+      ]
+
+    , [ InfixN $ binary (ArithOp . Max) TokMax
+      , InfixN $ binary (ArithOp . Min) TokMin
+      ]
+
+      -- =
+    , [ InfixL $ binary (ChainOp . EQ) TokEQ
       -- ~, <, <=, >, >=
-    , [ InfixL $ binary (ChainOp . NEQ) TokNEQ
+      , InfixL $ binary (ChainOp . NEQ) TokNEQ
       , InfixL $ binary (ChainOp . NEQU) TokNEQU
       , InfixL $ binary (ChainOp . LT) TokLT
       , InfixL $ binary (ChainOp . LTE) TokLTE
@@ -464,21 +480,27 @@ expression = makeExprParser (term <|> caseOf) chainOpTable <?> "expression"
       , InfixL $ binary (ChainOp . GTE) TokGTE
       , InfixL $ binary (ChainOp . GTEU) TokGTEU
       ]
-      -- &&
+
+      --- &&
     , [ InfixL $ binary (ArithOp . Conj) TokConj
       , InfixL $ binary (ArithOp . ConjU) TokConjU
-      ]
       --- ||
-    , [ InfixL $ binary (ArithOp . Disj) TokDisj
+      , InfixL $ binary (ArithOp . Disj) TokDisj
       , InfixL $ binary (ArithOp . DisjU) TokDisjU
-      ]
+    ]
+      
+    
       -- =>
     , [ InfixL $ binary (ArithOp . Implies) TokImpl
       , InfixL $ binary (ArithOp . ImpliesU) TokImplU
-      ]
       -- <=>
-    , [ InfixL $ binary (ChainOp . EQProp) TokEQProp
+      , InfixL $ binary (ChainOp . EQProp) TokEQProp
       , InfixL $ binary (ChainOp . EQPropU) TokEQPropU
+      ]
+
+    , [ Prefix $ foldr1 (.) <$> some (unary (ArithOp . Neg) TokNeg
+                                       <|> unary (ArithOp . NegU) TokNegU)
+      , Prefix $ unary (ArithOp . NegNum) TokSub
       ]
     ]
 
@@ -504,63 +526,39 @@ expression = makeExprParser (term <|> caseOf) chainOpTable <?> "expression"
   caseClause = CaseClause <$> pattern' <*> tokenArrow <*> expression --block expression
 
   term :: Parser Expr
-  term = makeExprParser term' arithTable
-   where
+  term =
+    choice
+        [ Lit <$> literal
+        , try array
+        , parensExpr
+        , Var <$> lower
+        , Const <$> upper
+        , Quant
+        <$> choice [Left <$> tokenQuantOpen, Right <$> tokenQuantOpenU]
+        <*> choice [Left <$> operator, Right <$> identifier]
+        <*> some lower
+        <*> tokenColon
+        <*> expression
+        <*> tokenColon
+        <*> expression
+        <*> choice [Left <$> tokenQuantClose, Right <$> tokenQuantCloseU]
+        ]
+      <?> "term"
 
-    arithTable :: [[Operator Parser Expr]]
-    arithTable =
-      [ [ Prefix $ foldr1 (.) <$> some (unary (ArithOp . Neg) TokNeg
-                                       <|> unary (ArithOp . NegU) TokNegU)
-        ]
-      , [InfixL (return App)]
-      , [InfixN $ binary (ArithOp . Exp) TokExp]
-      , [ InfixN $ binary (ArithOp . Max) TokMax
-        , InfixN $ binary (ArithOp . Min) TokMin
-        ]
-      , [InfixL $ binary (ArithOp . Mod) TokMod]
-      , [ InfixL $ binary (ArithOp . Mul) TokMul
-        , InfixL $ binary (ArithOp . Div) TokDiv
-        ]
-      , [ InfixL $ binary (ArithOp . Add) TokAdd
-        , InfixL $ binary (ArithOp . Sub) TokSub
-        ]
-      , [Prefix $ unary (ArithOp . NegNum) TokSub]
-      ]
-
-    term' :: Parser Expr
-    term' =
-      choice
-          [ Lit <$> literal
-          , try array
-          , parensExpr
-          , Var <$> lower
-          , Const <$> upper
-          , Quant
-          <$> choice [Left <$> tokenQuantOpen, Right <$> tokenQuantOpenU]
-          <*> choice [Left <$> operator, Right <$> identifier]
-          <*> some lower
-          <*> tokenColon
-          <*> expression
-          <*> tokenColon
-          <*> expression
-          <*> choice [Left <$> tokenQuantClose, Right <$> tokenQuantCloseU]
-          ]
-        <?> "term"
-
-    -- shoule parse A[A[i]], A[i1][i2]...[in]
-    array :: Parser Expr
-    array = do
-      arr     <- choice [parensExpr, Var <$> lower, Const <$> upper]
-      indices <- some $ do
-        open  <- tokenBracketOpen
-        xs    <- term
-        close <- tokenBracketClose
-        return (open, xs, close)
-      return $ helper arr indices
-     where
-      helper :: Expr -> [(Token "[", Expr, Token "]")] -> Expr
-      helper a []               = a
-      helper a ((o, x, c) : xs) = helper (Arr a o x c) xs
+  -- shoule parse A[A[i]], A[i1][i2]...[in]
+  array :: Parser Expr
+  array = do
+    arr     <- choice [parensExpr, Var <$> lower, Const <$> upper]
+    indices <- some $ do
+      open  <- tokenBracketOpen
+      xs    <- term
+      close <- tokenBracketClose
+      return (open, xs, close)
+    return $ helper arr indices
+    where
+    helper :: Expr -> [(Token "[", Expr, Token "]")] -> Expr
+    helper a []               = a
+    helper a ((o, x, c) : xs) = helper (Arr a o x c) xs
 
   operator :: Parser Op
   operator = choice [ChainOp <$> chainOp, ArithOp <$> arithOp] <?> "operator"
