@@ -449,6 +449,9 @@ predicate = expression <?> "predicate"
 
 expression :: Parser Expr
 expression = makeExprParser (term <|> caseOf) opTable <?> "expression"
+  -- An idea of handling the parsing of minus: 
+  --  If the first symbol is "-", and the rest of the expression isn't wrapped inside parentheses, 
+  --  then the first "-" belongs to the first symbol after "-".
  where
   opTable :: [[Operator Parser Expr]]
   opTable =
@@ -491,8 +494,8 @@ expression = makeExprParser (term <|> caseOf) opTable <?> "expression"
       
     
       -- =>
-    , [ InfixL $ binary (ArithOp . Implies) TokImpl
-      , InfixL $ binary (ArithOp . ImpliesU) TokImplU
+    , [ InfixR $ binary (ArithOp . Implies) TokImpl
+      , InfixR $ binary (ArithOp . ImpliesU) TokImplU
       -- <=>
       , InfixL $ binary (ChainOp . EQProp) TokEQProp
       , InfixL $ binary (ChainOp . EQPropU) TokEQPropU
