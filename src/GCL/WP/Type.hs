@@ -9,6 +9,7 @@ import           Control.Monad.RWS              ( MonadState(..)
                                                 , RWST(..) )
 import Data.IntMap                              ( IntMap )
 import Data.Aeson (ToJSON)
+import Data.Text  ( Text )
 import Data.Loc (Loc (..), Located (..))
 import Data.Loc.Range (Range)
 import GCL.Common
@@ -25,7 +26,7 @@ type TM = Except StructError
 
 type WP
   = RWST
-      (Substitution.Decls, [[Name]])
+      (Substitution.Decls, [[Text]])
       ([PO], [Spec], [StructWarning], IntMap (Int, A.Expr))
       Int
       TM

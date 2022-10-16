@@ -14,6 +14,7 @@ import           Control.Monad.RWS              ( MonadReader(ask)
 import qualified Data.Map                      as Map
 import           Data.Loc                       ( Loc(..) )
 import           Data.Loc.Range                 ( Range )
+import           Data.Text                      ( Text )
 import qualified Data.Text                     as Text
 import qualified Data.Hashable                 as Hashable
 import           GCL.Predicate                  ( Origin(..)
@@ -133,12 +134,12 @@ withFreshVar f = do
        ((Map.insert (nameToText name) Nothing decls, scopes), st))
     (f var)
 
-withLocalScopes :: ([[Name]] -> WP a) -> WP a
+withLocalScopes :: ([[Text]] -> WP a) -> WP a
 withLocalScopes f = do
   (_, scopes) <- ask
   f scopes
 
-withScopeExtension :: [Name] -> WP a -> WP a
+withScopeExtension :: [Text] -> WP a -> WP a
 withScopeExtension names =
   local (\(defns, scopes) -> (defns, names:scopes))
 

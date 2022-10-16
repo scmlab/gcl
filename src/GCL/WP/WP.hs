@@ -6,6 +6,7 @@ import           Control.Arrow                  ( first, second )
 import           Control.Monad.Except           ( MonadError(throwError)
                                                 , forM
                                                 )
+import           Data.Text                      ( Text )
 import           Data.Loc                       ( Loc(..), locOf )
 import           Data.Set                       ( member )
 import           Data.Map                       ( fromList )
@@ -14,6 +15,7 @@ import           GCL.Predicate.Util             ( conjunct
                                                 , toExpr
                                                 )
 import           GCL.Common                     ( Fresh(..)
+                                                , freshName
                                                 , freshName'
                                                 , freeVars
                                                 )
@@ -137,26 +139,26 @@ wpFunctions structSegs = (wpSegs, wpSStmts, wp)
    (xs, ys) <- withLocalScopes (\scopes ->
                  calcLocalRenaming (concat scopes) localNames)
    stmts' <- subst (toSubst ys) stmts
-   withScopeExtension (xs ++ (map snd ys))
+   withScopeExtension (xs ++ (map (nameToText . snd) ys))
      (wpStmts stmts' post)
    -- if any (`member` (fv pre)) (declaredNames decls)
    --   then throwError (LocalVarExceedScope l)
    --   else return pre
-  where toSubst = fromList . map (\(n, n') ->
-                    (nameToText n, A.Var n' (locOf n)))
+  where toSubst = fromList . map (\(n, n') -> (n, A.Var n' (locOf n')))
 
-calcLocalRenaming :: [Name] -> [Name] -> WP ([Name], [(Name, Name)])
+calcLocalRenaming :: [Text] -> [Name] -> WP ([Text], [(Text, Name)])
 calcLocalRenaming _ [] = return ([], [])
 calcLocalRenaming scope (x:xs)
-  | x `elem` scope = do
-        x' <- freshName' (nameToText x)
-        second ((x,x') :) <$> calcLocalRenaming scope xs
+  | t `elem` scope = do
+        x' <- freshName t (locOf x)
+        second ((t,x') :) <$> calcLocalRenaming scope xs
   | otherwise =
-        first (x:) <$> calcLocalRenaming scope xs
+        first (t:) <$> calcLocalRenaming scope xs
+ where t = nameToText x
 
-toMapping :: [(Name, Name)] -> A.Mapping
+toMapping :: [(Text, Name)] -> A.Mapping
 toMapping = fromList . map cvt
-  where cvt (x, y) = (nameToText x, A.Var y (locOf y))
+  where cvt (x, y) = (x, A.Var y (locOf y))
 
 allocated :: Fresh m => A.Expr -> m A.Expr
 allocated e = do
