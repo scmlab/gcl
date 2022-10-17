@@ -448,15 +448,47 @@ predicate :: Parser Expr
 predicate = expression <?> "predicate"
 
 expression :: Parser Expr
-expression = makeExprParser (term <|> caseOf) opTable <?> "expression"
-  -- An idea of handling the parsing of minus: 
-  --  If the first symbol is "-", and the rest of the expression isn't wrapped inside parentheses, 
-  --  then the first "-" belongs to the first symbol after "-".
+expression = do
+  expr <- makeExprParser (term <|> caseOf) opTable <?> "expression"
+  -- Handling the parsing of unary minus: 
+  --  The problem: conventionally, unary minus is the operator with highest precedence, but in order to parse
+  --  Haskell-style application, the precedence becomes the lowest (at least lower than binary minus), 
+  --  otherwise, "1-2" would be parsed as "1 (-2)", which means "1" is parsed as a function.
+  --  (in C-style syntax, "1 (-2)" is not a valid syntax, thus the precedence of unary minus can be higher than binary minus)
+  --  In another hand, binary minus can not be higher than application, otherwise "f n-3" becomes "f (n-3)".
+  
+  --  In short, precedence of unary minus should < binary minus, binary minus should < application,
+  --  but this then yields the problem that, "-1+2" now is parsed as "-(1+2)".
+
+  --  An observation: only the first symbol needs to be considered: -a+b should be parsed as (-a)+b, instead of -(a+b)
+  --  We can first check if the parsed expr is really meant to be "-(a+b)", by checking if parentheses are syntactically existed;
+  --  if not, then we attach the minus sign to the left-most entity of the mis-parsed expr body
+  --  (putting "-" to "a" of the expr "a+b", so it becomes "(-a)+b")
+  let expr' = case expr of
+        App neg@(Expr.Op (ArithOp (NegNum _))) e ->
+          if isntWrappedByParens e
+          then
+            addNegToLeftMost e
+          else
+            expr
+          where
+            isntWrappedByParens Paren {} = False
+            isntWrappedByParens _ = True
+
+            addNegToLeftMost (App (App op@(Expr.Op _) left) right) = 
+              -- ChainOps (which are all binary) and binary ArithOp operators. 
+              -- Unary oprators won't fall into this case, because we pattern-matched two layers of App;
+              -- and unary operators are same as the normal (App left right) case, no need to break further break it.
+              App (App op (addNegToLeftMost left)) right
+            addNegToLeftMost (App left right) = App (addNegToLeftMost left) right
+            addNegToLeftMost x = App neg x
+        _ -> expr
+  return expr'
  where
   opTable :: [[Operator Parser Expr]]
   opTable =
-    [ 
-      [InfixL (return App)] 
+    [
+      [InfixL (return App)]
     , [ InfixL $ binary (ArithOp . Mod) TokMod
       , InfixL $ binary (ArithOp . Mul) TokMul
       , InfixL $ binary (ArithOp . Div) TokDiv
@@ -491,8 +523,8 @@ expression = makeExprParser (term <|> caseOf) opTable <?> "expression"
       , InfixL $ binary (ArithOp . Disj) TokDisj
       , InfixL $ binary (ArithOp . DisjU) TokDisjU
     ]
-      
-    
+
+
       -- =>
     , [ InfixR $ binary (ArithOp . Implies) TokImpl
       , InfixR $ binary (ArithOp . ImpliesU) TokImplU
