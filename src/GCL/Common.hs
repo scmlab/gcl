@@ -32,7 +32,8 @@ freshName' prefix = freshName prefix NoLoc
 class Counterous m where
   countUp :: m Int
 
-instance (Monad m, Counterous m) => Fresh m where
+instance {-# OVERLAPPABLE #-}
+         (Monad m, Counterous m) => Fresh m where
   fresh = (Text.pack . ("?m_" ++) . show) <$> countUp
   freshPre prefix =
       (Text.pack . ("?" ++) . (Text.unpack prefix ++) .

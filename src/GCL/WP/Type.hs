@@ -1,6 +1,5 @@
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE DeriveGeneric, FlexibleContexts,
+             FlexibleInstances #-}
 
 module GCL.WP.Type where
 
@@ -19,7 +18,6 @@ import qualified GCL.Substitution              as Substitution
 import qualified Syntax.Abstract               as A
 import           Syntax.Common.Types           ( Name )
 import GHC.Generics (Generic)
-
 -- The WP monad.
 
 type TM = Except StructError
@@ -83,3 +81,6 @@ instance Located StructError where
   locOf (LocalVarExceedScope l) = l
 
 instance ToJSON StructError
+
+-- freshPreInScope prefix scope
+--   generates a fresh name, with prefix, that does not appear in scope

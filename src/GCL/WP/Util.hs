@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings, TypeSynonymInstances, FlexibleInstances #-}
 
 module GCL.WP.Util where
 
@@ -147,3 +147,18 @@ declaredNames :: [A.Declaration] -> [Name]
 declaredNames decls = concat . map extractNames $ decls
   where extractNames (A.ConstDecl ns _ _ _) = ns
         extractNames (A.VarDecl   ns _ _ _) = ns
+
+freshPreInScope :: Text -> [Text] -> Text
+freshPreInScope pref scope
+  | not (pref `elem` scope) = pref
+  | otherwise = freshAux 0
+  where freshAux :: Int -> Text
+        freshAux i | fre `elem` scope = freshAux (1+i)
+                   | otherwise = fre
+          where fre = Text.pack (pref' ++ show i)
+        pref' = Text.unpack pref
+
+
+instance Fresh WP where
+  fresh = freshPre "m"
+  freshPre p = withLocalScopes (return . freshPreInScope p . concat)
