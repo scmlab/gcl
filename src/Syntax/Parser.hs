@@ -487,8 +487,12 @@ expression = do
  where
   opTable :: [[Operator Parser Expr]]
   opTable =
-    [
+    [ 
       [InfixL (return App)]
+      
+    , [Prefix $ foldr1 (.) <$> some (unary (ArithOp . Neg) TokNeg
+                                     <|> unary (ArithOp . NegU) TokNegU)]
+
     , [ InfixL $ binary (ArithOp . Mod) TokMod
       , InfixL $ binary (ArithOp . Mul) TokMul
       , InfixL $ binary (ArithOp . Div) TokDiv
@@ -533,9 +537,8 @@ expression = do
       , InfixL $ binary (ChainOp . EQPropU) TokEQPropU
       ]
 
-    , [ Prefix $ foldr1 (.) <$> some (unary (ArithOp . Neg) TokNeg
-                                       <|> unary (ArithOp . NegU) TokNegU)
-      , Prefix $ unary (ArithOp . NegNum) TokSub
+    , [ 
+        Prefix $ unary (ArithOp . NegNum) TokSub
       ]
     ]
 
