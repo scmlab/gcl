@@ -164,7 +164,8 @@ structFunctions (wpSegs, wpSStmts, wp, spSStmts) =
  structBlock pre (A.Program _ decls props stmts _) post = do
    let localNames = declaredNames decls
    (xs, ys) <- withLocalScopes (\scopes ->
-                 calcLocalRenaming (concat scopes) localNames)
+                withScopeExtension (map nameToText localNames)
+                  (calcLocalRenaming (concat scopes) localNames))
    stmts' <- subst (toSubst ys) stmts
    withScopeExtension (xs ++ (map (nameToText . snd) ys))
      (structStmts Primary (pre, Nothing) stmts' post)

@@ -137,7 +137,8 @@ wpFunctions structSegs = (wpSegs, wpSStmts, wp)
  wpBlock (A.Program _ decls _props stmts _) post = do
    let localNames = declaredNames decls
    (xs, ys) <- withLocalScopes (\scopes ->
-                 calcLocalRenaming (concat scopes) localNames)
+                withScopeExtension (map nameToText localNames)
+                 (calcLocalRenaming (concat scopes) localNames))
    stmts' <- subst (toSubst ys) stmts
    withScopeExtension (xs ++ (map (nameToText . snd) ys))
      (wpStmts stmts' post)
