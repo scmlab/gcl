@@ -358,22 +358,22 @@ handleExpr (Case a expr b cases) =
 
 handleOp :: Op -> Variadic Expr (DocWithLoc ann)
 handleOp op = case classify op of
-  Infix _ -> do
+  (Infix, _) -> do
     p <- var
     q <- var
     return $ prettyWithLoc p <> prettyWithLoc op <> prettyWithLoc q
-  InfixL _ -> do
+  (InfixL, _) -> do
     p <- var
     q <- var
     return $ prettyWithLoc p <> prettyWithLoc op <> prettyWithLoc q
-  InfixR _ -> do
+  (InfixR, _) -> do
     p <- var
     q <- var
     return $ prettyWithLoc p <> prettyWithLoc op <> prettyWithLoc q
-  Prefix _ -> do
+  (Prefix, _) -> do
     p <- var
     return $ prettyWithLoc op <> prettyWithLoc p
-  Postfix _ -> do
+  (Postfix, _) -> do
     p <- var
     return $ prettyWithLoc p <> prettyWithLoc op
 
@@ -407,29 +407,29 @@ showWithParentheses expr = case handleExpr' expr of
 
     handleOp' :: Op -> Variadic Expr String
     handleOp' op = case classify op of
-      Infix _ -> do
+      (Infix, _) -> do
         p <- var
         q <- var
         ps <- handleExpr' p
         qs <- handleExpr' q
         return $ "(" <> ps <> show (pretty op) <> qs <> ")"
-      InfixL _ -> do
+      (InfixL, _) -> do
         p <- var
         q <- var
         ps <- handleExpr' p
         qs <- handleExpr' q
         return $ "(" <> ps <> show (pretty op) <> qs <> ")"
-      InfixR _ -> do
+      (InfixR, _) -> do
         p <- var
         q <- var
         ps <- handleExpr' p
         qs <- handleExpr' q
         return $ "(" <> ps <> show (pretty op) <> qs <> ")"
-      Prefix _ -> do
+      (Prefix, _) -> do
         p <- var
         ps <- handleExpr' p
         return $ "(" <> show (pretty op) <> ps <> ")"
-      Postfix _ -> do
+      (Postfix, _) -> do
         p <- var
         ps <- handleExpr' p
         return $ "(" <> ps <> show (pretty op) <> ")"

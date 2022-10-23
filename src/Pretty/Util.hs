@@ -32,6 +32,7 @@ import           Prettyprinter
 import qualified Prettyprinter.Render.Text     as Text
 import           Render.Class                   ( Render(..)
                                                 , RenderSection(renderSection)
+                                                , PrecContext(..)
                                                 )
 -- import           Render
 
@@ -100,7 +101,7 @@ fromRender :: Render a => a -> Doc ann
 fromRender x = pretty (render x)
 
 -- | If something can be rendered with precedence, then make it a Doc
-fromRenderPrec :: Render a => Int -> a -> Doc ann
+fromRenderPrec :: Render a => PrecContext -> a -> Doc ann
 fromRenderPrec n x = pretty (renderPrec n x)
 
 -- | If something can be rendered and located, then make it a DocWithLoc
@@ -130,7 +131,7 @@ fillGap this next =
 
 -- | Pretty print with Precedence
 class PrettyPrec a where
-  prettyPrec :: Int -> a -> Doc ann
+  prettyPrec :: PrecContext -> a -> Doc ann
 
 class PrettyWithLoc a where
   prettyWithLoc :: a -> DocWithLoc ann

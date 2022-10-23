@@ -180,52 +180,52 @@ classificationMap = Map.fromList $ concat $ zipWith f [initOrderIndex..] precede
 
 classify :: Op -> (Fixity,Int)
 classify op = fromMaybe (error "Operator's precedenceOrder is not completely defined.") 
-              $ Map.lookup op classificationMap
+              $ Map.lookup (wipeLoc op) classificationMap
 
 precOf :: Op -> Int
 precOf = snd . classify
 
 sameOpSym :: Op -> Op -> Bool
 sameOpSym x y = wipeLoc x == wipeLoc y
-  where 
-    wipeLoc :: Op -> Op
-    wipeLoc op = case op of
-      ChainOp co -> ChainOp (case co of
-        EQProp _ -> EQProp NoLoc
-        EQPropU _-> EQPropU NoLoc
-        EQ _     -> EQ NoLoc
-        NEQ _    -> NEQ NoLoc
-        NEQU _   -> NEQU NoLoc
-        LTE _    -> LTE NoLoc
-        LTEU _   -> LTEU NoLoc
-        GTE _    -> GTE NoLoc
-        GTEU _   -> GTEU NoLoc
-        LT _     -> LT NoLoc
-        GT _     -> GT NoLoc
-        )
-      ArithOp ao -> ArithOp (case ao of
-        Implies _ -> Implies NoLoc
-        ImpliesU _-> ImpliesU NoLoc
-        Conj _    -> Conj NoLoc
-        ConjU _   -> ConjU NoLoc
-        Disj _    -> Disj NoLoc
-        DisjU _   -> DisjU NoLoc
-        Neg _     -> Neg NoLoc
-        NegU _    -> NegU NoLoc
-        NegNum _  -> NegNum NoLoc
-        Add _     -> Add NoLoc
-        Sub _     -> Sub NoLoc
-        Mul _     -> Mul NoLoc
-        Div _     -> Div NoLoc
-        Mod _     -> Mod NoLoc
-        Max _     -> Max NoLoc
-        Min _     -> Min NoLoc
-        Exp _     -> Exp NoLoc
-        Hash _    -> Hash NoLoc
-        PointsTo _-> PointsTo NoLoc
-        SConj _   -> SConj NoLoc
-        SImp _    -> SImp NoLoc
-        )
+
+wipeLoc :: Op -> Op
+wipeLoc op = case op of
+  ChainOp co -> ChainOp (case co of
+    EQProp _ -> EQProp NoLoc
+    EQPropU _-> EQPropU NoLoc
+    EQ _     -> EQ NoLoc
+    NEQ _    -> NEQ NoLoc
+    NEQU _   -> NEQU NoLoc
+    LTE _    -> LTE NoLoc
+    LTEU _   -> LTEU NoLoc
+    GTE _    -> GTE NoLoc
+    GTEU _   -> GTEU NoLoc
+    LT _     -> LT NoLoc
+    GT _     -> GT NoLoc
+    )
+  ArithOp ao -> ArithOp (case ao of
+    Implies _ -> Implies NoLoc
+    ImpliesU _-> ImpliesU NoLoc
+    Conj _    -> Conj NoLoc
+    ConjU _   -> ConjU NoLoc
+    Disj _    -> Disj NoLoc
+    DisjU _   -> DisjU NoLoc
+    Neg _     -> Neg NoLoc
+    NegU _    -> NegU NoLoc
+    NegNum _  -> NegNum NoLoc
+    Add _     -> Add NoLoc
+    Sub _     -> Sub NoLoc
+    Mul _     -> Mul NoLoc
+    Div _     -> Div NoLoc
+    Mod _     -> Mod NoLoc
+    Max _     -> Max NoLoc
+    Min _     -> Min NoLoc
+    Exp _     -> Exp NoLoc
+    Hash _    -> Hash NoLoc
+    PointsTo _-> PointsTo NoLoc
+    SConj _   -> SConj NoLoc
+    SImp _    -> SImp NoLoc
+    )
 
 
 

@@ -8,6 +8,7 @@ import Pretty.Abstract ()
 import Pretty.Util
 import GCL.Predicate
 import Prelude hiding (Ordering (..))
+import Render.Class (PrecContext(NoContext))
 
 --------------------------------------------------------------------------------
 
@@ -16,7 +17,7 @@ instance PrettyPrec Pred where
   prettyPrec = fromRenderPrec
 
 instance Pretty Pred where
-  pretty = prettyPrec 0
+  pretty = prettyPrec NoContext
 
 --------------------------------------------------------------------------------
 

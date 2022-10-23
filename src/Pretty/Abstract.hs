@@ -11,6 +11,7 @@ import           Render.Error                   ( )
 import           Render.Predicate               ( )
 import           Render.Syntax.Common           ( )
 import           Syntax.Abstract
+import Render.Class (PrecContext(NoContext))
 
 --------------------------------------------------------------------------------
 
@@ -113,13 +114,13 @@ instance Pretty Lit where
 
 -- | Expr
 instance Pretty Expr where
-  pretty = prettyPrec 0
+  pretty = prettyPrec NoContext
 
 instance PrettyPrec Expr where
   prettyPrec = fromRenderPrec
 
 instance Pretty Pattern where
-  pretty = prettyPrec 0
+  pretty = prettyPrec NoContext
 
 instance PrettyPrec Pattern where
   prettyPrec = fromRenderPrec

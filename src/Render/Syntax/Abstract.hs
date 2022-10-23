@@ -48,7 +48,7 @@ handleExpr _ (Op _     ) = error "erroneous syntax given to render"
 handleExpr n (App (App (Op op) left _) right _) =  --binary operators
   return $ parensIf n (Just op) $ 
   renderPrec (HOLEOp op) left 
-  <+> render op
+       <+> render op
   <+> renderPrec (OpHOLE op) right
 handleExpr n (App (Op op) e _) = case classify op of --unary operators, this case shouldn't be former than the binary case
   (Prefix, _) -> return $ parensIf n (Just op) $ render op <+> renderPrec (OpHOLE op) e
@@ -198,6 +198,80 @@ instance Render Interval where
 
 -- | The second argument: Nothing means the op at-issue is application.
 parensIf :: PrecContext -> Maybe Op -> Inlines -> Inlines
+parensIf pc mop = case isomerismOfContextAndCurrentOp pc mop of
+  Nothing    -> 
+    let conditionOfOmittingParens = case classify' mop of
+          Prefix  -> precOfPC pc >= precOf' mop
+          Postfix -> precOfPC pc >= precOf' mop
+          _       -> precOfPC pc > precOf' mop || (sameOpSym' pc mop
+                                                   && isAssocOp' mop)
+    in
+    if conditionOfOmittingParens
+    then id
+    else parensE
+  Just Cis -> 
+    if precOfPC pc > precOf' mop || sameOpSym' pc mop
+    then id
+    else parensE
+  Just Trans   -> 
+    if precOfPC pc > precOf' mop || (sameOpSym' pc mop
+                                      && isAssocOp' mop)
+    then id
+    else parensE
+
+  where
+    -- In this scope, every "Nothing" case of "Maybe Op" means application.
+    sameOpSym' :: PrecContext -> Maybe Op -> Bool
+    sameOpSym' pc Nothing = case pc of
+      AppHOLE -> True
+      HOLEApp -> True
+      _       -> False
+    sameOpSym' pc (Just op) = case pc of
+      OpHOLE pcop -> sameOpSym pcop op
+      HOLEOp pcop -> sameOpSym pcop op
+      _ -> False
+    
+    isAssocOp' :: Maybe Op -> Bool
+    isAssocOp' Nothing = False
+    isAssocOp' (Just op) = isAssocOp op
+
+    precOf' :: Maybe Op -> Int
+    precOf' Nothing = initOrderIndex -1
+    precOf' (Just op) = precOf op
+
+    precOfPC :: PrecContext -> Int
+    precOfPC pc = case pc of
+      NoContext -> 99999
+      AppHOLE -> precOf' Nothing
+      HOLEApp -> precOf' Nothing
+      OpHOLE op -> precOf op
+      HOLEOp op -> precOf op
+
+data Isomerism = Cis | Trans deriving (Show) -- taking the concept from chemistry
+
+-- | The Nothing in the second argument means application. 
+-- Recalling that application is left associative "a b c" == "(a b) c"
+isomerismOfContextAndCurrentOp :: PrecContext -> Maybe Op -> Maybe Isomerism
+isomerismOfContextAndCurrentOp pc mop = case pc of
+  NoContext -> Nothing
+  AppHOLE -> case classify' mop of
+    InfixL -> Just Trans -- a - {b - c}   ==> a - (b - c)
+    InfixR -> Just Cis   -- a -> {b -> c} ==> a -> b -> c
+    _      -> Nothing
+  HOLEApp -> case classify' mop of
+    InfixL -> Just Cis   -- {a - b} - c   ==> a - b - c
+    InfixR -> Just Trans -- {a -> b} -> c ==> (a -> b) -> c
+    _      -> Nothing
+  OpHOLE _ -> isomerismOfContextAndCurrentOp AppHOLE mop
+  HOLEOp _ -> isomerismOfContextAndCurrentOp HOLEApp mop
+
+classify' :: Maybe Op -> Fixity
+classify' Nothing = InfixL
+classify' (Just op) = fst $ classify op
+
+
+{- the original, proved version
+parensIf :: PrecContext -> Maybe Op -> Inlines -> Inlines
 parensIf NoContext _ = id
 parensIf AppHOLE mop = case mop of
   Nothing -> parensE      -- a {b c} ==> a (b c)
@@ -208,76 +282,52 @@ parensIf HOLEApp mop = case mop of
 parensIf _ Nothing = id   -- a + {b c} ==> a + b c
 parensIf pc (Just op) = case classify op of
   (Infix, precOf_op) ->  
-    if sameOpSym' pc op || precOf' pc <= precOf_op 
+    if sameOpSym' pc op || precOfPC pc <= precOf_op 
     then parensE          -- {a-b}-c; {a-b}*c ==> (a-b)-c; (a-b)*c
     else id               -- {a && b} => c    ==> a && b => c
   (Prefix, precOf_op) -> 
-    if precOf' pc < precOf_op
+    if precOfPC pc < precOf_op
     then parensE          -- {¬ P} f ==> (¬ P) f --- but this case is already caught above, since only application has higher precedence
     else id               -- ¬ P ∧ Q
   (Postfix, precOf_op) -> 
-    if precOf' pc < precOf_op
+    if precOfPC pc < precOf_op
     then parensE 
     else id
   (InfixR, precOf_op) -> case pc of 
     OpHOLE _ ->  
-      if precOf' pc < precOf_op || (precOf' pc == precOf_op 
-                                    && not (sameOpSym' pc op))
-        then parensE        -- a ∧ {b => c}
-      else if precOf' pc > precOf_op || (precOf' pc == precOf_op 
-                                        && sameOpSym' pc op)
+      if precOfPC pc > precOf_op || sameOpSym' pc op
         then id             -- a -> {b -> c} ==> a -> b -> c
+      else if precOfPC pc < precOf_op || (precOfPC pc == precOf_op 
+                                         && not (sameOpSym' pc op))
+        then parensE        -- a ∧ {b => c}
       else nonExhaustiveGuardError
     HOLEOp _ -> 
-      if precOf' pc < precOf_op || (precOf' pc == precOf_op 
-                                    && not (isAssocOp op))
-        then parensE        -- {a -> b} -> c ==> (a -> b) -> c
-      else if precOf' pc > precOf_op || (sameOpSym' pc op
-                                         && isAssocOp op)
+      if precOfPC pc > precOf_op || (sameOpSym' pc op
+                                    && isAssocOp op)
         then id             -- 
+      else if precOfPC pc < precOf_op || (precOfPC pc == precOf_op 
+                                         && (not (sameOpSym' pc op)
+                                             || not (isAssocOp op)))
+        then parensE        -- {a -> b} -> c ==> (a -> b) -> c
       else nonExhaustiveGuardError
     _ -> error "These cases should be caught in first 3 cases of parensIf."
   (InfixL, precOf_op) -> case pc of -- is this case just the reverse of InfixR?
     OpHOLE _ -> 
-      if precOf' pc < precOf_op || (precOf' pc == precOf_op 
-                                    && (not (sameOpSym' pc op)
-                                        || not (isAssocOp op)))
-        then parensE        -- a * {b + c}, a ∧ {b ∨ c}, a - {b - c}
-      else if precOf' pc > precOf_op || (sameOpSym' pc op
-                                         && isAssocOp op)
+      if precOfPC pc > precOf_op || (sameOpSym' pc op
+                                    && isAssocOp op)
         then id             -- a + {b * c}, a ∧ {b ∧ c}
+      else if precOfPC pc < precOf_op || (precOfPC pc == precOf_op 
+                                         && (not (sameOpSym' pc op)
+                                             || not (isAssocOp op)))
+        then parensE        -- a * {b + c}, a ∧ {b ∨ c}, a - {b - c}
       else nonExhaustiveGuardError
     HOLEOp _ -> 
-      if precOf' pc < precOf_op || (precOf' pc == precOf_op 
-                                    && (not (sameOpSym' pc op)
-                                        || not (isAssocOp op)))
-        then parensE        -- {a + b} * c, {a ∧ b} ∨ c, {a - b} - c
-      else if precOf' pc > precOf_op || (precOf' pc == precOf_op 
-                                        && isAssocOp op)
-        then id             -- {a * b} + c, {a ∧ b} ∧ c
+      if precOfPC pc > precOf_op || sameOpSym' pc op
+        then id             -- {a * b} + c, {a - b} - c
+      else if precOfPC pc < precOf_op || (precOfPC pc == precOf_op 
+                                         && not (sameOpSym' pc op))
+        then parensE        -- {a + b} * c, {a ∧ b} ∨ c
       else nonExhaustiveGuardError
     _ -> error "These cases should be caught in first 3 cases of parensIf."
-  where
-    sameOpSym' :: PrecContext -> Op -> Bool
-    sameOpSym' pc op = case pc of
-      NoContext -> False
-      AppHOLE -> False
-      HOLEApp -> False
-      OpHOLE pcop -> sameOpSym pcop op
-      HOLEOp pcop -> sameOpSym pcop op
 
-    precOf' :: PrecContext -> Int
-    precOf' pc = case pc of
-      NoContext -> 99999
-      AppHOLE -> initOrderIndex -1
-      HOLEApp -> initOrderIndex -1
-      OpHOLE op -> precOf op
-      HOLEOp op -> precOf op
-    
-    nonExhaustiveGuardError = error "two cases above should be exhaustive" 
-      -- That we think in two different directions and result into the same conslusion.
-
--- the rules: compare the precedence, if the same op, check if it's associative, right-associative cases
-
--- parensIf n m | n < m     = parensE
---              | otherwise = id
+-}
