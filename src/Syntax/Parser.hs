@@ -487,24 +487,24 @@ expression = do
  where
   opTable :: [[Operator Parser Expr]]
   opTable =
-    [ 
+    [ -- The order should be same as in Syntax.Common.Types
       [InfixL (return App)]
-      
+
     , [Prefix $ foldr1 (.) <$> some (unary (ArithOp . Neg) TokNeg
                                      <|> unary (ArithOp . NegU) TokNegU)]
 
+    , [InfixL $ binary (ArithOp . Exp) TokExp]
     , [ InfixL $ binary (ArithOp . Mod) TokMod
       , InfixL $ binary (ArithOp . Mul) TokMul
       , InfixL $ binary (ArithOp . Div) TokDiv
-      , InfixN $ binary (ArithOp . Exp) TokExp
       ]
 
     , [ InfixL $ binary (ArithOp . Add) TokAdd
       , InfixL $ binary (ArithOp . Sub) TokSub
       ]
 
-    , [ InfixN $ binary (ArithOp . Max) TokMax
-      , InfixN $ binary (ArithOp . Min) TokMin
+    , [ InfixL $ binary (ArithOp . Max) TokMax
+      , InfixL $ binary (ArithOp . Min) TokMin
       ]
 
       -- =

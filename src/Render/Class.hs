@@ -5,7 +5,8 @@ module Render.Class
   ( Render (..),
     RenderSection(..), 
     tempHandleLoc,
-    renderManySepByComma
+    renderManySepByComma,
+    PrecContext(..)
   )
 where
 
@@ -17,15 +18,24 @@ import Data.Loc (Loc)
 import Prettyprinter (Doc)
 import qualified Prettyprinter.Render.Text as Text
 import qualified Prettyprinter as Doc
+import Syntax.Common.Types (Op)
 
 --------------------------------------------------------------------------------
+
+data PrecContext = NoContext
+                 | AppHOLE
+                 | HOLEApp 
+                 | OpHOLE Op
+                 | HOLEOp Op
+                 deriving (Show,Eq)
+
 
 -- | Typeclass for rendering Inline Elements
 class Render a where
   render :: a -> Inlines
-  renderPrec :: Int -> a -> Inlines
+  renderPrec :: PrecContext -> a -> Inlines
 
-  render = renderPrec 0
+  render = renderPrec NoContext
   renderPrec = const render
 
 -- | Typeclass for rendering Sections

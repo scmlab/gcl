@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE TupleSections #-}
 module Syntax.Common.Types where
 
 import           Data.Loc
@@ -7,6 +8,10 @@ import           GHC.Generics                   ( Generic )
 import           Data.Function                  ( on )
 import           Prelude                 hiding ( Ordering(..) )
 import           Data.Loc.Range                 ( )
+import           Data.Map                       (Map)
+import qualified Data.Map as Map
+import Control.Arrow ( Arrow(second) )
+import Data.Maybe ( fromMaybe )
 --------------------------------------------------------------------------------
 
 -- | Variables and stuff
@@ -36,7 +41,7 @@ data ChainOp =
   | GTEU Loc
   | LT Loc
   | GT Loc
-  deriving (Eq, Show, Generic)
+  deriving (Eq, Show, Generic, Ord)
 
 data ArithOp =
     -- logic
@@ -63,52 +68,182 @@ data ArithOp =
   | PointsTo Loc  -- a |-> v
   | SConj Loc
   | SImp Loc
-  deriving (Eq, Show, Generic)
+  deriving (Eq, Show, Generic, Ord)
 
 -- | Operators
 data Op = ChainOp ChainOp | ArithOp ArithOp
-  deriving (Show, Eq, Generic)
+  deriving (Show, Eq, Generic, Ord)
 
 
-classifyChainOp :: ChainOp -> Fixity
-classifyChainOp (EQProp  _) = Infix 0
-classifyChainOp (EQPropU _) = Infix 0
-classifyChainOp (EQ      _) = Infix 5
-classifyChainOp (NEQ     _) = Infix 4
-classifyChainOp (NEQU    _) = Infix 4
-classifyChainOp (LTE     _) = Infix 4
-classifyChainOp (LTEU    _) = Infix 4
-classifyChainOp (GTE     _) = Infix 4
-classifyChainOp (GTEU    _) = Infix 4
-classifyChainOp (LT      _) = Infix 4
-classifyChainOp (GT      _) = Infix 4
+-- | The order should be same as 'opTable' defined in Syntax.Parser
+-- Except NegNum (minus), which is dealt exceptionally in parser, but the objective is to make NegNum has the same precedence as below.
+precedenceOrder :: [[(Op, Fixity)]]
+precedenceOrder =
+  [ -- application is supposed to be here
+    [ (ArithOp (Hash     NoLoc), Prefix)
+    , (ArithOp (Neg      NoLoc), Prefix)
+    , (ArithOp (NegU     NoLoc), Prefix)
+    , (ArithOp (NegNum   NoLoc), Prefix)
+    ]
+  , [ (ArithOp (Exp      NoLoc), InfixL)
+    ]
+  , [ (ArithOp (Mul      NoLoc), InfixL)
+    , (ArithOp (Div      NoLoc), InfixL)
+    , (ArithOp (Mod      NoLoc), InfixL)
+    ]
+  , [ (ArithOp (Add      NoLoc), InfixL)
+    , (ArithOp (Sub      NoLoc), InfixL)
+    ]
+  , [ (ArithOp (Max      NoLoc), InfixL)
+    , (ArithOp (Min      NoLoc), InfixL)
+    ]
+  , [ (ArithOp (PointsTo NoLoc), Infix)
+    ]
+  , [ (ArithOp (SConj    NoLoc), InfixL)
+    ]
+  , [ (ArithOp (SImp     NoLoc), InfixR)
+    ]
+  , [ (ChainOp (EQ      NoLoc), InfixL)
+    , (ChainOp (NEQ     NoLoc), InfixL)
+    , (ChainOp (NEQU    NoLoc), InfixL)
+    , (ChainOp (LTE     NoLoc), InfixL)
+    , (ChainOp (LTEU    NoLoc), InfixL)
+    , (ChainOp (GTE     NoLoc), InfixL)
+    , (ChainOp (GTEU    NoLoc), InfixL)
+    , (ChainOp (LT      NoLoc), InfixL)
+    , (ChainOp (GT      NoLoc), InfixL)
+    , (ChainOp (EQProp  NoLoc), InfixL)
+    , (ChainOp (EQPropU NoLoc), InfixL)
+    ]
+  , [ (ArithOp (Disj     NoLoc), InfixL)
+    , (ArithOp (DisjU    NoLoc), InfixL)
+    , (ArithOp (Conj     NoLoc), InfixL)
+    , (ArithOp (ConjU    NoLoc), InfixL)
+    ]
+  , [ (ArithOp (Implies  NoLoc), InfixR)
+    , (ArithOp (ImpliesU NoLoc), InfixR)
+    ]
+  ]
 
-classifyArithOp :: ArithOp -> Fixity
-classifyArithOp (Implies  _) = InfixR 1
-classifyArithOp (ImpliesU _) = InfixR 1
-classifyArithOp (Disj     _) = InfixL 2
-classifyArithOp (DisjU    _) = InfixL 2
-classifyArithOp (Conj     _) = InfixL 3
-classifyArithOp (ConjU    _) = InfixL 3
-classifyArithOp (Neg      _) = Prefix 6
-classifyArithOp (NegU     _) = Prefix 6
-classifyArithOp (NegNum   _) = Prefix 6
-classifyArithOp (Add      _) = InfixL 7
-classifyArithOp (Sub      _) = InfixL 7
-classifyArithOp (Mul      _) = InfixL 8
-classifyArithOp (Div      _) = InfixL 8
-classifyArithOp (Mod      _) = InfixL 9
-classifyArithOp (Max      _) = Infix 10
-classifyArithOp (Min      _) = Infix 10
-classifyArithOp (Exp      _) = Infix 11
-classifyArithOp (Hash     _) = Infix (-1)
-classifyArithOp (PointsTo _) = Infix 4
-classifyArithOp (SConj    _) = InfixL 3
-classifyArithOp (SImp     _) = Infix 1
+initOrderIndex :: Int
+initOrderIndex = 1
 
-classify :: Op -> Fixity
-classify (ChainOp op) = classifyChainOp op
-classify (ArithOp op) = classifyArithOp op
+classificationMap :: Map Op (Fixity,Int)
+classificationMap = Map.fromList $ concat $ zipWith f [initOrderIndex..] precedenceOrder
+  where 
+    f :: Int -> [(Op,Fixity)] -> [(Op,(Fixity,Int))]
+    f n = map (second (,n))
+
+-- classifyChainOp :: ChainOp -> Fixity
+-- classifyChainOp (EQ      _) = Infix 8
+-- classifyChainOp (NEQ     _) = Infix 8
+-- classifyChainOp (NEQU    _) = Infix 8
+-- classifyChainOp (LTE     _) = Infix 8
+-- classifyChainOp (LTEU    _) = Infix 8
+-- classifyChainOp (GTE     _) = Infix 8
+-- classifyChainOp (GTEU    _) = Infix 8
+-- classifyChainOp (LT      _) = Infix 8
+-- classifyChainOp (GT      _) = Infix 8
+-- classifyChainOp (EQProp  _) = Infix 8
+-- classifyChainOp (EQPropU _) = Infix 8
+
+-- classifyArithOp :: ArithOp -> Fixity
+-- classifyArithOp (Hash     _) = Infix (-1)
+
+-- classifyArithOp (Neg      _) = Prefix 1
+-- classifyArithOp (NegU     _) = Prefix 1
+-- classifyArithOp (NegNum   _) = Prefix 1
+
+-- classifyArithOp (Exp      _) = InfixL 2
+
+-- classifyArithOp (Mul      _) = InfixL 2
+-- classifyArithOp (Div      _) = InfixL 2
+-- classifyArithOp (Mod      _) = InfixL 2
+
+-- classifyArithOp (Add      _) = InfixL 3
+-- classifyArithOp (Sub      _) = InfixL 3
+-- classifyArithOp (Max      _) = InfixL 4
+-- classifyArithOp (Min      _) = InfixL 4
+
+-- classifyArithOp (PointsTo _) = Infix 5 
+-- classifyArithOp (SConj    _) = InfixL 6 
+-- classifyArithOp (SImp     _) = Infix 7  
+
+-- classifyArithOp (Disj     _) = InfixL 9
+-- classifyArithOp (DisjU    _) = InfixL 9
+-- classifyArithOp (Conj     _) = InfixL 9
+-- classifyArithOp (ConjU    _) = InfixL 9
+
+-- classifyArithOp (Implies  _) = InfixR 10
+-- classifyArithOp (ImpliesU _) = InfixR 10
+
+
+classify :: Op -> (Fixity,Int)
+classify op = fromMaybe (error "Operator's precedenceOrder is not completely defined.") 
+              $ Map.lookup op classificationMap
+
+precOf :: Op -> Int
+precOf = snd . classify
+
+sameOpSym :: Op -> Op -> Bool
+sameOpSym x y = wipeLoc x == wipeLoc y
+  where 
+    wipeLoc :: Op -> Op
+    wipeLoc op = case op of
+      ChainOp co -> ChainOp (case co of
+        EQProp _ -> EQProp NoLoc
+        EQPropU _-> EQPropU NoLoc
+        EQ _     -> EQ NoLoc
+        NEQ _    -> NEQ NoLoc
+        NEQU _   -> NEQU NoLoc
+        LTE _    -> LTE NoLoc
+        LTEU _   -> LTEU NoLoc
+        GTE _    -> GTE NoLoc
+        GTEU _   -> GTEU NoLoc
+        LT _     -> LT NoLoc
+        GT _     -> GT NoLoc
+        )
+      ArithOp ao -> ArithOp (case ao of
+        Implies _ -> Implies NoLoc
+        ImpliesU _-> ImpliesU NoLoc
+        Conj _    -> Conj NoLoc
+        ConjU _   -> ConjU NoLoc
+        Disj _    -> Disj NoLoc
+        DisjU _   -> DisjU NoLoc
+        Neg _     -> Neg NoLoc
+        NegU _    -> NegU NoLoc
+        NegNum _  -> NegNum NoLoc
+        Add _     -> Add NoLoc
+        Sub _     -> Sub NoLoc
+        Mul _     -> Mul NoLoc
+        Div _     -> Div NoLoc
+        Mod _     -> Mod NoLoc
+        Max _     -> Max NoLoc
+        Min _     -> Min NoLoc
+        Exp _     -> Exp NoLoc
+        Hash _    -> Hash NoLoc
+        PointsTo _-> PointsTo NoLoc
+        SConj _   -> SConj NoLoc
+        SImp _    -> SImp NoLoc
+        )
+
+
+
+-- associative operators
+-- notice that =>,-> are not associative, a->(b->c) can be shown as a->b->c, but not the case of (a->b)->c
+isAssocOp :: Op -> Bool
+isAssocOp (ArithOp (Mul _)) = True
+isAssocOp (ArithOp (Add _)) = True
+isAssocOp (ArithOp (Conj _))  = True 
+isAssocOp (ArithOp (ConjU _)) = True
+isAssocOp (ArithOp (Disj _))  = True
+isAssocOp (ArithOp (DisjU _)) = True
+isAssocOp (ArithOp (Max _)) = True
+isAssocOp (ArithOp (Min _)) = True
+isAssocOp (ChainOp _) = True
+isAssocOp _ = False
+
+
 
 --------------------------------------------------------------------------------
 
@@ -125,7 +260,7 @@ classify (ArithOp op) = classifyArithOp op
 --------------------------------------------------------------------------------
 
 -- | Fixity & Precedence
-data Fixity = Infix Int | InfixR Int | InfixL Int | Prefix Int | Postfix Int
+data Fixity = Infix | InfixR | InfixL | Prefix | Postfix
   deriving (Show, Eq)
 
 -- --------------------------------------------------------------------------------

@@ -17,6 +17,10 @@ import           Syntax.Common                  ( ArithOp(..)
                                                 , Fixity(..)
                                                 , Op(..)
                                                 , classify
+                                                , isAssocOp
+                                                , sameOpSym
+                                                , precOf
+                                                , initOrderIndex
                                                 )
 
 ------------------------------------------------------------------------------
@@ -32,29 +36,44 @@ instance Render Lit where
 
 -- | Expr
 instance Render Expr where
-  renderPrec n expr = case handleExpr n expr of
+  renderPrec prec expr = case handleExpr prec expr of
     Expect   _ -> "<Render pending>"
     Complete s -> s
 
-handleExpr :: Int -> Expr -> Variadic Expr Inlines
-handleExpr n (Var   x l) = return $ tempHandleLoc l $ renderPrec n x
-handleExpr n (Const x l) = return $ tempHandleLoc l $ renderPrec n x
-handleExpr n (Lit   x l) = return $ tempHandleLoc l $ renderPrec n x
-handleExpr n (Op x     ) = handleOp n x
-handleExpr n (App (App (Op op@(ChainOp _)) p _) q _) = do
-  return $ renderPrec n p <+> render op <+> renderPrec n q
-handleExpr n (App p q _) = do
-  case handleExpr (succ n) p of
-    Expect   p' -> p' q
-    Complete p' -> do
+handleExpr :: PrecContext -> Expr -> Variadic Expr Inlines
+handleExpr _ (Var   x l) = return $ tempHandleLoc l $ render x
+handleExpr _ (Const x l) = return $ tempHandleLoc l $ render x
+handleExpr _ (Lit   x l) = return $ tempHandleLoc l $ render x
+handleExpr _ (Op _     ) = error "erroneous syntax given to render"
+handleExpr n (App (App (Op op) left _) right _) =  --binary operators
+  return $ parensIf n (Just op) $ 
+  renderPrec (HOLEOp op) left 
+  <+> render op
+  <+> renderPrec (OpHOLE op) right
+handleExpr n (App (Op op) e _) = case classify op of --unary operators, this case shouldn't be former than the binary case
+  (Prefix, _) -> return $ parensIf n (Just op) $ render op <+> renderPrec (OpHOLE op) e
+  (Postfix, _) -> return $ parensIf n (Just op) $ renderPrec (HOLEOp op) e <+>  render op
+  _ -> error "erroneous syntax given to render"
+handleExpr n (App f e _) =  -- should only be normal applications
+  return $ parensIf n Nothing $ renderPrec HOLEApp f <+> renderPrec AppHOLE e
+-- handleExpr n (App (App (Op op@(ChainOp _)) p _) q _) = do
+--   return $ renderPrec n p <+> render op <+> renderPrec n q
+-- handleExpr n (App p q _) = do
+--   case handleExpr HOLEApp p of
+--     Expect   p' -> p' q
+--     Complete p' -> do
 
-      -- function application is left-associative with the precedence of 9
-      let precedence = 9
-      t <- handleExpr (succ precedence) q
-      return $ parensIf n precedence $ p' <+> t
+--       -- function application is left-associative with the precedence of 0
+--       let precedence = 0
+--       t <- handleExpr AppHOLE q
+--       return $ parensIf n (Just Nothing) $ p' <+> t
 
-handleExpr n (Lam p q _) =
-  return $ parensIf n 0 $ "λ" <+> render p <+> "→" <+> render q
+handleExpr prec (Lam p q _) = 
+  let ifparens = case prec of
+        NoContext -> id
+        _ -> parensE
+  in
+  return $ ifparens $ "λ" <+> render p <+> "→" <+> render q
 handleExpr _ (Func name _ _) = -- display only a Func's name 
   return $ render name
 handleExpr _ (Tuple ps) =
@@ -115,38 +134,38 @@ instance Render Pattern where
 
 --------------------------------------------------------------------------------
 
-handleOp :: Int -> Op -> Variadic Expr Inlines
-handleOp n op = case classify op of
-  Infix m -> do
-    p <- var
-    q <- var
-    return
-      $   parensIf n m
-      $   renderPrec (succ m) p
-      <+> render op
-      <+> renderPrec (succ m) q
-  InfixL m -> do
-    p <- var
-    q <- var
-    return
-      $   parensIf n m
-      $   renderPrec m p
-      <+> render op
-      <+> renderPrec (succ m) q
-  InfixR m -> do
-    p <- var
-    q <- var
-    return
-      $   parensIf n m
-      $   renderPrec (succ m) p
-      <+> render op
-      <+> renderPrec m q
-  Prefix m -> do
-    p <- var
-    return $ parensIf n m $ render op <+> renderPrec m p
-  Postfix m -> do
-    p <- var
-    return $ parensIf n m $ renderPrec m p <+> render op
+-- handleOp :: Int -> Op -> Variadic Expr Inlines
+-- handleOp n op = case classify op of
+--   Infix m -> do
+--     p <- var
+--     q <- var
+--     return
+--       $   parensIf n op
+--       $   renderPrec (succ m) p
+--       <+> render op
+--       <+> renderPrec (succ m) q
+--   InfixL m -> do
+--     p <- var
+--     q <- var
+--     return
+--       $   parensIf n m
+--       $   renderPrec m p
+--       <+> render op
+--       <+> renderPrec (succ m) q
+--   InfixR m -> do
+--     p <- var
+--     q <- var
+--     return
+--       $   parensIf n m
+--       $   renderPrec (succ m) p
+--       <+> render op
+--       <+> renderPrec m q
+--   Prefix m -> do
+--     p <- var
+--     return $ parensIf n m $ render op <+> renderPrec m p
+--   Postfix m -> do
+--     p <- var
+--     return $ parensIf n m $ renderPrec m p <+> render op
 
 --------------------------------------------------------------------------------
 
@@ -176,6 +195,89 @@ instance Render Interval where
 
 --------------------------------------------------------------------------------
 
-parensIf :: Int -> Int -> Inlines -> Inlines
-parensIf n m | n > m     = parensE
-             | otherwise = id
+
+-- | The second argument: Nothing means the op at-issue is application.
+parensIf :: PrecContext -> Maybe Op -> Inlines -> Inlines
+parensIf NoContext _ = id
+parensIf AppHOLE mop = case mop of
+  Nothing -> parensE      -- a {b c} ==> a (b c)
+  Just _ -> parensE       -- a {b+c} ==> a (b+c)
+parensIf HOLEApp mop = case mop of
+  Nothing -> id           -- {a b} c ==> a b c
+  Just _ -> parensE       -- {a+b} c ==> (a+b) c
+parensIf _ Nothing = id   -- a + {b c} ==> a + b c
+parensIf pc (Just op) = case classify op of
+  (Infix, precOf_op) ->  
+    if sameOpSym' pc op || precOf' pc <= precOf_op 
+    then parensE          -- {a-b}-c; {a-b}*c ==> (a-b)-c; (a-b)*c
+    else id               -- {a && b} => c    ==> a && b => c
+  (Prefix, precOf_op) -> 
+    if precOf' pc < precOf_op
+    then parensE          -- {¬ P} f ==> (¬ P) f --- but this case is already caught above, since only application has higher precedence
+    else id               -- ¬ P ∧ Q
+  (Postfix, precOf_op) -> 
+    if precOf' pc < precOf_op
+    then parensE 
+    else id
+  (InfixR, precOf_op) -> case pc of 
+    OpHOLE _ ->  
+      if precOf' pc < precOf_op || (precOf' pc == precOf_op 
+                                    && not (sameOpSym' pc op))
+        then parensE        -- a ∧ {b => c}
+      else if precOf' pc > precOf_op || (precOf' pc == precOf_op 
+                                        && sameOpSym' pc op)
+        then id             -- a -> {b -> c} ==> a -> b -> c
+      else nonExhaustiveGuardError
+    HOLEOp _ -> 
+      if precOf' pc < precOf_op || (precOf' pc == precOf_op 
+                                    && not (isAssocOp op))
+        then parensE        -- {a -> b} -> c ==> (a -> b) -> c
+      else if precOf' pc > precOf_op || (sameOpSym' pc op
+                                         && isAssocOp op)
+        then id             -- 
+      else nonExhaustiveGuardError
+    _ -> error "These cases should be caught in first 3 cases of parensIf."
+  (InfixL, precOf_op) -> case pc of -- is this case just the reverse of InfixR?
+    OpHOLE _ -> 
+      if precOf' pc < precOf_op || (precOf' pc == precOf_op 
+                                    && (not (sameOpSym' pc op)
+                                        || not (isAssocOp op)))
+        then parensE        -- a * {b + c}, a ∧ {b ∨ c}, a - {b - c}
+      else if precOf' pc > precOf_op || (sameOpSym' pc op
+                                         && isAssocOp op)
+        then id             -- a + {b * c}, a ∧ {b ∧ c}
+      else nonExhaustiveGuardError
+    HOLEOp _ -> 
+      if precOf' pc < precOf_op || (precOf' pc == precOf_op 
+                                    && (not (sameOpSym' pc op)
+                                        || not (isAssocOp op)))
+        then parensE        -- {a + b} * c, {a ∧ b} ∨ c, {a - b} - c
+      else if precOf' pc > precOf_op || (precOf' pc == precOf_op 
+                                        && isAssocOp op)
+        then id             -- {a * b} + c, {a ∧ b} ∧ c
+      else nonExhaustiveGuardError
+    _ -> error "These cases should be caught in first 3 cases of parensIf."
+  where
+    sameOpSym' :: PrecContext -> Op -> Bool
+    sameOpSym' pc op = case pc of
+      NoContext -> False
+      AppHOLE -> False
+      HOLEApp -> False
+      OpHOLE pcop -> sameOpSym pcop op
+      HOLEOp pcop -> sameOpSym pcop op
+
+    precOf' :: PrecContext -> Int
+    precOf' pc = case pc of
+      NoContext -> 99999
+      AppHOLE -> initOrderIndex -1
+      HOLEApp -> initOrderIndex -1
+      OpHOLE op -> precOf op
+      HOLEOp op -> precOf op
+    
+    nonExhaustiveGuardError = error "two cases above should be exhaustive" 
+      -- That we think in two different directions and result into the same conslusion.
+
+-- the rules: compare the precedence, if the same op, check if it's associative, right-associative cases
+
+-- parensIf n m | n < m     = parensE
+--              | otherwise = id
