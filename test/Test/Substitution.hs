@@ -13,7 +13,7 @@ import           Data.Foldable                  ( toList )
 import           Data.Map                       ( Map )
 import qualified Data.Map                      as Map
 import           GCL.Common                     ( FreshState )
-import           GCL.Substitution               ( Scope
+import           GCL.Substitution               ( Decls
                                                 , buildRedexMap
                                                 , step
                                                 )
@@ -85,7 +85,7 @@ instance Pretty Tree where
     prettyTransition (transition, children) =
       [pretty transition, indent 2 $ vcat (map pretty children)]
 
-fromRedex :: MonadState FreshState m => Scope -> (Int, Expr) -> m Tree
+fromRedex :: MonadState FreshState m => Decls -> (Int, Expr) -> m Tree
 fromRedex scope (i, before) = do
   trees <- do
     after <- step scope before
