@@ -201,7 +201,10 @@ parensIf :: PrecContext -> Maybe Op -> Inlines -> Inlines
 parensIf pc mop = case isomerismOfContextAndCurrentOp pc mop of
   Nothing    -> 
     let conditionOfOmittingParens = case classify' mop of
-          Prefix  -> precOfPC pc >= precOf' mop
+          Prefix  -> case pc of
+            AppHOLE  -> False
+            OpHOLE _ -> False
+            _        -> precOfPC pc >= precOf' mop
           Postfix -> precOfPC pc >= precOf' mop
           _       -> precOfPC pc > precOf' mop || (sameOpSym' pc mop
                                                    && isAssocOp' mop)
