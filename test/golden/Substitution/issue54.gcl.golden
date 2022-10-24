@@ -1,9 +1,9 @@
 2: P [ x \ x + y ] z
-  P [ x \ x + y ] z ===> z > (x + y) + y
+  P [ x \ x + y ] z ===> z > x + y + y
     
 3: P [ x \ x + y ] [ y \ y + 1 ] z
-  P [ x \ x + y ] [ y \ y + 1 ] z ===> z > (x + (y + 1)) + (y + 1)
+  P [ x \ x + y ] [ y \ y + 1 ] z ===> z > x + y + 1 + y + 1
     
 5: P [ x \ x + y ] [ y \ y + 1 ] z
-  P [ x \ x + y ] [ y \ y + 1 ] z ===> z > (x + (y + 1)) + (y + 1)
+  P [ x \ x + y ] [ y \ y + 1 ] z ===> z > x + y + 1 + y + 1
     
