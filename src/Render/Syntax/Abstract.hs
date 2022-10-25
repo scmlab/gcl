@@ -45,6 +45,8 @@ handleExpr _ (Var   x l) = return $ tempHandleLoc l $ render x
 handleExpr _ (Const x l) = return $ tempHandleLoc l $ render x
 handleExpr _ (Lit   x l) = return $ tempHandleLoc l $ render x
 handleExpr _ (Op _     ) = error "erroneous syntax given to render"
+handleExpr n (App (App (Op op@(ChainOp _)) p _) q _) = do
+  return $ renderPrec n p <+> render op <+> renderPrec n q
 handleExpr n (App (App (Op op) left _) right _) =  --binary operators
   return $ parensIf n (Just op) $ 
   renderPrec (HOLEOp op) left 
@@ -56,8 +58,6 @@ handleExpr n (App (Op op) e _) = case classify op of --unary operators, this cas
   _ -> error "erroneous syntax given to render"
 handleExpr n (App f e _) =  -- should only be normal applications
   return $ parensIf n Nothing $ renderPrec HOLEApp f <+> renderPrec AppHOLE e
--- handleExpr n (App (App (Op op@(ChainOp _)) p _) q _) = do
---   return $ renderPrec n p <+> render op <+> renderPrec n q
 -- handleExpr n (App p q _) = do
 --   case handleExpr HOLEApp p of
 --     Expect   p' -> p' q
