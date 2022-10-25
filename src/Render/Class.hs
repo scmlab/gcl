@@ -21,7 +21,10 @@ import qualified Prettyprinter as Doc
 import Syntax.Common.Types (Op)
 
 --------------------------------------------------------------------------------
-
+-- | Describing the precedence context of an expression:
+-- AppHOLE,OpHOLE means the expression at issue (whether it needs parentheses or not) is at the parent's operator's right side,
+--  denotes as like: "f {a + b}", "a * {b + c}" (the curly braces denotes the HOLE)
+-- HOLEApp, HOLEOp then denotes things like: "{f} b " "{a * b} + c"
 data PrecContext = NoContext
                  | AppHOLE
                  | HOLEApp 

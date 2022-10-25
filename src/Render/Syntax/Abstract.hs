@@ -53,15 +53,6 @@ handleExpr n (App (Op op) e _) = case classify op of --unary operators, this cas
   _ -> error "erroneous syntax given to render"
 handleExpr n (App f e _) =  -- should only be normal applications
   parensIf n Nothing $ renderPrec HOLEApp f <+> renderPrec AppHOLE e
--- handleExpr n (App p q _) = do
---   case handleExpr HOLEApp p of
---     Expect   p' -> p' q
---     Complete p' -> do
-
---       -- function application is left-associative with the precedence of 0
---       let precedence = 0
---       t <- handleExpr AppHOLE q
---       parensIf n (Just Nothing) $ p' <+> t
 
 handleExpr prec (Lam p q _) = 
   let ifparens = case prec of
@@ -128,41 +119,6 @@ instance Render Pattern where
 
 --------------------------------------------------------------------------------
 
--- handleOp :: Int -> Op -> Variadic Expr Inlines
--- handleOp n op = case classify op of
---   Infix m -> do
---     p <- var
---     q <- var
---     return
---       $   parensIf n op
---       $   renderPrec (succ m) p
---       <+> render op
---       <+> renderPrec (succ m) q
---   InfixL m -> do
---     p <- var
---     q <- var
---     return
---       $   parensIf n m
---       $   renderPrec m p
---       <+> render op
---       <+> renderPrec (succ m) q
---   InfixR m -> do
---     p <- var
---     q <- var
---     return
---       $   parensIf n m
---       $   renderPrec (succ m) p
---       <+> render op
---       <+> renderPrec m q
---   Prefix m -> do
---     p <- var
---     return $ parensIf n m $ render op <+> renderPrec m p
---   Postfix m -> do
---     p <- var
---     return $ parensIf n m $ renderPrec m p <+> render op
-
---------------------------------------------------------------------------------
-
 
 -- | Type
 instance Render Type where
@@ -206,11 +162,12 @@ parensIf pc mop = case isomerismOfContextAndCurrentOp pc mop of
     if conditionOfOmittingParens
     then id
     else parensE
-  Just Cis -> 
+  Just Cis -> -- e.g., In "a -> (b -> c)", "(a - b) - c", parentheses can be omitted.
     if precOfPC pc > precOf' mop || sameOpSym' pc mop
     then id
     else parensE
-  Just Trans   -> 
+  Just Trans   -> -- e.g., In "a - (b - c)", the parentheses shouldn't be omitted;
+                  --  but in "a * (b * c)", since "*" is associative, the parentheses can be omitted.
     if precOfPC pc > precOf' mop || (sameOpSym' pc mop
                                       && isAssocOp' mop)
     then id
@@ -219,11 +176,11 @@ parensIf pc mop = case isomerismOfContextAndCurrentOp pc mop of
   where
     -- In this scope, every "Nothing" case of "Maybe Op" means application.
     sameOpSym' :: PrecContext -> Maybe Op -> Bool
-    sameOpSym' pc Nothing = case pc of
+    sameOpSym' pc' Nothing = case pc' of
       AppHOLE -> True
       HOLEApp -> True
       _       -> False
-    sameOpSym' pc (Just op) = case pc of
+    sameOpSym' pc' (Just op) = case pc' of
       OpHOLE pcop -> sameOpSym pcop op
       HOLEOp pcop -> sameOpSym pcop op
       _ -> False
@@ -237,7 +194,7 @@ parensIf pc mop = case isomerismOfContextAndCurrentOp pc mop of
     precOf' (Just op) = precOf op
 
     precOfPC :: PrecContext -> Int
-    precOfPC pc = case pc of
+    precOfPC pc' = case pc' of
       NoContext -> 99999
       AppHOLE -> precOf' Nothing
       HOLEApp -> precOf' Nothing
