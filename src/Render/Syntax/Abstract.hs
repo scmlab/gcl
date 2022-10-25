@@ -5,9 +5,6 @@ module Render.Syntax.Abstract where
 
 import           Data.Foldable                  ( toList )
 import qualified Data.Map                      as Map
-import           Pretty.Variadic                ( Variadic(..)
-                                                , var
-                                                )
 import           Render.Class
 import           Render.Element
 import           Render.Syntax.Common           ( )
@@ -36,28 +33,26 @@ instance Render Lit where
 
 -- | Expr
 instance Render Expr where
-  renderPrec prec expr = case handleExpr prec expr of
-    Expect   _ -> "<Render pending>"
-    Complete s -> s
+  renderPrec prec expr = handleExpr prec expr
 
-handleExpr :: PrecContext -> Expr -> Variadic Expr Inlines
-handleExpr _ (Var   x l) = return $ tempHandleLoc l $ render x
-handleExpr _ (Const x l) = return $ tempHandleLoc l $ render x
-handleExpr _ (Lit   x l) = return $ tempHandleLoc l $ render x
+handleExpr :: PrecContext -> Expr -> Inlines
+handleExpr _ (Var   x l) = tempHandleLoc l $ render x
+handleExpr _ (Const x l) = tempHandleLoc l $ render x
+handleExpr _ (Lit   x l) = tempHandleLoc l $ render x
 handleExpr _ (Op _     ) = error "erroneous syntax given to render"
 handleExpr n (App (App (Op op@(ChainOp _)) p _) q _) = do
-  return $ renderPrec n p <+> render op <+> renderPrec n q
+  renderPrec n p <+> render op <+> renderPrec n q
 handleExpr n (App (App (Op op) left _) right _) =  --binary operators
-  return $ parensIf n (Just op) $ 
+  parensIf n (Just op) $ 
   renderPrec (HOLEOp op) left 
        <+> render op
   <+> renderPrec (OpHOLE op) right
 handleExpr n (App (Op op) e _) = case classify op of --unary operators, this case shouldn't be former than the binary case
-  (Prefix, _) -> return $ parensIf n (Just op) $ render op <+> renderPrec (OpHOLE op) e
-  (Postfix, _) -> return $ parensIf n (Just op) $ renderPrec (HOLEOp op) e <+>  render op
+  (Prefix, _) -> parensIf n (Just op) $ render op <+> renderPrec (OpHOLE op) e
+  (Postfix, _) -> parensIf n (Just op) $ renderPrec (HOLEOp op) e <+>  render op
   _ -> error "erroneous syntax given to render"
 handleExpr n (App f e _) =  -- should only be normal applications
-  return $ parensIf n Nothing $ renderPrec HOLEApp f <+> renderPrec AppHOLE e
+  parensIf n Nothing $ renderPrec HOLEApp f <+> renderPrec AppHOLE e
 -- handleExpr n (App p q _) = do
 --   case handleExpr HOLEApp p of
 --     Expect   p' -> p' q
@@ -66,21 +61,20 @@ handleExpr n (App f e _) =  -- should only be normal applications
 --       -- function application is left-associative with the precedence of 0
 --       let precedence = 0
 --       t <- handleExpr AppHOLE q
---       return $ parensIf n (Just Nothing) $ p' <+> t
+--       parensIf n (Just Nothing) $ p' <+> t
 
 handleExpr prec (Lam p q _) = 
   let ifparens = case prec of
         NoContext -> id
         _ -> parensE
   in
-  return $ ifparens $ "λ" <+> render p <+> "→" <+> render q
+  ifparens $ "λ" <+> render p <+> "→" <+> render q
 handleExpr _ (Func name _ _) = -- display only a Func's name 
-  return $ render name
+  render name
 handleExpr _ (Tuple ps) =
-  return $ "(" <+> punctuateE "," (map render ps) <+> ")"
+  "(" <+> punctuateE "," (map render ps) <+> ")"
 handleExpr _ (Quant op xs r t _) =
-  return
-    $   "⟨"
+   "⟨"
     <+> renderQOp op
     <+> horzE (map render xs)
     <+> ":"
@@ -98,20 +92,20 @@ handleExpr _ (Quant op xs r t _) =
   renderQOp (Op op'                ) = render op'
   renderQOp op'                      = render op'
 handleExpr n (RedexKernel name _value _freeVars mappings) =
-  return $ renderPrec n name <+> mappings'
+  renderPrec n name <+> mappings'
  where
   -- reverse the stack when printing it
   mappings' = punctuateE
     " "
     (map render $ filter (not . Map.null) $ reverse $ toList mappings)
 handleExpr n (RedexShell index expr) =
-  return $ substE index (renderPrec n expr)
-handleExpr _ (ArrIdx e1 e2 _) = return $ render e1 <> "[" <> render e2 <> "]"
+  substE index (renderPrec n expr)
+handleExpr _ (ArrIdx e1 e2 _) = render e1 <> "[" <> render e2 <> "]"
 handleExpr _ (ArrUpd e1 e2 e3 _) =
-  return $ "(" <+> render e1 <+> ":" <+> render e2 <+> "↣" <+> render e3 <+> ")"
+  "(" <+> render e1 <+> ":" <+> render e2 <+> "↣" <+> render e3 <+> ")"
     -- SCM: need to print parenthesis around e1 when necessary.
 handleExpr _ (Case expr cases _) =
-  return $ "case" <+> render expr <+> "of" <+> vertE (map render cases)
+  "case" <+> render expr <+> "of" <+> vertE (map render cases)
 
 instance Render Mapping where
   render env | null env  = mempty
