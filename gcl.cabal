@@ -165,6 +165,7 @@ test-suite gcl-test
   main-is: Test.hs
   other-modules:
       Test.Parser
+      Test.Render
       Test.Server
       Test.Server.Interpreter
       Test.SrcLoc

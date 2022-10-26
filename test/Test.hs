@@ -1,4 +1,5 @@
 import qualified Test.Parser                   as Parser
+import qualified Test.Render                   as Render
 import qualified Test.Server                   as Server
 import qualified Test.SrcLoc                   as SrcLoc
 import qualified Test.Substitution             as Substitution
@@ -17,6 +18,7 @@ tests :: TestTree
 tests = testGroup
     "Tests"
     [ Parser.tests
+    , Render.tests
     , Substitution.tests
     , WP.tests
     , TypeChecking.tests
