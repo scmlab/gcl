@@ -112,8 +112,6 @@ precedenceOrder =
     , (ChainOp (GTEU    NoLoc), InfixL)
     , (ChainOp (LT      NoLoc), InfixL)
     , (ChainOp (GT      NoLoc), InfixL)
-    , (ChainOp (EQProp  NoLoc), InfixL)
-    , (ChainOp (EQPropU NoLoc), InfixL)
     ]
   , [ (ArithOp (Disj     NoLoc), InfixL)
     , (ArithOp (DisjU    NoLoc), InfixL)
@@ -122,6 +120,9 @@ precedenceOrder =
     ]
   , [ (ArithOp (Implies  NoLoc), InfixR)
     , (ArithOp (ImpliesU NoLoc), InfixR)
+    ]
+  , [ (ChainOp (EQProp  NoLoc), InfixL)
+    , (ChainOp (EQPropU NoLoc), InfixL)
     ]
   ]
 
