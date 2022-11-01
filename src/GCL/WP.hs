@@ -9,6 +9,7 @@ import           Control.Monad.Except           ( MonadError(throwError)
                                                 , runExcept
                                                 )
 import           Control.Monad.RWS              ( RWST(runRWST) )
+import           Data.Text                      ( Text )
 import           Data.IntMap                    ( IntMap )
 import qualified Data.List                     as List
 import           Data.Loc                       ( Located(..) )
@@ -23,7 +24,7 @@ import           GCL.WP.Type
 import qualified Syntax.Abstract               as A
 import qualified Syntax.Abstract.Operator      as A
 import qualified Syntax.Abstract.Util          as A
-import           Syntax.Common.Types           ( Name )
+import           Syntax.Common.Types           ( Name, nameToText)
 import GCL.WP.Struct
 import GCL.WP.WP
 import GCL.WP.SP
@@ -31,7 +32,7 @@ import GCL.WP.Util
 
 runWP
   :: WP a
-  -> (Substitution.Decls, [[Name]])
+  -> (Substitution.Decls, [[Text]])
   -> Either
        StructError
        (a, Int, ([PO], [Spec], [StructWarning], IntMap (Int, A.Expr)))
@@ -42,7 +43,7 @@ sweep
   -> Either StructError ([PO], [Spec], [StructWarning], IntMap (Int, A.Expr), Int)
 sweep program@(A.Program _ decs _props stmts _) = do
   let decls = A.programToScopeForSubstitution program
-  let dnames = [declaredNames decs]
+  let dnames = [map nameToText $ declaredNames decs]
   (_, counter, (pos, specs, warnings, redexes)) <-
            runWP (structProgram stmts) (decls, dnames)
   -- update Proof Obligations with corresponding Proof Anchors

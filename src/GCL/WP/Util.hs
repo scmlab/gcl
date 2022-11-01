@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings, TypeSynonymInstances, FlexibleInstances #-}
 
 module GCL.WP.Util where
 
@@ -14,6 +14,7 @@ import           Control.Monad.RWS              ( MonadReader(ask)
 import qualified Data.Map                      as Map
 import           Data.Loc                       ( Loc(..) )
 import           Data.Loc.Range                 ( Range )
+import           Data.Text                      ( Text )
 import qualified Data.Text                     as Text
 import qualified Data.Hashable                 as Hashable
 import           GCL.Predicate                  ( Origin(..)
@@ -26,6 +27,7 @@ import           GCL.Predicate.Util             ( disjunct
                                                 , toExpr
                                                 )
 import           GCL.Common                     ( Fresh(..)
+                                                , Counterous(..)
                                                 , freshName'
                                                 )
 
@@ -98,7 +100,7 @@ tellSpec :: Pred -> Pred -> Range -> WP ()
 tellSpec p q l = do
   p' <- substitute [] [] p
   q' <- substitute [] [] q
-  i  <- fresh
+  i  <- countUp
   tell ([], [Specification i p' q' l], [], mempty)
 
 throwWarning :: StructWarning -> WP ()
@@ -132,12 +134,12 @@ withFreshVar f = do
        ((Map.insert (nameToText name) Nothing decls, scopes), st))
     (f var)
 
-withLocalScopes :: ([[Name]] -> WP a) -> WP a
+withLocalScopes :: ([[Text]] -> WP a) -> WP a
 withLocalScopes f = do
   (_, scopes) <- ask
   f scopes
 
-withScopeExtension :: [Name] -> WP a -> WP a
+withScopeExtension :: [Text] -> WP a -> WP a
 withScopeExtension names =
   local (\(defns, scopes) -> (defns, names:scopes))
 
@@ -145,3 +147,18 @@ declaredNames :: [A.Declaration] -> [Name]
 declaredNames decls = concat . map extractNames $ decls
   where extractNames (A.ConstDecl ns _ _ _) = ns
         extractNames (A.VarDecl   ns _ _ _) = ns
+
+freshPreInScope :: Text -> [Text] -> Text
+freshPreInScope pref scope
+  | not (pref `elem` scope) = pref
+  | otherwise = freshAux 0
+  where freshAux :: Int -> Text
+        freshAux i | fre `elem` scope = freshAux (1+i)
+                   | otherwise = fre
+          where fre = Text.pack (pref' ++ show i)
+        pref' = Text.unpack pref
+
+
+instance Fresh WP where
+  fresh = freshPre "m"
+  freshPre p = withLocalScopes (return . freshPreInScope p . concat)

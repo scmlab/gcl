@@ -1,6 +1,5 @@
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances, UndecidableInstances,
+             MultiParamTypeClasses, FlexibleContexts #-}
 module GCL.Common where
 
 import           Control.Monad.RWS              ( RWST(..) )
@@ -17,31 +16,28 @@ import qualified Data.Text                     as Text
 import           Syntax.Abstract
 import           Syntax.Common.Types
 
--- get a fresh variable (and bump the counter)
+-- get a fresh variable
 class Monad m => Fresh m where
-    getCounter :: m Int
-    setCounter :: Int -> m ()
+    fresh :: m Text
+    fresh = freshPre (Text.pack "")
 
-    fresh :: m Int
-    fresh = do
-        i <- getCounter
-        setCounter (succ i)
-        return i
-
-  -- get a fresh variable in the form of Text
-freshText :: Fresh m => m Text
-freshText = (\i -> Text.pack ("?m_" ++ show i)) <$> fresh
-
-  -- a fancier `freshText`
-freshWithLabel :: Fresh m => Text -> m Text
-freshWithLabel l =
-  (\i -> Text.pack ("?" ++ Text.unpack l ++ "_" ++ show i)) <$> fresh
+    freshPre :: Text -> m Text
 
 freshName :: Fresh m => Text -> Loc -> m Name
-freshName prefix l = Name <$> freshWithLabel prefix <*> pure l
+freshName prefix l = Name <$> freshPre prefix <*> pure l
 
 freshName' :: Fresh m => Text -> m Name
 freshName' prefix = freshName prefix NoLoc
+
+class Counterous m where
+  countUp :: m Int
+
+instance {-# OVERLAPPABLE #-}
+         (Monad m, Counterous m) => Fresh m where
+  fresh = (Text.pack . ("?m_" ++) . show) <$> countUp
+  freshPre prefix =
+      (Text.pack . ("?" ++) . (Text.unpack prefix ++) .
+           ("_" ++) . show) <$> countUp
 
 type FreshState = Int
 

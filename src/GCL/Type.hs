@@ -163,13 +163,11 @@ class HasTypeInfoScope m where
 
 type TypeInferM = WriterT [Constraint] TypeCheckM
 
-instance Fresh TypeInferM where
-  getCounter = do
-    (i, _, _) <- get
+instance Counterous TypeInferM where
+  countUp = do
+    (i, s1, s2) <- get
+    put (succ i, s1, s2)
     return i
-  setCounter i = do
-    (_, s1, s2) <- get
-    put (i, s1, s2)
 
 instance HasTypeDefnInfoScope TypeInferM where
   getTypeDefnInfo = do
@@ -453,13 +451,11 @@ type TypeCheckM
       (FreshState, ScopeTreeZipper TypeDefnInfo, ScopeTreeZipper TypeInfo)
       (Except TypeError)
 
-instance Fresh TypeCheckM where
-  getCounter = do
-    (s, _, _) <- get
+instance Counterous TypeCheckM where
+  countUp = do
+    (s, s2, s3) <- get
+    put (succ s, s2, s3)
     return s
-  setCounter s1 = do
-    (_, s2, s3) <- get
-    put (s1, s2, s3)
 
 instance  HasTypeDefnInfoScope TypeCheckM where
   getTypeDefnInfo = do

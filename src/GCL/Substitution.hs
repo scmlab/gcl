@@ -1,7 +1,5 @@
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE FlexibleInstances, FlexibleContexts,
+             OverloadedStrings, LambdaCase #-}
 
 module GCL.Substitution
   ( run
@@ -27,10 +25,11 @@ import qualified Data.Set                      as Set
 import           Data.Set                       ( Set )
 import           Data.Text                      ( Text )
 import           GCL.Common                     ( Free(freeVars)
+                                                , Counterous(..)
                                                 , Fresh(..)
                                                 , FreshState
                                                 , fresh
-                                                , freshWithLabel
+                                                , freshPre
                                                 )
 import           GCL.Predicate                  ( PO(PO)
                                                 , Pred(..)
@@ -86,9 +85,10 @@ mappingFromSubstitution xs es =
 type Decls = Map Text (Maybe Expr)
 type M = RWS Decls () Int
 
-instance Fresh M where
-  getCounter = get
-  setCounter = put
+instance Counterous M where
+  countUp = do i <- get
+               put (succ i)
+               return i
 
 runM :: MonadState FreshState m => Decls -> M b -> m b
 runM decls p = do
@@ -146,7 +146,7 @@ instance Reducible Expr where
       f' <- reduce f
       x' <- reduce x
       case f' of
-        RedexShell _ e -> RedexShell <$> fresh <*> reduce (App e x' l1)
+        RedexShell _ e -> RedexShell <$> countUp <*> reduce (App e x' l1)
         Lam n body _   -> subst (mappingFromSubstitution [n] [x']) body
         _              -> return $ App f' x' l1
     Lam binder body l -> Lam binder <$> reduce body <*> return l
@@ -184,7 +184,7 @@ instance Substitutable Expr where
       Just value -> return value
       Nothing    -> do
         decls <- ask
-        index <- fresh
+        index <- countUp
         case Map.lookup (nameToText name) decls of
           Just (Just binding) -> do
             let e = RedexKernel
@@ -201,7 +201,7 @@ instance Substitutable Expr where
       Just value -> reduce value
       Nothing    -> do
         decls <- ask
-        index <- fresh
+        index <- countUp
         case Map.lookup (nameToText name) decls of
           Just (Just binding) -> do
             let e = RedexKernel
@@ -279,7 +279,7 @@ instance Substitutable Expr where
                              newFreeVars
                              (NonEmpty.cons shrinkedMapping mappings)
 
-    RedexShell _ e -> RedexShell <$> fresh <*> subst mapping e
+    RedexShell _ e -> RedexShell <$> countUp <*> subst mapping e
 
     ArrIdx array index l ->
       ArrIdx <$> subst mapping array <*> subst mapping index <*> pure l
@@ -343,7 +343,7 @@ produceBinderRenamings capturableNames binders = mconcat <$> mapM go binders
   go binder = if Set.member (nameToText binder) capturableNames
     then do
       -- CAPTURED! returns the alpha renamed binder
-      binder' <- Name <$> freshWithLabel (nameToText binder) <*> pure
+      binder' <- Name <$> freshPre (nameToText binder) <*> pure
         (locOf binder)
       return $ Map.singleton binder binder'
     else

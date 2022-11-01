@@ -1,6 +1,5 @@
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE DeriveGeneric, FlexibleContexts,
+             FlexibleInstances #-}
 
 module GCL.WP.Type where
 
@@ -9,30 +8,31 @@ import           Control.Monad.RWS              ( MonadState(..)
                                                 , RWST(..) )
 import Data.IntMap                              ( IntMap )
 import Data.Aeson (ToJSON)
+import Data.Text  ( Text )
 import Data.Loc (Loc (..), Located (..))
 import Data.Loc.Range (Range)
-import GCL.Common (Fresh(..))
+import GCL.Common
 import GCL.Predicate                           ( InfMode(..)
                                                , PO(..), Pred(..), Spec (..))
 import qualified GCL.Substitution              as Substitution
 import qualified Syntax.Abstract               as A
 import           Syntax.Common.Types           ( Name )
 import GHC.Generics (Generic)
-
 -- The WP monad.
 
 type TM = Except StructError
 
 type WP
   = RWST
-      (Substitution.Decls, [[Name]])
+      (Substitution.Decls, [[Text]])
       ([PO], [Spec], [StructWarning], IntMap (Int, A.Expr))
       Int
       TM
 
-instance Fresh WP where
-  getCounter = get
-  setCounter = put
+instance Counterous WP where
+  countUp = do i <- get
+               put (succ i)
+               return i
 
 ---
 
@@ -81,3 +81,6 @@ instance Located StructError where
   locOf (LocalVarExceedScope l) = l
 
 instance ToJSON StructError
+
+-- freshPreInScope prefix scope
+--   generates a fresh name, with prefix, that does not appear in scope

@@ -4,6 +4,7 @@ module GCL.WP.Struct where
 
 import           Control.Arrow                  ( first, second )
 import           Control.Monad.Except           ( forM_ )
+import           Data.Text                      ( Text )
 import           Data.Loc                       ( Loc(..)
                                                 , Located(..)
                                                 )
@@ -17,6 +18,7 @@ import           GCL.Predicate.Util             ( guardIf
                                                 , guardLoop
                                                 )
 import           GCL.Common                     ( Fresh(..)
+                                                , freshName
                                                 , freshName'
                                                 , freeVars
                                                 )
@@ -162,22 +164,23 @@ structFunctions (wpSegs, wpSStmts, wp, spSStmts) =
  structBlock pre (A.Program _ decls props stmts _) post = do
    let localNames = declaredNames decls
    (xs, ys) <- withLocalScopes (\scopes ->
-                 calcLocalRenaming (concat scopes) localNames)
+                withScopeExtension (map nameToText localNames)
+                  (calcLocalRenaming (concat scopes) localNames))
    stmts' <- subst (toSubst ys) stmts
-   withScopeExtension (xs ++ (map snd ys))
+   withScopeExtension (xs ++ (map (nameToText . snd) ys))
      (structStmts Primary (pre, Nothing) stmts' post)
-  where toSubst = fromList . map (\(n, n') ->
-                     (nameToText n, A.Var n' (locOf n)))
+  where toSubst = fromList . map (\(n, n') -> (n, A.Var n' (locOf n')))
 
-
-calcLocalRenaming :: [Name] -> [Name] -> WP ([Name], [(Name, Name)])
+calcLocalRenaming :: [Text] -> [Name] -> WP ([Text], [(Text, Name)])
 calcLocalRenaming _ [] = return ([], [])
 calcLocalRenaming scope (x:xs)
-  | x `elem` scope = do
-        x' <- freshName' (nameToText x)
-        second ((x,x') :) <$> calcLocalRenaming scope xs
+  | t `elem` scope = do
+        x' <- freshName t (locOf x)
+        second ((t,x') :) <$> calcLocalRenaming scope xs
   | otherwise =
-        first (x:) <$> calcLocalRenaming scope xs
+        first (t:) <$> calcLocalRenaming scope xs
+ where t = nameToText x
+
 -- debugging
 
 -- pp :: Pretty a => a -> String
