@@ -51,7 +51,9 @@ expression = testGroup
   , testCase "13" $ prettyae  "(- a) + b" @?= "- a + b"
   , testCase "14" $ prettyae "- a + b - c" @?= "(- a + b) - c"
   , testCase "15" $ run "a * (- a)"
-  , testCase "16" $ run "a => (~ b)"
+  , testCase "16" $ run "a => ~ b"
+  , testCase "17" $ run "a > b >= c"
+  , testCase "18" $ run "~ (a > b >= c)"
   ]
   where 
     run :: Text -> Assertion
