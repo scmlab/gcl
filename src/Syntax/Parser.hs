@@ -19,7 +19,7 @@ import           Prelude                 hiding ( EQ
                                                 , Ordering
                                                 , lookup
                                                 )
-import           Syntax.Common           hiding ( Fixity(..) )
+import           Syntax.Common           hiding (Fixity(..))
 import           Syntax.Concrete         hiding ( Op )
 import qualified Syntax.Concrete.Types         as Expr
 import           Syntax.Parser.Error
@@ -449,49 +449,17 @@ predicate = expression <?> "predicate"
 
 expression :: Parser Expr
 expression = do
-  expr <- makeExprParser (term <|> caseOf) opTable <?> "expression"
-  -- Handling the parsing of unary minus: 
-  --  The problem: conventionally, unary minus is the operator with highest precedence, but in order to parse
-  --  Haskell-style application, the precedence becomes the lowest (at least lower than binary minus), 
-  --  otherwise, "1-2" would be parsed as "1 (-2)", which means "1" is parsed as a function.
-  --  (in C-style syntax, "1 (-2)" is not a valid syntax, thus the precedence of unary minus can be higher than binary minus)
-  --  In another hand, binary minus can not be higher than application, otherwise "f n-3" becomes "f (n-3)".
-  
-  --  In short, precedence of unary minus should < binary minus, binary minus should < application,
-  --  but this then yields the problem that, "-1+2" now is parsed as "-(1+2)".
-
-  --  An observation: only the first symbol needs to be considered: -a+b should be parsed as (-a)+b, instead of -(a+b)
-  --  We can first check if the parsed expr is really meant to be "-(a+b)", by checking if parentheses are syntactically existed;
-  --  if not, then we attach the minus sign to the left-most entity of the mis-parsed expr body
-  --  (putting "-" to "a" of the expr "a+b", so it becomes "(-a)+b")
-  let expr' = case expr of
-        App neg@(Expr.Op (ArithOp (NegNum _))) e ->
-          if isntWrappedByParens e
-          then
-            addNegToLeftMost e
-          else
-            expr
-          where
-            isntWrappedByParens Paren {} = False
-            isntWrappedByParens _ = True
-
-            addNegToLeftMost (App (App op@(Expr.Op _) left) right) = 
-              -- ChainOps (which are all binary) and binary ArithOp operators. 
-              -- Unary oprators won't fall into this case, because we pattern-matched two layers of App;
-              -- and unary operators are same as the normal (App left right) case, no need to break further break it.
-              App (App op (addNegToLeftMost left)) right
-            addNegToLeftMost (App left right) = App (addNegToLeftMost left) right
-            addNegToLeftMost x = App neg x
-        _ -> expr
-  return expr'
+ makeExprParser (term <|> caseOf) opTable <?> "expression"
  where
   opTable :: [[Operator Parser Expr]]
   opTable =
     [ -- The order should be same as in Syntax.Common.Types
       [InfixL (return App)]
 
-    , [Prefix $ foldr1 (.) <$> some (unary (ArithOp . Neg) TokNeg
-                                     <|> unary (ArithOp . NegU) TokNegU)]
+    , [ Prefix $ foldr1 (.) <$> some (unary (ArithOp . Neg) TokNeg
+                                     <|> unary (ArithOp . NegU) TokNegU)
+      , Prefix $ unary (ArithOp . NegNum) TokSub
+      ]
 
     , [InfixL $ binary (ArithOp . Exp) TokExp]
     , [ InfixL $ binary (ArithOp . Mod) TokMod
@@ -535,10 +503,6 @@ expression = do
       -- <=>
       , InfixL $ binary (ChainOp . EQProp) TokEQProp
       , InfixL $ binary (ChainOp . EQPropU) TokEQPropU
-      ]
-
-    , [ 
-        Prefix $ unary (ArithOp . NegNum) TokSub
       ]
     ]
 
@@ -751,3 +715,86 @@ character = extract p <?> "character"
  where
   p (TokChar c) = Just c
   p _           = Nothing
+
+
+------- Records of resolving the problem of parsing, if NegNum's precedence is higher than application. ------------------
+
+  -- Handling the parsing of NegNum: 
+  --  The problem: conventionally, NegNum is the operator with highest precedence, but in order to parse
+  --  Haskell-style application, the precedence becomes the lowest (at least lower than Sub), 
+  --  otherwise, "1-2" would be parsed as "1 (-2)", which means "1" is parsed as a function.
+  --  (in C-style syntax, "1 (-2)" is not a valid syntax, thus the precedence of NegNum can be higher than Sub)
+  --  In another hand, Sub can not be higher than application, otherwise "f n-3" becomes "f (n-3)".
+
+  --  In short, precedence of NegNum should < Sub, Sub should < application,
+  --  but this then yields the problem that, "-1+2" now is parsed as "-(1+2)".
+
+  --  An observation, first attempt: only the first symbol needs to be considered: -a+b should be parsed as (-a)+b, instead of -(a+b)
+  --  We can first check if the parsed expr is really meant to be "-(a+b)", by checking if parentheses are syntactically existed;
+  --  if not, then we attach the minus sign to the left-most entity of the mis-parsed expr body
+  --  (putting "-" to "a" of the expr "a+b", so it becomes "(-a)+b")
+  --  ==> This approach fails at the case "a = -1", which simply raise an error, because the binding of "-" and "1" hasn't happend
+  --      when handling "=".
+
+  -- Second attempt: Let NegNum have higher precedence than Sub, then try to transform
+  -- expressions like "(1 (-2)) (-3)" back to "(1 - 2) - 3"
+
+-- handlingMinusSignIssue :: Expr -> Expr
+--   handlingMinusSignIssue expr' = case expr' of
+--         -- First four cases are just passing recursively into sub-expressions.
+--         Paren to ex to'                 -> Paren to (handlingMinusSignIssue ex) to'
+--         Quant e e' nas to ex to' ex' e6 -> Quant e e' nas to (handlingMinusSignIssue ex) to' (handlingMinusSignIssue ex') e6
+--         Case to ex to' ccs              -> Case to (handlingMinusSignIssue ex) to' (map f ccs)
+--           where
+--             f :: CaseClause -> CaseClause
+--             f (CaseClause pat e ex') = CaseClause pat e (handlingMinusSignIssue ex')
+--         Arr ex to ex' to'               -> Arr (handlingMinusSignIssue ex) to (handlingMinusSignIssue ex') to'
+--         App ex1 (App neg@(Op (ArithOp (NegNum l))) ex2) ->
+--           -- It has the pattern "a (-b)"
+--           if isInBinaryOpContext ex1 then
+--             -- Don't transform if the context is inside an operator
+--             noTransformation
+--           else
+--             -- First check if the user really mean this, i.e., there exist parentheses:
+--               -- Doesn't really need to check, because concrete syntax has "Paren", and it won't fall into this pattern
+--             -- Then make it the right expression: 
+--             noTransformation
+--           where
+--             noTransformation = App (handlingMinusSignIssue ex1) (App neg $ handlingMinusSignIssue ex2)
+--             transformation = 
+--               App (App (Op (ArithOp (Sub l))) (handlingMinusSignIssue ex1)) (handlingMinusSignIssue ex2)
+            
+--             isInBinaryOpContext :: Expr -> Bool
+--             isInBinaryOpContext (App (Op op) _) = isBinary op
+--             isInBinaryOpContext _ = False
+--             isBinary :: Op -> Bool
+--             isBinary op = case fst (classify op) of 
+--               Operator.Infix -> True
+--               Operator.InfixR -> True
+--               Operator.InfixL -> True
+--               Operator.Prefix -> False
+--               Operator.Postfix -> False
+--         App ex ex' -> App (handlingMinusSignIssue ex) (handlingMinusSignIssue ex')
+--         ex@_ -> ex
+
+
+------- Records of the former method handling minus sign in expression parsing.
+-- let expr' = case expr of
+--         App neg@(Expr.Op (ArithOp (NegNum _))) e ->
+--           if isntWrappedByParens e
+--           then
+--             addNegToLeftMost e
+--           else
+--             expr
+--           where
+--             isntWrappedByParens Paren {} = False
+--             isntWrappedByParens _ = True
+
+--             addNegToLeftMost (App (App op@(Expr.Op _) left) right) = 
+--               -- ChainOps (which are all binary) and binary ArithOp operators. 
+--               -- Unary oprators won't fall into this case, because we pattern-matched two layers of App;
+--               -- and unary operators are same as the normal (App left right) case, no need to break further break it.
+--               App (App op (addNegToLeftMost left)) right
+--             addNegToLeftMost (App left right) = App (addNegToLeftMost left) right
+--             addNegToLeftMost x = App neg x
+--         _ -> expr
