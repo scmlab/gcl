@@ -40,8 +40,8 @@ handleExpr _ (Var   x l) = tempHandleLoc l $ render x
 handleExpr _ (Const x l) = tempHandleLoc l $ render x
 handleExpr _ (Lit   x l) = tempHandleLoc l $ render x
 handleExpr _ (Op _     ) = error "erroneous syntax given to render"
-handleExpr n (App (App (Op op@(ChainOp _)) p _) q _) = do
-  renderPrec n p <+> render op <+> renderPrec n q
+-- handleExpr n (App (App (Op op@(ChainOp _)) p _) q _) = do
+--   renderPrec n p <+> render op <+> renderPrec n q          -- chain operators are now handled with other binary operators
 handleExpr n (App (App (Op op) left _) right _) =  --binary operators
   parensIf n (Just op) $ 
   renderPrec (HOLEOp op) left 
@@ -150,30 +150,53 @@ instance Render Interval where
 parensIf :: PrecContext -> Maybe Op -> Inlines -> Inlines
 parensIf pc mop = case isomerismOfContextAndCurrentOp pc mop of
   Nothing    -> 
-    let conditionOfOmittingParens = case classify' mop of
-          Prefix  -> case pc of
-            AppHOLE  -> False
-            OpHOLE _ -> False
-            _        -> precOfPC pc >= precOf' mop
-          Postfix -> precOfPC pc >= precOf' mop
-          _       -> precOfPC pc > precOf' mop || (sameOpSym' pc mop
-                                                   && isAssocOp' mop)
+    let conditionOfOmittingParens = case mop of
+          Just (ArithOp (Neg _)) -> commonParenOmittingCondition
+          Just (ArithOp (NegU _)) -> commonParenOmittingCondition
+          -- negation is treated differently from other unary operators: 
+          -- others, e.g., minus: "a * (- b)", but negation: "a && ~b" doesn't need parentheses
+          _ -> case classify' mop of
+            Prefix  -> case pc of
+              AppHOLE  -> False
+              OpHOLE _ -> False
+              _        -> precOfPC pc >= precOf' mop
+            Postfix -> commonParenOmittingCondition
+                       || precOfPC pc == precOf' mop
+            _       -> commonParenOmittingCondition
+                       || (sameOpSym' pc mop && isAssocOp' mop)
     in
     if conditionOfOmittingParens
     then id
     else parensE
   Just Cis -> -- e.g., In "a -> (b -> c)", "(a - b) - c", parentheses can be omitted.
-    if precOfPC pc > precOf' mop || sameOpSym' pc mop
+    if commonParenOmittingCondition || sameOpSym' pc mop
     then id
     else parensE
   Just Trans   -> -- e.g., In "a - (b - c)", the parentheses shouldn't be omitted;
                   --  but in "a * (b * c)", since "*" is associative, the parentheses can be omitted.
-    if precOfPC pc > precOf' mop || (sameOpSym' pc mop
-                                      && isAssocOp' mop)
+    if commonParenOmittingCondition || (sameOpSym' pc mop
+                                        && isAssocOp' mop)
     then id
     else parensE
 
   where
+    commonParenOmittingCondition = precOfPC pc > precOf' mop 
+                                  || (isChainPC pc && isChainOp' mop)
+    isChainPC :: PrecContext -> Bool
+    isChainPC pc' = case pc' of
+      NoContext -> False
+      AppHOLE -> False
+      HOLEApp -> False
+      OpHOLE op -> isChainOp' (Just op)
+      HOLEOp op -> isChainOp' (Just op)
+
+    isChainOp' :: Maybe Op -> Bool
+    isChainOp' mop' = case mop' of
+      Nothing -> False
+      Just op -> case op of
+        ChainOp _ -> True
+        ArithOp _ -> False
+
     -- In this scope, every "Nothing" case of "Maybe Op" means application.
     sameOpSym' :: PrecContext -> Maybe Op -> Bool
     sameOpSym' pc' Nothing = case pc' of
