@@ -74,6 +74,7 @@ library
       Syntax.Abstract.Instances.Json
       Syntax.Abstract.Instances.Located
       Syntax.Abstract.Operator
+      Syntax.Abstract.TypeChecked
       Syntax.Abstract.Types
       Syntax.Abstract.Util
       Syntax.Common
@@ -228,6 +229,7 @@ test-suite gcl-test
       Syntax.Abstract.Instances.Json
       Syntax.Abstract.Instances.Located
       Syntax.Abstract.Operator
+      Syntax.Abstract.TypeChecked
       Syntax.Abstract.Types
       Syntax.Abstract.Util
       Syntax.Common

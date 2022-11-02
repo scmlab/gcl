@@ -6,7 +6,7 @@ Sweep Result { POs: [ Conditional at ./test/source/Server/spec-qm-4.gcl [0-52] 1
                     True`
                     explanation not available ]
 Specs: [ Precondition at ./test/source/Server/spec-qm-4.gcl [16-30] 2:5-4:7
-       `True ∧True`
+       `True ∧ True`
        Postcondition
        `True`
        , Precondition at ./test/source/Server/spec-qm-4.gcl [35-49] 5:5-7:7
