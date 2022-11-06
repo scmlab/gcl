@@ -48,11 +48,10 @@ sweep program@(A.Program _ decs _props stmts _) = do
            runWP (structProgram stmts) (decls, dnames)
   -- update Proof Obligations with corresponding Proof Anchors
   let proofAnchors = stmts >>= \case
-        A.Proof anchors _ -> anchors
-        _                 -> []
+        A.Proof anchor _ r -> [(anchor,r)]
+        _                  -> []
   -- make a table of (#hash, range) from Proof Anchors
-  let table = Map.fromList
-        $ map (\(A.ProofAnchor hash range) -> (hash, range)) proofAnchors
+  let table = Map.fromList proofAnchors
   let updatePO po = case Map.lookup (poAnchorHash po) table of
         Nothing    -> po
         Just range -> po { poAnchorLoc = Just range }

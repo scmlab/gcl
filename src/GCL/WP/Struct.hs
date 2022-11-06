@@ -135,7 +135,7 @@ structFunctions (wpSegs, wpSStmts, wp, spSStmts) =
   let guards = A.getGuards gcmds
   tellPO (Conjunct (inv : map (Negate . guardLoop) guards)) post (AtLoop l)
   forM_ gcmds (structGdcmdInduct inv)
- struct _        (A.Proof _ _)     _    = return ()
+ struct _        (A.Proof _ _ _)     _    = return ()
  -- TODO:
  struct (pre, _) (A.Block prog _)  post = structBlock pre prog post
  struct (pre, _) s@(A.Alloc _ _ l) post =

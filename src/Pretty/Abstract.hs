@@ -84,8 +84,9 @@ instance Pretty Stmt where
   pretty (If gdCmds _) =
     "if" <> line <> vsep (map (\x -> " |" <+> pretty x <> line) gdCmds) <> "fi"
   pretty (Spec content _) = "[!" <> pretty content <> "!]"
-  pretty (Proof anchors _) =
-    "{-" <> vsep (map (\x -> pretty x <> line) anchors) <> "-}"
+  pretty (Proof anchor contents _) =
+    -- "{-" <> vsep (map (\x -> pretty x <> line) anchors) <> "-}"
+    "{- #" <> pretty anchor <> line <> pretty contents <> line <> "-}"
   pretty (Alloc x es _) =
     pretty x
       <+> ":="
@@ -101,8 +102,11 @@ instance Pretty GdCmd where
   pretty (GdCmd guard body _) =
     pretty guard <+> "->" <+> vsep (map pretty body)
 
-instance Pretty ProofAnchor where
-  pretty (ProofAnchor hash _) = "#" <+> pretty hash
+-- instance Pretty ProofAnchor where
+--   pretty (ProofAnchor hash _) = "#" <+> pretty hash
+
+-- instance Pretty TextContents where
+--   pretty (TextContents text _) = pretty text
 
 --------------------------------------------------------------------------------
 

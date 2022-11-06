@@ -216,7 +216,7 @@ fitsIndentReq tokToCheck indentReq = case indentReq of
      , TokBlockClose  -- ']|'
      , TokGuardBar    -- '|'
      , TokSpecClose   -- '!]'
-     , TokProofClose  -- '-}'
+     --, TokProofClose  -- '-}'
      , TokDeclClose   -- ':}'
      ])
       -- Special cases: structural delimiters don't need to align/indent to anything

@@ -63,7 +63,7 @@ data Stmt
   | Do [GdCmd] Loc
   | If [GdCmd] Loc
   | Spec Text Range
-  | Proof [ProofAnchor] Loc
+  | Proof Text Text Range
     -- pointer operations
   | Alloc   Name [Expr] Loc    --  p := new (e1,e2,..,en)
   | HLookup Name Expr Loc      --  x := *e
@@ -75,8 +75,9 @@ data Stmt
 
 data GdCmd = GdCmd Expr [Stmt] Loc
   deriving (Eq, Show)
-data ProofAnchor = ProofAnchor Text Range
-  deriving (Eq, Ord, Show)
+-- data ProofAnchor = ProofAnchor Text Range
+--   deriving (Eq, Ord, Show)
+
 
 --------------------------------------------------------------------------------
 

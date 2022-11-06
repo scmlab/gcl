@@ -98,7 +98,7 @@ data Stmt
   | If (Token "if") (SepBy "|" GdCmd) (Token "fi")
   | SpecQM Range -- ? to be rewritten as {!!}
   | Spec (Token "[!") [L Tok] (Token "!]")
-  | Proof (Token "{-") [ProofAnchor] (Token "-}")
+  | Proof Text Text Text Range -- anchor, the content of the block, the whole proof block (for pretty's reconstruction)
   | Alloc Name (Token ":=") (Token "new") (Token "(") (SepBy "," Expr) (Token ")")
   | HLookup Name (Token ":=") (Token "*") Expr
   | HMutate (Token "*") Expr (Token ":=") Expr
@@ -107,7 +107,8 @@ data Stmt
   deriving (Eq, Show)
 
 data GdCmd = GdCmd Expr TokArrows [Stmt] deriving (Eq, Show)
-data ProofAnchor = ProofAnchor Text Range deriving (Eq, Show)
+-- data ProofAnchor = ProofAnchor Text Range deriving (Eq, Show)
+-- data TextContents = TextContents Text Range deriving (Eq, Show)
 
 --------------------------------------------------------------------------------
 

@@ -156,11 +156,11 @@ tokenSpecOpen = adapt TokSpecOpen "[!"
 tokenSpecClose :: Parser (Token "!]")
 tokenSpecClose = adapt TokSpecClose "!]"
 
-tokenProofOpen :: Parser (Token "{-")
-tokenProofOpen = adapt TokProofOpen "{-"
+-- tokenProofOpen :: Parser (Token "{-")
+-- tokenProofOpen = adapt TokProofOpen "{-"
 
-tokenProofClose :: Parser (Token "-}")
-tokenProofClose = adapt TokProofClose "-}"
+-- tokenProofClose :: Parser (Token "-}")
+-- tokenProofClose = adapt TokProofClose "-}"
 
 tokenBlockOpen :: Parser (Token "|[")
 tokenBlockOpen = adapt TokBlockOpen "|["
@@ -292,7 +292,7 @@ statement :: Parser Stmt
 statement =
   choice
       [ skip
-      , proofAnchors
+      , proofBlock
       , abort
       , try assertion
       , loopInvariant
@@ -378,31 +378,39 @@ spec =
   notTokSpecClose (L _ TokSpecClose) = False
   notTokSpecClose _                  = True
 
-proofAnchors :: Parser Stmt
-proofAnchors =
-  Proof
-    <$> tokenProofOpen
-    <*> many proofAnchor
-    <*> tokenProofClose
- where
-  proofAnchor :: Parser ProofAnchor
-  proofAnchor = do
-    (hash, range) <- getRange $ extract extractHash
-    skipProof
-    return $ ProofAnchor hash range
+proofBlock :: Parser Stmt
+proofBlock = do
+  ((proofAnchor,contents,whole),r) <- getRange $ extract extractProof
+  return $ Proof (Text.pack proofAnchor) (Text.pack contents) (Text.pack whole) r
+  where
+    extractProof (TokProof anchor contents whole) = Just (anchor, contents, whole)
+    extractProof _ = Nothing
 
-  skipProof :: Parser ()
-  skipProof = void $ takeWhileP
-    (Just "anything other than '-]' or another proof anchor")
-    notTokProofCloseOrProofAnchor
+-- proofAnchors :: Parser Stmt
+-- proofAnchors =
+--   Proof
+--     <$> tokenProofOpen
+--     <*> many proofAnchor
+--     <*> tokenProofClose
+--  where
+--   proofAnchor :: Parser ProofAnchor
+--   proofAnchor = do
+--     (hash, range) <- getRange $ extract extractHash
+--     skipProof
+--     return $ ProofAnchor hash range
 
-  notTokProofCloseOrProofAnchor :: L Tok -> Bool
-  notTokProofCloseOrProofAnchor (L _ TokProofClose     ) = False
-  notTokProofCloseOrProofAnchor (L _ (TokProofAnchor _)) = False
-  notTokProofCloseOrProofAnchor _                        = True
+--   skipProof :: Parser ()
+--   skipProof = void $ takeWhileP
+--     (Just "anything other than '-]' or another proof anchor")
+--     notTokProofCloseOrProofAnchor
 
-  extractHash (TokProofAnchor s) = Just (Text.pack s)
-  extractHash _                  = Nothing
+--   notTokProofCloseOrProofAnchor :: L Tok -> Bool
+--   notTokProofCloseOrProofAnchor (L _ TokProofClose     ) = False
+--   notTokProofCloseOrProofAnchor (L _ (TokProofAnchor _)) = False
+--   notTokProofCloseOrProofAnchor _                        = True
+
+--   extractHash (TokProofAnchor s) = Just (Text.pack s)
+--   extractHash _                  = Nothing
 
 alloc :: Parser Stmt
 alloc =

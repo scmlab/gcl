@@ -128,11 +128,11 @@ instance PrettyWithLoc (Token "⟨") where
 instance PrettyWithLoc (Token "⟩") where
   prettyWithLoc (Token l r) = DocWithLoc (pretty $ show TokQuantCloseU) l r
 
-instance PrettyWithLoc (Token "{-") where
-  prettyWithLoc (Token l r) = DocWithLoc (pretty $ show TokProofOpen) l r
+-- instance PrettyWithLoc (Token "{-") where
+--   prettyWithLoc (Token l r) = DocWithLoc (pretty $ show TokProofOpen) l r
 
-instance PrettyWithLoc (Token "-}") where
-  prettyWithLoc (Token l r) = DocWithLoc (pretty $ show TokProofClose) l r
+-- instance PrettyWithLoc (Token "-}") where
+--   prettyWithLoc (Token l r) = DocWithLoc (pretty $ show TokProofClose) l r
 
 instance PrettyWithLoc (Token "{:") where
   prettyWithLoc (Token l r) = DocWithLoc (pretty $ show TokDeclOpen) l r
@@ -279,8 +279,8 @@ instance PrettyWithLoc Stmt where
         --   TokDedent            -> ""
         --   TokNewline           -> ""
         --   _ -> show Tok 
-  prettyWithLoc (Proof l anchors r) =
-    prettyWithLoc l <> prettyWithLoc anchors <> prettyWithLoc r
+  prettyWithLoc (Proof _ _ whole r) =
+    fromDoc (locOf r) (pretty whole)
   prettyWithLoc (Alloc p a n l es r) =
     prettyWithLoc p
       <> prettyWithLoc a
@@ -303,12 +303,16 @@ instance PrettyWithLoc GdCmd where
   prettyWithLoc (GdCmd guard a body) =
     prettyWithLoc guard <> prettyWithLoc a <> prettyWithLoc body
 
-instance Pretty ProofAnchor where
-  pretty = toDoc . prettyWithLoc
+-- instance Pretty ProofAnchor where
+--   pretty = toDoc . prettyWithLoc
 
-instance PrettyWithLoc ProofAnchor where
-  prettyWithLoc (ProofAnchor hash range) =
-    fromDoc (locOf range) (pretty (show TokHash) <> pretty hash)
+-- instance PrettyWithLoc ProofAnchor where
+--   prettyWithLoc (ProofAnchor hash range) =
+--     fromDoc (locOf range) (pretty (show TokHash) <> pretty hash)
+
+-- instance PrettyWithLoc TextContents where
+--   prettyWithLoc (TextContents text range) =
+--     fromDoc (locOf range) (pretty text)
 
 --------------------------------------------------------------------------------
 

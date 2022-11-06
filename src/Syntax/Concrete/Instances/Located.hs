@@ -52,7 +52,7 @@ instance Located Stmt where
   locOf (If l _ r                   ) = l <--> r
   locOf (SpecQM l                   ) = locOf l
   locOf (Spec  l _ r                ) = l <--> r
-  locOf (Proof l _ r                ) = l <--> r
+  locOf (Proof _ _ _ r                ) = locOf r
   locOf (Alloc l _ _ _ _ r          ) = l <--> r
   locOf (HLookup l _ _ r            ) = l <--> r
   locOf (HMutate l _ _ r            ) = l <--> r

@@ -125,7 +125,7 @@ instance ToAbstract Stmt A.Stmt where
     Spec l xs r -> do
       let text = docToText $ toDoc $ prettyWithLoc (map (fmap show) xs)
       pure (A.Spec text (rangeOf l <> rangeOf r))
-    Proof _ anchors _  -> A.Proof <$> toAbstract anchors <*> pure (locOf stmt)
+    Proof anchor contents _ r  -> pure $ A.Proof anchor contents r
     Alloc p _ _ _ es _ -> A.Alloc p <$> toAbstract es <*> pure (locOf stmt)
     HLookup x _ _ e    -> A.HLookup x <$> toAbstract e <*> pure (locOf stmt)
     HMutate _ e1 _ e2 ->
@@ -137,8 +137,11 @@ instance ToAbstract GdCmd A.GdCmd where
   toAbstract (GdCmd a _ b) =
     A.GdCmd <$> toAbstract a <*> toAbstract b <*> pure (a <--> b)
 
-instance ToAbstract ProofAnchor A.ProofAnchor where
-  toAbstract (ProofAnchor hash range) = pure $ A.ProofAnchor hash range
+-- instance ToAbstract ProofAnchor A.ProofAnchor where
+--   toAbstract (ProofAnchor hash range) = pure $ A.ProofAnchor hash range
+
+-- instance ToAbstract TextContents A.TextContents where
+--   toAbstract (TextContents text range) = pure $ A.TextContents text range
 
 --------------------------------------------------------------------------------
 

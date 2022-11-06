@@ -30,7 +30,7 @@ instance Located Stmt where
   locOf (Do    _ l          ) = l
   locOf (If    _ l          ) = l
   locOf (Spec  _ l          ) = locOf l
-  locOf (Proof _ l          ) = l
+  locOf (Proof _ _ r        ) = locOf r
   locOf (Alloc   _ _ l      ) = l
   locOf (HLookup _ _ l      ) = l
   locOf (HMutate _ _ l      ) = l

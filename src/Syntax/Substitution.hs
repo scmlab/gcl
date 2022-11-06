@@ -83,7 +83,7 @@ instance Fresh m => Substitutable m Stmt Expr where
   subst sb (If gdcmds l) =
     If <$> mapM (subst sb) gdcmds <*> pure l
   subst _ s@(Spec _ _) = return s
-  subst _ s@(Proof _ _) = return s
+  subst _ s@(Proof _ _ _) = return s
   subst sb (Alloc x es l) =
     Alloc (renameVar sb x) <$> mapM (subst sb) es <*> pure l
   subst sb (HLookup x i l) =

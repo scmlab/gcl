@@ -21,7 +21,7 @@ import           Data.Loc
 import           Data.Maybe                     ( fromMaybe )
 import           Data.Text                      ( Text )
 import qualified Data.Text                     as Text
-import Language.Lexer.Applicative              ( TokenStream(..), longest, runLexer, token, whitespace, Lexer )
+import Language.Lexer.Applicative              ( TokenStream(..), longest, longestShortest, runLexer, token, whitespace, Lexer )
 import           Syntax.Parser.TokenStream     ( PrettyToken(..) )
 import Text.Regex.Applicative                  ( Alternative((<|>), some, many), RE, anySym, psym, string )
 
@@ -82,8 +82,6 @@ data Tok
   | TokQuantClose
   | TokQuantOpenU
   | TokQuantCloseU
-  | TokProofOpen
-  | TokProofClose
   | TokBlockOpen
   | TokBlockClose
   | TokDeclOpen
@@ -127,7 +125,6 @@ data Tok
   | TokProd
   | TokForall
   | TokExist
-  | TokProofAnchor String
   | TokHash
   | TokUpperName Text
   | TokLowerName Text
@@ -135,6 +132,9 @@ data Tok
   | TokChar Char
   | TokTrue
   | TokFalse
+  
+  -- tokens for proof block {- #anchor ...} or block comment {- ... -}
+  | TokProof String String String -- anchor, contents, full-text containing "{-", "-}"
   deriving (Eq, Ord)
 
 instance Show Tok where
@@ -178,8 +178,6 @@ instance Show Tok where
     TokQuantClose        -> "|>"
     TokQuantOpenU        -> "⟨"
     TokQuantCloseU       -> "⟩"
-    TokProofOpen         -> "{-"
-    TokProofClose        -> "-}"
     TokBlockOpen         -> "|["
     TokBlockClose        -> "]|"
     TokDeclOpen          -> "{:"
@@ -219,7 +217,6 @@ instance Show Tok where
     TokProd              -> "∏"
     TokForall            -> "∀"
     TokExist             -> "∃"
-    TokProofAnchor s     -> "#" ++ s
     TokHash              -> "#"
     TokUpperName s       -> Text.unpack s
     TokLowerName s       -> Text.unpack s
@@ -227,6 +224,7 @@ instance Show Tok where
     TokChar      c       -> "'" <> show c <> "'"
     TokTrue              -> "True"
     TokFalse             -> "False"
+    TokProof s _ _       -> "{- #" ++ s ++ " ...-}"
 
 type TokStream = TokenStream (L Tok)
 
@@ -308,10 +306,6 @@ tokRE =
     <$  string "⟨"
     <|> TokQuantCloseU
     <$  string "⟩"
-    <|> TokProofOpen
-    <$  string "{-"
-    <|> TokProofClose
-    <$  string "-}"
     <|> TokBlockOpen
     <$  string "|["
     <|> TokBlockClose
@@ -407,16 +401,21 @@ tokRE =
     <$> intRE
     <|> TokChar
     <$> charRE
-    <|> TokProofAnchor
-    <$> proofAnchorRE
     <|> TokHash
     <$  string "#"
 
+-- proofBlockRE :: RE Char Tok
+-- proofBlockRE = TokProofBlock 
+--                <$> (string "{-" *> many (psym isSpace) *> proofAnchorRE)
+--                <*> untilProofBlockEnd
 
--- starts with uppercase alphabets
-proofAnchorRE :: RE Char String
-proofAnchorRE =
-  string "#" *> ((:) <$> psym isAlphaNum <*> many (psym isAlphaNum))
+-- commentBlockRE :: RE Char Tok
+-- commentBlockRE = TokCommentBlock <$ string "{-" <* untilProofBlockEnd
+
+-- untilProofBlockEnd :: RE Char String
+-- untilProofBlockEnd = (:) <$> anySym <*> untilProofBlockEnd 
+--                      <|> string "-}" *> empty
+
 
 -- starts with lowercase alphabets
 lowerNameRE :: RE Char String
@@ -441,21 +440,39 @@ isNewline _    = False
 isNameChar :: Char -> Bool
 isNameChar c = isAlphaNum c || c == '_' || c == '\''
 
-comment' :: RE Char String
-comment' = do
-  let oneLine = string "--" <* many (psym (not . isNewline))
-      multLine = string "{{" *> many anySym *> string "}}"
-  oneLine <|> multLine
+
+proofAnchorRE :: RE Char String
+proofAnchorRE =
+  -- string "#" *> ((:) <$> psym isAlphaNum <*> many (psym isAlphaNum))
+  string "#" *> some (psym isAlphaNum)
+
+makeProofTok :: (String,String) -> String -> String -> Tok
+makeProofTok (preSpaces,anchor) postSpaces contents = 
+  TokProof anchor contents ("{-" <> preSpaces <> "#" <> anchor <> postSpaces <> contents <> "-}")
+    
+
 
 lexer :: Lexer Tok
 lexer = mconcat
-  [ -- tokens to be sent to the parser
+  [ 
+  -- tokens to be sent to the parser
     token (longest tokRE)
-  
-    -- meaningless tokens that are to be dumped
-  , whitespace (longest comment')
+
+  -- Handling {- #anchor ... -} and {- ... -}
+  , token $ longestShortest ((,) <$> (string "{-" *> many (psym isSpace)) <*> proofAnchorRE)
+          $ \opening-> makeProofTok opening
+                    <$> many (psym isSpace)
+                    <*> (many anySym <* string "-}")
+  , whitespace $ longestShortest (string "{-") $ const (many anySym <* string "-}")
+
+  -- meaningless tokens that are to be dumped
+  , whitespace (longest $ string "--" <* many (psym (not . isNewline)))
+    -- single-line comment
+  , whitespace (longestShortest (string "{{") (const (many anySym *> string "}}")))
+    -- old-style comment block
   , whitespace (longest $ psym isSpace)
   ]
+
 
 --------------------------------------------------------------------------------
 type LexicalError = Pos
@@ -476,6 +493,7 @@ scan filepath =
               update (Loc start (Pos path l c co)) = Loc start (Pos path l (c+1) (co+1))
       f TsEof = TsEof 
       f (TsError e) = TsError e
+
 
 
 -- | Instances of PrettyToken

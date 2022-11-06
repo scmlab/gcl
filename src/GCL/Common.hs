@@ -136,7 +136,7 @@ instance Free Stmt where
   freeVars (Do gdcmds _) = Set.unions (map freeVars gdcmds)
   freeVars (If gdcmds _) = Set.unions (map freeVars gdcmds)
   freeVars (Spec  _ _) = mempty
-  freeVars (Proof _ _) = mempty
+  freeVars (Proof _ _ _) = mempty
   freeVars (Alloc x es _) =
      Set.singleton x <> Set.unions (map freeVars es)
   freeVars (HLookup x e _) =

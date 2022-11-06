@@ -155,9 +155,10 @@ instance Collect () Highlighting Stmt where
     Spec tokA _ tokB -> do
       addHighlighting J.SttKeyword [] tokA
       addHighlighting J.SttKeyword [] tokB
-    Proof tokA _ tokB -> do
-      addHighlighting J.SttKeyword [] tokA
-      addHighlighting J.SttKeyword [] tokB
+    Proof _ _ _ range -> do
+      addHighlighting J.SttKeyword [] range
+      -- addHighlighting J.SttKeyword [] tokA
+      -- addHighlighting J.SttKeyword [] tokB
     Alloc a tok tokNew _ bs _ -> do
       collect (AsVariable a)
       addHighlighting J.SttKeyword []                  tok

@@ -96,7 +96,7 @@ wpFunctions structSegs = (wpSegs, wpSStmts, wp)
     Constant . (guard `A.imply`) . toExpr <$> wpStmts body post
   return (conjunct (disjunctGuards gcmds : pres))
 
- wp (A.Proof _ _         ) post = return post
+ wp (A.Proof _ _ _       ) post = return post
 
  wp (A.Alloc x (e : es) _) post = do -- non-empty
     {- wp (x := es) P = (forall x', (x' -> es) -* P[x'/x])-}
