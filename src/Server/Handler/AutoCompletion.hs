@@ -7,7 +7,7 @@ import           Data.Text                      ( Text )
 import           Language.LSP.Types
 import           Server.Monad
 
--- To control the behaviour of autocomplete 
+-- To control the behaviour of autocomplete
 -- see https://github.com/haskell/lsp/blob/bf95cd94f3301fe391093912e6156de7cb5c1289/lsp-types/src/Language/LSP/Types/Completion.hs
 handler :: Position -> Maybe CompletionContext -> ServerM (a |? CompletionList)
 handler position completionContext = do
@@ -54,11 +54,17 @@ items position = mconcat
                 "\"≤\" Less-Than or Equal To"
                 "The Unicode variant of \"<=\""
     , makeItems position
-                ["=>", "Rightarrow", "implies", "R"]
+                ["==>", "Rightarrow", "implies", "R"]
                 (Just CiOperator)
                 "⇒"
                 "\"⇒\" Rightwards Double Arrow"
                 "The Unicode variant of \"=>\""
+    , makeItems position
+                ["<==", "Leftarrow", "ffrom", "L"]
+                (Just CiOperator)
+                "⇐"
+                "\"⇐\" Leftwards Double Arrow"
+                "The Unicode variant of \"<=\""
     , makeItems position
                 ["&&", "wedge", "and"]
                 (Just CiOperator)
@@ -143,21 +149,21 @@ makeItems
     -> Text
     -> [CompletionItem]
 makeItems position labels kind symbol detail doc = flip map labels $ \label ->
-    CompletionItem label  -- The label of this completion item. 
+    CompletionItem label  -- The label of this completion item.
            -- By default also the text that is inserted when selecting this completion.
                    kind   -- could be CIOperator, CiValue or whatever
                    Nothing -- for marking deprecated stuff
-                   (Just detail) -- human-readable string 
-                   (Just $ CompletionDocString doc) -- also human-readable string 
-                   Nothing -- deprecated 
-                   Nothing -- select thie item when showing 
-                   Nothing -- how to sort completion items 
-                   Nothing -- how to filter completion items 
-                   (Just symbol) -- the symbol we wanna insert 
-                   (Just PlainText) -- could be a "Snippet" (with holes) or just plain text 
-                   Nothing -- how whitespace and indentation is handled during completion 
+                   (Just detail) -- human-readable string
+                   (Just $ CompletionDocString doc) -- also human-readable string
+                   Nothing -- deprecated
+                   Nothing -- select thie item when showing
+                   Nothing -- how to sort completion items
+                   Nothing -- how to filter completion items
+                   (Just symbol) -- the symbol we wanna insert
+                   (Just PlainText) -- could be a "Snippet" (with holes) or just plain text
+                   Nothing -- how whitespace and indentation is handled during completion
                    Nothing -- TextEdit to be applied when this item has been selected (but not completed yet)
-                   removeSlash -- TextEdit to be applied when this item has been completed 
+                   removeSlash -- TextEdit to be applied when this item has been completed
                    (Just (List [" ", "\\"])) -- commit characters
                    Nothing -- command to be executed after completion
                    Nothing -- ???
