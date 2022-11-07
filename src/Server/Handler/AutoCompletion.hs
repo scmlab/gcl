@@ -30,7 +30,13 @@ shouldTriggerCompletion _ = False
 items :: Position -> [CompletionItem]
 items position = mconcat
     [ makeItems position
-                ["->", "rightarrow", "r"]
+                [" "]
+                (Just CiOperator)
+                "\\"
+                "\"\\\" Backward slash"
+                "Inserting \"\\\""
+    , makeItems position
+                ["->", "rightarrow", "r", "to"]
                 (Just CiOperator)
                 "→"
                 "\"→\" Rightwards Arrow"
@@ -137,6 +143,12 @@ items position = mconcat
                 "≡"
                 "\"≡\" If and only if"
                 "The Unicode variant of \"<=>\""
+    , makeItems position
+                ["sconj"]
+                (Just CiOperator)
+                "٭"
+                "\"٭\" SConj"
+                "SConj"
     ]
 
 -- See https://github.com/haskell/lsp/blob/bf95cd94f3301fe391093912e6156de7cb5c1289/lsp-types/src/Language/LSP/Types/Completion.hs#L288
