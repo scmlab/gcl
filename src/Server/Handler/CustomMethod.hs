@@ -16,6 +16,8 @@ import           Error                          ( Error(Others) )
 import           GCL.Predicate
 import qualified GCL.Substitution              as Substitution
 import           Render                         ( Render(render) )
+import           Render.Predicate               ( exprOfPred )
+import           Pretty
 import           Server.CustomMethod
 import           Server.Monad
 import           Server.Pipeline
@@ -71,23 +73,66 @@ handleInsertAnchor :: Text -> PipelineM [ResKind]
 handleInsertAnchor hash = do
   -- mute the event listener before editing the source
   mute True
-  -- template of proof to be appended to the source
-  let template = "{- #" <> hash <> "\n\n-}"
+  
   -- range for appending the template of proof
   source        <- getSource
   (_, abstract) <- parseProgram source
+  parsed      <- parse source
+  converted   <- convert parsed
+  typeChecked <- typeCheck converted
+  swept <- sweep typeChecked
+  -- read the PO here
+  let thePO  = lookup hash $ map (\x->(poAnchorHash x,x)) (sweptPOs swept)
+  
+  -- template of proof to be appended to the source
+  let template = case thePO of
+                  Nothing -> ""
+                  Just po -> "{- #" <> hash <> "\n" 
+                              <> preExpr <> "\n"
+                              <> "⇒" <> "\n"
+                              <> postExpr <> "\n"
+                              <> Text.pack (replicate len '=')
+                              <> "\n\n-}\n"
+                    where 
+                      preExpr = docToText $ pretty $ exprOfPred $ poPre po
+                      postExpr = docToText $ pretty $ exprOfPred $ poPost po
+                      len = max (max (Text.length preExpr) (Text.length postExpr) - 2) 5
+  -- then insert
   range         <- case fromLoc (locOf abstract) of
     Nothing -> throwError [Others "Cannot read the range of the program"]
     Just x  -> return x
 
   source' <- editText (Range (rangeEnd range) (rangeEnd range))
                       ("\n\n" <> template)
-  parsed      <- parse source'
-  converted   <- convert parsed
-  typeChecked <- typeCheck converted
+  -- 
+  parsed'      <- parse source'
+  converted'   <- convert parsed'
+  typeChecked' <- typeCheck converted'
   mute False
-  swept <- sweep typeChecked
-  generateResponseAndDiagnostics swept
+  swept' <- sweep typeChecked'
+  generateResponseAndDiagnostics swept'
+
+-- handleInsertAnchor :: Text -> PipelineM [ResKind]
+-- handleInsertAnchor hash = do
+--   -- mute the event listener before editing the source
+--   mute True
+--   -- template of proof to be appended to the source
+--   let template = "{- #" <> hash <> "\n\n-}"
+--   -- range for appending the template of proof
+--   source        <- getSource
+--   (_, abstract) <- parseProgram source
+--   range         <- case fromLoc (locOf abstract) of
+--     Nothing -> throwError [Others "Cannot read the range of the program"]
+--     Just x  -> return x
+
+--   source' <- editText (Range (rangeEnd range) (rangeEnd range))
+--                       ("\n\n" <> template)
+--   parsed      <- parse source'
+--   converted   <- convert parsed
+--   typeChecked <- typeCheck converted
+--   mute False
+--   swept <- sweep typeChecked
+--   generateResponseAndDiagnostics swept
 
 handleSubst :: Int -> PipelineM [ResKind]
 handleSubst i = do
