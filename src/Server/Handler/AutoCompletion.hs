@@ -132,7 +132,7 @@ items position = mconcat
                 "\"∀\" Forall"
                 "The Unicode variant of \"forall\""
     , makeItems position
-                ["exitsts", "ex", "E"]
+                ["exists", "ex", "E"]
                 (Just CiValue)
                 "∃"
                 "\"∃\" Exists"
