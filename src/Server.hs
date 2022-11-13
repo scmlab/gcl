@@ -33,7 +33,15 @@ run devMode = do
         _      <- runServerWithHandles handle handle (serverDefn env)
         putStrLn "== dev server closed =="
     else do
-      runServer (serverDefn env)
+      -- runServer (serverDefn env)
+      let port = "3000"
+      putStrLn "== GCL backend program started =="
+      _ <- forkIO (printLog env)
+      serve (Host "127.0.0.1") port $ \(sock, _remoteAddr) -> do
+        putStrLn $ "== GCL language server established at port:" ++ port ++ " =="
+        handle <- socketToHandle sock ReadWriteMode
+        _      <- runServerWithHandles handle handle (serverDefn env)
+        putStrLn "== GCL language server closed =="
  where
   printLog :: GlobalEnv -> IO ()
   printLog env = forever $ do
