@@ -26,15 +26,6 @@ import           Syntax.Abstract.Util           ( programToScopeForSubstitution
 
 import qualified Language.LSP.Types            as J
 
-handleSolve :: Text -> PipelineM [ResKind]
-handleSolve hash = do
-  logText $ "SOLVE " <> hash
-  resultFromSolver <- solve hash
-  logText $ "RESULT FROM SOLVER:  " <> Text.pack resultFromSolver
-  stage <- load
-  case stage of
-    Swept swept -> generateSolveAndDiagnostics swept hash resultFromSolver
-    _           -> return []
 
 handleInspect :: Range -> PipelineM [ResKind]
 handleInspect range = do
@@ -167,7 +158,6 @@ handleCustomMethod = \case
   ReqRefine       range -> handleRefine range
   ReqInsertAnchor hash  -> handleInsertAnchor hash
   ReqSubstitute   i     -> handleSubst i
-  ReqSolve        hash  -> handleSolve hash
   ReqDebug              -> return $ error "crash!"
 
 handler :: JSON.Value -> (Response -> ServerM ()) -> ServerM ()

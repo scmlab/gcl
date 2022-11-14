@@ -21,7 +21,6 @@ import           Language.LSP.Types             ( Diagnostic )
 import           Pretty
 import           Server.Pipeline
 import Error (Error)
-import Data.SBV ( defaultSMTCfg, SMTResult (Unsatisfiable), ThmResult (ThmResult) )
 
 --------------------------------------------------------------------------------
 
@@ -114,8 +113,3 @@ go = \case
   SendDiagnostics diagnostics next -> do
     tell [TraceSendDiagnostics diagnostics]
     interpret next
-  Solve _ next -> do
-    -- not sure what I should do with this
-    -- just some placeholder to make the code compile
-    tell [TraceSolve "Solve !"]
-    interpret (next "Nothing here yet")

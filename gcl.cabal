@@ -69,7 +69,6 @@ library
       Server.Monad
       Server.Pipeline
       Server.SrcLoc
-      SMT.Prove
       Syntax.Abstract
       Syntax.Abstract.Instances.Json
       Syntax.Abstract.Instances.Located
@@ -116,7 +115,6 @@ library
     , prettyprinter
     , random
     , regex-applicative
-    , sbv
     , srcloc
     , template-haskell
     , text
@@ -152,7 +150,6 @@ executable gcl
     , prettyprinter
     , random
     , regex-applicative
-    , sbv
     , srcloc
     , template-haskell
     , text
@@ -223,7 +220,6 @@ test-suite gcl-test
       Server.Monad
       Server.Pipeline
       Server.SrcLoc
-      SMT.Prove
       Syntax.Abstract
       Syntax.Abstract.Instances.Json
       Syntax.Abstract.Instances.Located
@@ -273,7 +269,6 @@ test-suite gcl-test
     , prettyprinter
     , random
     , regex-applicative
-    , sbv
     , srcloc
     , tasty
     , tasty-golden
