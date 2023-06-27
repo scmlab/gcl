@@ -69,6 +69,7 @@ library
       Server.Monad
       Server.Pipeline
       Server.SrcLoc
+      Server2.Requests
       Syntax.Abstract
       Syntax.Abstract.Instances.Json
       Syntax.Abstract.Instances.Located
@@ -220,6 +221,7 @@ test-suite gcl-test
       Server.Monad
       Server.Pipeline
       Server.SrcLoc
+      Server2.Requests
       Syntax.Abstract
       Syntax.Abstract.Instances.Json
       Syntax.Abstract.Instances.Located
