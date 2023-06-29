@@ -40,9 +40,10 @@ data Session = Session
      { filePath  :: Maybe FilePath
      , srcTree   :: Maybe A.Program 
      , proofObs  :: Maybe [PO]
-     , specs     :: Maybe [(Int, TypeEnv, Spec)]
+     , specs     :: Maybe [Spec]
      , globals   :: Maybe [A.Expr]
      }
+
 
 emptySession = Session Nothing Nothing Nothing Nothing
 
