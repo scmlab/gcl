@@ -3,6 +3,7 @@
 
 module Render.Syntax.Abstract where
 
+import           Data.Loc                       ( locOf )
 import           Data.Foldable                  ( toList )
 import qualified Data.Map                      as Map
 import           Render.Class
@@ -36,8 +37,7 @@ instance Render Expr where
   renderPrec prec expr = handleExpr prec expr
 
 handleExpr :: PrecContext -> Expr -> Inlines
-handleExpr _ (Var   x l) = tempHandleLoc l $ render x
-handleExpr _ (Const x l) = tempHandleLoc l $ render x
+handleExpr _ (Var   x  ) = tempHandleLoc (locOf x) $ render x
 handleExpr _ (Lit   x l) = tempHandleLoc l $ render x
 handleExpr _ (Op _     ) = error "erroneous syntax given to render"
 -- handleExpr n (App (App (Op op@(ChainOp _)) p _) q _) = do
@@ -129,7 +129,7 @@ instance Render Type where
   render (TFunc  a b    _) = render a <+> "→" <+> render b
   render (TArray i b    _) = "array" <+> render i <+> "of" <+> render b
   render (TCon   n args _) = render n <+> horzE (map render args)
-  render (TVar i _       ) = "TVar" <+> render i
+  render (TVar i         ) = "TVar" <+> render i
   render (TMetaVar n     ) = "TMetaVar" <+> render n
 
 -- | Interval

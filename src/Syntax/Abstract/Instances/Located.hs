@@ -53,12 +53,11 @@ instance Located Type where
   locOf (TTuple _    ) = NoLoc
   locOf (TFunc _ _ l ) = l
   locOf (TCon  _ _ l ) = locOf l
-  locOf (TVar _ l    ) = l
+  locOf (TVar x      ) = locOf x
   locOf (TMetaVar _  ) = NoLoc
 
 instance Located Expr where
-  locOf (Var   _ l           ) = l
-  locOf (Const _ l           ) = l
+  locOf (Var   x             ) = locOf x
   locOf (Lit   _ l           ) = l
   locOf (Op op               ) = locOf op
   locOf (App  _ _ l          ) = l

@@ -182,8 +182,7 @@ instance Collect LocationLinkToBe LocationLink GdCmd where
 instance Collect LocationLinkToBe LocationLink Expr where
   collect = \case
     Lit   _ _           -> return ()
-    Var   a _           -> collect a
-    Const a _           -> collect a
+    Var   a             -> collect a
     Op op               -> collect op
     App  a b _          -> collect a >> collect b
     Lam  _ b _          -> collect b
@@ -235,7 +234,7 @@ instance Collect LocationLinkToBe LocationLink Type where
     TTuple as    -> mapM_ collect as
     TFunc x y _  -> collect x >> collect y
     TCon  x _ _  -> collect x
-    TVar _ _     -> return ()
+    TVar _       -> return ()
     TMetaVar _   -> return ()
 
 instance Collect LocationLinkToBe LocationLink Interval where

@@ -128,11 +128,10 @@ substitute xs es expr = do
 withFreshVar :: (A.Expr -> WP a) -> WP a
 withFreshVar f = do
   name <- freshName' "bnd"
-  let var = A.Var name NoLoc
   withRWST
     (\(decls, scopes) st ->
        ((Map.insert (nameToText name) Nothing decls, scopes), st))
-    (f var)
+    (f (A.Var name))
 
 withLocalScopes :: ([[Text]] -> WP a) -> WP a
 withLocalScopes f = do

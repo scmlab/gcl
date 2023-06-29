@@ -141,8 +141,7 @@ instance Collect Type (J.Hover, Type) GdCmd where
 instance Collect Type (J.Hover, Type) Expr where
   collect = \case
     Lit   _ _              -> return ()
-    Var   a _              -> collect a
-    Const a _              -> collect a
+    Var   a                -> collect a
     Op op                  -> collect op
     App  a b _             -> collect a >> collect b
     Lam  _ b _             -> collect b
@@ -211,7 +210,7 @@ instance Collect Type (J.Hover, Type) Type where
     TTuple xs    -> mapM_ collect xs
     TFunc x y _  -> collect x >> collect y
     TCon  x _ _  -> collect x
-    TVar _ _     -> return ()
+    TVar _       -> return ()
     TMetaVar _   -> return ()
 
 instance Collect Type (J.Hover, Type) Interval where

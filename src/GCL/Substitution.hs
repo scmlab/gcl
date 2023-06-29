@@ -180,7 +180,7 @@ instance Substitutable Expr where
 
     Lit{}      -> return expr
 
-    Var name _ -> case Map.lookup (nameToText name) mapping of
+    Var name -> case Map.lookup (nameToText name) mapping of
       Just value -> return value
       Nothing    -> do
         decls <- ask
@@ -197,22 +197,22 @@ instance Substitutable Expr where
           Just Nothing -> return expr
           Nothing      -> return expr
 
-    Const name _ -> case Map.lookup (nameToText name) mapping of
-      Just value -> reduce value
-      Nothing    -> do
-        decls <- ask
-        index <- countUp
-        case Map.lookup (nameToText name) decls of
-          Just (Just binding) -> do
-            let e = RedexKernel
-                  name
-                  binding
-                  (freeVars binding)
-                  -- NonEmpty.singleton is only available after base-4.15
-                  (NonEmpty.fromList [shrinkMapping binding mapping])
-            return $ RedexShell index e
-          Just Nothing -> return expr
-          Nothing      -> return expr
+    -- Const name _ -> case Map.lookup (nameToText name) mapping of
+    --   Just value -> reduce value
+    --   Nothing    -> do
+    --     decls <- ask
+    --     index <- countUp
+    --     case Map.lookup (nameToText name) decls of
+    --       Just (Just binding) -> do
+    --         let e = RedexKernel
+    --               name
+    --               binding
+    --               (freeVars binding)
+    --               -- NonEmpty.singleton is only available after base-4.15
+    --               (NonEmpty.fromList [shrinkMapping binding mapping])
+    --         return $ RedexShell index e
+    --       Just Nothing -> return expr
+    --       Nothing      -> return expr
 
     Op{}              -> return expr
 
@@ -359,7 +359,7 @@ renameBinder renamings binder =
 renamingToMapping :: Map Name Name -> Mapping
 renamingToMapping =
   Map.fromList
-    . map (\(old, new) -> (nameToText old, Var new (locOf old)))
+    . map (\(old, new) -> (nameToText old, Var new))
     . Map.toList
 
 ------------------------------------------------------------------

@@ -100,7 +100,7 @@ data Type
   | TTuple [Type]
   | TFunc Type Type Loc
   | TCon Name [Name] Loc
-  | TVar Name Loc
+  | TVar Name
   | TMetaVar Name
   deriving (Eq, Show, Generic)
 
@@ -109,8 +109,7 @@ data Type
 -- | Expressions
 data Expr
   = Lit Lit Loc
-  | Var Name Loc
-  | Const Name Loc
+  | Var Name
   | Op Op
   | App Expr Expr Loc
   | Lam Name Expr Loc

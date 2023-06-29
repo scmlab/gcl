@@ -114,7 +114,7 @@ instance ToAbstract Stmt A.Stmt where
     Assign a _ b -> do
       A.Assign <$> toAbstract a <*> toAbstract b <*> pure (locOf stmt)
     AAssign x _ i _ _ e ->
-      A.AAssign (A.Var x (locOf x)) <$> toAbstract i <*> toAbstract e <*> pure
+      A.AAssign (A.Var x) <$> toAbstract i <*> toAbstract e <*> pure
         (locOf stmt)
     Assert _ a _ -> A.Assert <$> toAbstract a <*> pure (locOf stmt)
     LoopInvariant _ a _ _ _ b _ ->
@@ -195,7 +195,7 @@ instance ToAbstract Type A.Type where
       | tn == "Bool" && null ns -> return $ A.TBase A.TBool l
       | tn == "Char" && null ns -> return $ A.TBase A.TChar l
       | otherwise -> return $ A.TCon n ns (n <--> ns)
-    (TVar a      ) -> pure $ A.TVar a (locOf t)
+    (TVar a      ) -> pure $ A.TVar a
     (TParen _ a _) -> do
       t' <- toAbstract a
       case t' of
@@ -204,7 +204,7 @@ instance ToAbstract Type A.Type where
         A.TTuple as'     -> pure $ A.TTuple as'
         A.TFunc a' b' _  -> pure $ A.TFunc a' b' (locOf t)
         A.TCon  a' b' _  -> pure $ A.TCon a' b' (locOf t)
-        A.TVar a' _      -> pure $ A.TVar a' (locOf t)
+        A.TVar a'        -> pure $ A.TVar a'
         A.TMetaVar a'    -> pure $ A.TMetaVar a'
 
 --------------------------------------------------------------------------------
@@ -214,8 +214,8 @@ instance ToAbstract Expr A.Expr where
   toAbstract x = case x of
     Paren _ a _ -> toAbstract a
     Lit   a     -> A.Lit <$> toAbstract a <*> pure (locOf x)
-    Var   a     -> pure $ A.Var a (locOf x)
-    Const a     -> pure $ A.Const a (locOf x)
+    Var   a     -> pure $ A.Var a
+    Const a     -> pure $ A.Var a
     Op    a     -> pure $ A.Op a
     Arr arr _ i _ ->
       A.ArrIdx <$> toAbstract arr <*> toAbstract i <*> pure (locOf x)
@@ -229,8 +229,8 @@ instance ToAbstract Expr A.Expr where
         <*> pure (locOf x)
      where
       toAbstractQOp qop = case qop of
-        Left  op   -> return (A.Op op)
-        Right n@(Name _ l) -> return $ A.Const n l
+        Left  op -> return $ A.Op op
+        Right n  -> return $ A.Var n
     Case _ expr _ cases ->
       A.Case <$> toAbstract expr <*> toAbstract cases <*> pure (locOf x)
 

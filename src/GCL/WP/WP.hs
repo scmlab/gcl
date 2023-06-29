@@ -84,7 +84,7 @@ wpFunctions structSegs = (wpSegs, wpSStmts, wp)
 
  wp (A.Assign xs es _) post = substitute xs es post
 
- wp (A.AAssign (A.Var x _) i e _) post =
+ wp (A.AAssign (A.Var x) i e _) post =
   substitute [x] [A.ArrUpd (A.nameVar x) i e NoLoc] post
 
  wp (A.AAssign _ _ _ l) _    = throwError (MultiDimArrayAsgnNotImp l)
@@ -145,7 +145,7 @@ wpFunctions structSegs = (wpSegs, wpSStmts, wp)
    -- if any (`member` (fv pre)) (declaredNames decls)
    --   then throwError (LocalVarExceedScope l)
    --   else return pre
-  where toSubst = fromList . map (\(n, n') -> (n, A.Var n' (locOf n')))
+  where toSubst = fromList . map (\(n, n') -> (n, A.Var n'))
 
 calcLocalRenaming :: [Text] -> [Name] -> WP ([Text], [(Text, Name)])
 calcLocalRenaming _ [] = return ([], [])
@@ -159,7 +159,7 @@ calcLocalRenaming scope (x:xs)
 
 toMapping :: [(Text, Name)] -> A.Mapping
 toMapping = fromList . map cvt
-  where cvt (x, y) = (x, A.Var y (locOf y))
+  where cvt (x, y) = (x, A.Var y)
 
 allocated :: Fresh m => A.Expr -> m A.Expr
 allocated e = do

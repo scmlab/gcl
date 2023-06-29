@@ -229,8 +229,7 @@ runInferType x = do
 
 instance InferType Expr where
   inferType (Lit   lit l) = return (litTypes lit l)
-  inferType (Var   x   _) = inferType x
-  inferType (Const x   _) = inferType x
+  inferType (Var   x    ) = inferType x
   inferType (Op o       ) = inferType o
   inferType (App (App (Op op@(ChainOp _)) e1 _) e2 l) = do
     top <- inferType op
@@ -419,12 +418,12 @@ unifies (TFunc t1 t2 _) (TFunc t3 t4 _) l = do
   return (s2 `compose` s1)
 unifies (TCon n1 args1 _) (TCon n2 args2 _) _
   | n1 == n2 && length args1 == length args2 = return mempty
-unifies (TVar x1 _) (TVar x2 _) _ | x1 == x2 = return mempty
-unifies (TVar x _) t@(TBase tb _) _ | x == baseToName tb =
+unifies (TVar x1) (TVar x2) _ | x1 == x2 = return mempty
+unifies (TVar x) t@(TBase tb _) _ | x == baseToName tb =
   return $ Map.singleton x t
-unifies (TVar x _) t@(TCon n args _) _ | x == n && null args =
+unifies (TVar x) t@(TCon n args _) _ | x == n && null args =
   return $ Map.singleton x t
-unifies t1 t2@(TVar _ _) l                   = unifies t2 t1 l
+unifies t1 t2@(TVar _  ) l                   = unifies t2 t1 l
 unifies (TMetaVar x) (TMetaVar y) _ | x == y = return mempty
 unifies (TMetaVar x) t            l          = bind x t l
 unifies t            (TMetaVar x) l          = bind x t l

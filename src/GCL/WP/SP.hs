@@ -75,7 +75,7 @@ spFunctions (structSegs, struct) = spSStmts
   freshNames <- forM xs $ \x -> do
     x' <- freshPre (toText x)
     return $ Name x' NoLoc
-  let freshVars = map (`A.Var` l) freshNames
+  let freshVars = map A.Var freshNames
   -- substitute "xs"s with fresh names in "pre"
   pre' <- substitute xs freshVars (toExpr pre)
 
@@ -87,7 +87,7 @@ spFunctions (structSegs, struct) = spSStmts
     return $ A.nameVar x `A.eqq` e'
   return $ Constant (A.exists freshNames (A.conjunct predicates) pre')
 
- sp (pre, _) (A.AAssign (A.Var x _) i e _) = do
+ sp (pre, _) (A.AAssign (A.Var x) i e _) = do
   -- {P} x[I] := E { (exist x' :: x = x'[I[x'/x] -> E[x'/x]] && P[x'/x]) }
   x'   <- freshPre (nameToText x)
 

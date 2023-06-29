@@ -55,14 +55,14 @@ imply p q = App (App ((Op . ArithOp . ImpliesU) NoLoc) p (locOf p)) q (locOf q)
 predEq :: Expr -> Expr -> Bool
 predEq = (==)
 
-constant :: Text -> Expr
-constant x = Const (Name x NoLoc) NoLoc
+-- constant :: Text -> Expr
+-- constant x = Const (Name x NoLoc) 
 
 variable :: Text -> Expr
-variable x = Var (Name x NoLoc) NoLoc
+variable x = Var (Name x NoLoc) 
 
 nameVar :: Name -> Expr
-nameVar x = Var x NoLoc
+nameVar x = Var x
 
 number :: Int -> Expr
 number n = Lit (Num n) NoLoc

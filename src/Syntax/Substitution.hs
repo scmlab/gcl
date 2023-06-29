@@ -14,7 +14,12 @@ import           GCL.WP.Util                    ( declaredNames )
 import           Syntax.Abstract.Types
 import           Syntax.Common
 
+-- a substitution Subst b is a mapping from names to b.
+-- 
+
 type Subst b = Map Text b
+
+-- subs :: Variableous e => Subst b -> Text -> 
 
 class Substitutable m a b where
   subst :: Subst b -> a -> m a
@@ -22,21 +27,17 @@ class Substitutable m a b where
 -- types that has a concept of a "variable"
 class Variableous e where
   isVar :: e -> Maybe Name
-  mkVar :: Name -> Loc -> e
+  mkVar :: Name -> e
 
 instance Variableous Expr where
-  isVar (Var   x _) = Just x
-  isVar (Const x _) = Just x
-  isVar _           = Nothing
+  isVar (Var   x) = Just x
+  isVar _         = Nothing
   mkVar = Var
-
 
 instance Fresh m => Substitutable m Expr Expr where
   subst _ e@(Lit _ _) = return e
-  subst sb (Var x l) =
-    return . maybe (Var x l) id $ lookup (nameToText x) sb
-  subst sb (Const x l) =
-    return . maybe (Var x l) id $ lookup (nameToText x) sb
+  subst sb (Var x) =
+    return . maybe (Var x) id $ lookup (nameToText x) sb
   subst _ e@(Op _) = return e
   subst sb (App e1 e2 l) =
     App <$> subst sb e1 <*> subst sb e2 <*> pure l
@@ -162,14 +163,33 @@ shrinkSubst binders ns subs =
  where substractKeys sb bs =
          filterWithKey (\k _ -> not (k `elem` bs)) sb
 
+{- composeSubst s1 s2
+
+-}
+
+-- composeSubst :: Substitutable m b b => Subst b -> Subst b -> Subst b
+-- composeSubst
+
+{-  genBinderRenaming fvs xs 
+    produces a substitution that renames those 
+    variables in xs that occur in fvs.
+-}
+
 genBinderRenaming :: (Fresh m, Variableous e) =>
                   Set Text -> [Name] -> m (Subst e)
 genBinderRenaming _ [] = return empty
 genBinderRenaming fvs (Name x l : xs)
    | x `Set.member` fvs = do
        x' <- freshName x l
-       insert x (mkVar x' l) <$> genBinderRenaming fvs xs
+       insert x (mkVar x') <$> genBinderRenaming fvs xs
    | otherwise = genBinderRenaming fvs xs
+
+{- renameVars renames a list of Names.
+   renameVar renames a Name.
+   Defined for convenience: while a substiution maps a Name to
+   a (general) expression, we define renameVars for occassions
+   that a substition maps a Name to a Name.
+-}
 
 renameVars :: Variableous e => Subst e -> [Name] -> [Name]
 renameVars sb = map (renameVar sb)
@@ -182,3 +202,20 @@ renameVar sb x = case lookup (nameToText x) sb of
                          Nothing -> error "variable should be substituted for a variable"
         --- SCM: we assume that renameVars always succeed.
         --       Do we need to raise a catchable error?
+
+
+-- Type
+
+instance Fresh m => Substitutable m Type Type where
+  subst _ (TBase b l) = return $ TBase b l
+  subst sb (TVar x  ) =
+    return . maybe (TVar x) id $ lookup (nameToText x) sb
+  subst sb (TMetaVar x) = 
+    return . maybe (TMetaVar x) id $ lookup (nameToText x) sb
+  subst sb (TArray ran t l) = 
+    TArray ran <$> subst sb t <*> pure l
+  subst sb (TTuple ts) =
+    TTuple <$> mapM (subst sb) ts
+  subst sb (TFunc t1 t2 l) =
+    TFunc <$> subst sb t1 <*> subst sb t2 <*> pure l
+  subst _ tcon@(TCon _ _ _) = return tcon

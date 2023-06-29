@@ -85,12 +85,11 @@ instance Free Type where
   freeVars (TTuple ts    ) = Set.unions (map freeVars ts)
   freeVars (TFunc t1 t2 _) = freeVars t1 <> freeVars t2
   freeVars (TCon  _  ns _) = Set.fromList ns
-  freeVars (TVar x _     ) = Set.singleton x
+  freeVars (TVar x       ) = Set.singleton x
   freeVars (TMetaVar n   ) = Set.singleton n
 
 instance Free Expr where
-  freeVars (Var   x _        ) = Set.singleton x
-  freeVars (Const x _        ) = Set.singleton x
+  freeVars (Var   x          ) = Set.singleton x
   freeVars (Op _             ) = mempty
   freeVars (Lit _ _          ) = mempty
   freeVars (App  e1 e2      _) = freeVars e1 <> freeVars e2

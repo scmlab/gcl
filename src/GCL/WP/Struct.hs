@@ -169,7 +169,7 @@ structFunctions (wpSegs, wpSStmts, wp, spSStmts) =
    stmts' <- subst (toSubst ys) stmts
    withScopeExtension (xs ++ (map (nameToText . snd) ys))
      (structStmts Primary (pre, Nothing) stmts' post)
-  where toSubst = fromList . map (\(n, n') -> (n, A.Var n' (locOf n')))
+  where toSubst = fromList . map (\(n, n') -> (n, A.Var n'))
 
 calcLocalRenaming :: [Text] -> [Name] -> WP ([Text], [(Text, Name)])
 calcLocalRenaming _ [] = return ([], [])
