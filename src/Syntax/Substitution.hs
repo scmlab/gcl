@@ -15,11 +15,13 @@ import           Syntax.Abstract.Types
 import           Syntax.Common
 
 -- a substitution Subst b is a mapping from names to b.
--- 
 
 type Subst b = Map Text b
 
--- subs :: Variableous e => Subst b -> Text -> 
+-- simple substitution for variables. Not monadic. Always succeed.
+
+subs :: Variableous e => Subst e -> Name -> e
+subs sb x = maybe (mkVar x) id $ lookup (nameToText x) sb
 
 class Substitutable m a b where
   subst :: Subst b -> a -> m a
@@ -36,8 +38,7 @@ instance Variableous Expr where
 
 instance Fresh m => Substitutable m Expr Expr where
   subst _ e@(Lit _ _) = return e
-  subst sb (Var x) =
-    return . maybe (Var x) id $ lookup (nameToText x) sb
+  subst sb (Var x) = return $ subs sb x
   subst _ e@(Op _) = return e
   subst sb (App e1 e2 l) =
     App <$> subst sb e1 <*> subst sb e2 <*> pure l
@@ -163,12 +164,11 @@ shrinkSubst binders ns subs =
  where substractKeys sb bs =
          filterWithKey (\k _ -> not (k `elem` bs)) sb
 
-{- composeSubst s1 s2
+ -- composeSubst s2 s1 = s2 . s1
 
--}
-
--- composeSubst :: Substitutable m b b => Subst b -> Subst b -> Subst b
--- composeSubst
+composeSubst :: (Monad m, Substitutable m b b) => 
+                Subst b -> Subst b -> m (Subst b)
+composeSubst s2 s1 = (`union` s2) <$> sequence (fmap (subst s2) s1) 
 
 {-  genBinderRenaming fvs xs 
     produces a substitution that renames those 
@@ -206,12 +206,16 @@ renameVar sb x = case lookup (nameToText x) sb of
 
 -- Type
 
+instance Variableous Type where
+  isVar (TVar     x) = Just x
+  isVar (TMetaVar x) = Just x
+  isVar _            = Nothing
+  mkVar = TVar
+
 instance Fresh m => Substitutable m Type Type where
-  subst _ (TBase b l) = return $ TBase b l
-  subst sb (TVar x  ) =
-    return . maybe (TVar x) id $ lookup (nameToText x) sb
-  subst sb (TMetaVar x) = 
-    return . maybe (TMetaVar x) id $ lookup (nameToText x) sb
+  subst _  (TBase b l)  = return $ TBase b l
+  subst sb (TVar x  )   = return $ subs sb x
+  subst sb (TMetaVar x) = return $ subs sb x
   subst sb (TArray ran t l) = 
     TArray ran <$> subst sb t <*> pure l
   subst sb (TTuple ts) =
