@@ -237,6 +237,11 @@ sweep result = do
 type PipelineM
   = FreeT Instruction (RWST FilePath () PipelineState (Except [Error]))
 
+-- PipelineM a
+-- ~> a | Instruction (PipelineM a)
+-- ~> a | Instruction (a | Instruction (PipelineM a))
+-- ~~ a | Instruction a | (Instruction (Instruction a)) | ...
+
 runPipelineM
   :: FilePath
   -> PipelineState
