@@ -61,6 +61,7 @@ library
       Server.Handler.AutoCompletion
       Server.Handler.CustomMethod
       Server.Handler.CustomMethod2
+      Server.Handler.CustomMethod3
       Server.Handler.Diagnostic
       Server.Handler.GoToDefn
       Server.Handler.Hover
@@ -213,6 +214,7 @@ test-suite gcl-test
       Server.Handler.AutoCompletion
       Server.Handler.CustomMethod
       Server.Handler.CustomMethod2
+      Server.Handler.CustomMethod3
       Server.Handler.Diagnostic
       Server.Handler.GoToDefn
       Server.Handler.Hover

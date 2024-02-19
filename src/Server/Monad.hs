@@ -11,6 +11,9 @@ module Server.Monad
   , customRequestResponder
   , customRequestToNotification
   , interpret
+  , logText
+  , sendDiagnosticsLSP
+  , convertErrorsToResponsesAndDiagnostics
   ) where
 
 import           Control.Concurrent             ( Chan

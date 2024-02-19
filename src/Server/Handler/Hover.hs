@@ -7,7 +7,7 @@ module Server.Handler.Hover
   ) where
 
 import           Error                          ( Error )
-import           Server.Monad
+import           Server.Monad            hiding ( logText )
 
 import           Data.Loc                       ( posCoff )
 import           Language.LSP.Types      hiding ( Range )

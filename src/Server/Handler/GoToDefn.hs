@@ -9,7 +9,7 @@ module Server.Handler.GoToDefn
 import           Data.Maybe                     ( maybeToList )
 import           Error                          ( Error )
 import           Language.LSP.Types      hiding ( Range )
-import           Server.Monad
+import           Server.Monad            hiding ( logText )
 import           Server.Pipeline
 import qualified Server.SrcLoc                 as SrcLoc
 import qualified Server.IntervalMap               as IntervalMap

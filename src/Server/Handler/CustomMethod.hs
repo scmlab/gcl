@@ -19,7 +19,7 @@ import           Render                         ( Render(render), Section (Secti
 import           Render.Predicate               ( exprOfPred )
 import           Pretty
 import           Server.CustomMethod
-import           Server.Monad
+import           Server.Monad            hiding ( logText )
 import           Server.Pipeline
 import           Syntax.Abstract.Util           ( programToScopeForSubstitution
                                                 )
@@ -172,6 +172,7 @@ handleCustomMethod = \case
   ReqSubstitute   i     -> handleSubst i
   ReqDebug              -> return $ error "crash!"
   ReqHelloWorld   range -> handleHelloWorld range
+  _                     -> return $ error "Not yet implemented."
 
 handler :: JSON.Value -> (Response -> ServerM ()) -> ServerM ()
 handler params responder = do
