@@ -43,9 +43,10 @@ handleRefine range = do
   mute True
   setLastSelection range
   source               <- getSource
+  -- find the spec and its content in the source
   (spec, payloadLines) <- refine source range
 
-  -- remove the Spec
+  -- add indentation to the content
   let indentedPayload = case payloadLines of
         []  -> ""
         [x] -> x
@@ -53,9 +54,12 @@ handleRefine range = do
           let indentation =
                 Text.replicate (posCol (rangeStart (specRange spec)) - 1) " "
           in  Text.unlines $ x : map (indentation <>) xs
+  
+  -- remove the brackets of the spec and leave only the content
   source'     <- editText (specRange spec) indentedPayload
-  parsed      <- parse source'
 
+  -- reload
+  parsed      <- parse source'
   converted   <- convert parsed
   typeChecked <- typeCheck converted
   mute False

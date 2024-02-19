@@ -139,6 +139,20 @@ data GlobalEnv = GlobalEnv
     -- Counter for generating fresh numbers
     globalCounter      :: IORef Int
   , globalCurrentStage :: IORef (Map FilePath PipelineState)
+    -- NEW: book keeping abstract syntax and hints
+  , loadedPrograms :: IORef (Map FilePath LoadedProgram)
+  }
+
+data LoadedProgram = LoadedProgram
+  { highlightingInfos :: [J.SemanticTokenAbsolute]
+  , abstractProgram   :: A.Program
+  , scopingInfo       :: IntervalMap J.LocationLink
+  , typeCheckingInfo  :: IntervalMap (J.Hover, Type) 
+  , pos               :: [PO]
+  , specs             :: [Spec]
+  , warnings          :: [StructWarning]
+  , redexes           :: IntMap (Int, A.Expr)
+  , variableCounter   :: Int
   }
 
 -- | Constructs an initial global state
@@ -148,6 +162,7 @@ initGlobalEnv =
     <$> newChan
     -- <*> newIORef Map.empty
     <*> newIORef 0
+    <*> newIORef Map.empty
     <*> newIORef Map.empty
 
 --------------------------------------------------------------------------------
@@ -191,6 +206,22 @@ setState filepath state = do
 getState :: FilePath -> ServerM PipelineState
 getState filepath = do
   ref     <- lift $ asks globalCurrentStage
+  mapping <- liftIO $ readIORef ref
+  case Map.lookup filepath mapping of
+    Nothing    -> return $ initState filepath
+    Just state -> return state
+
+
+--------------------------------------------------------------------------------
+
+cacheProgram :: FilePath -> LoadedProgram -> ServerM ()
+cacheProgram filepath state = do
+  ref <- lift $ asks loadedPrograms
+  liftIO $ modifyIORef' ref (Map.insert filepath state)
+
+dumpProgram :: FilePath -> ServerM LoadedProgram
+dumpProgram filepath = do
+  ref     <- lift $ asks loadedPrograms
   mapping <- liftIO $ readIORef ref
   case Map.lookup filepath mapping of
     Nothing    -> return $ initState filepath

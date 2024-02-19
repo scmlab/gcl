@@ -25,7 +25,6 @@ import qualified Syntax.Parser as Parser
 import qualified Syntax.Abstract as A
 import qualified Data.Text as Text
 import Error (Error(..))
-import Syntax.Concrete (ToAbstract(..))
 import Control.Monad.Except (runExcept)
 import Pretty (toText)
 import Data.Loc (posCol)
@@ -51,7 +50,7 @@ handler params responder = do
     handleRequest _request@(Req filePath reqKind) = do
       case reqKind of
         ReqReload           -> handleReload filePath respondResult respondError
-        ReqHelloWorld range -> replaceWithHelloworld' range respondError
+        ReqHelloWorld range -> handleHelloWorld range respondResult respondError
         _                   -> return $ error "Not yet implemented"
       where
         respondError :: Error -> ServerM ()
@@ -71,6 +70,9 @@ getSource filepath = fmap LSP.virtualFileText
 
 logText :: Text -> ServerM ()
 logText = Server.Monad.logText
+
+bumpVersion :: ServerM Int
+bumpVersion = Server.Monad.bumpVersion
 
 sendDiagnostics :: FilePath -> [LSP.Diagnostic] -> ServerM ()
 sendDiagnostics = Server.Monad.sendDiagnosticsLSP
@@ -103,10 +105,28 @@ editText range textToReplace onSuccess = do
       _newText = textToReplace
     }
 
--- ServerM program - example 1 --
+-- Hello World --
 
-replaceWithHelloworld :: FilePath -> Range -> (Error -> ServerM ()) -> ServerM ()
-replaceWithHelloworld filepath range onError = do
+handleHelloWorld :: Range -> ServerM () -> (Error -> ServerM ()) -> ServerM ()
+handleHelloWorld range onFinish onError = do
+  let filepath :: FilePath = rangeFile range
+  replaceWithHelloworld filepath range (do
+    let helloWorldRange = rangeAfterReplacedWithHelloWorld range
+    diagnosticOnHelloWorld = makeDiagnostic Nothing helloWorldRange "Hello, World?" "This is a warning"
+    sendDiagnostics [diagnosticOnHelloWorld]
+    version <- bumpVersion
+    onFinish [
+      ResDisplay version [
+        Section Blue [
+          Header "Hello, world" Nothing
+        , Paragraph $ fromString "LSP server successfully responded."
+        ]
+      ]
+    ]
+  ) onError
+
+replaceWithHelloworld :: FilePath -> Range -> ServerM () -> (Error -> ServerM ()) -> ServerM ()
+replaceWithHelloworld filepath range onFinish onError = do
   maybeSource <- getSource filepath
   case maybeSource of
     Nothing -> onError (CannotReadFile filepath)
@@ -114,7 +134,7 @@ replaceWithHelloworld filepath range onError = do
       logText "before replacement"
       logText source
       logText "\n"
-      editText range "Hello, World!" $ do
+      editText range "Hello, World!\n" $ do
         maybeSource' <- getSource filepath
         case maybeSource' of
           Nothing -> onError (CannotReadFile filepath)
@@ -122,34 +142,52 @@ replaceWithHelloworld filepath range onError = do
             logText "after replacement"
             logText source'
             logText "\n"
+            onFinish
 
-replaceWithHelloworld' :: Range -> (Error -> ServerM ()) -> ServerM ()
-replaceWithHelloworld' range onError = do
-  let filepath :: FilePath = rangeFile range
-  replaceWithHelloworld filepath range onError
+rangeAfterReplacedWithHelloWorld :: Range -> Range
+rangeAfterReplacedWithHelloWorld =
+  Range (rangeStart range) (addToCoff 13 $ rangeEnd range)
+  where
+    addToCoff :: Int -> Pos -> Pos
+    addToCoff offset pos = Pos (posFile pos) (posLine pos) (posCol pos) (posCoff pos + offset)
 
 
 -- Reload --
 
 handleReload :: FilePath -> ([ResKind] -> ServerM ()) -> (Error -> ServerM ()) -> ServerM ()
 handleReload filepath onFinsih onError = do
+  -- load source
   maybeSource <- getSource filepath
   case maybeSource of
     Nothing     -> onError (CannotReadFile filepath)
     Just source -> 
+      -- parse source into concrete syntax
       case parse filepath source of
         Left err       -> onError err
-        Right concrete -> convert filepath concrete (\abstract -> do
+        Right concrete ->
+          -- dig holes and convert to abstract syntax
+          toAbstract filepath concrete (\abstract -> do
             -- type check
             case typeCheck abstract of
               Left err -> onError err
               Right scopeTree -> 
+                -- calculate proof obligations, specs and other hints
                 case WP.sweep abstract of
                   Left  err -> onError (StructError err)
-                  Right (pos, specs, warings, redexes, counter) -> do
-                    -- TODO convert sweep result to data or rendering
-                    -- respond and send diagnostics
-                    return ()
+                  Right (pos, specs, warnings, redexes, counter) -> do
+                    -- send warnings as diagnostics
+                    let diagnostics = concatMap collect warnings
+                    sendDiagnostics diagnostics
+
+                    -- send all hints as reponses for client to render
+                    let (A.Program _ _ globalProperties _ _) = abstract
+                    version' <- bumpVersion
+                    let response :: [ResKind] =
+                          hintsToResponseBody
+                            version'
+                            Nothing
+                            (globalProperties, List.sort pos, sortOn locOf specs, warnings, redexes, counter)
+                    onFinsih response
           ) onError
 
 parse :: FilePath -> Text -> Either Error C.Program
@@ -158,9 +196,9 @@ parse filepath source =
     Left  err   -> Left (ParseError err)
     Right program -> Right program
 
-convert :: FilePath -> C.Program -> (A.Program -> ServerM ()) -> (Error -> ServerM ()) -> ServerM ()
-convert filepath concrete onFinish onError = do
-  case runExcept $ toAbstract concrete of
+toAbstract :: FilePath -> C.Program -> (A.Program -> ServerM ()) -> (Error -> ServerM ()) -> ServerM ()
+toAbstract filepath concrete onFinish onError = do
+  case runExcept $ C.toAbstract concrete of
     Left rangeToDigHole -> do
       _ <- digHole rangeToDigHole do
         maybeSource <- getSource filepath
@@ -185,96 +223,61 @@ typeCheck abstract = do
     Left  e -> Left (TypeError e)
     Right (_, scopeTree) -> return scopeTree
 
--- -- | Converts abstract syntax to POs and other stuff
--- --   persists the result
--- sweep :: TypeCheckResult -> PipelineM SweepResult
--- sweep result = do
---   let abstract@(A.Program _ _ globalProps _ _) =
---         convertedProgram (typeCheckedPreviousStage result)
---   swept <- case WP.sweep abstract of
---     Left  e -> throwError [StructError e]
---     Right (pos, specs, warings, redexes, counter) -> return $ SweepResult
---       { sweptPreviousStage = result
---       , sweptPOs           = List.sort pos
---       , sweptSpecs         = sortOn locOf specs
---       , sweptProps         = globalProps
---       , sweptWarnings      = warings
---       , sweptRedexes       = redexes
---       , sweptCounter       = counter
---       }
---   save (Swept swept) -- save the current progress
---   return swept
+hintsToResponseBody :: Int -> Maybe Range -> ([Expr], [PO], [Spec], [StructWarning], IntMap (Int, A.Expr), Int) -> [ResKind]
+hintsToResponseBody version rangeToInspect _hints@(globalProperties, proofObligations, specs, warnings, redexes, counter) =
+  [ ResMarkPOs rangesOfPOs
+  , ResUpdateSpecs (map encodeSpec specs)
+  , ResDisplay version sections
+  ]
+  where
+    rangesOfPOs :: [Range]
+    rangesOfPOs = mapMaybe (fromLoc . locOf) pos
+    encodeSpec :: Spec -> (Int, Text, Text, Range)
+    encodeSpec spec = 
+      ( specID spec
+      , toText $ render (specPreCond spec)
+      , toText $ render (specPostCond spec)
+      , specRange spec
+      )
+    sections :: [Section]
+    sections = mconcat
+      [ warningsSections
+      , specsSections
+      , poSections
+      , globalPropertiesSections
+      ]
+      where 
+        warningsSections :: [Section]
+        warningSections = map renderSection warnings
+        specsSections :: [Section]
+        specsSections = map renderSection specsWithinCurrentSelection
+          where
+            specsWithinCurrentSelection :: [Spec]
+            specsWithinCurrentSelection = case rangeToInspect of
+              Nothing            -> specs
+              Just selectedRange -> filter (withinRange selectedRange) specs 
+        poSections :: [Section]
+        poSections = map renderSection posWithCurrentSelection
+          where
+            posWithCurrentSelection :: [PO]
+            posWithCurrentSelection = case rangeToInspect of
+              Nothing        -> pos
+              Just selectedRange -> filter (selectedRange `covers`) pos
+              where
+                covers :: Range -> PO -> Bool
+                covers range po = case poAnchorLoc po of
+                  Nothing     -> withinRange sel po
+                  Just anchor -> withinRange sel po || withinRange sel anchor
+        globalPropertiesSections :: [Section]
+        globalPropertiesSections = map
+                (\expr -> Section
+                  Plain
+                  [Header "Property" (fromLoc (locOf expr)), Code (render expr)]
+                )
+                globalProperties
 
---------------------------------------------------------------------------------
--- | Monad for handling the pipeline
---
---  Side effects:
---    Reader: FilePath
---    State: PipelineState
---    Exception: [Error]
---
---  Also, PipelineM is also a free monad of Instruction
---  which allows us to "compile" a PipelineM program into a series of Instructions
---  We can then decide to run these compiled Instructions in the real world
---                     or simulate them for testing
+-- Refine --
 
--- toReponse :: ([PO], [Spec], [StructWarning], IntMap (Int, A.Expr), Int) -> [ResKind]
--- toReponse (proofObligations, specs, warnings, redexes, counter) = 
-
--- toDiagnostics :: ([PO], [Spec], [StructWarning], IntMap (Int, A.Expr), Int) -> [LSP.Diagnostic]
--- toDiagnostics =
-
--- generateResponseAndDiagnostics :: SweepResult -> PipelineM [ResKind]
--- generateResponseAndDiagnostics result = do
---   let (SweepResult _ pos specs globalProps warnings _redexes _) = result
-
---   -- get Specs around the mouse selection
---   lastSelection <- getLastSelection
---   let overlappedSpecs = case lastSelection of
---         Nothing        -> specs
---         Just selection -> filter (withinRange selection) specs
---   -- get POs around the mouse selection (including their corresponding Proofs)
-
---   let withinPOrange sel po = case poAnchorLoc po of
---         Nothing     -> withinRange sel po
---         Just anchor -> withinRange sel po || withinRange sel anchor
-
---   let overlappedPOs = case lastSelection of
---         Nothing        -> pos
---         Just selection -> filter (withinPOrange selection) pos
---   -- render stuff
---   let warningsSections =
---         if null warnings then [] else map renderSection warnings
---   let globalPropsSections = if null globalProps
---         then []
---         else map
---           (\expr -> Section
---             Plain
---             [Header "Property" (fromLoc (locOf expr)), Code (render expr)]
---           )
---           globalProps
---   let specsSections =
---         if null overlappedSpecs then [] else map renderSection overlappedSpecs
---   let poSections =
---         if null overlappedPOs then [] else map renderSection overlappedPOs
---   let sections = mconcat
---         [warningsSections, specsSections, poSections, globalPropsSections]
-
---   version <- bumpVersion
---   let encodeSpec spec =
---         ( specID spec
---         , toText $ render (specPreCond spec)
---         , toText $ render (specPostCond spec)
---         , specRange spec
---         )
-
---   let rangesOfPOs = mapMaybe (fromLoc . locOf) pos
---   let responses =
---         [ ResDisplay version sections
---         , ResUpdateSpecs (map encodeSpec specs)
---         , ResMarkPOs rangesOfPOs
---         ]
---   let diagnostics = concatMap collect warnings
---   sendDiagnostics diagnostics
-
---   return responses
+handleRefine :: Range -> Text -> ServerM ()
+handleRefine specRange filledText = do
+  _
