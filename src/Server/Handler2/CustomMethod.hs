@@ -3,23 +3,17 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE BlockArguments #-}
 
-module Server.Handler.CustomMethod2 where
-
-import qualified Language.LSP.Types as LSP
-import qualified Language.LSP.VFS as LSP
-import qualified Language.LSP.Server as LSP
+module Server.Handler2.CustomMethod where
 
 import qualified Data.Aeson.Types as JSON
 
-import Server.CustomMethod (Response (..), Request (..), ReqKind (..), ResKind)
-import Server.Monad (ServerM)
-import qualified Server.Monad (logText, sendDiagnosticsLSP, convertErrorsToResponsesAndDiagnostics)
+import Server.CustomMethod (Response (..), Request (..), ReqKind (..), ResKind (..))
+import Server.Monad (ServerM, convertErrorsToResponsesAndDiagnostics)
 
-import Data.Loc.Range (Range, rangeFile, rangeStart)
+import Data.Loc.Range (Range (..), rangeFile, rangeStart, rangeEnd, withinRange, fromLoc)
 import Data.Text (Text)
 
 import qualified GCL.WP                        as WP
-import qualified Server.SrcLoc as SrcLoc
 import qualified Syntax.Concrete as C
 import qualified Syntax.Parser as Parser
 import qualified Syntax.Abstract as A
@@ -27,10 +21,20 @@ import qualified Data.Text as Text
 import Error (Error(..))
 import Control.Monad.Except (runExcept)
 import Pretty (toText)
-import Data.Loc (posCol)
-import qualified Data.Maybe as Maybe
+import Data.Loc hiding ( fromLoc )
 import GCL.Type (ScopeTreeZipper)
 import qualified GCL.Type as TypeChecking
+import qualified Data.List as List
+import Syntax.Abstract (Expr)
+import GCL.WP.Type (StructWarning)
+import GCL.Predicate (PO (..), Spec (..))
+import Data.IntMap (IntMap)
+import Render (Section (..), Deco (..), Block (..), Render (..), RenderSection (..))
+import Server.Handler.Diagnostic (makeDiagnostic, Collect (collect))
+import Data.String (fromString)
+import Data.List (sortOn)
+import Data.Maybe (mapMaybe)
+import Server.Handler2.Utils
 
 handler :: JSON.Value -> (Response -> ServerM ()) -> ServerM ()
 handler params responder = do
@@ -62,68 +66,25 @@ handler params responder = do
         respondResult :: [ResKind] -> ServerM ()
         respondResult results = responder (Res filePath results)
 
--- Basic Instructions for our ServerM programs --
-
-getSource :: FilePath -> ServerM (Maybe Text)
-getSource filepath = fmap LSP.virtualFileText
-                      <$> LSP.getVirtualFile (LSP.toNormalizedUri (LSP.filePathToUri filepath))
-
-logText :: Text -> ServerM ()
-logText = Server.Monad.logText
-
-bumpVersion :: ServerM Int
-bumpVersion = Server.Monad.bumpVersion
-
-sendDiagnostics :: FilePath -> [LSP.Diagnostic] -> ServerM ()
-sendDiagnostics = Server.Monad.sendDiagnosticsLSP
-
-editText :: Range -> Text -> ServerM () -> ServerM ()
-editText range textToReplace onSuccess = do
-  let requestParams :: LSP.ApplyWorkspaceEditParams
-        = LSP.ApplyWorkspaceEditParams {
-            _label = Just "Resolve Spec",
-            _edit = LSP.WorkspaceEdit {
-              _changes = Nothing,
-              _documentChanges = Just (LSP.List [LSP.InL textDocumentEdit]),
-              _changeAnnotations = Nothing
-            }
-          }
-  _ <- LSP.sendRequest LSP.SWorkspaceApplyEdit requestParams (const onSuccess)
-  return ()
-
-  where
-    filepath :: FilePath
-    filepath = rangeFile range
-    textDocumentEdit :: LSP.TextDocumentEdit
-    textDocumentEdit = LSP.TextDocumentEdit {
-      _textDocument = LSP.VersionedTextDocumentIdentifier (LSP.filePathToUri filepath) (Just 0),
-      _edits = LSP.List [LSP.InL textEdit]
-    }
-    textEdit :: LSP.TextEdit
-    textEdit = LSP.TextEdit {
-      _range = SrcLoc.toLSPRange range,
-      _newText = textToReplace
-    }
-
 -- Hello World --
 
-handleHelloWorld :: Range -> ServerM () -> (Error -> ServerM ()) -> ServerM ()
+handleHelloWorld :: Range -> ([ResKind] -> ServerM ()) -> (Error -> ServerM ()) -> ServerM ()
 handleHelloWorld range onFinish onError = do
   let filepath :: FilePath = rangeFile range
   replaceWithHelloworld filepath range (do
-    let helloWorldRange = rangeAfterReplacedWithHelloWorld range
-    diagnosticOnHelloWorld = makeDiagnostic Nothing helloWorldRange "Hello, World?" "This is a warning"
-    sendDiagnostics [diagnosticOnHelloWorld]
-    version <- bumpVersion
-    onFinish [
-      ResDisplay version [
-        Section Blue [
-          Header "Hello, world" Nothing
-        , Paragraph $ fromString "LSP server successfully responded."
+      let helloWorldRange = rangeAfterReplacedWithHelloWorld range
+      let diagnosticOnHelloWorld = makeDiagnostic Nothing helloWorldRange "Hello, World?" "This is a warning"
+      _ <- sendDiagnostics filepath [diagnosticOnHelloWorld]
+      version <- bumpVersion
+      onFinish [
+          ResDisplay version [
+            Section Blue [
+              Header "Hello, world" Nothing
+            , Paragraph $ fromString "LSP server successfully responded."
+            ]
+          ]
         ]
-      ]
-    ]
-  ) onError
+    ) onError
 
 replaceWithHelloworld :: FilePath -> Range -> ServerM () -> (Error -> ServerM ()) -> ServerM ()
 replaceWithHelloworld filepath range onFinish onError = do
@@ -145,7 +106,7 @@ replaceWithHelloworld filepath range onFinish onError = do
             onFinish
 
 rangeAfterReplacedWithHelloWorld :: Range -> Range
-rangeAfterReplacedWithHelloWorld =
+rangeAfterReplacedWithHelloWorld range =
   Range (rangeStart range) (addToCoff 13 $ rangeEnd range)
   where
     addToCoff :: Int -> Pos -> Pos
@@ -177,7 +138,7 @@ handleReload filepath onFinsih onError = do
                   Right (pos, specs, warnings, redexes, counter) -> do
                     -- send warnings as diagnostics
                     let diagnostics = concatMap collect warnings
-                    sendDiagnostics diagnostics
+                    sendDiagnostics filepath diagnostics
 
                     -- send all hints as reponses for client to render
                     let (A.Program _ _ globalProperties _ _) = abstract
@@ -206,7 +167,7 @@ toAbstract filepath concrete onFinish onError = do
           Nothing -> onError (CannotReadFile filepath)
           Just source' -> case parse filepath source' of
             Left err        -> onError err
-            Right concrete' -> convert filepath concrete' onFinish onError
+            Right concrete' -> toAbstract filepath concrete' onFinish onError
       return ()
     Right abstract -> onFinish abstract
   where
@@ -231,7 +192,7 @@ hintsToResponseBody version rangeToInspect _hints@(globalProperties, proofObliga
   ]
   where
     rangesOfPOs :: [Range]
-    rangesOfPOs = mapMaybe (fromLoc . locOf) pos
+    rangesOfPOs = mapMaybe (fromLoc . locOf) proofObligations
     encodeSpec :: Spec -> (Int, Text, Text, Range)
     encodeSpec spec = 
       ( specID spec
@@ -248,7 +209,7 @@ hintsToResponseBody version rangeToInspect _hints@(globalProperties, proofObliga
       ]
       where 
         warningsSections :: [Section]
-        warningSections = map renderSection warnings
+        warningsSections = map renderSection warnings
         specsSections :: [Section]
         specsSections = map renderSection specsWithinCurrentSelection
           where
@@ -261,13 +222,13 @@ hintsToResponseBody version rangeToInspect _hints@(globalProperties, proofObliga
           where
             posWithCurrentSelection :: [PO]
             posWithCurrentSelection = case rangeToInspect of
-              Nothing        -> pos
-              Just selectedRange -> filter (selectedRange `covers`) pos
+              Nothing        -> proofObligations
+              Just selectedRange -> filter (selectedRange `covers`) proofObligations
               where
                 covers :: Range -> PO -> Bool
                 covers range po = case poAnchorLoc po of
-                  Nothing     -> withinRange sel po
-                  Just anchor -> withinRange sel po || withinRange sel anchor
+                  Nothing     -> withinRange range po
+                  Just anchor -> withinRange range po || withinRange range anchor
         globalPropertiesSections :: [Section]
         globalPropertiesSections = map
                 (\expr -> Section
@@ -280,4 +241,5 @@ hintsToResponseBody version rangeToInspect _hints@(globalProperties, proofObliga
 
 handleRefine :: Range -> Text -> ServerM ()
 handleRefine specRange filledText = do
-  _
+  -- TODO: refine
+  return ()

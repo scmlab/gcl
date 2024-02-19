@@ -5,7 +5,7 @@
 
 module Server.Monad
   ( ServerM
-  , GlobalEnv(globalChan)
+  , GlobalEnv(..)
   , initGlobalEnv
   , runServerM
   , customRequestResponder
@@ -14,6 +14,8 @@ module Server.Monad
   , logText
   , sendDiagnosticsLSP
   , convertErrorsToResponsesAndDiagnostics
+  , bumpVersion
+  , LoadedProgram(..)
   ) where
 
 import           Control.Concurrent             ( Chan
@@ -50,6 +52,11 @@ import           Server.Pipeline                ( Instruction(..)
                                                 )
 import qualified Server.Pipeline               as DSL
 import qualified Server.SrcLoc                 as SrcLoc
+import GCL.WP.Type (StructWarning)
+import Server.IntervalMap (IntervalMap)
+import Syntax.Abstract                         as A
+import GCL.Predicate (PO, Spec)
+import Data.IntMap (IntMap)
 
 
 --------------------------------------------------------------------------------
@@ -147,9 +154,9 @@ data LoadedProgram = LoadedProgram
   { highlightingInfos :: [J.SemanticTokenAbsolute]
   , abstractProgram   :: A.Program
   , scopingInfo       :: IntervalMap J.LocationLink
-  , typeCheckingInfo  :: IntervalMap (J.Hover, Type) 
-  , pos               :: [PO]
-  , specs             :: [Spec]
+  , typeCheckingInfo  :: IntervalMap (J.Hover, A.Type) 
+  , proofObligations  :: [PO]
+  , specifiations     :: [Spec]
   , warnings          :: [StructWarning]
   , redexes           :: IntMap (Int, A.Expr)
   , variableCounter   :: Int
@@ -206,22 +213,6 @@ setState filepath state = do
 getState :: FilePath -> ServerM PipelineState
 getState filepath = do
   ref     <- lift $ asks globalCurrentStage
-  mapping <- liftIO $ readIORef ref
-  case Map.lookup filepath mapping of
-    Nothing    -> return $ initState filepath
-    Just state -> return state
-
-
---------------------------------------------------------------------------------
-
-cacheProgram :: FilePath -> LoadedProgram -> ServerM ()
-cacheProgram filepath state = do
-  ref <- lift $ asks loadedPrograms
-  liftIO $ modifyIORef' ref (Map.insert filepath state)
-
-dumpProgram :: FilePath -> ServerM LoadedProgram
-dumpProgram filepath = do
-  ref     <- lift $ asks loadedPrograms
   mapping <- liftIO $ readIORef ref
   case Map.lookup filepath mapping of
     Nothing    -> return $ initState filepath

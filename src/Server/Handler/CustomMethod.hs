@@ -19,7 +19,7 @@ import           Render                         ( Render(render), Section (Secti
 import           Render.Predicate               ( exprOfPred )
 import           Pretty
 import           Server.CustomMethod
-import           Server.Monad            hiding ( logText )
+import           Server.Monad            hiding ( logText, bumpVersion )
 import           Server.Pipeline
 import           Syntax.Abstract.Util           ( programToScopeForSubstitution
                                                 )

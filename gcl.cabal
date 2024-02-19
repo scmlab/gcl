@@ -60,11 +60,15 @@ library
       Server.Handler
       Server.Handler.AutoCompletion
       Server.Handler.CustomMethod
-      Server.Handler.CustomMethod2
       Server.Handler.Diagnostic
       Server.Handler.GoToDefn
       Server.Handler.Hover
-      Server.Handlers2
+      Server.Handler2
+      Server.Handler2.CustomMethod
+      Server.Handler2.GoToDefinition
+      Server.Handler2.Hover
+      Server.Handler2.TextDocumentSemanticTokensFull
+      Server.Handler2.Utils
       Server.Highlighting
       Server.Hover
       Server.IntervalMap
@@ -213,11 +217,15 @@ test-suite gcl-test
       Server.Handler
       Server.Handler.AutoCompletion
       Server.Handler.CustomMethod
-      Server.Handler.CustomMethod2
       Server.Handler.Diagnostic
       Server.Handler.GoToDefn
       Server.Handler.Hover
-      Server.Handlers2
+      Server.Handler2
+      Server.Handler2.CustomMethod
+      Server.Handler2.GoToDefinition
+      Server.Handler2.Hover
+      Server.Handler2.TextDocumentSemanticTokensFull
+      Server.Handler2.Utils
       Server.Highlighting
       Server.Hover
       Server.IntervalMap

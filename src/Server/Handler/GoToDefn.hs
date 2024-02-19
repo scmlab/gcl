@@ -46,21 +46,3 @@ handler uri position responder = do
         return $ maybeToList $ case tokenMap of
           Nothing -> Nothing
           Just xs -> IntervalMap.lookup pos xs
-
-handler' :: Uri -> Position -> ([LSP.LocationLink] -> ServerM ()) -> ServerM ()
-handler' uri position responder = do
-  case uriToFilePath uri of
-    Nothing       -> return ()
-    Just filePath -> do
-      logText "<-- Goto Definition"
-      source <- getSource filePath
-
-      let table = SrcLoc.makeToOffset source
-      let positions' = SrcLoc.fromLSPPosition table filepath position
-
-      loadedProgram <- dumpProgram filePath
-
-      case IntervalMap.lookup positions' (scopingInfo loadedProgram) of
-        Nothing -> return ()
-        Just locationLinks -> responder locationLinks
-

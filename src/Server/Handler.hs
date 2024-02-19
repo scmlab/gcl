@@ -23,7 +23,6 @@ import qualified Language.LSP.Types            as J
 import qualified Language.LSP.Types.Lens       as J
 import qualified Server.Handler.AutoCompletion as AutoCompletion
 import qualified Server.Handler.CustomMethod   as CustomMethod
-import qualified Server.Handler.CustomMethod2  as CustomMethod'
 import qualified Server.Handler.GoToDefn       as GoToDefn
 import qualified Server.Handler.Hover          as Hover
 
@@ -43,10 +42,6 @@ handlers = mconcat
     requestHandler (J.SCustomMethod "guabao") $ \req responder -> do
     let params = req ^. J.params
     CustomMethod.handler params (responder . Right . JSON.toJSON)
-  , -- custom methods group 2, for restructuring
-    requestHandler (J.SCustomMethod "guabao2") $ \req responder -> do
-    let params = req ^. J.params
-    CustomMethod'.handler params (responder . Right . JSON.toJSON)
   , notificationHandler J.STextDocumentDidChange $ \ntf -> do
     let uri = ntf ^. (J.params . J.textDocument . J.uri)
     interpret uri (customRequestToNotification uri) $ do
