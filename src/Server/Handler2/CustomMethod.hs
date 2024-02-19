@@ -8,7 +8,7 @@ module Server.Handler2.CustomMethod where
 import qualified Data.Aeson.Types as JSON
 
 import Server.CustomMethod (Response (..), Request (..), ReqKind (..), ResKind (..))
-import Server.Monad (ServerM, convertErrorsToResponsesAndDiagnostics)
+import Server.Monad (ServerM, convertErrorsToResponsesAndDiagnostics, LoadedProgram (..))
 
 import Data.Loc.Range (Range (..), rangeFile, rangeStart, rangeEnd, withinRange, fromLoc)
 import Data.Text (Text)
@@ -35,6 +35,9 @@ import Data.String (fromString)
 import Data.List (sortOn)
 import Data.Maybe (mapMaybe)
 import Server.Handler2.Utils
+import Server.Highlighting (collectHighlighting)
+import Server.Hover (collectHoverInfo)
+import Server.GoToDefn (collectLocationLinks)
 
 handler :: JSON.Value -> (Response -> ServerM ()) -> ServerM ()
 handler params responder = do
@@ -136,6 +139,18 @@ handleReload filepath onFinsih onError = do
                 case WP.sweep abstract of
                   Left  err -> onError (StructError err)
                   Right (pos, specs, warnings, redexes, counter) -> do
+                    -- cache all results
+                    cacheProgram filepath LoadedProgram
+                      { _highlightingInfos = collectHighlighting concrete
+                      , _abstractProgram = abstract
+                      , _scopingInfo = collectLocationLinks abstract
+                      , _typeCheckingInfo = collectHoverInfo abstract scopeTree
+                      , _proofObligations = List.sort pos
+                      , _specifiations = sortOn locOf specs
+                      , _warnings = warnings
+                      , _redexes = redexes
+                      , _variableCounter = counter
+                      }
                     -- send warnings as diagnostics
                     let diagnostics = concatMap collect warnings
                     sendDiagnostics filepath diagnostics

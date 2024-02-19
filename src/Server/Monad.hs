@@ -151,15 +151,15 @@ data GlobalEnv = GlobalEnv
   }
 
 data LoadedProgram = LoadedProgram
-  { highlightingInfos :: [J.SemanticTokenAbsolute]
-  , abstractProgram   :: A.Program
-  , scopingInfo       :: IntervalMap J.LocationLink
-  , typeCheckingInfo  :: IntervalMap (J.Hover, A.Type) 
-  , proofObligations  :: [PO]
-  , specifiations     :: [Spec]
-  , warnings          :: [StructWarning]
-  , redexes           :: IntMap (Int, A.Expr)
-  , variableCounter   :: Int
+  { _highlightingInfos :: [J.SemanticTokenAbsolute]
+  , _abstractProgram   :: A.Program
+  , _scopingInfo       :: IntervalMap J.LocationLink
+  , _typeCheckingInfo  :: IntervalMap (J.Hover, A.Type) 
+  , _proofObligations  :: [PO]
+  , _specifiations     :: [Spec]
+  , _warnings          :: [StructWarning]
+  , _redexes           :: IntMap (Int, A.Expr)
+  , _variableCounter   :: Int
   }
 
 -- | Constructs an initial global state

@@ -31,7 +31,7 @@ handler uri position responder = case uriToFilePath uri of
         case maybeLoadedProgram of
           Nothing -> responder Nothing
           Just loadedProgram -> do
-            case IntervalMap.lookup pos (typeCheckingInfo loadedProgram) of
+            case IntervalMap.lookup pos (_typeCheckingInfo loadedProgram) of
               Nothing -> do
                   -- logText $ toText xs
                   logText "    < Hover (not found)"

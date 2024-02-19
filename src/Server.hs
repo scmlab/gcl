@@ -14,7 +14,7 @@ import           Network.Simple.TCP             ( HostPreference(Host)
                                                 , serve
                                                 )
 import           Network.Socket                 ( socketToHandle )
-import           Server.Handler                 ( handlers )
+import           Server.Handler2                ( handlers )
 import           Server.Monad
 
 --------------------------------------------------------------------------------

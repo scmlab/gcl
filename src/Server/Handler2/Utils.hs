@@ -62,9 +62,9 @@ editText range textToReplace onSuccess = do
     }
 
 cacheProgram :: FilePath -> LoadedProgram -> ServerM ()
-cacheProgram filepath state = do
+cacheProgram filepath loadedProgram = do
   ref <- lift $ asks loadedPrograms
-  liftIO $ modifyIORef' ref (Map.insert filepath state)
+  liftIO $ modifyIORef' ref (Map.insert filepath loadedProgram)
 
 dumpProgram :: FilePath -> ServerM (Maybe LoadedProgram)
 dumpProgram filepath = do
@@ -72,4 +72,4 @@ dumpProgram filepath = do
   mapping <- liftIO $ readIORef ref
   case Map.lookup filepath mapping of
     Nothing    -> return Nothing
-    Just state -> return $ Just state
+    Just loadedProgram -> return $ Just loadedProgram

@@ -5,7 +5,7 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Use lambda-case" #-}
 
-module Server.Handler
+module Server.Handler2
   ( handlers
   ) where
 
@@ -36,7 +36,7 @@ handlers = mconcat
     let position          = req ^. LSP.params . LSP.position
     AutoCompletion.handler position completionContext >>= responder . Right
   , -- custom methods
-    requestHandler (LSP.SCustomMethod "guabao2") $ \req responder -> do
+    requestHandler (LSP.SCustomMethod "guabao") $ \req responder -> do
     let params = req ^. LSP.params
     CustomMethod.handler params (responder . Right . JSON.toJSON)
   , -- Goto Definition
