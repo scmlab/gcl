@@ -1,5 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
-module Server.Handler2.TextDocumentSemanticTokensFull where
+module Server.Handler2.SemanticTokens where
 
 import Server.Monad (ServerM, LoadedProgram (..))
 import qualified Language.LSP.Types as LSP

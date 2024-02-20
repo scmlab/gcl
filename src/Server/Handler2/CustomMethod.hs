@@ -25,7 +25,6 @@ import qualified Server.Handler2.CustomMethod.HelloWorld as HelloWorld (handler)
 
 handler :: JSON.Value -> (Response -> ServerM ()) -> ServerM ()
 handler params responder = do
-    -- JSON Value => Request => Response
   case JSON.fromJSON params of
     JSON.Error msg -> do
       logText
@@ -39,16 +38,16 @@ handler params responder = do
     dispatchRequest :: Request -> ServerM ()
     dispatchRequest _request@(Req filePath reqKind) = do
       case reqKind of
-        ReqReload                         -> Reload.handler filePath respondResult respondError
-        ReqInspect range                  -> Inspect.handler range respondResult respondError
-        ReqRefine' range text             -> Refine.slowHandler range text respondResult respondError
-        ReqInsertProofTemplate range hash -> InsertProofTemplate.slowHandler filePath range hash respondResult respondError
-        ReqSubstitute redexNumber         -> SubstituteRedex.handler redexNumber respondResult respondError
-        ReqHelloWorld range               -> HelloWorld.handler range respondResult respondError
-        _                                 -> respondError (Others "Not implemented yet.")
+        ReqReload                         -> Reload.handler filePath respondResult reportError
+        ReqInspect range                  -> Inspect.handler range respondResult reportError
+        ReqRefine' range text             -> Refine.slowHandler range text respondResult reportError
+        ReqInsertProofTemplate range hash -> InsertProofTemplate.slowHandler filePath range hash respondResult reportError
+        ReqSubstitute redexNumber         -> SubstituteRedex.handler redexNumber respondResult reportError
+        ReqHelloWorld range               -> HelloWorld.handler range respondResult reportError
+        _                                 -> reportError (Others "Not implemented yet.")
       where
-        respondError :: Error -> ServerM ()
-        respondError err = do
+        reportError :: Error -> ServerM ()
+        reportError err = do
           (responsesFromError, diagnosticsFromError)
             <- Server.Monad.convertErrorsToResponsesAndDiagnostics [err]
           sendDiagnostics filePath diagnosticsFromError

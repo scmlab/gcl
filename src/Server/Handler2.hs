@@ -5,25 +5,23 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Use lambda-case" #-}
 
-module Server.Handler2
-  ( handlers
-  ) where
+module Server.Handler2 ( handlers ) where
 
 import           Control.Lens                   ( (^.) )
-import qualified Data.Aeson                    as JSON
+import qualified Data.Aeson                     as JSON
 import           Language.LSP.Server            ( Handlers
                                                 , notificationHandler
                                                 , requestHandler
                                                 )
-import           Server.Monad                  hiding (logText)
+import           Server.Monad                   hiding (logText)
 
-import qualified Language.LSP.Types            as LSP
-import qualified Language.LSP.Types.Lens       as LSP
-import qualified Server.Handler.AutoCompletion as AutoCompletion
+import qualified Language.LSP.Types             as LSP
+import qualified Language.LSP.Types.Lens        as LSP
+import qualified Server.Handler.AutoCompletion  as AutoCompletion
 import qualified Server.Handler2.CustomMethod   as CustomMethod
 import qualified Server.Handler2.GoToDefinition as GoToDefinition
-import qualified Server.Handler2.Hover           as Hover
-import qualified Server.Handler2.TextDocumentSemanticTokensFull as TextDocumentSemanticTokensFull
+import qualified Server.Handler2.Hover          as Hover
+import qualified Server.Handler2.SemanticTokens as SemanticTokens
 
 -- handlers of the LSP server
 handlers :: Handlers ServerM
@@ -49,7 +47,7 @@ handlers = mconcat
   , -- "textDocument/semanticTokens/full" - get all semantic tokens
     requestHandler LSP.STextDocumentSemanticTokensFull $ \req responder -> do
     let uri = req ^. (LSP.params . LSP.textDocument . LSP.uri)
-    TextDocumentSemanticTokensFull.handler uri responder
+    SemanticTokens.handler uri responder
   , -- "guabao" - reload, refine, inspect and etc.
     requestHandler (LSP.SCustomMethod "guabao") $ \req responder -> do
     let params = req ^. LSP.params
