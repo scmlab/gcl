@@ -18,6 +18,8 @@ import qualified Server.Handler2.CustomMethod.Inspect    as Inspect (handler)
 import qualified Server.Handler2.CustomMethod.Refine     as Refine (slowHandler)
 import qualified Server.Handler2.CustomMethod.InsertProofTemplate 
                                                          as InsertProofTemplate (slowHandler)
+import qualified Server.Handler2.CustomMethod.SubstituteRedex
+                                                        as SubstituteRedex (handler)
 import qualified Server.Handler2.CustomMethod.HelloWorld as HelloWorld (handler)
 
 
@@ -42,6 +44,7 @@ handler params responder = do
         ReqInspect range                  -> Inspect.handler range respondResult respondError
         ReqRefine' range text             -> Refine.slowHandler range text respondResult respondError
         ReqInsertProofTemplate range hash -> InsertProofTemplate.slowHandler filePath range hash respondResult respondError
+        ReqSubstitute redexNumber         -> SubstituteRedex.handler redexNumber respondResult respondError
         ReqHelloWorld range               -> HelloWorld.handler range respondResult respondError
         _                                 -> respondError (Others "Not implemented yet.")
       where
