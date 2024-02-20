@@ -118,9 +118,9 @@ rangeAfterReplacedWithHelloWorld range =
 
 -- Reload --
 
-handleReload :: FilePath -> ([ResKind] -> ServerM ()) -> (Error -> ServerM ()) -> ServerM ()
-handleReload filepath onFinsih onError = do
-  -- load source
+reload :: FilePath -> (LoadedProgram -> ServerM ()) -> (Error -> ServerM ()) -> ServerM ()
+reload filepath onFinish onError = do
+    -- load source
   maybeSource <- getSource filepath
   case maybeSource of
     Nothing     -> onError (CannotReadFile filepath)
@@ -140,31 +140,33 @@ handleReload filepath onFinsih onError = do
                   Left  err -> onError (StructError err)
                   Right (pos, specs, warnings, redexes, counter) -> do
                     -- cache all results
-                    cacheProgram filepath LoadedProgram
+                    loadedProgram <- cacheProgram filepath LoadedProgram
                       { _highlightingInfos = collectHighlighting concrete
-                      , _abstractProgram = abstract
-                      , _scopingInfo = collectLocationLinks abstract
-                      , _typeCheckingInfo = collectHoverInfo abstract scopeTree
-                      , _proofObligations = List.sort pos
-                      , _specifiations = sortOn locOf specs
-                      , _warnings = warnings
-                      , _redexes = redexes
-                      , _variableCounter = counter
+                      , _abstractProgram   = abstract
+                      , _scopingInfo       = collectLocationLinks abstract
+                      , _typeCheckingInfo  = collectHoverInfo abstract scopeTree
+                      , _proofObligations  = List.sort pos
+                      , _specifiations     = sortOn locOf specs
+                      , _warnings          = warnings
+                      , _redexes           = redexes
+                      , _variableCounter   = counter
                       }
-                    -- send warnings as diagnostics
-                    let diagnostics = concatMap collect warnings
-                    sendDiagnostics filepath diagnostics
-
-                    -- send all hints as reponses for client to render
-                    let (A.Program _ _ globalProperties _ _) = abstract
-                    version' <- bumpVersion
-                    let response :: [ResKind] =
-                          hintsToResponseBody
-                            version'
-                            Nothing
-                            (globalProperties, List.sort pos, sortOn locOf specs, warnings, redexes, counter)
-                    onFinsih response
+                    onFinish loadedProgram
           ) onError
+
+handleReload :: FilePath -> ([ResKind] -> ServerM ()) -> (Error -> ServerM ()) -> ServerM ()
+handleReload filepath onFinsih onError = do
+  reload filepath (\loadedProgram -> do
+      -- send warnings as diagnostics
+      let warnings = _warnings loadedProgram
+      let diagnostics = concatMap collect warnings
+      sendDiagnostics filepath diagnostics
+
+      -- send all hints as reponses for client to render
+      version' <- bumpVersion
+      let response = loadedProgramToReponse loadedProgram version' Nothing
+      onFinsih response
+    ) onError
 
 parse :: FilePath -> Text -> Either Error C.Program
 parse filepath source =
@@ -198,6 +200,11 @@ typeCheck abstract = do
   case TypeChecking.runTypeCheck abstract of
     Left  e -> Left (TypeError e)
     Right (_, scopeTree) -> return scopeTree
+
+loadedProgramToReponse :: LoadedProgram -> Int -> Maybe Range ->  [ResKind]
+loadedProgramToReponse loadedProgram@(LoadedProgram _ abstract@(A.Abstract _ globalProperties _) _ _  proofObligations specs warnings _ _)
+                        version rangeToInspect
+                        = _
 
 hintsToResponseBody :: Int -> Maybe Range -> ([Expr], [PO], [Spec], [StructWarning], IntMap (Int, A.Expr), Int) -> [ResKind]
 hintsToResponseBody version rangeToInspect _hints@(globalProperties, proofObligations, specs, warnings, redexes, counter) =

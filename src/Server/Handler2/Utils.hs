@@ -61,10 +61,11 @@ editText range textToReplace onSuccess = do
       _newText = textToReplace
     }
 
-cacheProgram :: FilePath -> LoadedProgram -> ServerM ()
+cacheProgram :: FilePath -> LoadedProgram -> ServerM LoadedProgram
 cacheProgram filepath loadedProgram = do
   ref <- lift $ asks loadedPrograms
   liftIO $ modifyIORef' ref (Map.insert filepath loadedProgram)
+  return loadedProgram
 
 dumpProgram :: FilePath -> ServerM (Maybe LoadedProgram)
 dumpProgram filepath = do

@@ -26,7 +26,6 @@ import           Syntax.Abstract.Util           ( programToScopeForSubstitution
 
 import qualified Language.LSP.Types            as J
 import Data.String (IsString(fromString))
-import Language.LSP.Types (Diagnostic(Diagnostic))
 import Server.Handler.Diagnostic (makeDiagnostic)
 
 
