@@ -29,6 +29,7 @@ handler uri position responder = do
           maybeLoadedProgram <- dumpProgram filePath
           case maybeLoadedProgram of
             Nothing -> responder []
-            Just loadedProgram -> case IntervalMap.lookup positions' (_scopingInfo loadedProgram) of
-              Nothing -> responder []
-              Just locationLink -> responder [locationLink]
+            Just loadedProgram -> do
+              case IntervalMap.lookup positions' (_scopingInfo loadedProgram) of
+                Nothing -> responder []
+                Just locationLink -> responder [locationLink]

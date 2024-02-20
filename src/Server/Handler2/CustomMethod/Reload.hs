@@ -70,7 +70,7 @@ reload filepath onFinish onError = do
                   Left  err -> onError (StructError err)
                   Right (pos, specs, warnings, redexes, counter) -> do
                     -- cache all results
-                    loadedProgram <- cacheProgram filepath LoadedProgram
+                    loadedProgram = LoadedProgram
                       { _concreteProgram   = concrete
                       , _highlightingInfos = collectHighlighting concrete
                       , _abstractProgram   = abstract
@@ -82,6 +82,7 @@ reload filepath onFinish onError = do
                       , _redexes           = redexes
                       , _variableCounter   = counter
                       }
+                    _ <- cacheProgram filepath loadedProgram
                     onFinish loadedProgram
           ) onError
 

@@ -29,7 +29,7 @@ handler specRange filledText = do
     Just loadedProgram -> do
       let (refinedProgram, newRangeToFocus) = refine loadedProgram specRange filledText
       _ <- cacheProgram filePath refinedProgram
-      response <- sendDiagnosticsAndMakeResponseFromLoadedProgram loadedProgam newRangeToFocus
+      response <- sendDiagnosticsAndMakeResponseFromLoadedProgram refinedProgram newRangeToFocus
       onFinish response
 
 refine :: LoadedProgram -> Range -> Text -> (LoadedProgram, Maybe Range)

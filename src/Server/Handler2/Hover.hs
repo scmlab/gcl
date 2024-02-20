@@ -17,7 +17,7 @@ import Server.Monad (ServerM, LoadedProgram (..))
 
 handler :: Uri -> Position -> (Maybe Hover -> ServerM ()) -> ServerM ()
 handler uri position responder = case uriToFilePath uri of
-  Nothing       -> return ()
+  Nothing       -> responder Nothing
   Just filepath -> do
     maybeSource <- getSource filepath
     case maybeSource of
