@@ -5,9 +5,8 @@ module Server.Handler2.CustomMethod.Refine (slowHandler) where
 
 import Data.Loc.Range (Range (..), rangeFile)
 
-import Server.Monad (ServerM, LoadedProgram (..))
+import Server.Monad (ServerM)
 import Server.Handler2.Utils
-import Server.Handler2.CustomMethod.Utils
 import Server.Handler2.CustomMethod.Reload as Reload
 import Data.Text (Text)
 import Server.CustomMethod (ResKind)

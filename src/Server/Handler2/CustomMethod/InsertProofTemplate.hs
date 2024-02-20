@@ -8,7 +8,7 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.List as List
 
-import Data.Loc.Range (Range (..), rangeFile)
+import Data.Loc.Range (Range (..))
 import Render.Predicate (exprOfPred)
 import GCL.Predicate (PO(..))
 import Pretty (docToText, Pretty (..))

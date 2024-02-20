@@ -2,7 +2,7 @@
 module Server.Handler2.CustomMethod.Utils where
 import Server.Monad (LoadedProgram(..), ServerM)
 import qualified Syntax.Abstract as A
-import Data.Loc.Range (Range, fromLoc, withinRange, rangeFile)
+import Data.Loc.Range (Range, fromLoc, withinRange)
 import Syntax.Abstract (Expr)
 import GCL.Predicate (PO (..), Spec (..))
 import GCL.WP.Type (StructWarning)
