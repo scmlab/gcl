@@ -71,7 +71,8 @@ reload filepath onFinish onError = do
                   Right (pos, specs, warnings, redexes, counter) -> do
                     -- cache all results
                     loadedProgram <- cacheProgram filepath LoadedProgram
-                      { _highlightingInfos = collectHighlighting concrete
+                      { _concreteProgram   = concrete
+                      , _highlightingInfos = collectHighlighting concrete
                       , _abstractProgram   = abstract
                       , _scopingInfo       = collectLocationLinks abstract
                       , _typeCheckingInfo  = collectHoverInfo abstract scopeTree

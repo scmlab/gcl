@@ -55,6 +55,7 @@ import qualified Server.SrcLoc                 as SrcLoc
 import GCL.WP.Type (StructWarning)
 import Server.IntervalMap (IntervalMap)
 import Syntax.Abstract                         as A
+import Syntax.Concrete                         as C
 import GCL.Predicate (PO, Spec)
 import Data.IntMap (IntMap)
 
@@ -151,7 +152,8 @@ data GlobalEnv = GlobalEnv
   }
 
 data LoadedProgram = LoadedProgram
-  { _highlightingInfos :: [J.SemanticTokenAbsolute]
+  { _concreteProgram   :: C.Program
+  , _highlightingInfos :: [J.SemanticTokenAbsolute]
   , _abstractProgram   :: A.Program
   , _scopingInfo       :: IntervalMap J.LocationLink
   , _typeCheckingInfo  :: IntervalMap (J.Hover, A.Type) 

@@ -35,7 +35,8 @@ handler specRange filledText = do
 refine :: LoadedProgram -> Range -> Text -> (LoadedProgram, Maybe Range)
 refine loadedProgram specRange filledText =
   LoadedProgram
-  { _highlightingInfos = _
+  { _concreteProgram   = _
+  , _highlightingInfos = _
   , _abstractProgram   = _
   , _scopingInfo       = _
   , _typeCheckingInfo  = _
