@@ -65,9 +65,16 @@ library
       Server.Handler.Hover
       Server.Handler2
       Server.Handler2.CustomMethod
+      Server.Handler2.CustomMethod.HelloWorld
+      Server.Handler2.CustomMethod.InsertProofTemplate
+      Server.Handler2.CustomMethod.Inspect
+      Server.Handler2.CustomMethod.Refine
+      Server.Handler2.CustomMethod.Reload
+      Server.Handler2.CustomMethod.SubstituteRedex
+      Server.Handler2.CustomMethod.Utils
       Server.Handler2.GoToDefinition
       Server.Handler2.Hover
-      Server.Handler2.TextDocumentSemanticTokensFull
+      Server.Handler2.SemanticTokens
       Server.Handler2.Utils
       Server.Highlighting
       Server.Hover
@@ -222,9 +229,16 @@ test-suite gcl-test
       Server.Handler.Hover
       Server.Handler2
       Server.Handler2.CustomMethod
+      Server.Handler2.CustomMethod.HelloWorld
+      Server.Handler2.CustomMethod.InsertProofTemplate
+      Server.Handler2.CustomMethod.Inspect
+      Server.Handler2.CustomMethod.Refine
+      Server.Handler2.CustomMethod.Reload
+      Server.Handler2.CustomMethod.SubstituteRedex
+      Server.Handler2.CustomMethod.Utils
       Server.Handler2.GoToDefinition
       Server.Handler2.Hover
-      Server.Handler2.TextDocumentSemanticTokensFull
+      Server.Handler2.SemanticTokens
       Server.Handler2.Utils
       Server.Highlighting
       Server.Hover

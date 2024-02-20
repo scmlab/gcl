@@ -1,12 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE BlockArguments #-}
-module Server.Handler2.CustomMethod.Reload (handler) where
+module Server.Handler2.CustomMethod.Reload (handler, reload) where
 
-import qualified Data.Aeson.Types as JSON
-
-
-import Data.Loc.Range (Range (..), rangeStart, withinRange, fromLoc)
 import Data.Text (Text)
 
 import qualified GCL.WP                        as WP
@@ -21,30 +17,23 @@ import Data.Loc hiding ( fromLoc )
 import GCL.Type (ScopeTreeZipper)
 import qualified GCL.Type as TypeChecking
 import qualified Data.List as List
-import Syntax.Abstract (Expr)
-import GCL.WP.Type (StructWarning)
-import GCL.Predicate (PO (..), Spec (..))
-import Data.IntMap (IntMap)
-import Render (Render (..), RenderSection (..))
-import Data.String (fromString)
 import Data.List (sortOn)
-import Data.Maybe (mapMaybe)
 
-import Server.CustomMethod (Response (..), Request (..), ReqKind (..), ResKind (..))
+import Server.CustomMethod (ResKind (..))
 import Server.Monad (ServerM, LoadedProgram (..))
-import Server.Handler.Diagnostic (makeDiagnostic, Collect (collect))
 import Server.Highlighting (collectHighlighting)
 import Server.Hover (collectHoverInfo)
 import Server.GoToDefn (collectLocationLinks)
 
 import Server.Handler2.Utils
 import Server.Handler2.CustomMethod.Utils (sendDiagnosticsAndMakeResponseFromLoadedProgram)
+import Data.Loc.Range (Range, rangeStart)
 
 
 handler :: FilePath -> ([ResKind] -> ServerM ()) -> (Error -> ServerM ()) -> ServerM ()
-handler filepath onFinsih onError = do
-  reload filepath (\loadedProgram -> do
-      response <- sendDiagnosticsAndMakeResponseFromLoadedProgram loadedProgram Nothing
+handler filePath onFinsih onError = do
+  reload filePath (\loadedProgram -> do
+      response <- sendDiagnosticsAndMakeResponseFromLoadedProgram filePath loadedProgram Nothing
       onFinsih response
     ) onError
 
@@ -70,18 +59,18 @@ reload filepath onFinish onError = do
                   Left  err -> onError (StructError err)
                   Right (pos, specs, warnings, redexes, counter) -> do
                     -- cache all results
-                    loadedProgram = LoadedProgram
-                      { _concreteProgram   = concrete
-                      , _highlightingInfos = collectHighlighting concrete
-                      , _abstractProgram   = abstract
-                      , _scopingInfo       = collectLocationLinks abstract
-                      , _typeCheckingInfo  = collectHoverInfo abstract scopeTree
-                      , _proofObligations  = List.sort pos
-                      , _specifiations     = sortOn locOf specs
-                      , _warnings          = warnings
-                      , _redexes           = redexes
-                      , _variableCounter   = counter
-                      }
+                    let loadedProgram = LoadedProgram
+                          { _concreteProgram   = concrete
+                          , _highlightingInfos = collectHighlighting concrete
+                          , _abstractProgram   = abstract
+                          , _scopingInfo       = collectLocationLinks abstract
+                          , _typeCheckingInfo  = collectHoverInfo abstract scopeTree
+                          , _proofObligations  = List.sort pos
+                          , _specifiations     = sortOn locOf specs
+                          , _warnings          = warnings
+                          , _redexes           = redexes
+                          , _variableCounter   = counter
+                          }
                     _ <- cacheProgram filepath loadedProgram
                     onFinish loadedProgram
           ) onError

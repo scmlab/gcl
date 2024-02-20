@@ -21,6 +21,7 @@ import qualified Server.Handler2.CustomMethod.InsertProofTemplate
 import qualified Server.Handler2.CustomMethod.SubstituteRedex
                                                         as SubstituteRedex (handler)
 import qualified Server.Handler2.CustomMethod.HelloWorld as HelloWorld (handler)
+import qualified Data.Text as Text
 
 
 handler :: JSON.Value -> (Response -> ServerM ()) -> ServerM ()
@@ -40,9 +41,9 @@ handler params responder = do
       case reqKind of
         ReqReload                         -> Reload.handler filePath respondResult reportError
         ReqInspect range                  -> Inspect.handler range respondResult reportError
-        ReqRefine' range text             -> Refine.slowHandler range text respondResult reportError
+        ReqRefine2 range text             -> Refine.slowHandler range text respondResult reportError
         ReqInsertProofTemplate range hash -> InsertProofTemplate.slowHandler filePath range hash respondResult reportError
-        ReqSubstitute redexNumber         -> SubstituteRedex.handler redexNumber respondResult reportError
+        ReqSubstitute redexNumber         -> SubstituteRedex.handler filePath redexNumber respondResult reportError
         ReqHelloWorld range               -> HelloWorld.handler range respondResult reportError
         _                                 -> reportError (Others "Not implemented yet.")
       where

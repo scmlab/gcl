@@ -1,3 +1,6 @@
+{-# LANGUAGE BlockArguments #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Server.Handler2.CustomMethod.InsertProofTemplate (slowHandler) where
 
@@ -8,17 +11,18 @@ import qualified Data.List as List
 import Data.Loc.Range (Range (..), rangeFile)
 import Render.Predicate (exprOfPred)
 import GCL.Predicate (PO(..))
-import Pretty (docToText)
+import Pretty (docToText, Pretty (..))
 
 import Server.Monad (ServerM, LoadedProgram(..))
 import Server.Handler2.Utils
-import Server.Handler2.CustomMethod.Utils
 import Server.Handler2.CustomMethod.Reload as Reload
+import Server.CustomMethod (ResKind)
+import Error (Error (..))
 
 slowHandler :: FilePath -> Range -> Text -> ([ResKind] -> ServerM ()) -> (Error -> ServerM ()) -> ServerM ()
 slowHandler sourceFilePath rangeToInsertProof proofObligationHash onFinish onError = do
   -- reload source
-  reload sourceFilePath (\loadedProgram -> do
+  Reload.reload sourceFilePath (\loadedProgram -> do
       -- find proof obligation by hash
       let proofObligations :: [PO] = _proofObligations loadedProgram
       case findProofObligationByHash proofObligations proofObligationHash of
@@ -26,9 +30,9 @@ slowHandler sourceFilePath rangeToInsertProof proofObligationHash onFinish onErr
         Just proofObligation -> do
           -- insert proof template
           let proofTemplate :: Text = makeProofTemplate proofObligation
-          editText rangeToInsertProof ("\n\n" <> template) do
+          editText rangeToInsertProof ("\n\n" <> proofTemplate) do
             -- reload, send diagnostics and respond hint updates
-            Reload.handler filepath onFinsih onError
+            Reload.handler sourceFilePath onFinish onError
     ) onError
   where
     findProofObligationByHash :: [PO] -> Text -> Maybe PO

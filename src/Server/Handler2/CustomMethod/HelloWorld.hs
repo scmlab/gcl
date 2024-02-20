@@ -11,6 +11,9 @@ import Error (Error(..))
 
 import Server.Monad (ServerM)
 import Server.Handler2.Utils
+import Server.CustomMethod (ResKind (..))
+import Data.Loc (Pos (..), posFile, posLine, posCol, posCoff)
+import Server.Handler.Diagnostic (makeDiagnostic)
 
 
 handler :: Range -> ([ResKind] -> ServerM ()) -> (Error -> ServerM ()) -> ServerM ()

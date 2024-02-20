@@ -71,6 +71,7 @@ data ReqKind
   | ReqReload
   | ReqRefine2 Range Text
   | ReqInsertProofTemplate Range Text
+  deriving Generic
 
 instance FromJSON ReqKind
 

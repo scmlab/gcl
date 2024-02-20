@@ -1,17 +1,31 @@
-
+{-# LANGUAGE OverloadedStrings #-}
 module Server.Handler2.CustomMethod.Utils where
+import Server.Monad (LoadedProgram(..), ServerM)
+import qualified Syntax.Abstract as A
+import Data.Loc.Range (Range, fromLoc, withinRange, rangeFile)
+import Syntax.Abstract (Expr)
+import GCL.Predicate (PO (..), Spec (..))
+import GCL.WP.Type (StructWarning)
+import Server.CustomMethod (ResKind (..))
+import Data.Text (Text)
+import Render (Section (..), Render (..), RenderSection (..), Block (..), Deco (..))
+import Server.Handler.Diagnostic (Collect(..))
+import Server.Handler2.Utils (sendDiagnostics, bumpVersion)
+import Data.Maybe (mapMaybe)
+import Data.Loc (locOf)
+import Pretty (toText)
 
-sendDiagnosticsAndMakeResponseFromLoadedProgram :: LoadedProgram -> Maybe Range -> ServerM ()
-sendDiagnosticsAndMakeResponseFromLoadedProgram loadedProgram rangeToFocus = do
+sendDiagnosticsAndMakeResponseFromLoadedProgram :: FilePath -> LoadedProgram -> Maybe Range -> ServerM [ResKind]
+sendDiagnosticsAndMakeResponseFromLoadedProgram filePath loadedProgram rangeToFocus = do
   -- destructure and get needed data
   let (LoadedProgram
-        _ (A.Program _ _ globalProperties _)
-        _ _ proofObligations specs warnings _ _
-      ) = loadedProgram
+          _ _ (A.Program _ _ globalProperties _ _)
+          _ _ proofObligations specs warnings _ _
+        ) = loadedProgram
   
   -- send warnings as diagnostics
   let diagnostics = concatMap collect warnings
-  sendDiagnostics filepath diagnostics
+  sendDiagnostics filePath diagnostics
 
   -- send reponse for client to render hints
   version' <- bumpVersion

@@ -22,7 +22,7 @@ handler fileUri responder = do
             Left errorMessage    -> respondError (LSP.ResponseError LSP.InternalError errorMessage Nothing)
             Right semanticTokens -> respondResult semanticTokens
   where
-    respondResult :: Maybe LSP.SemanticTokens -> ServerM ()
-    respondResult result = responder (Right result)
-    respondError :: Error -> ServerM ()
+    respondResult :: LSP.SemanticTokens -> ServerM ()
+    respondResult result = responder (Right $ Just result)
+    respondError :: LSP.ResponseError -> ServerM ()
     respondError err = responder (Left err)

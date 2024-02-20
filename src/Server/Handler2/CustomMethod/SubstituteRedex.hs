@@ -1,3 +1,4 @@
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module Server.Handler2.CustomMethod.SubstituteRedex (handler) where
 
@@ -7,9 +8,16 @@ import Error (Error(..))
 import Server.Monad (ServerM, LoadedProgram(..))
 import Server.CustomMethod (ResKind(..))
 import Server.Handler2.Utils
-import Server.Handler2.CustomMethod.Utils
 
 import qualified GCL.Substitution as Substitution
+import Data.IntMap (IntMap)
+import qualified Data.IntMap as IntMap
+import Data.Map (Map)
+import Data.Text (Text)
+import Syntax.Abstract.Types (Expr)
+import qualified Syntax.Abstract.Util as A
+import Control.Monad.State (runState)
+import Render (Render(..))
 
 handler :: FilePath -> Int -> ([ResKind] -> ServerM ()) -> (Error -> ServerM ()) -> ServerM ()
 handler filePath redexNumber onFinish onError = do
@@ -31,5 +39,5 @@ handler filePath redexNumber onFinish onError = do
                 { _variableCounter = variableCounter'
                 , _redexes         = redexes <> redexesInNewExpr
                 }
-          _ <- cacheLoadedProgram filePath loadedProgram'
-          onFinish [ResSubstitute i (render newExpr)]
+          _ <- cacheProgram filePath loadedProgram'
+          onFinish [ResSubstitute redexNumber (render newExpr)]
