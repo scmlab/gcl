@@ -9,7 +9,6 @@ import Server.CustomMethod (ResKind(..))
 import Server.Handler2.Utils
 import Server.Handler2.CustomMethod.Utils
 
-
 import qualified GCL.Substitution as Substitution
 
 handler :: FilePath -> Int -> ([ResKind] -> ServerM ()) -> (Error -> ServerM ()) -> ServerM ()

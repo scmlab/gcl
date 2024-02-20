@@ -34,11 +34,10 @@ handler params responder = do
         <> " "
         <> Text.pack (show params)
       responder $ CannotDecodeRequest $ show msg ++ "\n" ++ show params
-    JSON.Success request -> handleRequest request
+    JSON.Success request -> dispatchRequest request
   where
-    -- convert Request to Response and Diagnostics 
-    handleRequest :: Request -> ServerM ()
-    handleRequest _request@(Req filePath reqKind) = do
+    dispatchRequest :: Request -> ServerM ()
+    dispatchRequest _request@(Req filePath reqKind) = do
       case reqKind of
         ReqReload                         -> Reload.handler filePath respondResult respondError
         ReqInspect range                  -> Inspect.handler range respondResult respondError
