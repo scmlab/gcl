@@ -28,29 +28,31 @@ import qualified Server.Handler2.TextDocumentSemanticTokensFull as TextDocumentS
 -- handlers of the LSP server
 handlers :: Handlers ServerM
 handlers = mconcat
-  [ notificationHandler LSP.SInitialized $ \_not -> do
+  [ -- "initialized" - after initialize
+    notificationHandler LSP.SInitialized $ \_not -> do
       return ()
-  , -- autocompletion
+  , -- "textDocument/completion" - autocompletion
     requestHandler LSP.STextDocumentCompletion $ \req responder -> do
     let completionContext = req ^. LSP.params . LSP.context
     let position          = req ^. LSP.params . LSP.position
     AutoCompletion.handler position completionContext >>= responder . Right
-  , -- custom methods
-    requestHandler (LSP.SCustomMethod "guabao") $ \req responder -> do
-    let params = req ^. LSP.params
-    CustomMethod.handler params (responder . Right . JSON.toJSON)
-  , -- Goto Definition
+  , -- "textDocument/definition" - go to definition
     requestHandler LSP.STextDocumentDefinition $ \req responder -> do
     let uri = req ^. (LSP.params . LSP.textDocument . LSP.uri)
     let pos = req ^. (LSP.params . LSP.position)
     GoToDefinition.handler uri pos (responder . Right . LSP.InR . LSP.InR . LSP.List)
-  , -- Hover
+  , -- "textDocument/hover" - get hover information
     requestHandler LSP.STextDocumentHover $ \req responder -> do
     let uri = req ^. (LSP.params . LSP.textDocument . LSP.uri)
     let pos = req ^. (LSP.params . LSP.position)
     Hover.handler uri pos (responder . Right)
-  , requestHandler LSP.STextDocumentSemanticTokensFull $ \req responder -> do
+  , -- "textDocument/semanticTokens/full" - get all semantic tokens
+    requestHandler LSP.STextDocumentSemanticTokensFull $ \req responder -> do
     let uri = req ^. (LSP.params . LSP.textDocument . LSP.uri)
     TextDocumentSemanticTokensFull.handler uri responder
+  , -- "guabao" - reload, refine, inspect and etc.
+    requestHandler (LSP.SCustomMethod "guabao") $ \req responder -> do
+    let params = req ^. LSP.params
+    CustomMethod.handler params (responder . Right . JSON.toJSON)
   ]
 
