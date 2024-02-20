@@ -44,7 +44,7 @@ editText range textToReplace onSuccess = do
               _changeAnnotations = Nothing
             }
           }
-  _ <- LSP.sendRequest LSP.SWorkspaceApplyEdit requestParams (const onSuccess)
+  _requestId <- LSP.sendRequest LSP.SWorkspaceApplyEdit requestParams (\_ -> onSuccess)
   return ()
 
   where
