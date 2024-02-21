@@ -27,7 +27,7 @@ main = do
 -- | Command-line arguments
 data Mode = ModeLSP | ModeHelp | ModeDev
 
-newtype Options = Options
+data Options = Options
   { optMode :: Mode
   , port :: String
   }
@@ -54,8 +54,8 @@ options =
       ['s']
       ["socket"]
       (OptArg (\case
-        Nothing -> opts -> opts
-        Just port -> opts -> opts {port = port}))
+        Nothing -> id
+        Just p -> \opts -> opts {port = p}) "SOCK")
       "socket port number"
   ]
 
