@@ -276,6 +276,7 @@ data Instruction next
   | SendDiagnostics [J.Diagnostic] next -- ^ Send Diagnostics
   deriving (Functor)
 
+
 initState :: FilePath -> PipelineState
 initState filepath = PipelineState [] (Raw filepath) False Nothing 0
 

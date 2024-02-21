@@ -31,10 +31,10 @@ import Data.Loc.Range (Range, rangeStart)
 
 
 handler :: FilePath -> ([ResKind] -> ServerM ()) -> (Error -> ServerM ()) -> ServerM ()
-handler filePath onFinsih onError = do
+handler filePath onFinish onError = do
   reload filePath (\loadedProgram -> do
       response <- sendDiagnosticsAndMakeResponseFromLoadedProgram filePath loadedProgram Nothing
-      onFinsih response
+      onFinish response
     ) onError
 
 reload :: FilePath -> (LoadedProgram -> ServerM ()) -> (Error -> ServerM ()) -> ServerM ()

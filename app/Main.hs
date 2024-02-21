@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE LambdaCase #-}
 
 module Main where
 
@@ -28,10 +29,14 @@ data Mode = ModeLSP | ModeHelp | ModeDev
 
 newtype Options = Options
   { optMode :: Mode
+  , port :: String
   }
 
 defaultOptions :: Options
-defaultOptions = Options {optMode = ModeLSP}
+defaultOptions = Options
+  { optMode = ModeLSP
+  , port = "3000"
+  }
 
 options :: [OptDescr (Options -> Options)]
 options =
@@ -44,7 +49,14 @@ options =
       ['d']
       ["dev"]
       (NoArg (\opts -> opts {optMode = ModeDev}))
-      "for testing"
+      "for testing",
+    Option
+      ['s']
+      ["socket"]
+      (OptArg (\case
+        Nothing -> opts -> opts
+        Just port -> opts -> opts {port = port}))
+      "socket port number"
   ]
 
 usage :: String
