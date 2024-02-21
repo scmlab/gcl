@@ -55,7 +55,7 @@ options =
       ["socket"]
       (OptArg (\case
         Nothing -> id
-        Just p -> \opts -> opts {port = p}) "SOCK")
+        Just portNumber -> \opts -> opts {port = portNumber}) "PORT_NUMBER")
       "socket port number"
   ]
 
