@@ -12,14 +12,14 @@ import Server (run)
 
 main :: IO ()
 main = do
-  (opts, _) <- getArgs >>= parseOpts
-  case optMode opts of
+  ((Options mode port), _) <- getArgs >>= parseOpts
+  case mode of
     ModeHelp -> putStrLn $ usageInfo usage options
     ModeLSP -> do
-      _ <- run False
+      _ <- run False port
       return ()
     ModeDev -> do 
-      _ <- run True 
+      _ <- run True port
       return ()
 
 --------------------------------------------------------------------------------

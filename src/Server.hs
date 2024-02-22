@@ -1,3 +1,6 @@
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedStrings #-}
+
 module Server where
 
 import           Control.Concurrent             ( forkIO
@@ -16,16 +19,16 @@ import           Network.Simple.TCP             ( HostPreference(Host)
 import           Network.Socket                 ( socketToHandle )
 import           Server.Handler2                ( handlers )
 import           Server.Monad
-
+import qualified Data.Text as T
+import Language.LSP.Types
 --------------------------------------------------------------------------------
 
 -- entry point of the LSP server
-run :: Bool -> IO Int
-run devMode = do
+run :: Bool -> String -> IO Int
+run devMode port = do
   env <- initGlobalEnv
   if True
     then do
-      let port = "3000"
       _ <- forkIO (printLog env)
       serve (Host "127.0.0.1") port $ \(sock, _remoteAddr) -> do
         putStrLn $ "== connection established at " ++ port ++ " =="
@@ -35,6 +38,22 @@ run devMode = do
     else do
       runServer (serverDefn env)
  where
+  handlers :: Handlers (LspM ())
+  handlers = mconcat
+    [ notificationHandler SInitialized $ \_notif -> do
+        let params =
+              ShowMessageRequestParams
+                MtInfo
+                "Hello, Guabao!"
+                Nothing
+        _ <- sendRequest SWindowShowMessageRequest params $ \case
+            Right _ ->
+              sendNotification SWindowShowMessage (ShowMessageParams MtInfo "Just saying hello again!")
+            Left err ->
+              sendNotification SWindowShowMessage (ShowMessageParams MtError $ "Something went wrong!\n" <> T.pack (show err))
+        pure ()
+    , requestHandler STextDocumentHover $ \_req _responder -> pure ()
+    ]
   printLog :: GlobalEnv -> IO ()
   printLog env = forever $ do
     result <- readChan (globalChan env)
@@ -47,7 +66,7 @@ run devMode = do
     , onConfigurationChange = const $ pure $ Right ()
     , doInitialize          = \ctxEnv _req -> pure $ Right ctxEnv
     , staticHandlers        = handlers
-    , interpretHandler      = \ctxEnv -> Iso (runServerM env ctxEnv) liftIO
+    , interpretHandler      = \ctxEnv -> Iso (runLspT ctxEnv) liftIO
     , options               = lspOptions
     }
 
