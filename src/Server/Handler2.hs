@@ -31,9 +31,9 @@ handlers = mconcat
       Initialized.handler
   , -- "textDocument/completion" - autocompletion
     requestHandler LSP.STextDocumentCompletion $ \req responder -> do
-    let completionContext = req ^. LSP.params . LSP.context
-    let position          = req ^. LSP.params . LSP.position
-    AutoCompletion.handler position completionContext >>= responder . Right
+      let completionContext = req ^. LSP.params . LSP.context
+      let position          = req ^. LSP.params . LSP.position
+      AutoCompletion.handler position completionContext >>= responder . Right
   , -- "textDocument/definition" - go to definition
     requestHandler LSP.STextDocumentDefinition $ \req responder -> do
       let uri = req ^. (LSP.params . LSP.textDocument . LSP.uri)
