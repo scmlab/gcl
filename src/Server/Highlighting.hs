@@ -1,6 +1,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE InstanceSigs #-}
 
 module Server.Highlighting
   ( Highlighting
@@ -126,6 +127,7 @@ instance Collect () Highlighting DeclType where
 -- Stmt
 
 instance Collect () Highlighting Stmt where
+  collect :: Stmt -> M () Highlighting ()
   collect = \case
     Skip  x          -> addHighlighting J.SttKeyword [] x
     Abort x          -> addHighlighting J.SttKeyword [] x
