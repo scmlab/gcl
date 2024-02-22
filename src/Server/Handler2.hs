@@ -2,16 +2,20 @@
 {-# LANGUAGE DisambiguateRecordFields #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE LambdaCase #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Use lambda-case" #-}
 
 module Server.Handler2 ( handlers ) where
 
+import qualified Data.Text                      as T
 import           Control.Lens                   ( (^.) )
 import qualified Data.Aeson                     as JSON
 import           Language.LSP.Server            ( Handlers
                                                 , notificationHandler
                                                 , requestHandler
+                                                , sendRequest
+                                                , sendNotification
                                                 )
 import           Server.Monad                   hiding (logText)
 
@@ -28,7 +32,17 @@ handlers :: Handlers ServerM
 handlers = mconcat
   [ -- "initialized" - after initialize
     notificationHandler LSP.SInitialized $ \_not -> do
-      return ()
+      let params =
+            LSP.ShowMessageRequestParams
+              LSP.MtInfo
+              "Hello, Guabao!"
+              Nothing
+      _ <- sendRequest LSP.SWindowShowMessageRequest params $ \case
+          Right _ ->
+            sendNotification LSP.SWindowShowMessage (LSP.ShowMessageParams LSP.MtInfo "Just saying hello again!")
+          Left err ->
+            sendNotification LSP.SWindowShowMessage (LSP.ShowMessageParams LSP.MtError $ "Something went wrong!\n" <> T.pack (show err))
+      pure ()
   , -- "textDocument/completion" - autocompletion
     requestHandler LSP.STextDocumentCompletion $ \req responder -> do
     let completionContext = req ^. LSP.params . LSP.context
