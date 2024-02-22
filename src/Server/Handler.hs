@@ -2,7 +2,6 @@
 {-# LANGUAGE DisambiguateRecordFields #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PolyKinds #-}
-{-# LANGUAGE LambdaCase #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Use lambda-case" #-}
 
@@ -10,14 +9,11 @@ module Server.Handler
   ( handlers
   ) where
 
-import qualified Data.Text as T
 import           Control.Lens                   ( (^.) )
 import qualified Data.Aeson                    as JSON
 import           Language.LSP.Server            ( Handlers
                                                 , notificationHandler
                                                 , requestHandler
-                                                , sendRequest
-                                                , sendNotification
                                                 )
 import           Server.Monad                  hiding (logText)
 import           Server.Pipeline
@@ -34,16 +30,6 @@ import qualified Server.Handler.Hover          as Hover
 handlers :: Handlers ServerM
 handlers = mconcat
   [ notificationHandler J.SInitialized $ \_not -> do
-      let params =
-              J.ShowMessageRequestParams
-                J.MtInfo
-                "Hello, Guabao!"
-                Nothing
-      _ <- sendRequest J.SWindowShowMessageRequest params $ \case
-          Right _ ->
-            sendNotification J.SWindowShowMessage (J.ShowMessageParams J.MtInfo "Just saying hello again!")
-          Left err ->
-            sendNotification J.SWindowShowMessage (J.ShowMessageParams J.MtError $ "Something went wrong!\n" <> T.pack (show err))
       pure ()
   , 
     -- autocompletion
