@@ -23,7 +23,7 @@ import           Server.Monad
 run :: Bool -> IO Int
 run devMode = do
   env <- initGlobalEnv
-  if devMode
+  if True
     then do
       let port = "3000"
       _ <- forkIO (printLog env)
