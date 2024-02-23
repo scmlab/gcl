@@ -25,14 +25,14 @@ run devMode port = do
   env <- initGlobalEnv
   if devMode
     then do
-      _ <- forkIO (printLog env)
+      _threadId <- forkIO (printLog env)
       serve (Host "127.0.0.1") port $ \(sock, _remoteAddr) -> do
         putStrLn $ "== connection established at " ++ port ++ " =="
         handle <- socketToHandle sock ReadWriteMode
         _      <- runServerWithHandles handle handle (serverDefn env)
         putStrLn "== dev server closed =="
     else do
-      _ <- forkIO (printLog env)
+      _threadId <- forkIO (printLog env)
       runServer (serverDefn env)
  where
   printLog :: GlobalEnv -> IO ()
