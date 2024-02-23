@@ -74,7 +74,6 @@ library
       Server.Handler2.CustomMethod.Utils
       Server.Handler2.GoToDefinition
       Server.Handler2.Hover
-      Server.Handler2.Initialized
       Server.Handler2.SemanticTokens
       Server.Handler2.Utils
       Server.Highlighting
@@ -239,7 +238,6 @@ test-suite gcl-test
       Server.Handler2.CustomMethod.Utils
       Server.Handler2.GoToDefinition
       Server.Handler2.Hover
-      Server.Handler2.Initialized
       Server.Handler2.SemanticTokens
       Server.Handler2.Utils
       Server.Highlighting
