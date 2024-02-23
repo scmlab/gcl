@@ -23,23 +23,21 @@ import           Server.Monad
 run :: Bool -> String -> IO Int
 run devMode port = do
   env <- initGlobalEnv
+  _threadId <- forkIO (printLog env)
   if devMode
     then do
-      _threadId <- forkIO (printLog env)
       serve (Host "127.0.0.1") port $ \(sock, _remoteAddr) -> do
         putStrLn $ "== connection established at " ++ port ++ " =="
         handle <- socketToHandle sock ReadWriteMode
         _      <- runServerWithHandles handle handle (serverDefn env)
         putStrLn "== dev server closed =="
     else do
-      _threadId <- forkIO (printLog env)
       runServer (serverDefn env)
  where
   printLog :: GlobalEnv -> IO ()
   printLog env = forever $ do
     result <- readChan (globalChan env)
-    when devMode $ do
-      Text.putStrLn result
+    Text.putStrLn result
 
   serverDefn :: GlobalEnv -> ServerDefinition ()
   serverDefn env = ServerDefinition
