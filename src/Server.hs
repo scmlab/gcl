@@ -32,6 +32,7 @@ run devMode port = do
         _      <- runServerWithHandles handle handle (serverDefn env)
         putStrLn "== dev server closed =="
     else do
+      _ <- forkIO (printLog env)
       runServer (serverDefn env)
  where
   printLog :: GlobalEnv -> IO ()
