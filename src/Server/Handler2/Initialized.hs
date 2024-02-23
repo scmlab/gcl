@@ -16,7 +16,7 @@ handler = do
   let requestParams =
         LSP.ShowMessageRequestParams
           LSP.MtInfo
-          "Hello, Handler2!"
+          "GCL Server Initialized."
           Nothing
   _ <- LSP.sendRequest LSP.SWindowShowMessageRequest requestParams $ \case
       Right _ ->

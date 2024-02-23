@@ -20,7 +20,7 @@ main = do
     ModeLSP -> do
       _ <- run False port
       return ()
-    ModeDev -> do 
+    ModeDev -> do
       _ <- run True port
       return ()
 
