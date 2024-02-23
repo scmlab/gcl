@@ -16,7 +16,7 @@ handler = do
   let requestParams =
         LSP.ShowMessageRequestParams
           LSP.MtInfo
-          "Hello, Guabao!"
+          "Hello, Handler2!"
           Nothing
   _ <- LSP.sendRequest LSP.SWindowShowMessageRequest requestParams $ \case
       Right _ ->

@@ -12,7 +12,9 @@ import Server (run)
 
 main :: IO ()
 main = do
-  ((Options mode port), _) <- getArgs >>= parseOpts
+  -- FIXME: ((Options mode port), _) <- getArgs >>= parseOpts
+  let mode = ModeLSP
+  let port = "3000"
   case mode of
     ModeHelp -> putStrLn $ usageInfo usage options
     ModeLSP -> do
