@@ -33,8 +33,9 @@ bumpVersion = Server.Monad.bumpVersion
 sendDiagnostics :: FilePath -> [LSP.Diagnostic] -> ServerM ()
 sendDiagnostics = Server.Monad.sendDiagnosticsLSP
 
-editText :: Range -> Text -> ServerM () -> ServerM ()
-editText range textToReplace onSuccess = do
+
+editTexts :: [(Range, Text)] -> ServerM () -> ServerM ()
+editTexts rangeTextPairs onSuccess = do
   let requestParams :: LSP.ApplyWorkspaceEditParams
         = LSP.ApplyWorkspaceEditParams {
             _label = Just "Resolve Spec",
@@ -53,13 +54,19 @@ editText range textToReplace onSuccess = do
     textDocumentEdit :: LSP.TextDocumentEdit
     textDocumentEdit = LSP.TextDocumentEdit {
       _textDocument = LSP.VersionedTextDocumentIdentifier (LSP.filePathToUri filepath) (Just 0),
-      _edits = LSP.List [LSP.InL textEdit]
+      _edits = LSP.List (map LSP.InL textEdits)
     }
-    textEdit :: LSP.TextEdit
-    textEdit = LSP.TextEdit {
+    textEdits :: [LSP.TextEdit]
+    textEdits = map makeTextEdit rangeTextPairs
+    makeTextEdit :: (Range, Text) -> LSP.TextEdit
+    makeTextEdit (range, textToReplace) = LSP.TextEdit {
       _range = SrcLoc.toLSPRange range,
       _newText = textToReplace
     }
+  
+
+editText :: Range -> Text -> ServerM () -> ServerM ()
+editText range textToReplace onSuccess = editTexts [(range, textToReplace)]
 
 cacheProgram :: FilePath -> LoadedProgram -> ServerM LoadedProgram
 cacheProgram filepath loadedProgram = do
