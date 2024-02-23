@@ -12,30 +12,30 @@ import Server (run)
 
 main :: IO ()
 main = do
-  ((Options mode port), _) <- getArgs >>= parseOpts
+  (Options mode port, _) <- getArgs >>= parseOpts
   case mode of
     ModeHelp -> putStrLn $ usageInfo usage options
     ModeLSP -> do
       _ <- run False port
       return ()
-    ModeDev -> do 
+    ModeDev -> do
       _ <- run True port
       return ()
 
 --------------------------------------------------------------------------------
 
 -- | Command-line arguments
-data Mode = ModeLSP | ModeHelp | ModeDev
+data Mode = ModeLSP | ModeHelp | ModeDev deriving Show
 
 data Options = Options
-  { optMode :: Mode
-  , port :: String
+  { _mode :: Mode
+  , _port :: String
   }
 
 defaultOptions :: Options
 defaultOptions = Options
-  { optMode = ModeLSP
-  , port = "3000"
+  { _mode = ModeLSP
+  , _port = "3000"
   }
 
 options :: [OptDescr (Options -> Options)]
@@ -43,19 +43,24 @@ options =
   [ Option
       ['h']
       ["help"]
-      (NoArg (\opts -> opts {optMode = ModeHelp}))
+      (NoArg (\opts -> opts {_mode = ModeHelp}))
       "print this help message",
     Option
       ['d']
       ["dev"]
-      (NoArg (\opts -> opts {optMode = ModeDev}))
+      (NoArg (\opts -> opts {_mode = ModeDev}))
+      "for testing",
+    Option
+      []
+      ["stdio"]
+      (NoArg (\opts -> opts {_mode = ModeLSP}))
       "for testing",
     Option
       ['s']
       ["socket"]
       (OptArg (\case
         Nothing -> id
-        Just portNumber -> \opts -> opts {port = portNumber}) "PORT_NUMBER")
+        Just portNumber -> \opts -> opts {_port = portNumber}) "PORT_NUMBER")
       "socket port number"
   ]
 
