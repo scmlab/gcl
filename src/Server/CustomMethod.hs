@@ -74,6 +74,7 @@ data ReqKind
   deriving Generic
 
 instance FromJSON ReqKind
+instance ToJSON ReqKind
 
 instance Show ReqKind where
   show (ReqInspect      range) = "Inspect " <> show (ShortRange range)
@@ -93,6 +94,7 @@ data Request = Req FilePath ReqKind
   deriving Generic
 
 instance FromJSON Request
+instance ToJSON Request
 
 instance Show Request where
   show (Req _path kind) = show kind
