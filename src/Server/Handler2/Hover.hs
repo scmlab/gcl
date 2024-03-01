@@ -1,7 +1,6 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE LambdaCase #-}
 
 module Server.Handler2.Hover
   ( handler
@@ -20,7 +19,6 @@ handler :: Uri -> Position -> (Maybe Hover -> ServerM ()) -> ServerM ()
 handler uri position responder = case uriToFilePath uri of
   Nothing       -> responder Nothing
   Just filepath -> do
-    logText "initialized"
     maybeSource <- getSource filepath
     case maybeSource of
       Nothing -> responder Nothing
