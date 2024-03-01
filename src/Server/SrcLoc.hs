@@ -62,7 +62,7 @@ toLSPPosition (Pos _path ln col _offset) = J.Position ((ln - 1) `max` 0) ((col -
 --  >def123\r\n          (2, 11)
 --  >ghi\r               (3, 15)
 --
-newtype ToOffset = ToOffset { unToOffset :: IntMap Int }
+newtype ToOffset = ToOffset { unToOffset :: IntMap Int } deriving Show
 
 data Accum = Accum
   { _accumPreviousChar  :: Maybe Char

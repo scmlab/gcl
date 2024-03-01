@@ -162,7 +162,7 @@ data LoadedProgram = LoadedProgram
   , _warnings          :: [StructWarning]
   , _redexes           :: IntMap (Int, A.Expr)
   , _variableCounter   :: Int
-  }
+  } deriving Show
 
 -- | Constructs an initial global state
 initGlobalEnv :: IO GlobalEnv

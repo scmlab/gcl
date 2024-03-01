@@ -36,22 +36,24 @@ handler params responder = do
       responder $ CannotDecodeRequest $ show msg ++ "\n" ++ show params
     JSON.Success request -> dispatchRequest request
   where
-    dispatchRequest :: Request -> ServerM ()
-    dispatchRequest _request@(Req filePath reqKind) = do
-      case reqKind of
-        ReqReload                         -> Reload.handler filePath respondResult reportError
-        ReqInspect range                  -> Inspect.handler range respondResult reportError
-        ReqRefine2 range text             -> Refine.slowHandler range text respondResult reportError
-        ReqInsertProofTemplate range hash -> InsertProofTemplate.slowHandler filePath range hash respondResult reportError
-        ReqSubstitute redexNumber         -> SubstituteRedex.handler filePath redexNumber respondResult reportError
-        ReqHelloWorld range               -> HelloWorld.handler range respondResult reportError
-        _                                 -> reportError (Others "Not implemented yet.")
-      where
-        reportError :: Error -> ServerM ()
-        reportError err = do
-          (responsesFromError, diagnosticsFromError)
-            <- Server.Monad.convertErrorsToResponsesAndDiagnostics [err]
-          sendDiagnostics filePath diagnosticsFromError
-          responder (Res filePath responsesFromError)
-        respondResult :: [ResKind] -> ServerM ()
-        respondResult results = responder (Res filePath results)
+    dispatchRequest :: [Request] -> ServerM ()
+    dispatchRequest request =
+      case head request of
+        Req filePath reqKind ->
+          case reqKind of
+            ReqReload                         -> Reload.handler filePath respondResult reportError
+            ReqInspect range                  -> Inspect.handler range respondResult reportError
+            ReqRefine2 range text             -> Refine.slowHandler range text respondResult reportError
+            ReqInsertProofTemplate range hash -> InsertProofTemplate.slowHandler filePath range hash respondResult reportError
+            ReqSubstitute redexNumber         -> SubstituteRedex.handler filePath redexNumber respondResult reportError
+            ReqHelloWorld range               -> HelloWorld.handler range respondResult reportError
+            _                                 -> reportError (Others "Not implemented yet.")
+          where
+            reportError :: Error -> ServerM ()
+            reportError err = do
+              (responsesFromError, diagnosticsFromError)
+                <- Server.Monad.convertErrorsToResponsesAndDiagnostics [err]
+              sendDiagnostics filePath diagnosticsFromError
+              responder (Res filePath responsesFromError)
+            respondResult :: [ResKind] -> ServerM ()
+            respondResult results = responder (Res filePath results)
