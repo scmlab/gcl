@@ -1,7 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE BlockArguments #-}
-{-# LANGUAGE LambdaCase #-}
 
 module Server.Handler2.CustomMethod.Reload (handler, reload) where
 
@@ -30,9 +29,6 @@ import Server.GoToDefn (collectLocationLinks)
 import Server.Handler2.Utils
 import Server.Handler2.CustomMethod.Utils (sendDiagnosticsAndMakeResponseFromLoadedProgram)
 import Data.Loc.Range (Range, rangeStart)
-
-import qualified Language.LSP.Server as LSP
-import qualified Language.LSP.Types  as LSP
 
 handler :: FilePath -> ([ResKind] -> ServerM ()) -> (Error -> ServerM ()) -> ServerM ()
 handler filePath onFinish onError = do
