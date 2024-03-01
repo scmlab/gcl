@@ -17,7 +17,7 @@ import           Server.Monad                   hiding (logText)
 import qualified Language.LSP.Types             as LSP
 import qualified Language.LSP.Types.Lens        as LSP
 import qualified Server.Handler2.Initialized    as Initialized
-import qualified Server.Handler2.AutoCompletion as AutoCompletion
+import qualified Server.Handler.AutoCompletion as AutoCompletion
 import qualified Server.Handler2.CustomMethod   as CustomMethod
 import qualified Server.Handler2.GoToDefinition as GoToDefinition
 import qualified Server.Handler2.Hover          as Hover
