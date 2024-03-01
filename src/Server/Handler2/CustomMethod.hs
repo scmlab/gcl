@@ -26,15 +26,10 @@ import qualified Data.Text as Text
 
 handler :: JSON.Value -> (Response -> ServerM ()) -> ServerM ()
 handler params responder = do
-  case JSON.fromJSON params of
-    JSON.Error msg -> do
-      logText
-        $  " --> CustomMethod: CannotDecodeRequest "
-        <> Text.pack (show msg)
-        <> " "
-        <> Text.pack (show params)
-      responder $ CannotDecodeRequest $ show msg ++ "\n" ++ show params
-    JSON.Success request -> dispatchRequest request
+  case JSON.fromJSON params :: JSON.Result [Request] of
+    JSON.Success (request:[]) -> dispatchRequest request
+    JSON.Success _            -> error "should not happen"
+    JSON.Error msg            -> responder $ CannotDecodeRequest $ show msg ++ "\n" ++ show params
   where
     dispatchRequest :: Request -> ServerM ()
     dispatchRequest _request@(Req filePath reqKind) = do
