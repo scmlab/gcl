@@ -98,7 +98,7 @@ instance Render Origin where
   render AtAbort{}                = "Abort"
   render AtSkip{}                 = "Skip"
   render AtSpec{}                 = "Spec"
-  render AtAssignment{}           = "Assigment"
+  render AtAssignment{}           = "Assignment"
   render AtAssertion{}            = "Assertion"
   render AtIf{}                   = "Conditional"
   render AtLoop{}                 = "Loop Invariant"

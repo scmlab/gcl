@@ -16,7 +16,7 @@ handler fileUri responder = do
             (LSP.List LSP.knownSemanticTokenModifiers)
       maybeLoadedProgram <- dumpProgram filePath
       case maybeLoadedProgram of
-        Nothing            -> respondError (LSP.ResponseError LSP.ServerNotInitialized "Please reload before requesting for semantic tokens." Nothing)
+        Nothing            -> responder $ pure Nothing
         Just loadedProgram -> do
           case LSP.makeSemanticTokens legend $ _highlightingInfos loadedProgram of
             Left errorMessage    -> respondError (LSP.ResponseError LSP.InternalError errorMessage Nothing)
