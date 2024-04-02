@@ -104,6 +104,7 @@ library
       Syntax.Parser.TokenStream
       Syntax.Parser.Util
       Syntax.Substitution
+      Syntax.Typed
   other-modules:
       Paths_gcl
   hs-source-dirs:
@@ -269,6 +270,7 @@ test-suite gcl-test
       Syntax.Parser.TokenStream
       Syntax.Parser.Util
       Syntax.Substitution
+      Syntax.Typed
       Paths_gcl
   hs-source-dirs:
       test

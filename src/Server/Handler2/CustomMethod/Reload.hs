@@ -14,7 +14,6 @@ import Error (Error(..))
 import Control.Monad.Except (runExcept)
 import Pretty (toText)
 import Data.Loc hiding ( fromLoc )
-import GCL.Type (ScopeTreeZipper)
 import qualified GCL.Type as TypeChecking
 import qualified Data.List as List
 import Data.List (sortOn)
@@ -28,6 +27,7 @@ import Server.GoToDefn (collectLocationLinks)
 import Server.Handler2.Utils
 import Server.Handler2.CustomMethod.Utils (sendDiagnosticsAndMakeResponseFromLoadedProgram)
 import Data.Loc.Range (Range, rangeStart)
+import Syntax.Typed (TypedProgram)
 
 
 handler :: FilePath -> ([ResKind] -> ServerM ()) -> (Error -> ServerM ()) -> ServerM ()
@@ -64,7 +64,7 @@ reload filepath onFinish onError = do
                           , _highlightingInfos = collectHighlighting concrete
                           , _abstractProgram   = abstract
                           , _scopingInfo       = collectLocationLinks abstract
-                          , _typeCheckingInfo  = collectHoverInfo abstract scopeTree
+                          , _typeCheckingInfo  = undefined -- TODO: collectHoverInfo abstract scopeTree
                           , _proofObligations  = List.sort pos
                           , _specifiations     = sortOn locOf specs
                           , _warnings          = warnings
@@ -102,9 +102,9 @@ toAbstract filepath concrete onFinish onError = do
       let holeText = "[!\n" <> indent <> "\n" <> indent <> "!]"
       editText range holeText _onFinish
 
-typeCheck :: A.Program -> Either Error (ScopeTreeZipper A.Type)
+typeCheck :: A.Program -> Either Error TypedProgram
 typeCheck abstract = do
   case TypeChecking.runTypeCheck abstract of
     Left  e -> Left (TypeError e)
-    Right (_, scopeTree) -> return scopeTree
+    Right typedProgram -> return typedProgram
 

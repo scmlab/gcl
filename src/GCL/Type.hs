@@ -9,7 +9,8 @@
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE DeriveFunctor #-}
-
+{-# LANGUAGE InstanceSigs #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module GCL.Type where
 
@@ -32,7 +33,6 @@ import           Data.Loc.Range                 ( Range
                                                 )
 import           Data.Map                       ( Map )
 import qualified Data.Map                      as Map
-import           Data.Maybe                     ( fromMaybe )
 import qualified Data.Text                     as Text
 import           GCL.Common
 import           GHC.Generics                   ( Generic )
@@ -47,6 +47,7 @@ import qualified Server.IntervalMap            as IntervalMap
 import           Syntax.Abstract
 import           Syntax.Abstract.Util
 import           Syntax.Common
+import qualified Syntax.Typed                  as Typed
 
 data Index = Index Name | Hole Range deriving (Eq, Show, Ord)
 
@@ -150,14 +151,6 @@ duplicationCheck ns =
     toName (Index n) = n
     toName (Hole rng) = Name (Text.pack (show rng)) (locOf rng)
 
-class HasTypeDefnInfoScope m where
-    getTypeDefnInfo :: m (ScopeTreeZipper TypeDefnInfo)
-    setTypeDefnInfo :: ScopeTreeZipper TypeDefnInfo -> m ()
-
-class HasTypeInfoScope m where
-    getTypeInfo :: m (ScopeTreeZipper TypeInfo)
-    setTypeInfo :: ScopeTreeZipper TypeInfo -> m ()
-
 --------------------------------------------------------------------------------
 -- Type inference
 
@@ -165,99 +158,52 @@ type TypeInferM = WriterT [Constraint] TypeCheckM
 
 instance Counterous TypeInferM where
   countUp = do
-    (i, s1, s2) <- get
-    put (succ i, s1, s2)
+    i <- get
+    put $ succ i
     return i
 
-instance HasTypeDefnInfoScope TypeInferM where
-  getTypeDefnInfo = do
-    (_, s, _) <- get
-    return s
-  setTypeDefnInfo s2 = do
-    (s1, _, s3) <- get
-    put (s1, s2, s3)
-
-instance HasTypeInfoScope TypeInferM where
-  getTypeInfo = do
-    (_, _, s) <- get
-    return s
-  setTypeInfo s3 = do
-    (s1, s2, _) <- get
-    put (s1, s2, s3)
-
 type Constraint = (Type, Type, Loc)
-
-checkScope :: (MonadError TypeError m, Eq a) => [(Index, a)] -> m (Map Index a)
-checkScope infos = Map.fromList <$> duplicationCheck infos
-
-newScope
-  :: (HasTypeDefnInfoScope m, HasTypeInfoScope m, MonadError TypeError m)
-  => Loc
-  -> ([(Index, TypeDefnInfo)], [(Index, TypeInfo)])
-  -> m ()
-newScope l (infos1, infos2) = do
-  m1 <- checkScope infos1
-  m2 <- checkScope infos2
-  case fromLoc l of
-    Just rng -> do
-      getTypeDefnInfo >>= setTypeDefnInfo . insertScopeTree rng m1
-      getTypeInfo >>= setTypeInfo . insertScopeTree rng m2
-    _ -> pure ()
-
-localScope
-  :: (HasTypeDefnInfoScope m, HasTypeInfoScope m, MonadError TypeError m)
-  => Loc
-  -> ([(Index, TypeDefnInfo)], [(Index, TypeInfo)])
-  -> m b
-  -> m b
-localScope l infos act = do
-  newScope l infos
-  x <- act
-  getTypeDefnInfo >>= setTypeDefnInfo . fsUpScopeTree'
-  getTypeInfo >>= setTypeInfo . fsUpScopeTree'
-  return x
-  where fsUpScopeTree' s = fromMaybe s (fsUpScopeTree s)
+type TypeEnv = Map String Type 
 
 class Located a => InferType a where
-    inferType :: a -> TypeInferM Type
+    inferType :: a -> TypeEnv -> TypeCheckM (Type, [Constraint])
 
 runInferType :: InferType a => a -> TypeCheckM (Map Name Type, Type)
 runInferType x = do
-  (tx, constraints) <- runWriterT (inferType x)
+  (tx, constraints) <- inferType x mempty
   s                 <- solveConstraints constraints
   return (s, subst s tx)
 
 instance InferType Expr where
-  inferType (Lit   lit l) = return (litTypes lit l)
-  inferType (Var   x   _) = inferType x
-  inferType (Const x   _) = inferType x
-  inferType (Op o       ) = inferType o
-  inferType (App (App (Op op@(ChainOp _)) e1 _) e2 l) = do
-    top <- inferType op
+  inferType (Lit   lit l) _ = return (litTypes lit l, [])
+  inferType (Var   x   _) env = inferType x env
+  inferType (Const x   _) env = inferType x env
+  inferType (Op o       ) env = inferType o env
+  inferType (App (App (Op op@(ChainOp _)) e1 _) e2 l) env = do
+    top <- inferType op env
 
-    t1  <- case e1 of
+    (t1, s1)  <- case e1 of
       App (App (Op (ChainOp _)) _ _) e12 _ -> do
-        _ <- inferType e1
-        inferType e12
-      _ -> inferType e1
+        _ <- inferType e1 env
+        inferType e12 env
+      _ -> inferType e1 env
 
-    t2 <- inferType e2
+    (t2, s2) <- inferType e2 env
     v  <- freshVar
     tell [(top, t1 ~-> t2 ~-> v, l)]
 
-    return (tBool l)
-  inferType (App e1 e2 l) = do
-    t1 <- inferType e1
-    t2 <- inferType e2
-    v  <- freshVar
-    tell [(t1, t2 ~-> v, l)]
-    return v
-  inferType (Lam x e l) = do
+    return (tBool l, [])
+  inferType (App e1 e2 l) env = do
     v <- freshVar
-    t <- localScope l ([], [(Index x, VarTypeInfo v)]) (inferType e)
-    return (TFunc v t l)
+    (t1, s1) <- inferType e1 env
+    (t2, s2) <- inferType e2 env
+    tell [(t1, t2 ~-> v, l)]
+    return (v, [])
+  inferType (Lam x e l) env = do
+    v <- freshVar
+    undefined -- FIXME:
 
-  inferType (Func name clauses l) = do
+  inferType (Func name clauses l) env = do
     -- infer the first clause
     t  <- inferFuncClause name (NonEmpty.head clauses)
     -- infer other clauses
@@ -276,11 +222,11 @@ instance InferType Expr where
       let binders = concat binders'
       localScope l ([], binders) (inferType body)
 
-  inferType (Tuple xs) = do
+  inferType (Tuple xs) env = do
     ts <- mapM inferType xs
     return (TTuple ts)
 
-  inferType (Quant qop ids rng t l) = do
+  inferType (Quant qop ids rng t l) env = do
     tids     <- mapM (const freshVar) ids
     (tr, tt) <- localScope
       l
@@ -296,9 +242,9 @@ instance InferType Expr where
         x  <- freshVar
         tell [(to, x ~-> x ~-> x, locOf op), (tt, x, locOf t)]
         return x
-  inferType (RedexShell _ expr  ) = inferType expr
-  inferType (RedexKernel n _ _ _) = inferType n
-  inferType (ArrIdx e1 e2 _     ) = do
+  inferType (RedexShell _ expr  ) env = inferType expr
+  inferType (RedexKernel n _ _ _) env = inferType n
+  inferType (ArrIdx e1 e2 _     ) env = do
     t1 <- inferType e1
     let interval = case t1 of
           TArray itv _ _ -> itv
@@ -308,7 +254,7 @@ instance InferType Expr where
     v <- freshVar
     tell [(t1, TArray interval v NoLoc, locOf t1)]
     return v
-  inferType (ArrUpd e1 e2 e3 _) = do
+  inferType (ArrUpd e1 e2 e3 _) env = do
     t1 <- inferType e1
     let interval = case t1 of
           TArray itv _ _ -> itv
@@ -317,7 +263,7 @@ instance InferType Expr where
     t3 <- inferType e3
     tell [(t2, tInt NoLoc, locOf e2), (t1, TArray interval t3 NoLoc, locOf e1)]
     return t1
-  inferType (Case expr cs l) = do
+  inferType (Case expr cs l) env = do
     te <- inferType expr
     ts <- mapM inferType cs
     t  <- freshVar
@@ -351,52 +297,53 @@ instance InferType Op where
   inferType (ArithOp op) = inferType op
 
 instance InferType ChainOp where
-  inferType (EQProp  l) = return $ tBool .-> tBool .-> tBool $ l
-  inferType (EQPropU l) = return $ tBool .-> tBool .-> tBool $ l
-  inferType (EQ      l) = do
+  inferType :: ChainOp -> TypeEnv -> TypeCheckM (Type, [Constraint])
+  inferType (EQProp  l) env = return (tBool .-> tBool .-> tBool $ l, [])
+  inferType (EQPropU l) env = return (tBool .-> tBool .-> tBool $ l, [])
+  inferType (EQ      l) env = do
     x <- freshVar
-    return $ const x .-> const x .-> tBool $ l
-  inferType (NEQ  l) = return $ tInt .-> tInt .-> tBool $ l
-  inferType (NEQU l) = return $ tInt .-> tInt .-> tBool $ l
-  inferType (LTE  l) = return $ tInt .-> tInt .-> tBool $ l
-  inferType (LTEU l) = return $ tInt .-> tInt .-> tBool $ l
-  inferType (GTE  l) = return $ tInt .-> tInt .-> tBool $ l
-  inferType (GTEU l) = return $ tInt .-> tInt .-> tBool $ l
-  inferType (LT   l) = do
+    return (const x .-> const x .-> tBool $ l, [])
+  inferType (NEQ  l) env = return (tInt .-> tInt .-> tBool $ l, [])
+  inferType (NEQU l) env = return (tInt .-> tInt .-> tBool $ l, [])
+  inferType (LTE  l) env = return (tInt .-> tInt .-> tBool $ l, [])
+  inferType (LTEU l) env = return (tInt .-> tInt .-> tBool $ l, [])
+  inferType (GTE  l) env = return (tInt .-> tInt .-> tBool $ l, [])
+  inferType (GTEU l) env = return (tInt .-> tInt .-> tBool $ l, [])
+  inferType (LT   l) env = do
     x <- freshVar
-    return $ const x .-> const x .-> tBool $ l
-  inferType (GT l) = do
+    return (const x .-> const x .-> tBool $ l, [])
+  inferType (GT l) env = do
     x <- freshVar
-    return $ const x .-> const x .-> tBool $ l
+    return (const x .-> const x .-> tBool $ l, [])
 
 instance InferType ArithOp where
-  inferType (Implies  l) = return $ tBool .-> tBool .-> tBool $ l
-  inferType (ImpliesU l) = return $ tBool .-> tBool .-> tBool $ l
-  inferType (Conj     l) = return $ tBool .-> tBool .-> tBool $ l
-  inferType (ConjU    l) = return $ tBool .-> tBool .-> tBool $ l
-  inferType (Disj     l) = return $ tBool .-> tBool .-> tBool $ l
-  inferType (DisjU    l) = return $ tBool .-> tBool .-> tBool $ l
-  inferType (Neg      l) = return $ tBool .-> tBool $ l
-  inferType (NegU     l) = return $ tBool .-> tBool $ l
-  inferType (NegNum   l) = return $ tInt .-> tInt $ l
-  inferType (Add      l) = return $ tInt .-> tInt .-> tInt $ l
-  inferType (Sub      l) = return $ tInt .-> tInt .-> tInt $ l
-  inferType (Mul      l) = return $ tInt .-> tInt .-> tInt $ l
-  inferType (Div      l) = return $ tInt .-> tInt .-> tInt $ l
-  inferType (Mod      l) = return $ tInt .-> tInt .-> tInt $ l
-  inferType (Max      l) = return $ tInt .-> tInt .-> tInt $ l
-  inferType (Min      l) = return $ tInt .-> tInt .-> tInt $ l
-  inferType (Exp      l) = return $ tInt .-> tInt .-> tInt $ l
-  inferType (Hash     l) = return $ tBool .-> tInt $ l
-  inferType (PointsTo l) = return $ tInt .-> tInt .-> tInt $ l
-  inferType (SConj    l) = return $ tBool .-> tBool .-> tBool $ l
-  inferType (SImp     l) = return $ tBool .-> tBool .-> tBool $ l
+  inferType (Implies  l) _ = return (tBool .-> tBool .-> tBool $ l, [])
+  inferType (ImpliesU l) _ = return (tBool .-> tBool .-> tBool $ l, [])
+  inferType (Conj     l) _ = return (tBool .-> tBool .-> tBool $ l, [])
+  inferType (ConjU    l) _ = return (tBool .-> tBool .-> tBool $ l, [])
+  inferType (Disj     l) _ = return (tBool .-> tBool .-> tBool $ l, [])
+  inferType (DisjU    l) _ = return (tBool .-> tBool .-> tBool $ l, [])
+  inferType (Neg      l) _ = return (tBool .-> tBool $ l, [])
+  inferType (NegU     l) _ = return (tBool .-> tBool $ l, [])
+  inferType (NegNum   l) _ = return (tInt .-> tInt $ l, [])
+  inferType (Add      l) _ = return (tInt .-> tInt .-> tInt $ l, [])
+  inferType (Sub      l) _ = return (tInt .-> tInt .-> tInt $ l, [])
+  inferType (Mul      l) _ = return (tInt .-> tInt .-> tInt $ l, [])
+  inferType (Div      l) _ = return (tInt .-> tInt .-> tInt $ l, [])
+  inferType (Mod      l) _ = return (tInt .-> tInt .-> tInt $ l, [])
+  inferType (Max      l) _ = return (tInt .-> tInt .-> tInt $ l, [])
+  inferType (Min      l) _ = return (tInt .-> tInt .-> tInt $ l, [])
+  inferType (Exp      l) _ = return (tInt .-> tInt .-> tInt $ l, [])
+  inferType (Hash     l) _ = return (tBool .-> tInt $ l, [])
+  inferType (PointsTo l) _ = return (tInt .-> tInt .-> tInt $ l, [])
+  inferType (SConj    l) _ = return (tBool .-> tBool .-> tBool $ l, [])
+  inferType (SImp     l) _ = return (tBool .-> tBool .-> tBool $ l, [])
 
 instance InferType Name where
-  inferType n = do
-    (_, _, s) <- get
+  inferType n env = do
+    s <- lift get
     case lookupScopeTree n s of
-      Just t  -> return (typeInfoToType t)
+      Just t  -> return (typeInfoToType t, [])
       Nothing -> throwError $ NotInScope n
 
 --------------------------------------------------------------------------------
@@ -446,63 +393,42 @@ solveUnifier (s, (t1, t2, l) : cs) = do
 
 --------------------------------------------------------------------------------
 -- Type check
-type TypeCheckM
-  = StateT
-      (FreshState, ScopeTreeZipper TypeDefnInfo, ScopeTreeZipper TypeInfo)
-      (Except TypeError)
+
+data family Typed untyped
+
+newtype instance Typed Program = TypedProgram Typed.TypedProgram
+
+newtype instance Typed Stmt = TypedStmt Typed.TypedStmt
+
+newtype instance Typed GdCmd = TypedGdCmd Typed.TypedGdCmd
+
+newtype instance Typed Expr = TypedExpr Typed.TypedExpr
+
+-- newtype instance Typed [a] = TypedList ??? -- FIXME:
+
+type TypeCheckM = StateT FreshState (Except TypeError)
 
 instance Counterous TypeCheckM where
   countUp = do
-    (s, s2, s3) <- get
-    put (succ s, s2, s3)
+    s <- get
+    put $ succ s
     return s
-
-instance  HasTypeDefnInfoScope TypeCheckM where
-  getTypeDefnInfo = do
-    (_, s, _) <- get
-    return s
-  setTypeDefnInfo s2 = do
-    (s1, _, s3) <- get
-    put (s1, s2, s3)
-
-instance HasTypeInfoScope TypeCheckM where
-  getTypeInfo = do
-    (_, _, s) <- get
-    return s
-  setTypeInfo s3 = do
-    (s1, s2, _) <- get
-    put (s1, s2, s3)
-
-infer :: InferType a => a -> TypeCheckM Type
-infer x = do
-  (s, t) <- runInferType x
-  updateScopeTreeZipper s
-  return t
 
 checkIsType :: InferType a => a -> Type -> TypeCheckM ()
 checkIsType x t = do
   (s1, te) <- runInferType x
   s2       <- solveConstraints [(t, te, locOf x)]
-  updateScopeTreeZipper (s2 `compose` s1)
-
-updateScopeTreeZipper :: Map Name Type -> TypeCheckM ()
-updateScopeTreeZipper s = do
-  getTypeInfo >>= setTypeInfo . subst s
+  return () -- FIXME: s2 `compose` s1
 
 runTypeCheck
-  :: Program -> Either TypeError (ScopeTreeZipper TypeDefnInfo, ScopeTreeZipper Type)
+  :: Program -> Either TypeError Typed.TypedProgram
 runTypeCheck prog = do
-  let initTypeInfo     = ScopeTreeZipper (ScopeTree mempty mempty) []
-  let initTypeDefnInfo = ScopeTreeZipper (ScopeTree mempty mempty) []
-  (_, s2, s3) <- runExcept
-    (execStateT (typeCheck prog) (0, initTypeDefnInfo, initTypeInfo))
-  return (fsRootScopeTree s2, fmap typeInfoToType (fsRootScopeTree s3))
+  (program, _fresh) <- runExcept (runStateT (typeCheck prog mempty) 0)
+  (TypedProgram typedProgram) <- Right program
+  return typedProgram
 
 class TypeCheckable a where
-    typeCheck :: a -> TypeCheckM ()
-
-instance (TypeCheckable a, Foldable t) => TypeCheckable (t a) where
-  typeCheck xs = mapM_ typeCheck xs
+    typeCheck :: a -> TypeEnv -> TypeCheckM (Typed a)
 
 class CollectIds a where
     collectIds :: Fresh m => a -> m [(Index, TypeInfo)]
@@ -527,18 +453,14 @@ instance CollectIds Declaration where
   collectIds (VarDecl   ns t _ _) = return $ map ((, VarTypeInfo t) . Index) ns
 
 instance TypeCheckable Program where
-  typeCheck (Program defns decls exprs stmts loc) = do
+  typeCheck (Program defns decls exprs stmts loc) env = do
     infos <- (<>) <$> collectIds defns <*> collectIds decls
     let tcons = concatMap collectTCon defns
-    localScope
-      loc
-      (tcons, infos)
-      (do
-        typeCheck defns
-        typeCheck decls
-        typeCheck exprs
-        typeCheck stmts
-      )
+    typedDefns <- typeCheck defns env
+    typedDecls <- typeCheck decls env
+    typedExprs <- typeCheck exprs env
+    TypedList typedStmts <- typeCheck stmts env
+    return $ TypedProgram (Typed.Program [] [] [] typedStmts loc) -- FIXME:
    where
     collectTCon (TypeDefn n args _ _) = [(Index n, TypeDefnInfo args)]
     collectTCon _                     = []
@@ -561,7 +483,7 @@ instance TypeCheckable Definition where
     typeCheck t
     typeCheck prop
   typeCheck (FuncDefn n exprs) = do
-    tn <- infer n
+    (tn, sn) <- inferType n
     mapM_ (`checkIsType` tn) exprs
 
 instance TypeCheckable TypeDefnCtor where
@@ -572,9 +494,9 @@ instance TypeCheckable Declaration where
   typeCheck (VarDecl   _ t prop _) = typeCheck t >> typeCheck prop
 
 instance TypeCheckable Stmt where
-  typeCheck (Skip  _       ) = return ()
-  typeCheck (Abort _       ) = return ()
-  typeCheck (Assign ns es _) = do
+  typeCheck (Skip  l       ) env = return $ Typed.Skip l
+  typeCheck (Abort _       ) env = return ()
+  typeCheck (Assign ns es _) env = do
     let ass = zip ns es
     let an  = length ass
     if
@@ -589,27 +511,27 @@ instance TypeCheckable Stmt where
         Just (VarTypeInfo t) -> checkIsType expr t
         Just _               -> throwError $ AssignToConst n
         Nothing              -> throwError $ NotInScope n
-  typeCheck (AAssign x i e _) = do
+  typeCheck (AAssign x i e _) env = do
     checkIsType i (tInt NoLoc)
     te <- infer e
     checkIsType
       x
       (TArray (Interval (Including i) (Including i) (locOf i)) te (locOf x))
-  typeCheck (Assert expr _        ) = checkIsType expr (tBool NoLoc)
-  typeCheck (LoopInvariant e1 e2 _) = do
+  typeCheck (Assert expr _        ) env = checkIsType expr (tBool NoLoc)
+  typeCheck (LoopInvariant e1 e2 _) env = do
     checkIsType e1 (tBool NoLoc)
     checkIsType e2 (tInt NoLoc)
-  typeCheck (Do gds _)     = typeCheck gds
-  typeCheck (If gds _)     = typeCheck gds
-  typeCheck Spec{}         = return ()
-  typeCheck Proof{}        = return ()
-  typeCheck (Alloc x es _) = do
+  typeCheck (Do gds _)     env = typeCheck gds
+  typeCheck (If gds _)     env = typeCheck gds
+  typeCheck Spec{}         env = return ()
+  typeCheck Proof{}        env = return ()
+  typeCheck (Alloc x es _) env = do
     t <- infer x
     mapM_ (`checkIsType` t) es
-  typeCheck (HLookup x  e  _) = infer x >>= checkIsType e
-  typeCheck (HMutate e1 e2 _) = infer e1 >>= checkIsType e2
-  typeCheck (Dispose e _    ) = checkIsType e (tInt NoLoc)
-  typeCheck (Block   p _    ) = typeCheck p
+  typeCheck (HLookup x  e  _) env = infer x >>= checkIsType e
+  typeCheck (HMutate e1 e2 _) env = infer e1 >>= checkIsType e2
+  typeCheck (Dispose e _    ) env = checkIsType e (tInt NoLoc)
+  typeCheck (Block   p _    ) env = typeCheck p
 
 instance TypeCheckable GdCmd where
   typeCheck (GdCmd e s _) = checkIsType e (tBool NoLoc) >> typeCheck s
