@@ -3,15 +3,29 @@ module Syntax.Typed where
 import Data.Text ( Text )
 import Data.Loc ( Loc )
 import Data.Loc.Range ( Range )
-import Syntax.Abstract.Types ( Lit, Type )
+import Syntax.Abstract.Types ( Lit, Type, TypeDefnCtor, Expr )
 import Syntax.Common.Types ( Name, Op )
 
 -- FIXME:
-data TypedProgram = Program [()] -- definitions (the functional language part)
-                            [()] -- constant and variable declarations
+data TypedProgram = Program [TypedDefinition] -- definitions (the functional language part)
+                            [TypedDeclaration] -- constant and variable declarations
                             [()] -- global properties
                             [TypedStmt] -- main program
                             Loc
+
+data TypedDefinition
+  = TypeDefn Name [Name] [TypedTypeDefnCtor] Loc
+  | FuncDefnSig Name Type (Maybe TypedExpr) Loc
+  | FuncDefn Name [TypedExpr]
+  deriving (Eq, Show)
+
+data TypedTypeDefnCtor = TypedTypeDefnCtor Name [Type] -- FIXME: Add type
+  deriving (Eq, Show)
+
+data TypedDeclaration
+  = ConstDecl [Name] Type (Maybe TypedExpr) Loc
+  | VarDecl [Name] Type (Maybe TypedExpr) Loc
+  deriving (Eq, Show) -- FIXME: Add types
 
 data TypedStmt
   = Skip Loc
@@ -35,4 +49,5 @@ data TypedExpr
   | Op Op Type
   | App TypedExpr TypedExpr Loc
   | Lam Name Type TypedExpr Loc
+  deriving (Eq, Show)
   -- FIXME: Other constructors.
