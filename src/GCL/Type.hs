@@ -110,24 +110,22 @@ duplicationCheck ns =
 --------------------------------------------------------------------------------
 -- Type inference
 
-type Constraint = (Type, Type, Loc)
 type TypeEnv = Map Index Type 
 
 class Located a => InferType a where
-    inferType :: a -> TypeEnv -> TypeCheckM (Type, [Constraint])
+    inferType :: a -> TypeEnv -> TypeCheckM (Type, Subs Type)
 
-runInferType :: InferType a => a -> TypeCheckM (Map Name Type, Type)
+runInferType :: InferType a => a -> TypeCheckM Type
 runInferType x = do
-  (tx, constraints) <- inferType x mempty
-  s                 <- solveConstraints constraints
-  return (s, subst s tx)
+  (ty, sub) <- inferType x mempty
+  return $ subst sub ty
 
 instance InferType Expr where
-  inferType (Lit   lit l) _ = return (litTypes lit l, [])
+  inferType (Lit   lit l) _ = return (litTypes lit l, mempty)
   inferType (Var   x   _) env = inferType x env
   inferType (Const x   _) env = inferType x env
   inferType (Op o       ) env = inferType o env
-  inferType (App (App (Op op@(ChainOp _)) e1 _) e2 l) env = do
+  inferType (App (App (Op op@(ChainOp _)) e1 _) e2 l) env =  undefined {- do
     top <- inferType op env
 
     (t1, s1)  <- case e1 of
@@ -140,168 +138,81 @@ instance InferType Expr where
     v  <- freshVar
     tell [(top, t1 ~-> t2 ~-> v, l)]
 
-    return (tBool l, [])
-  inferType (App e1 e2 l) env = do
+    return (tBool l, mempty) -}
+  inferType (App e1 e2 loc) env = do
     v <- freshVar
     (t1, s1) <- inferType e1 env
-    (t2, s2) <- inferType e2 env
-    tell [(t1, t2 ~-> v, l)]
-    return (v, [])
-  inferType (Lam x e l) env = do
-    v <- freshVar
-    undefined -- FIXME:
+    (t2, s2) <- inferType e2 (subst s1 env)
+    s3 <- unifies (subst s2 t1) (TFunc t2 v NoLoc) loc
+    return (v, s3 `compose` s2 `compose` s1)
+  inferType (Lam bound expr loc) env = do
+    tv <- freshVar
+    let newEnv = Map.insert (Index bound) tv env
+    (t1, s1) <- inferType expr newEnv
+    return (TFunc (subst s1 tv) t1 loc, s1)
+  inferType _ _ = undefined -- FIXME:
 
-  inferType (Func name clauses l) env = do
-    -- infer the first clause
-    t  <- inferFuncClause name (NonEmpty.head clauses)
-    -- infer other clauses
-    ts <- mapM (inferFuncClause name) clauses
-    -- and unify them all
-
-    let pairs = map (t, , l) (NonEmpty.toList ts)
-    tell pairs
-
-    return t
-   where
-      -- infer the types of arguments and the return type
-    inferFuncClause :: Name -> FuncClause -> TypeCheckM (Type, [Constraint])
-    inferFuncClause _ (FuncClause patterns body) = undefined {-do
-      (binders', _) <- unzip <$> mapM collectPattInfos patterns
-      let binders = concat binders'
-      localScope l ([], binders) (inferType body)-} -- FIXME:
-
-  inferType (Tuple xs) env = do
-    ts <- mapM (`inferType` env) xs
-    return undefined -- FIXME:
-
-  inferType (Quant qop ids rng t l) env = undefined {-do
-    tids     <- mapM (const freshVar) ids
-    (tr, tt) <- localScope
-      l
-      ([], [ (Index n, VarTypeInfo tn) | n <- ids, tn <- tids ])
-      ((,) <$> inferType rng <*> inferType t)
-    tell [(tr, tBool NoLoc, locOf rng)]
-    case qop of
-      Op (ArithOp (Hash _)) -> do
-        tell [(tt, tBool NoLoc, locOf t)]
-        return (tInt l)
-      op -> do
-        to <- inferType op
-        x  <- freshVar
-        tell [(to, x ~-> x ~-> x, locOf op), (tt, x, locOf t)]
-        return x-}
-  inferType (RedexShell _ expr  ) env = inferType expr env
-  inferType (RedexKernel n _ _ _) env = inferType n env
-  inferType (ArrIdx e1 e2 _     ) env = do
-    (t1, s1) <- inferType e1 env
-    let interval = case t1 of
-          TArray itv _ _ -> itv
-          _              -> emptyInterval
-    t2 <- inferType e2 env
-    tell [(t2, tInt NoLoc, locOf e2)]
-    v <- freshVar
-    tell [(t1, TArray interval v NoLoc, locOf t1)]
-    return (v, [])
-  inferType (ArrUpd e1 e2 e3 _) env = do
-    (t1, s1) <- inferType e1 env
-    let interval = case t1 of
-          TArray itv _ _ -> itv
-          _              -> emptyInterval
-    (t2, s2) <- inferType e2 env
-    (t3, s3) <- inferType e3 env
-    tell [(t2, tInt NoLoc, locOf e2), (t1, TArray interval t3 NoLoc, locOf e1)]
-    return (t1, [])
-  inferType (Case expr cs l) env = do
-    (te, se) <- inferType expr env
-    ts <- mapM (`inferType` env) cs
-    t  <- freshVar
-    mapM_ (\(tc, c) -> tell [(TFunc te t l, tc, locOf c)]) (zip ts cs)
-    return (t, [])
-{-
-instance InferType CaseClause where
-  inferType c@(CaseClause patt expr) = do
-    (pattInfos, tPatt) <- collectPattInfos patt
-    te                 <- localScope (locOf c) ([], pattInfos) (inferType expr)
-    return (TFunc tPatt te (locOf c))
-
-collectPattInfos :: Pattern -> TypeCheckM (Type, [Constraint])
-collectPattInfos (PattLit    x) = return ([], litTypes x (locOf x))
-collectPattInfos (PattBinder n) = do
-  tn <- freshVar
-  return ([(Index n, VarTypeInfo tn)], tn)
-collectPattInfos (PattWildcard rng) = do
-  v <- freshVar
-  return ([(Hole rng, VarTypeInfo v)], v)
-collectPattInfos (PattConstructor n patts) = do
-  tPatt           <- freshVar
-  tn              <- inferType n
-  (infos, tpatts) <- first concat . unzip <$> mapM collectPattInfos patts
-
-  tell [(tn, wrapTFunc tpatts tPatt, n <--> patts)]
-  return (infos, tPatt)
--} -- FIXME:
 instance InferType Op where
   inferType (ChainOp op) = inferType op
   inferType (ArithOp op) = inferType op
 
 instance InferType ChainOp where
-  inferType :: ChainOp -> TypeEnv -> TypeCheckM (Type, [Constraint])
-  inferType (EQProp  l) env = return (tBool .-> tBool .-> tBool $ l, [])
-  inferType (EQPropU l) env = return (tBool .-> tBool .-> tBool $ l, [])
+  inferType :: ChainOp -> TypeEnv -> TypeCheckM (Type, Subs Type)
+  inferType (EQProp  l) env = return (tBool .-> tBool .-> tBool $ l, mempty)
+  inferType (EQPropU l) env = return (tBool .-> tBool .-> tBool $ l, mempty)
   inferType (EQ      l) env = do
     x <- freshVar
-    return (const x .-> const x .-> tBool $ l, [])
-  inferType (NEQ  l) env = return (tInt .-> tInt .-> tBool $ l, [])
-  inferType (NEQU l) env = return (tInt .-> tInt .-> tBool $ l, [])
-  inferType (LTE  l) env = return (tInt .-> tInt .-> tBool $ l, [])
-  inferType (LTEU l) env = return (tInt .-> tInt .-> tBool $ l, [])
-  inferType (GTE  l) env = return (tInt .-> tInt .-> tBool $ l, [])
-  inferType (GTEU l) env = return (tInt .-> tInt .-> tBool $ l, [])
+    return (const x .-> const x .-> tBool $ l, mempty)
+  inferType (NEQ  l) env = return (tInt .-> tInt .-> tBool $ l, mempty)
+  inferType (NEQU l) env = return (tInt .-> tInt .-> tBool $ l, mempty)
+  inferType (LTE  l) env = return (tInt .-> tInt .-> tBool $ l, mempty)
+  inferType (LTEU l) env = return (tInt .-> tInt .-> tBool $ l, mempty)
+  inferType (GTE  l) env = return (tInt .-> tInt .-> tBool $ l, mempty)
+  inferType (GTEU l) env = return (tInt .-> tInt .-> tBool $ l, mempty)
   inferType (LT   l) env = do
     x <- freshVar
-    return (const x .-> const x .-> tBool $ l, [])
+    return (const x .-> const x .-> tBool $ l, mempty)
   inferType (GT l) env = do
     x <- freshVar
-    return (const x .-> const x .-> tBool $ l, [])
+    return (const x .-> const x .-> tBool $ l, mempty)
 
 instance InferType ArithOp where
-  inferType (Implies  l) _ = return (tBool .-> tBool .-> tBool $ l, [])
-  inferType (ImpliesU l) _ = return (tBool .-> tBool .-> tBool $ l, [])
-  inferType (Conj     l) _ = return (tBool .-> tBool .-> tBool $ l, [])
-  inferType (ConjU    l) _ = return (tBool .-> tBool .-> tBool $ l, [])
-  inferType (Disj     l) _ = return (tBool .-> tBool .-> tBool $ l, [])
-  inferType (DisjU    l) _ = return (tBool .-> tBool .-> tBool $ l, [])
-  inferType (Neg      l) _ = return (tBool .-> tBool $ l, [])
-  inferType (NegU     l) _ = return (tBool .-> tBool $ l, [])
-  inferType (NegNum   l) _ = return (tInt .-> tInt $ l, [])
-  inferType (Add      l) _ = return (tInt .-> tInt .-> tInt $ l, [])
-  inferType (Sub      l) _ = return (tInt .-> tInt .-> tInt $ l, [])
-  inferType (Mul      l) _ = return (tInt .-> tInt .-> tInt $ l, [])
-  inferType (Div      l) _ = return (tInt .-> tInt .-> tInt $ l, [])
-  inferType (Mod      l) _ = return (tInt .-> tInt .-> tInt $ l, [])
-  inferType (Max      l) _ = return (tInt .-> tInt .-> tInt $ l, [])
-  inferType (Min      l) _ = return (tInt .-> tInt .-> tInt $ l, [])
-  inferType (Exp      l) _ = return (tInt .-> tInt .-> tInt $ l, [])
-  inferType (Hash     l) _ = return (tBool .-> tInt $ l, [])
-  inferType (PointsTo l) _ = return (tInt .-> tInt .-> tInt $ l, [])
-  inferType (SConj    l) _ = return (tBool .-> tBool .-> tBool $ l, [])
-  inferType (SImp     l) _ = return (tBool .-> tBool .-> tBool $ l, [])
+  inferType (Implies  l) _ = return (tBool .-> tBool .-> tBool $ l, mempty)
+  inferType (ImpliesU l) _ = return (tBool .-> tBool .-> tBool $ l, mempty)
+  inferType (Conj     l) _ = return (tBool .-> tBool .-> tBool $ l, mempty)
+  inferType (ConjU    l) _ = return (tBool .-> tBool .-> tBool $ l, mempty)
+  inferType (Disj     l) _ = return (tBool .-> tBool .-> tBool $ l, mempty)
+  inferType (DisjU    l) _ = return (tBool .-> tBool .-> tBool $ l, mempty)
+  inferType (Neg      l) _ = return (tBool .-> tBool $ l, mempty)
+  inferType (NegU     l) _ = return (tBool .-> tBool $ l, mempty)
+  inferType (NegNum   l) _ = return (tInt .-> tInt $ l, mempty)
+  inferType (Add      l) _ = return (tInt .-> tInt .-> tInt $ l, mempty)
+  inferType (Sub      l) _ = return (tInt .-> tInt .-> tInt $ l, mempty)
+  inferType (Mul      l) _ = return (tInt .-> tInt .-> tInt $ l, mempty)
+  inferType (Div      l) _ = return (tInt .-> tInt .-> tInt $ l, mempty)
+  inferType (Mod      l) _ = return (tInt .-> tInt .-> tInt $ l, mempty)
+  inferType (Max      l) _ = return (tInt .-> tInt .-> tInt $ l, mempty)
+  inferType (Min      l) _ = return (tInt .-> tInt .-> tInt $ l, mempty)
+  inferType (Exp      l) _ = return (tInt .-> tInt .-> tInt $ l, mempty)
+  inferType (Hash     l) _ = return (tBool .-> tInt $ l, mempty)
+  inferType (PointsTo l) _ = return (tInt .-> tInt .-> tInt $ l, mempty)
+  inferType (SConj    l) _ = return (tBool .-> tBool .-> tBool $ l, mempty)
+  inferType (SImp     l) _ = return (tBool .-> tBool .-> tBool $ l, mempty)
 
 instance InferType Name where
   inferType n env = do
-    s <- lift get
     case Map.lookup (Index n) env of
-      Just t  -> return (t, [])
-      Nothing -> throwError $ NotInScope n
+      Just t  -> return (t, mempty)
+      Nothing -> throwError $ NotInScope n -- FIXME: Errors are thrown here.
 
 --------------------------------------------------------------------------------
 -- unification
-type Unifier = (Map Name Type, [Constraint])
+type Unifier = (Map Name Type, Subs Type)
 
 emptyUnifier :: Unifier
-emptyUnifier = (mempty, [])
+emptyUnifier = (mempty, mempty)
 
-unifies :: MonadError TypeError m => Type -> Type -> Loc -> m (Map Name Type)
+unifies :: MonadError TypeError m => Type -> Type -> Loc -> m (Subs Type)
 unifies (TBase t1 _) (TBase t2 _) _ | t1 == t2 = return mempty
 unifies (TArray _ t1 _) (TArray _ t2 _) l = unifies t1 t2 l {-  | i1 == i2 = unifies t1 t2 -}
   -- SCM: for now, we do not check the intervals
@@ -329,16 +240,6 @@ bind :: MonadError TypeError m => Name -> Type -> Loc -> m (Map Name Type)
 bind x t l | occurs x t = throwError $ RecursiveType x t l
            | otherwise  = return (Map.singleton x t)
 
-solveConstraints :: MonadError TypeError m => [Constraint] -> m (Map Name Type)
-solveConstraints cs = solveUnifier (mempty, cs)
-
-solveUnifier :: MonadError TypeError m => Unifier -> m (Map Name Type)
-solveUnifier (s, []              ) = return s
-solveUnifier (s, (t1, t2, l) : cs) = do
-  su <- unifies t1 t2 l
-  solveUnifier (su `compose` s, map (f (subst su)) cs)
-  where f g (a, b, l') = (g a, g b, l')
-
 --------------------------------------------------------------------------------
 -- Type check
 
@@ -350,37 +251,39 @@ type family Typed untyped where
   Typed Stmt = Typed.TypedStmt
   Typed GdCmd = Typed.TypedGdCmd
   Typed Expr = Typed.TypedExpr
+  Typed Name = Maybe TypeInfo
   Typed Type = ()
   Typed Interval = ()
   Typed Endpoint = ()
   Typed [a] = [Typed a]
-  -- (TypeCheckable a, Foldable t) => TypedFoldable (t a)
+  Typed (Maybe a) = Maybe (Typed a)
 
-type TypeCheckM = StateT FreshState (Except TypeError)
+type TypeCheckM = StateT (FreshState, Map Index TypeDefnInfo, Map Index TypeInfo) (Except TypeError)
 
 instance Counterous TypeCheckM where
   countUp = do
-    s <- get
-    put $ succ s
-    return s
+    (count, typeDefnInfo, typeInfo) <- get
+    put (succ count, typeDefnInfo, typeInfo)
+    return count
 
-checkIsType :: InferType a => a -> Type -> TypeCheckM (Subs Type)
-checkIsType x t = do
-  (s1, te) <- runInferType x
-  s2       <- solveConstraints [(t, te, locOf x)]
-  return $ s2 `compose` s1
+checkIsType :: InferType a => a -> Type -> TypeCheckM () -- FIXME: Loc
+
+checkIsType x expected = do
+  (_, _, info) <- get
+  (actual, _) <- inferType x $ typeInfoToType <$> info
+  sub <- unifies actual expected NoLoc
+  if Map.null sub -- FIXME: Either `==` doesn't work here or something else is wrong.
+    then return ()
+    else throwError $ UnifyFailed actual expected NoLoc
 
 runTypeCheck
   :: Program -> Either TypeError Typed.TypedProgram
 runTypeCheck prog = do
-  (program, _fresh) <- runExcept (runStateT (typeCheck prog mempty) 0)
+  (program, _state) <- runExcept (runStateT (typeCheck prog) (0, mempty, mempty))
   Right program
 
 class TypeCheckable a where
-    typeCheck :: a -> TypeEnv -> TypeCheckM (Typed a)
-
-{- instance (TypeCheckable a, Foldable t) => TypeCheckable (t a) where
-  typeCheck xs env = mapM (`typeCheck` env) xs -}
+    typeCheck :: a -> TypeCheckM (Typed a)
 
 class CollectIds a where
     collectIds :: Fresh m => a -> m [(Index, TypeInfo)]
@@ -405,23 +308,26 @@ instance CollectIds Declaration where
   collectIds (VarDecl   ns t _ _) = return $ map ((, VarTypeInfo t) . Index) ns
 
 instance TypeCheckable Program where
-  typeCheck (Program defns decls exprs stmts loc) env = do
+  typeCheck (Program defns decls exprs stmts loc) = do
     infos <- (<>) <$> collectIds defns <*> collectIds decls
+    modify (\(freshState, typeDefnInfos, origInfos) -> (freshState, typeDefnInfos, Map.union origInfos $ Map.fromList infos))
     let tcons = concatMap collectTCon defns
-    typedDefns <- typeCheck defns env
-    typedDecls <- typeCheck decls env
-    typedExprs <- typeCheck exprs env
-    typedStmts <- typeCheck stmts env
-    return $ Typed.Program [] [] [] typedStmts loc -- FIXME:
+    modify (\(freshState, origInfos, typeInfos) -> (freshState, Map.union origInfos $ Map.fromList tcons, typeInfos))
+    typedDefns <- mapM typeCheck defns
+    typedDecls <- mapM typeCheck decls
+    typedExprs <- mapM typeCheck exprs
+    typedStmts <- mapM typeCheck stmts
+    return $ Typed.Program typedDefns typedDecls [] typedStmts loc -- FIXME:
    where
     collectTCon (TypeDefn n args _ _) = [(Index n, TypeDefnInfo args)]
     collectTCon _                     = []
 
 instance TypeCheckable Definition where
-  typeCheck (TypeDefn _ args ctors _) env = do
+  typeCheck (TypeDefn name args ctors loc) = do
     let m = Map.fromList (map (, ()) args)
     mapM_ (\(TypeDefnCtor _ ts) -> mapM_ (scopeCheck m) ts) ctors
-    return []
+    ctors' <- mapM typeCheck ctors
+    return $ Typed.TypeDefn name args ctors' loc
    where
     scopeCheck :: MonadError TypeError m => Map Name () -> Type -> m ()
     scopeCheck m (TCon _ args' _) = mapM_
@@ -431,119 +337,157 @@ instance TypeCheckable Definition where
       )
       args'
     scopeCheck _ _ = return ()
-  typeCheck (FuncDefnSig _ t prop _) env = do
-    typeCheck t env
-    typeCheck prop env
-    
-  typeCheck (FuncDefn n exprs) env = do
-    (tn, sn) <- inferType n env
+  typeCheck (FuncDefnSig name ty expr loc) = do
+    _ <- typeCheck ty
+    expr' <- mapM typeCheck expr
+    return $ Typed.FuncDefnSig name ty expr' loc
+  typeCheck (FuncDefn name exprs) = do
+    (_, _, info) <- get
+    (tn, sn) <- inferType name $ typeInfoToType <$> info -- FIXME: This part might be wrong. (Edit: it's wrong)
     mapM_ (`checkIsType` tn) exprs
+    exprs' <- mapM typeCheck exprs
+    return $ Typed.FuncDefn name exprs'
 
 instance TypeCheckable TypeDefnCtor where
-  typeCheck (TypeDefnCtor name ts) env = do
-    _ <- typeCheck ts env
+  typeCheck (TypeDefnCtor name ts) = do -- TODO: I deleted some code which might be purposeful
     return $ Typed.TypedTypeDefnCtor name ts
+
 instance TypeCheckable Declaration where
-  typeCheck (ConstDecl names ty prop loc) env =
+  typeCheck (ConstDecl names ty prop loc) =
     case prop of
       Just p -> do
-        typeCheck ty env
-        p' <- typeCheck p env
+        typeCheck ty
+        p' <- typeCheck p
         return $ Typed.ConstDecl names ty (Just p') loc
       Nothing -> return $ Typed.ConstDecl names ty Nothing loc
-  typeCheck (VarDecl names ty prop loc) env =
+  typeCheck (VarDecl names ty prop loc) =
     case prop of
       Just p -> do
-        typeCheck ty env
-        p' <- typeCheck p env
+        typeCheck ty
+        p' <- typeCheck p
         return $ Typed.VarDecl names ty (Just p') loc
       Nothing -> return $ Typed.VarDecl names ty Nothing loc
 
+typeOf :: Typed.TypedExpr -> Type
+typeOf (Typed.Lit _ ty _) = ty
+typeOf (Typed.Var _ ty _) = ty
+typeOf (Typed.Const _ ty _) = ty
+typeOf _ = undefined -- FIXME:
+
 instance TypeCheckable Stmt where
-  typeCheck (Skip  l       ) env = return $ Typed.Skip l
-  typeCheck (Abort l       ) env = return $ Typed.Abort l
-  typeCheck (Assign ns es _) env = do
-    let ass = zip ns es
+  typeCheck (Skip  loc     ) = return $ Typed.Skip loc
+  typeCheck (Abort loc     ) = return $ Typed.Abort loc
+  typeCheck (Assign names exprs loc) = do
+    let ass = zip names exprs
     let an  = length ass
     if
-      | an < length es -> throwError $ RedundantExprs (drop an es)
-      | an < length ns -> throwError $ RedundantNames (drop an ns)
-      | otherwise      -> mapM_ checkAssign ass
+      | an < length exprs -> throwError $ RedundantExprs (drop an exprs)
+      | an < length names -> throwError $ RedundantNames (drop an names)
+      | otherwise      -> do
+        (_, _, infos) <- get
+        mapM_ (checkAssign infos) ass
+        exprs' <- mapM typeCheck exprs
+        return $ Typed.Assign names exprs' loc
    where
-    checkAssign :: (Name, Expr) -> TypeEnv -> TypeCheckM ()
-    checkAssign (n, expr) env = do
-      case Map.lookup (Index n) env of
-        Just t  -> checkIsType expr t
-        Just _  -> throwError $ AssignToConst n -- FIXME: check that lhs is a var.
-        Nothing -> throwError $ NotInScope n
-  typeCheck (AAssign x i e _) env = do
-    checkIsType i (tInt NoLoc)
-    te <- infer e
-    checkIsType
-      x
-      (TArray (Interval (Including i) (Including i) (locOf i)) te (locOf x))
-  typeCheck (Assert expr _        ) env = checkIsType expr (tBool NoLoc)
-  typeCheck (LoopInvariant e1 e2 _) env = do
-    checkIsType e1 (tBool NoLoc)
-    checkIsType e2 (tInt NoLoc)
-  typeCheck (Do gds _)     env = typeCheck gds
-  typeCheck (If gds _)     env = typeCheck gds
-  typeCheck Spec{}         env = return ()
-  typeCheck Proof{}        env = return ()
-  typeCheck (Alloc x es _) env = do
-    t <- infer x
-    mapM_ (`checkIsType` t) es
-  typeCheck (HLookup x  e  _) env = infer x >>= checkIsType e
-  typeCheck (HMutate e1 e2 _) env = infer e1 >>= checkIsType e2
-  typeCheck (Dispose e _    ) env = checkIsType e (tInt NoLoc)
-  typeCheck (Block   p _    ) env = typeCheck p
+    checkAssign :: Map Index TypeInfo -> (Name, Expr) -> TypeCheckM ()
+    checkAssign infos (name, expr) = do
+      case Map.lookup (Index name) infos of
+        Just (VarTypeInfo t) -> checkIsType expr t >> pure ()
+        Just _               -> throwError $ AssignToConst name
+        Nothing              -> throwError $ NotInScope name
+  typeCheck (AAssign arr index e loc) = do
+    typedIndex <- typeCheck index
+    if typeOf typedIndex == tInt NoLoc
+    then do
+      (_, _, info) <- get
+      (te, _) <- inferType e $ typeInfoToType <$> info
+      typedArr <- typeCheck arr
+      if typeOf typedArr == TArray (Interval (Including index) (Including index) (locOf index)) te (locOf arr)
+      then do
+        e' <- typeCheck e
+        return $ Typed.AAssign typedArr typedIndex e' loc
+      else throwError $ UnifyFailed (typeOf typedArr) (TArray (Interval (Including index) (Including index) (locOf index)) te (locOf arr)) loc
+    else throwError $ UnifyFailed (typeOf typedIndex) (tInt NoLoc) loc
+  typeCheck (Assert expr loc        ) = do
+    typedExpr <- typeCheck expr
+    if typeOf typedExpr == tBool NoLoc
+    then return (Typed.Assert typedExpr loc)
+    else throwError $ UnifyFailed (typeOf typedExpr) (tBool NoLoc) loc
+  typeCheck (LoopInvariant e1 e2 loc) = do
+    e1' <- typeCheck e1
+    if typeOf e1' == tBool NoLoc
+    then do
+      e2' <- typeCheck e2
+      if typeOf e2' == tInt NoLoc
+      then return $ Typed.LoopInvariant e1' e2' loc
+      else throwError $ UnifyFailed (typeOf e2') (tBool NoLoc) loc
+    else throwError $ UnifyFailed (typeOf e1') (tBool NoLoc) loc
+  typeCheck (Do gds loc) = do
+    gds' <- mapM typeCheck gds
+    return $ Typed.Do gds' loc
+  typeCheck (If gds loc) = do
+    gds' <-  mapM typeCheck gds
+    return $ Typed.If gds' loc
+  typeCheck (Spec text range) = return $ Typed.Spec text range
+  typeCheck (Proof text1 text2 range) = return $ Typed.Proof text1 text2 range
+  typeCheck _ = undefined -- FIXME:
 
 instance TypeCheckable GdCmd where
-  typeCheck (GdCmd e s _) = checkIsType e (tBool NoLoc) >> typeCheck s
+  typeCheck (GdCmd e s loc) = do
+    e' <- typeCheck e
+    if typeOf e' == tBool NoLoc
+    then do
+      s' <- mapM typeCheck s
+      return $ Typed.TypedGdCmd e' s' loc
+    else throwError $ UnifyFailed (typeOf e') (tBool NoLoc) loc
 
 instance TypeCheckable Expr where
-  typeCheck expr env = case expr of
+  typeCheck expr = case expr of
     Lit lit loc -> do
-      (litTy, _) <- inferType lit env
+      let litTy = litTypes lit loc
       return $ Typed.Lit lit litTy loc
     Var name loc -> do
-      (nameTy, _) <- inferType name env
+      (_, _, info) <- get
+      (nameTy, _) <- inferType name $ typeInfoToType <$> info
       return $ Typed.Var name nameTy loc
     Const name loc -> do
-      (nameTy, _) <- inferType name env
+      (_, _, info) <- get
+      (nameTy, _) <- inferType name $ typeInfoToType <$> info
       return $ Typed.Const name nameTy loc
     Op op -> do
-      (opTy, _) <- inferType op env
+      (_, _, info) <- get
+      (opTy, _) <- inferType op $ typeInfoToType <$> info
       return $ Typed.Op op opTy
     App expr1 expr2 loc -> do
-      typedExpr1 <- typeCheck expr1 env
-      typedExpr2 <- typeCheck expr2 env
+      typedExpr1 <- typeCheck expr1
+      typedExpr2 <- typeCheck expr2
       -- FIXME: Add check
       return $ Typed.App typedExpr1 typedExpr2 loc
     Lam name expr loc -> do
-      (nameTy, []) <- inferType name env -- FIXME: This is probably wrong.
-      typedExpr <- typeCheck expr env
+      (_, _, info) <- get
+      (nameTy, _) <- inferType name $ typeInfoToType <$> info -- FIXME: This is probably wrong.
+      typedExpr <- typeCheck expr
       return $ Typed.Lam name nameTy typedExpr loc
     Func na ne loc -> undefined -- FIXME: This and below.
-    Tuple exs -> undefined -- FIXME: This and below.
+    Tuple exs -> undefined
     Quant ex nas ex' ex3 loc -> undefined
     RedexKernel na ex set ne -> undefined
     RedexShell n ex -> undefined
     ArrIdx ex ex' loc -> undefined
     ArrUpd ex ex' ex3 loc -> undefined
     Case ex ccs loc -> undefined
-      
 
 instance TypeCheckable Type where
-  typeCheck TBase{}          _ = return ()
-  typeCheck (TArray i  t  _) env = do
-    typeCheck i env
-    typeCheck t env
+  typeCheck TBase{} = return ()
+  typeCheck (TArray i t _) = do
+    typeCheck i
+    typeCheck t
     return ()
-  typeCheck (TFunc  t1 t2 _) env = typeCheck t1 env >> typeCheck t2 env
-  typeCheck (TTuple ts     ) env = forM_ ts (`typeCheck` env)
-  typeCheck (TCon n args _ ) env = do
-    case Map.lookup (Index n) env of
+  typeCheck (TFunc  t1 t2 _) = typeCheck t1 >> typeCheck t2
+  typeCheck (TTuple ts     )  = forM_ ts typeCheck
+  typeCheck (TCon name args _ ) = do
+    (_, infos, _) <- get
+    case Map.lookup (Index name) infos of -- TODO: Check if this is right.
       Just ty -> undefined -- FIXME:
       {-if 
         | length args < length args' -> throwError
@@ -551,16 +495,16 @@ instance TypeCheckable Type where
         | length args > length args' -> throwError
         $ RedundantNames (drop (length args') args)
         | otherwise -> return () -}
-      _ -> throwError $ NotInScope n
-  typeCheck TVar{}     _ = return ()
-  typeCheck TMetaVar{} _ = return ()
+      _ -> throwError $ NotInScope name
+  typeCheck TVar{} = return ()
+  typeCheck TMetaVar{} = return ()
 
 instance TypeCheckable Interval where
-  typeCheck (Interval e1 e2 _) env = typeCheck e1 env >> typeCheck e2 env
+  typeCheck (Interval e1 e2 _) = typeCheck e1 >> typeCheck e2
 
 instance TypeCheckable Endpoint where
-  typeCheck (Including e) env = return ()
-  typeCheck (Excluding e) env = return () -- FIXME: This might be wrong
+  typeCheck (Including e) = return ()
+  typeCheck (Excluding e) = return () -- FIXME: This might be wrong
 
 --------------------------------------------------------------------------------
 -- helper combinators

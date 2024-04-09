@@ -1,3 +1,5 @@
+
+
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -7,12 +9,23 @@ module Server.Hover
   ( collectHoverInfo
   ) where
 
+-- FIXME:
+
+import qualified Language.LSP.Types            as J
+import           Pretty
+
+collectHoverInfo = undefined
+
+instance Pretty J.Hover where
+  pretty = pretty . show
+
+{- -- FIXME:
+
 import           Control.Monad.RWS
 import           Data.Loc                       ( Located
                                                 , locOf
                                                 )
 import           Data.Loc.Range
-import           GCL.Type                       (ScopeTreeZipper)
 import qualified GCL.Type                      as TypeChecking
 import qualified Language.LSP.Types            as J
 import           Pretty                         ( Pretty(..)
@@ -221,3 +234,5 @@ instance Collect Type (J.Hover, Type) Endpoint where
   collect = \case
     Including x -> collect x
     Excluding x -> collect x
+
+-}
