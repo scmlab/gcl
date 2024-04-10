@@ -207,10 +207,6 @@ instance InferType Name where
 
 --------------------------------------------------------------------------------
 -- unification
-type Unifier = (Map Name Type, Subs Type)
-
-emptyUnifier :: Unifier
-emptyUnifier = (mempty, mempty)
 
 unifies :: MonadError TypeError m => Type -> Type -> Loc -> m (Subs Type)
 unifies (TBase t1 _) (TBase t2 _) _ | t1 == t2 = return mempty
@@ -258,7 +254,7 @@ type family Typed untyped where
   Typed [a] = [Typed a]
   Typed (Maybe a) = Maybe (Typed a)
 
-type TypeCheckM = StateT (FreshState, Map Index TypeDefnInfo, Map Index TypeInfo) (Except TypeError)
+type TypeCheckM = StateT (FreshState, [(Index, TypeDefnInfo)], [(Index, TypeInfo)]) (Except TypeError)
 
 instance Counterous TypeCheckM where
   countUp = do
@@ -267,10 +263,9 @@ instance Counterous TypeCheckM where
     return count
 
 checkIsType :: InferType a => a -> Type -> TypeCheckM () -- FIXME: Loc
-
 checkIsType x expected = do
   (_, _, info) <- get
-  (actual, _) <- inferType x $ typeInfoToType <$> info
+  (actual, _) <- inferType x $ typeInfoToType <$> Map.fromList info -- TODO: use typeCheck instead of inferType
   sub <- unifies actual expected NoLoc
   if Map.null sub -- FIXME: Either `==` doesn't work here or something else is wrong.
     then return ()
@@ -310,9 +305,9 @@ instance CollectIds Declaration where
 instance TypeCheckable Program where
   typeCheck (Program defns decls exprs stmts loc) = do
     infos <- (<>) <$> collectIds defns <*> collectIds decls
-    modify (\(freshState, typeDefnInfos, origInfos) -> (freshState, typeDefnInfos, Map.union origInfos $ Map.fromList infos))
+    modify (\(freshState, typeDefnInfos, origInfos) -> (freshState, typeDefnInfos, origInfos <> infos))
     let tcons = concatMap collectTCon defns
-    modify (\(freshState, origInfos, typeInfos) -> (freshState, Map.union origInfos $ Map.fromList tcons, typeInfos))
+    modify (\(freshState, origInfos, typeInfos) -> (freshState, origInfos <> tcons, typeInfos))
     typedDefns <- mapM typeCheck defns
     typedDecls <- mapM typeCheck decls
     typedExprs <- mapM typeCheck exprs
@@ -343,7 +338,7 @@ instance TypeCheckable Definition where
     return $ Typed.FuncDefnSig name ty expr' loc
   typeCheck (FuncDefn name exprs) = do
     (_, _, info) <- get
-    (tn, sn) <- inferType name $ typeInfoToType <$> info -- FIXME: This part might be wrong. (Edit: it's wrong)
+    (tn, sn) <- inferType name $ typeInfoToType <$> Map.fromList info -- FIXME: This part might be wrong. (Edit: it's wrong)
     mapM_ (`checkIsType` tn) exprs
     exprs' <- mapM typeCheck exprs
     return $ Typed.FuncDefn name exprs'
@@ -389,9 +384,9 @@ instance TypeCheckable Stmt where
         exprs' <- mapM typeCheck exprs
         return $ Typed.Assign names exprs' loc
    where
-    checkAssign :: Map Index TypeInfo -> (Name, Expr) -> TypeCheckM ()
+    checkAssign :: [(Index, TypeInfo)] -> (Name, Expr) -> TypeCheckM ()
     checkAssign infos (name, expr) = do
-      case Map.lookup (Index name) infos of
+      case lookup (Index name) infos of
         Just (VarTypeInfo t) -> checkIsType expr t >> pure ()
         Just _               -> throwError $ AssignToConst name
         Nothing              -> throwError $ NotInScope name
@@ -399,8 +394,8 @@ instance TypeCheckable Stmt where
     typedIndex <- typeCheck index
     if typeOf typedIndex == tInt NoLoc
     then do
-      (_, _, info) <- get
-      (te, _) <- inferType e $ typeInfoToType <$> info
+      (_, _, infos) <- get
+      (te, _) <- inferType e $ typeInfoToType <$> Map.fromList infos
       typedArr <- typeCheck arr
       if typeOf typedArr == TArray (Interval (Including index) (Including index) (locOf index)) te (locOf arr)
       then do
@@ -448,15 +443,15 @@ instance TypeCheckable Expr where
       return $ Typed.Lit lit litTy loc
     Var name loc -> do
       (_, _, info) <- get
-      (nameTy, _) <- inferType name $ typeInfoToType <$> info
+      (nameTy, _) <- inferType name $ typeInfoToType <$> Map.fromList info
       return $ Typed.Var name nameTy loc
     Const name loc -> do
       (_, _, info) <- get
-      (nameTy, _) <- inferType name $ typeInfoToType <$> info
+      (nameTy, _) <- inferType name $ typeInfoToType <$> Map.fromList info
       return $ Typed.Const name nameTy loc
     Op op -> do
       (_, _, info) <- get
-      (opTy, _) <- inferType op $ typeInfoToType <$> info
+      (opTy, _) <- inferType op $ typeInfoToType <$> Map.fromList info
       return $ Typed.Op op opTy
     App expr1 expr2 loc -> do
       typedExpr1 <- typeCheck expr1
@@ -465,7 +460,7 @@ instance TypeCheckable Expr where
       return $ Typed.App typedExpr1 typedExpr2 loc
     Lam name expr loc -> do
       (_, _, info) <- get
-      (nameTy, _) <- inferType name $ typeInfoToType <$> info -- FIXME: This is probably wrong.
+      (nameTy, _) <- inferType name $ typeInfoToType <$> Map.fromList info -- FIXME: This is probably wrong.
       typedExpr <- typeCheck expr
       return $ Typed.Lam name nameTy typedExpr loc
     Func na ne loc -> undefined -- FIXME: This and below.
@@ -487,7 +482,7 @@ instance TypeCheckable Type where
   typeCheck (TTuple ts     )  = forM_ ts typeCheck
   typeCheck (TCon name args _ ) = do
     (_, infos, _) <- get
-    case Map.lookup (Index name) infos of -- TODO: Check if this is right.
+    case lookup (Index name) infos of -- TODO: Check if this is right.
       Just ty -> undefined -- FIXME:
       {-if 
         | length args < length args' -> throwError
