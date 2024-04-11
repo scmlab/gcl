@@ -315,11 +315,11 @@ instance CollectIds Declaration where
 
 instance TypeCheckable Program where
   typeCheck (Program defns decls exprs stmts loc) = do
+    collectIds decls
     -- TODO: This is a hack to make function definitions always the last of the list.
     -- Even if it's desirable to do so, it's inappropriate to write the logic here.
-    let newDefns = sortBy (\fst snd -> case snd of (FuncDefn _ _) -> Data.Ord.LT; _ -> Data.Ord.GT) defns
+    let newDefns = sortBy (\_fst snd -> case snd of (FuncDefn _ _) -> Data.Ord.LT; _ -> Data.Ord.GT) defns
     collectIds newDefns
-    collectIds decls
     let tcons = concatMap collectTCon defns
     modify (\(freshState, origInfos, typeInfos) -> (freshState, origInfos <> tcons, typeInfos))
     typedDefns <- mapM typeCheck defns
@@ -352,8 +352,9 @@ instance TypeCheckable Definition where
     return $ Typed.FuncDefnSig name ty expr' loc
   typeCheck (FuncDefn name exprs) = do
     (_, _, infos) <- get
-    (tn, sn) <- inferType name $ Data.Bifunctor.second typeInfoToType <$> infos -- FIXME: This part might be wrong. (Edit: it's wrong)
-    mapM_ (`checkIsType` subst sn tn) exprs
+    -- inferred <- mapM (`inferType` (Data.Bifunctor.second typeInfoToType <$> infos)) exprs -- FIXME: This part might be wrong. (Edit: it's wrong)
+    -- mapM_ (\(expr, (tn, sn)) -> checkIsType expr (subst sn tn)) (zip exprs inferred)
+    -- FIXME: alter the state to make it work correctly.
     exprs' <- mapM typeCheck exprs
     return $ Typed.FuncDefn name exprs'
 
