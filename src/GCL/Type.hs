@@ -126,7 +126,7 @@ instance InferType Expr where
   inferType (Var   x   _) env = inferType x env
   inferType (Const x   _) env = inferType x env
   inferType (Op o       ) env = inferType o env
-  inferType (App (App (Op op@(ChainOp _)) e1 _) e2 l) env =  undefined {- do
+  {- inferType (App (App (Op op@(ChainOp _)) e1 _) e2 l) env = do -- FIXME: Make chain operators work.
     top <- inferType op env
 
     (t1, s1)  <- case e1 of
@@ -204,7 +204,7 @@ instance InferType Name where
   inferType n env = do
     case lookup (Index n) env of
       Just t  -> return (t, mempty)
-      Nothing -> throwError $ NotInScope n -- FIXME: Errors are thrown here.
+      Nothing -> throwError $ NotInScope n
 
 --------------------------------------------------------------------------------
 -- unification
@@ -266,7 +266,7 @@ instance Counterous TypeCheckM where
 checkIsType :: InferType a => a -> Type -> TypeCheckM () -- FIXME: Loc
 checkIsType x expected = do
   (_, _, info) <- get
-  (actual, s) <- inferType x $ Data.Bifunctor.second typeInfoToType <$> info -- TODO: use typeCheck instead of inferType
+  (actual, s) <- inferType x $ Data.Bifunctor.second typeInfoToType <$> info
   _ <- unifies (subst s actual) expected NoLoc
   return ()
 
@@ -300,7 +300,7 @@ instance CollectIds Definition where
   collectIds (FuncDefn name exprs) = do
     (_, _, infos) <- get
     case lookup (Index name) $ Data.Bifunctor.second typeInfoToType <$> infos of
-      Just ty -> mapM_ (`checkIsType` ty) exprs -- FIXME: This path is never executed.
+      Just ty -> mapM_ (`checkIsType` ty) exprs
       Nothing -> do
         inferred <- mapM (`inferType` (Data.Bifunctor.second typeInfoToType <$> infos)) exprs
         let infos' = (\(ty, sub) -> (Index name, ConstTypeInfo $ subst sub ty)) <$> inferred
@@ -358,7 +358,7 @@ instance TypeCheckable Definition where
     return $ Typed.FuncDefn name exprs'
 
 instance TypeCheckable TypeDefnCtor where
-  typeCheck (TypeDefnCtor name ts) = do -- TODO: I deleted some code which might be purposeful
+  typeCheck (TypeDefnCtor name ts) = do
     return $ Typed.TypedTypeDefnCtor name ts
 
 instance TypeCheckable Declaration where
