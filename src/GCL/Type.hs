@@ -20,7 +20,7 @@ import           Control.Monad.Except
 import           Control.Monad.State.Lazy
 import           Control.Monad.Writer.Lazy
 import           Data.Aeson                     ( ToJSON )
-import           Data.Bifunctor                 ( first )
+import           Data.Bifunctor                 ( first, Bifunctor (second) )
 import           Data.Functor
 import           Data.List
 import           Data.Loc                       ( (<-->)
@@ -48,6 +48,7 @@ import           Syntax.Abstract
 import           Syntax.Abstract.Util
 import           Syntax.Common
 import qualified Syntax.Typed                  as Typed
+import qualified Data.Ord
 
 data Index = Index Name | Hole Range deriving (Eq, Show, Ord)
 
@@ -110,7 +111,7 @@ duplicationCheck ns =
 --------------------------------------------------------------------------------
 -- Type inference
 
-type TypeEnv = Map Index Type 
+type TypeEnv = [(Index, Type)]
 
 class Located a => InferType a where
     inferType :: a -> TypeEnv -> TypeCheckM (Type, Subs Type)
@@ -147,7 +148,7 @@ instance InferType Expr where
     return (v, s3 `compose` s2 `compose` s1)
   inferType (Lam bound expr loc) env = do
     tv <- freshVar
-    let newEnv = Map.insert (Index bound) tv env
+    let newEnv = env ++ [(Index bound, tv)]
     (t1, s1) <- inferType expr newEnv
     return (TFunc (subst s1 tv) t1 loc, s1)
   inferType _ _ = undefined -- FIXME:
@@ -201,7 +202,7 @@ instance InferType ArithOp where
 
 instance InferType Name where
   inferType n env = do
-    case Map.lookup (Index n) env of
+    case lookup (Index n) env of
       Just t  -> return (t, mempty)
       Nothing -> throwError $ NotInScope n -- FIXME: Errors are thrown here.
 
@@ -265,11 +266,9 @@ instance Counterous TypeCheckM where
 checkIsType :: InferType a => a -> Type -> TypeCheckM () -- FIXME: Loc
 checkIsType x expected = do
   (_, _, info) <- get
-  (actual, _) <- inferType x $ typeInfoToType <$> Map.fromList info -- TODO: use typeCheck instead of inferType
-  sub <- unifies actual expected NoLoc
-  if Map.null sub -- FIXME: Either `==` doesn't work here or something else is wrong.
-    then return ()
-    else throwError $ UnifyFailed actual expected NoLoc
+  (actual, s) <- inferType x $ Data.Bifunctor.second typeInfoToType <$> info -- TODO: use typeCheck instead of inferType
+  _ <- unifies (subst s actual) expected NoLoc
+  return ()
 
 runTypeCheck
   :: Program -> Either TypeError Typed.TypedProgram
@@ -281,31 +280,46 @@ class TypeCheckable a where
     typeCheck :: a -> TypeCheckM (Typed a)
 
 class CollectIds a where
-    collectIds :: Fresh m => a -> m [(Index, TypeInfo)]
+    collectIds :: a -> TypeCheckM ()
 
 instance CollectIds a => CollectIds [a] where
-  collectIds xs = concat <$> mapM collectIds xs
+  collectIds xs = mapM_ collectIds xs
 
 instance CollectIds Definition where
   collectIds (TypeDefn n args ctors _) = do
-    let t = TCon n args (n <--> args)
-    return $ map
-      (\(TypeDefnCtor cn ts) -> (Index cn, TypeDefnCtorInfo (wrapTFunc ts t)))
-      ctors
+    modify (\(freshState, typeDefnInfos, origInfos) -> (freshState, typeDefnInfos, origInfos <> infos))
+    where
+      infos =
+        map
+        (\(TypeDefnCtor cn ts) -> (Index cn, TypeDefnCtorInfo (wrapTFunc ts (TCon n args (n <--> args)))))
+        ctors
 
-  collectIds (FuncDefnSig n t _ _) = return [(Index n, ConstTypeInfo t)]
-  collectIds (FuncDefn n _       ) = do
-    v <- freshVar
-    return [(Index n, ConstTypeInfo v)]
+  collectIds (FuncDefnSig n t _ _) = modify (\(freshState, typeDefnInfos, origInfos) -> (freshState, typeDefnInfos, origInfos <> infos))
+    where infos = [(Index n, ConstTypeInfo t)]
+  
+  collectIds (FuncDefn name exprs) = do
+    (_, _, infos) <- get
+    case lookup (Index name) $ Data.Bifunctor.second typeInfoToType <$> infos of
+      Just ty -> mapM_ (`checkIsType` ty) exprs -- FIXME: This path is never executed.
+      Nothing -> do
+        inferred <- mapM (`inferType` (Data.Bifunctor.second typeInfoToType <$> infos)) exprs
+        let infos' = (\(ty, sub) -> (Index name, ConstTypeInfo $ subst sub ty)) <$> inferred
+        modify (\(freshState, typeDefnInfos, origInfos) -> (freshState, typeDefnInfos, origInfos <> infos'))
+        return ()
 
 instance CollectIds Declaration where
-  collectIds (ConstDecl ns t _ _) = return $ map ((, ConstTypeInfo t) . Index) ns
-  collectIds (VarDecl   ns t _ _) = return $ map ((, VarTypeInfo t) . Index) ns
+  collectIds (ConstDecl ns t _ _) = modify (\(freshState, typeDefnInfos, origInfos) -> (freshState, typeDefnInfos, origInfos <> infos))
+    where infos = map ((, ConstTypeInfo t) . Index) ns
+  collectIds (VarDecl   ns t _ _) = modify (\(freshState, typeDefnInfos, origInfos) -> (freshState, typeDefnInfos, origInfos <> infos))
+    where infos = map ((, VarTypeInfo t) . Index) ns
 
 instance TypeCheckable Program where
   typeCheck (Program defns decls exprs stmts loc) = do
-    infos <- (<>) <$> collectIds defns <*> collectIds decls
-    modify (\(freshState, typeDefnInfos, origInfos) -> (freshState, typeDefnInfos, origInfos <> infos))
+    -- TODO: This is a hack to make function definitions always the last of the list.
+    -- Even if it's desirable to do so, it's inappropriate to write the logic here.
+    let newDefns = sortBy (\fst snd -> case snd of (FuncDefn _ _) -> Data.Ord.LT; _ -> Data.Ord.GT) defns
+    collectIds newDefns
+    collectIds decls
     let tcons = concatMap collectTCon defns
     modify (\(freshState, origInfos, typeInfos) -> (freshState, origInfos <> tcons, typeInfos))
     typedDefns <- mapM typeCheck defns
@@ -337,9 +351,9 @@ instance TypeCheckable Definition where
     expr' <- mapM typeCheck expr
     return $ Typed.FuncDefnSig name ty expr' loc
   typeCheck (FuncDefn name exprs) = do
-    (_, _, info) <- get
-    (tn, sn) <- inferType name $ typeInfoToType <$> Map.fromList info -- FIXME: This part might be wrong. (Edit: it's wrong)
-    mapM_ (`checkIsType` tn) exprs
+    (_, _, infos) <- get
+    (tn, sn) <- inferType name $ Data.Bifunctor.second typeInfoToType <$> infos -- FIXME: This part might be wrong. (Edit: it's wrong)
+    mapM_ (`checkIsType` subst sn tn) exprs
     exprs' <- mapM typeCheck exprs
     return $ Typed.FuncDefn name exprs'
 
@@ -363,12 +377,6 @@ instance TypeCheckable Declaration where
         return $ Typed.VarDecl names ty (Just p') loc
       Nothing -> return $ Typed.VarDecl names ty Nothing loc
 
-typeOf :: Typed.TypedExpr -> Type
-typeOf (Typed.Lit _ ty _) = ty
-typeOf (Typed.Var _ ty _) = ty
-typeOf (Typed.Const _ ty _) = ty
-typeOf _ = undefined -- FIXME:
-
 instance TypeCheckable Stmt where
   typeCheck (Skip  loc     ) = return $ Typed.Skip loc
   typeCheck (Abort loc     ) = return $ Typed.Abort loc
@@ -391,32 +399,24 @@ instance TypeCheckable Stmt where
         Just _               -> throwError $ AssignToConst name
         Nothing              -> throwError $ NotInScope name
   typeCheck (AAssign arr index e loc) = do
+    checkIsType index $ tInt NoLoc
     typedIndex <- typeCheck index
-    if typeOf typedIndex == tInt NoLoc
-    then do
-      (_, _, infos) <- get
-      (te, _) <- inferType e $ typeInfoToType <$> Map.fromList infos
-      typedArr <- typeCheck arr
-      if typeOf typedArr == TArray (Interval (Including index) (Including index) (locOf index)) te (locOf arr)
-      then do
-        e' <- typeCheck e
-        return $ Typed.AAssign typedArr typedIndex e' loc
-      else throwError $ UnifyFailed (typeOf typedArr) (TArray (Interval (Including index) (Including index) (locOf index)) te (locOf arr)) loc
-    else throwError $ UnifyFailed (typeOf typedIndex) (tInt NoLoc) loc
+    (_, _, infos) <- get
+    (te, _) <- inferType e $ Data.Bifunctor.second typeInfoToType <$> infos
+    checkIsType arr $ TArray (Interval (Including index) (Including index) (locOf index)) te (locOf arr)
+    typedArr <- typeCheck arr
+    e' <- typeCheck e
+    return $ Typed.AAssign typedArr typedIndex e' loc
   typeCheck (Assert expr loc        ) = do
+    checkIsType expr $ tBool NoLoc
     typedExpr <- typeCheck expr
-    if typeOf typedExpr == tBool NoLoc
-    then return (Typed.Assert typedExpr loc)
-    else throwError $ UnifyFailed (typeOf typedExpr) (tBool NoLoc) loc
+    return (Typed.Assert typedExpr loc)
   typeCheck (LoopInvariant e1 e2 loc) = do
+    checkIsType e1 $ tBool NoLoc
     e1' <- typeCheck e1
-    if typeOf e1' == tBool NoLoc
-    then do
-      e2' <- typeCheck e2
-      if typeOf e2' == tInt NoLoc
-      then return $ Typed.LoopInvariant e1' e2' loc
-      else throwError $ UnifyFailed (typeOf e2') (tBool NoLoc) loc
-    else throwError $ UnifyFailed (typeOf e1') (tBool NoLoc) loc
+    checkIsType e2 $ tInt NoLoc
+    e2' <- typeCheck e2
+    return $ Typed.LoopInvariant e1' e2' loc
   typeCheck (Do gds loc) = do
     gds' <- mapM typeCheck gds
     return $ Typed.Do gds' loc
@@ -429,12 +429,10 @@ instance TypeCheckable Stmt where
 
 instance TypeCheckable GdCmd where
   typeCheck (GdCmd e s loc) = do
+    checkIsType e $ tBool NoLoc
     e' <- typeCheck e
-    if typeOf e' == tBool NoLoc
-    then do
-      s' <- mapM typeCheck s
-      return $ Typed.TypedGdCmd e' s' loc
-    else throwError $ UnifyFailed (typeOf e') (tBool NoLoc) loc
+    s' <- mapM typeCheck s
+    return $ Typed.TypedGdCmd e' s' loc
 
 instance TypeCheckable Expr where
   typeCheck expr = case expr of
@@ -442,26 +440,27 @@ instance TypeCheckable Expr where
       let litTy = litTypes lit loc
       return $ Typed.Lit lit litTy loc
     Var name loc -> do
-      (_, _, info) <- get
-      (nameTy, _) <- inferType name $ typeInfoToType <$> Map.fromList info
+      (_, _, infos) <- get
+      (nameTy, _) <- inferType name $ Data.Bifunctor.second typeInfoToType <$> infos
       return $ Typed.Var name nameTy loc
     Const name loc -> do
-      (_, _, info) <- get
-      (nameTy, _) <- inferType name $ typeInfoToType <$> Map.fromList info
+      (_, _, infos) <- get
+      (nameTy, _) <- inferType name $ Data.Bifunctor.second typeInfoToType <$> infos
       return $ Typed.Const name nameTy loc
     Op op -> do
-      (_, _, info) <- get
-      (opTy, _) <- inferType op $ typeInfoToType <$> Map.fromList info
+      (_, _, infos) <- get
+      (opTy, _) <- inferType op $ Data.Bifunctor.second typeInfoToType <$> infos
       return $ Typed.Op op opTy
     App expr1 expr2 loc -> do
+      (_, _, infos) <- get
+      _ <- inferType (App expr1 expr2 loc) $ Data.Bifunctor.second typeInfoToType <$> infos
       typedExpr1 <- typeCheck expr1
       typedExpr2 <- typeCheck expr2
-      -- FIXME: Add check
       return $ Typed.App typedExpr1 typedExpr2 loc
-    Lam name expr loc -> do
-      (_, _, info) <- get
-      (nameTy, _) <- inferType name $ typeInfoToType <$> Map.fromList info -- FIXME: This is probably wrong.
-      typedExpr <- typeCheck expr
+    Lam name inner loc -> do
+      (_, _, infos) <- get
+      (nameTy, _) <- inferType name $ Data.Bifunctor.second typeInfoToType <$> infos -- FIXME: Figure this out.
+      typedExpr <- typeCheck inner
       return $ Typed.Lam name nameTy typedExpr loc
     Func na ne loc -> undefined -- FIXME: This and below.
     Tuple exs -> undefined
