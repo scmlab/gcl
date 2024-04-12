@@ -318,7 +318,9 @@ instance TypeCheckable Program where
     collectIds decls
     -- TODO: This is a hack to make function definitions always the last of the list.
     -- Even if it's desirable to do so, it's inappropriate to write the logic here.
-    let newDefns = sortBy (\_fst snd -> case snd of (FuncDefn _ _) -> Data.Ord.LT; _ -> Data.Ord.GT) defns
+    let newDefns = sortBy (\left right -> case (left, right) of
+          (_, FuncDefn _ _) -> Data.Ord.LT
+          _ -> Data.Ord.GT) $ reverse defns -- This is also a hack (and I don't know why it works).
     collectIds newDefns
     let tcons = concatMap collectTCon defns
     modify (\(freshState, origInfos, typeInfos) -> (freshState, origInfos <> tcons, typeInfos))
@@ -326,6 +328,7 @@ instance TypeCheckable Program where
     typedDecls <- mapM typeCheck decls
     typedExprs <- mapM typeCheck exprs
     typedStmts <- mapM typeCheck stmts
+    -- throwError $ UndefinedType (Name (Text.pack . show $ Typed.Program typedDefns typedDecls [] typedStmts loc) NoLoc) -- TODO: For debugging.
     return $ Typed.Program typedDefns typedDecls [] typedStmts loc -- FIXME:
    where
     collectTCon (TypeDefn n args _ _) = [(Index n, TypeDefnInfo args)]
@@ -351,10 +354,6 @@ instance TypeCheckable Definition where
     expr' <- mapM typeCheck expr
     return $ Typed.FuncDefnSig name ty expr' loc
   typeCheck (FuncDefn name exprs) = do
-    (_, _, infos) <- get
-    -- inferred <- mapM (`inferType` (Data.Bifunctor.second typeInfoToType <$> infos)) exprs -- FIXME: This part might be wrong. (Edit: it's wrong)
-    -- mapM_ (\(expr, (tn, sn)) -> checkIsType expr (subst sn tn)) (zip exprs inferred)
-    -- FIXME: alter the state to make it work correctly.
     exprs' <- mapM typeCheck exprs
     return $ Typed.FuncDefn name exprs'
 
@@ -436,41 +435,49 @@ instance TypeCheckable GdCmd where
     return $ Typed.TypedGdCmd e' s' loc
 
 instance TypeCheckable Expr where
-  typeCheck expr = case expr of
-    Lit lit loc -> do
-      let litTy = litTypes lit loc
-      return $ Typed.Lit lit litTy loc
-    Var name loc -> do
-      (_, _, infos) <- get
-      (nameTy, _) <- inferType name $ Data.Bifunctor.second typeInfoToType <$> infos
-      return $ Typed.Var name nameTy loc
-    Const name loc -> do
-      (_, _, infos) <- get
-      (nameTy, _) <- inferType name $ Data.Bifunctor.second typeInfoToType <$> infos
-      return $ Typed.Const name nameTy loc
-    Op op -> do
-      (_, _, infos) <- get
-      (opTy, _) <- inferType op $ Data.Bifunctor.second typeInfoToType <$> infos
-      return $ Typed.Op op opTy
-    App expr1 expr2 loc -> do
-      (_, _, infos) <- get
-      _ <- inferType (App expr1 expr2 loc) $ Data.Bifunctor.second typeInfoToType <$> infos
-      typedExpr1 <- typeCheck expr1
-      typedExpr2 <- typeCheck expr2
-      return $ Typed.App typedExpr1 typedExpr2 loc
-    Lam name inner loc -> do
-      (_, _, infos) <- get
-      (nameTy, _) <- inferType name $ Data.Bifunctor.second typeInfoToType <$> infos -- FIXME: Figure this out.
-      typedExpr <- typeCheck inner
-      return $ Typed.Lam name nameTy typedExpr loc
-    Func na ne loc -> undefined -- FIXME: This and below.
-    Tuple exs -> undefined
-    Quant ex nas ex' ex3 loc -> undefined
-    RedexKernel na ex set ne -> undefined
-    RedexShell n ex -> undefined
-    ArrIdx ex ex' loc -> undefined
-    ArrUpd ex ex' ex3 loc -> undefined
-    Case ex ccs loc -> undefined
+  typeCheck e = typeCheck' e mempty
+    where
+      typeCheck' :: Expr -> TypeEnv -> TypeCheckM (Typed Expr)
+      typeCheck' expr env = case expr of
+        Lit lit loc -> do
+          let litTy = litTypes lit loc
+          return $ Typed.Lit lit litTy loc
+        Var name loc -> do
+          (_, _, infos) <- get
+          (nameTy, _) <- inferType name $ union (Data.Bifunctor.second typeInfoToType <$> infos) env
+          return $ Typed.Var name nameTy loc
+        Const name loc -> do
+          (_, _, infos) <- get
+          (nameTy, _) <- inferType name $ union (Data.Bifunctor.second typeInfoToType <$> infos) env
+          return $ Typed.Const name nameTy loc
+        Op op -> do
+          (_, _, infos) <- get
+          (opTy, _) <- inferType op $ union (Data.Bifunctor.second typeInfoToType <$> infos) env
+          return $ Typed.Op op opTy
+        App expr1 expr2 loc -> do
+          (_, _, infos) <- get
+          _ <- inferType (App expr1 expr2 loc) $ union (Data.Bifunctor.second typeInfoToType <$> infos) env -- TODO: There is perhaps bug here.
+          typedExpr1 <- typeCheck' expr1 env
+          typedExpr2 <- typeCheck' expr2 env
+          return $ Typed.App typedExpr1 typedExpr2 loc
+        Lam name inner loc -> do
+          v <- freshVar
+          (_, _, infos) <- get
+          let env' = filter (\(index, _) -> index /= Index name) env <> [(Index name, v)]
+          (lamTy, _) <- inferType (Lam name inner loc) $ union (Data.Bifunctor.second typeInfoToType <$> infos) env' 
+          typedExpr <- typeCheck' inner env'
+          nameTy <- case lamTy of
+            (TFunc t1 _ _) -> return t1
+            other -> throwError $ UnifyFailed lamTy other loc 
+          return $ Typed.Lam name nameTy typedExpr loc
+        Func na ne loc -> undefined -- FIXME: This and below.
+        Tuple exs -> undefined
+        Quant ex nas ex' ex3 loc -> undefined
+        RedexKernel na ex set ne -> undefined
+        RedexShell n ex -> undefined
+        ArrIdx ex ex' loc -> undefined
+        ArrUpd ex ex' ex3 loc -> undefined
+        Case ex ccs loc -> undefined
 
 instance TypeCheckable Type where
   typeCheck TBase{} = return ()

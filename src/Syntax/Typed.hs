@@ -12,6 +12,7 @@ data TypedProgram = Program [TypedDefinition] -- definitions (the functional lan
                             [()] -- global properties
                             [TypedStmt] -- main program
                             Loc
+  deriving (Eq, Show)
 
 data TypedDefinition
   = TypeDefn Name [Name] [TypedTypeDefnCtor] Loc
@@ -39,8 +40,10 @@ data TypedStmt
   | Spec Text Range
   | Proof Text Text Range
   -- FIXME: Other constructors.
+  deriving (Eq, Show)
 
 data TypedGdCmd = TypedGdCmd TypedExpr [TypedStmt] Loc
+  deriving (Eq, Show)
 
 data TypedExpr
   = Lit Lit Type Loc
