@@ -49,6 +49,7 @@ import           Syntax.Abstract.Util
 import           Syntax.Common
 import qualified Syntax.Typed                  as Typed
 import qualified Data.Ord
+import qualified Data.Set as Set
 
 data Index = Index Name | Hole Range deriving (Eq, Show, Ord)
 
@@ -162,7 +163,7 @@ instance InferType ChainOp where
   inferType (EQProp  l) env = return (tBool .-> tBool .-> tBool $ l, mempty)
   inferType (EQPropU l) env = return (tBool .-> tBool .-> tBool $ l, mempty)
   inferType (EQ      l) env = do
-    x <- freshVar
+    x <- freshMetaVar
     return (const x .-> const x .-> tBool $ l, mempty)
   inferType (NEQ  l) env = return (tInt .-> tInt .-> tBool $ l, mempty)
   inferType (NEQU l) env = return (tInt .-> tInt .-> tBool $ l, mempty)
@@ -171,10 +172,10 @@ instance InferType ChainOp where
   inferType (GTE  l) env = return (tInt .-> tInt .-> tBool $ l, mempty)
   inferType (GTEU l) env = return (tInt .-> tInt .-> tBool $ l, mempty)
   inferType (LT   l) env = do
-    x <- freshVar
+    x <- freshMetaVar
     return (const x .-> const x .-> tBool $ l, mempty)
   inferType (GT l) env = do
-    x <- freshVar
+    x <- freshMetaVar
     return (const x .-> const x .-> tBool $ l, mempty)
 
 instance InferType ArithOp where
@@ -203,8 +204,28 @@ instance InferType ArithOp where
 instance InferType Name where
   inferType n env = do
     case lookup (Index n) env of
-      Just t  -> return (t, mempty) -- TODO: Instantiate here.
+      Just t  -> do
+        let t' = t -- t' <- instantiate t
+        return (t', mempty)
       Nothing -> throwError $ NotInScope n
+    where
+      instantiate :: Type -> TypeCheckM Type -- TODO: Implement this.
+      instantiate t = do
+        let vars = Set.toList $ metaVars t
+        nvars <- mapM (const freshVar) vars
+        let s = Map.fromList $ zip vars nvars
+        return $ subst s t
+        where
+          metaVars :: Type -> Set.Set Name
+          metaVars ty = case ty of
+            TBase _ _ -> mempty
+            TArray _index ty _ -> metaVars ty
+            TTuple tys -> Set.fromList $ concatMap (Set.toList . metaVars) tys
+            TFunc ty1 ty2 _ -> metaVars ty1 <> metaVars ty2
+            TCon {} -> mempty
+            TVar {} -> mempty
+            TMetaVar na -> Set.singleton na
+          
 
 --------------------------------------------------------------------------------
 -- unification
@@ -222,7 +243,7 @@ unifies (TFunc t1 t2 _) (TFunc t3 t4 _) l = do
   return (s2 `compose` s1)
 unifies (TCon n1 args1 _) (TCon n2 args2 _) _
   | n1 == n2 && length args1 == length args2 = return mempty
-unifies (TVar x1 _) (TVar x2 _) _ | x1 == x2 = return mempty
+unifies (TVar x1 _) (TVar x2 _) _ | x1 == x2 = return mempty -- TODO:
 unifies (TVar x _) t@(TBase tb _) _ | x == baseToName tb =
   return $ Map.singleton x t
 unifies (TVar x _) t@(TCon n args _) _ | x == n && null args =
@@ -447,14 +468,37 @@ instance TypeCheckable Expr where
       typeCheck' env ((bindingName, bindingExpr) : bindings) expr = do
         (_, _, infos, _) <- get
         (t1, s1) <- inferType bindingExpr $ union (Data.Bifunctor.second typeInfoToType <$> infos) env
-        let env' = filter (\(name, _) -> name /= bindingName) env ++ [(bindingName, t1)] -- TODO: Optimize this and other usages of `<>`.
-        (t2, s2) <- typeCheck' (subst s1 env') bindings expr
+        let env' = filter (\(name, _) -> name /= bindingName) env
+        let t' = t1 -- t' <- generalize (subst s1 env) t1 -- FIXME:
+        let env'' = env' ++ [(bindingName, t')] -- TODO: Optimize this and other usages of `<>`.
+        (t2, s2) <- typeCheck' (subst s1 env'') bindings expr
         return (t2, s1 `compose` s2)
+        where
+          generalize :: TypeEnv -> Type -> TypeCheckM Type
+          generalize env ty = do
+            let free = Set.toList $ freeVars ty
+            nvars <- mapM (const freshMetaVar) free
+            let s = Map.fromList $ zip free nvars
+            return $ subst s ty
+            where
+              freeVars :: Type -> Set.Set Name
+              freeVars ty = case ty of
+                TBase tb loc -> mempty
+                TArray interval ty loc -> freeVars ty
+                TTuple tys -> Set.fromList $ concatMap (Set.toList . freeVars) tys
+                TFunc ty1 ty2 loc -> freeVars ty1 <> freeVars ty2
+                TCon na nas loc -> mempty
+                TVar name loc -> if name `elem` freeVars' env then mempty else Set.singleton $ name
+                  where
+                    freeVars' :: TypeEnv -> Set.Set Name
+                    freeVars' env = Set.fromList $ concatMap (Set.toList . freeVars) (snd <$> env)
+                TMetaVar na -> mempty
+
       typeCheck' env [] expr = do
         (_, _, infos, _) <- get
         inferType expr $ union (Data.Bifunctor.second typeInfoToType <$> infos) env
         return undefined -- TODO:
-        {-
+        {- (_, _, infos, _) <- get
         case expr of
           Lit lit loc -> do
             let litTy = litTypes lit loc
@@ -489,8 +533,7 @@ instance TypeCheckable Expr where
           RedexShell n ex -> undefined
           ArrIdx ex ex' loc -> undefined
           ArrUpd ex ex' ex3 loc -> undefined
-          Case ex ccs loc -> undefined
-        -}
+          Case ex ccs loc -> undefined -}
 
 instance TypeCheckable Type where
   typeCheck TBase{} = return ()
@@ -528,8 +571,12 @@ typeInfoToType (TypeDefnCtorInfo t) = t
 typeInfoToType (ConstTypeInfo    t) = t
 typeInfoToType (VarTypeInfo      t) = t
 
-freshVar :: Fresh m => m Type
+freshVar :: Fresh m => m Type -- TODO: Check the correct variant (freshVar / freshMetaVar) is used.
 freshVar = do
+  (`TVar` NoLoc) <$> freshName "Type.var" NoLoc
+
+freshMetaVar :: Fresh m => m Type 
+freshMetaVar = do
   TMetaVar <$> freshName "Type.metaVar" NoLoc
 
 litTypes :: Lit -> Loc -> Type
@@ -612,5 +659,5 @@ instance Substitutable Type Type where
   subst s (TTuple ts    ) = TTuple (map (subst s) ts)
   subst s (TFunc t1 t2 l) = TFunc (subst s t1) (subst s t2) l
   subst _ t@TCon{}        = t
-  subst _ t@TVar{}        = t
+  subst s t@(TVar n _)    = Map.findWithDefault t n s -- TODO: Loc
   subst s t@(TMetaVar n)  = Map.findWithDefault t n s
