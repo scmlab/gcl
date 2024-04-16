@@ -146,7 +146,7 @@ instance InferType Expr where
     (t1, s1) <- inferType e1 env
     (t2, s2) <- inferType e2 (subst s1 env)
     s3 <- unifies (subst s2 t1) (TFunc t2 v NoLoc) loc
-    return (v, s3 `compose` s2 `compose` s1)
+    return (subst s3 v, s3 `compose` s2 `compose` s1)
   inferType (Lam bound expr loc) env = do
     tv <- freshVar
     let newEnv = filter (\(name, _) -> name /= Index bound) env ++ [(Index bound, tv)]
@@ -205,11 +205,11 @@ instance InferType Name where
   inferType n env = do
     case lookup (Index n) env of
       Just t  -> do
-        let t' = t -- t' <- instantiate t
+        t' <- instantiate t
         return (t', mempty)
       Nothing -> throwError $ NotInScope n
     where
-      instantiate :: Type -> TypeCheckM Type -- TODO: Implement this.
+      instantiate :: Type -> TypeCheckM Type
       instantiate t = do
         let vars = Set.toList $ metaVars t
         nvars <- mapM (const freshVar) vars
@@ -460,8 +460,8 @@ instance TypeCheckable GdCmd where
 
 instance TypeCheckable Expr where
   typeCheck expr = do
-    (_, _, _, bs) <- get
-    (typed, sub) <- typeCheck' mempty bs expr
+    (_, _, infos, bs) <- get
+    (typed, sub) <- typeCheck' (Data.Bifunctor.second typeInfoToType <$> infos) bs expr
     return typed
     where
       typeCheck' :: TypeEnv -> [(Index, Expr)] -> Expr -> TypeCheckM (Typed Expr, Subs Type)
@@ -469,16 +469,16 @@ instance TypeCheckable Expr where
         (_, _, infos, _) <- get
         (t1, s1) <- inferType bindingExpr $ union (Data.Bifunctor.second typeInfoToType <$> infos) env
         let env' = filter (\(name, _) -> name /= bindingName) env
-        let t' = t1 -- t' <- generalize (subst s1 env) t1 -- FIXME:
+        t' <- generalize (subst s1 env) t1
         let env'' = env' ++ [(bindingName, t')] -- TODO: Optimize this and other usages of `<>`.
         (t2, s2) <- typeCheck' (subst s1 env'') bindings expr
         return (t2, s1 `compose` s2)
         where
           generalize :: TypeEnv -> Type -> TypeCheckM Type
           generalize env ty = do
-            let free = Set.toList $ freeVars ty
-            nvars <- mapM (const freshMetaVar) free
-            let s = Map.fromList $ zip free nvars
+            let vars = Set.toList $ freeVars ty
+            nvars <- mapM (const freshMetaVar) vars
+            let s = Map.fromList $ zip vars nvars
             return $ subst s ty
             where
               freeVars :: Type -> Set.Set Name
@@ -488,7 +488,7 @@ instance TypeCheckable Expr where
                 TTuple tys -> Set.fromList $ concatMap (Set.toList . freeVars) tys
                 TFunc ty1 ty2 loc -> freeVars ty1 <> freeVars ty2
                 TCon na nas loc -> mempty
-                TVar name loc -> if name `elem` freeVars' env then mempty else Set.singleton $ name
+                TVar name loc -> if name `elem` freeVars' env then mempty else Set.singleton name
                   where
                     freeVars' :: TypeEnv -> Set.Set Name
                     freeVars' env = Set.fromList $ concatMap (Set.toList . freeVars) (snd <$> env)
@@ -496,9 +496,10 @@ instance TypeCheckable Expr where
 
       typeCheck' env [] expr = do
         (_, _, infos, _) <- get
-        inferType expr $ union (Data.Bifunctor.second typeInfoToType <$> infos) env
-        return undefined -- TODO:
-        {- (_, _, infos, _) <- get
+        inferType expr $ union (Data.Bifunctor.second typeInfoToType <$> infos) env -- TODO: 
+        return (Typed.Lit (Num 0) (TBase TInt NoLoc) NoLoc, mempty) -- FIXME:
+        {-
+        (_, _, infos, _) <- get
         case expr of
           Lit lit loc -> do
             let litTy = litTypes lit loc
@@ -533,8 +534,8 @@ instance TypeCheckable Expr where
           RedexShell n ex -> undefined
           ArrIdx ex ex' loc -> undefined
           ArrUpd ex ex' ex3 loc -> undefined
-          Case ex ccs loc -> undefined -}
-
+          Case ex ccs loc -> undefined
+-}
 instance TypeCheckable Type where
   typeCheck TBase{} = return ()
   typeCheck (TArray i t _) = do
