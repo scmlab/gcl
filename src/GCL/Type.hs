@@ -49,11 +49,6 @@ import           Syntax.Abstract.Util
 import           Syntax.Common
 import qualified Syntax.Typed                  as Typed
 import qualified Data.Ord
-<<<<<<< Updated upstream
-=======
-import qualified Data.Set as Set
-import Control.Monad.RWS
->>>>>>> Stashed changes
 
 data Index = Index Name | Hole Range deriving (Eq, Show, Ord)
 
@@ -153,7 +148,7 @@ instance InferType Expr where
     return (subst s3 v, s3 `compose` s2 `compose` s1)
   inferType (Lam bound expr loc) env = do
     tv <- freshVar
-    let newEnv = filter (\(name, _) -> name /= Index bound) env ++ [(Index bound, tv)]
+    let newEnv = env ++ [(Index bound, tv)]
     (t1, s1) <- inferType expr newEnv
     return (TFunc (subst s1 tv) t1 loc, s1)
   inferType _ _ = undefined -- FIXME:
@@ -208,7 +203,7 @@ instance InferType ArithOp where
 instance InferType Name where
   inferType n env = do
     case lookup (Index n) env of
-      Just t  -> return (t, mempty) -- TODO: Instantiate here.
+      Just t  -> return (t, mempty)
       Nothing -> throwError $ NotInScope n
 
 --------------------------------------------------------------------------------
@@ -260,7 +255,7 @@ type family Typed untyped where
   Typed [a] = [Typed a]
   Typed (Maybe a) = Maybe (Typed a)
 
-type TypeCheckM = RWST [(Index, Expr)] () (FreshState, [(Index, TypeDefnInfo)], [(Index, TypeInfo)]) (Except TypeError)
+type TypeCheckM = StateT (FreshState, [(Index, TypeDefnInfo)], [(Index, TypeInfo)]) (Except TypeError)
 
 instance Counterous TypeCheckM where
   countUp = do
@@ -278,7 +273,7 @@ checkIsType x expected = do
 runTypeCheck
   :: Program -> Either TypeError Typed.TypedProgram
 runTypeCheck prog = do
-  (program, _state) <- runExcept (evalRWST (typeCheck prog) mempty (0, mempty, mempty))
+  (program, _state) <- runExcept (runStateT (typeCheck prog) (0, mempty, mempty))
   Right program
 
 class TypeCheckable a where
@@ -292,30 +287,30 @@ instance CollectIds a => CollectIds [a] where
 
 instance CollectIds Definition where
   collectIds (TypeDefn n args ctors _) = do
-    modify (\(freshState, typeDefnInfos, origTypeInfos, bindings) -> (freshState, typeDefnInfos, origTypeInfos <> infos, bindings))
+    modify (\(freshState, typeDefnInfos, origInfos) -> (freshState, typeDefnInfos, origInfos <> infos))
     where
       infos =
         map
         (\(TypeDefnCtor cn ts) -> (Index cn, TypeDefnCtorInfo (wrapTFunc ts (TCon n args (n <--> args)))))
         ctors
 
-  collectIds (FuncDefnSig n t _ _) = modify (\(freshState, typeDefnInfos, origTypeInfos, bindings) -> (freshState, typeDefnInfos, origTypeInfos <> infos, bindings)) -- TODO: use a more efficient way than using `<>`
+  collectIds (FuncDefnSig n t _ _) = modify (\(freshState, typeDefnInfos, origInfos) -> (freshState, typeDefnInfos, origInfos <> infos))
     where infos = [(Index n, ConstTypeInfo t)]
   
   collectIds (FuncDefn name exprs) = do
-    (_, _, infos, _) <- get
+    (_, _, infos) <- get
     case lookup (Index name) $ Data.Bifunctor.second typeInfoToType <$> infos of
       Just ty -> mapM_ (`checkIsType` ty) exprs
       Nothing -> do
         inferred <- mapM (`inferType` (Data.Bifunctor.second typeInfoToType <$> infos)) exprs
         let infos' = (\(ty, sub) -> (Index name, ConstTypeInfo $ subst sub ty)) <$> inferred
-        modify (\(freshState, typeDefnInfos, origTypeInfos, bindings) -> (freshState, typeDefnInfos, origTypeInfos <> infos', bindings))
+        modify (\(freshState, typeDefnInfos, origInfos) -> (freshState, typeDefnInfos, origInfos <> infos'))
         return ()
 
 instance CollectIds Declaration where
-  collectIds (ConstDecl ns t _ _) = modify (\(freshState, typeDefnInfos, origTypeInfos, bindings) -> (freshState, typeDefnInfos, origTypeInfos <> infos, bindings))
+  collectIds (ConstDecl ns t _ _) = modify (\(freshState, typeDefnInfos, origInfos) -> (freshState, typeDefnInfos, origInfos <> infos))
     where infos = map ((, ConstTypeInfo t) . Index) ns
-  collectIds (VarDecl   ns t _ _) = modify (\(freshState, typeDefnInfos, origTypeInfos, bindings) -> (freshState, typeDefnInfos, origTypeInfos <> infos, bindings))
+  collectIds (VarDecl   ns t _ _) = modify (\(freshState, typeDefnInfos, origInfos) -> (freshState, typeDefnInfos, origInfos <> infos))
     where infos = map ((, VarTypeInfo t) . Index) ns
 
 instance TypeCheckable Program where
@@ -324,12 +319,11 @@ instance TypeCheckable Program where
     -- TODO: This is a hack to make function definitions always the last of the list.
     -- Even if it's desirable to do so, it's inappropriate to write the logic here.
     let newDefns = sortBy (\left right -> case (left, right) of
-                                               (FuncDefn _ _, FuncDefn _ _) -> Data.Ord.EQ
-                                               (_, FuncDefn _ _) -> Data.Ord.LT
-                                               _ -> Data.Ord.GT) $ reverse defns -- This is also a hack (and I don't know why it works).
+          (_, FuncDefn _ _) -> Data.Ord.LT
+          _ -> Data.Ord.GT) $ reverse defns -- This is also a hack (and I don't know why it works).
     collectIds newDefns
     let tcons = concatMap collectTCon defns
-    modify (\(freshState, origInfos, typeInfos, bindings) -> (freshState, origInfos <> tcons, typeInfos, bindings))
+    modify (\(freshState, origInfos, typeInfos) -> (freshState, origInfos <> tcons, typeInfos))
     typedDefns <- mapM typeCheck defns
     typedDecls <- mapM typeCheck decls
     typedExprs <- mapM typeCheck exprs
@@ -342,17 +336,17 @@ instance TypeCheckable Program where
 
 instance TypeCheckable Definition where
   typeCheck (TypeDefn name args ctors loc) = do
-    let m = Set.fromList args
+    let m = Map.fromList (map (, ()) args)
     mapM_ (\(TypeDefnCtor _ ts) -> mapM_ (scopeCheck m) ts) ctors
     ctors' <- mapM typeCheck ctors
     return $ Typed.TypeDefn name args ctors' loc
    where
-    scopeCheck :: MonadError TypeError m => Set.Set Name -> Type -> m ()
+    scopeCheck :: MonadError TypeError m => Map Name () -> Type -> m ()
     scopeCheck m (TCon _ args' _) = mapM_
-      (\a ->
-        if Set.member a m
-        then return ()
-        else throwError $ NotInScope a)
+      (\a -> case Map.lookup a m of
+        Just _ -> return ()
+        _      -> throwError $ NotInScope a
+      )
       args'
     scopeCheck _ _ = return ()
   typeCheck (FuncDefnSig name ty expr loc) = do
@@ -360,9 +354,8 @@ instance TypeCheckable Definition where
     expr' <- mapM typeCheck expr
     return $ Typed.FuncDefnSig name ty expr' loc
   typeCheck (FuncDefn name exprs) = do
-    -- exprs' <- mapM typeCheck exprs -- FIXME:
-    forM_ exprs $ \expr -> modify (\(freshState, typeDefnInfos, typeInfos, bindings) -> (freshState, typeDefnInfos, typeInfos, bindings ++ [(Index name, expr)]))
-    return $ Typed.FuncDefn name [] -- FIXME:
+    exprs' <- mapM typeCheck exprs
+    return $ Typed.FuncDefn name exprs'
 
 instance TypeCheckable TypeDefnCtor where
   typeCheck (TypeDefnCtor name ts) = do
@@ -374,7 +367,6 @@ instance TypeCheckable Declaration where
       Just p -> do
         typeCheck ty
         p' <- typeCheck p
-        forM_ names $ \name -> modify (\(freshState, typeDefnInfos, typeInfos, bindings) -> (freshState, typeDefnInfos, typeInfos, bindings ++ [(Index name, p)]))
         return $ Typed.ConstDecl names ty (Just p') loc
       Nothing -> return $ Typed.ConstDecl names ty Nothing loc
   typeCheck (VarDecl names ty prop loc) =
@@ -382,7 +374,6 @@ instance TypeCheckable Declaration where
       Just p -> do
         typeCheck ty
         p' <- typeCheck p
-        forM_ names $ \name -> modify (\(freshState, typeDefnInfos, typeInfos, bindings) -> (freshState, typeDefnInfos, typeInfos, bindings ++ [(Index name, p)]))
         return $ Typed.VarDecl names ty (Just p') loc
       Nothing -> return $ Typed.VarDecl names ty Nothing loc
 
@@ -396,7 +387,7 @@ instance TypeCheckable Stmt where
       | an < length exprs -> throwError $ RedundantExprs (drop an exprs)
       | an < length names -> throwError $ RedundantNames (drop an names)
       | otherwise      -> do
-        (_, _, infos, _) <- get
+        (_, _, infos) <- get
         mapM_ (checkAssign infos) ass
         exprs' <- mapM typeCheck exprs
         return $ Typed.Assign names exprs' loc
@@ -410,14 +401,14 @@ instance TypeCheckable Stmt where
   typeCheck (AAssign arr index e loc) = do
     checkIsType index $ tInt NoLoc
     typedIndex <- typeCheck index
-    (_, _, infos, _) <- get
+    (_, _, infos) <- get
     (te, _) <- inferType e $ Data.Bifunctor.second typeInfoToType <$> infos
     checkIsType arr $ TArray (Interval (Including index) (Including index) (locOf index)) te (locOf arr)
     typedArr <- typeCheck arr
     e' <- typeCheck e
     return $ Typed.AAssign typedArr typedIndex e' loc
   typeCheck (Assert expr loc        ) = do
-    -- checkIsType expr $ tBool NoLoc -- FIXME:
+    checkIsType expr $ tBool NoLoc
     typedExpr <- typeCheck expr
     return (Typed.Assert typedExpr loc)
   typeCheck (LoopInvariant e1 e2 loc) = do
@@ -444,59 +435,50 @@ instance TypeCheckable GdCmd where
     return $ Typed.TypedGdCmd e' s' loc
 
 instance TypeCheckable Expr where
-  typeCheck expr = do
-    (_, _, infos, bs) <- get
-    (typed, sub) <- typeCheck' (Data.Bifunctor.second typeInfoToType <$> infos) bs expr
-    return typed
+  typeCheck e = typeCheck' e mempty
     where
-      typeCheck' :: TypeEnv -> [(Index, Expr)] -> Expr -> TypeCheckM (Typed Expr, Subs Type)
-      typeCheck' env ((bindingName, bindingExpr) : bindings) expr = do
-        (_, _, infos, _) <- get
-        (t1, s1) <- inferType bindingExpr $ union (Data.Bifunctor.second typeInfoToType <$> infos) env
-        let env' = filter (\(name, _) -> name /= bindingName) env ++ [(bindingName, t1)] -- TODO: Optimize this and other usages of `<>`.
-        (t2, s2) <- typeCheck' (subst s1 env') bindings expr
-        return (t2, s1 `compose` s2)
-      typeCheck' env [] expr = do
-        (_, _, infos, _) <- get
-        inferType expr $ union (Data.Bifunctor.second typeInfoToType <$> infos) env
-        return undefined -- TODO:
-        {-
-        case expr of
-          Lit lit loc -> do
-            let litTy = litTypes lit loc
-            return (Typed.Lit lit litTy loc, mempty)
-          Var name loc -> do
-            (nameTy, sub) <- inferType name $ union (Data.Bifunctor.second typeInfoToType <$> infos) env
-            return (Typed.Var name nameTy loc, sub)
-          Const name loc -> do
-            (nameTy, sub) <- inferType name $ union (Data.Bifunctor.second typeInfoToType <$> infos) env
-            return (Typed.Const name nameTy loc, sub)
-          Op op -> do
-            (opTy, sub) <- inferType op $ union (Data.Bifunctor.second typeInfoToType <$> infos) env
-            return (Typed.Op op opTy, sub)
-          App expr1 expr2 loc -> do
-            _ <- inferType (App expr1 expr2 loc) $ union (Data.Bifunctor.second typeInfoToType <$> infos) env -- TODO: There is perhaps bug here.
-            (typedExpr1, sub1) <- typeCheck' env [] expr1 
-            (typedExpr2, sub2) <- typeCheck' env [] expr2
-            return (Typed.App typedExpr1 typedExpr2 loc, sub1 `compose` sub2)
-          Lam name inner loc -> do
-            v <- freshVar
-            let env' = filter (\(index, _) -> index /= Index name) env <> [(Index name, v)]
-            (lamTy, _) <- inferType (Lam name inner loc) $ union (Data.Bifunctor.second typeInfoToType <$> infos) env' 
-            (typedExpr, sub) <- typeCheck' env' [] inner
-            nameTy <- case lamTy of
-              (TFunc t1 _ _) -> return t1
-              other -> throwError $ UnifyFailed lamTy other loc 
-            return (Typed.Lam name nameTy typedExpr loc, sub)
-          Func na ne loc -> undefined -- FIXME: This and below.
-          Tuple exs -> undefined
-          Quant ex nas ex' ex3 loc -> undefined
-          RedexKernel na ex set ne -> undefined
-          RedexShell n ex -> undefined
-          ArrIdx ex ex' loc -> undefined
-          ArrUpd ex ex' ex3 loc -> undefined
-          Case ex ccs loc -> undefined
--}
+      typeCheck' :: Expr -> TypeEnv -> TypeCheckM (Typed Expr)
+      typeCheck' expr env = case expr of
+        Lit lit loc -> do
+          let litTy = litTypes lit loc
+          return $ Typed.Lit lit litTy loc
+        Var name loc -> do
+          (_, _, infos) <- get
+          (nameTy, _) <- inferType name $ union (Data.Bifunctor.second typeInfoToType <$> infos) env
+          return $ Typed.Var name nameTy loc
+        Const name loc -> do
+          (_, _, infos) <- get
+          (nameTy, _) <- inferType name $ union (Data.Bifunctor.second typeInfoToType <$> infos) env
+          return $ Typed.Const name nameTy loc
+        Op op -> do
+          (_, _, infos) <- get
+          (opTy, _) <- inferType op $ union (Data.Bifunctor.second typeInfoToType <$> infos) env
+          return $ Typed.Op op opTy
+        App expr1 expr2 loc -> do
+          (_, _, infos) <- get
+          _ <- inferType (App expr1 expr2 loc) $ union (Data.Bifunctor.second typeInfoToType <$> infos) env -- TODO: There is perhaps bug here.
+          typedExpr1 <- typeCheck' expr1 env
+          typedExpr2 <- typeCheck' expr2 env
+          return $ Typed.App typedExpr1 typedExpr2 loc
+        Lam name inner loc -> do
+          v <- freshVar
+          (_, _, infos) <- get
+          let env' = filter (\(index, _) -> index /= Index name) env <> [(Index name, v)]
+          (lamTy, _) <- inferType (Lam name inner loc) $ union (Data.Bifunctor.second typeInfoToType <$> infos) env' 
+          typedExpr <- typeCheck' inner env'
+          nameTy <- case lamTy of
+            (TFunc t1 _ _) -> return t1
+            other -> throwError $ UnifyFailed lamTy other loc 
+          return $ Typed.Lam name nameTy typedExpr loc
+        Func na ne loc -> undefined -- FIXME: This and below.
+        Tuple exs -> undefined
+        Quant ex nas ex' ex3 loc -> undefined
+        RedexKernel na ex set ne -> undefined
+        RedexShell n ex -> undefined
+        ArrIdx ex ex' loc -> undefined
+        ArrUpd ex ex' ex3 loc -> undefined
+        Case ex ccs loc -> undefined
+
 instance TypeCheckable Type where
   typeCheck TBase{} = return ()
   typeCheck (TArray i t _) = do
@@ -506,7 +488,7 @@ instance TypeCheckable Type where
   typeCheck (TFunc  t1 t2 _) = typeCheck t1 >> typeCheck t2
   typeCheck (TTuple ts     )  = forM_ ts typeCheck
   typeCheck (TCon name args _ ) = do
-    (_, infos, _, _) <- get
+    (_, infos, _) <- get
     case lookup (Index name) infos of -- TODO: Check if this is right.
       Just ty -> undefined -- FIXME:
       {-if 
