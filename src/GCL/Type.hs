@@ -49,6 +49,11 @@ import           Syntax.Abstract.Util
 import           Syntax.Common
 import qualified Syntax.Typed                  as Typed
 import qualified Data.Ord
+<<<<<<< Updated upstream
+=======
+import qualified Data.Set as Set
+import Control.Monad.RWS
+>>>>>>> Stashed changes
 
 data Index = Index Name | Hole Range deriving (Eq, Show, Ord)
 
@@ -255,17 +260,17 @@ type family Typed untyped where
   Typed [a] = [Typed a]
   Typed (Maybe a) = Maybe (Typed a)
 
-type TypeCheckM = StateT (FreshState, [(Index, TypeDefnInfo)], [(Index, TypeInfo)], [(Index, Expr)]) (Except TypeError)
+type TypeCheckM = RWST [(Index, Expr)] () (FreshState, [(Index, TypeDefnInfo)], [(Index, TypeInfo)]) (Except TypeError)
 
 instance Counterous TypeCheckM where
   countUp = do
-    (count, typeDefnInfo, typeInfo, bindings) <- get
-    put (succ count, typeDefnInfo, typeInfo, bindings)
+    (count, typeDefnInfo, typeInfo) <- get
+    put (succ count, typeDefnInfo, typeInfo)
     return count
 
 checkIsType :: InferType a => a -> Type -> TypeCheckM () -- FIXME: Loc
 checkIsType x expected = do
-  (_, _, info, _) <- get
+  (_, _, info) <- get
   (actual, s) <- inferType x $ Data.Bifunctor.second typeInfoToType <$> info
   _ <- unifies (subst s actual) expected NoLoc
   return ()
@@ -273,7 +278,7 @@ checkIsType x expected = do
 runTypeCheck
   :: Program -> Either TypeError Typed.TypedProgram
 runTypeCheck prog = do
-  (program, _state) <- runExcept (runStateT (typeCheck prog) (0, mempty, mempty, mempty))
+  (program, _state) <- runExcept (evalRWST (typeCheck prog) mempty (0, mempty, mempty))
   Right program
 
 class TypeCheckable a where
@@ -319,6 +324,7 @@ instance TypeCheckable Program where
     -- TODO: This is a hack to make function definitions always the last of the list.
     -- Even if it's desirable to do so, it's inappropriate to write the logic here.
     let newDefns = sortBy (\left right -> case (left, right) of
+                                               (FuncDefn _ _, FuncDefn _ _) -> Data.Ord.EQ
                                                (_, FuncDefn _ _) -> Data.Ord.LT
                                                _ -> Data.Ord.GT) $ reverse defns -- This is also a hack (and I don't know why it works).
     collectIds newDefns
@@ -336,17 +342,17 @@ instance TypeCheckable Program where
 
 instance TypeCheckable Definition where
   typeCheck (TypeDefn name args ctors loc) = do
-    let m = Map.fromList (map (, ()) args)
+    let m = Set.fromList args
     mapM_ (\(TypeDefnCtor _ ts) -> mapM_ (scopeCheck m) ts) ctors
     ctors' <- mapM typeCheck ctors
     return $ Typed.TypeDefn name args ctors' loc
    where
-    scopeCheck :: MonadError TypeError m => Map Name () -> Type -> m ()
+    scopeCheck :: MonadError TypeError m => Set.Set Name -> Type -> m ()
     scopeCheck m (TCon _ args' _) = mapM_
-      (\a -> case Map.lookup a m of
-        Just _ -> return ()
-        _      -> throwError $ NotInScope a
-      )
+      (\a ->
+        if Set.member a m
+        then return ()
+        else throwError $ NotInScope a)
       args'
     scopeCheck _ _ = return ()
   typeCheck (FuncDefnSig name ty expr loc) = do
@@ -354,9 +360,9 @@ instance TypeCheckable Definition where
     expr' <- mapM typeCheck expr
     return $ Typed.FuncDefnSig name ty expr' loc
   typeCheck (FuncDefn name exprs) = do
-    exprs' <- mapM typeCheck exprs
+    -- exprs' <- mapM typeCheck exprs -- FIXME:
     forM_ exprs $ \expr -> modify (\(freshState, typeDefnInfos, typeInfos, bindings) -> (freshState, typeDefnInfos, typeInfos, bindings ++ [(Index name, expr)]))
-    return $ Typed.FuncDefn name exprs'
+    return $ Typed.FuncDefn name [] -- FIXME:
 
 instance TypeCheckable TypeDefnCtor where
   typeCheck (TypeDefnCtor name ts) = do
@@ -411,7 +417,7 @@ instance TypeCheckable Stmt where
     e' <- typeCheck e
     return $ Typed.AAssign typedArr typedIndex e' loc
   typeCheck (Assert expr loc        ) = do
-    checkIsType expr $ tBool NoLoc
+    -- checkIsType expr $ tBool NoLoc -- FIXME:
     typedExpr <- typeCheck expr
     return (Typed.Assert typedExpr loc)
   typeCheck (LoopInvariant e1 e2 loc) = do
