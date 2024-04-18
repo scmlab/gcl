@@ -10,7 +10,7 @@
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE TypeFamilies #-}
 
-module GCL.Type where
+module GCL.Type where -- TODO: IMPORTANT! REMEMBER TO CHANGE THE CODE TO USE CORRECT LOC.
 
 import           Control.Monad.Except
 import           Control.Monad.State.Lazy
@@ -39,6 +39,8 @@ import           Syntax.Abstract.Util
 import           Syntax.Common
 import qualified Syntax.Typed                  as Typed
 import qualified Data.Ord
+import Data.Foldable (foldrM)
+import qualified Data.Set as Set
 
 data Index = Index Name | Hole Range deriving (Eq, Show, Ord)
 
@@ -141,6 +143,7 @@ instance InferType Expr where
     let newEnv = env ++ [(Index bound, tv)]
     (t1, s1) <- inferType expr newEnv
     return (TFunc (subst s1 tv) t1 loc, s1)
+  inferType (Quant _ _ _ _ loc) _ = pure $ (tBool loc, mempty)
   inferType _ _ = undefined -- FIXME:
 
 instance InferType Op where
@@ -448,7 +451,7 @@ instance TypeCheckable Expr where
           return $ Typed.Op op opTy
         App expr1 expr2 loc -> do
           (_, _, infos) <- get
-          _ <- inferType (App expr1 expr2 loc) $ union (Data.Bifunctor.second typeInfoToType <$> infos) env -- TODO: There is perhaps bug here.
+          _ <- inferType (App expr1 expr2 loc) $ union (Data.Bifunctor.second typeInfoToType <$> infos) env -- TODO: There is perhaps bug about generalization here.
           typedExpr1 <- typeCheck' expr1 env
           typedExpr2 <- typeCheck' expr2 env
           return $ Typed.App typedExpr1 typedExpr2 loc
@@ -456,15 +459,28 @@ instance TypeCheckable Expr where
           v <- freshVar
           (_, _, infos) <- get
           let env' = filter (\(index, _) -> index /= Index name) env <> [(Index name, v)]
-          (lamTy, _) <- inferType (Lam name inner loc) $ union (Data.Bifunctor.second typeInfoToType <$> infos) env' 
+          (lamTy, sub) <- inferType (Lam name inner loc) $ union (Data.Bifunctor.second typeInfoToType <$> infos) env' 
           typedExpr <- typeCheck' inner env'
-          nameTy <- case lamTy of
+          nameTy <- case subst sub lamTy of
             (TFunc t1 _ _) -> return t1
             other -> throwError $ UnifyFailed lamTy other loc 
           return $ Typed.Lam name nameTy typedExpr loc
-        Func na ne loc -> undefined -- FIXME: This and below.
+        Func na ne loc -> undefined -- FIXME: This undefined and below.
         Tuple exs -> undefined
-        Quant ex nas ex' ex3 loc -> undefined
+        Quant op bounded restriction inner loc -> do
+          (_, _, infos) <- get
+          (opTy, sub1) <- inferType op $ union (Data.Bifunctor.second typeInfoToType <$> infos) env
+          -- unifies (subst sub1 opTy) (tBool .-> tBool .-> tBool $ NoLoc) loc -- TODO: Do some investigation to understand why this unification fails. This is not top priority, anyway.
+          env' <- foldrM (\name tmpEnv -> do
+                  v <- freshVar
+                  return $ filter (\(index, _) -> index /= Index name) tmpEnv <> [(Index name, v)]
+                ) env bounded
+          (resTy, sub2) <- inferType restriction $ union (Data.Bifunctor.second typeInfoToType <$> infos) env'
+          (innerTy, sub3) <- inferType inner $ union (Data.Bifunctor.second typeInfoToType <$> infos) (subst sub2 env')
+          unifies (subst (sub2 `compose` sub3) resTy) (tBool NoLoc) loc
+          unifies (subst (sub2 `compose` sub3) innerTy) (tBool NoLoc) loc
+          forM_ (Set.intersection (Map.keysSet sub2) (Map.keysSet sub3)) (\name -> return $ void $ (unifies :: Type -> Type -> Loc -> TypeCheckM (Subs Type)) <$> Map.lookup name sub2 <*> Map.lookup name sub3 <*> pure loc)
+          return $ Typed.Quant (Typed.Op undefined opTy) undefined undefined undefined loc
         RedexKernel na ex set ne -> undefined
         RedexShell n ex -> undefined
         ArrIdx ex ex' loc -> undefined

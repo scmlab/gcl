@@ -52,5 +52,6 @@ data TypedExpr
   | Op Op Type
   | App TypedExpr TypedExpr Loc
   | Lam Name Type TypedExpr Loc
+  | Quant TypedExpr [Name] TypedExpr TypedExpr Loc
   deriving (Eq, Show)
   -- FIXME: Other constructors.
