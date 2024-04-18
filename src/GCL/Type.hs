@@ -14,13 +14,11 @@
 
 module GCL.Type where
 
-import           Control.Applicative.Combinators
-                                                ( (<|>) )
 import           Control.Monad.Except
 import           Control.Monad.State.Lazy
 import           Control.Monad.Writer.Lazy
 import           Data.Aeson                     ( ToJSON )
-import           Data.Bifunctor                 ( first, Bifunctor (second) )
+import           Data.Bifunctor                 ( Bifunctor (second) )
 import           Data.Functor
 import           Data.List
 import           Data.Loc                       ( (<-->)
@@ -28,10 +26,7 @@ import           Data.Loc                       ( (<-->)
                                                 , Located
                                                 , locOf
                                                 )
-import           Data.Loc.Range                 ( Range
-                                                , fromLoc
-                                                )
-import           Data.Map                       ( Map )
+import           Data.Loc.Range                 ( Range )
 import qualified Data.Map                      as Map
 import qualified Data.Text                     as Text
 import           GCL.Common
@@ -41,9 +36,6 @@ import           Prelude                 hiding ( EQ
                                                 , LT
                                                 )
 
-import qualified Data.List.NonEmpty            as NonEmpty
-import           Server.IntervalMap             ( IntervalMap )
-import qualified Server.IntervalMap            as IntervalMap
 import           Syntax.Abstract
 import           Syntax.Abstract.Util
 import           Syntax.Common
@@ -159,21 +151,21 @@ instance InferType Op where
 
 instance InferType ChainOp where
   inferType :: ChainOp -> TypeEnv -> TypeCheckM (Type, Subs Type)
-  inferType (EQProp  l) env = return (tBool .-> tBool .-> tBool $ l, mempty)
-  inferType (EQPropU l) env = return (tBool .-> tBool .-> tBool $ l, mempty)
-  inferType (EQ      l) env = do
+  inferType (EQProp  l) _ = return (tBool .-> tBool .-> tBool $ l, mempty)
+  inferType (EQPropU l) _ = return (tBool .-> tBool .-> tBool $ l, mempty)
+  inferType (EQ      l) _ = do
     x <- freshVar
     return (const x .-> const x .-> tBool $ l, mempty)
-  inferType (NEQ  l) env = return (tInt .-> tInt .-> tBool $ l, mempty)
-  inferType (NEQU l) env = return (tInt .-> tInt .-> tBool $ l, mempty)
-  inferType (LTE  l) env = return (tInt .-> tInt .-> tBool $ l, mempty)
-  inferType (LTEU l) env = return (tInt .-> tInt .-> tBool $ l, mempty)
-  inferType (GTE  l) env = return (tInt .-> tInt .-> tBool $ l, mempty)
-  inferType (GTEU l) env = return (tInt .-> tInt .-> tBool $ l, mempty)
-  inferType (LT   l) env = do
+  inferType (NEQ  l) _ = return (tInt .-> tInt .-> tBool $ l, mempty)
+  inferType (NEQU l) _ = return (tInt .-> tInt .-> tBool $ l, mempty)
+  inferType (LTE  l) _ = return (tInt .-> tInt .-> tBool $ l, mempty)
+  inferType (LTEU l) _ = return (tInt .-> tInt .-> tBool $ l, mempty)
+  inferType (GTE  l) _ = return (tInt .-> tInt .-> tBool $ l, mempty)
+  inferType (GTEU l) _ = return (tInt .-> tInt .-> tBool $ l, mempty)
+  inferType (LT   l) _ = do
     x <- freshVar
     return (const x .-> const x .-> tBool $ l, mempty)
-  inferType (GT l) env = do
+  inferType (GT l) _ = do
     x <- freshVar
     return (const x .-> const x .-> tBool $ l, mempty)
 
@@ -233,7 +225,7 @@ unifies (TMetaVar x) t            l          = bind x t l
 unifies t            (TMetaVar x) l          = bind x t l
 unifies t1           t2           l          = throwError $ UnifyFailed t1 t2 l
 
-bind :: MonadError TypeError m => Name -> Type -> Loc -> m (Map Name Type)
+bind :: MonadError TypeError m => Name -> Type -> Loc -> m (Map.Map Name Type)
 bind x t l | occurs x t = throwError $ RecursiveType x t l
            | otherwise  = return (Map.singleton x t)
 
@@ -319,6 +311,7 @@ instance TypeCheckable Program where
     -- TODO: This is a hack to make function definitions always the last of the list.
     -- Even if it's desirable to do so, it's inappropriate to write the logic here.
     let newDefns = sortBy (\left right -> case (left, right) of
+          (FuncDefn _ _, FuncDefn _ _) -> Data.Ord.EQ
           (_, FuncDefn _ _) -> Data.Ord.LT
           _ -> Data.Ord.GT) $ reverse defns -- This is also a hack (and I don't know why it works).
     collectIds newDefns
@@ -341,7 +334,7 @@ instance TypeCheckable Definition where
     ctors' <- mapM typeCheck ctors
     return $ Typed.TypeDefn name args ctors' loc
    where
-    scopeCheck :: MonadError TypeError m => Map Name () -> Type -> m ()
+    scopeCheck :: MonadError TypeError m => Map.Map Name () -> Type -> m ()
     scopeCheck m (TCon _ args' _) = mapM_
       (\a -> case Map.lookup a m of
         Just _ -> return ()
