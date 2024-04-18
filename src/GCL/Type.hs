@@ -4,11 +4,9 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections #-}
-{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE TypeFamilies #-}
 
@@ -255,7 +253,7 @@ instance Counterous TypeCheckM where
     put (succ count, typeDefnInfo, typeInfo)
     return count
 
-checkIsType :: InferType a => a -> Type -> TypeCheckM () -- FIXME: Loc
+checkIsType :: InferType a => a -> Type -> TypeCheckM () -- TODO: Loc
 checkIsType x expected = do
   (_, _, info) <- get
   (actual, s) <- inferType x $ Data.Bifunctor.second typeInfoToType <$> info
@@ -278,12 +276,13 @@ instance CollectIds a => CollectIds [a] where
   collectIds xs = mapM_ collectIds xs
 
 instance CollectIds Definition where
-  collectIds (TypeDefn n args ctors _) = do
-    modify (\(freshState, typeDefnInfos, origInfos) -> (freshState, typeDefnInfos, origInfos <> infos))
+  collectIds (TypeDefn name args ctors _) = do
+    modify (\(freshState, origTypeDefnInfos, origTypeInfos) -> (freshState, origTypeDefnInfos ++ [newTypeDefnInfos], origTypeInfos <> newTypeInfos)) -- TODO: do not use `++`
     where
-      infos =
+      newTypeDefnInfos = (Index name, TypeDefnInfo args)
+      newTypeInfos =
         map
-        (\(TypeDefnCtor cn ts) -> (Index cn, TypeDefnCtorInfo (wrapTFunc ts (TCon n args (n <--> args)))))
+        (\(TypeDefnCtor cn ts) -> (Index cn, TypeDefnCtorInfo (wrapTFunc ts (TCon name args (name <--> args)))))
         ctors
 
   collectIds (FuncDefnSig n t _ _) = modify (\(freshState, typeDefnInfos, origInfos) -> (freshState, typeDefnInfos, origInfos <> infos))
@@ -483,13 +482,13 @@ instance TypeCheckable Type where
   typeCheck (TCon name args _ ) = do
     (_, infos, _) <- get
     case lookup (Index name) infos of -- TODO: Check if this is right.
-      Just ty -> undefined -- FIXME:
-      {-if 
-        | length args < length args' -> throwError
-        $ MissingArguments (drop (length args) args')
-        | length args > length args' -> throwError
-        $ RedundantNames (drop (length args') args)
-        | otherwise -> return () -}
+      Just (TypeDefnInfo args') ->
+        if 
+          | length args < length args' -> throwError
+          $ MissingArguments (drop (length args) args')
+          | length args > length args' -> throwError
+          $ RedundantNames (drop (length args') args)
+          | otherwise -> return ()
       _ -> throwError $ NotInScope name
   typeCheck TVar{} = return ()
   typeCheck TMetaVar{} = return ()
