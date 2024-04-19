@@ -143,7 +143,7 @@ instance InferType Expr where
     let newEnv = env ++ [(Index bound, tv)]
     (t1, s1) <- inferType expr newEnv
     return (TFunc (subst s1 tv) t1 loc, s1)
-  inferType (Quant _ _ _ _ loc) _ = pure $ (tBool loc, mempty)
+  inferType (Quant _ _ _ _ loc) _ = pure (tBool loc, mempty)
   inferType _ _ = undefined -- FIXME:
 
 instance InferType Op where
@@ -470,16 +470,17 @@ instance TypeCheckable Expr where
         Quant op bounded restriction inner loc -> do
           (_, _, infos) <- get
           (opTy, sub1) <- inferType op $ union (Data.Bifunctor.second typeInfoToType <$> infos) env
-          -- unifies (subst sub1 opTy) (tBool .-> tBool .-> tBool $ NoLoc) loc -- TODO: Do some investigation to understand why this unification fails. This is not top priority, anyway.
+          -- _ <- unifies (subst sub1 opTy) (tBool .-> tBool .-> tBool $ NoLoc) loc -- TODO: Do some investigation to understand why this unification fails. This is not top priority, anyway.
           env' <- foldrM (\name tmpEnv -> do
                   v <- freshVar
                   return $ filter (\(index, _) -> index /= Index name) tmpEnv <> [(Index name, v)]
                 ) env bounded
           (resTy, sub2) <- inferType restriction $ union (Data.Bifunctor.second typeInfoToType <$> infos) env'
           (innerTy, sub3) <- inferType inner $ union (Data.Bifunctor.second typeInfoToType <$> infos) (subst sub2 env')
-          unifies (subst (sub2 `compose` sub3) resTy) (tBool NoLoc) loc
-          unifies (subst (sub2 `compose` sub3) innerTy) (tBool NoLoc) loc
-          forM_ (Set.intersection (Map.keysSet sub2) (Map.keysSet sub3)) (\name -> return $ void $ (unifies :: Type -> Type -> Loc -> TypeCheckM (Subs Type)) <$> Map.lookup name sub2 <*> Map.lookup name sub3 <*> pure loc)
+          _ <- unifies (subst (sub2 `compose` sub3) resTy) (tBool NoLoc) loc
+          _ <- unifies (subst (sub2 `compose` sub3) innerTy) (tBool NoLoc) loc
+          forM_ (Set.intersection (Map.keysSet sub2) (Map.keysSet sub3))
+                (\name -> return . void $ (unifies :: Type -> Type -> Loc -> TypeCheckM (Subs Type)) <$> Map.lookup name sub2 <*> Map.lookup name sub3 <*> pure loc)
           return $ Typed.Quant (Typed.Op undefined opTy) undefined undefined undefined loc
         RedexKernel na ex set ne -> undefined
         RedexShell n ex -> undefined
