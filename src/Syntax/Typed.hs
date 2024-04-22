@@ -3,7 +3,7 @@ module Syntax.Typed where
 import Data.Text ( Text )
 import Data.Loc ( Loc )
 import Data.Loc.Range ( Range )
-import Syntax.Abstract.Types ( Lit, Type, TypeDefnCtor, Expr )
+import Syntax.Abstract.Types ( Lit, Type )
 import Syntax.Common.Types ( Name, Op )
 
 -- FIXME:

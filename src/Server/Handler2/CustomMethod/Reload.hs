@@ -53,7 +53,7 @@ reload filepath onFinish onError = do
             -- type check
             case typeCheck abstract of
               Left err -> onError err
-              Right scopeTree -> 
+              Right typedAst -> 
                 -- calculate proof obligations, specs and other hints
                 case WP.sweep abstract of
                   Left  err -> onError (StructError err)
@@ -64,7 +64,7 @@ reload filepath onFinish onError = do
                           , _highlightingInfos = collectHighlighting concrete
                           , _abstractProgram   = abstract
                           , _scopingInfo       = collectLocationLinks abstract
-                          , _typeCheckingInfo  = undefined -- TODO: collectHoverInfo abstract scopeTree
+                          , _typeCheckingInfo  = collectHoverInfo typedAst
                           , _proofObligations  = List.sort pos
                           , _specifiations     = sortOn locOf specs
                           , _warnings          = warnings
