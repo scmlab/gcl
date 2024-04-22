@@ -323,8 +323,7 @@ instance TypeCheckable Program where
     typedDecls <- mapM typeCheck decls
     typedExprs <- mapM typeCheck exprs
     typedStmts <- mapM typeCheck stmts
-    -- throwError $ UndefinedType (Name (Text.pack . show $ Typed.Program typedDefns typedDecls [] typedStmts loc) NoLoc) -- TODO: For debugging.
-    return $ Typed.Program typedDefns typedDecls typedExprs typedStmts loc -- FIXME:
+    return $ Typed.Program typedDefns typedDecls typedExprs typedStmts loc
    where
     collectTCon (TypeDefn n args _ _) = [(Index n, TypeDefnInfo args)]
     collectTCon _                     = []
@@ -498,7 +497,7 @@ instance TypeCheckable Type where
   typeCheck (TTuple ts     )  = forM_ ts typeCheck
   typeCheck (TCon name args _ ) = do
     (_, infos, _) <- get
-    case lookup (Index name) infos of -- TODO: Check if this is right.
+    case lookup (Index name) infos of
       Just (TypeDefnInfo args') ->
         if 
           | length args < length args' -> throwError
@@ -515,7 +514,7 @@ instance TypeCheckable Interval where
 
 instance TypeCheckable Endpoint where
   typeCheck (Including e) = return ()
-  typeCheck (Excluding e) = return () -- FIXME: This might be wrong
+  typeCheck (Excluding e) = return () -- TODO: This might be wrong
 
 --------------------------------------------------------------------------------
 -- helper combinators

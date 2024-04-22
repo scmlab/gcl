@@ -6,7 +6,6 @@ import Data.Loc.Range ( Range )
 import Syntax.Abstract.Types ( Lit, Type )
 import Syntax.Common.Types ( Name, Op )
 
--- FIXME:
 data TypedProgram = Program [TypedDefinition] -- definitions (the functional language part)
                             [TypedDeclaration] -- constant and variable declarations
                             [TypedExpr] -- global properties
@@ -20,13 +19,13 @@ data TypedDefinition
   | FuncDefn Name [TypedExpr]
   deriving (Eq, Show)
 
-data TypedTypeDefnCtor = TypedTypeDefnCtor Name [Type] -- FIXME: Add type
+data TypedTypeDefnCtor = TypedTypeDefnCtor Name [Type]
   deriving (Eq, Show)
 
 data TypedDeclaration
   = ConstDecl [Name] Type (Maybe TypedExpr) Loc
   | VarDecl [Name] Type (Maybe TypedExpr) Loc
-  deriving (Eq, Show) -- FIXME: Add types
+  deriving (Eq, Show)
 
 data TypedStmt
   = Skip Loc
