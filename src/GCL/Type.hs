@@ -324,7 +324,7 @@ instance TypeCheckable Program where
     typedExprs <- mapM typeCheck exprs
     typedStmts <- mapM typeCheck stmts
     -- throwError $ UndefinedType (Name (Text.pack . show $ Typed.Program typedDefns typedDecls [] typedStmts loc) NoLoc) -- TODO: For debugging.
-    return $ Typed.Program typedDefns typedDecls [] typedStmts loc -- FIXME:
+    return $ Typed.Program typedDefns typedDecls typedExprs typedStmts loc -- FIXME:
    where
     collectTCon (TypeDefn n args _ _) = [(Index n, TypeDefnInfo args)]
     collectTCon _                     = []

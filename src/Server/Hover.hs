@@ -1,7 +1,6 @@
 
 
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 
@@ -10,19 +9,15 @@ module Server.Hover
   ) where
 
 
-import qualified Language.LSP.Types            as J
+import qualified Language.LSP.Types as J
 import           Pretty
-import           Data.Loc                       ( Located
-                                                , locOf
-                                                )
+import           Data.Loc           ( Located
+                                    , locOf
+                                    )
 import           Data.Loc.Range
-import qualified GCL.Type                      as TypeChecking
-import qualified Language.LSP.Types            as J
-import           Pretty                         ( Pretty(..)
-                                                , toText
-                                                )
-import           Server.IntervalMap             (IntervalMap)
-import qualified Server.IntervalMap             as IntervalMap
+import qualified GCL.Type           as TypeChecking
+import           Server.IntervalMap ( IntervalMap )
+import qualified Server.IntervalMap as IntervalMap
 import           Syntax.Abstract
 import           Syntax.Common
 import           Syntax.Typed                   as Typed
@@ -58,25 +53,25 @@ instance Collect a => Collect [a] where
 -- Program
 
 instance Collect Typed.TypedProgram where
-  collect (Typed.Program defns decls _ stmts _) = foldMap collect defns <> foldMap collect decls <> foldMap collect stmts
+  collect (Typed.Program defns decls exprs stmts _) = foldMap collect defns <> foldMap collect decls <> foldMap collect exprs <> foldMap collect stmts
 
 --------------------------------------------------------------------------------
 -- Definition
 
 instance Collect Typed.TypedDefinition where
-  collect (Typed.TypeDefn    _ _ ctors _) = foldMap collect ctors
+  collect (Typed.TypeDefn _ _ ctors _) = foldMap collect ctors
   collect (Typed.FuncDefnSig arg t prop _) = annotateType arg t <> maybe mempty collect prop
-  collect (Typed.FuncDefn n exprs) = foldMap collect exprs
+  collect (Typed.FuncDefn name exprs) = foldMap collect exprs
 
 instance Collect Typed.TypedTypeDefnCtor where
-  collect (Typed.TypedTypeDefnCtor n ts) = mempty
+  collect (Typed.TypedTypeDefnCtor name tys) = mempty
 
 --------------------------------------------------------------------------------
 -- Declaration
 
 instance Collect Typed.TypedDeclaration where
-  collect (Typed.ConstDecl names ty expr _) = annotateType names ty -- FIXME: Display expr.
-  collect (Typed.VarDecl names ty expr _) = annotateType names ty
+  collect (Typed.ConstDecl names ty expr _) = annotateType names ty <> maybe mempty collect expr
+  collect (Typed.VarDecl names ty expr _) = annotateType names ty <> maybe mempty collect expr
 
 --------------------------------------------------------------------------------
 -- Stmt

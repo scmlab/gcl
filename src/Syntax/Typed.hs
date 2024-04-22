@@ -9,7 +9,7 @@ import Syntax.Common.Types ( Name, Op )
 -- FIXME:
 data TypedProgram = Program [TypedDefinition] -- definitions (the functional language part)
                             [TypedDeclaration] -- constant and variable declarations
-                            [()] -- global properties
+                            [TypedExpr] -- global properties
                             [TypedStmt] -- main program
                             Loc
   deriving (Eq, Show)
