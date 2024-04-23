@@ -101,6 +101,9 @@ instance Collect Typed.TypedExpr where
   collect (Typed.App expr1 expr2 _) = collect expr1 <> collect expr2
   collect (Typed.Lam name ty expr _) = annotateType name ty <> collect expr
   collect (Typed.Quant quantifier bound restriction inner _) = collect restriction <> collect inner
+  collect Typed.ArrIdx {} = undefined -- FIXME: Implement this.
+  collect Typed.ArrUpd {} = undefined -- FIXME: Implement this.
+
 
 instance Collect Op where
   collect (ChainOp op) = collect op

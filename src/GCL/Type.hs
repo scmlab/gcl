@@ -18,6 +18,8 @@ import           Control.Monad.Writer.Lazy
 import           Data.Aeson                     ( ToJSON )
 import           Data.Bifunctor                 ( Bifunctor (second) )
 import           Data.Functor
+import qualified Data.Ord
+import           Data.Foldable ( foldrM )
 import           Data.List
 import           Data.Loc                       ( (<-->)
                                                 , Loc(..)
@@ -25,6 +27,7 @@ import           Data.Loc                       ( (<-->)
                                                 , locOf
                                                 )
 import           Data.Loc.Range                 ( Range )
+import qualified Data.Set                      as Set
 import qualified Data.Map                      as Map
 import qualified Data.Text                     as Text
 import           GCL.Common
@@ -38,9 +41,6 @@ import           Syntax.Abstract
 import           Syntax.Abstract.Util
 import           Syntax.Common
 import qualified Syntax.Typed                  as Typed
-import qualified Data.Ord
-import Data.Foldable (foldrM)
-import qualified Data.Set as Set
 
 data Index = Index Name | Hole Range deriving (Eq, Show, Ord)
 
@@ -114,10 +114,10 @@ runInferType x = do
   return $ subst sub ty
 
 instance InferType Expr where
-  inferType (Lit   lit l) _ = return (litTypes lit l, mempty)
-  inferType (Var   x   _) env = inferType x env
-  inferType (Const x   _) env = inferType x env
-  inferType (Op o       ) env = inferType o env
+  inferType (Lit lit l) _ = return (litTypes lit l, mempty)
+  inferType (Var x _) env = inferType x env
+  inferType (Const x _) env = inferType x env
+  inferType (Op o) env = inferType o env
   {- inferType (App (App (Op op@(ChainOp _)) e1 _) e2 l) env = do -- FIXME: Make chain operators work.
     top <- inferType op env
 
@@ -143,8 +143,19 @@ instance InferType Expr where
     let newEnv = env ++ [(Index bound, tv)]
     (t1, s1) <- inferType expr newEnv
     return (TFunc (subst s1 tv) t1 loc, s1)
-  inferType (Quant _ _ _ _ loc) _ = pure (tBool loc, mempty)
-  inferType _ _ = undefined -- FIXME:
+  inferType (Func name clauses l) env = undefined -- TODO: Implement below cases for type checking exprs.
+  inferType (Tuple xs) env = undefined
+  inferType (Quant _ _ _ _ loc) _ = pure (tBool loc, mempty) -- TODO: Do not return mempty. This is a bug.
+  inferType (RedexShell _ expr) env = undefined
+  inferType (RedexKernel n _ _ _) env = undefined
+  inferType (ArrIdx e1 e2 loc) env = do
+    (ty, sub) <- inferType e1 env
+    case subst sub ty of
+      TArray int ty' _ -> return (ty', mempty) -- TODO: Do not return mempty. Instead, treat TArray as a function from int to something and output meaningful substitutions.
+      _ -> throwError $ UnifyFailed (subst sub ty) (TArray (Interval (Including (Var (Name "start" NoLoc) NoLoc)) (Including (Var (Name "end" NoLoc) NoLoc)) NoLoc) (subst sub ty) NoLoc) loc
+      -- TODO: Throw error above in a better way.
+  inferType (ArrUpd e1 e2 e3 _) env = inferType e3 env
+  inferType (Case expr cs l) env = undefined
 
 instance InferType Op where
   inferType (ChainOp op) = inferType op
@@ -280,7 +291,7 @@ instance CollectIds a => CollectIds [a] where
 
 instance CollectIds Definition where
   collectIds (TypeDefn name args ctors _) = do
-    modify (\(freshState, origTypeDefnInfos, origTypeInfos) -> (freshState, origTypeDefnInfos ++ [newTypeDefnInfos], origTypeInfos <> newTypeInfos)) -- TODO: do not use `++`
+    modify (\(freshState, origTypeDefnInfos, origTypeInfos) -> (freshState, origTypeDefnInfos ++ [newTypeDefnInfos], origTypeInfos <> newTypeInfos)) -- TODO: For performance, do not use `++`
     where
       newTypeDefnInfos = (Index name, TypeDefnInfo args)
       newTypeInfos =
@@ -450,9 +461,9 @@ instance TypeCheckable Expr where
           return $ Typed.Op op opTy
         App expr1 expr2 loc -> do
           (_, _, infos) <- get
-          _ <- inferType (App expr1 expr2 loc) $ union (Data.Bifunctor.second typeInfoToType <$> infos) env -- TODO: There is perhaps bug about generalization here.
-          typedExpr1 <- typeCheck' expr1 env
-          typedExpr2 <- typeCheck' expr2 env
+          (_, sub) <- inferType (App expr1 expr2 loc) $ union (Data.Bifunctor.second typeInfoToType <$> infos) env -- TODO: There is perhaps bug about generalization here.
+          typedExpr1 <- typeCheck' expr1 $ subst sub $ union (Data.Bifunctor.second typeInfoToType <$> infos) env
+          typedExpr2 <- typeCheck' expr2 $ subst sub $ union (Data.Bifunctor.second typeInfoToType <$> infos) env
           return $ Typed.App typedExpr1 typedExpr2 loc
         Lam name inner loc -> do
           v <- freshVar
@@ -466,24 +477,33 @@ instance TypeCheckable Expr where
           return $ Typed.Lam name nameTy typedExpr loc
         Func na ne loc -> undefined -- FIXME: This undefined and below.
         Tuple exs -> undefined
-        Quant op bounded restriction inner loc -> do
+        Quant op bound restriction inner loc -> do
           (_, _, infos) <- get
           (opTy, sub1) <- inferType op $ union (Data.Bifunctor.second typeInfoToType <$> infos) env
           -- _ <- unifies (subst sub1 opTy) (tBool .-> tBool .-> tBool $ NoLoc) loc -- TODO: Do some investigation to understand why this unification fails. This is not top priority, anyway.
           env' <- foldrM (\name tmpEnv -> do
                   v <- freshVar
                   return $ filter (\(index, _) -> index /= Index name) tmpEnv <> [(Index name, v)]
-                ) env bounded
+                ) env bound
           (resTy, sub2) <- inferType restriction $ union (Data.Bifunctor.second typeInfoToType <$> infos) env'
           (innerTy, sub3) <- inferType inner $ union (Data.Bifunctor.second typeInfoToType <$> infos) (subst sub2 env')
           _ <- unifies (subst (sub2 `compose` sub3) resTy) (tBool NoLoc) loc
           _ <- unifies (subst (sub2 `compose` sub3) innerTy) (tBool NoLoc) loc
           forM_ (Set.intersection (Map.keysSet sub2) (Map.keysSet sub3))
                 (\name -> return . void $ (unifies :: Type -> Type -> Loc -> TypeCheckM (Subs Type)) <$> Map.lookup name sub2 <*> Map.lookup name sub3 <*> pure loc)
-          return $ Typed.Quant (Typed.Op undefined opTy) undefined undefined undefined loc
+          restriction' <- typeCheck' restriction (subst (sub2 `compose` sub3) env')
+          inner' <- typeCheck' inner (subst (sub2 `compose` sub3) env')
+          return $ Typed.Quant (Typed.Op undefined opTy) bound restriction' inner' loc
         RedexKernel na ex set ne -> undefined
         RedexShell n ex -> undefined
-        ArrIdx ex ex' loc -> undefined
+        ArrIdx arr index loc -> do
+          (_, _, infos) <- get
+          (indexTy, indexSub) <- inferType index $ union (Data.Bifunctor.second typeInfoToType <$> infos) env
+          unifySub <- unifies (subst indexSub indexTy) (tInt NoLoc) loc
+          _ <- inferType (ArrIdx arr index loc) $ union (Data.Bifunctor.second typeInfoToType <$> infos) (subst unifySub env)
+          typedArr <- typeCheck' arr env
+          typedIndex <- typeCheck' index env
+          return $ Typed.ArrIdx typedArr typedIndex loc
         ArrUpd ex ex' ex3 loc -> undefined
         Case ex ccs loc -> undefined
 
