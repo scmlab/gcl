@@ -10,7 +10,7 @@
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE TypeFamilies #-}
 
-module GCL.Type where -- TODO: IMPORTANT! REMEMBER TO CHANGE THE CODE TO USE CORRECT LOC.
+module GCL.Type where
 
 import           Control.Monad.Except
 import           Control.Monad.State.Lazy
@@ -180,7 +180,7 @@ class Located a => Elab a where
 instance Elab Program where
   elaborate (Program defns decls exprs stmts loc) _env = do
     collectIds decls
-    collectIds defns
+    collectIds $ reverse defns
     let tcons = concatMap collectTCon defns
     modify (\(freshState, origInfos, typeInfos) -> (freshState, tcons <> origInfos, typeInfos))
     (_, _, infos) <- get
@@ -286,7 +286,7 @@ instance Elab Stmt where
         Just (VarTypeInfo _) -> pure ()
         Just _               -> throwError $ AssignToConst name
         Nothing              -> throwError $ NotInScope name
-  elaborate (AAssign arr index e loc) _ = undefined {- do
+  elaborate (AAssign arr index e loc) _ = undefined {- do -- TODO:
     checkIsType index $ tInt NoLoc
     typedIndex <- typeCheck index
     (_, _, infos) <- get
@@ -365,8 +365,8 @@ instance Elab Expr where
     tv <- freshVar
     (ty1, typedExpr1, sub1) <- elaborate e1 env
     (ty2, typedExpr2, sub2) <- elaborate e2 (subst sub1 env)
-    s3 <- unifies (subst sub2 $ fromJust ty1) (TFunc (fromJust ty2) tv NoLoc) loc
-    return (Just $ subst s3 tv, Typed.App typedExpr1 typedExpr2 loc, s3 `compose` sub2 `compose` sub1)
+    sub3 <- unifies (subst sub2 $ fromJust ty1) (TFunc (fromJust ty2) tv NoLoc) loc
+    return (Just $ subst sub3 tv, Typed.App typedExpr1 typedExpr2 loc, sub3 `compose` sub2 `compose` sub1)
   elaborate (Lam bound expr loc) env = do
     tv <- freshVar
     let newEnv = (Index bound, tv) : env
@@ -375,16 +375,28 @@ instance Elab Expr where
     return (Just returnTy, Typed.Lam bound (subst sub1 tv) typedExpr1 loc, sub1)
   elaborate (Func name clauses l) env = undefined -- TODO: Implement below cases for type checking exprs.
   elaborate (Tuple xs) env = undefined
-  elaborate (Quant _ _ _ _ loc) _ = undefined -- pure (tBool loc, mempty) -- TODO: Do not return mempty. This is a bug.
+  elaborate (Quant quantifier bound restriction inner loc) env = do -- TODO: implement `#` as a quantifer.
+    tv <- freshVar
+    (quantTy, quantTypedExpr, quantSub) <- elaborate quantifier env
+    uniSub <- unifies (subst quantSub $ fromJust quantTy) (tv ~-> tv ~-> tv) (locOf quantifier)
+    tvs <- replicateM (length bound) freshVar
+    let newEnv = zip (Index <$> bound) tvs <> subst (quantSub `compose` uniSub) env
+    (resTy, resTypedExpr, resSub) <- elaborate restriction newEnv
+    uniSub2 <- unifies (subst resSub $ fromJust resTy) (tBool NoLoc) (locOf restriction)
+    let newEnv' = subst (resSub `compose` uniSub2) newEnv
+    (innerTy, innerTypedExpr, innerSub) <- elaborate inner newEnv'
+    uniSub3 <- unifies (subst innerSub $ fromJust innerTy) tv (locOf inner)
+    return (Just $ subst quantSub tv, Typed.Quant quantTypedExpr bound resTypedExpr innerTypedExpr loc, quantSub `compose` resSub `compose` innerSub `compose` uniSub `compose` uniSub2 `compose` uniSub3)
   elaborate (RedexShell _ expr) env = undefined
   elaborate (RedexKernel n _ _ _) env = undefined
-  elaborate (ArrIdx e1 e2 loc) env = undefined {- do
-    (ty, sub) <- elaborate e1 env
-    case subst sub ty of
-      TArray int ty' _ -> return (ty', mempty) -- TODO: Do not return mempty. Instead, treat TArray as a function from int to something and output meaningful substitutions.
-      _ -> throwError $ UnifyFailed (subst sub ty) (TArray (Interval (Including (Var (Name "start" NoLoc) NoLoc)) (Including (Var (Name "end" NoLoc) NoLoc)) NoLoc) (subst sub ty) NoLoc) loc
-      -- TODO: Throw error above in a better way. -}
-  elaborate (ArrUpd e1 e2 e3 _) env = elaborate e3 env
+  elaborate (ArrIdx e1 e2 loc) env = do
+    tv <- freshVar
+    (ty1, typedExpr1, sub1) <- elaborate e1 env
+    (ty2, typedExpr2, sub2) <- elaborate e2 (subst sub1 env)
+    sub3 <- unifies (subst sub2 $ fromJust ty2) (tInt NoLoc) (locOf e2)
+    sub4 <- unifies (subst (sub2 `compose` sub3) (fromJust ty1)) (TFunc (tInt NoLoc) tv NoLoc) loc
+    return (Just $ subst sub3 tv, Typed.ArrIdx typedExpr1 typedExpr2 loc, sub4 `compose` sub3 `compose` sub2 `compose` sub1)
+  elaborate (ArrUpd e1 e2 e3 _) env = elaborate e3 env -- TODO:
   elaborate (Case expr cs l) env = undefined
 
 instance Elab Op where
