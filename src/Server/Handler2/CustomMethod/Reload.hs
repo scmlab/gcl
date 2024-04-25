@@ -104,7 +104,7 @@ toAbstract filepath concrete onFinish onError = do
 
 typeCheck :: A.Program -> Either Error TypedProgram
 typeCheck abstract = do
-  case TypeChecking.runTypeCheck abstract of
+  case TypeChecking.runElaboration abstract of
     Left  e -> Left (TypeError e)
     Right typedProgram -> return typedProgram
 
