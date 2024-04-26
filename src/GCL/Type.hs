@@ -130,7 +130,7 @@ instance CollectIds Definition where
 
   collectIds (FuncDefnSig n t _ _) = modify (\(freshState, typeDefnInfos, origInfos) -> (freshState, typeDefnInfos, infos <> origInfos))
     where infos = [(Index n, ConstTypeInfo t)]
-  
+
   collectIds (FuncDefn name exprs) = do
     (_, _, infos) <- get
     case lookup (Index name) $ Data.Bifunctor.second typeInfoToType <$> infos of
@@ -347,24 +347,25 @@ instance Elab Expr where
       Just ty -> return (Just ty, Typed.Const x ty loc, mempty)
       Nothing -> throwError $ NotInScope x
   elaborate (Op o) env = (\(ty, op, sub) -> (ty, Typed.Op op $ fromJust ty, sub)) <$> elaborate o env
-  {- elaborate (App (App (Op op@(ChainOp _)) e1 _) e2 l) env = do -- FIXME: Make chain operators work.
-    top <- elaborate op env
-
-    (t1, s1)  <- case e1 of
-      App (App (Op (ChainOp _)) _ _) e12 _ -> do
-        _ <- elaborate e1 env
-        elaborate e12 env
-      _ -> elaborate e1 env
-
-    (t2, s2) <- elaborate e2 env
-    v  <- freshVar
-    tell [(top, t1 ~-> t2 ~-> v, l)]
-
-    return (tBool l, mempty) -}
+  elaborate (App (App (Op op@(ChainOp _)) e1 _) e2 l) env = do -- TODO: Make sure this implementation is correct, espeically when the ChainOp is polymorphic.
+    (opTy, opTyped, opSub) <- elaborate op env
+    (t1, typed1, s1) <- case e1 of
+      App (App innerOp@(Op (ChainOp _)) e11 _) e12 _ -> do
+        (t12, typed12, s12) <- elaborate e12 $ subst opSub env
+        (t2, _, s2) <- elaborate e2 $ subst opSub env
+        _ <- unifies (subst s12 $ fromJust t12) (subst s2 $ fromJust t2) (locOf e12)
+        (t11, typed11, s11) <- elaborate e11 $ subst opSub env
+        (_, innerOpTyped, _) <- elaborate innerOp $ subst opSub env
+        pure (Nothing, Typed.App (Typed.App innerOpTyped typed11 (locOf e11)) typed12 (locOf e1), s12 <> s2 <> s11)
+      _ -> elaborate e1 $ subst opSub env
+    v <- freshVar
+    (t2, typed2, s2) <- elaborate e2 $ subst opSub env
+    vSub <- unifies (subst s2 (fromJust t2) ~-> subst s2 (fromJust t2) ~-> v) (subst opSub $ fromJust opTy) l
+    pure (Just $ subst vSub v, Typed.App (Typed.App (Typed.Op opTyped $ subst opSub $ fromJust opTy) typed1 $ locOf e1) typed2 l, s1 <> s2)
   elaborate (App e1 e2 loc) env = do
     tv <- freshVar
     (ty1, typedExpr1, sub1) <- elaborate e1 env
-    (ty2, typedExpr2, sub2) <- elaborate e2 (subst sub1 env)
+    (ty2, typedExpr2, sub2) <- elaborate e2 $ subst sub1 env
     sub3 <- unifies (subst sub2 $ fromJust ty1) (TFunc (fromJust ty2) tv NoLoc) loc
     return (Just $ subst sub3 tv, Typed.App typedExpr1 typedExpr2 loc, sub3 `compose` sub2 `compose` sub1)
   elaborate (Lam bound expr loc) env = do
