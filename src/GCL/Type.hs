@@ -347,7 +347,8 @@ instance Elab Expr where
       Just ty -> return (Just ty, Typed.Const x ty loc, mempty)
       Nothing -> throwError $ NotInScope x
   elaborate (Op o) env = (\(ty, op, sub) -> (ty, Typed.Op op $ fromJust ty, sub)) <$> elaborate o env
-  elaborate (App (App (Op op@(ChainOp _)) e1 _) e2 l) env = do -- TODO: Make sure this implementation is correct, espeically when the ChainOp is polymorphic.
+  -- TODO: Make sure the below implementation is correct, espeically when the ChainOp is polymorphic. (edit: apprently it's incorrect)
+  elaborate (App (App (Op op@(ChainOp _)) e1 _) e2 l) env = do 
     (opTy, opTyped, opSub) <- elaborate op env
     (t1, typed1, s1) <- case e1 of
       App (App innerOp@(Op (ChainOp _)) e11 _) e12 _ -> do
@@ -410,18 +411,18 @@ instance Elab ChainOp where
   elaborate (EQ      l) _ = do
     x <- freshVar
     return (Just $ const x .-> const x .-> tBool $ l, ChainOp $ EQ l, mempty)
-  elaborate (NEQ  l) _ = return (Just $ tInt .-> tInt .-> tBool $ l, ChainOp $ NEQ l, mempty)
-  elaborate (NEQU l) _ = return (Just $ tInt .-> tInt .-> tBool $ l, ChainOp $ NEQU l, mempty)
+  elaborate (NEQ  l) _ = do
+    x <- freshVar
+    return (Just $ const x .-> const x .-> tBool $ l, ChainOp $ NEQ l, mempty)
+  elaborate (NEQU l) _ = do
+    x <- freshVar
+    return (Just $ const x .-> const x .-> tBool $ l, ChainOp $ NEQU l, mempty)
   elaborate (LTE  l) _ = return (Just $ tInt .-> tInt .-> tBool $ l, ChainOp $ LTE l, mempty)
   elaborate (LTEU l) _ = return (Just $ tInt .-> tInt .-> tBool $ l, ChainOp $ LTEU l, mempty)
   elaborate (GTE  l) _ = return (Just $ tInt .-> tInt .-> tBool $ l, ChainOp $ GTE l, mempty)
   elaborate (GTEU l) _ = return (Just $ tInt .-> tInt .-> tBool $ l, ChainOp $ GTEU l, mempty)
-  elaborate (LT   l) _ = do
-    x <- freshVar
-    return (Just $ const x .-> const x .-> tBool $ l, ChainOp $ LT l, mempty)
-  elaborate (GT l) _ = do
-    x <- freshVar
-    return (Just $ const x .-> const x .-> tBool $ l, ChainOp $ GT l, mempty)
+  elaborate (LT   l) _ = return (Just $ tInt .-> tInt .-> tBool $ l, ChainOp $ LT l, mempty)
+  elaborate (GT   l) _ = return (Just $ tInt .-> tInt .-> tBool $ l, ChainOp $ GT l, mempty)
 
 instance Elab ArithOp where
   elaborate (Implies  l) _ = return (Just $ tBool .-> tBool .-> tBool $ l, ArithOp $ Implies l, mempty)
@@ -521,9 +522,9 @@ emptyInterval = Interval (Including zero) (Excluding zero) NoLoc
 chainOpTypes :: ChainOp -> Type
 chainOpTypes (EQProp  l) = tBool .-> tBool .-> tBool $ l
 chainOpTypes (EQPropU l) = tBool .-> tBool .-> tBool $ l
-chainOpTypes (EQ      l) = tInt .-> tInt .-> tBool $ l
-chainOpTypes (NEQ     l) = tInt .-> tInt .-> tBool $ l
-chainOpTypes (NEQU    l) = tInt .-> tInt .-> tBool $ l
+chainOpTypes (EQ      l) = (TMetaVar . Name (Text.pack "a")) .-> (TMetaVar . Name (Text.pack "a")) .-> tBool $ l
+chainOpTypes (NEQ     l) = (TMetaVar . Name (Text.pack "a")) .-> (TMetaVar . Name (Text.pack "a")) .-> tBool $ l
+chainOpTypes (NEQU    l) = (TMetaVar . Name (Text.pack "a")) .-> (TMetaVar . Name (Text.pack "a")) .-> tBool $ l
 chainOpTypes (LTE     l) = tInt .-> tInt .-> tBool $ l
 chainOpTypes (LTEU    l) = tInt .-> tInt .-> tBool $ l
 chainOpTypes (GTE     l) = tInt .-> tInt .-> tBool $ l
