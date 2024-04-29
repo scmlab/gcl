@@ -286,15 +286,15 @@ instance Elab Stmt where
         Just (VarTypeInfo _) -> pure ()
         Just _               -> throwError $ AssignToConst name
         Nothing              -> throwError $ NotInScope name
-  elaborate (AAssign arr index e loc) _ = undefined {- do -- TODO:
-    checkIsType index $ tInt NoLoc
-    typedIndex <- typeCheck index
-    (_, _, infos) <- get
-    (te, _) <- elaborate e $ Data.Bifunctor.second typeInfoToType <$> infos
-    checkIsType arr $ TArray (Interval (Including index) (Including index) (locOf index)) te (locOf arr)
-    typedArr <- typeCheck arr
-    e' <- typeCheck e
-    return $ Typed.AAssign typedArr typedIndex e' loc -}
+  elaborate (AAssign arr index e loc) env = do -- TODO: It seems that `A[n] := e` currently yields a parse error. What can I do?
+    tv <- freshVar
+    (arrTy, typedArr, arrSub) <- elaborate arr env
+    (indexTy, typedIndex, indexSub) <- elaborate index $ subst arrSub env
+    uniSubIndex <- unifies (subst indexSub $ fromJust indexTy) (tInt NoLoc) (locOf index)
+    uniSubArr <- unifies (subst (indexSub `compose` uniSubIndex) (fromJust arrTy)) (TFunc (tInt NoLoc) tv NoLoc) loc
+    (eTy, typedE, eSub) <- elaborate e env
+    _ <- unifies (subst eSub $ fromJust eTy) (subst uniSubArr tv) (locOf e)
+    return (Nothing, Typed.AAssign typedArr typedIndex typedE loc, mempty)
   elaborate (Assert expr loc        ) env = do
     (ty, _, sub) <- elaborate expr env
     _ <- unifies (subst sub $ fromJust ty) (tBool NoLoc) loc
@@ -399,14 +399,22 @@ instance Elab Expr where
     return (Just $ subst quantSub tv, Typed.Quant quantTypedExpr bound resTypedExpr innerTypedExpr loc, quantSub `compose` resSub `compose` innerSub `compose` uniSub `compose` uniSub2 `compose` uniSub3)
   elaborate (RedexShell _ expr) env = undefined
   elaborate (RedexKernel n _ _ _) env = undefined
-  elaborate (ArrIdx e1 e2 loc) env = do
+  elaborate (ArrIdx e1 e2 loc) env = do -- TODO: Check if this is correct.
     tv <- freshVar
     (ty1, typedExpr1, sub1) <- elaborate e1 env
     (ty2, typedExpr2, sub2) <- elaborate e2 (subst sub1 env)
     sub3 <- unifies (subst sub2 $ fromJust ty2) (tInt NoLoc) (locOf e2)
     sub4 <- unifies (subst (sub2 `compose` sub3) (fromJust ty1)) (TFunc (tInt NoLoc) tv NoLoc) loc
     return (Just $ subst sub3 tv, Typed.ArrIdx typedExpr1 typedExpr2 loc, sub4 `compose` sub3 `compose` sub2 `compose` sub1)
-  elaborate (ArrUpd e1 e2 e3 _) env = elaborate e3 env -- TODO:
+  elaborate (ArrUpd arr index e loc) env = do -- TODO: Check if this is correct.
+    tv <- freshVar
+    (arrTy, typedArr, arrSub) <- elaborate arr env
+    (indexTy, typedIndex, indexSub) <- elaborate index $ subst arrSub env
+    uniSubIndex <- unifies (subst indexSub $ fromJust indexTy) (tInt NoLoc) (locOf index)
+    uniSubArr <- unifies (subst (indexSub `compose` uniSubIndex) (fromJust arrTy)) (TFunc (tInt NoLoc) tv NoLoc) loc
+    (eTy, typedE, eSub) <- elaborate e env
+    uniSubExpr <- unifies (subst eSub $ fromJust eTy) (subst uniSubArr tv) (locOf e)
+    return (subst uniSubArr arrTy, Typed.ArrUpd typedArr typedIndex typedE loc, uniSubExpr `compose` eSub `compose` uniSubArr `compose` uniSubIndex `compose` indexSub `compose` arrSub)
   elaborate (Case expr cs l) env = undefined
 
 instance Elab Op where
