@@ -338,6 +338,10 @@ instance Elab GdCmd where
                ) stmts
     return (Nothing, Typed.TypedGdCmd e' s' loc, mempty)
 
+-- TODO: Current breaking change:
+-- Now, `f i` cannot pass type checking when `f` is an array.
+-- Discuss with SCM if we should add support for this back.
+
 -- You can freely use `fromJust` below to extract the underlying `Type` from the `Maybe Type` you got.
 -- You should also ensure that `elaborate` in `Elab Expr` returns a `Just` when it comes to the `Maybe Type` value.
 -- TODO: Maybe fix this?
@@ -446,7 +450,9 @@ instance Elab ArithOp where
   elaborate (Max      l) _ = return (Just $ tInt .-> tInt .-> tInt $ l, ArithOp $ Max l, mempty)
   elaborate (Min      l) _ = return (Just $ tInt .-> tInt .-> tInt $ l, ArithOp $ Min l, mempty)
   elaborate (Exp      l) _ = return (Just $ tInt .-> tInt .-> tInt $ l, ArithOp $ Exp l, mempty)
-  elaborate (Hash     l) _ = return (Just $ tBool .-> tInt $ l, ArithOp $ Hash l, mempty)
+  elaborate (Hash     l) _ = do
+    x <- freshVar
+    return (Just $ const x .-> const x .-> tInt $ l, ArithOp $ Hash l, mempty)
   elaborate (PointsTo l) _ = return (Just $ tInt .-> tInt .-> tInt $ l, ArithOp $ PointsTo l, mempty)
   elaborate (SConj    l) _ = return (Just $ tBool .-> tBool .-> tBool $ l, ArithOp $ SConj l, mempty)
   elaborate (SImp     l) _ = return (Just $ tBool .-> tBool .-> tBool $ l, ArithOp $ SImp l, mempty)
