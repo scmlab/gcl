@@ -97,23 +97,12 @@ instance Collect Typed.TypedExpr where
   collect (Typed.Lit _lit ty loc) = annotateType loc ty
   collect (Typed.Var name ty _) = annotateType name ty
   collect (Typed.Const name ty _) = annotateType name ty
-  collect (Typed.Op op _ty) = collect op
+  collect (Typed.Op op ty) = annotateType op ty
   collect (Typed.App expr1 expr2 _) = collect expr1 <> collect expr2
   collect (Typed.Lam name ty expr _) = annotateType name ty <> collect expr
   collect (Typed.Quant quantifier _bound restriction inner _) = collect quantifier <> collect restriction <> collect inner
   collect (Typed.ArrIdx expr1 expr2 _) = collect expr1 <> collect expr2
   collect Typed.ArrUpd {} = undefined -- FIXME: Implement this.
-
-
-instance Collect Op where
-  collect (ChainOp op) = collect op
-  collect (ArithOp op) = collect op
-
-instance Collect ArithOp where
-  collect op = annotateType op (TypeChecking.arithOpTypes op)
-
-instance Collect ChainOp where
-  collect op = annotateType op (TypeChecking.chainOpTypes op)
 
 {-
 

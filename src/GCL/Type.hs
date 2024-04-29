@@ -338,6 +338,10 @@ instance Elab GdCmd where
                ) stmts
     return (Nothing, Typed.TypedGdCmd e' s' loc, mempty)
 
+-- You can freely use `fromJust` below to extract the underlying `Type` from the `Maybe Type` you got.
+-- You should also ensure that `elaborate` in `Elab Expr` returns a `Just` when it comes to the `Maybe Type` value.
+-- TODO: Maybe fix this?
+
 instance Elab Expr where
   elaborate (Lit lit loc) _ = let ty = litTypes lit loc in return (Just ty, Typed.Lit lit ty loc, mempty)
   elaborate (Var x loc) env = case lookup (Index x) env of
@@ -377,7 +381,7 @@ instance Elab Expr where
     return (Just returnTy, Typed.Lam bound (subst sub1 tv) typedExpr1 loc, sub1)
   elaborate (Func name clauses l) env = undefined -- TODO: Implement below cases for type checking exprs.
   elaborate (Tuple xs) env = undefined
-  elaborate (Quant quantifier bound restriction inner loc) env = do -- TODO: implement `#` as a quantifer.
+  elaborate (Quant quantifier bound restriction inner loc) env = do -- TODO: implement `#` as a quantifer. Also, implement this correctly.
     tv <- freshVar
     (quantTy, quantTypedExpr, quantSub) <- elaborate quantifier env
     uniSub <- unifies (subst quantSub $ fromJust quantTy) (tv ~-> tv ~-> tv) (locOf quantifier)
@@ -518,43 +522,6 @@ infixr 1 ~->
 emptyInterval :: Interval
 emptyInterval = Interval (Including zero) (Excluding zero) NoLoc
   where zero = Lit (Num 0) NoLoc
-
-chainOpTypes :: ChainOp -> Type
-chainOpTypes (EQProp  l) = tBool .-> tBool .-> tBool $ l
-chainOpTypes (EQPropU l) = tBool .-> tBool .-> tBool $ l
-chainOpTypes (EQ      l) = (TMetaVar . Name (Text.pack "a")) .-> (TMetaVar . Name (Text.pack "a")) .-> tBool $ l
-chainOpTypes (NEQ     l) = (TMetaVar . Name (Text.pack "a")) .-> (TMetaVar . Name (Text.pack "a")) .-> tBool $ l
-chainOpTypes (NEQU    l) = (TMetaVar . Name (Text.pack "a")) .-> (TMetaVar . Name (Text.pack "a")) .-> tBool $ l
-chainOpTypes (LTE     l) = tInt .-> tInt .-> tBool $ l
-chainOpTypes (LTEU    l) = tInt .-> tInt .-> tBool $ l
-chainOpTypes (GTE     l) = tInt .-> tInt .-> tBool $ l
-chainOpTypes (GTEU    l) = tInt .-> tInt .-> tBool $ l
-chainOpTypes (LT      l) = tInt .-> tInt .-> tBool $ l
-chainOpTypes (GT      l) = tInt .-> tInt .-> tBool $ l
-
-
-arithOpTypes :: ArithOp -> Type
-arithOpTypes (Implies  l) = tBool .-> tBool .-> tBool $ l
-arithOpTypes (ImpliesU l) = tBool .-> tBool .-> tBool $ l
-arithOpTypes (Conj     l) = tBool .-> tBool .-> tBool $ l
-arithOpTypes (ConjU    l) = tBool .-> tBool .-> tBool $ l
-arithOpTypes (Disj     l) = tBool .-> tBool .-> tBool $ l
-arithOpTypes (DisjU    l) = tBool .-> tBool .-> tBool $ l
-arithOpTypes (Neg      l) = tBool .-> tBool $ l
-arithOpTypes (NegU     l) = tBool .-> tBool $ l
-arithOpTypes (NegNum   l) = tInt .-> tInt $ l
-arithOpTypes (Add      l) = tInt .-> tInt .-> tInt $ l
-arithOpTypes (Sub      l) = tInt .-> tInt .-> tInt $ l
-arithOpTypes (Mul      l) = tInt .-> tInt .-> tInt $ l
-arithOpTypes (Div      l) = tInt .-> tInt .-> tInt $ l
-arithOpTypes (Mod      l) = tInt .-> tInt .-> tInt $ l
-arithOpTypes (Max      l) = tInt .-> tInt .-> tInt $ l
-arithOpTypes (Min      l) = tInt .-> tInt .-> tInt $ l
-arithOpTypes (Exp      l) = tInt .-> tInt .-> tInt $ l
-arithOpTypes (Hash     l) = tBool .-> tInt $ l
-arithOpTypes (PointsTo l) = tInt .-> tInt .-> tInt $ l
-arithOpTypes (SConj    l) = tBool .-> tBool .-> tBool $ l
-arithOpTypes (SImp     l) = tBool .-> tBool .-> tBool $ l
 
 -- A class for substitution not needing a Fresh monad.
 -- Used only in this module.
