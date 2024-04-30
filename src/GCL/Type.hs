@@ -110,10 +110,10 @@ instance Counterous ElabaratorM where
     return count
 
 runElaboration
-  :: Program -> Either TypeError Typed.TypedProgram
-runElaboration prog = do
-  ((_, program, _), _state) <- runExcept (runStateT (elaborate prog mempty) (0, mempty, mempty))
-  Right program
+  :: Elab a => a -> Either TypeError (Typed a)
+runElaboration a = do
+  ((_, elaborated, _), _state) <- runExcept (runStateT (elaborate a mempty) (0, mempty, mempty))
+  Right elaborated
 
 --------------------------------------------------------------------------------
 -- Collecting ids
