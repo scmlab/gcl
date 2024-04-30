@@ -117,6 +117,8 @@ runElaboration a = do
 
 --------------------------------------------------------------------------------
 -- Collecting ids
+-- The ids are collected by `CollectIds` into the state wrapped by `ElaboratorM`.
+-- `collectIds` are thus called in the beginning of elaborating the whole program.
 
 instance CollectIds Definition where
   collectIds (TypeDefn name args ctors _) = do
@@ -177,10 +179,13 @@ type family Typed untyped where
 class Located a => Elab a where
     elaborate :: a -> TypeEnv -> ElabaratorM (Maybe Type, Typed a, Subs Type)
 
+
+-- Note that we pass the collected ids into each sections of the program.
+-- After `colledtIds`, we don't need to change the state.
 instance Elab Program where
   elaborate (Program defns decls exprs stmts loc) _env = do
     collectIds decls
-    collectIds $ reverse defns
+    collectIds $ reverse defns -- I don't really know why this works. However, `defns` are likely gathered in reverse order, so we have to reverse it again.
     let tcons = concatMap collectTCon defns
     modify (\(freshState, origInfos, typeInfos) -> (freshState, tcons <> origInfos, typeInfos))
     (_, _, infos) <- get

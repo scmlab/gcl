@@ -102,7 +102,7 @@ instance Collect Typed.TypedExpr where
   collect (Typed.Lam name ty expr _) = annotateType name ty <> collect expr
   collect (Typed.Quant quantifier _bound restriction inner _) = collect quantifier <> collect restriction <> collect inner
   collect (Typed.ArrIdx expr1 expr2 _) = collect expr1 <> collect expr2
-  collect Typed.ArrUpd {} = undefined -- FIXME: Implement this.
+  collect (Typed.ArrUpd arr index expr _) = collect arr <> collect index <> collect expr
 
 {-
 

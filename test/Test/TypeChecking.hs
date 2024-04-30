@@ -8,11 +8,11 @@ import           Control.Monad.State.Lazy
 import           Data.Loc                       ( Loc(..) )
 import qualified Data.Map                      as Map
 import           Data.Map                       ( Map )
+import           Data.Maybe                     ( fromJust )
 import           Data.Text                      ( Text )
 import           Error                          ( Error(..) )
 import           GCL.Type                       ( Elab (elaborate)
                                                 , runElaboration
-                                                , TypeEnv
                                                 , Index(..)
                                                 , TypeDefnInfo(..)
                                                 , TypeInfo(..)
@@ -22,7 +22,7 @@ import           Pretty                         ( Pretty(pretty)
                                                 , punctuate
                                                 , toByteString
                                                 , toText
-                                                , vsep
+                                                -- , vsep
                                                 )
 import           Syntax.Abstract
 import           Syntax.Common                  ( Name(Name)
@@ -360,13 +360,11 @@ runParser p t =
     Right (Left  loc ) -> Left [Others (show loc)]
     Right (Right expr) -> Right expr
 
-elab :: Elab a => [(Index, Type)] -> a -> Either [Error] ()
+elab :: Elab a => [(Index, Type)] -> a -> Either [Error] Type
 elab env' e =
-  case
-      runExcept (runStateT (elaborate e env') (0, mempty, mempty))
-    of
+  case runExcept (runStateT (elaborate e env') (0, mempty, mempty)) of
       Left  err -> Left [TypeError err]
-      Right _   -> Right ()
+      Right ((ty, _, _), _states) -> Right $ fromJust ty
 
 exprCheck :: Text -> Text -> Assertion
 exprCheck t1 t2 =
