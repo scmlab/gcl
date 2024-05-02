@@ -291,7 +291,7 @@ instance Elab Stmt where
         Just (VarTypeInfo _) -> pure ()
         Just _               -> throwError $ AssignToConst name
         Nothing              -> throwError $ NotInScope name
-  elaborate (AAssign arr index e loc) env = do -- TODO: It seems that `A[n] := e` currently yields a parse error. What can I do?
+  elaborate (AAssign arr index e loc) env = do
     tv <- freshVar
     (arrTy, typedArr, arrSub) <- elaborate arr env
     (indexTy, typedIndex, indexSub) <- elaborate index $ subst arrSub env

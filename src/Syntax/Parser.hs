@@ -345,7 +345,7 @@ assignment =
 arrayAssignment :: Parser Stmt
 arrayAssignment =
   AAssign
-    <$> lower
+    <$> identifier
     <*> tokenBracketOpen
     <*> expression
     <*> tokenBracketClose
