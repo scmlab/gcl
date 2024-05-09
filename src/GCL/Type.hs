@@ -343,10 +343,6 @@ instance Elab GdCmd where
                ) stmts
     return (Nothing, Typed.TypedGdCmd e' s' loc, mempty)
 
--- TODO: Current breaking change:
--- Now, `f i` cannot pass type checking when `f` is an array.
--- Discuss with SCM if we should add support for this back.
-
 -- You can freely use `fromJust` below to extract the underlying `Type` from the `Maybe Type` you got.
 -- You should also ensure that `elaborate` in `Elab Expr` returns a `Just` when it comes to the `Maybe Type` value.
 -- TODO: Maybe fix this?
