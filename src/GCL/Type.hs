@@ -390,18 +390,28 @@ instance Elab Expr where
     return (Just returnTy, Typed.Lam bound (subst sub1 tv) typedExpr1 loc, sub1)
   elaborate (Func name clauses l) env = undefined -- TODO: Implement below cases for type checking exprs.
   elaborate (Tuple xs) env = undefined
-  elaborate (Quant quantifier bound restriction inner loc) env = do -- TODO: implement `#` as a quantifer. Also, implement this correctly.
+  elaborate (Quant quantifier bound restriction inner loc) env = do
     tv <- freshVar
     (quantTy, quantTypedExpr, quantSub) <- elaborate quantifier env
-    uniSub <- unifies (subst quantSub $ fromJust quantTy) (tv ~-> tv ~-> tv) (locOf quantifier)
-    tvs <- replicateM (length bound) freshVar
-    let newEnv = zip (Index <$> bound) tvs <> subst (quantSub `compose` uniSub) env
-    (resTy, resTypedExpr, resSub) <- elaborate restriction newEnv
-    uniSub2 <- unifies (subst resSub $ fromJust resTy) (tBool NoLoc) (locOf restriction)
-    let newEnv' = subst (resSub `compose` uniSub2) newEnv
-    (innerTy, innerTypedExpr, innerSub) <- elaborate inner newEnv'
-    uniSub3 <- unifies (subst innerSub $ fromJust innerTy) tv (locOf inner)
-    return (Just $ subst quantSub tv, Typed.Quant quantTypedExpr bound resTypedExpr innerTypedExpr loc, quantSub `compose` resSub `compose` innerSub `compose` uniSub `compose` uniSub2 `compose` uniSub3)
+    case quantifier of
+      Op (ArithOp (Hash _)) -> do
+        tvs <- replicateM (length bound) freshVar
+        let newEnv = zip (Index <$> bound) tvs <> subst quantSub env
+        (resTy, resTypedExpr, resSub) <- elaborate restriction newEnv
+        uniSub2 <- unifies (fromJust resTy) (tBool NoLoc) (locOf restriction)
+        (innerTy, innerTypedExpr, innerSub) <- elaborate inner newEnv
+        uniSub3 <- unifies (subst innerSub $ fromJust innerTy) (tBool NoLoc) (locOf inner)
+        return (Just $ subst quantSub tv, Typed.Quant quantTypedExpr bound resTypedExpr innerTypedExpr loc, uniSub3 `compose` innerSub `compose` uniSub2 `compose` resSub `compose` quantSub)      
+      _ -> do
+        uniSub <- unifies (subst quantSub $ fromJust quantTy) (tv ~-> tv ~-> tv) (locOf quantifier)
+        tvs <- replicateM (length bound) freshVar
+        let newEnv = zip (Index <$> bound) tvs <> subst (uniSub `compose` quantSub) env
+        (resTy, resTypedExpr, resSub) <- elaborate restriction newEnv
+        uniSub2 <- unifies (fromJust resTy) (tBool NoLoc) (locOf restriction)
+        let newEnv' = subst (uniSub2 `compose` resSub) newEnv
+        (innerTy, innerTypedExpr, innerSub) <- elaborate inner newEnv'
+        uniSub3 <- unifies (subst innerSub $ fromJust innerTy) (subst uniSub tv) (locOf inner)
+        return (Just $ subst quantSub tv, Typed.Quant quantTypedExpr bound resTypedExpr innerTypedExpr loc, uniSub3 `compose` innerSub `compose` uniSub2 `compose` resSub `compose` uniSub `compose` quantSub)
   elaborate (RedexShell _ expr) env = undefined
   elaborate (RedexKernel n _ _ _) env = undefined
   elaborate (ArrIdx e1 e2 loc) env = do -- TODO: Check if this is correct.
@@ -463,9 +473,7 @@ instance Elab ArithOp where
   elaborate (Max      l) _ = return (Just $ tInt .-> tInt .-> tInt $ l, ArithOp $ Max l, mempty)
   elaborate (Min      l) _ = return (Just $ tInt .-> tInt .-> tInt $ l, ArithOp $ Min l, mempty)
   elaborate (Exp      l) _ = return (Just $ tInt .-> tInt .-> tInt $ l, ArithOp $ Exp l, mempty)
-  elaborate (Hash     l) _ = do
-    x <- freshVar
-    return (Just $ const x .-> const x .-> tInt $ l, ArithOp $ Hash l, mempty)
+  elaborate (Hash     l) _ = return (Just $ tBool .-> tInt $ l, ArithOp $ Hash l, mempty)
   elaborate (PointsTo l) _ = return (Just $ tInt .-> tInt .-> tInt $ l, ArithOp $ PointsTo l, mempty)
   elaborate (SConj    l) _ = return (Just $ tBool .-> tBool .-> tBool $ l, ArithOp $ SConj l, mempty)
   elaborate (SImp     l) _ = return (Just $ tBool .-> tBool .-> tBool $ l, ArithOp $ SImp l, mempty)
@@ -478,8 +486,14 @@ unifies (TBase t1 _) (TBase t2 _) _ | t1 == t2 = return mempty
 unifies (TArray _ t1 _) (TArray _ t2 _) l = unifies t1 t2 l {-  | i1 == i2 = unifies t1 t2 -}
   -- SCM: for now, we do not check the intervals
 -- view array of type `t` as function type of `Int -> t`
-unifies (TArray _ t1 _) (TFunc (TBase TInt _) t2 _) l = unifies t1 t2 l
-unifies (TFunc (TBase TInt _) t1 _) (TArray _ t2 _) l = unifies t1 t2 l
+unifies (TArray _ t1 _) (TFunc i t2 _) l = do
+  s1 <- unifies i (tInt NoLoc) l
+  s2 <- unifies t1 t2 l
+  return (s2 `compose` s1)
+unifies (TFunc i t1 _) (TArray _ t2 _) l = do
+  s1 <- unifies i (tInt NoLoc) l
+  s2 <- unifies t1 t2 l
+  return (s2 `compose` s1)
 unifies (TFunc t1 t2 _) (TFunc t3 t4 _) l = do
   s1 <- unifies t1 t3 l
   s2 <- unifies (subst s1 t2) (subst s1 t4) l
