@@ -347,11 +347,22 @@ instance Elab GdCmd where
 -- You should also ensure that `elaborate` in `Elab Expr` returns a `Just` when it comes to the `Maybe Type` value.
 -- TODO: Maybe fix this?
 
+-- The typing rules below are written by SCM.
+
+-- Γ ⊢ e ↑ (s, u)
+-- v = unify (u, t)
+---- Checking ------
+-- Γ ⊢ e : t ↓ (v . s)
+
 instance Elab Expr where
   elaborate (Lit lit loc) _ = let ty = litTypes lit loc in return (Just ty, Typed.Lit lit ty loc, mempty)
   elaborate (Var x loc) env = case lookup (Index x) env of
       Just ty -> return (Just ty, Typed.Var x ty loc, mempty)
       Nothing -> throwError $ NotInScope x
+  -- x : t ∈ Γ
+  -- t ⊑ u
+  ---- Var, Const, Op --
+  -- Γ ⊢ x ↑ (∅, t)
   elaborate (Const x loc) env = case lookup (Index x) env of
       Just ty -> return (Just ty, Typed.Const x ty loc, mempty)
       Nothing -> throwError $ NotInScope x
@@ -372,12 +383,21 @@ instance Elab Expr where
     (t2, typed2, s2) <- elaborate e2 $ subst opSub env
     vSub <- unifies (subst s2 (fromJust t2) ~-> subst s2 (fromJust t2) ~-> v) (subst opSub $ fromJust opTy) l
     pure (Just $ subst vSub v, Typed.App (Typed.App (Typed.Op opTyped $ subst opSub $ fromJust opTy) typed1 $ locOf e1) typed2 l, s1 <> s2)
+  -- Γ ⊢ e1 ↑ (s1, t1)
+  -- s1 Γ ⊢ e2 ↑ (s2, t2)
+  -- b fresh   v = unify (s2 t1, t2 -> b)
+  ---- App -----------------------------------
+  -- Γ ⊢ e1 e2 ↑ (v . s2 . s1, v b)
   elaborate (App e1 e2 loc) env = do
     tv <- freshVar
     (ty1, typedExpr1, sub1) <- elaborate e1 env
     (ty2, typedExpr2, sub2) <- elaborate e2 $ subst sub1 env
     sub3 <- unifies (subst sub2 $ fromJust ty1) (TFunc (fromJust ty2) tv NoLoc) loc
     return (Just $ subst sub3 tv, Typed.App typedExpr1 typedExpr2 loc, sub3 `compose` sub2 `compose` sub1)
+  -- a fresh
+  -- Γ, x : a ⊢ e ↑ (s, t)
+  ---- Lam ----------------------
+  -- Γ ⊢ (λ x . e) ↑ (s, s a -> t)
   elaborate (Lam bound expr loc) env = do
     tv <- freshVar
     let newEnv = (Index bound, tv) : env
@@ -385,6 +405,10 @@ instance Elab Expr where
     let returnTy = TFunc (subst sub1 tv) (fromJust ty1) loc
     return (Just returnTy, Typed.Lam bound (subst sub1 tv) typedExpr1 loc, sub1)
   elaborate (Func name clauses l) env = undefined -- TODO: Implement below cases for type checking exprs.
+  -- Γ ⊢ e1 ↑ (s1, t1)
+  -- s1 Γ ⊢ e2 ↑ (s2, t2)
+  -- Tuple -------------------------------
+  -- Γ ⊢ (e1, e2) ↑ (s2 . s1, (s2 t1, t2))
   elaborate (Tuple xs) env = undefined
   elaborate (Quant quantifier bound restriction inner loc) env = do
     tv <- freshVar
@@ -392,32 +416,46 @@ instance Elab Expr where
     case quantifier of
       Op (ArithOp (Hash _)) -> do
         tvs <- replicateM (length bound) freshVar
-        let newEnv = zip (Index <$> bound) tvs <> subst quantSub env
-        (resTy, resTypedExpr, resSub) <- elaborate restriction newEnv
+        let newEnv = subst quantSub env
+        (resTy, resTypedExpr, resSub) <- elaborate restriction $ zip (Index <$> bound) tvs <> newEnv
         uniSub2 <- unifies (fromJust resTy) (tBool NoLoc) (locOf restriction)
         (innerTy, innerTypedExpr, innerSub) <- elaborate inner newEnv
         uniSub3 <- unifies (subst innerSub $ fromJust innerTy) (tBool NoLoc) (locOf inner)
         return (Just $ subst quantSub tv, Typed.Quant quantTypedExpr bound resTypedExpr innerTypedExpr loc, uniSub3 `compose` innerSub `compose` uniSub2 `compose` resSub `compose` quantSub)      
+      -- a fresh   Γ ⊢ ⊕ : (a -> a -> a) ↓ s⊕
+      -- b fresh   s⊕ Γ, i : b ⊢ R : Bool ↓ sR
+      -- sR (s⊕ Γ), i : sR b ⊢ B : sR (s⊕ a) ↓ sB
+      ---- Quant -------------------------------------------
+      -- Γ ⊢ ⟨⊕ i : R : B⟩ ↑ (sB . sR , sB (sR (s⊕ a)))
       _ -> do
         uniSub <- unifies (subst quantSub $ fromJust quantTy) (tv ~-> tv ~-> tv) (locOf quantifier)
         tvs <- replicateM (length bound) freshVar
-        let newEnv = zip (Index <$> bound) tvs <> subst (uniSub `compose` quantSub) env
-        (resTy, resTypedExpr, resSub) <- elaborate restriction newEnv
+        let newEnv = subst (uniSub `compose` quantSub) env
+        (resTy, resTypedExpr, resSub) <- elaborate restriction $ zip (Index <$> bound) tvs <> newEnv
         uniSub2 <- unifies (fromJust resTy) (tBool NoLoc) (locOf restriction)
         let newEnv' = subst (uniSub2 `compose` resSub) newEnv
-        (innerTy, innerTypedExpr, innerSub) <- elaborate inner newEnv'
-        uniSub3 <- unifies (subst innerSub $ fromJust innerTy) (subst uniSub tv) (locOf inner)
-        return (Just $ subst quantSub tv, Typed.Quant quantTypedExpr bound resTypedExpr innerTypedExpr loc, uniSub3 `compose` innerSub `compose` uniSub2 `compose` resSub `compose` uniSub `compose` quantSub)
+        (innerTy, innerTypedExpr, innerSub) <- elaborate inner $ zip (Index <$> bound) (subst (uniSub2 `compose` resSub) <$> tvs) <> newEnv'
+        uniSub3 <- unifies (subst innerSub $ fromJust innerTy) (subst (uniSub2 `compose` resSub `compose` uniSub `compose` quantSub) tv) (locOf inner)
+        return (Just $ subst (uniSub3 `compose` innerSub `compose` uniSub2 `compose` resSub `compose` uniSub `compose` quantSub) tv, Typed.Quant quantTypedExpr bound resTypedExpr innerTypedExpr loc, uniSub3 `compose` innerSub `compose` uniSub2 `compose` resSub)
   elaborate (RedexShell _ expr) env = undefined
   elaborate (RedexKernel n _ _ _) env = undefined
-  elaborate (ArrIdx e1 e2 loc) env = do -- TODO: Check if this is correct.
+  -- b fresh    Γ ⊢ a : Array .. of b ↓ sa
+  -- sa Γ ⊢ i : Int ↓ si
+  ---- ArrIdx ----------------------------
+  -- Γ ⊢ a[i] ↑ (si . sa, si (sa b))
+  elaborate (ArrIdx e1 e2 loc) env = do -- TODO: I didn't follow the above typing rules. Check if this is correct.
     tv <- freshVar
     (ty1, typedExpr1, sub1) <- elaborate e1 env
     (ty2, typedExpr2, sub2) <- elaborate e2 (subst sub1 env)
     sub3 <- unifies (subst sub2 $ fromJust ty2) (tInt NoLoc) (locOf e2)
-    sub4 <- unifies (subst (sub2 `compose` sub3) (fromJust ty1)) (TFunc (tInt NoLoc) tv NoLoc) loc
+    sub4 <- unifies (subst (sub3 `compose` sub2) (fromJust ty1)) (TFunc (tInt NoLoc) tv NoLoc) loc
     return (Just $ subst sub3 tv, Typed.ArrIdx typedExpr1 typedExpr2 loc, sub4 `compose` sub3 `compose` sub2 `compose` sub1)
-  elaborate (ArrUpd arr index e loc) env = do -- TODO: Check if this is correct.
+  -- b fresh    Γ ⊢ a : Array .. of b ↓ sa
+  -- sa Γ ⊢ i : Int ↓ si
+  -- si (sa Γ) ⊢ e : si (sa b) ↓ se
+  ---- ArrUpd --------------------------------------
+  -- Γ ⊢ (a : i ↦ e) ↑ (se . si . sa, se (si (sa b)))
+  elaborate (ArrUpd arr index e loc) env = do -- TODO: I didn't follow the above typing rules. Check if this is correct.
     tv <- freshVar
     (arrTy, typedArr, arrSub) <- elaborate arr env
     (indexTy, typedIndex, indexSub) <- elaborate index $ subst arrSub env
