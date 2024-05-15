@@ -101,9 +101,9 @@ duplicationCheck ns =
 --------------------------------------------------------------------------------
 -- The elaboration monad
 
-type ElabaratorM = StateT (FreshState, [(Index, TypeDefnInfo)], [(Index, TypeInfo)]) (Except TypeError)
+type ElaboratorM = StateT (FreshState, [(Index, TypeDefnInfo)], [(Index, TypeInfo)]) (Except TypeError)
 
-instance Counterous ElabaratorM where
+instance Counterous ElaboratorM where
   countUp = do
     (count, typeDefnInfo, typeInfo) <- get
     put (succ count, typeDefnInfo, typeInfo)
@@ -120,7 +120,15 @@ runElaboration a = do
 -- The ids are collected by `CollectIds` into the state wrapped by `ElaboratorM`.
 -- `collectIds` are thus called in the beginning of elaborating the whole program.
 
-instance CollectIds Definition where
+class CollectIds a where
+    collectIds :: a -> ElaboratorM ()
+
+{-
+instance CollectIds a => CollectIds [a] where
+  collectIds xs = mapM_ collectIds xs
+-}
+
+instance CollectIds [Definition] where
   collectIds (TypeDefn name args ctors _) = do
     modify (\(freshState, origTypeDefnInfos, origTypeInfos) -> (freshState, newTypeDefnInfos : origTypeDefnInfos, newTypeInfos <> origTypeInfos))
     where
@@ -177,14 +185,14 @@ type family Typed untyped where
   Typed (Maybe a) = Maybe (Typed a)
 
 class Located a => Elab a where
-    elaborate :: a -> TypeEnv -> ElabaratorM (Maybe Type, Typed a, Subs Type)
+    elaborate :: a -> TypeEnv -> ElaboratorM (Maybe Type, Typed a, Subs Type)
 
 
 -- Note that we pass the collected ids into each sections of the program.
 -- After `colledtIds`, we don't need to change the state.
 instance Elab Program where
   elaborate (Program defns decls exprs stmts loc) _env = do
-    collectIds decls
+    mapM_ collectIds decls
     collectIds $ reverse defns -- I don't really know why this works. However, `defns` are likely gathered in reverse order, so we have to reverse it again.
     let tcons = concatMap collectTCon defns
     modify (\(freshState, origInfos, typeInfos) -> (freshState, tcons <> origInfos, typeInfos))
@@ -219,8 +227,7 @@ instance Elab Definition where
     let m = Map.fromList (map (, ()) args)
     mapM_ (\(TypeDefnCtor _ ts) -> mapM_ (scopeCheck m) ts) ctors
     ctors' <- mapM (\ctor -> do
-                      typedCtor <- elaborate ctor env
-                      let (_, typed, _) = typedCtor
+                      (_, typed, _) <- elaborate ctor env
                       return typed
                    ) ctors
     return (Nothing, Typed.TypeDefn name args ctors' loc, mempty)
@@ -235,15 +242,13 @@ instance Elab Definition where
     scopeCheck _ _ = return ()
   elaborate (FuncDefnSig name ty maybeExpr loc) env = do
     expr' <- mapM (\expr -> do
-                    typedExpr <- elaborate expr env
-                    let (_, typed, _) = typedExpr
+                    (_, typed, _) <- elaborate expr env
                     return typed
                   ) maybeExpr
     return (Nothing, Typed.FuncDefnSig name ty expr' loc, mempty)
   elaborate (FuncDefn name exprs) env = do
     exprs' <- mapM (\expr -> do
-                      typedExpr <- elaborate expr env
-                      let (_, typed, _) = typedExpr -- TODO: Insert forall. 
+                      (_, typed, _) <- elaborate expr env
                       return typed
                    ) exprs
     return (Nothing, Typed.FuncDefn name exprs', mempty)
@@ -285,7 +290,7 @@ instance Elab Stmt where
                        ) exprs
         return (Nothing, Typed.Assign names exprs' loc, mempty)
    where
-    checkAssign :: [(Index, TypeInfo)] -> (Name, Expr) -> ElabaratorM ()
+    checkAssign :: [(Index, TypeInfo)] -> (Name, Expr) -> ElaboratorM ()
     checkAssign infos (name, _expr) = do
       case lookup (Index name) infos of
         Just (VarTypeInfo _) -> pure ()
@@ -474,13 +479,13 @@ instance Elab ChainOp where
   elaborate (EQProp  l) _ = return (Just $ tBool .-> tBool .-> tBool $ l, ChainOp $ EQProp l, mempty)
   elaborate (EQPropU l) _ = return (Just $ tBool .-> tBool .-> tBool $ l, ChainOp $ EQPropU l, mempty)
   elaborate (EQ      l) _ = do
-    x <- freshVar
+    x <- freshMetaVar
     return (Just $ const x .-> const x .-> tBool $ l, ChainOp $ EQ l, mempty)
   elaborate (NEQ  l) _ = do
-    x <- freshVar
+    x <- freshMetaVar
     return (Just $ const x .-> const x .-> tBool $ l, ChainOp $ NEQ l, mempty)
   elaborate (NEQU l) _ = do
-    x <- freshVar
+    x <- freshMetaVar
     return (Just $ const x .-> const x .-> tBool $ l, ChainOp $ NEQU l, mempty)
   elaborate (LTE  l) _ = return (Just $ tInt .-> tInt .-> tBool $ l, ChainOp $ LTE l, mempty)
   elaborate (LTEU l) _ = return (Just $ tInt .-> tInt .-> tBool $ l, ChainOp $ LTEU l, mempty)
@@ -549,12 +554,6 @@ bind :: MonadError TypeError m => Name -> Type -> Loc -> m (Map.Map Name Type)
 bind x t l | occurs x t = throwError $ RecursiveType x t l
            | otherwise  = return (Map.singleton x t)
 
-class CollectIds a where
-    collectIds :: a -> ElabaratorM ()
-
-instance CollectIds a => CollectIds [a] where
-  collectIds xs = mapM_ collectIds xs
-
 --------------------------------------------------------------------------------
 -- helper combinators
 
@@ -564,9 +563,10 @@ typeInfoToType (ConstTypeInfo    t) = t
 typeInfoToType (VarTypeInfo      t) = t
 
 freshVar :: Fresh m => m Type
-freshVar = do
-  TMetaVar <$> freshName "Type.metaVar" NoLoc
+freshVar = TVar <$> freshName "Type.var" NoLoc <*> pure NoLoc
 
+freshMetaVar :: Fresh m => m Type
+freshMetaVar = TMetaVar <$> freshName "Type.metaVar" NoLoc
 litTypes :: Lit -> Loc -> Type
 litTypes (Num _) l = tInt l
 litTypes (Bol _) l = tBool l
