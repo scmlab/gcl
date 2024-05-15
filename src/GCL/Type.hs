@@ -243,7 +243,7 @@ instance Elab Definition where
   elaborate (FuncDefn name exprs) env = do
     exprs' <- mapM (\expr -> do
                       typedExpr <- elaborate expr env
-                      let (_, typed, _) = typedExpr
+                      let (_, typed, _) = typedExpr -- TODO: Insert forall. 
                       return typed
                    ) exprs
     return (Nothing, Typed.FuncDefn name exprs', mempty)
@@ -356,18 +356,18 @@ instance Elab GdCmd where
 
 instance Elab Expr where
   elaborate (Lit lit loc) _ = let ty = litTypes lit loc in return (Just ty, Typed.Lit lit ty loc, mempty)
-  elaborate (Var x loc) env = case lookup (Index x) env of
-      Just ty -> return (Just ty, Typed.Var x ty loc, mempty)
-      Nothing -> throwError $ NotInScope x
   -- x : t ∈ Γ
   -- t ⊑ u
   ---- Var, Const, Op --
   -- Γ ⊢ x ↑ (∅, t)
+  elaborate (Var x loc) env = case lookup (Index x) env of
+      Just ty -> return (Just ty, Typed.Var x ty loc, mempty)
+      Nothing -> throwError $ NotInScope x
   elaborate (Const x loc) env = case lookup (Index x) env of
       Just ty -> return (Just ty, Typed.Const x ty loc, mempty)
       Nothing -> throwError $ NotInScope x
   elaborate (Op o) env = (\(ty, op, sub) -> (ty, Typed.Op op $ fromJust ty, sub)) <$> elaborate o env
-  -- TODO: Make sure the below implementation is correct, espeically when the ChainOp is polymorphic. (edit: apprently it's incorrect)
+  -- TODO: Make sure the below implementation is correct, especially when the ChainOp is polymorphic. (edit: apprently it's incorrect)
   elaborate (App (App (Op op@(ChainOp _)) e1 _) e2 l) env = do 
     (opTy, opTyped, opSub) <- elaborate op env
     (t1, typed1, s1) <- case e1 of
