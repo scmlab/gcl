@@ -297,7 +297,7 @@ instance Elab Stmt where
     (indexTy, typedIndex, indexSub) <- elaborate index $ subst arrSub env
     uniSubIndex <- unifies (subst indexSub $ fromJust indexTy) (tInt NoLoc) (locOf index)
     uniSubArr <- unifies (subst (indexSub `compose` uniSubIndex) (fromJust arrTy)) (TFunc (tInt NoLoc) tv NoLoc) loc
-    (eTy, typedE, eSub) <- elaborate e env
+    (eTy, typedE, eSub) <- elaborate e $ subst (uniSubArr `compose` uniSubIndex `compose` indexSub `compose` arrSub) env
     _ <- unifies (subst eSub $ fromJust eTy) (subst uniSubArr tv) (locOf e)
     return (Nothing, Typed.AAssign typedArr typedIndex typedE loc, mempty)
   elaborate (Assert expr loc        ) env = do
@@ -461,7 +461,7 @@ instance Elab Expr where
     (indexTy, typedIndex, indexSub) <- elaborate index $ subst arrSub env
     uniSubIndex <- unifies (subst indexSub $ fromJust indexTy) (tInt NoLoc) (locOf index)
     uniSubArr <- unifies (subst (indexSub `compose` uniSubIndex) (fromJust arrTy)) (TFunc (tInt NoLoc) tv NoLoc) loc
-    (eTy, typedE, eSub) <- elaborate e env
+    (eTy, typedE, eSub) <- elaborate e $ subst (uniSubArr `compose` uniSubIndex `compose` indexSub `compose` arrSub) env
     uniSubExpr <- unifies (subst eSub $ fromJust eTy) (subst uniSubArr tv) (locOf e)
     return (subst uniSubArr arrTy, Typed.ArrUpd typedArr typedIndex typedE loc, uniSubExpr `compose` eSub `compose` uniSubArr `compose` uniSubIndex `compose` indexSub `compose` arrSub)
   elaborate (Case expr cs l) env = undefined
