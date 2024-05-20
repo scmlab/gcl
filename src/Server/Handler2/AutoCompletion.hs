@@ -1,6 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 {-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE DuplicateRecordFields #-}
+
 module Server.Handler2.AutoCompletion where
 
 import           Data.Text                      ( Text )
@@ -14,7 +16,7 @@ handler position completionContext
     | shouldTriggerUnicodeCompletion completionContext
         = return $ CompletionList True (List (unicodeCompletionItems position))
     | shouldTriggerDighole completionContext
-        = return $ CompletionList False (List [specBracketsCompletionItem])
+        = return $ CompletionList False (List [specBracketsCompletionItem position])
     | otherwise
         = return $ CompletionList True (List [])
 
@@ -197,37 +199,27 @@ makeItems position labels kind symbol detail doc = flip map labels $ \label ->
       Just $ List [TextEdit (Range (Position ln (col - 1)) position) ""]
     -- tempReplaceWithSymbol = Just $ CompletionEditText $ TextEdit (Range position (Position ln (col + 1 ))) "symbol"
 
-specBracketsCompletionItem :: CompletionItem
-specBracketsCompletionItem =
-  CompletionItem
+specBracketsCompletionItem :: Position -> CompletionItem
+specBracketsCompletionItem position = CompletionItem
     { _label               = "?"
     , _kind                = Just CiSnippet
-    , _tags                = Nothing -- ^ Tags for this completion item.
-    , _detail              = Nothing -- ^ A human-readable string with additional
-                              -- information about this item, like type or
-                              -- symbol information.
+    , _tags                = Nothing
+    , _detail              = Nothing
     , _documentation       = Just (CompletionDocString "Type \"?\" and a space to insert a spec.")
     , _deprecated          = Nothing
     , _preselect           = Just True
-         -- ^ Select this item when showing.
-         -- *Note* that only one completion item can be selected and that the
-         -- tool / client decides which item that is. The rule is that the *first*
-         -- item of those that match best is selected.
     , _sortText            = Nothing
     , _filterText          = Nothing
     , _insertText          = Just "[! !]"
     , _insertTextFormat    = Just PlainText
     , _insertTextMode      = Nothing
-         -- ^ How whitespace and indentation is handled during completion
-         -- item insertion. If not provided the client's default value depends on
-         -- the @textDocument.completion.insertTextMode@ client capability.
     , _textEdit            = removeQuestionMark
     , _additionalTextEdits = Nothing
     , _commitCharacters    = Just (List [" "])
     , _command             = Nothing
     , _xdata               = Nothing
-    } deriving (Read,Show,Eq)
-  where
-    Position line column = position
-    removeQuestionMark =
-      Just $ List [TextEdit (Range (Position line (column - 1)) position) ""]
+    }
+    where
+      Position line column = position
+      removeQuestionMark =
+        Just $ CompletionEditText $ TextEdit (Range (Position line (column - 1)) position) ""
