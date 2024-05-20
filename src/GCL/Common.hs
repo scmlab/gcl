@@ -1,5 +1,5 @@
 {-# LANGUAGE FlexibleInstances, UndecidableInstances,
-             MultiParamTypeClasses, FlexibleContexts #-}
+             MultiParamTypeClasses, FlexibleContexts, OverlappingInstances #-}
 module GCL.Common where
 
 import           Control.Monad.RWS              ( RWST(..) )
@@ -13,8 +13,14 @@ import           Data.Set                       ( Set
 import qualified Data.Set                      as Set
 import           Data.Text                      ( Text )
 import qualified Data.Text                     as Text
+import           Data.Loc.Range                 ( Range )
 import           Syntax.Abstract
 import           Syntax.Common.Types
+
+
+data Index = Index Name | Hole Range deriving (Eq, Show, Ord)
+
+type TypeEnv = [(Index, Type)]
 
 -- get a fresh variable
 class Monad m => Fresh m where
@@ -88,6 +94,9 @@ instance Free Type where
   freeVars (TVar x _     ) = Set.singleton x
   freeVars (TMetaVar n   ) = Set.singleton n
 
+instance Free TypeEnv where
+  freeVars env = foldMap freeVars $ Map.elems $ Map.fromList env 
+
 instance Free Expr where
   freeVars (Var   x _        ) = Set.singleton x
   freeVars (Const x _        ) = Set.singleton x
@@ -116,7 +125,7 @@ instance Free Pattern where
   freeVars (PattLit      _      ) = mempty
   freeVars (PattBinder   n      ) = Set.singleton n
   freeVars (PattWildcard _      ) = mempty
-  freeVars (PattConstructor _ ps) = freeVars ps
+  freeVars (PattConstructor _ ps) = foldMap freeVars ps
 
 instance Free Declaration where
   freeVars (ConstDecl ns t expr _) =
@@ -151,7 +160,7 @@ instance Free GdCmd where
 
 instance Free Program where
   freeVars (Program _defns decls props stmts _) =
-    freeVars decls <> freeVars props <> freeVars stmts
+    foldMap freeVars decls <> foldMap freeVars props <> foldMap freeVars stmts
    -- SCM: TODO: deal with defns later.
 
 toStateT :: Monad m => r -> RWST r w s m a -> StateT s m a

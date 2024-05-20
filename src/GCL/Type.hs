@@ -9,6 +9,7 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE LambdaCase #-}
 
 module GCL.Type where
 
@@ -25,7 +26,9 @@ import           Data.Loc                       ( (<-->)
                                                 , Located
                                                 , locOf
                                                 )
+import           Data.Foldable                  ( foldlM )
 import           Data.Loc.Range                 ( Range )
+import qualified Data.Set                      as Set
 import qualified Data.Map                      as Map
 import qualified Data.Text                     as Text
 import           GCL.Common
@@ -39,8 +42,6 @@ import           Syntax.Abstract
 import           Syntax.Abstract.Util
 import           Syntax.Common
 import qualified Syntax.Typed                  as Typed
-
-data Index = Index Name | Hole Range deriving (Eq, Show, Ord)
 
 data TypeError
     = NotInScope Name
@@ -129,30 +130,71 @@ instance CollectIds a => CollectIds [a] where
 -}
 
 instance CollectIds [Definition] where
-  collectIds (TypeDefn name args ctors _) = do
-    modify (\(freshState, origTypeDefnInfos, origTypeInfos) -> (freshState, newTypeDefnInfos : origTypeDefnInfos, newTypeInfos <> origTypeInfos))
-    where
-      newTypeDefnInfos = (Index name, TypeDefnInfo args)
-      newTypeInfos =
-        map
-        (\(TypeDefnCtor cn ts) -> (Index cn, TypeDefnCtorInfo (wrapTFunc ts (TCon name args (name <--> args)))))
-        ctors
-
-  collectIds (FuncDefnSig n t _ _) = modify (\(freshState, typeDefnInfos, origInfos) -> (freshState, typeDefnInfos, infos <> origInfos))
-    where infos = [(Index n, ConstTypeInfo t)]
-
-  collectIds (FuncDefn name exprs) = do
+  collectIds defns = do
+    -- Split variants of definitions.
+    let sigPredicate = \case
+          FuncDefnSig {} -> True
+          _ -> False
+    let sigs = filter sigPredicate defns
+    let funcDefnPredicate = \case
+          FuncDefn {} -> True
+          _ -> False
+    let funcDefns = filter funcDefnPredicate defns
+    let typeDefnPredicate = \case
+          FuncDefn {} -> True
+          _ -> False
+    let typeDefns = filter typeDefnPredicate defns
+    -- Add signatures into the state one by one.
+    mapM_ (
+      \case
+        (FuncDefnSig n t _ _) ->
+          let infos = (Index n, ConstTypeInfo t) in
+            modify (\(freshState, typeDefnInfos, origInfos) -> (freshState, typeDefnInfos, infos : origInfos))
+        _ -> undefined
+      ) sigs
+    -- Give each function definition a fresh name.
+    let defined = concatMap (\case
+                                (FuncDefn name _exprs) -> [Index name]
+                                _ -> []
+                            ) defns
+    freshVars <- replicateM (length defined) freshVar
+    let gathered = second ConstTypeInfo <$> zip defined freshVars
+    modify (\(freshState, typeDefnInfos, origInfos) -> (freshState, typeDefnInfos, gathered <> origInfos))
+    -- Get the previously gathered type infos.
     (_, _, infos) <- get
-    case lookup (Index name) $ Data.Bifunctor.second typeInfoToType <$> infos of
-      Just ty -> mapM_ (\expr -> do
-                        (exprTy, _, exprSub) <- elaborate expr $ Data.Bifunctor.second typeInfoToType <$> infos
-                        unifies (subst exprSub $ fromJust exprTy) ty (locOf expr)
-                       ) exprs
-      Nothing -> do
-        inferred <- mapM (`elaborate` (Data.Bifunctor.second typeInfoToType <$> infos)) exprs
-        let infos' = (\(ty, _, sub) -> (Index name, ConstTypeInfo $ subst sub $ fromJust ty)) <$> inferred
-        modify (\(freshState, typeDefnInfos, origInfos) -> (freshState, typeDefnInfos, infos' <> origInfos))
-        return ()
+    let env = second typeInfoToType <$> infos
+    -- Do a `foldlM` to elaborate multiple definitions together.
+    (context, names, tys, _sub) <-
+      foldlM (\(context, names, tys, sub) funcDefn -> do
+        case funcDefn of
+          (FuncDefn name exprs) -> do
+            (ty, _, sub1) <- elaborate (head exprs) context -- Calling `head` is safe for the meantime.
+            return (subst sub1 context, name : names, subst sub1 (fromJust ty) : (subst sub1 <$> tys), sub1 `compose` sub)
+          _ -> return (context, names, tys, sub)
+      ) (env, mempty, mempty, mempty) funcDefns
+    -- Generalize the types of definitions.
+    mapM_ (\(name, ty) -> do
+            -- _ <- unifies (fromJust $ lookup (Index name) context) ty NoLoc
+            ty' <- generalize ty context
+            let info = (Index name, ConstTypeInfo ty')
+            modify (\(freshState, typeDefnInfos, origInfos) -> (freshState, typeDefnInfos, info : origInfos))
+          ) (zip names tys)
+    -- Gather the type definitions.
+    mapM_ (\(TypeDefn name args ctors _) -> do
+            let newTypeInfos =
+                  map
+                    (\(TypeDefnCtor cn ts) -> (Index cn, TypeDefnCtorInfo (wrapTFunc ts (TCon name args (name <--> args)))))
+                    ctors
+            let newTypeDefnInfos = (Index name, TypeDefnInfo args)
+            modify (\(freshState, origTypeDefnInfos, origTypeInfos) -> (freshState, newTypeDefnInfos : origTypeDefnInfos, newTypeInfos <> origTypeInfos))
+          ) typeDefns
+    where
+      generalize :: Fresh m => Type -> TypeEnv -> m Type
+      generalize ty' env' = do
+        let free = Set.toList (freeVars ty') \\ Set.toList (freeVars env')
+        metaVars <- replicateM (length free) freshMetaVar
+        let sub = zip free metaVars
+        return $ subst (Map.fromList sub) ty'
 
 instance CollectIds Declaration where
   collectIds (ConstDecl ns t _ _) = modify (\(freshState, typeDefnInfos, origInfos) -> (freshState, typeDefnInfos, infos <> origInfos))
@@ -163,8 +205,6 @@ instance CollectIds Declaration where
 
 --------------------------------------------------------------------------------
 -- Elaboration
-
-type TypeEnv = [(Index, Type)]
 
 type family Typed untyped where
   Typed Definition = Typed.TypedDefinition
@@ -189,7 +229,7 @@ class Located a => Elab a where
 
 
 -- Note that we pass the collected ids into each sections of the program.
--- After `colledtIds`, we don't need to change the state.
+-- After `collectIds`, we don't need to change the state.
 instance Elab Program where
   elaborate (Program defns decls exprs stmts loc) _env = do
     mapM_ collectIds decls
@@ -198,22 +238,22 @@ instance Elab Program where
     modify (\(freshState, origInfos, typeInfos) -> (freshState, tcons <> origInfos, typeInfos))
     (_, _, infos) <- get
     typedDefns <- mapM (\defn -> do
-                          typedDefn <- elaborate defn $ Data.Bifunctor.second typeInfoToType <$> infos
+                          typedDefn <- elaborate defn $ second typeInfoToType <$> infos
                           let (_, typed, _) = typedDefn
                           return typed
                        ) defns
     typedDecls <- mapM (\decl -> do
-                          typedDecl <- elaborate decl $ Data.Bifunctor.second typeInfoToType <$> infos
+                          typedDecl <- elaborate decl $ second typeInfoToType <$> infos
                           let (_, typed, _) = typedDecl
                           return typed
                        ) decls
     typedExprs <- mapM (\expr -> do
-                          typedExpr <- elaborate expr $ Data.Bifunctor.second typeInfoToType <$> infos
+                          typedExpr <- elaborate expr $ second typeInfoToType <$> infos
                           let (_, typed, _) = typedExpr
                           return typed
                        ) exprs
     typedStmts <- mapM (\stmt -> do
-                          typedStmt <- elaborate stmt $ Data.Bifunctor.second typeInfoToType <$> infos
+                          typedStmt <- elaborate stmt $ second typeInfoToType <$> infos
                           let (_, typed, _) = typedStmt
                           return typed
                        ) stmts
@@ -348,6 +388,20 @@ instance Elab GdCmd where
                ) stmts
     return (Nothing, Typed.TypedGdCmd e' s' loc, mempty)
 
+instantiate :: Fresh m => Type -> m Type
+instantiate ty = do
+  let freeMeta = Set.toList (freeMetaVars ty)
+  new <- replicateM (length freeMeta) freshVar
+  return $ subst (Map.fromList $ zip freeMeta new) ty
+  where
+    freeMetaVars (TBase _ _    ) = mempty
+    freeMetaVars (TArray _ t _ ) = freeMetaVars t
+    freeMetaVars (TTuple ts    ) = Set.unions (map freeMetaVars ts)
+    freeMetaVars (TFunc t1 t2 _) = freeMetaVars t1 <> freeMetaVars t2
+    freeMetaVars (TCon  _  ns _) = Set.fromList ns
+    freeMetaVars (TVar x _     ) = mempty
+    freeMetaVars (TMetaVar n   ) = Set.singleton n
+
 -- You can freely use `fromJust` below to extract the underlying `Type` from the `Maybe Type` you got.
 -- You should also ensure that `elaborate` in `Elab Expr` returns a `Just` when it comes to the `Maybe Type` value.
 -- TODO: Maybe fix this?
@@ -366,14 +420,21 @@ instance Elab Expr where
   ---- Var, Const, Op --
   -- Γ ⊢ x ↑ (∅, t)
   elaborate (Var x loc) env = case lookup (Index x) env of
-      Just ty -> return (Just ty, Typed.Var x ty loc, mempty)
+      Just ty -> do
+        ty' <- instantiate ty
+        return (Just ty', Typed.Var x ty' loc, mempty)
       Nothing -> throwError $ NotInScope x
   elaborate (Const x loc) env = case lookup (Index x) env of
-      Just ty -> return (Just ty, Typed.Const x ty loc, mempty)
+      Just ty -> do
+        ty' <- instantiate ty
+        return (Just ty', Typed.Const x ty' loc, mempty)
       Nothing -> throwError $ NotInScope x
-  elaborate (Op o) env = (\(ty, op, sub) -> (ty, Typed.Op op $ fromJust ty, sub)) <$> elaborate o env
+  elaborate (Op o) env = do
+    (ty, op, sub) <- elaborate o env
+    ty' <- instantiate $ fromJust ty
+    return (Just ty', Typed.Op op ty', sub)
   -- TODO: Make sure the below implementation is correct, especially when the ChainOp is polymorphic. (edit: apprently it's incorrect)
-  elaborate (App (App (Op op@(ChainOp _)) e1 _) e2 l) env = do 
+  elaborate (App (App (Op op@(ChainOp _)) e1 _) e2 l) env = do
     (opTy, opTyped, opSub) <- elaborate op env
     (t1, typed1, s1) <- case e1 of
       App (App innerOp@(Op (ChainOp _)) e11 _) e12 _ -> do
@@ -426,7 +487,7 @@ instance Elab Expr where
         uniSub2 <- unifies (fromJust resTy) (tBool NoLoc) (locOf restriction)
         (innerTy, innerTypedExpr, innerSub) <- elaborate inner newEnv
         uniSub3 <- unifies (subst innerSub $ fromJust innerTy) (tBool NoLoc) (locOf inner)
-        return (Just $ subst quantSub tv, Typed.Quant quantTypedExpr bound resTypedExpr innerTypedExpr loc, uniSub3 `compose` innerSub `compose` uniSub2 `compose` resSub `compose` quantSub)      
+        return (Just $ subst quantSub tv, Typed.Quant quantTypedExpr bound resTypedExpr innerTypedExpr loc, uniSub3 `compose` innerSub `compose` uniSub2 `compose` resSub `compose` quantSub)
       -- a fresh   Γ ⊢ ⊕ : (a -> a -> a) ↓ s⊕
       -- b fresh   s⊕ Γ, i : b ⊢ R : Bool ↓ sR
       -- sR (s⊕ Γ), i : sR b ⊢ B : sR (s⊕ a) ↓ sB
@@ -539,20 +600,16 @@ unifies (TFunc t1 t2 _) (TFunc t3 t4 _) l = do
   return (s2 `compose` s1)
 unifies (TCon n1 args1 _) (TCon n2 args2 _) _
   | n1 == n2 && length args1 == length args2 = return mempty
-unifies (TVar x1 _) (TVar x2 _) _ | x1 == x2 = return mempty
-unifies (TVar x _) t@(TBase tb _) _ | x == baseToName tb =
-  return $ Map.singleton x t
-unifies (TVar x _) t@(TCon n args _) _ | x == n && null args =
-  return $ Map.singleton x t
-unifies t1 t2@(TVar _ _) l                   = unifies t2 t1 l
-unifies (TMetaVar x) (TMetaVar y) _ | x == y = return mempty
+unifies (TVar x _)   t            l          = bind x t l
+unifies t            (TVar x _)   l          = bind x t l
 unifies (TMetaVar x) t            l          = bind x t l
 unifies t            (TMetaVar x) l          = bind x t l
 unifies t1           t2           l          = throwError $ UnifyFailed t1 t2 l
 
 bind :: MonadError TypeError m => Name -> Type -> Loc -> m (Map.Map Name Type)
-bind x t l | occurs x t = throwError $ RecursiveType x t l
-           | otherwise  = return (Map.singleton x t)
+bind x t l | t == TVar x NoLoc = return mempty
+           | occurs x t  = throwError $ RecursiveType x t l
+           | otherwise   = return (Map.singleton x t)
 
 --------------------------------------------------------------------------------
 -- helper combinators
@@ -567,6 +624,7 @@ freshVar = TVar <$> freshName "Type.var" NoLoc <*> pure NoLoc
 
 freshMetaVar :: Fresh m => m Type
 freshMetaVar = TMetaVar <$> freshName "Type.metaVar" NoLoc
+
 litTypes :: Lit -> Loc -> Type
 litTypes (Num _) l = tInt l
 litTypes (Bol _) l = tBool l
@@ -610,5 +668,5 @@ instance Substitutable Type Type where
   subst s (TTuple ts    ) = TTuple (map (subst s) ts)
   subst s (TFunc t1 t2 l) = TFunc (subst s t1) (subst s t2) l
   subst _ t@TCon{}        = t
-  subst _ t@TVar{}        = t
+  subst s t@(TVar n _)    = Map.findWithDefault t n s
   subst s t@(TMetaVar n)  = Map.findWithDefault t n s
