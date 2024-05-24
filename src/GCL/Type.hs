@@ -27,7 +27,6 @@ import           Data.Loc                       ( (<-->)
                                                 , locOf
                                                 )
 import           Data.Foldable                  ( foldlM )
-import           Data.Loc.Range                 ( Range )
 import qualified Data.Set                      as Set
 import qualified Data.Map                      as Map
 import qualified Data.Text                     as Text
@@ -218,6 +217,7 @@ type family Typed untyped where
   Typed Op = Op
   Typed ChainOp = Op
   Typed ArithOp = Op
+  Typed TypeOp = Op
   Typed Type = ()
   Typed Interval = ()
   Typed Endpoint = ()
@@ -233,7 +233,9 @@ class Located a => Elab a where
 instance Elab Program where
   elaborate (Program defns decls exprs stmts loc) _env = do
     mapM_ collectIds decls
-    collectIds $ reverse defns -- I don't really know why this works. However, `defns` are likely gathered in reverse order, so we have to reverse it again.
+    -- The `reverse` here shouldn't be needed now. In the past, it was a trick to make things work.
+    -- I still keep it as-is in case of future refactoring / rewriting.
+    collectIds $ reverse defns
     let tcons = concatMap collectTCon defns
     modify (\(freshState, origInfos, typeInfos) -> (freshState, tcons <> origInfos, typeInfos))
     (_, _, infos) <- get
@@ -539,6 +541,7 @@ instance Elab Expr where
 instance Elab Op where
   elaborate (ChainOp op) = elaborate op
   elaborate (ArithOp op) = elaborate op
+  elaborate (TypeOp op) = elaborate op
 
 instance Elab ChainOp where
   elaborate (EQProp  l) _ = return (Just $ tBool .-> tBool .-> tBool $ l, ChainOp $ EQProp l, mempty)
@@ -581,6 +584,9 @@ instance Elab ArithOp where
   elaborate (PointsTo l) _ = return (Just $ tInt .-> tInt .-> tInt $ l, ArithOp $ PointsTo l, mempty)
   elaborate (SConj    l) _ = return (Just $ tBool .-> tBool .-> tBool $ l, ArithOp $ SConj l, mempty)
   elaborate (SImp     l) _ = return (Just $ tBool .-> tBool .-> tBool $ l, ArithOp $ SImp l, mempty)
+
+instance Elab TypeOp where
+  elaborate (Arrow _) _ = undefined -- We do not have a kind system yet.
 
 --------------------------------------------------------------------------------
 -- Unification

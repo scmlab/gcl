@@ -412,16 +412,6 @@ instance Pretty TypeInfo where
   pretty (ConstTypeInfo    t) = "ConstTypeInfo " <> pretty t
   pretty (VarTypeInfo      t) = "VarTypeInfo " <> pretty t
 
-{- -- TODO: Remove this?
-instance Pretty a => Pretty (ScopeTree a) where
-  pretty ScopeTree {..} =
-    "GlobalScope " <> pretty globalScope <> "\nLocalScopes " <> vsep
-      (punctuate "," (map pretty (IntervalMap.toList localScopes)))
-
-instance Pretty a => Pretty (ScopeTreeZipper a) where
-  pretty ScopeTreeZipper {..} = "Cursor " <> pretty cursor
--}
-
 instance Pretty Index where
   pretty (Index n  ) = pretty n
   pretty (Hole  rng) = pretty rng
