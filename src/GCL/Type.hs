@@ -161,6 +161,8 @@ instance CollectIds [Definition] where
         _ -> undefined
       ) sigs
     (_, _, infos) <- get
+    -- Get the original explicit signatures.
+    -- We will try to restrict polymorphic functions to the types of the corresponding signatures.
     let sigEnv = second typeInfoToType <$> infos
     -- Give each function definition a fresh name.
     let defined = concatMap (\case

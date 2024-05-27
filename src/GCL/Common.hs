@@ -1,5 +1,5 @@
 {-# LANGUAGE FlexibleInstances, UndecidableInstances,
-             MultiParamTypeClasses, FlexibleContexts, OverlappingInstances #-}
+             MultiParamTypeClasses, FlexibleContexts #-}
 module GCL.Common where
 
 import           Control.Monad.RWS              ( RWST(..) )
@@ -73,7 +73,7 @@ instance Free a => Free (Subs a) where
   freeVars = Set.unions . Map.map freeVars
 
 
-instance Free a => Free [a] where
+instance {-# OVERLAPPABLE #-} Free a => Free [a] where
   freeVars l = foldMap freeVars l
 
 instance (Free a, Free b) => Free (a, b) where
@@ -94,7 +94,7 @@ instance Free Type where
   freeVars (TVar x _     ) = Set.singleton x
   freeVars (TMetaVar n   ) = Set.singleton n
 
-instance Free TypeEnv where
+instance {-# OVERLAPS #-} Free TypeEnv where
   freeVars env = foldMap freeVars $ Map.elems $ Map.fromList env 
 
 instance Free Expr where
