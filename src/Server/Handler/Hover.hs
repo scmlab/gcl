@@ -2,52 +2,38 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleInstances #-}
 
-module Server.Handler.Hover
-  ( handler
-  ) where
+module Server.Handler.Hover where
 
-import           Error                          ( Error )
-import           Server.Monad            hiding ( logText )
+-- import           Data.Loc                       ( posCoff )
+-- import           Language.LSP.Types      hiding ( Range )
+-- import           Pretty                         ( toText )
+-- import qualified Server.SrcLoc                 as SrcLoc
+-- import qualified Server.IntervalMap               as IntervalMap
 
-import           Data.Loc                       ( posCoff )
-import           Language.LSP.Types      hiding ( Range )
-import           Pretty                         ( toText )
-import           Server.Pipeline
-import qualified Server.SrcLoc                 as SrcLoc
-import qualified Server.IntervalMap               as IntervalMap
+-- import Server.Handler2.Utils
+-- import Server.Monad (ServerM, LoadedProgram (..))
 
-ignoreErrors :: ([Error], Maybe (Maybe Hover)) -> Maybe Hover
-ignoreErrors (_, Nothing) = Nothing
-ignoreErrors (_, Just xs) = xs
-
-handler :: Uri -> Position -> (Maybe Hover -> ServerM ()) -> ServerM ()
-handler uri position responder = case uriToFilePath uri of
-  Nothing       -> return ()
-  Just filepath -> do
-    interpret uri (responder . ignoreErrors) $ do
-      source <- getSource
-      let table = SrcLoc.makeToOffset source
-      let pos   = SrcLoc.fromLSPPosition table filepath position
-      logText $ " ---> Hover " <> toText (posCoff pos)
-
-      stage <- load
-
-      let
-        tokenMap = case stage of
-          Raw         _      -> Nothing
-          Parsed      _      -> Nothing
-          Converted   _      -> Nothing
-          TypeChecked result -> Just $ typeCheckedIntervalMap result
-          Swept result ->
-            Just $ typeCheckedIntervalMap (sweptPreviousStage result)
-
-      case tokenMap of
-        Nothing -> return Nothing
-        Just xs -> case IntervalMap.lookup pos xs of
-          Nothing -> do
-            -- logText $ toText xs
-            logText "    < Hover (not found)"
-            return Nothing
-          Just (hover, _) -> do
-            logText $ "    < Hover " <> toText hover
-            return (Just hover)
+-- handler :: Uri -> Position -> (Maybe Hover -> ServerM ()) -> ServerM ()
+-- handler uri position responder = case uriToFilePath uri of
+--   Nothing       -> responder Nothing
+--   Just filepath -> do
+--     maybeSource <- getSource filepath
+--     case maybeSource of
+--       Nothing -> responder Nothing
+--       Just source -> do
+--         let table = SrcLoc.makeToOffset source
+--         let pos   = SrcLoc.fromLSPPosition table filepath position
+--         logText $ " ---> Hover " <> toText (posCoff pos)
+        
+--         maybeLoadedProgram <- dumpProgram filepath
+--         case maybeLoadedProgram of
+--           Nothing -> responder Nothing
+--           Just loadedProgram -> do
+--             case IntervalMap.lookup pos (_typeCheckingInfo loadedProgram) of
+--               Nothing -> do
+--                   -- logText $ toText xs
+--                   logText "    < Hover (not found)"
+--                   responder Nothing
+--               Just (hover, _) -> do
+--                   logText $ "    < Hover " <> toText hover
+--                   responder (Just hover)

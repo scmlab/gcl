@@ -2,7 +2,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module Server.CustomMethod where
+module Server.Handler.CustomMethod.Types where
 
 import           Data.Aeson                     ( FromJSON
                                                 , ToJSON

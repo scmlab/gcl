@@ -55,34 +55,22 @@ library
       Render.Syntax.Abstract
       Render.Syntax.Common
       Server
-      Server.CustomMethod
       Server.GoToDefn
       Server.Handler
       Server.Handler.AutoCompletion
       Server.Handler.CustomMethod
-      Server.Handler.Diagnostic
-      Server.Handler.GoToDefn
+      Server.Handler.CustomMethod.Reload
+      Server.Handler.CustomMethod.Types
+      Server.Handler.GoToDefinition
       Server.Handler.Hover
-      Server.Handler2
-      Server.Handler2.AutoCompletion
-      Server.Handler2.CustomMethod
-      Server.Handler2.CustomMethod.HelloWorld
-      Server.Handler2.CustomMethod.InsertProofTemplate
-      Server.Handler2.CustomMethod.Inspect
-      Server.Handler2.CustomMethod.Refine
-      Server.Handler2.CustomMethod.Reload
-      Server.Handler2.CustomMethod.SubstituteRedex
-      Server.Handler2.CustomMethod.Utils
-      Server.Handler2.GoToDefinition
-      Server.Handler2.Hover
-      Server.Handler2.Initialized
-      Server.Handler2.SemanticTokens
-      Server.Handler2.Utils
+      Server.Handler.Initialized
+      Server.Handler.SemanticTokens
       Server.Highlighting
       Server.Hover
       Server.IntervalMap
+      Server.Load
       Server.Monad
-      Server.Pipeline
+      Server.PositionMapping
       Server.SrcLoc
       Syntax.Abstract
       Syntax.Abstract.Instances.Json
@@ -111,10 +99,12 @@ library
       src
   ghc-options: -Wall -Werror=incomplete-patterns -fno-warn-orphans
   build-depends:
-      aeson
+      Diff
+    , aeson
     , base >=4.7 && <5
     , bytestring
     , containers
+    , deepseq
     , free
     , hashable
     , lens
@@ -145,10 +135,12 @@ executable gcl
       app
   ghc-options: -Wall -threaded -rtsopts -with-rtsopts=-N -Werror=incomplete-patterns -fno-warn-orphans
   build-depends:
-      aeson
+      Diff
+    , aeson
     , base >=4.7 && <5
     , bytestring
     , containers
+    , deepseq
     , free
     , gcl
     , hashable
@@ -221,34 +213,22 @@ test-suite gcl-test
       Render.Syntax.Abstract
       Render.Syntax.Common
       Server
-      Server.CustomMethod
       Server.GoToDefn
       Server.Handler
       Server.Handler.AutoCompletion
       Server.Handler.CustomMethod
-      Server.Handler.Diagnostic
-      Server.Handler.GoToDefn
+      Server.Handler.CustomMethod.Reload
+      Server.Handler.CustomMethod.Types
+      Server.Handler.GoToDefinition
       Server.Handler.Hover
-      Server.Handler2
-      Server.Handler2.AutoCompletion
-      Server.Handler2.CustomMethod
-      Server.Handler2.CustomMethod.HelloWorld
-      Server.Handler2.CustomMethod.InsertProofTemplate
-      Server.Handler2.CustomMethod.Inspect
-      Server.Handler2.CustomMethod.Refine
-      Server.Handler2.CustomMethod.Reload
-      Server.Handler2.CustomMethod.SubstituteRedex
-      Server.Handler2.CustomMethod.Utils
-      Server.Handler2.GoToDefinition
-      Server.Handler2.Hover
-      Server.Handler2.Initialized
-      Server.Handler2.SemanticTokens
-      Server.Handler2.Utils
+      Server.Handler.Initialized
+      Server.Handler.SemanticTokens
       Server.Highlighting
       Server.Hover
       Server.IntervalMap
+      Server.Load
       Server.Monad
-      Server.Pipeline
+      Server.PositionMapping
       Server.SrcLoc
       Syntax.Abstract
       Syntax.Abstract.Instances.Json
@@ -277,10 +257,12 @@ test-suite gcl-test
       src
   ghc-options: -Wall -Werror=incomplete-patterns -fno-warn-orphans
   build-depends:
-      aeson
+      Diff
+    , aeson
     , base >=4.7 && <5
     , bytestring
     , containers
+    , deepseq
     , directory
     , filepath
     , free

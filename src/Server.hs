@@ -14,8 +14,8 @@ import           Network.Simple.TCP             ( HostPreference(Host)
                                                 , serve
                                                 )
 import           Network.Socket                 ( socketToHandle )
-import           Server.Handler2                ( handlers )
-import           Server.Monad
+import           Server.Handler                 ( handlers )
+import Server.Monad (GlobalState, initGlobalEnv, runServerM, logChannel)
 
 --------------------------------------------------------------------------------
 
@@ -34,12 +34,12 @@ run devMode port = do
     else do
       runServer (serverDefn env)
  where
-  printLog :: GlobalEnv -> IO ()
+  printLog :: GlobalState -> IO ()
   printLog env = forever $ do
-    result <- readChan (globalChan env)
+    result <- readChan (logChannel env)
     when devMode $ do
       Text.putStrLn result
-  serverDefn :: GlobalEnv -> ServerDefinition ()
+  serverDefn :: GlobalState -> ServerDefinition ()
   serverDefn env = ServerDefinition
     { defaultConfig         = ()
     , onConfigurationChange = const $ pure $ Right ()
