@@ -143,41 +143,6 @@ instance CollectIds [Definition] where
           TypeDefn {} -> True
           _ -> False
     let typeDefns = filter typeDefnPredicate defns
-    -- Add signatures into the state one by one.
-    mapM_ (
-      \case
-        (FuncDefnSig n t _ _) ->
-          let infos = (Index n, ConstTypeInfo t) in
-            modify (\(freshState, typeDefnInfos, origInfos) -> (freshState, typeDefnInfos, infos : origInfos))
-        _ -> undefined
-      ) sigs
-    -- Give each function definition a fresh name.
-    let defined = concatMap (\case
-                                (FuncDefn name _exprs) -> [Index name]
-                                _ -> []
-                            ) defns
-    freshVars <- replicateM (length defined) freshVar
-    let gathered = second ConstTypeInfo <$> zip defined freshVars
-    modify (\(freshState, typeDefnInfos, origInfos) -> (freshState, typeDefnInfos, gathered <> origInfos))
-    -- Get the previously gathered type infos.
-    (_, _, infos) <- get
-    let env = second typeInfoToType <$> infos
-    -- Do a `foldlM` to elaborate multiple definitions together.
-    (_, names, tys, _sub) <-
-      foldlM (\(context, names, tys, sub) funcDefn -> do
-        case funcDefn of
-          (FuncDefn name exprs) -> do
-            (ty, _, sub1) <- elaborate (head exprs) context -- Calling `head` is safe for the meantime.
-            unifySub <- unifies (subst sub1 (fromJust $ lookup (Index name) context)) (fromJust ty) NoLoc
-            return (subst (unifySub `compose` sub1) context, name : names, subst unifySub <$> (subst sub1 (fromJust ty) : (subst sub1 <$> tys)), unifySub `compose` sub1 `compose` sub)
-          _ -> return (context, names, tys, sub)
-      ) (env, mempty, mempty, mempty) funcDefns
-    -- Generalize the types of definitions.
-    mapM_ (\(name, ty) -> do
-            ty' <- generalize ty env -- TODO: Why???
-            let info = (Index name, ConstTypeInfo ty')
-            modify (\(freshState, typeDefnInfos, origInfos) -> (freshState, typeDefnInfos, info : origInfos))
-          ) (zip names tys)
     -- Gather the type definitions.
     mapM_ (\(TypeDefn name args ctors _) -> do
             let newTypeInfos =
@@ -187,6 +152,47 @@ instance CollectIds [Definition] where
             let newTypeDefnInfos = (Index name, TypeDefnInfo args)
             modify (\(freshState, origTypeDefnInfos, origTypeInfos) -> (freshState, newTypeDefnInfos : origTypeDefnInfos, newTypeInfos <> origTypeInfos))
           ) typeDefns
+    -- Add signatures into the state one by one.
+    mapM_ (
+      \case
+        (FuncDefnSig n t _ _) ->
+          let infos = (Index n, ConstTypeInfo t) in
+            modify (\(freshState, typeDefnInfos, origInfos) -> (freshState, typeDefnInfos, infos : origInfos))
+        _ -> undefined
+      ) sigs
+    (_, _, infos) <- get
+    let sigEnv = second typeInfoToType <$> infos
+    -- Give each function definition a fresh name.
+    let defined = concatMap (\case
+                                (FuncDefn name _exprs) -> [Index name]
+                                _ -> []
+                            ) defns
+    freshVars <- replicateM (length defined) freshVar
+    let gathered = second ConstTypeInfo <$> zip defined freshVars
+    modify (\(freshState, typeDefnInfos, origInfos) -> (freshState, typeDefnInfos, gathered <> origInfos))
+    -- Get the previously gathered type infos.
+    (_, _, infos') <- get
+    let env = second typeInfoToType <$> infos'
+    -- Do a `foldlM` to elaborate multiple definitions together.
+    (_, names, tys, _sub) <-
+      foldlM (\(context, names, tys, sub) funcDefn -> do
+        case funcDefn of
+          (FuncDefn name exprs) -> do
+            (ty, _, sub1) <- elaborate (head exprs) context -- Calling `head` is safe for the meantime.
+            unifySub <- unifies (subst sub1 (fromJust $ lookup (Index name) context)) (fromJust ty) NoLoc
+            case lookup (Index name) sigEnv of
+              Just ty' -> do
+                _ <- unifies (fromJust ty) ty' NoLoc
+                return (subst (unifySub `compose` sub1) context, name : names, subst unifySub <$> (ty' : (subst sub1 <$> tys)), unifySub `compose` sub1 `compose` sub)
+              Nothing -> return (subst (unifySub `compose` sub1) context, name : names, subst unifySub <$> (subst sub1 (fromJust ty) : (subst sub1 <$> tys)), unifySub `compose` sub1 `compose` sub)
+          _ -> return (context, names, tys, sub)
+      ) (env, mempty, mempty, mempty) funcDefns
+    -- Generalize the types of definitions.
+    mapM_ (\(name, ty) -> do
+            ty' <- generalize ty env -- TODO: Why???
+            let info = (Index name, ConstTypeInfo ty')
+            modify (\(freshState, typeDefnInfos, origInfos) -> (freshState, typeDefnInfos, info : origInfos))
+          ) (zip names tys)
     where
       generalize :: Fresh m => Type -> TypeEnv -> m Type
       generalize ty' env' = do
