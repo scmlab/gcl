@@ -13,7 +13,6 @@ import           Data.Text                      ( Text )
 import           Error                          ( Error(..) )
 import           GCL.Type                       ( Elab (elaborate)
                                                 , runElaboration
-                                                , Index(..)
                                                 , TypeDefnInfo(..)
                                                 , TypeInfo(..)
                                                 )

@@ -130,7 +130,7 @@ instance CollectIds a => CollectIds [a] where
 
 instance CollectIds [Definition] where
   collectIds defns = do
-    -- Split variants of definitions.
+    -- First, we split variants of definitions because different kinds of definitions need to be processed differently.
     let sigPredicate = \case
           FuncDefnSig {} -> True
           _ -> False
@@ -144,6 +144,7 @@ instance CollectIds [Definition] where
           _ -> False
     let typeDefns = filter typeDefnPredicate defns
     -- Gather the type definitions.
+    -- Type definitions are collected first because signatures and function definitions may depend on it.
     mapM_ (\(TypeDefn name args ctors _) -> do
             let newTypeInfos =
                   map
@@ -151,7 +152,7 @@ instance CollectIds [Definition] where
                     ctors
             let newTypeDefnInfos = (Index name, TypeDefnInfo args)
             modify (\(freshState, origTypeDefnInfos, origTypeInfos) -> (freshState, newTypeDefnInfos : origTypeDefnInfos, newTypeInfos <> origTypeInfos))
-          ) typeDefns
+          ) typeDefns -- For all typeDefns, do the above monadically ...
     -- Add signatures into the state one by one.
     mapM_ (
       \case
@@ -181,15 +182,18 @@ instance CollectIds [Definition] where
         case funcDefn of
           (FuncDefn name exprs) -> do
             (ty, _, sub1) <- elaborate (head exprs) context -- Calling `head` is safe for the meantime.
-            unifySub <- unifies (subst sub1 (fromJust $ lookup (Index name) context)) (fromJust ty) NoLoc
+            unifySub <- unifies (subst sub1 (fromJust $ lookup (Index name) context)) (fromJust ty) NoLoc -- the first `fromJust` should also be safe.
+            -- We see if there are signatures restricting the type of function definitions.
             case lookup (Index name) sigEnv of
+              -- If there is, we save the restricted type.
               Just ty' -> do
                 _ <- unifies (fromJust ty) ty' NoLoc
                 return (subst (unifySub `compose` sub1) context, name : names, subst unifySub <$> (ty' : (subst sub1 <$> tys)), unifySub `compose` sub1 `compose` sub)
+              -- If not, we proceed as if it's normal.
               Nothing -> return (subst (unifySub `compose` sub1) context, name : names, subst unifySub <$> (subst sub1 (fromJust ty) : (subst sub1 <$> tys)), unifySub `compose` sub1 `compose` sub)
           _ -> return (context, names, tys, sub)
       ) (env, mempty, mempty, mempty) funcDefns
-    -- Generalize the types of definitions.
+    -- Generalize the types of definitions, i.e. change free type variables into metavariables.
     mapM_ (\(name, ty) -> do
             ty' <- generalize ty env -- TODO: Why???
             let info = (Index name, ConstTypeInfo ty')
@@ -213,6 +217,8 @@ instance CollectIds Declaration where
 --------------------------------------------------------------------------------
 -- Elaboration
 
+
+-- The type family `Typed` turns data into its typed version.
 type family Typed untyped where
   Typed Definition = Typed.TypedDefinition
   Typed Declaration = Typed.TypedDeclaration
@@ -405,7 +411,7 @@ instantiate ty = do
     freeMetaVars (TTuple ts    ) = Set.unions (map freeMetaVars ts)
     freeMetaVars (TFunc t1 t2 _) = freeMetaVars t1 <> freeMetaVars t2
     freeMetaVars (TCon  _  ns _) = Set.fromList ns
-    freeMetaVars (TVar x _     ) = mempty
+    freeMetaVars (TVar _ _     ) = mempty
     freeMetaVars (TMetaVar n   ) = Set.singleton n
 
 -- You can freely use `fromJust` below to extract the underlying `Type` from the `Maybe Type` you got.
