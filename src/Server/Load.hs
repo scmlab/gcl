@@ -23,6 +23,7 @@ import Server.Highlighting (collectHighlighting)
 import Server.GoToDefn (collectLocationLinks)
 import Control.Monad.Except (runExcept)
 import Server.PositionMapping (idDelta)
+import qualified Server.SrcLoc                 as SrcLoc
 
 load :: FilePath -> (FileState -> ServerM ()) -> (Error -> ServerM ()) -> ServerM ()
 load filePath onSuccess onError = do
@@ -60,6 +61,7 @@ load filePath onSuccess onError = do
 
                                       -- to support other LSP methods in a light-weighted manner
                                       , loadedVersion    = currentVersion
+                                      , toOffsetMap      = SrcLoc.makeToOffset source
                                       , concrete         = concrete
                                       , semanticTokens   = collectHighlighting concrete
                                       , abstract         = abstract
@@ -100,3 +102,6 @@ digHoles filePath ranges onFinish = do
   let indent range = Text.replicate (posCol (rangeStart range) - 1) " "
   let diggedText range = "[!\n" <> indent range <> "\n" <> indent range <> "!]"
   editTexts filePath (map (\range -> (range, diggedText range)) ranges) onFinish
+
+-- elaborate :: A.Program -> Either Error E.Program
+-- elaborate abstract =  

@@ -24,15 +24,15 @@ handler uri lspPosition responder = do
       case maybeFileState of
         Nothing                           -> responder []
         Just (FileState{definitionLinks, positionDelta}) -> do
-          maybeSource <- readSource filePath
-          case maybeSource of
-            Nothing -> responder []
-            Just source -> do
-              let table = SrcLoc.makeToOffset source
-              case fromDelta positionDelta lspPosition of
-                PositionExact oldLspPosition -> do  
+          case fromDelta positionDelta lspPosition of
+            PositionExact oldLspPosition -> do
+              maybeSource <- readSource filePath
+              case maybeSource of
+                Nothing -> responder []
+                Just source -> do
+                  let table = SrcLoc.makeToOffset source
                   let oldPos = SrcLoc.fromLSPPosition table filePath oldLspPosition
                   case IntervalMap.lookup oldPos definitionLinks of
                     Nothing -> responder []
                     Just locationLink -> responder [locationLink]
-                _                            -> responder []
+            _                            -> responder []

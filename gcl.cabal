@@ -58,10 +58,8 @@ library
       Server.GoToDefn
       Server.Handler
       Server.Handler.AutoCompletion
-      Server.Handler.CustomMethod
-      Server.Handler.CustomMethod.Reload
-      Server.Handler.CustomMethod.Types
       Server.Handler.GoToDefinition
+      Server.Handler.Guabao.Refine
       Server.Handler.Guabao.Reload
       Server.Handler.Hover
       Server.Handler.Initialized
@@ -217,10 +215,8 @@ test-suite gcl-test
       Server.GoToDefn
       Server.Handler
       Server.Handler.AutoCompletion
-      Server.Handler.CustomMethod
-      Server.Handler.CustomMethod.Reload
-      Server.Handler.CustomMethod.Types
       Server.Handler.GoToDefinition
+      Server.Handler.Guabao.Refine
       Server.Handler.Guabao.Reload
       Server.Handler.Hover
       Server.Handler.Initialized

@@ -10,6 +10,7 @@
 
 module Server.Handler ( handlers ) where
 
+import           Control.Monad                  ( when )
 import           Control.Lens                   ( (^.) )
 import qualified Data.Aeson                     as JSON
 import Data.Text (Text)
@@ -26,11 +27,11 @@ import qualified Server.Handler.Initialized    as Initialized
 import qualified Server.Handler.GoToDefinition as GoToDefinition
 import qualified Server.Handler.AutoCompletion as AutoCompletion
 import qualified Server.Handler.SemanticTokens as SemanticTokens
-import qualified Server.Handler.CustomMethod   as CustomMethod
 import qualified Server.Handler.Guabao.Reload  as Reload
-import Server.Monad (ServerM, modifyPositionDelta, saveEditedVersion)
+import Server.Monad (ServerM, modifyPositionDelta, saveEditedVersion, FileState(..), modifyFileState, changesAreOutsideSpecs)
 import Server.PositionMapping (applyChange)
 import Server.Load (load)
+import GCL.Predicate (Spec)
 
 -- handlers of the LSP server
 handlers :: Handlers ServerM
@@ -52,6 +53,9 @@ handlers = mconcat
         Nothing       -> return ()
         Just filePath -> do
           modifyPositionDelta filePath (\positionDelta -> foldl applyChange positionDelta changes)
+          dirty <- changesAreOutsideSpecs filePath changes
+          when dirty $ do
+            modifyFileState filePath (\fileState -> fileState{hasChangedOutsideSpecsSinceLastReload = True})
           case ntf ^. (LSP.params . LSP.textDocument . LSP.version) of
             Nothing      -> return ()
             Just version -> saveEditedVersion filePath version
@@ -74,10 +78,6 @@ handlers = mconcat
     requestHandler LSP.STextDocumentSemanticTokensFull $ \req responder -> do
       let uri = req ^. (LSP.params . LSP.textDocument . LSP.uri)
       SemanticTokens.handler uri responder
-  , -- "guabao" - reload, refine, inspect and etc.
-    requestHandler (LSP.SCustomMethod "guabao") $ \req responder -> do
-      let params = req ^. LSP.params
-      CustomMethod.handler params (responder . Right . JSON.toJSON)
   , -- "guabao/reload" - reload
     requestHandler (LSP.SCustomMethod "guabao/reload") $ jsonMiddleware Reload.handler
   ]
@@ -116,6 +116,3 @@ makeParseError message = LSP.ResponseError
     , _message = message
     , _xdata   = Nothing
     }
-
--- elaborate :: A.Program -> Either Error E.Program
--- elaborate abstract =  

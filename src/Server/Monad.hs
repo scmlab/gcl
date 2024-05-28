@@ -3,6 +3,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
@@ -51,6 +52,7 @@ data FileState = FileState
 
   -- to support other LSP methods in a light-weighted manner
   , loadedVersion    :: Int  -- the version number of the last reload
+  , toOffsetMap      :: SrcLoc.ToOffset
   , concrete         :: Concrete.Program
   , semanticTokens   :: [LSP.SemanticTokenAbsolute]
   , abstract         :: Abstract.Program
@@ -160,6 +162,18 @@ sendDiagnostics filePath diagnostics = do
                        maybeVersion
                        (LSP.partitionBySource diagnostics)
 
+
+changeIsOutsideSpecs :: [Spec] -> LSP.TextDocumentContentChangeEvent -> Bool
+changeIsOutsideSpecs specs (LSP.TextDocumentContentChangeEvent (Just range) _ text) =
+  error "TODO"
+changeIsOutsideSpecs _  _ = True
+
+changesAreOutsideSpecs :: FilePath -> [LSP.TextDocumentContentChangeEvent] -> ServerM Bool
+changesAreOutsideSpecs filePath changes = do
+  maybeFileState <- loadFileState filePath
+  case maybeFileState of
+    Nothing        -> return True
+    Just FileState{specifications} -> return $ Prelude.all (changeIsOutsideSpecs specifications) changes
 
 -- --------------------------------------------------------------------------------
 
