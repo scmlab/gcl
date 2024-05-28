@@ -145,10 +145,14 @@ instance CollectIds [Definition] where
     let typeDefns = filter typeDefnPredicate defns
     -- Gather the type definitions.
     -- Type definitions are collected first because signatures and function definitions may depend on it.
-    mapM_ (\(TypeDefn name args ctors _) -> do
+    mapM_ (\(TypeDefn name args ctors _) -> do -- TODO: Fix loc.
+            let formTy con params loc =
+                  case params of
+                    [] -> con
+                    n : ns -> formTy (TApp con n loc) ns loc
             let newTypeInfos =
                   map
-                    (\(TypeDefnCtor cn ts) -> (Index cn, TypeDefnCtorInfo (wrapTFunc ts (TCon name args (name <--> args)))))
+                    (\(TypeDefnCtor cn ts) -> (Index cn, TypeDefnCtorInfo (wrapTFunc ts (formTy (TVar name (locOf name)) ((`TVar` locOf args) <$> args) (name <--> args)))))
                     ctors
             let newTypeDefnInfos = (Index name, TypeDefnInfo args)
             modify (\(freshState, origTypeDefnInfos, origTypeInfos) -> (freshState, newTypeDefnInfos : origTypeDefnInfos, newTypeInfos <> origTypeInfos))
@@ -289,12 +293,11 @@ instance Elab Definition where
     return (Nothing, Typed.TypeDefn name args ctors' loc, mempty)
    where
     scopeCheck :: MonadError TypeError m => Map.Map Name () -> Type -> m ()
-    scopeCheck m (TCon _ args' _) = mapM_
+    scopeCheck m (TApp l r _) = mapM_
       (\a -> case Map.lookup a m of
         Just _ -> return ()
         _      -> throwError $ NotInScope a
-      )
-      args'
+      ) (freeVars l <> freeVars r)
     scopeCheck _ _ = return ()
   elaborate (FuncDefnSig name ty maybeExpr loc) env = do
     expr' <- mapM (\expr -> do
@@ -405,14 +408,6 @@ instantiate ty = do
   let freeMeta = Set.toList (freeMetaVars ty)
   new <- replicateM (length freeMeta) freshVar
   return $ subst (Map.fromList $ zip freeMeta new) ty
-  where
-    freeMetaVars (TBase _ _    ) = mempty
-    freeMetaVars (TArray _ t _ ) = freeMetaVars t
-    freeMetaVars (TTuple ts    ) = Set.unions (map freeMetaVars ts)
-    freeMetaVars (TFunc t1 t2 _) = freeMetaVars t1 <> freeMetaVars t2
-    freeMetaVars (TCon  _  ns _) = Set.fromList ns
-    freeMetaVars (TVar _ _     ) = mempty
-    freeMetaVars (TMetaVar n   ) = Set.singleton n
 
 -- You can freely use `fromJust` below to extract the underlying `Type` from the `Maybe Type` you got.
 -- You should also ensure that `elaborate` in `Elab Expr` returns a `Just` when it comes to the `Maybe Type` value.
@@ -622,9 +617,9 @@ unifies (TFunc t1 t2 _) (TFunc t3 t4 _) l = do
   s1 <- unifies t1 t3 l
   s2 <- unifies (subst s1 t2) (subst s1 t4) l
   return (s2 `compose` s1)
-unifies (TApp l1 r1 _) (TApp l2 r2 _) _ = do
-  s1 <- unifies l1 l2
-  s2 <- unifies (subst s1 l2) (subst s1 r2) l
+unifies (TApp l1 r1 loc1) (TApp l2 r2 loc2) _ = do
+  s1 <- unifies l1 l2 loc1
+  s2 <- unifies (subst s1 r1) (subst s1 r2) loc2
   return (s2 `compose` s1)
 unifies (TVar x _)   t            l          = bind x t l
 unifies t            (TVar x _)   l          = bind x t l
@@ -633,9 +628,12 @@ unifies t            (TMetaVar x) l          = bind x t l
 unifies t1           t2           l          = throwError $ UnifyFailed t1 t2 l
 
 bind :: MonadError TypeError m => Name -> Type -> Loc -> m (Map.Map Name Type)
-bind x t l | t == TVar x NoLoc = return mempty
+bind x t l | same t $ TVar x NoLoc = return mempty
            | occurs x t  = throwError $ RecursiveType x t l
            | otherwise   = return (Map.singleton x t)
+  where
+    same (TVar v1 _) (TVar v2 _) = v1 == v2
+    same _ _ = False
 
 --------------------------------------------------------------------------------
 -- helper combinators
@@ -693,7 +691,7 @@ instance Substitutable Type Type where
   subst s (TArray i t l ) = TArray i (subst s t) l
   subst s (TTuple ts    ) = TTuple (map (subst s) ts)
   subst s (TFunc t1 t2 l) = TFunc (subst s t1) (subst s t2) l
-  subst _ t@TCon{}        = t
+  subst s (TApp l r loc ) = TApp (subst s l) (subst s r) loc
   subst s t@(TVar n _)    = Map.findWithDefault t n s
   subst s t@(TMetaVar n)  = Map.findWithDefault t n s
 

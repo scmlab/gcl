@@ -59,6 +59,15 @@ emptySubs = mempty
 emptyEnv :: Env a
 emptyEnv = mempty
 
+freeMetaVars :: Type -> Set Name
+freeMetaVars (TBase _ _    ) = mempty
+freeMetaVars (TArray _ t _ ) = freeMetaVars t
+freeMetaVars (TTuple ts    ) = Set.unions (map freeMetaVars ts)
+freeMetaVars (TFunc t1 t2 _) = freeMetaVars t1 <> freeMetaVars t2
+freeMetaVars (TApp l r _   ) = freeMetaVars l <> freeMetaVars r
+freeMetaVars (TVar _ _     ) = mempty
+freeMetaVars (TMetaVar n   ) = Set.singleton n
+
 -- A class of types for which we may compute their free variables.
 class Free a where
   freeVars :: a -> Set Name

@@ -644,7 +644,7 @@ type' = do
   makeExprParser term table <?> "type"
  where
   table :: [[Operator Parser Type]]
-  table = [[InfixR function]]
+  table = [[InfixL (return TApp)], [InfixR function]]
 
   function :: Parser (Type -> Type -> Type)
   function = do
@@ -652,17 +652,13 @@ type' = do
     return $ \x y -> TFunc x arrow y
 
   term :: Parser Type
-  term = parensType <|> array <|> try typeVar <|> typeName <?> "type term"
+  term = parensType <|> array <|> typeVar <?> "type term"
 
   parensType :: Parser Type
   parensType = TParen <$> tokenParenOpen <*> type' <*> tokenParenClose
 
-
   typeVar :: Parser Type
-  typeVar = TVar <$> lower
-
-  typeName :: Parser Type
-  typeName = TApp <$> (TVar <$> identifier) <*> (TVar <$> identifier) -- TODO: This does not work well.
+  typeVar = TVar <$> identifier
 
   array :: Parser Type
   array = TArray <$> tokenArray <*> interval <*> tokenOf <*> type'

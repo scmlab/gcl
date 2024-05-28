@@ -234,7 +234,7 @@ instance Collect LocationLinkToBe LocationLink Type where
     TArray i x _ -> collect i >> collect x
     TTuple as    -> mapM_ collect as
     TFunc x y _  -> collect x >> collect y
-    TCon  x _ _  -> collect x
+    TApp  x y _  -> collect x >> collect y
     TVar _ _     -> return ()
     TMetaVar _   -> return ()
 
