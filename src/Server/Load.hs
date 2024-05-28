@@ -24,14 +24,14 @@ import Server.GoToDefn (collectLocationLinks)
 import Control.Monad.Except (runExcept)
 import Server.PositionMapping (idDelta)
 
-load :: FilePath -> (Error -> ServerM ()) -> ServerM ()
-load filePath onError = do
+load :: FilePath -> (FileState -> ServerM ()) -> (Error -> ServerM ()) -> ServerM ()
+load filePath onSuccess onError = do
   
   maybeFileState <- loadFileState filePath
 
-  currentVersion <- case maybeFileState of
-    Nothing -> return 0
-    Just (FileState{editedVersion}) -> return editedVersion
+  let currentVersion = case maybeFileState of
+                        Nothing -> 0
+                        Just (FileState{editedVersion}) -> editedVersion
 
   -- read source
   maybeSource <- readSource filePath
@@ -44,7 +44,7 @@ load filePath onError = do
         Right concrete ->
           case reportHolesOrToAbstract concrete of
             Left holes -> digHoles filePath holes do
-              load filePath onError
+              load filePath onSuccess onError
             Right abstract -> case WP.sweep abstract of
               Left  err -> onError (StructError err)
               Right (pos, specs, warnings, redexes, counter) -> do
@@ -71,7 +71,7 @@ load filePath onError = do
                                       , editedVersion    = currentVersion
                                       }
                     saveFileState filePath fileState
-  return ()
+                    onSuccess fileState
 
 parse :: FilePath -> Text -> Either Error C.Program
 parse filepath source =

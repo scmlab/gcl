@@ -62,6 +62,7 @@ library
       Server.Handler.CustomMethod.Reload
       Server.Handler.CustomMethod.Types
       Server.Handler.GoToDefinition
+      Server.Handler.Guabao.Reload
       Server.Handler.Hover
       Server.Handler.Initialized
       Server.Handler.SemanticTokens
@@ -220,6 +221,7 @@ test-suite gcl-test
       Server.Handler.CustomMethod.Reload
       Server.Handler.CustomMethod.Types
       Server.Handler.GoToDefinition
+      Server.Handler.Guabao.Reload
       Server.Handler.Hover
       Server.Handler.Initialized
       Server.Handler.SemanticTokens

@@ -2,7 +2,7 @@
 module Server.Handler.CustomMethod.Reload where
 
 import Server.Monad (ServerM)
-
+import Server.Load (load)
 
 -- data ReloadResponse
 --   = Success [PO] [Spec]
@@ -16,7 +16,8 @@ import Server.Monad (ServerM)
 --   | Others String
 --   deriving (Eq, Show, Generic)
 
+
+-- TODO: respond result or error
 handler :: FilePath -> ServerM ()
 handler filePath = do
-  -- TODO
-  return ()
+  load filePath (\_ -> return ()) (\_ -> return ())

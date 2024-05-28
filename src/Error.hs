@@ -7,6 +7,7 @@ import           GCL.WP.Type                    ( StructError )
 import           GHC.Generics
 import           Syntax.Common                  ( )
 import           Syntax.Parser.Error           ( ParseError )
+import qualified Data.Aeson.Types as JSON
 
 --------------------------------------------------------------------------------
 
@@ -18,3 +19,7 @@ data Error
   | CannotReadFile FilePath
   | Others String
   deriving (Eq, Show, Generic)
+
+instance JSON.ToJSON ParseError
+
+instance JSON.ToJSON Error

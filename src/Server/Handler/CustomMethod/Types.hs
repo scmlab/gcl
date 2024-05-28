@@ -99,9 +99,9 @@ instance Show Request where
 
 --------------------------------------------------------------------------------
 
-instance ToJSON Origin
-instance ToJSON InfMode
+-- instance ToJSON Origin
+-- instance ToJSON InfMode
 
-instance ToJSON PO
+-- instance ToJSON PO
 
-instance ToJSON Spec
+-- instance ToJSON Spec

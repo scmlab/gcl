@@ -109,9 +109,13 @@ instance Ord PO where
 instance Located PO where
   locOf (PO _ _ _ _ o) = locOf o
 
+instance ToJSON PO
+
 data InfMode = Primary     -- the main inference mode
              | Secondary   -- non-functional postconditions. ignore assertions
              deriving (Eq, Show, Generic)
+
+instance ToJSON InfMode
 
 data Origin
   = AtAbort Loc
@@ -153,6 +157,8 @@ instance Located Origin where
   locOf (AtTermination l  ) = l
   locOf (Explain _ _ _ _ l) = l
 
+instance ToJSON Origin
+
 data Spec = Specification
   { specID       :: Int
   , specPreCond  :: Pred
@@ -166,3 +172,5 @@ instance Located Spec where
 
 instance Ranged Spec where
   rangeOf (Specification _ _ _ r) = r
+
+instance ToJSON Spec

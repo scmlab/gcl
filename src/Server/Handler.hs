@@ -12,6 +12,7 @@ module Server.Handler ( handlers ) where
 
 import           Control.Lens                   ( (^.) )
 import qualified Data.Aeson                     as JSON
+import Data.Text (Text)
 import           Language.LSP.Server            ( Handlers
                                                 , notificationHandler
                                                 , requestHandler
@@ -19,13 +20,15 @@ import           Language.LSP.Server            ( Handlers
 
 import qualified Language.LSP.Types             as LSP
 import qualified Language.LSP.Types.Lens        as LSP
+import qualified Language.LSP.Server            as LSP
 
 import qualified Server.Handler.Initialized    as Initialized
 import qualified Server.Handler.GoToDefinition as GoToDefinition
 import qualified Server.Handler.AutoCompletion as AutoCompletion
 import qualified Server.Handler.SemanticTokens as SemanticTokens
 import qualified Server.Handler.CustomMethod   as CustomMethod
-import Server.Monad (ServerM, modifyPositionDelta)
+import qualified Server.Handler.Guabao.Reload  as Reload
+import Server.Monad (ServerM, modifyPositionDelta, saveEditedVersion)
 import Server.PositionMapping (applyChange)
 import Server.Load (load)
 
@@ -40,15 +43,19 @@ handlers = mconcat
       let uri            = ntf ^. (LSP.params . LSP.textDocument . LSP.uri)
       case LSP.uriToFilePath uri of
         Nothing       -> return ()
-        Just filePath -> load filePath (\_ -> return ())
+        Just filePath -> load filePath (\_ -> return ()) (\_ -> return ())
   , -- "textDocument/didChange" - after every edition
     notificationHandler LSP.STextDocumentDidChange $ \ntf -> do
       let uri        :: LSP.Uri = ntf ^. (LSP.params . LSP.textDocument . LSP.uri)
       let (LSP.List changes)    = ntf ^. (LSP.params . LSP.contentChanges)
       case LSP.uriToFilePath uri of
         Nothing       -> return ()
-        Just filePath -> modifyPositionDelta filePath (\positionDelta -> foldl applyChange positionDelta changes)
-  , -- "textDocument/completion" - autocompletion
+        Just filePath -> do
+          modifyPositionDelta filePath (\positionDelta -> foldl applyChange positionDelta changes)
+          case ntf ^. (LSP.params . LSP.textDocument . LSP.version) of
+            Nothing      -> return ()
+            Just version -> saveEditedVersion filePath version
+  , -- "textDocument/completion" - auto-completion
     requestHandler LSP.STextDocumentCompletion $ \req responder -> do
       let completionContext = req ^. LSP.params . LSP.context
       let position          = req ^. LSP.params . LSP.position
@@ -71,10 +78,44 @@ handlers = mconcat
     requestHandler (LSP.SCustomMethod "guabao") $ \req responder -> do
       let params = req ^. LSP.params
       CustomMethod.handler params (responder . Right . JSON.toJSON)
+  , -- "guabao/reload" - reload
+    requestHandler (LSP.SCustomMethod "guabao/reload") $ jsonMiddleware Reload.handler
   ]
 
+type CustomMethodHandler params result error = params -> (result -> ServerM ()) -> (error -> ServerM ()) -> ServerM ()
 
+jsonMiddleware :: (JSON.FromJSON params, JSON.ToJSON result, JSON.ToJSON error)
+                  => CustomMethodHandler params result error
+                  -> LSP.Handler ServerM (LSP.CustomMethod :: LSP.Method LSP.FromClient LSP.Request)
+jsonMiddleware handler req responder = do
+  let json = req ^. LSP.params
+  case decodeMessageParams json of
+    Left error   -> responder (Left error)
+    Right params -> do
+      handler params
+        (responder . Right . JSON.toJSON)
+        (responder. Left . makeInternalError)
 
+decodeMessageParams :: forall a. JSON.FromJSON a => JSON.Value -> Either LSP.ResponseError a
+decodeMessageParams json = do
+  case JSON.fromJSON json :: JSON.Result [a] of
+    JSON.Success (params:[]) -> Right params
+    JSON.Success _            -> error "should not happen"
+    JSON.Error msg            -> Left (makeParseError "Json decoding failed.")
+
+makeInternalError :: JSON.ToJSON e => e -> LSP.ResponseError
+makeInternalError error = LSP.ResponseError 
+    { _code    = LSP.InternalError
+    , _message = ""
+    , _xdata   = Just (JSON.toJSON error)
+    }
+
+makeParseError :: Text -> LSP.ResponseError
+makeParseError message = LSP.ResponseError 
+    { _code    = LSP.ParseError
+    , _message = message
+    , _xdata   = Nothing
+    }
 
 -- elaborate :: A.Program -> Either Error E.Program
 -- elaborate abstract =  

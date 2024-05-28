@@ -37,7 +37,7 @@ translatePosition :: PositionDelta -> LSP.SemanticTokenAbsolute -> Maybe LSP.Sem
 translatePosition PositionDelta{toDelta} oldToken@(LSP.SemanticTokenAbsolute{line, startChar}) =
   case toDelta oldPosition of
     PositionExact (Position{_line, _character}) -> Just (oldToken{line = _line, startChar = _character})
-    _ -> Nothing
+    _                                           -> Nothing
   where
     oldPosition :: LSP.Position
     oldPosition = LSP.Position line startChar

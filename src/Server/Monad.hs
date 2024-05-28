@@ -25,6 +25,8 @@ import           Data.Map                       ( Map )
 import qualified Language.LSP.Types             as LSP
 import qualified Language.LSP.Server            as LSP
 import qualified Language.LSP.VFS               as LSP
+import qualified Language.LSP.Diagnostics       as LSP
+import qualified Data.Aeson                     as JSON
 import GCL.Predicate (Spec, PO)
 import qualified Syntax.Abstract as Abstract
 import qualified Syntax.Concrete as Concrete
@@ -144,15 +146,19 @@ editTexts filepath rangeTextPairs onSuccess = do
       _newText = textToReplace
     }
 
--- -- send diagnostics
--- -- NOTE: existing diagnostics would be erased if `diagnostics` is empty
--- sendDiagnosticsLSP :: FilePath -> [J.Diagnostic] -> ServerM ()
--- sendDiagnosticsLSP filepath diagnostics = do
---   version <- bumpVersion
---   J.publishDiagnostics 100
---                        (J.toNormalizedLSP.Uri (J.filePathToLSP.Uri filepath))
---                        (Just version)
---                        (J.partitionBySource diagnostics)
+sendCustomNotification :: Text -> JSON.Value -> ServerM ()
+sendCustomNotification methodId json = LSP.sendNotification (LSP.SCustomMethod methodId) json
+
+-- send diagnostics
+-- NOTE: existing diagnostics would be erased if `diagnostics` is empty
+sendDiagnostics :: FilePath -> [LSP.Diagnostic] -> ServerM ()
+sendDiagnostics filePath diagnostics = do
+  maybeFileState <- loadFileState filePath
+  let maybeVersion = fmap editedVersion maybeFileState
+  LSP.publishDiagnostics 100
+                       (LSP.toNormalizedUri (LSP.filePathToUri filePath))
+                       maybeVersion
+                       (LSP.partitionBySource diagnostics)
 
 
 -- --------------------------------------------------------------------------------
