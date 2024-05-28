@@ -99,7 +99,7 @@ data Type
   -- TTuple has no srcloc info because it has no conrete syntax at the moment 
   | TTuple [Type]
   | TFunc Type Type Loc
-  | TCon Name [Name] Loc
+  | TApp Type Type Loc
   | TVar Name Loc
   | TMetaVar Name
   deriving (Eq, Show, Generic)

@@ -90,7 +90,7 @@ instance Free Type where
   freeVars (TArray _ t _ ) = freeVars t
   freeVars (TTuple ts    ) = Set.unions (map freeVars ts)
   freeVars (TFunc t1 t2 _) = freeVars t1 <> freeVars t2
-  freeVars (TCon  _  ns _) = Set.fromList ns
+  freeVars (TApp l r _   ) = freeVars l <> freeVars r
   freeVars (TVar x _     ) = Set.singleton x
   freeVars (TMetaVar n   ) = Set.singleton n
 

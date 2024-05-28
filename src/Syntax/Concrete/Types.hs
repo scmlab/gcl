@@ -140,7 +140,7 @@ data Type
   | TBase TBase
   | TArray (Token "array") Interval (Token "of") Type
   | TFunc Type TokArrows Type
-  | TCon Name [Name]
+  | TApp Type Type
   | TVar Name
   deriving (Eq, Show)
 

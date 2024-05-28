@@ -662,7 +662,7 @@ type' = do
   typeVar = TVar <$> lower
 
   typeName :: Parser Type
-  typeName = TCon <$> upper <*> many lower
+  typeName = TApp <$> (TVar <$> identifier) <*> (TVar <$> identifier) -- TODO: This does not work well.
 
   array :: Parser Type
   array = TArray <$> tokenArray <*> interval <*> tokenOf <*> type'

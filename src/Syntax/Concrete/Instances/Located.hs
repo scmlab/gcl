@@ -82,7 +82,7 @@ instance Located Type where
   locOf (TBase a       ) = locOf a
   locOf (TArray l _ _ r) = l <--> r
   locOf (TFunc l _ r   ) = l <--> r
-  locOf (TCon l r      ) = l <--> r
+  locOf (TApp l r      ) = l <--> r
   locOf (TVar x        ) = locOf x
 
 --------------------------------------------------------------------------------

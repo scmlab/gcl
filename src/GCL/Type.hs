@@ -622,8 +622,10 @@ unifies (TFunc t1 t2 _) (TFunc t3 t4 _) l = do
   s1 <- unifies t1 t3 l
   s2 <- unifies (subst s1 t2) (subst s1 t4) l
   return (s2 `compose` s1)
-unifies (TCon n1 args1 _) (TCon n2 args2 _) _
-  | n1 == n2 && length args1 == length args2 = return mempty
+unifies (TApp l1 r1 _) (TApp l2 r2 _) _ = do
+  s1 <- unifies l1 l2
+  s2 <- unifies (subst s1 l2) (subst s1 r2) l
+  return (s2 `compose` s1)
 unifies (TVar x _)   t            l          = bind x t l
 unifies t            (TVar x _)   l          = bind x t l
 unifies (TMetaVar x) t            l          = bind x t l

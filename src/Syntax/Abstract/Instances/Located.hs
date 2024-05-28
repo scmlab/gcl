@@ -52,7 +52,7 @@ instance Located Type where
   locOf (TArray _ _ l) = l
   locOf (TTuple _    ) = NoLoc
   locOf (TFunc _ _ l ) = l
-  locOf (TCon  _ _ l ) = locOf l
+  locOf (TApp  _ _ l ) = locOf l
   locOf (TVar _ l    ) = l
   locOf (TMetaVar _  ) = NoLoc
 

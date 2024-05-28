@@ -190,11 +190,7 @@ instance ToAbstract Type A.Type where
       A.TArray <$> toAbstract a <*> toAbstract b <*> pure (locOf t)
     (TFunc a _ b) ->
       A.TFunc <$> toAbstract a <*> toAbstract b <*> pure (locOf t)
-    (TCon n@(Name tn l) ns    ) 
-      | tn == "Int"  && null ns -> return $ A.TBase A.TInt l
-      | tn == "Bool" && null ns -> return $ A.TBase A.TBool l
-      | tn == "Char" && null ns -> return $ A.TBase A.TChar l
-      | otherwise -> return $ A.TCon n ns (n <--> ns)
+    (TApp l r) -> A.TApp <$> toAbstract l <*> toAbstract r <*> pure (l <--> r)
     (TVar a      ) -> pure $ A.TVar a (locOf t)
     (TParen _ a _) -> do
       t' <- toAbstract a
@@ -203,7 +199,7 @@ instance ToAbstract Type A.Type where
         A.TArray a' b' _ -> pure $ A.TArray a' b' (locOf t)
         A.TTuple as'     -> pure $ A.TTuple as'
         A.TFunc a' b' _  -> pure $ A.TFunc a' b' (locOf t)
-        A.TCon  a' b' _  -> pure $ A.TCon a' b' (locOf t)
+        A.TApp  a' b' _  -> pure $ A.TApp a' b' (locOf t)
         A.TVar a' _      -> pure $ A.TVar a' (locOf t)
         A.TMetaVar a'    -> pure $ A.TMetaVar a'
 
