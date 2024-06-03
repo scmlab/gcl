@@ -152,7 +152,7 @@ instance CollectIds [Definition] where
                     n : ns -> formTy (TApp con n loc) ns loc
             let newTypeInfos = -- TODO: Fix possible name collision.
                   map
-                    (\(TypeDefnCtor cn ts) -> (Index cn, TypeDefnCtorInfo (wrapTFunc ts (formTy (TData name 1 {- FIXME: This is incorrect. -} (locOf name)) (TMetaVar <$> args) (name <--> args)))))
+                    (\(TypeDefnCtor cn ts) -> (Index cn, TypeDefnCtorInfo (wrapTFunc ts (formTy (TData name () (locOf name)) (TMetaVar <$> args) (name <--> args)))))
                     ctors
             let newTypeDefnInfos = (Index name, TypeDefnInfo args)
             modify (\(freshState, origTypeDefnInfos, origTypeInfos) -> (freshState, newTypeDefnInfos : origTypeDefnInfos, newTypeInfos <> origTypeInfos))

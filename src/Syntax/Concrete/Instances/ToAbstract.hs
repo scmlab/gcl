@@ -192,7 +192,7 @@ instance ToAbstract Type A.Type where
       A.TFunc <$> toAbstract a <*> toAbstract b <*> pure (locOf t)
     (TApp l r) -> A.TApp <$> toAbstract l <*> toAbstract r <*> pure (l <--> r)
     (TVar a      ) -> pure $ A.TVar a (locOf t)
-    (TData n     ) -> pure $ A.TData n 1 (locOf t) -- FIXME: Do not limit the parameter count to 1.
+    (TData n     ) -> pure $ A.TData n () (locOf t)
     (TParen _ a _) -> do
       t' <- toAbstract a
       case t' of

@@ -100,7 +100,7 @@ data Type
   | TTuple [Type]
   | TFunc Type Type Loc
   | TApp Type Type Loc
-  | TData Name Int Loc
+  | TData Name () {- TODO: kind system -} Loc
   | TVar Name Loc
   | TMetaVar Name
   deriving (Eq, Show, Generic)
