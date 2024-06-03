@@ -270,7 +270,8 @@ instance Collect () Highlighting Type where
     collect a
     addHighlighting J.SttOperator [] tok
     collect b
-  -- TODO: handle type application collect
-  collect TApp{}      = return ()
-  collect TData{}     = return () -- TODO: Fix this.
-  collect (TVar name) = addHighlighting J.SttType [] name
+  collect (TApp a b)  = do
+    collect a
+    collect b
+  collect (TData name) = addHighlighting J.SttType [] name
+  collect (TVar name)  = addHighlighting J.SttType [] name
