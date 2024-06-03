@@ -45,6 +45,9 @@ instance Render ArithOp where
   render (SImp     l) = tempHandleLoc l $ render (show TokLolipop)
 
 
+instance Render TypeOp where
+  render (Arrow l) = tempHandleLoc l $ render (show TokArrowU)
 instance Render Op where
   render (ChainOp op) = render op
   render (ArithOp op) = render op
+  render (TypeOp op) = render op

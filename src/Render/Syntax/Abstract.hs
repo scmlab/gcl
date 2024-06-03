@@ -10,7 +10,9 @@ import           Render.Element
 import           Render.Syntax.Common           ( )
 import           Syntax.Abstract
 -- import           Syntax.Abstract.Util           ( assignBindingToExpr )
+-- import           Syntax.Abstract.Util           ( assignBindingToExpr )
 import           Syntax.Common                  ( ArithOp(..)
+                                                , TypeOp(..)
                                                 , Fixity(..)
                                                 , Op(..)
                                                 , classify
@@ -19,6 +21,7 @@ import           Syntax.Common                  ( ArithOp(..)
                                                 , precOf
                                                 , initOrderIndex
                                                 )
+import           Data.Loc                       ( Loc(NoLoc) )
 
 ------------------------------------------------------------------------------
 
@@ -122,15 +125,19 @@ instance Render Pattern where
 
 -- | Type
 instance Render Type where
-  render (TBase TInt  _  ) = "Int"
-  render (TBase TBool _  ) = "Bool"
-  render (TBase TChar _  ) = "Char"
-  render (TTuple es      ) = "(" <+> punctuateE "," (map render es) <+> ")"
-  render (TFunc  a b    _) = render a <+> "→" <+> render b
-  render (TArray i b    _) = "array" <+> render i <+> "of" <+> render b
-  render (TCon   n args _) = render n <+> horzE (map render args)
-  render (TVar i _       ) = "TVar" <+> render i
-  render (TMetaVar n     ) = "TMetaVar" <+> render n
+  renderPrec _ (TBase TInt  _  ) = "Int"
+  renderPrec _ (TBase TBool _  ) = "Bool"
+  renderPrec _ (TBase TChar _  ) = "Char"
+  renderPrec _ (TTuple es      ) = "(" <+> punctuateE "," (map render es) <+> ")"
+  renderPrec n (TFunc  a b    _) =
+    parensIf n (Just . TypeOp $ Arrow NoLoc) $ 
+      renderPrec (HOLEOp . TypeOp $ Arrow NoLoc) a 
+      <+> "→"
+      <+> renderPrec (OpHOLE . TypeOp $ Arrow NoLoc) b
+  renderPrec _ (TArray i b    _) = "array" <+> render i <+> "of" <+> render b
+  renderPrec _ (TCon   n args _) = render n <+> horzE (map render args)
+  renderPrec _ (TVar i _       ) = "TVar" <+> render i
+  renderPrec _ (TMetaVar n     ) = "TMetaVar" <+> render n
 
 -- | Interval
 instance Render Interval where
@@ -196,6 +203,7 @@ parensIf pc mop = case isomerismOfContextAndCurrentOp pc mop of
       Just op -> case op of
         ChainOp _ -> True
         ArithOp _ -> False
+        TypeOp _ -> False
 
     -- In this scope, every "Nothing" case of "Maybe Op" means application.
     sameOpSym' :: PrecContext -> Maybe Op -> Bool

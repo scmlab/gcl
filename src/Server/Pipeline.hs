@@ -171,7 +171,7 @@ data TypeCheckResult = TypeCheckResult
 typeCheck :: ConvertResult -> PipelineM TypeCheckResult
 typeCheck result = do
   let program = convertedProgram result
-
+  undefined {- -- (This function is no longer needed)
   (_, scopeTree) <- case TypeChecking.runTypeCheck program of
     Left  e -> throwError [TypeError e]
     Right v -> return v
@@ -182,7 +182,7 @@ typeCheck result = do
         }
   save (TypeChecked typeChecked) -- save the current progress
   return typeChecked
-
+-}
 --------------------------------------------------------------------------------
 
 data SweepResult = SweepResult

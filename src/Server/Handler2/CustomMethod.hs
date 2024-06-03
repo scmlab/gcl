@@ -21,15 +21,14 @@ import qualified Server.Handler2.CustomMethod.InsertProofTemplate
 import qualified Server.Handler2.CustomMethod.SubstituteRedex
                                                         as SubstituteRedex (handler)
 import qualified Server.Handler2.CustomMethod.HelloWorld as HelloWorld (handler)
-import qualified Data.Text as Text
 
 
 handler :: JSON.Value -> (Response -> ServerM ()) -> ServerM ()
 handler params responder = do
   case JSON.fromJSON params :: JSON.Result [Request] of
-    JSON.Success (request:[]) -> dispatchRequest request
-    JSON.Success _            -> error "should not happen"
-    JSON.Error msg            -> responder $ CannotDecodeRequest $ show msg ++ "\n" ++ show params
+    JSON.Success [request] -> dispatchRequest request
+    JSON.Success _         -> error "should not happen"
+    JSON.Error msg         -> responder $ CannotDecodeRequest $ show msg ++ "\n" ++ show params
   where
     dispatchRequest :: Request -> ServerM ()
     dispatchRequest _request@(Req filePath reqKind) = do
