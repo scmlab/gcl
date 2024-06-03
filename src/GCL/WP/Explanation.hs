@@ -21,7 +21,7 @@ emptyExplain title l = Explain
 
 explainAssignment :: Pred -> Pred -> [Name] -> [Expr] -> Loc -> Origin
 explainAssignment pre post vars exprs l = Explain
-  { originHeader           = "Assigment"
+  { originHeader           = "Assignment"
   , originExplanation      = "After assignment, the postcondition"
                              <> (codeE . render) post
                              <> "should be implied by the precondition"

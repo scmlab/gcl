@@ -47,6 +47,9 @@ instance Located ArithOp where
   locOf (SConj    l) = l
   locOf (SImp     l) = l
 
+instance Located TypeOp where
+  locOf (Arrow l) = l
 instance Located Op where
   locOf (ChainOp op) = locOf op
   locOf (ArithOp op) = locOf op
+  locOf (TypeOp op) = locOf op

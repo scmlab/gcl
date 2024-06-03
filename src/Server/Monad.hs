@@ -5,12 +5,17 @@
 
 module Server.Monad
   ( ServerM
-  , GlobalEnv(globalChan)
+  , GlobalEnv(..)
   , initGlobalEnv
   , runServerM
   , customRequestResponder
   , customRequestToNotification
   , interpret
+  , logText
+  , sendDiagnosticsLSP
+  , convertErrorsToResponsesAndDiagnostics
+  , bumpVersion
+  , LoadedProgram(..)
   ) where
 
 import           Control.Concurrent             ( Chan
@@ -47,6 +52,12 @@ import           Server.Pipeline                ( Instruction(..)
                                                 )
 import qualified Server.Pipeline               as DSL
 import qualified Server.SrcLoc                 as SrcLoc
+import GCL.WP.Type (StructWarning)
+import Server.IntervalMap (IntervalMap)
+import Syntax.Abstract                         as A
+import Syntax.Concrete                         as C
+import GCL.Predicate (PO, Spec)
+import Data.IntMap (IntMap)
 
 
 --------------------------------------------------------------------------------
@@ -136,6 +147,21 @@ data GlobalEnv = GlobalEnv
     -- Counter for generating fresh numbers
     globalCounter      :: IORef Int
   , globalCurrentStage :: IORef (Map FilePath PipelineState)
+    -- NEW: book keeping abstract syntax and hints
+  , loadedPrograms :: IORef (Map FilePath LoadedProgram)
+  }
+
+data LoadedProgram = LoadedProgram
+  { _concreteProgram   :: C.Program
+  , _highlightingInfos :: [J.SemanticTokenAbsolute]
+  , _abstractProgram   :: A.Program
+  , _scopingInfo       :: IntervalMap J.LocationLink
+  , _typeCheckingInfo  :: IntervalMap (J.Hover, A.Type) 
+  , _proofObligations  :: [PO]
+  , _specifiations     :: [Spec]
+  , _warnings          :: [StructWarning]
+  , _redexes           :: IntMap (Int, A.Expr)
+  , _variableCounter   :: Int
   }
 
 -- | Constructs an initial global state
@@ -145,6 +171,7 @@ initGlobalEnv =
     <$> newChan
     -- <*> newIORef Map.empty
     <*> newIORef 0
+    <*> newIORef Map.empty
     <*> newIORef Map.empty
 
 --------------------------------------------------------------------------------

@@ -15,16 +15,18 @@ import           Data.Text                      ( Text )
 import           Error                          ( Error(Others) )
 import           GCL.Predicate
 import qualified GCL.Substitution              as Substitution
-import           Render                         ( Render(render) )
+import           Render                         ( Render(render), Section (Section), Deco(..), Block(..) )
 import           Render.Predicate               ( exprOfPred )
 import           Pretty
 import           Server.CustomMethod
-import           Server.Monad
+import           Server.Monad            hiding ( logText, bumpVersion )
 import           Server.Pipeline
 import           Syntax.Abstract.Util           ( programToScopeForSubstitution
                                                 )
 
 import qualified Language.LSP.Types            as J
+import Data.String (IsString(fromString))
+import Server.Handler.Diagnostic (makeDiagnostic)
 
 
 handleInspect :: Range -> PipelineM [ResKind]
@@ -40,9 +42,10 @@ handleRefine range = do
   mute True
   setLastSelection range
   source               <- getSource
+  -- find the spec and its content in the source
   (spec, payloadLines) <- refine source range
 
-  -- remove the Spec
+  -- add indentation to the content
   let indentedPayload = case payloadLines of
         []  -> ""
         [x] -> x
@@ -50,9 +53,12 @@ handleRefine range = do
           let indentation =
                 Text.replicate (posCol (rangeStart (specRange spec)) - 1) " "
           in  Text.unlines $ x : map (indentation <>) xs
+  
+  -- remove the brackets of the spec and leave only the content
   source'     <- editText (specRange spec) indentedPayload
-  parsed      <- parse source'
 
+  -- reload
+  parsed      <- parse source'
   converted   <- convert parsed
   typeChecked <- typeCheck converted
   mute False
@@ -64,7 +70,7 @@ handleInsertAnchor :: Text -> PipelineM [ResKind]
 handleInsertAnchor hash = do
   -- mute the event listener before editing the source
   mute True
-  
+
   -- range for appending the template of proof
   source        <- getSource
   (_, abstract) <- parseProgram source
@@ -74,17 +80,17 @@ handleInsertAnchor hash = do
   swept <- sweep typeChecked
   -- read the PO here
   let thePO  = lookup hash $ map (\x->(poAnchorHash x,x)) (sweptPOs swept)
-  
+
   -- template of proof to be appended to the source
   let template = case thePO of
                   Nothing -> ""
-                  Just po -> "{- #" <> hash <> "\n" 
+                  Just po -> "{- #" <> hash <> "\n"
                               <> preExpr <> "\n"
                               <> "⇒" <> "\n"
                               <> postExpr <> "\n"
                               <> Text.pack (replicate len '=')
                               <> "\n\n-}\n"
-                    where 
+                    where
                       preExpr = docToText $ pretty $ exprOfPred $ poPre po
                       postExpr = docToText $ pretty $ exprOfPred $ poPost po
                       len = max (max (Text.length preExpr) (Text.length postExpr) - 2) 5
@@ -152,6 +158,15 @@ handleSubst i = do
           save (Swept newResult)
           return [ResSubstitute i (render newExpr)]
 
+handleHelloWorld :: Range -> PipelineM [ResKind]
+handleHelloWorld range = do
+  logText "Hello, world!"
+  _ <- sendDiagnostics [makeDiagnostic Nothing range "Hello, World?" "This is a warning" ]
+  version <- bumpVersion
+  let titleBlock = Header "Hello, world" Nothing
+  let contentBlock = Paragraph $ fromString "LSP server successfully responded."
+  return [ResDisplay version [Section Blue [titleBlock, contentBlock]]]
+
 handleCustomMethod :: ReqKind -> PipelineM [ResKind]
 handleCustomMethod = \case
   ReqInspect      range -> handleInspect range
@@ -159,6 +174,8 @@ handleCustomMethod = \case
   ReqInsertAnchor hash  -> handleInsertAnchor hash
   ReqSubstitute   i     -> handleSubst i
   ReqDebug              -> return $ error "crash!"
+  ReqHelloWorld   range -> handleHelloWorld range
+  _                     -> return $ error "Not yet implemented."
 
 handler :: JSON.Value -> (Response -> ServerM ()) -> ServerM ()
 handler params responder = do

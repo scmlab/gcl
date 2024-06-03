@@ -15,7 +15,7 @@ import           Language.LSP.Server            ( Handlers
                                                 , notificationHandler
                                                 , requestHandler
                                                 )
-import           Server.Monad
+import           Server.Monad                  hiding (logText)
 import           Server.Pipeline
 
 import           Error                          ( Error )

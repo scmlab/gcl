@@ -14,19 +14,18 @@ import           Network.Simple.TCP             ( HostPreference(Host)
                                                 , serve
                                                 )
 import           Network.Socket                 ( socketToHandle )
-import           Server.Handler                 ( handlers )
+import           Server.Handler2                ( handlers )
 import           Server.Monad
 
 --------------------------------------------------------------------------------
 
 -- entry point of the LSP server
-run :: Bool -> IO Int
-run devMode = do
+run :: Bool -> String -> IO Int
+run devMode port = do
   env <- initGlobalEnv
   if devMode
     then do
-      let port = "3000"
-      _ <- forkIO (printLog env)
+      _threadId <- forkIO (printLog env)
       serve (Host "127.0.0.1") port $ \(sock, _remoteAddr) -> do
         putStrLn $ "== connection established at " ++ port ++ " =="
         handle <- socketToHandle sock ReadWriteMode
@@ -40,7 +39,6 @@ run devMode = do
     result <- readChan (globalChan env)
     when devMode $ do
       Text.putStrLn result
-
   serverDefn :: GlobalEnv -> ServerDefinition ()
   serverDefn env = ServerDefinition
     { defaultConfig         = ()

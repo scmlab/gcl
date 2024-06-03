@@ -9,16 +9,17 @@ module Server.Handler.GoToDefn
 import           Data.Maybe                     ( maybeToList )
 import           Error                          ( Error )
 import           Language.LSP.Types      hiding ( Range )
-import           Server.Monad
+import qualified Language.LSP.Types            as LSP
+import           Server.Monad            hiding ( logText )
 import           Server.Pipeline
 import qualified Server.SrcLoc                 as SrcLoc
 import qualified Server.IntervalMap               as IntervalMap
 
-ignoreErrors :: ([Error], Maybe [LocationLink]) -> [LocationLink]
+ignoreErrors :: ([Error], Maybe [LSP.LocationLink]) -> [LSP.LocationLink]
 ignoreErrors (_, Nothing) = []
 ignoreErrors (_, Just xs) = xs
 
-handler :: Uri -> Position -> ([LocationLink] -> ServerM ()) -> ServerM ()
+handler :: Uri -> Position -> ([LSP.LocationLink] -> ServerM ()) -> ServerM ()
 handler uri position responder = do
   case uriToFilePath uri of
     Nothing       -> return ()

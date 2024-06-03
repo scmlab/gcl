@@ -66,7 +66,12 @@ data ReqKind
   | ReqInsertAnchor Text
   | ReqSubstitute Int
   | ReqDebug
-  deriving (Generic)
+  -- new
+  | ReqHelloWorld Range
+  | ReqReload
+  | ReqRefine2 Range Text
+  | ReqInsertProofTemplate Range Text
+  deriving Generic
 
 instance FromJSON ReqKind
 
@@ -76,6 +81,13 @@ instance Show ReqKind where
   show (ReqInsertAnchor hash ) = "InsertAnchor " <> show hash
   show (ReqSubstitute   i    ) = "Substitute " <> show i
   show ReqDebug                = "Debug"
+  show (ReqHelloWorld   range) = "HelloWorld " <> show (ShortRange range)
+  show ReqReload               = "Reload"
+  show (ReqRefine2 range text) = "Refine2 " <> show (ShortRange range)
+                                  <>    " " <> show text
+  show (ReqInsertProofTemplate range hash)
+                               = "InsertProofTemplate " <> show (ShortRange range)
+                                  <>                " " <> show hash
 
 data Request = Req FilePath ReqKind
   deriving Generic

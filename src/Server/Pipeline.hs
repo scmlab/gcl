@@ -171,7 +171,7 @@ data TypeCheckResult = TypeCheckResult
 typeCheck :: ConvertResult -> PipelineM TypeCheckResult
 typeCheck result = do
   let program = convertedProgram result
-
+  undefined {- -- (This function is no longer needed)
   (_, scopeTree) <- case TypeChecking.runTypeCheck program of
     Left  e -> throwError [TypeError e]
     Right v -> return v
@@ -182,7 +182,7 @@ typeCheck result = do
         }
   save (TypeChecked typeChecked) -- save the current progress
   return typeChecked
-
+-}
 --------------------------------------------------------------------------------
 
 data SweepResult = SweepResult
@@ -237,6 +237,11 @@ sweep result = do
 type PipelineM
   = FreeT Instruction (RWST FilePath () PipelineState (Except [Error]))
 
+-- PipelineM a
+-- ~> a | Instruction (PipelineM a)
+-- ~> a | Instruction (a | Instruction (PipelineM a))
+-- ~~ a | Instruction a | (Instruction (Instruction a)) | ...
+
 runPipelineM
   :: FilePath
   -> PipelineState
@@ -270,6 +275,7 @@ data Instruction next
   | Log Text next -- ^ Make some noise
   | SendDiagnostics [J.Diagnostic] next -- ^ Send Diagnostics
   deriving (Functor)
+
 
 initState :: FilePath -> PipelineState
 initState filepath = PipelineState [] (Raw filepath) False Nothing 0

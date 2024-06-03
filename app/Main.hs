@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE LambdaCase #-}
 
 module Main where
 
@@ -11,40 +12,56 @@ import Server (run)
 
 main :: IO ()
 main = do
-  (opts, _) <- getArgs >>= parseOpts
-  case optMode opts of
+  (Options mode port, _) <- getArgs >>= parseOpts
+  case mode of
     ModeHelp -> putStrLn $ usageInfo usage options
     ModeLSP -> do
-      _ <- run False
+      _ <- run False port
       return ()
-    ModeDev -> do 
-      _ <- run True 
+    ModeDev -> do
+      _ <- run True port
       return ()
 
 --------------------------------------------------------------------------------
 
 -- | Command-line arguments
-data Mode = ModeLSP | ModeHelp | ModeDev
+data Mode = ModeLSP | ModeHelp | ModeDev deriving Show
 
-newtype Options = Options
-  { optMode :: Mode
+data Options = Options
+  { _mode :: Mode
+  , _port :: String
   }
 
 defaultOptions :: Options
-defaultOptions = Options {optMode = ModeLSP}
+defaultOptions = Options
+  { _mode = ModeLSP
+  , _port = "3000"
+  }
 
 options :: [OptDescr (Options -> Options)]
 options =
   [ Option
       ['h']
       ["help"]
-      (NoArg (\opts -> opts {optMode = ModeHelp}))
+      (NoArg (\opts -> opts {_mode = ModeHelp}))
       "print this help message",
     Option
       ['d']
       ["dev"]
-      (NoArg (\opts -> opts {optMode = ModeDev}))
-      "for testing"
+      (NoArg (\opts -> opts {_mode = ModeDev}))
+      "for testing",
+    Option
+      []
+      ["stdio"]
+      (NoArg (\opts -> opts {_mode = ModeLSP}))
+      "for testing",
+    Option
+      ['s']
+      ["socket"]
+      (OptArg (\case
+        Nothing -> id
+        Just portNumber -> \opts -> opts {_port = portNumber}) "PORT_NUMBER")
+      "socket port number"
   ]
 
 usage :: String

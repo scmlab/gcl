@@ -70,8 +70,15 @@ data ArithOp =
   | SImp Loc
   deriving (Eq, Show, Generic, Ord)
 
+newtype TypeOp = Arrow Loc
+  deriving (Eq, Show, Generic, Ord)
+
 -- | Operators
 data Op = ChainOp ChainOp | ArithOp ArithOp
+        -- It's debatable whether we should put type operators here.
+        -- This could be seen as a hack (as it is used as a workaround in order not to change too much code),
+        -- However, this might also be justified in future versions of Guabao when we don't distinguish term-level and type-level operators.
+        | TypeOp TypeOp
   deriving (Show, Eq, Generic, Ord)
 
 
@@ -124,6 +131,9 @@ precedenceOrder =
   , [ (ChainOp (EQProp  NoLoc), InfixL)
     , (ChainOp (EQPropU NoLoc), InfixL)
     ]
+  -- Below is a type operator and is naturally very different from other operators.
+  -- It is put it here because we need a way to know its fixity.
+  , [ (TypeOp (Arrow NoLoc), InfixR) ]
   ]
 
 initOrderIndex :: Int
@@ -227,6 +237,7 @@ wipeLoc op = case op of
     SConj _   -> SConj NoLoc
     SImp _    -> SImp NoLoc
     )
+  TypeOp (Arrow _) -> TypeOp $ Arrow NoLoc
 
 
 

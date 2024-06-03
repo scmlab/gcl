@@ -1,6 +1,6 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.34.4.
+-- This file has been generated from package.yaml by hpack version 0.36.0.
 --
 -- see: https://github.com/sol/hpack
 
@@ -63,6 +63,20 @@ library
       Server.Handler.Diagnostic
       Server.Handler.GoToDefn
       Server.Handler.Hover
+      Server.Handler2
+      Server.Handler2.CustomMethod
+      Server.Handler2.CustomMethod.HelloWorld
+      Server.Handler2.CustomMethod.InsertProofTemplate
+      Server.Handler2.CustomMethod.Inspect
+      Server.Handler2.CustomMethod.Refine
+      Server.Handler2.CustomMethod.Reload
+      Server.Handler2.CustomMethod.SubstituteRedex
+      Server.Handler2.CustomMethod.Utils
+      Server.Handler2.GoToDefinition
+      Server.Handler2.Hover
+      Server.Handler2.Initialized
+      Server.Handler2.SemanticTokens
+      Server.Handler2.Utils
       Server.Highlighting
       Server.Hover
       Server.IntervalMap
@@ -90,6 +104,7 @@ library
       Syntax.Parser.TokenStream
       Syntax.Parser.Util
       Syntax.Substitution
+      Syntax.Typed
   other-modules:
       Paths_gcl
   hs-source-dirs:
@@ -214,6 +229,20 @@ test-suite gcl-test
       Server.Handler.Diagnostic
       Server.Handler.GoToDefn
       Server.Handler.Hover
+      Server.Handler2
+      Server.Handler2.CustomMethod
+      Server.Handler2.CustomMethod.HelloWorld
+      Server.Handler2.CustomMethod.InsertProofTemplate
+      Server.Handler2.CustomMethod.Inspect
+      Server.Handler2.CustomMethod.Refine
+      Server.Handler2.CustomMethod.Reload
+      Server.Handler2.CustomMethod.SubstituteRedex
+      Server.Handler2.CustomMethod.Utils
+      Server.Handler2.GoToDefinition
+      Server.Handler2.Hover
+      Server.Handler2.Initialized
+      Server.Handler2.SemanticTokens
+      Server.Handler2.Utils
       Server.Highlighting
       Server.Hover
       Server.IntervalMap
@@ -241,6 +270,7 @@ test-suite gcl-test
       Syntax.Parser.TokenStream
       Syntax.Parser.Util
       Syntax.Substitution
+      Syntax.Typed
       Paths_gcl
   hs-source-dirs:
       test
