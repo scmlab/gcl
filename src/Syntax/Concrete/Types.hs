@@ -67,7 +67,7 @@ data Definition
   | FuncDefn Name [Name] (Token "=") Expr
   deriving (Eq, Show)
 
-data TypeDefnCtor = TypeDefnCtor Name [Type] deriving (Eq, Show)
+data TypeDefnCtor = TypeDefnCtor Name [Name] deriving (Eq, Show)
 
 --------------------------------------------------------------------------------
 -- | Declaration
@@ -141,6 +141,7 @@ data Type
   | TArray (Token "array") Interval (Token "of") Type
   | TFunc Type TokArrows Type
   | TApp Type Type
+  | TData Name -- TODO: add range
   | TVar Name
   deriving (Eq, Show)
 

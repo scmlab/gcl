@@ -107,9 +107,8 @@ instance Collect () Highlighting Declaration where
     collect a
 
 instance Collect () Highlighting TypeDefnCtor where
-  collect (TypeDefnCtor name types) = do
+  collect (TypeDefnCtor name _) = do
     collect (AsName name)
-    collect types
 
 instance Collect () Highlighting DeclBase where
   collect (DeclBase as _ b) = do
@@ -273,4 +272,5 @@ instance Collect () Highlighting Type where
     collect b
   -- TODO: handle type application collect
   collect TApp{}      = return ()
+  collect TData{}     = return () -- TODO: Fix this.
   collect (TVar name) = addHighlighting J.SttType [] name

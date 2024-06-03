@@ -152,7 +152,7 @@ instance CollectIds [Definition] where
                     n : ns -> formTy (TApp con n loc) ns loc
             let newTypeInfos = -- TODO: Fix possible name collision.
                   map
-                    (\(TypeDefnCtor cn ts) -> (Index cn, TypeDefnCtorInfo (wrapTFunc ts (formTy (TVar name (locOf name)) (TMetaVar <$> args) (name <--> args)))))
+                    (\(TypeDefnCtor cn ts) -> (Index cn, TypeDefnCtorInfo (wrapTFunc ts (formTy (TData name 1 {- FIXME: This is incorrect. -} (locOf name)) (TMetaVar <$> args) (name <--> args)))))
                     ctors
             let newTypeDefnInfos = (Index name, TypeDefnInfo args)
             modify (\(freshState, origTypeDefnInfos, origTypeInfos) -> (freshState, newTypeDefnInfos : origTypeDefnInfos, newTypeInfos <> origTypeInfos))
@@ -284,7 +284,7 @@ instance Elab Program where
 
 instance Elab Definition where
   elaborate (TypeDefn name args ctors loc) env = do
-    let m = Map.fromList (map (, ()) args)
+    let m = Set.fromList args
     mapM_ (\(TypeDefnCtor _ ts) -> mapM_ (scopeCheck m) ts) ctors
     ctors' <- mapM (\ctor -> do
                       (_, typed, _) <- elaborate ctor env
@@ -292,13 +292,8 @@ instance Elab Definition where
                    ) ctors
     return (Nothing, Typed.TypeDefn name args ctors' loc, mempty)
    where
-    scopeCheck :: MonadError TypeError m => Map.Map Name () -> Type -> m ()
-    scopeCheck m (TApp l r _) = mapM_
-      (\a -> case Map.lookup a m of
-        Just _ -> return ()
-        _      -> throwError $ NotInScope a
-      ) (freeVars l <> freeVars r)
-    scopeCheck _ _ = return ()
+    scopeCheck :: MonadError TypeError m => Set.Set Name -> Name -> m ()
+    scopeCheck m n = if Set.member n m then return () else throwError $ NotInScope n
   elaborate (FuncDefnSig name ty maybeExpr loc) env = do
     expr' <- mapM (\expr -> do
                     (_, typed, _) <- elaborate expr env
@@ -621,6 +616,7 @@ unifies (TApp l1 r1 loc1) (TApp l2 r2 loc2) _ = do
   s1 <- unifies l1 l2 loc1
   s2 <- unifies (subst s1 r1) (subst s1 r2) loc2
   return (s2 `compose` s1)
+unifies t1@(TData name1 _ _) t2@(TData name2 _ _) l = if name1 == name2 then pure mempty else throwError $ UnifyFailed t1 t2 l
 unifies (TVar x _)   t            l          = bind x t l
 unifies t            (TVar x _)   l          = bind x t l
 unifies (TMetaVar x) t            l          = bind x t l
@@ -692,6 +688,7 @@ instance Substitutable Type Type where
   subst s (TTuple ts    ) = TTuple (map (subst s) ts)
   subst s (TFunc t1 t2 l) = TFunc (subst s t1) (subst s t2) l
   subst s (TApp l r loc ) = TApp (subst s l) (subst s r) loc
+  subst _ t@TData {}      = t
   subst s t@(TVar n _)    = Map.findWithDefault t n s
   subst s t@(TMetaVar n)  = Map.findWithDefault t n s
 

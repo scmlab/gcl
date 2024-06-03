@@ -136,6 +136,7 @@ instance Render Type where
       <+> renderPrec (OpHOLE . TypeOp $ Arrow NoLoc) b
   renderPrec _ (TArray i b    _) = "array" <+> render i <+> "of" <+> render b
   renderPrec _ (TApp l r _     ) = render l <+> render r -- TODO: Deal with parentheses.
+  renderPrec _ (TData n _ _    ) = render n
   renderPrec _ (TVar i _       ) = render i
   renderPrec _ (TMetaVar n     ) = render n
 

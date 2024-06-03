@@ -61,10 +61,8 @@ instance Pretty Definition where
 
 
 instance Pretty TypeDefnCtor where
-  pretty (TypeDefnCtor cn ts) = pretty cn <+> hsep (map wrap ts)
-   where
-    wrap t@TBase{} = pretty t
-    wrap t         = "(" <> pretty t <> ")"
+  pretty (TypeDefnCtor cn ts) = pretty cn <+> hsep (pretty <$> ts)
+
 --------------------------------------------------------------------------------
 
 -- | Stmt

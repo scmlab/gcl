@@ -53,6 +53,7 @@ instance Located Type where
   locOf (TTuple _    ) = NoLoc
   locOf (TFunc _ _ l ) = l
   locOf (TApp  _ _ l ) = locOf l
+  locOf (TData _ _ l ) = l
   locOf (TVar _ l    ) = l
   locOf (TMetaVar _  ) = NoLoc
 

@@ -90,7 +90,7 @@ instance ToAbstract Definition [A.Definition] where
     return [A.FuncDefn name [wrapLam args body']]
 
 instance ToAbstract TypeDefnCtor A.TypeDefnCtor where
-  toAbstract (TypeDefnCtor c ts) = A.TypeDefnCtor c <$> toAbstract ts
+  toAbstract (TypeDefnCtor c ts) = return $ A.TypeDefnCtor c ts
 
 --------------------------------------------------------------------------------
 -- | Declaraion
@@ -192,6 +192,7 @@ instance ToAbstract Type A.Type where
       A.TFunc <$> toAbstract a <*> toAbstract b <*> pure (locOf t)
     (TApp l r) -> A.TApp <$> toAbstract l <*> toAbstract r <*> pure (l <--> r)
     (TVar a      ) -> pure $ A.TVar a (locOf t)
+    (TData n     ) -> pure $ A.TData n 1 (locOf t) -- FIXME: Do not limit the parameter count to 1.
     (TParen _ a _) -> do
       t' <- toAbstract a
       case t' of
@@ -200,6 +201,7 @@ instance ToAbstract Type A.Type where
         A.TTuple as'     -> pure $ A.TTuple as'
         A.TFunc a' b' _  -> pure $ A.TFunc a' b' (locOf t)
         A.TApp  a' b' _  -> pure $ A.TApp a' b' (locOf t)
+        A.TData name i _ -> pure $ A.TData name i (locOf t)
         A.TVar a' _      -> pure $ A.TVar a' (locOf t)
         A.TMetaVar a'    -> pure $ A.TMetaVar a'
 

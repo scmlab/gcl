@@ -65,6 +65,7 @@ freeMetaVars (TArray _ t _ ) = freeMetaVars t
 freeMetaVars (TTuple ts    ) = Set.unions (map freeMetaVars ts)
 freeMetaVars (TFunc t1 t2 _) = freeMetaVars t1 <> freeMetaVars t2
 freeMetaVars (TApp l r _   ) = freeMetaVars l <> freeMetaVars r
+freeMetaVars (TData _ _ _  ) = mempty
 freeMetaVars (TVar _ _     ) = mempty
 freeMetaVars (TMetaVar n   ) = Set.singleton n
 
@@ -100,6 +101,7 @@ instance Free Type where
   freeVars (TTuple ts    ) = Set.unions (map freeVars ts)
   freeVars (TFunc t1 t2 _) = freeVars t1 <> freeVars t2
   freeVars (TApp l r _   ) = freeVars l <> freeVars r
+  freeVars (TData _ _ _  ) = mempty
   freeVars (TVar x _     ) = Set.singleton x
   freeVars (TMetaVar n   ) = Set.singleton n
 

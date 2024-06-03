@@ -29,10 +29,10 @@ import           Syntax.Common                  ( Name(..)
     --Nothing
     --(locOf cn)
 
-wrapTFunc :: [Type] -> Type -> Type
+wrapTFunc :: [Name] -> Type -> Type
 wrapTFunc []       t  = t
-wrapTFunc [t     ] t0 = TFunc t t0 (locOf t)
-wrapTFunc (t : ts) t0 = let t0' = wrapTFunc ts t0 in TFunc t t0' (t <--> t0')
+wrapTFunc [t     ] t0 = TFunc (TMetaVar t) t0 (locOf t)
+wrapTFunc (t : ts) t0 = let t0' = wrapTFunc ts t0 in TFunc (TMetaVar t) t0' (t <--> t0')
 
 getGuards :: [GdCmd] -> [Expr]
 getGuards = fst . unzipGdCmds

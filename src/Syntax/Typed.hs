@@ -19,7 +19,7 @@ data TypedDefinition
   | FuncDefn Name [TypedExpr]
   deriving (Eq, Show)
 
-data TypedTypeDefnCtor = TypedTypeDefnCtor Name [Type]
+data TypedTypeDefnCtor = TypedTypeDefnCtor Name [Name]
   deriving (Eq, Show)
 
 data TypedDeclaration

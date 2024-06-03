@@ -267,7 +267,7 @@ definition = choice [try funcDefnSig, typeDefn, funcDefnF]
   typeDefn = TypeDefn <$> tokenData <*> upper <*> many lower <*> tokenEQ <*> sepByGuardBar typeDefnCtor
 
   typeDefnCtor :: Parser TypeDefnCtor
-  typeDefnCtor = TypeDefnCtor <$> upper <*> many type'
+  typeDefnCtor = TypeDefnCtor <$> upper <*> many lower
 
 definitionBlock :: Parser DefinitionBlock
 definitionBlock = DefinitionBlock <$> tokenDeclOpen <*> sepByAlignmentOrSemi definition <*> tokenDeclClose
@@ -652,13 +652,25 @@ type' = do
     return $ \x y -> TFunc x arrow y
 
   term :: Parser Type
-  term = parensType <|> array <|> typeVar <?> "type term"
+  term = prim <|> parensType <|> array <|> typeVar <?> "type term"
+
+  prim :: Parser Type
+  prim = tInt <|> tBool <|> tChar
+  
+  tInt :: Parser Type
+  tInt = withRange $ (TBase . TInt) <$ symbol TokIntType
+  
+  tBool :: Parser Type
+  tBool = withRange $ (TBase . TBool) <$ symbol TokBoolType
+
+  tChar :: Parser Type
+  tChar = withRange $ (TBase . TChar) <$ symbol TokCharType
 
   parensType :: Parser Type
   parensType = TParen <$> tokenParenOpen <*> type' <*> tokenParenClose
 
   typeVar :: Parser Type
-  typeVar = TVar <$> identifier
+  typeVar = TData <$> upper
 
   array :: Parser Type
   array = TArray <$> tokenArray <*> interval <*> tokenOf <*> type'
@@ -691,7 +703,7 @@ upperName = extract p
 upper :: Parser Name
 upper =
   withLoc (Name <$> upperName)
-    <?> "identifier that starts with a uppercase letter"
+    <?> "identifier that starts with an uppercase letter"
 
 lowerName :: Parser Text
 lowerName = extract p
