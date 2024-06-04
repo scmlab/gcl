@@ -15,11 +15,9 @@ import           Data.Loc           ( Located
                                     , locOf
                                     )
 import           Data.Loc.Range
-import qualified GCL.Type           as TypeChecking
 import           Server.IntervalMap ( IntervalMap )
 import qualified Server.IntervalMap as IntervalMap
 import           Syntax.Abstract
-import           Syntax.Common
 import           Syntax.Typed                   as Typed
 
 collectHoverInfo :: Typed.TypedProgram -> IntervalMap (J.Hover, Type)
@@ -61,10 +59,10 @@ instance Collect Typed.TypedProgram where
 instance Collect Typed.TypedDefinition where
   collect (Typed.TypeDefn _ _ ctors _) = foldMap collect ctors
   collect (Typed.FuncDefnSig arg t prop _) = annotateType arg t <> maybe mempty collect prop
-  collect (Typed.FuncDefn name exprs) = foldMap collect exprs
+  collect (Typed.FuncDefn _name exprs) = foldMap collect exprs
 
 instance Collect Typed.TypedTypeDefnCtor where
-  collect (Typed.TypedTypeDefnCtor name tys) = mempty
+  collect (Typed.TypedTypeDefnCtor _name _tys) = mempty
 
 --------------------------------------------------------------------------------
 -- Declaration
@@ -79,7 +77,7 @@ instance Collect Typed.TypedDeclaration where
 instance Collect Typed.TypedStmt where
   collect (Typed.Skip _) = mempty
   collect (Typed.Abort _) = mempty
-  collect (Typed.Assign names exprs _) = foldMap collect exprs -- TODO: Display hover info for names.
+  collect (Typed.Assign _names exprs _) = foldMap collect exprs -- TODO: Display hover info for names.
   collect (Typed.AAssign arr index rhs _) = collect arr <> collect index <> collect rhs
   collect (Typed.Assert expr _) = collect expr
   collect (Typed.LoopInvariant inv bnd _) = collect inv <> collect bnd

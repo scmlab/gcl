@@ -28,7 +28,6 @@ import           GCL.Common                     ( Free(freeVars)
                                                 , Counterous(..)
                                                 , Fresh(..)
                                                 , FreshState
-                                                , fresh
                                                 , freshPre
                                                 )
 import           GCL.Predicate                  ( PO(PO)

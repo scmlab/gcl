@@ -8,7 +8,6 @@ import           Control.Monad.Except           ( MonadError(throwError)
                                                 )
 import           Data.Text                      ( Text )
 import           Data.Loc                       ( Loc(..), locOf )
-import           Data.Set                       ( member )
 import           Data.Map                       ( fromList )
 import           GCL.Predicate                  ( Pred(..) )
 import           GCL.Predicate.Util             ( conjunct
@@ -17,7 +16,6 @@ import           GCL.Predicate.Util             ( conjunct
 import           GCL.Common                     ( Fresh(..)
                                                 , freshName
                                                 , freshName'
-                                                , freeVars
                                                 )
 import           Pretty                         ( toText )
 import GCL.WP.Type
