@@ -1,39 +1,37 @@
-{-# LANGUAGE MultiParamTypeClasses #-}
+
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE BlockArguments #-}
+{-# LANGUAGE NamedFieldPuns #-}
 
 module Server.Handler.Hover where
 
--- import           Data.Loc                       ( posCoff )
--- import           Language.LSP.Types      hiding ( Range )
--- import           Pretty                         ( toText )
--- import qualified Server.SrcLoc                 as SrcLoc
--- import qualified Server.IntervalMap               as IntervalMap
+import           Data.Loc                       ( posCoff )
+import qualified Language.LSP.Types            as LSP
+import           Pretty                         ( toText )
+import qualified Server.SrcLoc                 as SrcLoc
+import qualified Server.IntervalMap            as IntervalMap
+import Server.PositionMapping (PositionDelta, toCurrentRange, PositionMapping(..), PositionResult(..), fromDelta)
 
--- import Server.Handler2.Utils
--- import Server.Monad (ServerM, LoadedProgram (..))
+import Server.Monad (ServerM, FileState (..), loadFileState, logText)
 
--- handler :: Uri -> Position -> (Maybe Hover -> ServerM ()) -> ServerM ()
--- handler uri position responder = case uriToFilePath uri of
---   Nothing       -> responder Nothing
---   Just filepath -> do
---     maybeSource <- getSource filepath
---     case maybeSource of
---       Nothing -> responder Nothing
---       Just source -> do
---         let table = SrcLoc.makeToOffset source
---         let pos   = SrcLoc.fromLSPPosition table filepath position
---         logText $ " ---> Hover " <> toText (posCoff pos)
-        
---         maybeLoadedProgram <- dumpProgram filepath
---         case maybeLoadedProgram of
---           Nothing -> responder Nothing
---           Just loadedProgram -> do
---             case IntervalMap.lookup pos (_typeCheckingInfo loadedProgram) of
---               Nothing -> do
---                   -- logText $ toText xs
---                   logText "    < Hover (not found)"
---                   responder Nothing
---               Just (hover, _) -> do
---                   logText $ "    < Hover " <> toText hover
---                   responder (Just hover)
+handler :: LSP.Uri -> LSP.Position -> (Maybe LSP.Hover -> ServerM ()) -> ServerM ()
+handler uri lspPosition responder =do
+  logText "<-- Goto Definition"
+  case LSP.uriToFilePath uri of
+    Nothing       -> responder Nothing
+    Just filePath -> do
+      maybeFileState <- loadFileState filePath
+      case maybeFileState of
+        Nothing                           -> responder Nothing
+        Just (FileState{hoverInfos, positionDelta, toOffsetMap}) -> do
+          case (fromDelta positionDelta) lspPosition of
+            PositionExact oldLspPosition -> do
+              let oldPos = SrcLoc.fromLSPPosition toOffsetMap filePath oldLspPosition
+              case IntervalMap.lookup oldPos hoverInfos of
+                Nothing             -> responder Nothing
+                Just (hover, _type) -> responder $ Just $ toCurrentHover positionDelta hover
+            _                            -> responder Nothing
+
+toCurrentHover :: PositionDelta -> LSP.Hover -> LSP.Hover
+toCurrentHover positionDelta (LSP.Hover contents maybeRange)
+  = LSP.Hover contents (maybeRange >>= (toCurrentRange $ PositionMapping positionDelta))

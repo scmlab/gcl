@@ -17,19 +17,21 @@ import qualified GCL.WP                        as WP
 import qualified Syntax.Concrete as C
 import qualified Syntax.Parser as Parser
 import qualified Syntax.Abstract as A
+import qualified Syntax.Typed as T
 import Error (Error(..))
 import Data.Loc (posCol)
 import Server.Highlighting (collectHighlighting)
 import Server.GoToDefn (collectLocationLinks)
+import Server.Hover (collectHoverInfo)
 import Control.Monad.Except (runExcept)
 import Server.PositionMapping (idDelta)
 import qualified Server.SrcLoc                 as SrcLoc
+import qualified GCL.Type as TypeChecking
 
 load :: FilePath -> (FileState -> ServerM ()) -> (Error -> ServerM ()) -> ServerM ()
 load filePath onSuccess onError = do
   
   maybeFileState <- loadFileState filePath
-
   let currentVersion = case maybeFileState of
                         Nothing -> 0
                         Just (FileState{editedVersion}) -> editedVersion
@@ -49,9 +51,9 @@ load filePath onSuccess onError = do
             Right abstract -> case WP.sweep abstract of
               Left  err -> onError (StructError err)
               Right (pos, specs, warnings, redexes, counter) -> do
-                -- case elaborate abstract of
-                --   Left err        -> onError err
-                --   Right elaborated -> do
+                case elaborate abstract of
+                  Left err        -> onError err
+                  Right elaborated -> do
                     let fileState = FileState 
                                       { refinedVersion   = currentVersion
                                       , specifications   = specs
@@ -67,7 +69,8 @@ load filePath onSuccess onError = do
                                       , abstract         = abstract
                                       , variableCounter  = counter
                                       , definitionLinks  = collectLocationLinks abstract
-                                      -- , elaborated    = elaborated
+                                      , elaborated       = elaborated
+                                      , hoverInfos       = collectHoverInfo elaborated
 
                                       , positionDelta    = idDelta
                                       , editedVersion    = currentVersion
@@ -103,5 +106,8 @@ digHoles filePath ranges onFinish = do
   let diggedText range = "[!\n" <> indent range <> "\n" <> indent range <> "!]"
   editTexts filePath (map (\range -> (range, diggedText range)) ranges) onFinish
 
--- elaborate :: A.Program -> Either Error E.Program
--- elaborate abstract =  
+elaborate :: A.Program -> Either Error T.TypedProgram
+elaborate abstract = do
+  case TypeChecking.runElaboration abstract of
+    Left  e -> Left (TypeError e)
+    Right typedProgram -> return typedProgram

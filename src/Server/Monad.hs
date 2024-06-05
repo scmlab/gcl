@@ -31,6 +31,7 @@ import qualified Data.Aeson                     as JSON
 import GCL.Predicate (Spec, PO)
 import qualified Syntax.Abstract as Abstract
 import qualified Syntax.Concrete as Concrete
+import qualified Syntax.Typed    as Typed
 import Server.IntervalMap (IntervalMap)
 import Server.PositionMapping (PositionDelta)
 import Data.Loc.Range (Range)
@@ -58,7 +59,8 @@ data FileState = FileState
   , abstract         :: Abstract.Program
   , variableCounter  :: Int
   , definitionLinks  :: IntervalMap LSP.LocationLink
-  -- , elaborated        :: Elaborated.Program
+  , hoverInfos       :: IntervalMap (LSP.Hover, Abstract.Type) 
+  , elaborated       :: Typed.TypedProgram
   , positionDelta    :: PositionDelta   -- from loadedVersion to editedVersion
   , editedVersion    :: Int  -- the version number of the last change
   }
