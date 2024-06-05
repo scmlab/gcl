@@ -5,18 +5,27 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE FlexibleInstances #-}
 
 module Server.Handler.Guabao.Refine where
 
 import qualified Data.Aeson.Types as JSON
 import GHC.Generics ( Generic )
+import Control.Monad.Except           ( runExcept )
 import Server.Monad (ServerM, FileState(..), loadFileState)
+
 import qualified Syntax.Parser                as Parser
 import           Syntax.Parser.Error           ( ParseError(..) )
 import Syntax.Parser.Lexer (TokStream(..), scan)
 import Language.Lexer.Applicative              ( TokenStream(..))
+
+import           Data.Bifunctor                 ( Bifunctor (second) )
+
 import Error (Error)
 import GCL.Predicate (Spec(..), PO)
+import GCL.Common (TypeEnv)
+import GCL.Type (Elab(..), TypeError, runElaboration, typeInfoToType)
+import           Control.Monad.State.Lazy (get)
 import Server.Load (load)
 import Data.Loc.Range (Range)
 import Server.PositionMapping (fromCurrentRange, PositionDelta(..), PositionMapping(..))
@@ -28,6 +37,7 @@ import Data.List (find)
 import Data.Loc (Pos(..), Loc(..), L(..))
 import qualified Syntax.Concrete as C
 import qualified Syntax.Abstract as A
+import qualified Syntax.Typed    as T
 
 data RefineParams = RefineParams
   { filePath     :: FilePath
@@ -117,10 +127,19 @@ parseFragment fragmentStart fragment = do
     translateTokStream fragmentStart (TsError e) = TsError e
 
 toAbstractFragment :: [C.Stmt] -> Maybe [A.Stmt]
-toAbstractFragment fragment = error "not yet implemented"
+toAbstractFragment concreteFragment = 
+  case runExcept $ C.toAbstract concreteFragment of
+    Left _                 -> Nothing
+    Right abstractFragment -> Just abstractFragment
 
--- eleborateFragment :: E.Program -> Range -> [A.Stmt] -> Maybe [E.Stmt]
--- eleborateFragment elaborated specRange fragment = error "TODO find type env. with specRange and elaborate fragment"
+typeCheckFragment :: Elab a => TypeEnv -> a -> Either TypeError ()
+typeCheckFragment typeEnv abstractFragment =
+  case runElaboration abstractFragment of
+    Left err -> Left err
+    Right _  -> Right ()
+
+instance Elab [A.Stmt] where
+  elaborate stmts env = error "TODO"
 
 sweepFragment :: [A.Stmt] -> Maybe ([PO], [Spec])
 sweepFragment fragment = error "TODO find new POs and specs with StructStmt"
