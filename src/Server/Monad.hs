@@ -48,8 +48,6 @@ data FileState = FileState
   { refinedVersion   :: Int  -- the version number of the last refine
   , specifications   :: [Spec]
   , proofObligations :: [PO]
-  , hasChangedOutsideSpecsSinceLastReload
-                     :: Bool
 
   -- to support other LSP methods in a light-weighted manner
   , loadedVersion    :: Int  -- the version number of the last reload

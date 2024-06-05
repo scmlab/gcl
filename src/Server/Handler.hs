@@ -53,9 +53,6 @@ handlers = mconcat
         Nothing       -> return ()
         Just filePath -> do
           modifyPositionDelta filePath (\positionDelta -> foldl applyChange positionDelta changes)
-          dirty <- changesAreOutsideSpecs filePath changes
-          when dirty $ do
-            modifyFileState filePath (\fileState -> fileState{hasChangedOutsideSpecsSinceLastReload = True})
           case ntf ^. (LSP.params . LSP.textDocument . LSP.version) of
             Nothing      -> return ()
             Just version -> saveEditedVersion filePath version

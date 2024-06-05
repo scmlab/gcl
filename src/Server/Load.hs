@@ -58,8 +58,6 @@ load filePath onSuccess onError = do
                                       { refinedVersion   = currentVersion
                                       , specifications   = specs
                                       , proofObligations = pos
-                                      , hasChangedOutsideSpecsSinceLastReload
-                                                        = False
 
                                       -- to support other LSP methods in a light-weighted manner
                                       , loadedVersion    = currentVersion

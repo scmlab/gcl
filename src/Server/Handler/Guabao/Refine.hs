@@ -11,6 +11,10 @@ module Server.Handler.Guabao.Refine where
 import qualified Data.Aeson.Types as JSON
 import GHC.Generics ( Generic )
 import Server.Monad (ServerM, FileState(..), loadFileState)
+import qualified Syntax.Parser                as Parser
+import           Syntax.Parser.Error           ( ParseError(..) )
+import Syntax.Parser.Lexer (TokStream(..), scan)
+import Language.Lexer.Applicative              ( TokenStream(..))
 import Error (Error)
 import GCL.Predicate (Spec(..), PO)
 import Server.Load (load)
@@ -21,6 +25,7 @@ import qualified Language.LSP.Types as LSP
 import qualified Server.SrcLoc as SrcLoc
 import Data.Text (Text)
 import Data.List (find)
+import Data.Loc (Pos(..), Loc(..), L(..))
 import qualified Syntax.Concrete as C
 import qualified Syntax.Abstract as A
 
@@ -50,28 +55,22 @@ handler params@RefineParams{filePath, range, fragmentText} onSuccess onError = d
     Nothing -> return () -- TODO: report error using onError
     Just fileState -> do
       let FileState{
-        hasChangedOutsideSpecsSinceLastReload,
         positionDelta,
         toOffsetMap,
         specifications
       } = fileState
-      if hasChangedOutsideSpecsSinceLastReload
-        then load filePath (\_ -> handler params onSuccess onError) onError
-        else do
-          -- calculate rangeAtLastReload with positionDelta
-          let lspRange = SrcLoc.toLSPRange range
-          case fromCurrentRange' positionDelta lspRange of
-            Nothing -> return ()
-            Just lspRangeAtLastReload -> do
-              let rangeAtLastReload = SrcLoc.fromLSPRange toOffsetMap filePath lspRangeAtLastReload
-              -- find the spec with rangeAtLastReload
-              case findSpecWithRange rangeAtLastReload specifications of
-                Nothing   -> return () -- TODO: error "spec not found at range"
-                Just spec -> do
-                  -- TODO
-                  return ()
+      -- calculate rangeAtLastReload with positionDelta
+      let lspRange = SrcLoc.toLSPRange range
+      case fromCurrentRange' positionDelta lspRange of
+        Nothing -> return ()
+        Just lspRangeAtLastReload -> do
+          let rangeAtLastReload = SrcLoc.fromLSPRange toOffsetMap filePath lspRangeAtLastReload
+          -- find the spec with rangeAtLastReload
+          case findSpecWithRange rangeAtLastReload specifications of
+            Nothing   -> return () -- TODO: error "spec not found at range"
+            Just spec -> do
+              -- TODO
               return ()
-          return ()
 
 fromCurrentRange' :: PositionDelta -> LSP.Range -> Maybe LSP.Range
 fromCurrentRange' = fromCurrentRange . PositionMapping
@@ -82,8 +81,40 @@ findSpecWithRange range = find (\Specification{specRange} -> specRange == range)
 deleteSpecWithRange :: Range -> [Spec] -> [Spec]
 deleteSpecWithRange range = filter (\Specification{specRange} -> specRange == range)
 
-parseFragment :: Text -> Maybe [C.Stmt]
-parseFragment fragment = error "not yet implemented"
+parseFragment :: Pos -> Text -> Either ParseError [C.Stmt]
+parseFragment fragmentStart fragment = do
+  let Pos filePath _ _ _ = fragmentStart
+  case scan filePath fragment of
+    Left  err    -> Left (LexicalError err)
+    Right tokens -> do
+      let tokens' = translateTokStream fragmentStart tokens
+      case Parser.parse Parser.statements filePath tokens' of
+        Left  (errors,logMsg) -> Left (SyntacticError errors logMsg)
+        Right val             -> Right val
+  where
+    translateRange :: Pos -> Pos -> Pos
+    translateRange fragmentStart@(Pos _ lineStart colStart coStart)
+        (Pos path lineOffset colOffset coOffset)
+      = Pos path line col co
+      where
+        line = lineStart + lineOffset - 1
+        col = if lineOffset == 1
+                then colStart + colOffset
+                else colStart
+        co = if lineOffset == 1
+                then coStart + coOffset
+                else coStart
+
+    translateLoc :: Pos -> Loc -> Loc
+    translateLoc fragmentStart (Loc left right)
+      = Loc (translateRange fragmentStart left) (translateRange fragmentStart right)
+    translateLoc fragmentStart NoLoc = NoLoc
+
+    translateTokStream :: Pos -> TokStream -> TokStream
+    translateTokStream fragmentStart (TsToken (L loc x) rest)
+      = TsToken (L (translateLoc fragmentStart loc) x) (translateTokStream fragmentStart rest)
+    translateTokStream fragmentStart TsEof = TsEof
+    translateTokStream fragmentStart (TsError e) = TsError e
 
 toAbstractFragment :: [C.Stmt] -> Maybe [A.Stmt]
 toAbstractFragment fragment = error "not yet implemented"
