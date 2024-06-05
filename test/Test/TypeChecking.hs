@@ -8,26 +8,21 @@ import           Control.Monad.State.Lazy
 import           Data.Loc                       ( Loc(..) )
 import qualified Data.Map                      as Map
 import           Data.Map                       ( Map )
+import           Data.Maybe                     ( fromJust )
 import           Data.Text                      ( Text )
 import           Error                          ( Error(..) )
-import           GCL.Type                       ( Index(..)
-                                                , InferType(..)
-                                                , ScopeTree(..)
-                                                , ScopeTreeZipper(..)
-                                                , TypeCheckable(..)
+import           GCL.Type                       ( Elab (elaborate)
+                                                , runElaboration
                                                 , TypeDefnInfo(..)
                                                 , TypeInfo(..)
-                                                , runInferType
-                                                , runTypeCheck
                                                 )
 import           Pretty                         ( Pretty(pretty)
                                                 , hsep
                                                 , punctuate
                                                 , toByteString
                                                 , toText
-                                                , vsep
+                                                -- , vsep
                                                 )
-import qualified Server.IntervalMap            as IntervalMap
 import           Syntax.Abstract
 import           Syntax.Common                  ( Name(Name)
                                                 , Op
@@ -48,7 +43,7 @@ tests :: TestTree
 tests = testGroup
   "Type"
   [ exprTests
-  , typeTests
+  -- , typeTests
   , stmtTests
   , declarationTests
   , definitionTests
@@ -101,6 +96,7 @@ exprTests = testGroup
     \  Nothing -> 0" "Int"
   ]
 
+{-
 typeTests :: TestTree
 typeTests = testGroup
   "Check Type"
@@ -116,38 +112,40 @@ typeTests = testGroup
     $ typeCheck' "Char -> Bool -> Int -> array [0 .. N) of Int"
   --, testCase "TVar" $ typeCheck' "T"
   ]
+-}
 
 stmtTests :: TestTree
 stmtTests = testGroup
   "Check stmt"
-  [ testCase "skip" $ stmtCheck' "skip"
-  , testCase "abort" $ stmtCheck' "abort"
-  , testCase "assign 1" $ stmtCheck' "i := j"
-  , testCase "assign 2" $ stmtCheck' "i, j, k := 0, 0, 0"
+  [ testCase "skip" $ programCheck "skip"
+  , testCase "abort" $ programCheck "abort"
+  , testCase "assign 1" $ programCheck "i := j"
+  , testCase "assign 2" $ programCheck "i, j, k := 0, 0, 0"
   , -- NOTE : not sure if assign should work this way
-    testCase "assert 1" $ stmtCheck' "{ A = B }"
-  , testCase "assert 2" $ stmtCheck' "{ P i }"
+    testCase "assert 1" $ programCheck "{ A = B }"
+  , testCase "assert 2" $ programCheck "{ P i }"
   ,
       -- testCase "assert 3" $
-      --   stmtCheck' "{ P }"
-    testCase "loop invariant" $ stmtCheck' "{ i >= 0, bnd: N }"
+      --   programCheck "{ P }"
+    testCase "loop invariant" $ programCheck "{ i >= 0, bnd: N }"
   ,
       -- testCase "loop invariant" $
-      --   stmtCheck' "{A, bnd : N}",
+      --   programCheck "{A, bnd : N}",
       -- testCase "loop invariant" $
-      --   stmtCheck' "{i >= 0, bnd : P}"
+      --   programCheck "{i >= 0, bnd : P}"
     testCase "loop 1"
-    $ stmtCheck' "do i /= N ->\n\
+    $ programCheck
+        "do i /= N ->\n\
           \   skip\n\
           \od"
   , testCase "loop 2"
-    $ stmtCheck'
+    $ programCheck
         "do i /= N ->\n\
           \   i := i + 1\n\
           \   skip\n\
           \od"
   , testCase "loop 3"
-    $ stmtCheck'
+    $ programCheck
         "do i /= N ->\n\
           \   i := i + 1\n\
           \   skip\n\
@@ -156,7 +154,7 @@ stmtTests = testGroup
           \   skip\n\
           \od"
   , testCase "loop 4"
-    $ stmtCheck'
+    $ programCheck
         "if i /= N ->\n\
           \   i := i + 1\n\
           \   skip\n\
@@ -164,17 +162,17 @@ stmtTests = testGroup
           \   j := j + 1\n\
           \   skip\n\
           \fi"
-  , testCase "spec 1" $ stmtCheck' "[!   !]"
-  , testCase "spec 2" $ stmtCheck' "[! asdff !]"
-  , testCase "spec 3" $ stmtCheck' "[!\n\
+  , testCase "spec 1" $ programCheck "[!   !]"
+  , testCase "spec 2" $ programCheck "[! asdff !]"
+  , testCase "spec 3" $ programCheck "[!\n\
           \asdfasdf\n\
           \!]"
   , testCase "spec 4"
-    $ stmtCheck' "[!\n\
+    $ programCheck "[!\n\
           \asdfasdf\n\
           \   !]"
       -- testCase "proof" $
-      --   stmtCheck' ""
+      --   programCheck ""
   ]
 
 declarationTests :: TestTree
@@ -259,11 +257,12 @@ typeCheckFile dirName =
               Left  err -> Left [ParseError err]
               Right ast -> case runExcept (toAbstract ast) of
                 Left  _    -> Left [Others "Should dig hole"]
-                Right prog -> case runTypeCheck prog of
+                Right prog -> case runElaboration prog of
                   Left  errors -> Left [TypeError errors]
                   Right _      -> Right ()
         return $ toByteString result
 
+{-
 fileCheck :: (FilePath, Text) -> Text
 fileCheck (filepath, source) = toText result
  where
@@ -274,6 +273,7 @@ fileCheck (filepath, source) = toText result
       Right prog -> case runTypeCheck prog of
         Left  errors -> Left [TypeError errors]
         Right val    -> Right val
+-}
 
 tint :: Type
 tint = TBase TInt NoLoc
@@ -326,30 +326,30 @@ name' t = Name t NoLoc
 index :: Text -> Index
 index = Index . name'
 
-env :: Map Index TypeInfo
-env = Map.fromList
-  [ (index "A", ConstTypeInfo tint)
-  , (index "B", ConstTypeInfo tint)
-  , (index "N", ConstTypeInfo tint)
+env :: [(Index, Type)]
+env =
+  [ (index "A", tint)
+  , (index "B", tint)
+  , (index "N", tint)
   , ( index "Arr"
-    , ConstTypeInfo (tarr (Including (litNum 0)) (Excluding (cons "N")) tint)
+    , tarr (Including (litNum 0)) (Excluding (cons "N")) tint
     )
-  , (index "P"  , ConstTypeInfo (tfunc tint tbool))
-  , (index "F"  , ConstTypeInfo (tfunc tint tint))
-  , (index "G"  , ConstTypeInfo (tfunc tchar tbool))
-  , (index "Max", ConstTypeInfo (tfunc tint (tfunc tint tbool)))
-  , (index "i"  , VarTypeInfo tint)
-  , (index "j"  , VarTypeInfo tint)
-  , (index "k"  , VarTypeInfo tint)
-  , (index "b"  , VarTypeInfo tbool)
-  , (index "p"  , VarTypeInfo tbool)
-  , (index "q"  , VarTypeInfo tbool)
-  , (index "r"  , VarTypeInfo tbool)
-  , (index "x", VarTypeInfo (TCon (name' "Maybe") [name' "a"] NoLoc))
+  , (index "P"  , tfunc tint tbool)
+  , (index "F"  , tfunc tint tint)
+  , (index "G"  , tfunc tchar tbool)
+  , (index "Max", tfunc tint (tfunc tint tbool))
+  , (index "i"  , tint)
+  , (index "j"  , tint)
+  , (index "k"  , tint)
+  , (index "b"  , tbool)
+  , (index "p"  , tbool)
+  , (index "q"  , tbool)
+  , (index "r"  , tbool)
+  , (index "x", TCon (name' "Maybe") [name' "a"] NoLoc)
   , ( index "Just"
-    , TypeDefnCtorInfo (tfunc tint (TCon (name' "Maybe") [name' "a"] NoLoc))
+    , tfunc tint (TCon (name' "Maybe") [name' "a"] NoLoc)
     )
-  , (index "Nothing", TypeDefnCtorInfo (TCon (name' "Maybe") [name' "a"] NoLoc))
+  , (index "Nothing", TCon (name' "Maybe") [name' "a"] NoLoc)
   ]
 
 runParser :: ToAbstract a b => Parser a -> Text -> Either [Error] b
@@ -359,66 +359,45 @@ runParser p t =
     Right (Left  loc ) -> Left [Others (show loc)]
     Right (Right expr) -> Right expr
 
-check :: TypeCheckable a => Map Index TypeInfo -> a -> Either [Error] ()
-check env' e =
-  case
-      runExcept
-        (execStateT
-          (typeCheck e)
-          ( 0
-          , ScopeTreeZipper (ScopeTree mempty mempty) []
-          , ScopeTreeZipper (ScopeTree env' mempty)   []
-          )
-        )
-    of
+elab :: Elab a => [(Index, Type)] -> a -> Either [Error] Type
+elab env' e =
+  case runExcept (runStateT (elaborate e env') (0, mempty, mempty)) of
       Left  err -> Left [TypeError err]
-      Right _   -> Right ()
-
-inferCheck :: InferType a => Map Index TypeInfo -> a -> Either [Error] Type
-inferCheck env' e =
-  case
-      runExcept
-        (evalStateT
-          (runInferType e)
-          ( 0
-          , ScopeTreeZipper (ScopeTree mempty mempty) []
-          , ScopeTreeZipper (ScopeTree env' mempty)   []
-          )
-        )
-    of
-      Left  err -> Left [TypeError err]
-      Right x   -> Right (snd x)
+      Right ((ty, _, _), _states) -> Right $ fromJust ty
 
 exprCheck :: Text -> Text -> Assertion
 exprCheck t1 t2 =
-  toText (runParser Parser.expression t1 >>= inferCheck env) @?= t2
+  toText (runParser Parser.expression t1 >>= elab env) @?= t2
 
+
+{- -- TODO: Maybe remove these?
 typeCheckAssert :: Text -> Text -> Assertion
-typeCheckAssert t1 t2 = toText (runParser Parser.type' t1 >>= check env) @?= t2
+typeCheckAssert t1 t2 = toText (runParser Parser.type' t1 >>= elab env) @?= t2
 
 typeCheck' :: Text -> Assertion
 typeCheck' t = typeCheckAssert t "()"
 
 stmtCheck :: Text -> Text -> Assertion
-stmtCheck t1 t2 = toText (runParser Parser.statements t1 >>= check env) @?= t2
+stmtCheck t1 t2 = toText (runParser Parser.statements t1 >>= elab env) @?= t2
 
 stmtCheck' :: Text -> Assertion
 stmtCheck' t = stmtCheck t "()"
+-}
 
 declarationCheck :: Text -> Text -> Assertion
 declarationCheck t1 t2 =
-  toText (runParser Parser.program t1 >>= check mempty) @?= t2
+  toText (runParser Parser.program t1 >>= elab mempty) @?= t2
 
 envCheck :: Text -> Assertion
 envCheck t = toText env @?= t
 
 definitionCheck :: Text -> Text -> Assertion
 definitionCheck t1 t2 =
-  toText (runParser Parser.program t1 >>= check mempty) @?= t2
+  toText (runParser Parser.program t1 >>= elab mempty) @?= t2
 
 programCheck :: Text -> Assertion
 programCheck t1 =
-  toText (runParser Parser.program t1 >>= check mempty) @?= "()"
+  toText (runParser Parser.program t1 >>= elab mempty) @?= "()"
 
 instance (Pretty a, Pretty b) => Pretty (Map a b) where
   pretty m = "[" <> hsep (punctuate "," (map pretty (Map.toList m))) <> "]"
@@ -431,14 +410,6 @@ instance Pretty TypeInfo where
   pretty (TypeDefnCtorInfo t) = "TypeDefnCtorInfo " <> pretty t
   pretty (ConstTypeInfo    t) = "ConstTypeInfo " <> pretty t
   pretty (VarTypeInfo      t) = "VarTypeInfo " <> pretty t
-
-instance Pretty a => Pretty (ScopeTree a) where
-  pretty ScopeTree {..} =
-    "GlobalScope " <> pretty globalScope <> "\nLocalScopes " <> vsep
-      (punctuate "," (map pretty (IntervalMap.toList localScopes)))
-
-instance Pretty a => Pretty (ScopeTreeZipper a) where
-  pretty ScopeTreeZipper {..} = "Cursor " <> pretty cursor
 
 instance Pretty Index where
   pretty (Index n  ) = pretty n

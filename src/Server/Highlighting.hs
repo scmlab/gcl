@@ -15,7 +15,7 @@ import           Data.Loc                       ( Located(locOf)
                                                 , posLine
                                                 )
 import           Data.Loc.Range
-import qualified Language.LSP.Types            as J
+import qualified Language.LSP.Types               as J
 import           Server.IntervalMap                ( Collect(..)
                                                 , M
                                                 , runM
