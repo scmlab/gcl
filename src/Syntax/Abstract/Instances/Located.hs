@@ -62,6 +62,7 @@ instance Located Expr where
   locOf (Const _ l           ) = l
   locOf (Lit   _ l           ) = l
   locOf (Op op               ) = locOf op
+  locOf (Chain chain         ) = locOf chain
   locOf (App  _ _ l          ) = l
   locOf (Func _ _ l          ) = l
   locOf (Lam  _ _ l          ) = l
@@ -72,6 +73,10 @@ instance Located Expr where
   locOf (ArrIdx _ _ l        ) = l
   locOf (ArrUpd _ _ _ l      ) = l
   locOf (Case _ _ l          ) = l
+
+instance Located Chain where
+  locOf (Pure _ l            ) = l
+  locOf (More _ _ _ l        ) = l
 
 instance Located CaseClause where
   locOf (CaseClause l r) = l <--> r

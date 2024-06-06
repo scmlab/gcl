@@ -185,6 +185,7 @@ instance Collect LocationLinkToBe LocationLink Expr where
     Var   a _           -> collect a
     Const a _           -> collect a
     Op op               -> collect op
+    Chain ch            -> collect ch
     App  a b _          -> collect a >> collect b
     Lam  _ b _          -> collect b
     Func a b _          -> collect a >> collect b
@@ -217,6 +218,10 @@ instance Collect LocationLinkToBe LocationLink Expr where
 
 instance Collect LocationLinkToBe LocationLink Op where
   collect _ = return ()
+
+instance Collect LocationLinkToBe LocationLink Chain where
+  collect (Pure expr _) = collect expr
+  collect (More ch' op expr _) = collect ch' >> collect op >> collect expr
 
 instance Collect LocationLinkToBe LocationLink FuncClause where
   collect _ = return ()

@@ -462,55 +462,55 @@ expression = do
   opTable :: [[Operator Parser Expr]]
   opTable =
     [ -- The order should be same as in Syntax.Common.Types
-      [InfixL (return App)]
+      [ InfixL (return App) ]
 
     , [ Prefix $ foldr1 (.) <$> some (unary (ArithOp . Neg) TokNeg
                                      <|> unary (ArithOp . NegU) TokNegU)
       , Prefix $ unary (ArithOp . NegNum) TokSub
       ]
 
-    , [InfixL $ binary (ArithOp . Exp) TokExp]
-    , [ InfixL $ binary (ArithOp . Mod) TokMod
-      , InfixL $ binary (ArithOp . Mul) TokMul
-      , InfixL $ binary (ArithOp . Div) TokDiv
+    , [ InfixL $ arithOp (ArithOp . Exp) TokExp ]
+    , [ InfixL $ arithOp (ArithOp . Mod) TokMod
+      , InfixL $ arithOp (ArithOp . Mul) TokMul
+      , InfixL $ arithOp (ArithOp . Div) TokDiv
       ]
 
-    , [ InfixL $ binary (ArithOp . Add) TokAdd
-      , InfixL $ binary (ArithOp . Sub) TokSub
+    , [ InfixL $ arithOp (ArithOp . Add) TokAdd
+      , InfixL $ arithOp (ArithOp . Sub) TokSub
       ]
 
-    , [ InfixL $ binary (ArithOp . Max) TokMax
-      , InfixL $ binary (ArithOp . Min) TokMin
+    , [ InfixL $ arithOp (ArithOp . Max) TokMax
+      , InfixL $ arithOp (ArithOp . Min) TokMin
       ]
 
       -- =
-    , [ InfixL $ binary (ChainOp . EQ) TokEQ
+    , [ InfixL $ chainOp (ChainOp . EQ) TokEQ
       -- ~, <, <=, >, >=
-      , InfixL $ binary (ChainOp . NEQ) TokNEQ
-      , InfixL $ binary (ChainOp . NEQU) TokNEQU
-      , InfixL $ binary (ChainOp . LT) TokLT
-      , InfixL $ binary (ChainOp . LTE) TokLTE
-      , InfixL $ binary (ChainOp . LTEU) TokLTEU
-      , InfixL $ binary (ChainOp . GT) TokGT
-      , InfixL $ binary (ChainOp . GTE) TokGTE
-      , InfixL $ binary (ChainOp . GTEU) TokGTEU
+      , InfixL $ chainOp (ChainOp . NEQ) TokNEQ
+      , InfixL $ chainOp (ChainOp . NEQU) TokNEQU
+      , InfixL $ chainOp (ChainOp . LT) TokLT
+      , InfixL $ chainOp (ChainOp . LTE) TokLTE
+      , InfixL $ chainOp (ChainOp . LTEU) TokLTEU
+      , InfixL $ chainOp (ChainOp . GT) TokGT
+      , InfixL $ chainOp (ChainOp . GTE) TokGTE
+      , InfixL $ chainOp (ChainOp . GTEU) TokGTEU
       ]
 
       --- &&
-    , [ InfixL $ binary (ArithOp . Conj) TokConj
-      , InfixL $ binary (ArithOp . ConjU) TokConjU
+    , [ InfixL $ arithOp (ArithOp . Conj) TokConj
+      , InfixL $ arithOp (ArithOp . ConjU) TokConjU
       --- ||
-      , InfixL $ binary (ArithOp . Disj) TokDisj
-      , InfixL $ binary (ArithOp . DisjU) TokDisjU
+      , InfixL $ arithOp (ArithOp . Disj) TokDisj
+      , InfixL $ arithOp (ArithOp . DisjU) TokDisjU
     ]
 
 
       -- =>
-    , [ InfixR $ binary (ArithOp . Implies) TokImpl
-      , InfixR $ binary (ArithOp . ImpliesU) TokImplU
+    , [ InfixR $ arithOp (ArithOp . Implies) TokImpl
+      , InfixR $ arithOp (ArithOp . ImpliesU) TokImplU
       -- <=>
-      , InfixL $ binary (ChainOp . EQProp) TokEQProp
-      , InfixL $ binary (ChainOp . EQPropU) TokEQPropU
+      , InfixL $ chainOp (ChainOp . EQProp) TokEQProp
+      , InfixL $ chainOp (ChainOp . EQPropU) TokEQPropU
       ]
     ]
 
@@ -520,8 +520,13 @@ expression = do
     loc <- symbol tok
     return $ \result -> App (Expr.Op (operator' loc)) result
 
-  binary :: (Loc -> Op) -> Tok -> Parser (Expr -> Expr -> Expr)
-  binary operator' tok = do
+  arithOp :: (Loc -> Op) -> Tok -> Parser (Expr -> Expr -> Expr)
+  arithOp operator' tok = do
+    (op, loc) <- getLoc (operator' <$ symbol tok)
+    return $ \x y -> App (App (Expr.Op (op loc)) x) y
+
+  chainOp :: (Loc -> Op) -> Tok -> Parser (Expr -> Expr -> Expr) -- FIXME:
+  chainOp operator' tok = do
     (op, loc) <- getLoc (operator' <$ symbol tok)
     return $ \x y -> App (App (Expr.Op (op loc)) x) y
 

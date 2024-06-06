@@ -54,7 +54,7 @@ import qualified Server.Pipeline               as DSL
 import qualified Server.SrcLoc                 as SrcLoc
 import GCL.WP.Type (StructWarning)
 import Server.IntervalMap (IntervalMap)
-import Syntax.Abstract                         as A
+import Syntax.Abstract                         as A hiding ( Pure )
 import Syntax.Concrete                         as C
 import GCL.Predicate (PO, Spec)
 import Data.IntMap (IntMap)

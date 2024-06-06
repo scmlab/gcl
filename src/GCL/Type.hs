@@ -435,6 +435,8 @@ instance Elab Expr where
     (ty, op, sub) <- elaborate o env
     ty' <- instantiate $ fromJust ty
     return (Just ty', subst sub (Typed.Op op ty'), sub)
+  elaborate (Chain ch) env = undefined -- FIXME:
+  {-
   -- TODO: Make sure the below implementation is correct, especially when the ChainOp is polymorphic. (edit: apprently it's incorrect)
   elaborate (App (App (Op op@(ChainOp _)) e1 _) e2 l) env = do
     (opTy, opTyped, opSub) <- elaborate op env
@@ -453,6 +455,7 @@ instance Elab Expr where
     vSub <- unifies (subst s2 (fromJust t2) ~-> subst s2 (fromJust t2) ~-> v) (subst opSub $ fromJust opTy) l
     let sub = s1 <> s2
     pure (Just $ subst vSub v, subst sub (Typed.App (Typed.App (Typed.Op opTyped $ subst opSub $ fromJust opTy) typed1 $ locOf e1) typed2 l), sub)
+  -}
   -- Γ ⊢ e1 ↑ (s1, t1)
   -- s1 Γ ⊢ e2 ↑ (s2, t2)
   -- b fresh   v = unify (s2 t1, t2 -> b)

@@ -215,6 +215,8 @@ instance Substitutable Expr where
 
     Op{}              -> return expr
 
+    Chain {} -> return expr -- FIXME: 
+
     App f      x    l -> App <$> subst mapping f <*> subst mapping x <*> pure l
 
     Lam binder body l -> do

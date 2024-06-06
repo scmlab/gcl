@@ -43,8 +43,7 @@ handleExpr _ (Var   x l) = tempHandleLoc l $ render x
 handleExpr _ (Const x l) = tempHandleLoc l $ render x
 handleExpr _ (Lit   x l) = tempHandleLoc l $ render x
 handleExpr _ (Op _     ) = error "erroneous syntax given to render"
--- handleExpr n (App (App (Op op@(ChainOp _)) p _) q _) = do
---   renderPrec n p <+> render op <+> renderPrec n q          -- chain operators are now handled with other binary operators
+handleExpr n (Chain ch ) = render ch
 handleExpr n (App (App (Op op) left _) right _) =  --binary operators
   parensIf n (Just op) $ 
   renderPrec (HOLEOp op) left 
@@ -100,6 +99,10 @@ handleExpr _ (ArrUpd e1 e2 e3 _) =
     -- SCM: need to print parenthesis around e1 when necessary.
 handleExpr _ (Case expr cases _) =
   "case" <+> render expr <+> "of" <+> vertE (map render cases)
+
+instance Render Chain where -- TODO: Check if this is correct.
+  render (Pure expr _) = render expr
+  render (More ch op expr _) = render ch <+> render op <+> render expr
 
 instance Render Mapping where
   render env | null env  = mempty

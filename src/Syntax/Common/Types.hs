@@ -132,7 +132,7 @@ precedenceOrder =
     , (ChainOp (EQPropU NoLoc), InfixL)
     ]
   -- Below is a type operator and is naturally very different from other operators.
-  -- It is put it here because we need a way to know its fixity.
+  -- It is put here because we need a way to know its fixity.
   , [ (TypeOp (Arrow NoLoc), InfixR) ]
   ]
 

@@ -109,14 +109,15 @@ instance {-# OVERLAPS #-} Free TypeEnv where
   freeVars env = foldMap freeVars $ Map.elems $ Map.fromList env 
 
 instance Free Expr where
-  freeVars (Var   x _        ) = Set.singleton x
-  freeVars (Const x _        ) = Set.singleton x
-  freeVars (Op _             ) = mempty
-  freeVars (Lit _ _          ) = mempty
-  freeVars (App  e1 e2      _) = freeVars e1 <> freeVars e2
-  freeVars (Func _  clauses _) = Set.unions (fmap freeVars clauses)
-  freeVars (Lam  x  e       _) = freeVars e \\ Set.singleton x
-  freeVars (Tuple xs         ) = Set.unions (map freeVars xs)
+  freeVars (Var   x _            ) = Set.singleton x
+  freeVars (Const x _            ) = Set.singleton x
+  freeVars (Op _                 ) = mempty
+  freeVars (Chain chain          ) = freeVars chain
+  freeVars (Lit _ _              ) = mempty
+  freeVars (App  e1 e2      _    ) = freeVars e1 <> freeVars e2
+  freeVars (Func _  clauses _    ) = Set.unions (fmap freeVars clauses)
+  freeVars (Lam  x  e       _    ) = freeVars e \\ Set.singleton x
+  freeVars (Tuple xs             ) = Set.unions (map freeVars xs)
   freeVars (Quant op xs range term _) =
     (freeVars op <> freeVars range <> freeVars term) \\ Set.fromList xs
   freeVars (RedexKernel _ _ fv _) = fv
@@ -125,6 +126,10 @@ instance Free Expr where
   freeVars (ArrUpd e1 e2 e3 _   ) = freeVars e1 <> freeVars e2 <> freeVars e3
   freeVars (Case e clauses _    ) = freeVars e <> Set.unions (map freeVars clauses)
 
+
+instance Free Chain where
+  freeVars (Pure expr _) = freeVars expr
+  freeVars (More chain _op expr _) = freeVars chain <> freeVars expr
 
 instance Free FuncClause where
   freeVars (FuncClause patterns expr) = freeVars expr \\ Set.unions (map freeVars patterns)

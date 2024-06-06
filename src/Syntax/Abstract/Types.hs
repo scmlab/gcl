@@ -113,6 +113,7 @@ data Expr
   | Var Name Loc
   | Const Name Loc
   | Op Op
+  | Chain Chain
   | App Expr Expr Loc
   | Lam Name Expr Loc
   | Func Name (NonEmpty FuncClause) Loc
@@ -137,6 +138,10 @@ data Expr
   | ArrIdx Expr Expr Loc
   | ArrUpd Expr Expr Expr Loc
   | Case Expr [CaseClause] Loc
+  deriving (Eq, Show, Generic)
+
+
+data Chain = Pure Expr Loc | More Chain Op Expr Loc
   deriving (Eq, Show, Generic)
 
 -- QuantOp' seems not being used at current version of abstract?
