@@ -94,10 +94,15 @@ instance Located Expr where
   locOf (Var   x              ) = locOf x
   locOf (Const x              ) = locOf x
   locOf (Op    x              ) = locOf x
+  locOf (Chain ch             ) = locOf ch
   locOf (Arr l _ _ r          ) = l <--> r
   locOf (App x y              ) = x <--> y
   locOf (Quant l _ _ _ _ _ _ r) = l <--> r
   locOf (Case l _ _ r         ) = l <--> r
+
+instance Located Chain where
+  locOf (Pure expr) = locOf expr
+  locOf (More ch _ expr) = ch <--> expr
 
 instance Located CaseClause where
   locOf (CaseClause l _ r) = l <--> r

@@ -33,7 +33,8 @@ import           GCL.Common                     ( Free(freeVars)
 import           GCL.Predicate                  ( PO(PO)
                                                 , Pred(..)
                                                 )
-import           Syntax.Abstract                ( CaseClause(..)
+import           Syntax.Abstract                ( Chain(..)
+                                                , CaseClause(..)
                                                 , Expr(..)
                                                 , FuncClause(..)
                                                 , Mapping
@@ -215,7 +216,7 @@ instance Substitutable Expr where
 
     Op{}              -> return expr
 
-    Chain {} -> return expr -- FIXME: 
+    Chain ch          -> Chain <$> subst mapping ch
 
     App f      x    l -> App <$> subst mapping f <*> subst mapping x <*> pure l
 
@@ -297,6 +298,11 @@ instance Substitutable Expr where
       cases' <- forM cases
         $ \(CaseClause patt body) -> CaseClause patt <$> subst mapping body
       return $ Case e cases' l
+
+instance Substitutable Chain where
+  subst mapping ch = case ch of
+    Pure expr loc -> Pure <$> subst mapping expr <*> pure loc
+    More ch' op expr loc -> More <$> subst mapping ch' <*> pure op <*> subst mapping expr <*> pure loc
 
 instance Substitutable FuncClause where
   subst mapping (FuncClause patterns body) = do

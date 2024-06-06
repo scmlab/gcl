@@ -55,7 +55,7 @@ import qualified Server.SrcLoc                 as SrcLoc
 import GCL.WP.Type (StructWarning)
 import Server.IntervalMap (IntervalMap)
 import Syntax.Abstract                         as A hiding ( Pure )
-import Syntax.Concrete                         as C
+import Syntax.Concrete                         as C hiding ( Pure )
 import GCL.Predicate (PO, Spec)
 import Data.IntMap (IntMap)
 

@@ -528,7 +528,11 @@ expression = do
   chainOp :: (Loc -> Op) -> Tok -> Parser (Expr -> Expr -> Expr) -- FIXME:
   chainOp operator' tok = do
     (op, loc) <- getLoc (operator' <$ symbol tok)
-    return $ \x y -> App (App (Expr.Op (op loc)) x) y
+    return (`makeChain` op loc)
+    where
+      makeChain a op b = Chain $ More (asChain a) op b
+      asChain (Chain c) = c
+      asChain e = Pure e
 
   parensExpr :: Parser Expr
   parensExpr = Paren <$> tokenParenOpen <*> expression <*> tokenParenClose

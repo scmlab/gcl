@@ -332,6 +332,7 @@ handleExpr (Var   x) = return $ prettyWithLoc x
 handleExpr (Const x) = return $ prettyWithLoc x
 handleExpr (Lit   x) = return $ prettyWithLoc x
 handleExpr (Op    x) = handleOp x
+handleExpr (Chain c) = handleChain c
 handleExpr (Arr arr l i r) =
   return
     $  prettyWithLoc arr
@@ -381,6 +382,14 @@ handleOp op = case classify op of
     p <- var
     return $ prettyWithLoc p <> prettyWithLoc op
 
+handleChain :: Chain -> Variadic Expr (DocWithLoc ann)
+handleChain chain = case chain of -- TODO: This might be incorrect.
+  Pure expr -> handleExpr expr
+  More ch op expr -> do
+    ch' <- handleChain ch
+    return $ ch' <> prettyWithLoc op <> prettyWithLoc expr
+
+
 showWithParentheses :: Expr -> String
 showWithParentheses expr = case handleExpr' expr of
   Expect _ -> error "strange case in printWithParenses"
@@ -395,6 +404,7 @@ showWithParentheses expr = case handleExpr' expr of
       LitBool b _ -> return $ show b
       LitChar c _ -> return $ show c
     handleExpr' (Op    x) = handleOp' x
+    handleExpr' (Chain c) = handleChain' c
     handleExpr' (Arr arr _ i _) = do
       arrs <- handleExpr' arr
       inds   <- handleExpr' i
@@ -437,6 +447,15 @@ showWithParentheses expr = case handleExpr' expr of
         p <- var
         ps <- handleExpr' p
         return $ "(" <> ps <> show (pretty op) <> ")"
+
+    handleChain' :: Chain -> Variadic Expr String -- TODO: This is likely incorrect and require further investigation.
+    handleChain' chain = case chain of
+      Pure expr' -> handleExpr' expr'
+      More ch op ex -> do
+        ch' <- handleChain' ch
+        ex' <- handleExpr' ex
+        return $ ch' <> show (pretty op) <> ex'
+
 
 --------------------------------------------------------------------------------
 -- | Pattern

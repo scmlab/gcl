@@ -196,6 +196,12 @@ instance Collect () Highlighting Expr where
     Var   a     -> collect (AsVariable a)
     Const a     -> collect (AsVariable a)
     Op    a     -> addHighlighting J.SttOperator [] a
+    Chain ch    -> case ch of
+      Pure expr -> collect expr
+      More ch' op expr -> do
+        collect (Chain ch')
+        addHighlighting J.SttOperator [] op
+        collect expr
     Arr a _ b _ -> do
       collect a
       collect b

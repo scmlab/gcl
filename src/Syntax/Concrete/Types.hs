@@ -15,6 +15,7 @@ import Syntax.Common (Name, Op)
 import Prelude hiding (Ordering (..))
 import Data.Loc (Located (locOf), Pos, Loc (Loc), L)
 import Syntax.Parser.Lexer (Tok)
+import Render.Class (Render (..))
 
 --------------------------------------------------------------------------------
 
@@ -154,6 +155,7 @@ data Expr
   | Var Name
   | Const Name
   | Op Op
+  | Chain Chain
   | Arr Expr (Token "[") Expr (Token "]")
   | App Expr Expr
   | Quant
@@ -167,6 +169,9 @@ data Expr
       TokQuantEnds
   -- case expr of { ctor1 -> expr | ctor2 binder1 binder2 -> expr }
   | Case (Token "case") Expr (Token "of") [CaseClause]
+  deriving (Eq, Show, Generic)
+
+data Chain = Pure Expr | More Chain Op Expr
   deriving (Eq, Show, Generic)
 
 type QuantOp' = Either Op Name

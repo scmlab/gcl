@@ -215,6 +215,7 @@ instance ToAbstract Expr A.Expr where
     Var   a     -> pure $ A.Var a (locOf x)
     Const a     -> pure $ A.Const a (locOf x)
     Op    a     -> pure $ A.Op a
+    Chain ch    -> A.Chain <$> toAbstract ch
     Arr arr _ i _ ->
       A.ArrIdx <$> toAbstract arr <*> toAbstract i <*> pure (locOf x)
     App a b -> A.App <$> toAbstract a <*> toAbstract b <*> pure (locOf x)
@@ -231,6 +232,11 @@ instance ToAbstract Expr A.Expr where
         Right n@(Name _ l) -> return $ A.Const n l
     Case _ expr _ cases ->
       A.Case <$> toAbstract expr <*> toAbstract cases <*> pure (locOf x)
+
+instance ToAbstract Chain A.Chain where
+  toAbstract chain = case chain of
+    Pure expr -> A.Pure <$> toAbstract expr <*> pure (locOf expr)
+    More ch' op expr -> A.More <$> toAbstract ch' <*> pure op <*> toAbstract expr <*> pure (locOf expr)
 
 instance ToAbstract CaseClause A.CaseClause where
   toAbstract (CaseClause patt _ body) =
