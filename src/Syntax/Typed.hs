@@ -49,6 +49,7 @@ data TypedExpr
   | Var Name Type Loc
   | Const Name Type Loc
   | Op Op Type
+  | Chain TypedChain
   | App TypedExpr TypedExpr Loc
   | Lam Name Type TypedExpr Loc
   | Quant TypedExpr [Name] TypedExpr TypedExpr Loc
@@ -56,3 +57,8 @@ data TypedExpr
   | ArrUpd TypedExpr TypedExpr TypedExpr Loc
   deriving (Eq, Show)
   -- FIXME: Other constructors.
+
+data TypedChain
+  = Pure TypedExpr
+  | More TypedChain Op Type TypedExpr
+  deriving (Eq, Show)

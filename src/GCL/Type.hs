@@ -231,6 +231,7 @@ type family Typed untyped where
   Typed Stmt = Typed.TypedStmt
   Typed GdCmd = Typed.TypedGdCmd
   Typed Expr = Typed.TypedExpr
+  Typed Chain = Typed.TypedChain
   Typed Name = Name
   Typed Op = Op
   Typed ChainOp = Op
@@ -435,7 +436,7 @@ instance Elab Expr where
     (ty, op, sub) <- elaborate o env
     ty' <- instantiate $ fromJust ty
     return (Just ty', subst sub (Typed.Op op ty'), sub)
-  elaborate (Chain ch) env = undefined -- FIXME:
+  elaborate (Chain ch) env = (\(ty, typed, sub) -> (ty, Typed.Chain typed, sub)) <$> elaborate ch env
   {-
   -- TODO: Make sure the below implementation is correct, especially when the ChainOp is polymorphic. (edit: apprently it's incorrect)
   elaborate (App (App (Op op@(ChainOp _)) e1 _) e2 l) env = do
@@ -544,6 +545,28 @@ instance Elab Expr where
     let sub = uniSubExpr `compose` eSub `compose` uniSubArr `compose` uniSubIndex `compose` indexSub `compose` arrSub
     return (subst uniSubArr arrTy, subst sub (Typed.ArrUpd typedArr typedIndex typedE loc), sub)
   elaborate (Case expr cs l) env = undefined
+
+instance Elab Chain where
+  elaborate (More (More ch' op1 e1 loc1) op2 e2 loc2) env = do
+    tv <- freshVar
+    (_chainTy, typedChain, chainSub) <- elaborate (More ch' op1 e1 loc1) env
+    (opTy, opTyped, opSub) <- elaborate op2 env
+    opTy' <- instantiate $ fromJust opTy
+    (ty1, _typedExpr1, sub1) <- elaborate e1 $ subst chainSub env
+    (ty2, typedExpr2, sub2) <- elaborate e2 $ subst (chainSub <> sub1) env
+    unifyTy <- unifies (fromJust ty1 ~-> fromJust ty2 ~-> tv) opTy' loc2
+    let sub = chainSub <> opSub <> sub1 <> sub2
+    return (Just $ subst unifyTy tv, subst sub $ Typed.More typedChain opTyped (subst unifyTy opTy') typedExpr2, sub)
+  elaborate (More (Pure e1 loc1) op e2 loc2) env = do
+    tv <- freshVar
+    (opTy, opTyped, opSub) <- elaborate op env
+    opTy' <- instantiate $ fromJust opTy
+    (ty1, typedExpr1, sub1) <- elaborate e1 env
+    (ty2, typedExpr2, sub2) <- elaborate e2 $ subst sub1 env
+    unifyTy <- unifies (fromJust ty1 ~-> fromJust ty2 ~-> tv) opTy' loc2
+    let sub = unifyTy <> sub2 <> sub1 <> opSub
+    return (Just $ subst unifyTy tv, subst sub $ Typed.More (Typed.Pure typedExpr1) opTyped (subst unifyTy opTy') typedExpr2, sub)
+  elaborate (Pure _expr _loc) _ = error "Chain of length 1 shouldn't exist."
 
 instance Elab Op where
   elaborate (ChainOp op) = elaborate op
@@ -700,8 +723,13 @@ instance Substitutable Type Typed.TypedExpr where
   subst s (Typed.Var name ty loc) = Typed.Var name (subst s ty) loc
   subst s (Typed.Const name ty loc) = Typed.Const name (subst s ty) loc
   subst s (Typed.Op op ty) = Typed.Op op $ subst s ty
+  subst s (Typed.Chain ch) = Typed.Chain $ subst s ch
   subst s (Typed.App e1 e2 loc) = Typed.App (subst s e1) (subst s e2) loc
   subst s (Typed.Lam name ty expr loc) = Typed.Lam name (subst s ty) (subst s expr) loc
   subst s (Typed.Quant quantifier vars restriction inner loc) = Typed.Quant (subst s quantifier) vars (subst s restriction) (subst s inner) loc
   subst s (Typed.ArrIdx arr index loc) = Typed.ArrIdx (subst s arr) (subst s index) loc
   subst s (Typed.ArrUpd arr index expr loc) = Typed.ArrUpd (subst s arr) (subst s index) (subst s expr) loc
+
+instance Substitutable Type Typed.TypedChain where
+  subst s (Typed.Pure expr) = Typed.Pure $ subst s expr
+  subst s (Typed.More ch op ty expr) = Typed.More (subst s ch) op (subst s ty) (subst s expr)

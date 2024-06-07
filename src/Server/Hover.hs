@@ -96,11 +96,16 @@ instance Collect Typed.TypedExpr where
   collect (Typed.Var name ty _) = annotateType name ty
   collect (Typed.Const name ty _) = annotateType name ty
   collect (Typed.Op op ty) = annotateType op ty
+  collect (Typed.Chain ch) = collect ch
   collect (Typed.App expr1 expr2 _) = collect expr1 <> collect expr2
   collect (Typed.Lam name ty expr _) = annotateType name ty <> collect expr
   collect (Typed.Quant quantifier _bound restriction inner _) = collect quantifier <> collect restriction <> collect inner
   collect (Typed.ArrIdx expr1 expr2 _) = collect expr1 <> collect expr2
   collect (Typed.ArrUpd arr index expr _) = collect arr <> collect index <> collect expr
+
+instance Collect Typed.TypedChain where
+  collect (Typed.Pure expr) = collect expr
+  collect (Typed.More chain op ty expr) = collect chain <> annotateType op ty <> collect expr
 
 {-
 
