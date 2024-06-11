@@ -383,7 +383,7 @@ handleArithOp op = case classify (ArithOp op) of -- TODO: rewrite `classify` to 
     return $ prettyWithLoc p <> prettyWithLoc op
 
 handleChain :: Chain -> Variadic Expr (DocWithLoc ann)
-handleChain chain = case chain of -- TODO: This might be incorrect.
+handleChain chain = case chain of
   Pure expr -> handleExpr expr
   More ch op expr -> do
     ch' <- handleChain ch
@@ -448,7 +448,7 @@ showWithParentheses expr = case handleExpr' expr of
         ps <- handleExpr' p
         return $ "(" <> ps <> show (pretty op) <> ")"
 
-    handleChain' :: Chain -> Variadic Expr String -- TODO: This is likely incorrect and require further investigation.
+    handleChain' :: Chain -> Variadic Expr String
     handleChain' chain = case chain of
       Pure expr' -> handleExpr' expr'
       More ch op ex -> do

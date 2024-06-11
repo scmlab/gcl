@@ -16,8 +16,8 @@ import           Prelude                 hiding ( Ordering(..) )
 unary :: ArithOp -> Expr -> Expr
 unary op x = App (Op op) x (x <--> op)
 
-binary :: ArithOp -> Expr -> Expr -> Expr
-binary op x y = App (App (Op op) x (x <--> op)) y (x <--> y)
+arith :: ArithOp -> Expr -> Expr -> Expr
+arith op x y = App (App (Op op) x (x <--> op)) y (x <--> y)
 
 chain :: ChainOp -> Expr -> Expr -> Expr -- TODO: This might be wrong. Needs further investigation.
 chain op x y = Chain (More (Pure x (x <--> op)) op y (x <--> y))
@@ -28,10 +28,10 @@ gt = (chain . GT) NoLoc
 gte = (chain . GTEU) NoLoc
 lte = (chain . LTEU) NoLoc
 eqq = (chain . EQ) NoLoc
-conj = (binary . ConjU) NoLoc
-disj = (binary . DisjU) NoLoc
-implies = (binary . ImpliesU) NoLoc
-add = (binary . Add) NoLoc
+conj = (arith . ConjU) NoLoc
+disj = (arith . DisjU) NoLoc
+implies = (arith . ImpliesU) NoLoc
+add = (arith . Add) NoLoc
 
 neg :: Expr -> Expr
 neg = (unary . NegU) NoLoc
@@ -75,9 +75,9 @@ forAll :: [Name] -> Expr -> Expr -> Expr
 forAll xs ran term = Quant (Op (ConjU NoLoc)) xs ran term NoLoc
 
 pointsTo, sConj, sImp :: Expr -> Expr -> Expr
-pointsTo = (binary . PointsTo) NoLoc
-sConj = (binary . SConj) NoLoc
-sImp = (binary . SImp) NoLoc
+pointsTo = (arith . PointsTo) NoLoc
+sConj = (arith . SConj) NoLoc
+sImp = (arith . SImp) NoLoc
 
 sconjunct :: [Expr] -> Expr
 sconjunct [] = true
