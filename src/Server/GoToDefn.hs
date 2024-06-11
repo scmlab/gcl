@@ -113,6 +113,8 @@ scopeFromLocalBinders names =
 --------------------------------------------------------------------------------
 -- Names
 
+-- TODO: It is likely that the go-to-definition function for definitions is actually not yet implemented.
+-- Fixing this would be really good.
 instance Collect LocationLinkToBe LocationLink Name where
   collect name = do
     result <- lookupScopes (nameToText name)
@@ -216,7 +218,10 @@ instance Collect LocationLinkToBe LocationLink Expr where
 --     localScope args $ do
 --       collect body
 
-instance Collect LocationLinkToBe LocationLink Op where
+instance Collect LocationLinkToBe LocationLink ArithOp where
+  collect _ = return ()
+
+instance Collect LocationLinkToBe LocationLink ChainOp where
   collect _ = return ()
 
 instance Collect LocationLinkToBe LocationLink Chain where

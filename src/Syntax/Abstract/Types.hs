@@ -11,7 +11,8 @@ import           Data.Text                      ( Text )
 import           GHC.Generics                   ( Generic )
 import           Prelude                 hiding ( Ordering(..) )
 import           Syntax.Common                  ( Name
-                                                , Op
+                                                , ArithOp
+                                                , ChainOp
                                                 )
 --------------------------------------------------------------------------------
 
@@ -112,7 +113,7 @@ data Expr
   = Lit Lit Loc
   | Var Name Loc
   | Const Name Loc
-  | Op Op
+  | Op ArithOp
   | Chain Chain
   | App Expr Expr Loc
   | Lam Name Expr Loc
@@ -141,11 +142,11 @@ data Expr
   deriving (Eq, Show, Generic)
 
 
-data Chain = Pure Expr Loc | More Chain Op Expr Loc
+data Chain = Pure Expr Loc | More Chain ChainOp Expr Loc
   deriving (Eq, Show, Generic)
 
 -- QuantOp' seems not being used at current version of abstract?
-type QuantOp' = Either Op Expr
+type QuantOp' = Either ArithOp Expr
 
 type Mapping = Map Text Expr
 

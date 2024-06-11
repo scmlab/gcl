@@ -145,7 +145,7 @@ instance CollectIds [Definition] where
     let typeDefns = filter typeDefnPredicate defns
     -- Gather the type definitions.
     -- Type definitions are collected first because signatures and function definitions may depend on it.
-    mapM_ (\(TypeDefn name args ctors _) -> do -- TODO: Fix loc.
+    mapM_ (\(TypeDefn name args ctors _) -> do
             let formTy con params loc =
                   case params of
                     [] -> con
@@ -437,26 +437,6 @@ instance Elab Expr where
     ty' <- instantiate $ fromJust ty
     return (Just ty', subst sub (Typed.Op op ty'), sub)
   elaborate (Chain ch) env = (\(ty, typed, sub) -> (ty, Typed.Chain typed, sub)) <$> elaborate ch env
-  {-
-  -- TODO: Make sure the below implementation is correct, especially when the ChainOp is polymorphic. (edit: apprently it's incorrect)
-  elaborate (App (App (Op op@(ChainOp _)) e1 _) e2 l) env = do
-    (opTy, opTyped, opSub) <- elaborate op env
-    (t1, typed1, s1) <- case e1 of
-      App (App innerOp@(Op (ChainOp _)) e11 _) e12 _ -> do
-        (t12, typed12, s12) <- elaborate e12 $ subst opSub env
-        (t2, _, s2) <- elaborate e2 $ subst opSub env
-        _ <- unifies (subst s12 $ fromJust t12) (subst s2 $ fromJust t2) (locOf e12)
-        (t11, typed11, s11) <- elaborate e11 $ subst opSub env
-        (_, innerOpTyped, _) <- elaborate innerOp $ subst opSub env
-        let sub = s12 <> s2 <> s11
-        pure (Nothing, subst sub (Typed.App (Typed.App innerOpTyped typed11 (locOf e11)) typed12 (locOf e1)), s12 <> s2 <> s11)
-      _ -> elaborate e1 $ subst opSub env
-    v <- freshVar
-    (t2, typed2, s2) <- elaborate e2 $ subst opSub env
-    vSub <- unifies (subst s2 (fromJust t2) ~-> subst s2 (fromJust t2) ~-> v) (subst opSub $ fromJust opTy) l
-    let sub = s1 <> s2
-    pure (Just $ subst vSub v, subst sub (Typed.App (Typed.App (Typed.Op opTyped $ subst opSub $ fromJust opTy) typed1 $ locOf e1) typed2 l), sub)
-  -}
   -- Γ ⊢ e1 ↑ (s1, t1)
   -- s1 Γ ⊢ e2 ↑ (s2, t2)
   -- b fresh   v = unify (s2 t1, t2 -> b)
@@ -489,7 +469,7 @@ instance Elab Expr where
     tv <- freshVar
     (quantTy, quantTypedExpr, quantSub) <- elaborate quantifier env
     case quantifier of
-      Op (ArithOp (Hash _)) -> do
+      Op (Hash _) -> do
         tvs <- replicateM (length bound) freshVar
         let newEnv = subst quantSub env
         (resTy, resTypedExpr, resSub) <- elaborate restriction $ zip (Index <$> bound) tvs <> newEnv
@@ -546,7 +526,7 @@ instance Elab Expr where
     return (subst uniSubArr arrTy, subst sub (Typed.ArrUpd typedArr typedIndex typedE loc), sub)
   elaborate (Case expr cs l) env = undefined
 
-instance Elab Chain where
+instance Elab Chain where -- TODO: Make sure the below implementation is correct
   elaborate (More (More ch' op1 e1 loc1) op2 e2 loc2) env = do
     tv <- freshVar
     (_chainTy, typedChain, chainSub) <- elaborate (More ch' op1 e1 loc1) env

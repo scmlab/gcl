@@ -43,15 +43,15 @@ handleExpr _ (Var   x l) = tempHandleLoc l $ render x
 handleExpr _ (Const x l) = tempHandleLoc l $ render x
 handleExpr _ (Lit   x l) = tempHandleLoc l $ render x
 handleExpr _ (Op _     ) = error "erroneous syntax given to render"
-handleExpr n (Chain ch ) = render ch
+handleExpr _ (Chain ch ) = render ch
 handleExpr n (App (App (Op op) left _) right _) =  --binary operators
-  parensIf n (Just op) $ 
-  renderPrec (HOLEOp op) left 
+  parensIf n (Just (ArithOp op)) $ 
+  renderPrec (HOLEOp (ArithOp op)) left 
        <+> render op
-  <+> renderPrec (OpHOLE op) right
-handleExpr n (App (Op op) e _) = case classify op of --unary operators, this case shouldn't be former than the binary case
-  (Prefix, _) -> parensIf n (Just op) $ render op <+> renderPrec (OpHOLE op) e
-  (Postfix, _) -> parensIf n (Just op) $ renderPrec (HOLEOp op) e <+>  render op
+  <+> renderPrec (OpHOLE (ArithOp op)) right
+handleExpr n (App (Op op) e _) = case classify (ArithOp op) of --unary operators, this case shouldn't be former than the binary case
+  (Prefix, _) -> parensIf n (Just (ArithOp op)) $ render op <+> renderPrec (OpHOLE (ArithOp op)) e
+  (Postfix, _) -> parensIf n (Just (ArithOp op)) $ renderPrec (HOLEOp (ArithOp op)) e <+>  render op
   _ -> error "erroneous syntax given to render"
 handleExpr n (App f e _) =  -- should only be normal applications
   parensIf n Nothing $ renderPrec HOLEApp f <+> renderPrec AppHOLE e
@@ -76,12 +76,12 @@ handleExpr _ (Quant op xs r t _) =
     <+> render t
     <+> "⟩"
  where
-  renderQOp (Op (ArithOp (Conj  _))) = "∀"
-  renderQOp (Op (ArithOp (ConjU _))) = "∀"
-  renderQOp (Op (ArithOp (Disj  _))) = "∃"
-  renderQOp (Op (ArithOp (DisjU _))) = "∃"
-  renderQOp (Op (ArithOp (Add   _))) = "Σ"
-  renderQOp (Op (ArithOp (Mul   _))) = "Π"
+  renderQOp (Op (Conj  _)) = "∀"
+  renderQOp (Op (ConjU _)) = "∀"
+  renderQOp (Op (Disj  _)) = "∃"
+  renderQOp (Op (DisjU _)) = "∃"
+  renderQOp (Op (Add   _)) = "Σ"
+  renderQOp (Op (Mul   _)) = "Π"
   renderQOp (Op op'                ) = render op'
   renderQOp op'                      = render op'
 handleExpr n (RedexKernel name _value _freeVars mappings) =

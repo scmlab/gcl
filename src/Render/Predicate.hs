@@ -70,10 +70,10 @@ exprOfPred p = case p of
                            exprs
   Negate pr -> 
     let ex = exprOfPred pr
-    in App (Op $ ArithOp $ NegU NoLoc) ex (locOf ex)
+    in App (Op $ NegU NoLoc) ex (locOf ex)
   where
-    conjOp = Op (ArithOp (ConjU NoLoc))
-    disjOp = Op (ArithOp (DisjU NoLoc))
+    conjOp = Op $ ConjU NoLoc
+    disjOp = Op $ DisjU NoLoc
     makeOpExpr :: Expr -> Expr -> Expr -> Expr
     makeOpExpr op x y = App (App op x (locOf x)) y (locOf y)
 

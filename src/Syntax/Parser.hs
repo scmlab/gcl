@@ -464,75 +464,74 @@ expression = do
     [ -- The order should be same as in Syntax.Common.Types
       [ InfixL (return App) ]
 
-    , [ Prefix $ foldr1 (.) <$> some (unary (ArithOp . Neg) TokNeg
-                                     <|> unary (ArithOp . NegU) TokNegU)
-      , Prefix $ unary (ArithOp . NegNum) TokSub
+    , [ Prefix $ foldr1 (.) <$> some (unary Neg TokNeg
+                                     <|> unary NegU TokNegU)
+      , Prefix $ unary NegNum TokSub
       ]
 
-    , [ InfixL $ arithOp (ArithOp . Exp) TokExp ]
-    , [ InfixL $ arithOp (ArithOp . Mod) TokMod
-      , InfixL $ arithOp (ArithOp . Mul) TokMul
-      , InfixL $ arithOp (ArithOp . Div) TokDiv
+    , [ InfixL $ arithOp Exp TokExp ]
+    , [ InfixL $ arithOp Mod TokMod
+      , InfixL $ arithOp Mul TokMul
+      , InfixL $ arithOp Div TokDiv
       ]
 
-    , [ InfixL $ arithOp (ArithOp . Add) TokAdd
-      , InfixL $ arithOp (ArithOp . Sub) TokSub
+    , [ InfixL $ arithOp Add TokAdd
+      , InfixL $ arithOp Sub TokSub
       ]
 
-    , [ InfixL $ arithOp (ArithOp . Max) TokMax
-      , InfixL $ arithOp (ArithOp . Min) TokMin
+    , [ InfixL $ arithOp Max TokMax
+      , InfixL $ arithOp Min TokMin
       ]
 
       -- =
-    , [ InfixL $ chainOp (ChainOp . EQ) TokEQ
+    , [ InfixL $ chainOp EQ TokEQ
       -- ~, <, <=, >, >=
-      , InfixL $ chainOp (ChainOp . NEQ) TokNEQ
-      , InfixL $ chainOp (ChainOp . NEQU) TokNEQU
-      , InfixL $ chainOp (ChainOp . LT) TokLT
-      , InfixL $ chainOp (ChainOp . LTE) TokLTE
-      , InfixL $ chainOp (ChainOp . LTEU) TokLTEU
-      , InfixL $ chainOp (ChainOp . GT) TokGT
-      , InfixL $ chainOp (ChainOp . GTE) TokGTE
-      , InfixL $ chainOp (ChainOp . GTEU) TokGTEU
+      , InfixL $ chainOp NEQ TokNEQ
+      , InfixL $ chainOp NEQU TokNEQU
+      , InfixL $ chainOp LT TokLT
+      , InfixL $ chainOp LTE TokLTE
+      , InfixL $ chainOp LTEU TokLTEU
+      , InfixL $ chainOp GT TokGT
+      , InfixL $ chainOp GTE TokGTE
+      , InfixL $ chainOp GTEU TokGTEU
       ]
 
       --- &&
-    , [ InfixL $ arithOp (ArithOp . Conj) TokConj
-      , InfixL $ arithOp (ArithOp . ConjU) TokConjU
+    , [ InfixL $ arithOp Conj TokConj
+      , InfixL $ arithOp ConjU TokConjU
       --- ||
-      , InfixL $ arithOp (ArithOp . Disj) TokDisj
-      , InfixL $ arithOp (ArithOp . DisjU) TokDisjU
+      , InfixL $ arithOp Disj TokDisj
+      , InfixL $ arithOp DisjU TokDisjU
     ]
 
 
       -- =>
-    , [ InfixR $ arithOp (ArithOp . Implies) TokImpl
-      , InfixR $ arithOp (ArithOp . ImpliesU) TokImplU
+    , [ InfixR $ arithOp Implies TokImpl
+      , InfixR $ arithOp ImpliesU TokImplU
       -- <=>
-      , InfixL $ chainOp (ChainOp . EQProp) TokEQProp
-      , InfixL $ chainOp (ChainOp . EQPropU) TokEQPropU
+      , InfixL $ chainOp EQProp TokEQProp
+      , InfixL $ chainOp EQPropU TokEQPropU
       ]
     ]
+    where
+      arithOp :: (Loc -> ArithOp) -> Tok -> Parser (Expr -> Expr -> Expr)
+      arithOp operator' tok = do
+        (op, loc) <- getLoc (operator' <$ symbol tok)
+        return $ \x y -> App (App (Expr.Op (op loc)) x) y
 
+      chainOp :: (Loc -> ChainOp) -> Tok -> Parser (Expr -> Expr -> Expr)
+      chainOp operator' tok = do
+        (op, loc) <- getLoc (operator' <$ symbol tok)
+        return (`makeChain` op loc)
+        where
+          makeChain a op b = Chain $ More (asChain a) op b
+          asChain (Chain c) = c
+          asChain e = Pure e
 
-  unary :: (Loc -> Op) -> Tok -> Parser (Expr -> Expr)
+  unary :: (Loc -> ArithOp) -> Tok -> Parser (Expr -> Expr)
   unary operator' tok = do
     loc <- symbol tok
     return $ \result -> App (Expr.Op (operator' loc)) result
-
-  arithOp :: (Loc -> Op) -> Tok -> Parser (Expr -> Expr -> Expr)
-  arithOp operator' tok = do
-    (op, loc) <- getLoc (operator' <$ symbol tok)
-    return $ \x y -> App (App (Expr.Op (op loc)) x) y
-
-  chainOp :: (Loc -> Op) -> Tok -> Parser (Expr -> Expr -> Expr) -- FIXME:
-  chainOp operator' tok = do
-    (op, loc) <- getLoc (operator' <$ symbol tok)
-    return (`makeChain` op loc)
-    where
-      makeChain a op b = Chain $ More (asChain a) op b
-      asChain (Chain c) = c
-      asChain e = Pure e
 
   parensExpr :: Parser Expr
   parensExpr = Paren <$> tokenParenOpen <*> expression <*> tokenParenClose
@@ -554,7 +553,7 @@ expression = do
         , Const <$> upper
         , Quant
         <$> choice [Left <$> tokenQuantOpen, Right <$> tokenQuantOpenU]
-        <*> choice [Left <$> operator, Right <$> identifier]
+        <*> choice [Left <$> arithOp, Right <$> identifier]
         <*> some lower
         <*> tokenColon
         <*> expression
@@ -579,48 +578,45 @@ expression = do
     helper a []               = a
     helper a ((o, x, c) : xs) = helper (Arr a o x c) xs
 
-  operator :: Parser Op
-  operator = choice [ChainOp <$> chainOp, ArithOp <$> arithOp] <?> "operator"
-   where
-    chainOp :: Parser ChainOp
-    chainOp = choice
-      [ EQProp <$> symbol TokEQProp
-      , EQPropU <$> symbol TokEQPropU
-      , EQ <$> symbol TokEQ
-      , NEQ <$> symbol TokNEQ
-      , NEQU <$> symbol TokNEQU
-      , LTE <$> symbol TokLTE
-      , LTEU <$> symbol TokLTEU
-      , GTE <$> symbol TokGTE
-      , GTEU <$> symbol TokGTEU
-      , LT <$> symbol TokLT
-      , GT <$> symbol TokGT
-      ]
+  chainOp :: Parser ChainOp
+  chainOp = choice
+    [ EQProp <$> symbol TokEQProp
+    , EQPropU <$> symbol TokEQPropU
+    , EQ <$> symbol TokEQ
+    , NEQ <$> symbol TokNEQ
+    , NEQU <$> symbol TokNEQU
+    , LTE <$> symbol TokLTE
+    , LTEU <$> symbol TokLTEU
+    , GTE <$> symbol TokGTE
+    , GTEU <$> symbol TokGTEU
+    , LT <$> symbol TokLT
+    , GT <$> symbol TokGT
+    ] <?> "chain operator"
 
-    arithOp :: Parser ArithOp
-    arithOp = choice
-      [ Implies <$> symbol TokImpl
-      , ImpliesU <$> symbol TokImplU
-      , Conj <$> symbol TokConj
-      , ConjU <$> symbol TokConjU
-      , Disj <$> symbol TokDisj
-      , DisjU <$> symbol TokDisjU
-      , Neg <$> symbol TokNeg
-      , NegU <$> symbol TokNegU
-      , Add <$> symbol TokAdd
-      , Sub <$> symbol TokSub
-      , Mul <$> symbol TokMul
-      , Div <$> symbol TokDiv
-      , Mod <$> symbol TokMod
-      , Max <$> symbol TokMax
-      , Min <$> symbol TokMin
-      , Exp <$> symbol TokExp
-      , Add <$> symbol TokSum
-      , Mul <$> symbol TokProd
-      , Conj <$> symbol TokForall
-      , Disj <$> symbol TokExist
-      , Hash <$> symbol TokHash
-      ]
+  arithOp :: Parser ArithOp
+  arithOp = choice
+    [ Implies <$> symbol TokImpl
+    , ImpliesU <$> symbol TokImplU
+    , Conj <$> symbol TokConj
+    , ConjU <$> symbol TokConjU
+    , Disj <$> symbol TokDisj
+    , DisjU <$> symbol TokDisjU
+    , Neg <$> symbol TokNeg
+    , NegU <$> symbol TokNegU
+    , Add <$> symbol TokAdd
+    , Sub <$> symbol TokSub
+    , Mul <$> symbol TokMul
+    , Div <$> symbol TokDiv
+    , Mod <$> symbol TokMod
+    , Max <$> symbol TokMax
+    , Min <$> symbol TokMin
+    , Exp <$> symbol TokExp
+    , Add <$> symbol TokSum
+    , Mul <$> symbol TokProd
+    , Conj <$> symbol TokForall
+    , Disj <$> symbol TokExist
+    , Hash <$> symbol TokHash
+    ]
 
 -- TODO: LitChar 
 literal :: Parser Lit

@@ -331,7 +331,7 @@ handleExpr (Paren l x r) =
 handleExpr (Var   x) = return $ prettyWithLoc x
 handleExpr (Const x) = return $ prettyWithLoc x
 handleExpr (Lit   x) = return $ prettyWithLoc x
-handleExpr (Op    x) = handleOp x
+handleExpr (Op    x) = handleArithOp x
 handleExpr (Chain c) = handleChain c
 handleExpr (Arr arr l i r) =
   return
@@ -361,8 +361,8 @@ handleExpr (Case a expr b cases) =
     <> prettyWithLoc b
     <> prettyWithLoc cases
 
-handleOp :: Op -> Variadic Expr (DocWithLoc ann)
-handleOp op = case classify op of
+handleArithOp :: ArithOp -> Variadic Expr (DocWithLoc ann)
+handleArithOp op = case classify (ArithOp op) of -- TODO: rewrite `classify` to only handle `ArithOp`s.
   (Infix, _) -> do
     p <- var
     q <- var
@@ -403,7 +403,7 @@ showWithParentheses expr = case handleExpr' expr of
       LitInt n _ -> return $ show n
       LitBool b _ -> return $ show b
       LitChar c _ -> return $ show c
-    handleExpr' (Op    x) = handleOp' x
+    handleExpr' (Op    x) = handleArithOp' x
     handleExpr' (Chain c) = handleChain' c
     handleExpr' (Arr arr _ i _) = do
       arrs <- handleExpr' arr
@@ -419,8 +419,8 @@ showWithParentheses expr = case handleExpr' expr of
     handleExpr' c@Case {} =
       return $ show $ pretty c
 
-    handleOp' :: Op -> Variadic Expr String
-    handleOp' op = case classify op of
+    handleArithOp' :: ArithOp -> Variadic Expr String
+    handleArithOp' op = case classify (ArithOp op) of
       (Infix, _) -> do
         p <- var
         q <- var

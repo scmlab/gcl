@@ -11,7 +11,7 @@ import Data.Loc.Range
 import Data.Text (Text)
 import GHC.Base (Symbol)
 import GHC.Generics (Generic)
-import Syntax.Common (Name, Op)
+import Syntax.Common (Name, ArithOp, ChainOp)
 import Prelude hiding (Ordering (..))
 import Data.Loc (Located (locOf), Pos, Loc (Loc), L)
 import Syntax.Parser.Lexer (Tok)
@@ -154,7 +154,7 @@ data Expr
   | Lit Lit
   | Var Name
   | Const Name
-  | Op Op
+  | Op ArithOp
   | Chain Chain
   | Arr Expr (Token "[") Expr (Token "]")
   | App Expr Expr
@@ -171,10 +171,10 @@ data Expr
   | Case (Token "case") Expr (Token "of") [CaseClause]
   deriving (Eq, Show, Generic)
 
-data Chain = Pure Expr | More Chain Op Expr
+data Chain = Pure Expr | More Chain ChainOp Expr
   deriving (Eq, Show, Generic)
 
-type QuantOp' = Either Op Name
+type QuantOp' = Either ArithOp Name
 
 --------------------------------------------------------------------------------
 -- | Pattern matching
