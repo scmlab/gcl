@@ -233,7 +233,6 @@ type family Typed untyped where
   Typed Expr = Typed.TypedExpr
   Typed Chain = Typed.TypedChain
   Typed Name = Name
-  Typed Op = Op
   Typed ChainOp = Op
   Typed ArithOp = Op
   Typed TypeOp = Op
@@ -537,7 +536,7 @@ instance Elab Chain where -- TODO: Make sure the below implementation is correct
     unifyTy <- unifies (fromJust ty1 ~-> fromJust ty2 ~-> tv) opTy' loc2
     let sub = chainSub <> opSub <> sub1 <> sub2
     return (Just $ subst unifyTy tv, subst sub $ Typed.More typedChain opTyped (subst unifyTy opTy') typedExpr2, sub)
-  elaborate (More (Pure e1 loc1) op e2 loc2) env = do
+  elaborate (More (Pure e1 _loc1) op e2 loc2) env = do
     tv <- freshVar
     (opTy, opTyped, opSub) <- elaborate op env
     opTy' <- instantiate $ fromJust opTy
