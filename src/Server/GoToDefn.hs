@@ -35,19 +35,26 @@ instance Pretty LocationLink where
 
 type LocationLinkToBe = Range -> LocationLink
 
+
+-- TODO: The go-to-definition function for definitions is actually not yet implemented.
+-- Fixing this would be really good.
 -- | Extracts Scopes from a Program
 programToScopes :: Program -> [Scope LocationLinkToBe]
-programToScopes (Program _defns decls _ _ _) = [topLevelScope]
+programToScopes (Program defns decls _ _ _) = [topLevelScope]
  where
   topLevelScope :: Map Text LocationLinkToBe
   topLevelScope = Map.mapKeys nameToText locationLinks
 
   locationLinks :: Map Name LocationLinkToBe
-  locationLinks = locationLinksFromDecls
+  locationLinks = locationLinksFromDecls <> locationLinksFromDefns
 
   locationLinksFromDecls :: Map Name LocationLinkToBe
   locationLinksFromDecls =
     makeLocationLinks $ Map.fromList $ concatMap splitDecl decls
+
+  locationLinksFromDefns ::  Map Name LocationLinkToBe
+  locationLinksFromDefns =
+    makeLocationLinks $ Map.fromList $ concatMap splitDefn defns
 
   --locationLinksFromFuncDefns :: Map Name LocationLinkToBe
   --locationLinksFromFuncDefns = makeLocationLinks funcDefns
@@ -59,6 +66,14 @@ programToScopes (Program _defns decls _ _ _) = [topLevelScope]
   splitDecl :: Declaration -> [(Name, Declaration)]
   splitDecl decl@(ConstDecl names _ _ _) = [ (name, decl) | name <- names ]
   splitDecl decl@(VarDecl   names _ _ _) = [ (name, decl) | name <- names ]
+
+  splitDefn :: Definition -> [(Name, Definition)]
+  splitDefn def@(TypeDefn con _params ctors _) = (con, def) : concatMap (`splitCtor` def) ctors
+  splitDefn FuncDefnSig {} = mempty
+  splitDefn def@(FuncDefn name _exprs) = [(name, def)]
+
+  splitCtor :: TypeDefnCtor -> Definition -> [(Name, Definition)]
+  splitCtor (TypeDefnCtor name _params) def = [(name, def)]
 
 --  Helper function for converting
 --      a Map of "names" and "targets"
@@ -113,8 +128,6 @@ scopeFromLocalBinders names =
 --------------------------------------------------------------------------------
 -- Names
 
--- TODO: It is likely that the go-to-definition function for definitions is actually not yet implemented.
--- Fixing this would be really good.
 instance Collect LocationLinkToBe LocationLink Name where
   collect name = do
     result <- lookupScopes (nameToText name)
