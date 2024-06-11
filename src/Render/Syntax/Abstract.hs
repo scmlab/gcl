@@ -100,7 +100,7 @@ handleExpr _ (ArrUpd e1 e2 e3 _) =
 handleExpr _ (Case expr cases _) =
   "case" <+> render expr <+> "of" <+> vertE (map render cases)
 
-instance Render Chain where -- TODO: Check if this is correct.
+instance Render Chain where -- Hopefully this is correct.
   render (Pure expr _) = render expr
   render (More ch op expr _) = render ch <+> render op <+> render expr
 
