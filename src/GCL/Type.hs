@@ -548,11 +548,6 @@ instance Elab Chain where -- TODO: Make sure the below implementation is correct
     return (Just $ subst unifyTy tv, subst sub $ Typed.More (Typed.Pure typedExpr1) opTyped (subst unifyTy opTy') typedExpr2, sub)
   elaborate (Pure _expr _loc) _ = error "Chain of length 1 shouldn't exist."
 
-instance Elab Op where
-  elaborate (ChainOp op) = elaborate op
-  elaborate (ArithOp op) = elaborate op
-  elaborate (TypeOp op) = elaborate op
-
 instance Elab ChainOp where
   elaborate (EQProp  l) _ = return (Just $ tBool .-> tBool .-> tBool $ l, ChainOp $ EQProp l, mempty)
   elaborate (EQPropU l) _ = return (Just $ tBool .-> tBool .-> tBool $ l, ChainOp $ EQPropU l, mempty)
