@@ -131,43 +131,15 @@ instance CollectIds a => CollectIds [a] where
 instance CollectIds [Definition] where
   collectIds defns = do
     -- First, we split variants of definitions because different kinds of definitions need to be processed differently.
-    let sigPredicate = \case
-          FuncDefnSig {} -> True
-          _ -> False
-    let sigs = filter sigPredicate defns
-    let funcDefnPredicate = \case
-          FuncDefn {} -> True
-          _ -> False
-    let funcDefns = filter funcDefnPredicate defns
-    let typeDefnPredicate = \case
-          TypeDefn {} -> True
-          _ -> False
-    let typeDefns = filter typeDefnPredicate defns
+    let (typeDefns, funcSigs, funcDefns) = split defns
     -- Gather the type definitions.
-    -- Type definitions are collected first because signatures and function definitions may depend on it.
-    mapM_ (\(TypeDefn name args ctors _) -> do
-            let formTy con params loc =
-                  case params of
-                    [] -> con
-                    n : ns -> formTy (TApp con n loc) ns loc
-            let newTypeInfos = -- TODO: Fix possible name collision.
-                  map
-                    (\(TypeDefnCtor cn ts) -> (Index cn, TypeDefnCtorInfo (wrapTFunc ts (formTy (TData name () (locOf name)) (TMetaVar <$> args) (name <--> args)))))
-                    ctors
-            let newTypeDefnInfos = (Index name, TypeDefnInfo args)
-            modify (\(freshState, origTypeDefnInfos, origTypeInfos) -> (freshState, newTypeDefnInfos : origTypeDefnInfos, newTypeInfos <> origTypeInfos))
-          ) typeDefns -- For all typeDefns, do the above monadically ...
+    -- Type definitions are collected first because signatures and function definitions may depend on them.
+    collectTypeDefns typeDefns 
     -- Add signatures into the state one by one.
-    mapM_ (
-      \case
-        (FuncDefnSig n t _ _) ->
-          let infos = (Index n, ConstTypeInfo t) in
-            modify (\(freshState, typeDefnInfos, origInfos) -> (freshState, typeDefnInfos, infos : origInfos))
-        _ -> undefined
-      ) sigs
-    (_, _, infos) <- get
+    collectFuncSigs funcSigs
     -- Get the original explicit signatures.
     -- We will try to restrict polymorphic functions to the types of the corresponding signatures.
+    (_, _, infos) <- get
     let sigEnv = second typeInfoToType <$> infos
     -- Give each function definition a fresh name.
     let defined = concatMap (\case
@@ -204,6 +176,36 @@ instance CollectIds [Definition] where
             modify (\(freshState, typeDefnInfos, origInfos) -> (freshState, typeDefnInfos, info : origInfos))
           ) (zip names tys)
     where
+      split :: [Definition] -> ([Definition], [Definition], [Definition])
+      split defs = foldr (
+          \def accum -> case def of
+            d @ TypeDefn {} -> let (typeDefns, sigs, funcDefns) = accum in (d : typeDefns, sigs, funcDefns)
+            d @ FuncDefnSig {} -> let (typeDefns, sigs, funcDefns) = accum in (typeDefns, d : sigs, funcDefns)
+            d @ FuncDefn {} -> let (typeDefns, sigs, funcDefns) = accum in (typeDefns, sigs, d : funcDefns)
+        ) mempty defs
+      
+      collectTypeDefns :: [Definition] -> ElaboratorM ()
+      collectTypeDefns typeDefns =
+        mapM_ (\(TypeDefn name args ctors _) -> do
+          let formTy con params loc =
+                case params of
+                  [] -> con
+                  n : ns -> formTy (TApp con n loc) ns loc
+          let newTypeInfos = -- TODO: Fix possible name collision.
+                map
+                  (\(TypeDefnCtor cn ts) -> (Index cn, TypeDefnCtorInfo (wrapTFunc ts (formTy (TData name () (locOf name)) (TMetaVar <$> args) (name <--> args)))))
+                  ctors
+          let newTypeDefnInfos = (Index name, TypeDefnInfo args)
+          modify (\(freshState, origTypeDefnInfos, origTypeInfos) -> (freshState, newTypeDefnInfos : origTypeDefnInfos, newTypeInfos <> origTypeInfos))
+        ) typeDefns -- For all typeDefns, do the above monadically ...
+
+      collectFuncSigs :: [Definition] -> ElaboratorM ()
+      collectFuncSigs funcSigs =
+        mapM_ (\(FuncDefnSig n t _ _) -> do 
+          let infos = (Index n, ConstTypeInfo t)
+          modify (\(freshState, typeDefnInfos, origInfos) -> (freshState, typeDefnInfos, infos : origInfos))
+        ) funcSigs
+
       generalize :: Fresh m => Type -> TypeEnv -> m Type
       generalize ty' env' = do
         let free = Set.toList (freeVars ty') \\ Set.toList (freeVars env')
@@ -500,7 +502,7 @@ instance Elab Expr where
   -- sa Γ ⊢ i : Int ↓ si
   ---- ArrIdx ----------------------------
   -- Γ ⊢ a[i] ↑ (si . sa, si (sa b))
-  elaborate (ArrIdx e1 e2 loc) env = do -- TODO: I didn't follow the above typing rules. Check if this is correct.
+  elaborate (ArrIdx e1 e2 loc) env = do -- I didn't follow the above typing rules. Hopefully this is correct.
     tv <- freshVar
     (ty1, typedExpr1, sub1) <- elaborate e1 env
     (ty2, typedExpr2, sub2) <- elaborate e2 (subst sub1 env)
@@ -513,7 +515,7 @@ instance Elab Expr where
   -- si (sa Γ) ⊢ e : si (sa b) ↓ se
   ---- ArrUpd --------------------------------------
   -- Γ ⊢ (a : i ↦ e) ↑ (se . si . sa, se (si (sa b)))
-  elaborate (ArrUpd arr index e loc) env = do -- TODO: I didn't follow the above typing rules. Check if this is correct.
+  elaborate (ArrUpd arr index e loc) env = do -- I didn't follow the above typing rules. Hopefully this is correct.
     tv <- freshVar
     (arrTy, typedArr, arrSub) <- elaborate arr env
     (indexTy, typedIndex, indexSub) <- elaborate index $ subst arrSub env
@@ -525,7 +527,7 @@ instance Elab Expr where
     return (subst uniSubArr arrTy, subst sub (Typed.ArrUpd typedArr typedIndex typedE loc), sub)
   elaborate (Case expr cs l) env = undefined
 
-instance Elab Chain where -- TODO: Make sure the below implementation is correct
+instance Elab Chain where -- TODO: Make sure the below implementation is correct.
   elaborate (More (More ch' op1 e1 loc1) op2 e2 loc2) env = do
     tv <- freshVar
     (_chainTy, typedChain, chainSub) <- elaborate (More ch' op1 e1 loc1) env
