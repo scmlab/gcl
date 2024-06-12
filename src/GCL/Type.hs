@@ -81,22 +81,12 @@ instance Substitutable Type TypeInfo where
 newtype TypeDefnInfo = TypeDefnInfo [Name]
   deriving (Eq, Show)
 
-dups :: Eq a => [a] -> [a]
-dups = map head . filter ((> 1) . length) . group
-
-duplicationCheck
-  :: (Eq a, MonadError TypeError m) => [(Index, a)] -> m [(Index, a)]
+duplicationCheck :: (MonadError TypeError m) => [Name] -> m ()
 duplicationCheck ns =
-  let ds = dups ns
+  let ds = map head . filter ((> 1) . length) . groupBy (\(Name text1 _)(Name text2 _) -> text1 == text2) $ ns
   in  if null ds
-        then return ns
-        else throwError . DuplicatedIdentifiers . map (toName . fst) . filter isName $ ds
-  where
-    isName (Index{}, _) = True
-    isName _            = False
-
-    toName (Index n) = n
-    toName (Hole rng) = Name (Text.pack (show rng)) (locOf rng)
+        then return ()
+        else throwError . DuplicatedIdentifiers $ ds
 
 --------------------------------------------------------------------------------
 -- The elaboration monad
@@ -132,6 +122,10 @@ instance CollectIds [Definition] where
   collectIds defns = do
     -- First, we split variants of definitions because different kinds of definitions need to be processed differently.
     let (typeDefns, funcSigs, funcDefns) = split defns
+    -- Check if there are duplications of definitions.
+    duplicationCheck $ (\(TypeDefn name _ _ _) -> name) <$> typeDefns -- TODO: Also check for (term) constructors.
+    duplicationCheck $ (\(FuncDefnSig name _ _ _) -> name) <$> funcSigs
+    duplicationCheck $ (\(FuncDefn name _) -> name) <$> funcDefns -- TODO: This doesn't seem to be working.
     -- Gather the type definitions.
     -- Type definitions are collected first because signatures and function definitions may depend on them.
     collectTypeDefns typeDefns 
@@ -471,6 +465,7 @@ instance Elab Expr where
   -- Γ ⊢ (e1, e2) ↑ (s2 . s1, (s2 t1, t2))
   elaborate (Tuple xs) env = undefined
   elaborate (Quant quantifier bound restriction inner loc) env = do
+    duplicationCheck bound
     tv <- freshVar
     (quantTy, quantTypedExpr, quantSub) <- elaborate quantifier env
     case quantifier of
