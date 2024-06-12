@@ -178,10 +178,10 @@ instance CollectIds [Definition] where
     where
       split :: [Definition] -> ([Definition], [Definition], [Definition])
       split defs = foldr (
-          \def accum -> case def of
-            d @ TypeDefn {} -> let (typeDefns, sigs, funcDefns) = accum in (d : typeDefns, sigs, funcDefns)
-            d @ FuncDefnSig {} -> let (typeDefns, sigs, funcDefns) = accum in (typeDefns, d : sigs, funcDefns)
-            d @ FuncDefn {} -> let (typeDefns, sigs, funcDefns) = accum in (typeDefns, sigs, d : funcDefns)
+          \def (typeDefns, sigs, funcDefns)  -> case def of
+            d @ TypeDefn {} -> (d : typeDefns, sigs, funcDefns)
+            d @ FuncDefnSig {} -> (typeDefns, d : sigs, funcDefns)
+            d @ FuncDefn {} -> (typeDefns, sigs, d : funcDefns)
         ) mempty defs
       
       collectTypeDefns :: [Definition] -> ElaboratorM ()
@@ -191,10 +191,14 @@ instance CollectIds [Definition] where
                 case params of
                   [] -> con
                   n : ns -> formTy (TApp con n loc) ns loc
-          let newTypeInfos = -- TODO: Fix possible name collision.
+          -- Give type variables fresh names to prevent name collision.
+          freshNames <- mapM freshName' $ (\(Name text _) -> text) <$> args
+          let sub = Map.fromList . zip args $ TMetaVar <$> freshNames
+          let newTypeInfos =
                 map
-                  (\(TypeDefnCtor cn ts) -> (Index cn, TypeDefnCtorInfo (wrapTFunc ts (formTy (TData name () (locOf name)) (TMetaVar <$> args) (name <--> args)))))
+                  (\(TypeDefnCtor cn ts) -> (Index cn, TypeDefnCtorInfo $ subst sub (wrapTFunc ts (formTy (TData name () (locOf name)) (TMetaVar <$> args) (name <--> args)))))
                   ctors
+          -- This is not yet used throughout the whole program. We may have to change the type and store pattern infos here in the future.
           let newTypeDefnInfos = (Index name, TypeDefnInfo args)
           modify (\(freshState, origTypeDefnInfos, origTypeInfos) -> (freshState, newTypeDefnInfos : origTypeDefnInfos, newTypeInfos <> origTypeInfos))
         ) typeDefns -- For all typeDefns, do the above monadically ...
