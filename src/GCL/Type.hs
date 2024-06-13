@@ -123,9 +123,10 @@ instance CollectIds [Definition] where
     -- First, we split variants of definitions because different kinds of definitions need to be processed differently.
     let (typeDefns, funcSigs, funcDefns) = split defns
     -- Check if there are duplications of definitions.
-    duplicationCheck $ (\(TypeDefn name _ _ _) -> name) <$> typeDefns -- TODO: Also check for (term) constructors.
-    duplicationCheck $ (\(FuncDefnSig name _ _ _) -> name) <$> funcSigs
-    duplicationCheck $ (\(FuncDefn name _) -> name) <$> funcDefns
+    -- While checking signatures and function definitions, we take account of the names of (term) constructors.
+    duplicationCheck $ (\(TypeDefn name _ _ _) -> name) <$> typeDefns
+    duplicationCheck $ ((\(FuncDefnSig name _ _ _) -> name) <$> funcSigs) <> gatherCtorNames typeDefns
+    duplicationCheck $ ((\(FuncDefn name _) -> name) <$> funcDefns) <> gatherCtorNames typeDefns
     -- Gather the type definitions.
     -- Type definitions are collected first because signatures and function definitions may depend on them.
     collectTypeDefns typeDefns 
@@ -178,6 +179,16 @@ instance CollectIds [Definition] where
             d @ FuncDefn {} -> (typeDefns, sigs, d : funcDefns)
         ) mempty defs
       
+      gatherCtorNames :: [Definition] -> [Name]
+      gatherCtorNames defs = do
+        def <- defs
+        case def of
+          TypeDefn _ _ ctors _ -> do
+            ctor <- ctors
+            let TypeDefnCtor name _ = ctor
+            return name
+          _ -> []
+
       collectTypeDefns :: [Definition] -> ElaboratorM ()
       collectTypeDefns typeDefns =
         mapM_ (\(TypeDefn name args ctors _) -> do
