@@ -74,10 +74,10 @@ instance Collect Typed.TypedDeclaration where
 --------------------------------------------------------------------------------
 -- Stmt
 
-instance Collect Typed.TypedStmt where
+instance Collect Typed.TypedStmt where -- TODO: Display hover info for names.
   collect (Typed.Skip _) = mempty
   collect (Typed.Abort _) = mempty
-  collect (Typed.Assign _names exprs _) = foldMap collect exprs -- TODO: Display hover info for names.
+  collect (Typed.Assign _names exprs _) = foldMap collect exprs
   collect (Typed.AAssign arr index rhs _) = collect arr <> collect index <> collect rhs
   collect (Typed.Assert expr _) = collect expr
   collect (Typed.LoopInvariant inv bnd _) = collect inv <> collect bnd
@@ -85,6 +85,11 @@ instance Collect Typed.TypedStmt where
   collect (Typed.If gdCmds _) = foldMap collect gdCmds
   collect Typed.Spec {} = mempty
   collect Typed.Proof {} = mempty
+  collect (Typed.Alloc _name exprs _) = foldMap collect exprs
+  collect (Typed.HLookup _name expr _) = collect expr
+  collect (Typed.HMutate e1 e2 _) = collect e1 <> collect e2
+  collect (Typed.Dispose expr _) = collect expr
+  collect (Typed.Block program _) = collect program 
 
 instance Collect Typed.TypedGdCmd where
   collect (Typed.TypedGdCmd gd stmts _) = collect gd <> foldMap collect stmts

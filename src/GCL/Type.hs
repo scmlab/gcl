@@ -333,6 +333,14 @@ instance Elab Declaration where
         return (Nothing, Typed.VarDecl names ty (Just p') loc, mempty)
       Nothing -> return (Nothing, Typed.VarDecl names ty Nothing loc, mempty)
 
+-- This function is used during elaborating stmts.
+checkAssign :: [(Index, TypeInfo)] -> Name -> ElaboratorM Type
+checkAssign infos name = do
+  case lookup (Index name) infos of
+    Just (VarTypeInfo t) -> pure t
+    Just _               -> throwError $ AssignToConst name
+    Nothing              -> throwError $ NotInScope name
+
 instance Elab Stmt where
   elaborate (Skip  loc     ) _ = return (Nothing, Typed.Skip loc, mempty)
   elaborate (Abort loc     ) _ = return (Nothing, Typed.Abort loc, mempty)
@@ -346,19 +354,12 @@ instance Elab Stmt where
       | otherwise      -> do
         (_, _, infos) <- get
         exprs' <- mapM (\(name, expr) -> do
-                          ty <- checkAssign infos (name, expr)
+                          ty <- checkAssign infos name
                           (ty', typedExpr, _) <- elaborate expr env
                           _ <- unifies ty (fromJust ty') $ locOf expr
                           return typedExpr
                        ) ass
         return (Nothing, Typed.Assign names exprs' loc, mempty)
-   where
-    checkAssign :: [(Index, TypeInfo)] -> (Name, Expr) -> ElaboratorM Type
-    checkAssign infos (name, _expr) = do
-      case lookup (Index name) infos of
-        Just (VarTypeInfo t) -> pure t
-        Just _               -> throwError $ AssignToConst name
-        Nothing              -> throwError $ NotInScope name
   elaborate (AAssign arr index e loc) env = do
     tv <- freshVar
     (arrTy, typedArr, arrSub) <- elaborate arr env
@@ -395,7 +396,36 @@ instance Elab Stmt where
     return (Nothing, Typed.If gds' loc, mempty)
   elaborate (Spec text range) _ = return (Nothing, Typed.Spec text range, mempty)
   elaborate (Proof text1 text2 range) _ = return (Nothing, Typed.Proof text1 text2 range, mempty)
-  elaborate _ _ = undefined -- FIXME:
+  elaborate (Alloc var exprs loc) env = do
+    (_, _, infos) <- get
+    ty <- checkAssign infos var
+    _ <- unifies ty (tInt NoLoc) $ locOf var
+    typedExprs <-
+      mapM
+        (\expr -> do
+          (ty', typedExpr, _) <- elaborate expr env
+          _ <- unifies (fromJust ty') (tInt NoLoc) (locOf expr)
+          return typedExpr
+        ) exprs
+    return (Nothing, Typed.Alloc var typedExprs loc, mempty)
+  elaborate (HLookup name expr loc) env = do
+    (_, _, infos) <- get
+    ty <- checkAssign infos name
+    _ <- unifies ty (tInt NoLoc) $ locOf name
+    (ty', typedExpr, _) <- elaborate expr env
+    _ <- unifies (fromJust ty') (tInt NoLoc) (locOf expr)
+    return (Nothing, Typed.HLookup name typedExpr loc, mempty)
+  elaborate (HMutate left right loc) env = do
+    (ty, typedLeft, _) <- elaborate left env
+    _ <- unifies (fromJust ty) (tInt NoLoc) (locOf left)
+    (ty', typedRight, _) <- elaborate right env
+    _ <- unifies (fromJust ty') (tInt NoLoc) (locOf right)
+    return (Nothing, Typed.HMutate typedLeft typedRight loc, mempty)
+  elaborate (Dispose expr loc) env = do
+    (ty, typedExpr, _) <- elaborate expr env
+    _ <- unifies (fromJust ty) (tInt NoLoc) (locOf expr)
+    return (Nothing, Typed.Dispose typedExpr loc, mempty)
+  elaborate Block {} env = undefined -- TODO: Implement blocks.
 
 instance Elab GdCmd where
   elaborate (GdCmd expr stmts loc) env = do

@@ -38,7 +38,11 @@ data TypedStmt
   | If [TypedGdCmd] Loc
   | Spec Text Range
   | Proof Text Text Range
-  -- FIXME: Other constructors.
+  | Alloc   Name [TypedExpr] Loc    --  p := new (e1,e2,..,en)
+  | HLookup Name TypedExpr Loc      --  x := *e
+  | HMutate TypedExpr TypedExpr Loc --  *e1 := e2
+  | Dispose TypedExpr Loc           --  dispose e
+  | Block TypedProgram Loc
   deriving (Eq, Show)
 
 data TypedGdCmd = TypedGdCmd TypedExpr [TypedStmt] Loc
