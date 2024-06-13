@@ -337,6 +337,7 @@ instance Elab Stmt where
   elaborate (Skip  loc     ) _ = return (Nothing, Typed.Skip loc, mempty)
   elaborate (Abort loc     ) _ = return (Nothing, Typed.Abort loc, mempty)
   elaborate (Assign names exprs loc) env = do
+    duplicationCheck names
     let ass = zip names exprs
     let an  = length ass
     if
@@ -344,17 +345,18 @@ instance Elab Stmt where
       | an < length names -> throwError $ RedundantNames (drop an names)
       | otherwise      -> do
         (_, _, infos) <- get
-        mapM_ (checkAssign infos) ass
-        exprs' <- mapM (\expr -> do
-                          (_, typedExpr, _) <- elaborate expr env
+        exprs' <- mapM (\(name, expr) -> do
+                          ty <- checkAssign infos (name, expr)
+                          (ty', typedExpr, _) <- elaborate expr env
+                          _ <- unifies ty (fromJust ty') $ locOf expr
                           return typedExpr
-                       ) exprs
+                       ) ass
         return (Nothing, Typed.Assign names exprs' loc, mempty)
    where
-    checkAssign :: [(Index, TypeInfo)] -> (Name, Expr) -> ElaboratorM ()
+    checkAssign :: [(Index, TypeInfo)] -> (Name, Expr) -> ElaboratorM Type
     checkAssign infos (name, _expr) = do
       case lookup (Index name) infos of
-        Just (VarTypeInfo _) -> pure ()
+        Just (VarTypeInfo t) -> pure t
         Just _               -> throwError $ AssignToConst name
         Nothing              -> throwError $ NotInScope name
   elaborate (AAssign arr index e loc) env = do
