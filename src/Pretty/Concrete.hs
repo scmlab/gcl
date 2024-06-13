@@ -492,9 +492,9 @@ instance PrettyWithLoc Type where
     prettyWithLoc a <> prettyWithLoc l <> prettyWithLoc b
   prettyWithLoc (TArray l a r b) =
     prettyWithLoc l <> prettyWithLoc a <> prettyWithLoc r <> prettyWithLoc b
-  prettyWithLoc (TApp a b) = prettyWithLoc a <> prettyWithLoc b
-  prettyWithLoc (TData n ) = prettyWithLoc n
-  prettyWithLoc (TVar i  ) = prettyWithLoc i
+  prettyWithLoc (TApp a b ) = prettyWithLoc a <> prettyWithLoc b
+  prettyWithLoc (TData n l) = fromDoc (locOf l) (pretty n)
+  prettyWithLoc (TVar i   ) = prettyWithLoc i
 
 --------------------------------------------------------------------------------
 

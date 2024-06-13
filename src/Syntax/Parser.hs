@@ -675,7 +675,7 @@ type' = do
   parensType = TParen <$> tokenParenOpen <*> type' <*> tokenParenClose
 
   typeVar :: Parser Type
-  typeVar = TData <$> upper
+  typeVar = withRange $ TData <$> upper
 
   array :: Parser Type
   array = TArray <$> tokenArray <*> interval <*> tokenOf <*> type'

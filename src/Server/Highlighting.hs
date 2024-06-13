@@ -279,5 +279,5 @@ instance Collect () Highlighting Type where
   collect (TApp a b)  = do
     collect a
     collect b
-  collect (TData name) = addHighlighting J.SttType [] name
+  collect (TData name _) = addHighlighting J.SttType [] name
   collect (TVar name)  = addHighlighting J.SttType [] name

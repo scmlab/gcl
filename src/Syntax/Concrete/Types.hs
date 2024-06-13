@@ -142,7 +142,7 @@ data Type
   | TArray (Token "array") Interval (Token "of") Type
   | TFunc Type TokArrows Type
   | TApp Type Type
-  | TData Name -- TODO: add range
+  | TData Name Range
   | TVar Name
   deriving (Eq, Show)
 
