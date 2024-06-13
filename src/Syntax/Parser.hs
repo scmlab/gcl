@@ -267,7 +267,7 @@ definition = choice [try funcDefnSig, typeDefn, funcDefnF]
   typeDefn = TypeDefn <$> tokenData <*> upper <*> many lower <*> tokenEQ <*> sepByGuardBar typeDefnCtor
 
   typeDefnCtor :: Parser TypeDefnCtor
-  typeDefnCtor = TypeDefnCtor <$> upper <*> many type'
+  typeDefnCtor = TypeDefnCtor <$> upper <*> many lower
 
 definitionBlock :: Parser DefinitionBlock
 definitionBlock = DefinitionBlock <$> tokenDeclOpen <*> sepByAlignmentOrSemi definition <*> tokenDeclClose
@@ -462,68 +462,76 @@ expression = do
   opTable :: [[Operator Parser Expr]]
   opTable =
     [ -- The order should be same as in Syntax.Common.Types
-      [InfixL (return App)]
+      [ InfixL (return App) ]
 
-    , [ Prefix $ foldr1 (.) <$> some (unary (ArithOp . Neg) TokNeg
-                                     <|> unary (ArithOp . NegU) TokNegU)
-      , Prefix $ unary (ArithOp . NegNum) TokSub
+    , [ Prefix $ foldr1 (.) <$> some (unary Neg TokNeg
+                                     <|> unary NegU TokNegU)
+      , Prefix $ unary NegNum TokSub
       ]
 
-    , [InfixL $ binary (ArithOp . Exp) TokExp]
-    , [ InfixL $ binary (ArithOp . Mod) TokMod
-      , InfixL $ binary (ArithOp . Mul) TokMul
-      , InfixL $ binary (ArithOp . Div) TokDiv
+    , [ InfixL $ arithOp Exp TokExp ]
+    , [ InfixL $ arithOp Mod TokMod
+      , InfixL $ arithOp Mul TokMul
+      , InfixL $ arithOp Div TokDiv
       ]
 
-    , [ InfixL $ binary (ArithOp . Add) TokAdd
-      , InfixL $ binary (ArithOp . Sub) TokSub
+    , [ InfixL $ arithOp Add TokAdd
+      , InfixL $ arithOp Sub TokSub
       ]
 
-    , [ InfixL $ binary (ArithOp . Max) TokMax
-      , InfixL $ binary (ArithOp . Min) TokMin
+    , [ InfixL $ arithOp Max TokMax
+      , InfixL $ arithOp Min TokMin
       ]
 
       -- =
-    , [ InfixL $ binary (ChainOp . EQ) TokEQ
+    , [ InfixL $ chainOp EQ TokEQ
       -- ~, <, <=, >, >=
-      , InfixL $ binary (ChainOp . NEQ) TokNEQ
-      , InfixL $ binary (ChainOp . NEQU) TokNEQU
-      , InfixL $ binary (ChainOp . LT) TokLT
-      , InfixL $ binary (ChainOp . LTE) TokLTE
-      , InfixL $ binary (ChainOp . LTEU) TokLTEU
-      , InfixL $ binary (ChainOp . GT) TokGT
-      , InfixL $ binary (ChainOp . GTE) TokGTE
-      , InfixL $ binary (ChainOp . GTEU) TokGTEU
+      , InfixL $ chainOp NEQ TokNEQ
+      , InfixL $ chainOp NEQU TokNEQU
+      , InfixL $ chainOp LT TokLT
+      , InfixL $ chainOp LTE TokLTE
+      , InfixL $ chainOp LTEU TokLTEU
+      , InfixL $ chainOp GT TokGT
+      , InfixL $ chainOp GTE TokGTE
+      , InfixL $ chainOp GTEU TokGTEU
       ]
 
       --- &&
-    , [ InfixL $ binary (ArithOp . Conj) TokConj
-      , InfixL $ binary (ArithOp . ConjU) TokConjU
+    , [ InfixL $ arithOp Conj TokConj
+      , InfixL $ arithOp ConjU TokConjU
       --- ||
-      , InfixL $ binary (ArithOp . Disj) TokDisj
-      , InfixL $ binary (ArithOp . DisjU) TokDisjU
+      , InfixL $ arithOp Disj TokDisj
+      , InfixL $ arithOp DisjU TokDisjU
     ]
 
 
       -- =>
-    , [ InfixR $ binary (ArithOp . Implies) TokImpl
-      , InfixR $ binary (ArithOp . ImpliesU) TokImplU
+    , [ InfixR $ arithOp Implies TokImpl
+      , InfixR $ arithOp ImpliesU TokImplU
       -- <=>
-      , InfixL $ binary (ChainOp . EQProp) TokEQProp
-      , InfixL $ binary (ChainOp . EQPropU) TokEQPropU
+      , InfixL $ chainOp EQProp TokEQProp
+      , InfixL $ chainOp EQPropU TokEQPropU
       ]
     ]
+    where
+      arithOp :: (Loc -> ArithOp) -> Tok -> Parser (Expr -> Expr -> Expr)
+      arithOp operator' tok = do
+        (op, loc) <- getLoc (operator' <$ symbol tok)
+        return $ \x y -> App (App (Expr.Op (op loc)) x) y
 
+      chainOp :: (Loc -> ChainOp) -> Tok -> Parser (Expr -> Expr -> Expr)
+      chainOp operator' tok = do
+        (op, loc) <- getLoc (operator' <$ symbol tok)
+        return (`makeChain` op loc)
+        where
+          makeChain a op b = Chain $ More (asChain a) op b
+          asChain (Chain c) = c
+          asChain e = Pure e
 
-  unary :: (Loc -> Op) -> Tok -> Parser (Expr -> Expr)
+  unary :: (Loc -> ArithOp) -> Tok -> Parser (Expr -> Expr)
   unary operator' tok = do
     loc <- symbol tok
     return $ \result -> App (Expr.Op (operator' loc)) result
-
-  binary :: (Loc -> Op) -> Tok -> Parser (Expr -> Expr -> Expr)
-  binary operator' tok = do
-    (op, loc) <- getLoc (operator' <$ symbol tok)
-    return $ \x y -> App (App (Expr.Op (op loc)) x) y
 
   parensExpr :: Parser Expr
   parensExpr = Paren <$> tokenParenOpen <*> expression <*> tokenParenClose
@@ -545,7 +553,7 @@ expression = do
         , Const <$> upper
         , Quant
         <$> choice [Left <$> tokenQuantOpen, Right <$> tokenQuantOpenU]
-        <*> choice [Left <$> operator, Right <$> identifier]
+        <*> choice [Left <$> arithOp, Right <$> identifier]
         <*> some lower
         <*> tokenColon
         <*> expression
@@ -570,48 +578,45 @@ expression = do
     helper a []               = a
     helper a ((o, x, c) : xs) = helper (Arr a o x c) xs
 
-  operator :: Parser Op
-  operator = choice [ChainOp <$> chainOp, ArithOp <$> arithOp] <?> "operator"
-   where
-    chainOp :: Parser ChainOp
-    chainOp = choice
-      [ EQProp <$> symbol TokEQProp
-      , EQPropU <$> symbol TokEQPropU
-      , EQ <$> symbol TokEQ
-      , NEQ <$> symbol TokNEQ
-      , NEQU <$> symbol TokNEQU
-      , LTE <$> symbol TokLTE
-      , LTEU <$> symbol TokLTEU
-      , GTE <$> symbol TokGTE
-      , GTEU <$> symbol TokGTEU
-      , LT <$> symbol TokLT
-      , GT <$> symbol TokGT
-      ]
+  chainOp :: Parser ChainOp
+  chainOp = choice
+    [ EQProp <$> symbol TokEQProp
+    , EQPropU <$> symbol TokEQPropU
+    , EQ <$> symbol TokEQ
+    , NEQ <$> symbol TokNEQ
+    , NEQU <$> symbol TokNEQU
+    , LTE <$> symbol TokLTE
+    , LTEU <$> symbol TokLTEU
+    , GTE <$> symbol TokGTE
+    , GTEU <$> symbol TokGTEU
+    , LT <$> symbol TokLT
+    , GT <$> symbol TokGT
+    ] <?> "chain operator"
 
-    arithOp :: Parser ArithOp
-    arithOp = choice
-      [ Implies <$> symbol TokImpl
-      , ImpliesU <$> symbol TokImplU
-      , Conj <$> symbol TokConj
-      , ConjU <$> symbol TokConjU
-      , Disj <$> symbol TokDisj
-      , DisjU <$> symbol TokDisjU
-      , Neg <$> symbol TokNeg
-      , NegU <$> symbol TokNegU
-      , Add <$> symbol TokAdd
-      , Sub <$> symbol TokSub
-      , Mul <$> symbol TokMul
-      , Div <$> symbol TokDiv
-      , Mod <$> symbol TokMod
-      , Max <$> symbol TokMax
-      , Min <$> symbol TokMin
-      , Exp <$> symbol TokExp
-      , Add <$> symbol TokSum
-      , Mul <$> symbol TokProd
-      , Conj <$> symbol TokForall
-      , Disj <$> symbol TokExist
-      , Hash <$> symbol TokHash
-      ]
+  arithOp :: Parser ArithOp
+  arithOp = choice
+    [ Implies <$> symbol TokImpl
+    , ImpliesU <$> symbol TokImplU
+    , Conj <$> symbol TokConj
+    , ConjU <$> symbol TokConjU
+    , Disj <$> symbol TokDisj
+    , DisjU <$> symbol TokDisjU
+    , Neg <$> symbol TokNeg
+    , NegU <$> symbol TokNegU
+    , Add <$> symbol TokAdd
+    , Sub <$> symbol TokSub
+    , Mul <$> symbol TokMul
+    , Div <$> symbol TokDiv
+    , Mod <$> symbol TokMod
+    , Max <$> symbol TokMax
+    , Min <$> symbol TokMin
+    , Exp <$> symbol TokExp
+    , Add <$> symbol TokSum
+    , Mul <$> symbol TokProd
+    , Conj <$> symbol TokForall
+    , Disj <$> symbol TokExist
+    , Hash <$> symbol TokHash
+    ] <?> "arithmetic operator"
 
 -- TODO: LitChar 
 literal :: Parser Lit
@@ -644,7 +649,7 @@ type' = do
   makeExprParser term table <?> "type"
  where
   table :: [[Operator Parser Type]]
-  table = [[InfixR function]]
+  table = [[InfixL (return TApp)], [InfixR function]]
 
   function :: Parser (Type -> Type -> Type)
   function = do
@@ -652,17 +657,25 @@ type' = do
     return $ \x y -> TFunc x arrow y
 
   term :: Parser Type
-  term = parensType <|> array <|> try typeVar <|> typeName <?> "type term"
+  term = prim <|> parensType <|> array <|> typeVar <?> "type term"
+
+  prim :: Parser Type
+  prim = tInt <|> tBool <|> tChar
+  
+  tInt :: Parser Type
+  tInt = withRange $ (TBase . TInt) <$ symbol TokIntType
+  
+  tBool :: Parser Type
+  tBool = withRange $ (TBase . TBool) <$ symbol TokBoolType
+
+  tChar :: Parser Type
+  tChar = withRange $ (TBase . TChar) <$ symbol TokCharType
 
   parensType :: Parser Type
   parensType = TParen <$> tokenParenOpen <*> type' <*> tokenParenClose
 
-
   typeVar :: Parser Type
-  typeVar = TVar <$> lower
-
-  typeName :: Parser Type
-  typeName = TCon <$> upper <*> many lower
+  typeVar = withRange $ TData <$> upper
 
   array :: Parser Type
   array = TArray <$> tokenArray <*> interval <*> tokenOf <*> type'
@@ -695,7 +708,7 @@ upperName = extract p
 upper :: Parser Name
 upper =
   withLoc (Name <$> upperName)
-    <?> "identifier that starts with a uppercase letter"
+    <?> "identifier that starts with an uppercase letter"
 
 lowerName :: Parser Text
 lowerName = extract p

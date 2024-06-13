@@ -3,6 +3,7 @@
 
 module GCL.WP.Type where
 
+import           GHC.Generics                   ( Generic )
 import           Control.Monad.Except           ( Except )
 import           Control.Monad.RWS              ( MonadState(..)
                                                 , RWST(..) )
@@ -16,8 +17,7 @@ import GCL.Predicate                           ( InfMode(..)
                                                , PO(..), Pred(..), Spec (..))
 import qualified GCL.Substitution              as Substitution
 import qualified Syntax.Abstract               as A
-import           Syntax.Common.Types           ( Name )
-import GHC.Generics (Generic)
+
 -- The WP monad.
 
 type TM = Except StructError

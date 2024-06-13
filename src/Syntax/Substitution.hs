@@ -38,6 +38,7 @@ instance Fresh m => Substitutable m Expr Expr where
   subst sb (Const x l) =
     return . maybe (Var x l) id $ lookup (nameToText x) sb
   subst _ e@(Op _) = return e
+  subst sb (Chain ch) = Chain <$> subst sb ch
   subst sb (App e1 e2 l) =
     App <$> subst sb e1 <*> subst sb e2 <*> pure l
   subst sb (Lam x e l)
@@ -62,6 +63,9 @@ instance Fresh m => Substitutable m Expr Expr where
       $ \(CaseClause patt body) -> CaseClause patt <$> subst sb body
     return $ Case e cases' l
 
+instance Fresh m => Substitutable m Chain Expr where
+  subst sb (Pure expr loc) = Pure <$> subst sb expr <*> pure loc
+  subst sb (More ch' op expr loc) = More <$> subst sb ch' <*> pure op <*> subst sb expr <*> pure loc
 
 instance Fresh m => Substitutable m FuncClause Expr where
   subst _ = return

@@ -17,11 +17,7 @@ import           GCL.Predicate                  ( InfMode(..)
 import           GCL.Predicate.Util             ( guardIf
                                                 , guardLoop
                                                 )
-import           GCL.Common                     ( Fresh(..)
-                                                , freshName
-                                                , freshName'
-                                                , freeVars
-                                                )
+import           GCL.Common                     ( freshName )
 import GCL.WP.Type
 import GCL.WP.Explanation
 import GCL.WP.Util
@@ -161,7 +157,7 @@ structFunctions (wpSegs, wpSStmts, wp, spSStmts) =
     (Bound (bnd `A.lt` oldbnd) NoLoc)
 
  structBlock :: Pred -> A.Program -> Pred -> WP ()
- structBlock pre (A.Program _ decls props stmts _) post = do
+ structBlock pre (A.Program _ decls _props stmts _) post = do
    let localNames = declaredNames decls
    (xs, ys) <- withLocalScopes (\scopes ->
                 withScopeExtension (map nameToText localNames)

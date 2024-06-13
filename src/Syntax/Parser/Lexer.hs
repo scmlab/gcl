@@ -88,7 +88,10 @@ data Tok
   | TokDeclClose
   | -- expression
     TokUnderscore
-
+    -- types
+  | TokIntType
+  | TokBoolType
+  | TokCharType
     -- operators
   | TokEQ
   | TokNEQ
@@ -132,7 +135,7 @@ data Tok
   | TokChar Char
   | TokTrue
   | TokFalse
-  
+
   -- tokens for proof block {- #anchor ...} or block comment {- ... -}
   | TokProof String String String -- anchor, contents, full-text containing "{-", "-}"
   deriving (Eq, Ord)
@@ -224,6 +227,9 @@ instance Show Tok where
     TokChar      c       -> "'" <> show c <> "'"
     TokTrue              -> "True"
     TokFalse             -> "False"
+    TokIntType           -> "Int"
+    TokBoolType          -> "Bool"
+    TokCharType          -> "Char"
     TokProof s _ _       -> "{- #" ++ s ++ " ...-}"
 
 type TokStream = TokenStream (L Tok)
@@ -391,6 +397,12 @@ tokRE =
     <$  string "True"
     <|> TokFalse
     <$  string "False"
+    <|> TokIntType
+    <$  string "Int"
+    <|> TokBoolType
+    <$  string "Bool"
+    <|> TokCharType
+    <$  string "Char"
     <|> TokUpperName
     .   Text.pack
     <$> upperNameRE

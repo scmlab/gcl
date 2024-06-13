@@ -11,7 +11,8 @@ import           Data.Text                      ( Text )
 import           GHC.Generics                   ( Generic )
 import           Prelude                 hiding ( Ordering(..) )
 import           Syntax.Common                  ( Name
-                                                , Op
+                                                , ArithOp
+                                                , ChainOp
                                                 )
 --------------------------------------------------------------------------------
 
@@ -36,11 +37,11 @@ data Program = Program [Definition]       -- definitions (the functional languag
 data Definition =
     TypeDefn Name [Name] [TypeDefnCtor] Loc
     | FuncDefnSig Name Type (Maybe Expr) Loc
-    | FuncDefn Name [Expr]
+    | FuncDefn Name Expr
     deriving (Eq, Show)
 
 -- constructor of type definition
-data TypeDefnCtor = TypeDefnCtor Name [Type]
+data TypeDefnCtor = TypeDefnCtor Name [Name]
   deriving (Eq, Show)
 
 --------------------------------------------------------------------------------
@@ -99,7 +100,8 @@ data Type
   -- TTuple has no srcloc info because it has no conrete syntax at the moment 
   | TTuple [Type]
   | TFunc Type Type Loc
-  | TCon Name [Name] Loc
+  | TApp Type Type Loc
+  | TData Name () {- TODO: kind system -} Loc
   | TVar Name Loc
   | TMetaVar Name
   deriving (Eq, Show, Generic)
@@ -111,7 +113,8 @@ data Expr
   = Lit Lit Loc
   | Var Name Loc
   | Const Name Loc
-  | Op Op
+  | Op ArithOp
+  | Chain Chain
   | App Expr Expr Loc
   | Lam Name Expr Loc
   | Func Name (NonEmpty FuncClause) Loc
@@ -138,8 +141,12 @@ data Expr
   | Case Expr [CaseClause] Loc
   deriving (Eq, Show, Generic)
 
+
+data Chain = Pure Expr Loc | More Chain ChainOp Expr Loc
+  deriving (Eq, Show, Generic)
+
 -- QuantOp' seems not being used at current version of abstract?
-type QuantOp' = Either Op Expr
+type QuantOp' = Either ArithOp Expr
 
 type Mapping = Map Text Expr
 

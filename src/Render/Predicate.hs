@@ -10,8 +10,8 @@ import           GCL.WP.Type
 import           Render.Class
 import           Render.Element
 import           Render.Syntax.Abstract         ( )
-import           Syntax.Abstract.Types          (Expr(..))
-import           Syntax.Common.Types (Op(..), ArithOp (..))
+import           Syntax.Abstract.Types          ( Expr(..) )
+import           Syntax.Common.Types            ( ArithOp (..) )
 
 instance Render StructWarning where
   render (MissingBound _)
@@ -70,10 +70,10 @@ exprOfPred p = case p of
                            exprs
   Negate pr -> 
     let ex = exprOfPred pr
-    in App (Op $ ArithOp $ NegU NoLoc) ex (locOf ex)
-  where
-    conjOp = Op (ArithOp (ConjU NoLoc))
-    disjOp = Op (ArithOp (DisjU NoLoc))
+    in App (Op $ NegU NoLoc) ex (locOf ex)
+  where -- TODO: Maybe we don't need `Op` here. This requires further investigation. 
+    conjOp = Op $ ConjU NoLoc
+    disjOp = Op $ DisjU NoLoc
     makeOpExpr :: Expr -> Expr -> Expr -> Expr
     makeOpExpr op x y = App (App op x (locOf x)) y (locOf y)
 
