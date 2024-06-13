@@ -153,12 +153,12 @@ instance CollectIds [Definition] where
         case funcDefn of
           (FuncDefn name expr) -> do
             (ty, _, sub1) <- elaborate expr context -- Calling `head` is safe for the meantime.
-            unifySub <- unifies (subst sub1 (fromJust $ lookup (Index name) context)) (fromJust ty) NoLoc -- the first `fromJust` should also be safe.
+            unifySub <- unifies (subst sub1 (fromJust $ lookup (Index name) context)) (fromJust ty) (locOf name) -- the first `fromJust` should also be safe.
             -- We see if there are signatures restricting the type of function definitions.
             case lookup (Index name) sigEnv of
               -- If there is, we save the restricted type.
               Just ty' -> do
-                _ <- unifies (fromJust ty) ty' NoLoc
+                _ <- unifies (fromJust ty) ty' (locOf name)
                 return (subst (unifySub `compose` sub1) context, name : names, subst unifySub <$> (ty' : (subst sub1 <$> tys)), unifySub `compose` sub1 `compose` sub)
               -- If not, we proceed as if it's normal.
               Nothing -> return (subst (unifySub `compose` sub1) context, name : names, subst unifySub <$> (subst sub1 (fromJust ty) : (subst sub1 <$> tys)), unifySub `compose` sub1 `compose` sub)
@@ -192,16 +192,16 @@ instance CollectIds [Definition] where
       collectTypeDefns :: [Definition] -> ElaboratorM ()
       collectTypeDefns typeDefns =
         mapM_ (\(TypeDefn name args ctors _) -> do
-          let formTy con params loc =
+          let formTy con params =
                 case params of
                   [] -> con
-                  n : ns -> formTy (TApp con n loc) ns loc
+                  n : ns -> formTy (TApp con n $ con <--> n) ns
           -- Give type variables fresh names to prevent name collision.
           freshNames <- mapM freshName' $ (\(Name text _) -> text) <$> args
           let sub = Map.fromList . zip args $ TMetaVar <$> freshNames
           let newTypeInfos =
                 map
-                  (\(TypeDefnCtor cn ts) -> (Index cn, TypeDefnCtorInfo $ subst sub (wrapTFunc ts (formTy (TData name () (locOf name)) (TMetaVar <$> args) (name <--> args)))))
+                  (\(TypeDefnCtor cn ts) -> (Index cn, TypeDefnCtorInfo $ subst sub (wrapTFunc ts (formTy (TData name () (locOf name)) (TMetaVar <$> args)))))
                   ctors
           -- This is not yet used throughout the whole program. We may have to change the type and store pattern infos here in the future.
           let newTypeDefnInfos = (Index name, TypeDefnInfo args)
@@ -365,21 +365,21 @@ instance Elab Stmt where
     (arrTy, typedArr, arrSub) <- elaborate arr env
     (indexTy, typedIndex, indexSub) <- elaborate index $ subst arrSub env
     uniSubIndex <- unifies (subst indexSub $ fromJust indexTy) (tInt NoLoc) (locOf index)
-    uniSubArr <- unifies (subst (indexSub `compose` uniSubIndex) (fromJust arrTy)) (TFunc (tInt NoLoc) tv NoLoc) loc
+    uniSubArr <- unifies (subst (indexSub `compose` uniSubIndex) (fromJust arrTy)) (TFunc (tInt NoLoc) tv NoLoc) (locOf arr)
     (eTy, typedE, eSub) <- elaborate e $ subst (uniSubArr `compose` uniSubIndex `compose` indexSub `compose` arrSub) env
     _ <- unifies (subst eSub $ fromJust eTy) (subst uniSubArr tv) (locOf e)
     return (Nothing, Typed.AAssign typedArr typedIndex typedE loc, mempty)
   elaborate (Assert expr loc        ) env = do
     (ty, _, sub) <- elaborate expr env
-    _ <- unifies (subst sub $ fromJust ty) (tBool NoLoc) loc
+    _ <- unifies (subst sub $ fromJust ty) (tBool NoLoc) (locOf expr)
     (_, typedExpr, _) <- elaborate expr env
     return (Nothing, Typed.Assert typedExpr loc, mempty)
   elaborate (LoopInvariant e1 e2 loc) env = do
     (ty1, _, sub1) <- elaborate e1 env
-    _ <- unifies (subst sub1 $ fromJust ty1) (tBool NoLoc) loc
+    _ <- unifies (subst sub1 $ fromJust ty1) (tBool NoLoc) (locOf e1)
     (_, e1', _) <- elaborate e1 env
     (ty2, _, sub2) <- elaborate e2 env
-    _ <- unifies (subst sub2 $ fromJust ty2) (tInt NoLoc) loc
+    _ <- unifies (subst sub2 $ fromJust ty2) (tInt NoLoc) (locOf e2)
     (_, e2', _) <- elaborate e2 env
     return (Nothing, Typed.LoopInvariant e1' e2' loc, mempty)
   elaborate (Do gds loc) env = do
@@ -430,7 +430,7 @@ instance Elab Stmt where
 instance Elab GdCmd where
   elaborate (GdCmd expr stmts loc) env = do
     (ty, _, sub) <- elaborate expr env
-    _ <- unifies (subst sub $ fromJust ty) (tBool NoLoc) loc
+    _ <- unifies (subst sub $ fromJust ty) (tBool NoLoc) (locOf expr)
     (_, e', _) <- elaborate expr env
     s' <- mapM (\stmt -> do
                   (_, typed, _) <- elaborate stmt env
@@ -559,7 +559,7 @@ instance Elab Expr where
     (arrTy, typedArr, arrSub) <- elaborate arr env
     (indexTy, typedIndex, indexSub) <- elaborate index $ subst arrSub env
     uniSubIndex <- unifies (subst indexSub $ fromJust indexTy) (tInt NoLoc) (locOf index)
-    uniSubArr <- unifies (subst (indexSub `compose` uniSubIndex) (fromJust arrTy)) (TFunc (tInt NoLoc) tv NoLoc) loc
+    uniSubArr <- unifies (subst (indexSub `compose` uniSubIndex) (fromJust arrTy)) (TFunc (tInt NoLoc) tv NoLoc) (locOf arr)
     (eTy, typedE, eSub) <- elaborate e $ subst (uniSubArr `compose` uniSubIndex `compose` indexSub `compose` arrSub) env
     uniSubExpr <- unifies (subst eSub $ fromJust eTy) (subst uniSubArr tv) (locOf e)
     let sub = uniSubExpr `compose` eSub `compose` uniSubArr `compose` uniSubIndex `compose` indexSub `compose` arrSub
