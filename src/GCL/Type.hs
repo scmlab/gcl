@@ -498,7 +498,7 @@ instance Elab Expr where
     (ty1, typedExpr1, sub1) <- elaborate expr newEnv
     let returnTy = TFunc (subst sub1 tv) (fromJust ty1) loc
     return (Just returnTy, subst sub1 (Typed.Lam bound (subst sub1 tv) typedExpr1 loc), sub1)
-  elaborate (Func name clauses l) env = undefined -- TODO: Implement below cases for type checking exprs.
+  elaborate (Func name clauses l) env = undefined
   -- Γ ⊢ e1 ↑ (s1, t1)
   -- s1 Γ ⊢ e2 ↑ (s2, t2)
   -- Tuple -------------------------------
@@ -564,7 +564,7 @@ instance Elab Expr where
     uniSubExpr <- unifies (subst eSub $ fromJust eTy) (subst uniSubArr tv) (locOf e)
     let sub = uniSubExpr `compose` eSub `compose` uniSubArr `compose` uniSubIndex `compose` indexSub `compose` arrSub
     return (subst uniSubArr arrTy, subst sub (Typed.ArrUpd typedArr typedIndex typedE loc), sub)
-  elaborate (Case expr cs l) env = undefined
+  elaborate (Case expr cs l) env = undefined -- TODO: Implement pattern matching.
 
 instance Elab Chain where -- TODO: Make sure the below implementation is correct.
   elaborate (More (More ch' op1 e1 loc1) op2 e2 loc2) env = do

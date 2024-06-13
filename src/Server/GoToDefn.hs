@@ -35,9 +35,6 @@ instance Pretty LocationLink where
 
 type LocationLinkToBe = Range -> LocationLink
 
-
--- TODO: The go-to-definition function for definitions is actually not yet implemented.
--- Fixing this would be really good.
 -- | Extracts Scopes from a Program
 programToScopes :: Program -> [Scope LocationLinkToBe]
 programToScopes (Program defns decls _ _ _) = [topLevelScope]

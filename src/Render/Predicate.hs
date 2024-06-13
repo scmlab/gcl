@@ -71,7 +71,7 @@ exprOfPred p = case p of
   Negate pr -> 
     let ex = exprOfPred pr
     in App (Op $ NegU NoLoc) ex (locOf ex)
-  where -- TODO: This requires further investigation. Maybe we don't need `Op` here
+  where -- TODO: Maybe we don't need `Op` here. This requires further investigation. 
     conjOp = Op $ ConjU NoLoc
     disjOp = Op $ DisjU NoLoc
     makeOpExpr :: Expr -> Expr -> Expr -> Expr
