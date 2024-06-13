@@ -59,7 +59,7 @@ instance Collect Typed.TypedProgram where
 instance Collect Typed.TypedDefinition where
   collect (Typed.TypeDefn _ _ ctors _) = foldMap collect ctors
   collect (Typed.FuncDefnSig arg t prop _) = annotateType arg t <> maybe mempty collect prop
-  collect (Typed.FuncDefn _name exprs) = foldMap collect exprs
+  collect (Typed.FuncDefn _name expr) = collect expr
 
 instance Collect Typed.TypedTypeDefnCtor where
   collect (Typed.TypedTypeDefnCtor _name _tys) = mempty

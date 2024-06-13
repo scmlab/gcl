@@ -125,7 +125,7 @@ instance CollectIds [Definition] where
     -- Check if there are duplications of definitions.
     duplicationCheck $ (\(TypeDefn name _ _ _) -> name) <$> typeDefns -- TODO: Also check for (term) constructors.
     duplicationCheck $ (\(FuncDefnSig name _ _ _) -> name) <$> funcSigs
-    duplicationCheck $ (\(FuncDefn name _) -> name) <$> funcDefns -- TODO: This doesn't seem to be working.
+    duplicationCheck $ (\(FuncDefn name _) -> name) <$> funcDefns
     -- Gather the type definitions.
     -- Type definitions are collected first because signatures and function definitions may depend on them.
     collectTypeDefns typeDefns 
@@ -150,8 +150,8 @@ instance CollectIds [Definition] where
     (_, names, tys, _sub) <-
       foldlM (\(context, names, tys, sub) funcDefn -> do
         case funcDefn of
-          (FuncDefn name exprs) -> do
-            (ty, _, sub1) <- elaborate (head exprs) context -- Calling `head` is safe for the meantime.
+          (FuncDefn name expr) -> do
+            (ty, _, sub1) <- elaborate expr context -- Calling `head` is safe for the meantime.
             unifySub <- unifies (subst sub1 (fromJust $ lookup (Index name) context)) (fromJust ty) NoLoc -- the first `fromJust` should also be safe.
             -- We see if there are signatures restricting the type of function definitions.
             case lookup (Index name) sigEnv of
@@ -300,12 +300,9 @@ instance Elab Definition where
                     return typed
                   ) maybeExpr
     return (Nothing, Typed.FuncDefnSig name ty expr' loc, mempty)
-  elaborate (FuncDefn name exprs) env = do
-    exprs' <- mapM (\expr -> do
-                      (_, typed, _) <- elaborate expr env
-                      return typed
-                   ) exprs
-    return (Nothing, Typed.FuncDefn name exprs', mempty)
+  elaborate (FuncDefn name expr) env = do
+    (_, typed, _) <- elaborate expr env
+    return (Nothing, Typed.FuncDefn name typed, mempty)
 
 instance Elab TypeDefnCtor where
   elaborate (TypeDefnCtor name ts) _ = do

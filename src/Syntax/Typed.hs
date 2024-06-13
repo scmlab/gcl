@@ -16,7 +16,7 @@ data TypedProgram = Program [TypedDefinition] -- definitions (the functional lan
 data TypedDefinition
   = TypeDefn Name [Name] [TypedTypeDefnCtor] Loc
   | FuncDefnSig Name Type (Maybe TypedExpr) Loc
-  | FuncDefn Name [TypedExpr]
+  | FuncDefn Name TypedExpr
   deriving (Eq, Show)
 
 data TypedTypeDefnCtor = TypedTypeDefnCtor Name [Name]

@@ -52,13 +52,7 @@ instance Pretty Definition where
   pretty (FuncDefnSig name typ Nothing _) = pretty name <> ": " <> pretty typ
   pretty (FuncDefnSig name typ (Just prop) _) =
     pretty name <> ": " <> pretty typ <> "{ " <> pretty prop <> " }"
-  pretty (FuncDefn name clauses) = vsep (map f clauses)
-   where
-    f e = pretty name <+> g e
-
-    g (Lam x e _) = pretty x <+> f e
-    g e           = "= " <> pretty e
-
+  pretty (FuncDefn name expr) = pretty name <+> " = " <+> pretty expr
 
 instance Pretty TypeDefnCtor where
   pretty (TypeDefnCtor cn ts) = pretty cn <+> hsep (pretty <$> ts)

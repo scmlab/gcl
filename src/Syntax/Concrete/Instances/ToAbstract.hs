@@ -73,8 +73,7 @@ instance ToAbstract (Either Declaration DefinitionBlock) ([A.Declaration], [A.De
 -- | Definition
 
 instance ToAbstract DefinitionBlock [A.Definition] where
-  toAbstract (DefinitionBlock _ defns _) =
-    combineFuncDefns . concat <$> toAbstract defns
+  toAbstract (DefinitionBlock _ defns _) = concat <$> toAbstract defns
 
 instance ToAbstract Definition [A.Definition] where
   toAbstract (TypeDefn tok name binders _ cons) = do
@@ -87,7 +86,7 @@ instance ToAbstract Definition [A.Definition] where
       names
   toAbstract (FuncDefn name args _ body) = do
     body' <- toAbstract body
-    return [A.FuncDefn name [wrapLam args body']]
+    return [A.FuncDefn name $ wrapLam args body']
 
 instance ToAbstract TypeDefnCtor A.TypeDefnCtor where
   toAbstract (TypeDefnCtor c ts) = return $ A.TypeDefnCtor c ts

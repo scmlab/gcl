@@ -53,7 +53,7 @@ programToScopeForSubstitution (Program defns decls _ _ _) =
   Map.mapKeys nameToText
     $  foldMap extractDeclaration decls
     <> ( Map.fromList
-       . map (second Maybe.listToMaybe)
+       . map (second Just)
        . Maybe.mapMaybe pickFuncDefn
        )
          defns
@@ -65,10 +65,11 @@ programToScopeForSubstitution (Program defns decls _ _ _) =
   extractDeclaration (VarDecl names _ _ _) =
     Map.fromList (zip names (repeat Nothing))
 
-pickFuncDefn :: Definition -> Maybe (Name, [Expr])
-pickFuncDefn (FuncDefn n es) = Just (n, es)
-pickFuncDefn _               = Nothing
+pickFuncDefn :: Definition -> Maybe (Name, Expr)
+pickFuncDefn (FuncDefn n expr) = Just (n, expr)
+pickFuncDefn _                 = Nothing
 
+{-
 combineFuncDefns :: [Definition] -> [Definition]
 combineFuncDefns defns =
   let (funcDefns, otherDefns) =
@@ -78,6 +79,7 @@ combineFuncDefns defns =
             mempty
             funcDefns
       in  combinedFuncDefns <> otherDefns
+-}
 --collectFuncDefns = Map.fromListWith mergeFuncDefnsOfTheSameName
   -- . map (\(FuncDefn name clauses _) -> (name, map (uncurry wrapLam) clauses))
  --where

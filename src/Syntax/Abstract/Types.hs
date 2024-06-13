@@ -37,7 +37,7 @@ data Program = Program [Definition]       -- definitions (the functional languag
 data Definition =
     TypeDefn Name [Name] [TypeDefnCtor] Loc
     | FuncDefnSig Name Type (Maybe Expr) Loc
-    | FuncDefn Name [Expr]
+    | FuncDefn Name Expr
     deriving (Eq, Show)
 
 -- constructor of type definition

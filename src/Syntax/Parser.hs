@@ -616,7 +616,7 @@ expression = do
     , Conj <$> symbol TokForall
     , Disj <$> symbol TokExist
     , Hash <$> symbol TokHash
-    ]
+    ] <?> "arithmetic operator"
 
 -- TODO: LitChar 
 literal :: Parser Lit
