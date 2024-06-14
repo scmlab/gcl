@@ -118,6 +118,9 @@ instance CollectIds a => CollectIds [a] where
   collectIds xs = mapM_ collectIds xs
 -}
 
+
+-- Currently (and hopefully in the future), we only modify the state of `ElaboratorM` during `collectIds`.
+
 instance CollectIds [Definition] where
   collectIds defns = do
     -- First, we split variants of definitions because different kinds of definitions need to be processed differently.
@@ -147,7 +150,24 @@ instance CollectIds [Definition] where
     -- Get the previously gathered type infos.
     (_, _, infos') <- get
     let env = second typeInfoToType <$> infos'
-    -- Do a `foldlM` to elaborate multiple definitions together.
+    -- Elaborate multiple definitions simultaneously.
+    -- For instance, while elaborating 2 definitions, the typing rule is:
+    --
+    -- Γ ⊢ e1 ↑ (s1, t1)
+    -- s1 Γ ⊢ e2 ↑ (s2, t2)
+    ---- Simul2 ------------------------
+    -- (e1, e2) ↑ (s2 . s1, (s2 t1, t2))
+    --
+    -- For 3 definitions, the typing rule is:
+    -- Γ ⊢ e1 ↑ (s1, t1)
+    -- s1 Γ ⊢ e2 ↑ (s2, t2)
+    -- s2 s1 Γ ⊢ e3 ↑ (s3, t3)
+    ---- Simul3 -----------------------
+    -- ((e1, e2), e3) ↑ (s3 . s2 . s1, (s3 (s2 t1, t2), t3))
+    --
+    -- And it goes on and on ...
+    -- Notice that Simul3 is merely doing Simul2 twice.
+    -- Therefore, we need to do a `foldlM` to elaborate definitions. 
     (_, names, tys, _sub) <-
       foldlM (\(context, names, tys, sub) funcDefn -> do
         case funcDefn of
@@ -501,7 +521,7 @@ instance Elab Expr where
   elaborate (Func name clauses l) env = undefined
   -- Γ ⊢ e1 ↑ (s1, t1)
   -- s1 Γ ⊢ e2 ↑ (s2, t2)
-  -- Tuple -------------------------------
+  ---- Tuple -----------------------------
   -- Γ ⊢ (e1, e2) ↑ (s2 . s1, (s2 t1, t2))
   elaborate (Tuple xs) env = undefined
   elaborate (Quant quantifier bound restriction inner loc) env = do
