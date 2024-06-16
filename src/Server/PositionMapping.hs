@@ -29,6 +29,8 @@ module Server.PositionMapping
   -- toCurrent and fromCurrent are mainly exposed for testing
   , toCurrent
   , fromCurrent
+  , toCurrentRange'
+  , fromCurrentRange'
   ) where
 
 import           Control.DeepSeq
@@ -104,9 +106,17 @@ toCurrentRange :: PositionMapping -> Range -> Maybe Range
 toCurrentRange mapping (Range a b) =
     Range <$> toCurrentPosition mapping a <*> toCurrentPosition mapping b
 
+
+toCurrentRange' :: PositionDelta -> Range -> Maybe Range
+toCurrentRange' = toCurrentRange . PositionMapping
+
 fromCurrentRange :: PositionMapping -> Range -> Maybe Range
 fromCurrentRange mapping (Range a b) =
     Range <$> fromCurrentPosition mapping a <*> fromCurrentPosition mapping b
+
+
+fromCurrentRange' :: PositionDelta -> Range -> Maybe Range
+fromCurrentRange' = fromCurrentRange . PositionMapping
 
 zeroMapping :: PositionMapping
 zeroMapping = PositionMapping idDelta

@@ -1,6 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 
 module Server.Handler.AutoCompletion where

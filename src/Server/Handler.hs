@@ -28,10 +28,11 @@ import qualified Server.Handler.GoToDefinition as GoToDefinition
 import qualified Server.Handler.AutoCompletion as AutoCompletion
 import qualified Server.Handler.SemanticTokens as SemanticTokens
 import qualified Server.Handler.Guabao.Reload  as Reload
-import Server.Monad (ServerM, modifyPositionDelta, saveEditedVersion, FileState(..), modifyFileState, changesAreOutsideSpecs)
-import Server.PositionMapping (applyChange)
+import Server.Monad (ServerM, FileState (..), modifyFileState)
+import Server.PositionMapping (applyChange, mkDelta)
 import Server.Load (load)
-import GCL.Predicate (Spec)
+import GCL.Predicate (Spec(..))
+import qualified Server.Handler.OnDidChangeTextDocument as OnDidChangeTextDocument
 
 -- handlers of the LSP server
 handlers :: Handlers ServerM
@@ -51,11 +52,7 @@ handlers = mconcat
       let (LSP.List changes)    = ntf ^. (LSP.params . LSP.contentChanges)
       case LSP.uriToFilePath uri of
         Nothing       -> return ()
-        Just filePath -> do
-          modifyPositionDelta filePath (\positionDelta -> foldl applyChange positionDelta changes)
-          case ntf ^. (LSP.params . LSP.textDocument . LSP.version) of
-            Nothing      -> return ()
-            Just version -> saveEditedVersion filePath version
+        Just filePath -> OnDidChangeTextDocument.handler filePath changes
   , -- "textDocument/completion" - auto-completion
     requestHandler LSP.STextDocumentCompletion $ \req responder -> do
       let completionContext = req ^. LSP.params . LSP.context

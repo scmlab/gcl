@@ -1,48 +1,43 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DuplicateRecordFields #-}
-{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# OPTIONS_GHC -Wno-name-shadowing #-}
 
 module Server.Handler.Guabao.Refine where
 
 import qualified Data.Aeson.Types as JSON
 import GHC.Generics ( Generic )
 import Control.Monad.Except           ( runExcept )
-import Server.Monad (ServerM, FileState(..), loadFileState)
+import Server.Monad (ServerM, FileState(..), loadFileState, editTexts, pushSpecs, deleteSpec, sendUpdateSpecNotification)
 
 import qualified Syntax.Parser                as Parser
 import           Syntax.Parser.Error           ( ParseError(..) )
 import Syntax.Parser.Lexer (TokStream(..), scan)
 import Language.Lexer.Applicative              ( TokenStream(..))
 
-import           Data.Bifunctor                 ( Bifunctor (second) )
 
-import Error (Error)
+import Error (Error (ParseError, TypeError, StructError))
 import GCL.Predicate (Spec(..), PO)
 import GCL.Common (TypeEnv)
-import GCL.Type (Elab(..), TypeError, runElaboration, typeInfoToType)
-import           Control.Monad.State.Lazy (get)
-import Server.Load (load)
-import Data.Loc.Range (Range)
-import Server.PositionMapping (fromCurrentRange, PositionDelta(..), PositionMapping(..))
-import Server.SrcLoc (fromLSPRange, toLSPRange)
-import qualified Language.LSP.Types as LSP
-import qualified Server.SrcLoc as SrcLoc
-import Data.Text (Text)
+import GCL.Type (Elab(..), TypeError, runElaboration, Typed)
+import Data.Loc.Range (Range (..))
+import Data.Text (Text, split)
 import Data.List (find)
 import Data.Loc (Pos(..), Loc(..), L(..))
 import qualified Syntax.Concrete as C
 import qualified Syntax.Abstract as A
 import qualified Syntax.Typed    as T
+import GCL.WP.Type (StructError)
+import qualified Data.Text as Text
 
 data RefineParams = RefineParams
-  { filePath     :: FilePath
-  , range        :: Range
-  , fragmentText :: Text
+  { filePath  :: FilePath
+  , specRange :: Range
+  , specText  :: Text -- brackets included
   }
   deriving (Eq, Show, Generic)
 
@@ -58,43 +53,107 @@ instance JSON.ToJSON RefineResult
 -- TODO customize refine error
 type RefineError = Error
 
+-- assumes specText is surrounded by "[!" and "!]" 
 handler :: RefineParams -> (RefineResult -> ServerM ()) -> (RefineError -> ServerM ()) -> ServerM ()
-handler params@RefineParams{filePath, range, fragmentText} onSuccess onError = do
+handler _params@RefineParams{filePath, specRange, specText} onSuccess onError = do
   maybeFileState <- loadFileState filePath
   case maybeFileState of
     Nothing -> return () -- TODO: report error using onError
     Just fileState -> do
-      let FileState{
-        positionDelta,
-        toOffsetMap,
-        specifications
-      } = fileState
-      -- calculate rangeAtLastReload with positionDelta
-      let lspRange = SrcLoc.toLSPRange range
-      case fromCurrentRange' positionDelta lspRange of
-        Nothing -> return ()
-        Just lspRangeAtLastReload -> do
-          let rangeAtLastReload = SrcLoc.fromLSPRange toOffsetMap filePath lspRangeAtLastReload
-          -- find the spec with rangeAtLastReload
-          case findSpecWithRange rangeAtLastReload specifications of
-            Nothing   -> return () -- TODO: error "spec not found at range"
-            Just spec -> do
-              -- TODO
-              return ()
+      let FileState{specifications} = fileState
+      case lookupSpecWithRange specifications specRange of
+        Nothing   -> return () -- TODO: error "spec not found at range"
+        Just spec -> do
+          -- 把 specText 去掉頭尾的 [!!] 和 \t \n \s
+          let implText = trimSpecBracketsAndSpaces specText
+          -- 挖洞
+          case digImplHoles filePath implText of
+            Left err -> onError (ParseError err)
+            Right holessImplText -> do
+              -- use specStart as the starting position in parse/toAbstract/elaborate
+              let (Range specStart _) = specRange
+              -- text to concrete
+              case parseFragment specStart holessImplText of
+                Left err           -> onError (ParseError err)
+                Right concreteImpl -> do
+                  -- concrete to abstract
+                  case toAbstractFragment concreteImpl of
+                    Nothing           -> error "Should not happen"
+                    Just abstractImpl -> do
+                      -- elaborate
+                      let typeEnv :: TypeEnv = _ -- specTypeEnv spec
+                      case elaborateFragment typeEnv abstractImpl of
+                        Left err -> onError (TypeError err)
+                        Right typedImpl -> do
+                          -- get POs and specs
+                          case sweepFragment spec typedImpl of
+                            Left err -> onError (StructError err)
+                            Right (innerPos, innerSpecs) -> do
+                              -- edit source (dig holes + remove outer brackets)
+                              editTexts filePath [(specRange, implText)] do
+                                -- remove outer spec (by id)
+                                deleteSpec filePath spec
+                                -- add inner specs to fileState
+                                pushSpecs filePath innerSpecs
+                                -- send notification to update Specs
+                                sendUpdateSpecNotification filePath
+                                -- TODO: send notification to update POs
 
-fromCurrentRange' :: PositionDelta -> LSP.Range -> Maybe LSP.Range
-fromCurrentRange' = fromCurrentRange . PositionMapping
+-- assumes specText is surrounded by "[!" and "!]" 
+trimSpecBracketsAndSpaces :: Text -> Text
+trimSpecBracketsAndSpaces specText
+  = Text.strip $ Text.dropEnd 2 $ Text.drop 2 specText
 
-findSpecWithRange :: Range -> [Spec] -> Maybe Spec
-findSpecWithRange range = find (\Specification{specRange} -> specRange == range)
+lookupSpecWithRange :: [Spec] -> Range -> Maybe Spec
+lookupSpecWithRange specs targetRange = do
+  find (\Specification{specRange} -> specRange == targetRange) specs
 
-deleteSpecWithRange :: Range -> [Spec] -> [Spec]
-deleteSpecWithRange range = filter (\Specification{specRange} -> specRange == range)
+collectFragmentHoles :: [C.Stmt] -> [Range]
+collectFragmentHoles concreteFragment = do
+  statement <- concreteFragment
+  case statement of
+    C.SpecQM range -> return range
+    _ -> []
 
+reportFragmentHolesOrToAbstract :: [C.Stmt] -> Either [Range] [A.Stmt]
+reportFragmentHolesOrToAbstract concreteFragment =
+  case collectFragmentHoles concreteFragment of
+    []    -> case toAbstractFragment concreteFragment of
+      Nothing               -> error "should dig all holes before calling Concrete.toAbstract"
+      Just abstractFragment -> Right abstractFragment
+    holes -> Left holes
+
+
+digImplHoles :: FilePath -> Text -> Either ParseError Text
+digImplHoles filePath implText =
+  case parseFragment (Pos filePath 1 1 0) implText of
+    Left err -> Left err
+    Right concreteImpl ->
+      case collectFragmentHoles concreteImpl of
+        [] -> return implText
+        Range start _:_ -> digImplHoles filePath $ digFragementHole start implText
+  where
+    digFragementHole :: Pos -> Text -> Text
+    digFragementHole (Pos _path lineNumber col _charOff) fullText =
+      Text.unlines linesEdited
+      where
+        allLines :: [Text]
+        allLines = split (== '\n') fullText -- split fullText by '\n'
+        lineToEdit :: Text
+        lineToEdit = allLines !! lineNumber
+        beforeHole = Text.take (col-1) lineToEdit
+        afterHole = Text.drop col lineToEdit -- lineToEdit
+        indentation = Text.replicate col " "
+        lineEdited :: Text
+        lineEdited = beforeHole <> "[!\n" <> indentation <> "\n" <> indentation <> "!]" <> afterHole
+        linesEdited :: [Text]
+        linesEdited = take (lineNumber - 1) allLines ++ [lineEdited] ++ drop lineNumber allLines
+
+-- `fragmentStart :: Pos` is used to translate the locations in the parse result
 parseFragment :: Pos -> Text -> Either ParseError [C.Stmt]
 parseFragment fragmentStart fragment = do
   let Pos filePath _ _ _ = fragmentStart
-  case scan filePath fragment of
+  case Syntax.Parser.Lexer.scan filePath fragment of
     Left  err    -> Left (LexicalError err)
     Right tokens -> do
       let tokens' = translateTokStream fragmentStart tokens
@@ -103,7 +162,7 @@ parseFragment fragmentStart fragment = do
         Right val             -> Right val
   where
     translateRange :: Pos -> Pos -> Pos
-    translateRange fragmentStart@(Pos _ lineStart colStart coStart)
+    translateRange _fragmentStart@(Pos _ lineStart colStart coStart)
         (Pos path lineOffset colOffset coOffset)
       = Pos path line col co
       where
@@ -118,13 +177,13 @@ parseFragment fragmentStart fragment = do
     translateLoc :: Pos -> Loc -> Loc
     translateLoc fragmentStart (Loc left right)
       = Loc (translateRange fragmentStart left) (translateRange fragmentStart right)
-    translateLoc fragmentStart NoLoc = NoLoc
+    translateLoc _ NoLoc = NoLoc
 
-    translateTokStream :: Pos -> TokStream -> TokStream
+    translateTokStream :: Pos -> Syntax.Parser.Lexer.TokStream -> Syntax.Parser.Lexer.TokStream
     translateTokStream fragmentStart (TsToken (L loc x) rest)
       = TsToken (L (translateLoc fragmentStart loc) x) (translateTokStream fragmentStart rest)
-    translateTokStream fragmentStart TsEof = TsEof
-    translateTokStream fragmentStart (TsError e) = TsError e
+    translateTokStream _ TsEof = TsEof
+    translateTokStream _ (TsError e) = TsError e
 
 toAbstractFragment :: [C.Stmt] -> Maybe [A.Stmt]
 toAbstractFragment concreteFragment = 
@@ -132,15 +191,19 @@ toAbstractFragment concreteFragment =
     Left _                 -> Nothing
     Right abstractFragment -> Just abstractFragment
 
-typeCheckFragment :: Elab a => TypeEnv -> a -> Either TypeError ()
-typeCheckFragment typeEnv abstractFragment =
-  case runElaboration abstractFragment of
-    Left err -> Left err
-    Right _  -> Right ()
+elaborateFragment :: Elab a => TypeEnv -> a -> Either TypeError (Typed a)
+elaborateFragment typeEnv abstractFragment = do
+  runElaboration abstractFragment
+  -- ? 為什麼現在 elaborate 不需要 typeEnv
 
 instance Elab [A.Stmt] where
-  elaborate stmts env = error "TODO"
+  -- elaborate :: a -> TypeEnv -> ElaboratorM (Maybe Type, Typed a, Subs Type)
+  elaborate stmts env = do
+    typed <- mapM (\stmt -> do
+        (_, typed, _) <- elaborate stmt env
+        return typed
+        ) stmts
+    return (Nothing, typed, mempty)
 
-sweepFragment :: [A.Stmt] -> Maybe ([PO], [Spec])
-sweepFragment fragment = error "TODO find new POs and specs with StructStmt"
-
+sweepFragment :: Spec -> [T.TypedStmt] -> Either StructError ([PO], [Spec])
+sweepFragment spec impl = error "TODO: define this after modifying definitions of Spec and StructStmts"

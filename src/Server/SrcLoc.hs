@@ -12,6 +12,7 @@ module Server.SrcLoc
   , toLSPLocation
   , toLSPRange
   , toLSPPosition
+  , fromLSPRangeWithoutCharacterOffset
   ) where
 
 import           Data.IntMap                    ( IntMap )
@@ -41,6 +42,19 @@ fromLSPPosition table filepath (J.Position line col) = Pos
   (fromIntegral line + 1) -- starts at 1
   (fromIntegral col + 1) -- starts at 1 
   (fromIntegral (toOffset table (line, col))) -- starts at 0
+
+fromLSPRangeWithoutCharacterOffset :: FilePath -> J.Range -> Range
+fromLSPRangeWithoutCharacterOffset filepath (J.Range start end) = Range
+  (fromLSPPositionWithoutCharacterOffset filepath start)
+  (fromLSPPositionWithoutCharacterOffset filepath end)
+
+-- | LSP Position -> Data.Loc.Pos
+fromLSPPositionWithoutCharacterOffset :: FilePath -> J.Position -> Pos
+fromLSPPositionWithoutCharacterOffset filepath (J.Position line col) = Pos
+  filepath
+  (fromIntegral line + 1) -- starts at 1
+  (fromIntegral col + 1) -- starts at 1 
+  (-1)     -- discard this field
 
 toLSPLocation :: Range -> J.Location
 toLSPLocation (Range start end) =

@@ -164,6 +164,7 @@ data Spec = Specification
   , specPreCond  :: Pred
   , specPostCond :: Pred
   , specRange    :: Range
+  -- , specTypeEnv :: TypeEnv
   }
   deriving (Eq, Show, Generic)
 

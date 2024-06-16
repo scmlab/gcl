@@ -12,7 +12,7 @@ import Server.Monad (ServerM, FileState (..), readSource, loadFileState, logText
 
 import qualified Server.SrcLoc as SrcLoc
 import qualified Server.IntervalMap as IntervalMap
-import Server.PositionMapping( PositionResult( PositionExact ), fromDelta, PositionDelta, toCurrentRange, PositionMapping(..) )
+import Server.PositionMapping( PositionResult( PositionExact ), fromDelta, PositionDelta, toCurrentRange, PositionMapping(..), toCurrentRange' )
 
 handler :: LSP.Uri -> LSP.Position -> ([LSP.LocationLink] -> ServerM ()) -> ServerM ()
 handler uri lspPosition responder = do
@@ -50,4 +50,4 @@ translateLocationLink delta (LSP.LocationLink maybeSource targetUri targetRange 
   return (LSP.LocationLink maybeSource' targetUri targetRange' targetSelection')
   where
     translateRange :: LSP.Range -> Maybe LSP.Range
-    translateRange = toCurrentRange (PositionMapping delta)
+    translateRange = toCurrentRange' delta

@@ -1,5 +1,4 @@
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE DisambiguateRecordFields #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE RecordWildCards #-}
@@ -28,14 +27,16 @@ import qualified Language.LSP.Server            as LSP
 import qualified Language.LSP.VFS               as LSP
 import qualified Language.LSP.Diagnostics       as LSP
 import qualified Data.Aeson                     as JSON
-import GCL.Predicate (Spec, PO)
+import GCL.Predicate (Spec (Specification, specID), PO)
 import qualified Syntax.Abstract as Abstract
 import qualified Syntax.Concrete as Concrete
 import qualified Syntax.Typed    as Typed
 import Server.IntervalMap (IntervalMap)
 import Server.PositionMapping (PositionDelta)
-import Data.Loc.Range (Range)
+import Data.Loc.Range (Range, rangeStart)
 import qualified Server.SrcLoc                 as SrcLoc
+import qualified Data.Text as Text
+import Data.Loc (posCol)
 
 -- | State shared by all clients and requests
 data GlobalState = GlobalState
@@ -43,11 +44,13 @@ data GlobalState = GlobalState
   , filesState :: IORef (Map FilePath FileState)
   }
 
+type Versioned a = (Int, a)
+
 data FileState = FileState
     -- main states for Reload and Refine
   { refinedVersion   :: Int  -- the version number of the last refine
-  , specifications   :: [Spec]
-  , proofObligations :: [PO]
+  , specifications   :: [Spec] -- editedVersion
+  , proofObligations :: [PO] -- editedVersion
 
   -- to support other LSP methods in a light-weighted manner
   , loadedVersion    :: Int  -- the version number of the last reload
@@ -57,9 +60,9 @@ data FileState = FileState
   , abstract         :: Abstract.Program
   , variableCounter  :: Int
   , definitionLinks  :: IntervalMap LSP.LocationLink
-  , hoverInfos       :: IntervalMap (LSP.Hover, Abstract.Type) 
+  , hoverInfos       :: IntervalMap (LSP.Hover, Abstract.Type)
   , elaborated       :: Typed.TypedProgram
-  , positionDelta    :: PositionDelta   -- from loadedVersion to editedVersion
+  , positionDelta    :: PositionDelta   -- loadedVersion ~> editedVersion
   , editedVersion    :: Int  -- the version number of the last change
   }
 
@@ -108,9 +111,22 @@ modifyFileState filePath modifier = do
       let fileState' = modifier fileState
       saveFileState filePath fileState'
 
+bumpVersion :: FilePath -> ServerM ()
+bumpVersion filePath = do
+  modifyFileState filePath (\fileState@FileState{editedVersion} -> fileState {editedVersion = editedVersion + 1})
+
 saveEditedVersion :: FilePath -> Int -> ServerM ()
 saveEditedVersion filePath version = do
   modifyFileState filePath (\fileState -> fileState {editedVersion = version})
+
+pushSpecs :: FilePath -> [Spec] -> ServerM ()
+pushSpecs filePath newSpecs = do
+  modifyFileState filePath (\fileState@FileState{specifications} -> fileState{specifications = specifications ++ newSpecs})
+
+deleteSpec :: FilePath -> Spec -> ServerM ()
+deleteSpec filePath Specification{specID = targetSpecId} = do
+  modifyFileState filePath (\filesState@FileState{specifications} ->
+    filesState{specifications = Prelude.filter (\Specification{specID} -> specID /= targetSpecId) specifications})
 
 readSource :: FilePath -> ServerM (Maybe Text)
 readSource filepath = fmap LSP.virtualFileText
@@ -118,7 +134,8 @@ readSource filepath = fmap LSP.virtualFileText
 
 modifyPositionDelta :: FilePath -> (PositionDelta -> PositionDelta) -> ServerM ()
 modifyPositionDelta filePath modifier = do
-  modifyFileState filePath (\fileState@(FileState{..}) -> fileState{positionDelta = modifier positionDelta})
+  modifyFileState filePath (\fileState@FileState{positionDelta} -> fileState{positionDelta = modifier positionDelta})
+
 
 editTexts :: FilePath -> [(Range, Text)] -> ServerM () -> ServerM ()
 editTexts filepath rangeTextPairs onSuccess = do
@@ -151,6 +168,15 @@ editTexts filepath rangeTextPairs onSuccess = do
 sendCustomNotification :: Text -> JSON.Value -> ServerM ()
 sendCustomNotification methodId json = LSP.sendNotification (LSP.SCustomMethod methodId) json
 
+sendUpdateSpecNotification :: FilePath -> ServerM ()
+sendUpdateSpecNotification filePath = do
+  maybeFileState <- loadFileState filePath
+  case maybeFileState of
+    Nothing -> return ()
+    Just fileState -> do
+      let FileState{specifications} = fileState
+      sendCustomNotification "guabao/specifications" (JSON.toJSON specifications)
+
 -- send diagnostics
 -- NOTE: existing diagnostics would be erased if `diagnostics` is empty
 sendDiagnostics :: FilePath -> [LSP.Diagnostic] -> ServerM ()
@@ -162,18 +188,12 @@ sendDiagnostics filePath diagnostics = do
                        maybeVersion
                        (LSP.partitionBySource diagnostics)
 
-
-changeIsOutsideSpecs :: [Spec] -> LSP.TextDocumentContentChangeEvent -> Bool
-changeIsOutsideSpecs specs (LSP.TextDocumentContentChangeEvent (Just range) _ text) =
-  error "TODO"
-changeIsOutsideSpecs _  _ = True
-
-changesAreOutsideSpecs :: FilePath -> [LSP.TextDocumentContentChangeEvent] -> ServerM Bool
-changesAreOutsideSpecs filePath changes = do
-  maybeFileState <- loadFileState filePath
-  case maybeFileState of
-    Nothing        -> return True
-    Just FileState{specifications} -> return $ Prelude.all (changeIsOutsideSpecs specifications) changes
+digHoles :: FilePath -> [Range] -> ServerM () -> ServerM ()
+digHoles filePath ranges onFinish = do
+  -- logText $ "    < DigHoles " <> (map ranges toText)
+  let indent range = Text.replicate (posCol (rangeStart range) - 1) " "
+  let diggedText range = "[!\n" <> indent range <> "\n" <> indent range <> "!]"
+  editTexts filePath (Prelude.map (\range -> (range, diggedText range)) ranges) onFinish
 
 -- --------------------------------------------------------------------------------
 

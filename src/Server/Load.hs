@@ -4,14 +4,12 @@
 
 module Server.Load where
 
-import qualified Language.LSP.Types             as LSP
 
 
-import Server.Monad (ServerM, FileState(..), loadFileState, saveFileState, readSource, editTexts)
+import Server.Monad (ServerM, FileState(..), loadFileState, saveFileState, readSource, digHoles)
 import Data.Text (Text)
-import qualified Data.Text as Text
 
-import Data.Loc.Range (Range, rangeStart)
+import Data.Loc.Range (Range)
 
 import qualified GCL.WP                        as WP
 import qualified Syntax.Concrete as C
@@ -19,7 +17,6 @@ import qualified Syntax.Parser as Parser
 import qualified Syntax.Abstract as A
 import qualified Syntax.Typed as T
 import Error (Error(..))
-import Data.Loc (posCol)
 import Server.Highlighting (collectHighlighting)
 import Server.GoToDefn (collectLocationLinks)
 import Server.Hover (collectHoverInfo)
@@ -27,20 +24,21 @@ import Control.Monad.Except (runExcept)
 import Server.PositionMapping (idDelta)
 import qualified Server.SrcLoc                 as SrcLoc
 import qualified GCL.Type as TypeChecking
+import Data.Map (singleton)
 
 load :: FilePath -> (FileState -> ServerM ()) -> (Error -> ServerM ()) -> ServerM ()
 load filePath onSuccess onError = do
-  
+
   maybeFileState <- loadFileState filePath
   let currentVersion = case maybeFileState of
                         Nothing -> 0
-                        Just (FileState{editedVersion}) -> editedVersion
+                        Just FileState{editedVersion} -> editedVersion
 
   -- read source
   maybeSource <- readSource filePath
   case maybeSource of
     Nothing     -> onError (CannotReadFile filePath)
-    Just source -> 
+    Just source ->
       -- parse source into concrete syntax
       case parse filePath source of
         Left err       -> onError err
@@ -54,7 +52,7 @@ load filePath onSuccess onError = do
                 case elaborate abstract of
                   Left err        -> onError err
                   Right elaborated -> do
-                    let fileState = FileState 
+                    let fileState = FileState
                                       { refinedVersion   = currentVersion
                                       , specifications   = specs
                                       , proofObligations = pos
@@ -70,7 +68,7 @@ load filePath onSuccess onError = do
                                       , elaborated       = elaborated
                                       , hoverInfos       = collectHoverInfo elaborated
 
-                                      , positionDelta    = idDelta
+                                      , positionDelta   = idDelta
                                       , editedVersion    = currentVersion
                                       }
                     saveFileState filePath fileState
@@ -96,13 +94,6 @@ collectHoles (C.Program _ statements) = do
   case statement of
     C.SpecQM range -> return range
     _ -> []
-
-digHoles :: FilePath -> [Range] -> ServerM () -> ServerM ()
-digHoles filePath ranges onFinish = do
-  -- logText $ "    < DigHoles " <> (map ranges toText)
-  let indent range = Text.replicate (posCol (rangeStart range) - 1) " "
-  let diggedText range = "[!\n" <> indent range <> "\n" <> indent range <> "!]"
-  editTexts filePath (map (\range -> (range, diggedText range)) ranges) onFinish
 
 elaborate :: A.Program -> Either Error T.TypedProgram
 elaborate abstract = do

@@ -63,6 +63,7 @@ library
       Server.Handler.Guabao.Reload
       Server.Handler.Hover
       Server.Handler.Initialized
+      Server.Handler.OnDidChangeTextDocument
       Server.Handler.SemanticTokens
       Server.Highlighting
       Server.Hover
@@ -221,6 +222,7 @@ test-suite gcl-test
       Server.Handler.Guabao.Reload
       Server.Handler.Hover
       Server.Handler.Initialized
+      Server.Handler.OnDidChangeTextDocument
       Server.Handler.SemanticTokens
       Server.Highlighting
       Server.Hover

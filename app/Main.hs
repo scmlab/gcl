@@ -1,5 +1,6 @@
-{-# LANGUAGE OverloadedStrings #-}
+
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Main where
 
