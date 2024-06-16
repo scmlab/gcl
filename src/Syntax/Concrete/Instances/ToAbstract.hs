@@ -73,8 +73,7 @@ instance ToAbstract (Either Declaration DefinitionBlock) ([A.Declaration], [A.De
 -- | Definition
 
 instance ToAbstract DefinitionBlock [A.Definition] where
-  toAbstract (DefinitionBlock _ defns _) =
-    combineFuncDefns . concat <$> toAbstract defns
+  toAbstract (DefinitionBlock _ defns _) = concat <$> toAbstract defns
 
 instance ToAbstract Definition [A.Definition] where
   toAbstract (TypeDefn tok name binders _ cons) = do
@@ -87,10 +86,10 @@ instance ToAbstract Definition [A.Definition] where
       names
   toAbstract (FuncDefn name args _ body) = do
     body' <- toAbstract body
-    return [A.FuncDefn name [wrapLam args body']]
+    return [A.FuncDefn name $ wrapLam args body']
 
 instance ToAbstract TypeDefnCtor A.TypeDefnCtor where
-  toAbstract (TypeDefnCtor c ts) = A.TypeDefnCtor c <$> toAbstract ts
+  toAbstract (TypeDefnCtor c ts) = return $ A.TypeDefnCtor c ts
 
 --------------------------------------------------------------------------------
 -- | Declaraion
@@ -190,12 +189,9 @@ instance ToAbstract Type A.Type where
       A.TArray <$> toAbstract a <*> toAbstract b <*> pure (locOf t)
     (TFunc a _ b) ->
       A.TFunc <$> toAbstract a <*> toAbstract b <*> pure (locOf t)
-    (TCon n@(Name tn l) ns    ) 
-      | tn == "Int"  && null ns -> return $ A.TBase A.TInt l
-      | tn == "Bool" && null ns -> return $ A.TBase A.TBool l
-      | tn == "Char" && null ns -> return $ A.TBase A.TChar l
-      | otherwise -> return $ A.TCon n ns (n <--> ns)
+    (TApp l r) -> A.TApp <$> toAbstract l <*> toAbstract r <*> pure (l <--> r)
     (TVar a      ) -> pure $ A.TVar a (locOf t)
+    (TData n _   ) -> pure $ A.TData n () (locOf t)
     (TParen _ a _) -> do
       t' <- toAbstract a
       case t' of
@@ -203,7 +199,8 @@ instance ToAbstract Type A.Type where
         A.TArray a' b' _ -> pure $ A.TArray a' b' (locOf t)
         A.TTuple as'     -> pure $ A.TTuple as'
         A.TFunc a' b' _  -> pure $ A.TFunc a' b' (locOf t)
-        A.TCon  a' b' _  -> pure $ A.TCon a' b' (locOf t)
+        A.TApp  a' b' _  -> pure $ A.TApp a' b' (locOf t)
+        A.TData name i _ -> pure $ A.TData name i (locOf t)
         A.TVar a' _      -> pure $ A.TVar a' (locOf t)
         A.TMetaVar a'    -> pure $ A.TMetaVar a'
 
@@ -217,6 +214,7 @@ instance ToAbstract Expr A.Expr where
     Var   a     -> pure $ A.Var a (locOf x)
     Const a     -> pure $ A.Const a (locOf x)
     Op    a     -> pure $ A.Op a
+    Chain ch    -> A.Chain <$> toAbstract ch
     Arr arr _ i _ ->
       A.ArrIdx <$> toAbstract arr <*> toAbstract i <*> pure (locOf x)
     App a b -> A.App <$> toAbstract a <*> toAbstract b <*> pure (locOf x)
@@ -233,6 +231,11 @@ instance ToAbstract Expr A.Expr where
         Right n@(Name _ l) -> return $ A.Const n l
     Case _ expr _ cases ->
       A.Case <$> toAbstract expr <*> toAbstract cases <*> pure (locOf x)
+
+instance ToAbstract Chain A.Chain where
+  toAbstract chain = case chain of
+    Pure expr -> A.Pure <$> toAbstract expr <*> pure (locOf expr)
+    More ch' op expr -> A.More <$> toAbstract ch' <*> pure op <*> toAbstract expr <*> pure (locOf expr)
 
 instance ToAbstract CaseClause A.CaseClause where
   toAbstract (CaseClause patt _ body) =

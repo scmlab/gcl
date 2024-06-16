@@ -331,7 +331,8 @@ handleExpr (Paren l x r) =
 handleExpr (Var   x) = return $ prettyWithLoc x
 handleExpr (Const x) = return $ prettyWithLoc x
 handleExpr (Lit   x) = return $ prettyWithLoc x
-handleExpr (Op    x) = handleOp x
+handleExpr (Op    x) = handleArithOp x
+handleExpr (Chain c) = handleChain c
 handleExpr (Arr arr l i r) =
   return
     $  prettyWithLoc arr
@@ -360,8 +361,8 @@ handleExpr (Case a expr b cases) =
     <> prettyWithLoc b
     <> prettyWithLoc cases
 
-handleOp :: Op -> Variadic Expr (DocWithLoc ann)
-handleOp op = case classify op of
+handleArithOp :: ArithOp -> Variadic Expr (DocWithLoc ann)
+handleArithOp op = case classify (ArithOp op) of -- TODO: rewrite `classify` to only handle `ArithOp`s.
   (Infix, _) -> do
     p <- var
     q <- var
@@ -381,6 +382,14 @@ handleOp op = case classify op of
     p <- var
     return $ prettyWithLoc p <> prettyWithLoc op
 
+handleChain :: Chain -> Variadic Expr (DocWithLoc ann)
+handleChain chain = case chain of
+  Pure expr -> handleExpr expr
+  More ch op expr -> do
+    ch' <- handleChain ch
+    return $ ch' <> prettyWithLoc op <> prettyWithLoc expr
+
+
 showWithParentheses :: Expr -> String
 showWithParentheses expr = case handleExpr' expr of
   Expect _ -> error "strange case in printWithParenses"
@@ -394,7 +403,8 @@ showWithParentheses expr = case handleExpr' expr of
       LitInt n _ -> return $ show n
       LitBool b _ -> return $ show b
       LitChar c _ -> return $ show c
-    handleExpr' (Op    x) = handleOp' x
+    handleExpr' (Op    x) = handleArithOp' x
+    handleExpr' (Chain c) = handleChain' c
     handleExpr' (Arr arr _ i _) = do
       arrs <- handleExpr' arr
       inds   <- handleExpr' i
@@ -409,8 +419,8 @@ showWithParentheses expr = case handleExpr' expr of
     handleExpr' c@Case {} =
       return $ show $ pretty c
 
-    handleOp' :: Op -> Variadic Expr String
-    handleOp' op = case classify op of
+    handleArithOp' :: ArithOp -> Variadic Expr String
+    handleArithOp' op = case classify (ArithOp op) of
       (Infix, _) -> do
         p <- var
         q <- var
@@ -437,6 +447,15 @@ showWithParentheses expr = case handleExpr' expr of
         p <- var
         ps <- handleExpr' p
         return $ "(" <> ps <> show (pretty op) <> ")"
+
+    handleChain' :: Chain -> Variadic Expr String
+    handleChain' chain = case chain of
+      Pure expr' -> handleExpr' expr'
+      More ch op ex -> do
+        ch' <- handleChain' ch
+        ex' <- handleExpr' ex
+        return $ ch' <> show (pretty op) <> ex'
+
 
 --------------------------------------------------------------------------------
 -- | Pattern
@@ -473,8 +492,9 @@ instance PrettyWithLoc Type where
     prettyWithLoc a <> prettyWithLoc l <> prettyWithLoc b
   prettyWithLoc (TArray l a r b) =
     prettyWithLoc l <> prettyWithLoc a <> prettyWithLoc r <> prettyWithLoc b
-  prettyWithLoc (TCon a b) = prettyWithLoc a <> prettyWithLoc b
-  prettyWithLoc (TVar i  ) = prettyWithLoc i
+  prettyWithLoc (TApp a b ) = prettyWithLoc a <> prettyWithLoc b
+  prettyWithLoc (TData n l) = fromDoc (locOf l) (pretty n)
+  prettyWithLoc (TVar i   ) = prettyWithLoc i
 
 --------------------------------------------------------------------------------
 

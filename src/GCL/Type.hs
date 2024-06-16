@@ -81,22 +81,12 @@ instance Substitutable Type TypeInfo where
 newtype TypeDefnInfo = TypeDefnInfo [Name]
   deriving (Eq, Show)
 
-dups :: Eq a => [a] -> [a]
-dups = map head . filter ((> 1) . length) . group
-
-duplicationCheck
-  :: (Eq a, MonadError TypeError m) => [(Index, a)] -> m [(Index, a)]
+duplicationCheck :: (MonadError TypeError m) => [Name] -> m ()
 duplicationCheck ns =
-  let ds = dups ns
+  let ds = map head . filter ((> 1) . length) . groupBy (\(Name text1 _)(Name text2 _) -> text1 == text2) $ ns
   in  if null ds
-        then return ns
-        else throwError . DuplicatedIdentifiers . map (toName . fst) . filter isName $ ds
-  where
-    isName (Index{}, _) = True
-    isName _            = False
-
-    toName (Index n) = n
-    toName (Hole rng) = Name (Text.pack (show rng)) (locOf rng)
+        then return ()
+        else throwError . DuplicatedIdentifiers $ ds
 
 --------------------------------------------------------------------------------
 -- The elaboration monad
@@ -131,39 +121,20 @@ instance CollectIds a => CollectIds [a] where
 instance CollectIds [Definition] where
   collectIds defns = do
     -- First, we split variants of definitions because different kinds of definitions need to be processed differently.
-    let sigPredicate = \case
-          FuncDefnSig {} -> True
-          _ -> False
-    let sigs = filter sigPredicate defns
-    let funcDefnPredicate = \case
-          FuncDefn {} -> True
-          _ -> False
-    let funcDefns = filter funcDefnPredicate defns
-    let typeDefnPredicate = \case
-          TypeDefn {} -> True
-          _ -> False
-    let typeDefns = filter typeDefnPredicate defns
+    let (typeDefns, funcSigs, funcDefns) = split defns
+    -- Check if there are duplications of definitions.
+    -- While checking signatures and function definitions, we take account of the names of (term) constructors.
+    duplicationCheck $ (\(TypeDefn name _ _ _) -> name) <$> typeDefns
+    duplicationCheck $ ((\(FuncDefnSig name _ _ _) -> name) <$> funcSigs) <> gatherCtorNames typeDefns
+    duplicationCheck $ ((\(FuncDefn name _) -> name) <$> funcDefns) <> gatherCtorNames typeDefns
     -- Gather the type definitions.
-    -- Type definitions are collected first because signatures and function definitions may depend on it.
-    mapM_ (\(TypeDefn name args ctors _) -> do
-            let newTypeInfos =
-                  map
-                    (\(TypeDefnCtor cn ts) -> (Index cn, TypeDefnCtorInfo (wrapTFunc ts (TCon name args (name <--> args)))))
-                    ctors
-            let newTypeDefnInfos = (Index name, TypeDefnInfo args)
-            modify (\(freshState, origTypeDefnInfos, origTypeInfos) -> (freshState, newTypeDefnInfos : origTypeDefnInfos, newTypeInfos <> origTypeInfos))
-          ) typeDefns -- For all typeDefns, do the above monadically ...
+    -- Type definitions are collected first because signatures and function definitions may depend on them.
+    collectTypeDefns typeDefns 
     -- Add signatures into the state one by one.
-    mapM_ (
-      \case
-        (FuncDefnSig n t _ _) ->
-          let infos = (Index n, ConstTypeInfo t) in
-            modify (\(freshState, typeDefnInfos, origInfos) -> (freshState, typeDefnInfos, infos : origInfos))
-        _ -> undefined
-      ) sigs
-    (_, _, infos) <- get
+    collectFuncSigs funcSigs
     -- Get the original explicit signatures.
     -- We will try to restrict polymorphic functions to the types of the corresponding signatures.
+    (_, _, infos) <- get
     let sigEnv = second typeInfoToType <$> infos
     -- Give each function definition a fresh name.
     let defined = concatMap (\case
@@ -180,14 +151,14 @@ instance CollectIds [Definition] where
     (_, names, tys, _sub) <-
       foldlM (\(context, names, tys, sub) funcDefn -> do
         case funcDefn of
-          (FuncDefn name exprs) -> do
-            (ty, _, sub1) <- elaborate (head exprs) context -- Calling `head` is safe for the meantime.
-            unifySub <- unifies (subst sub1 (fromJust $ lookup (Index name) context)) (fromJust ty) NoLoc -- the first `fromJust` should also be safe.
+          (FuncDefn name expr) -> do
+            (ty, _, sub1) <- elaborate expr context -- Calling `head` is safe for the meantime.
+            unifySub <- unifies (subst sub1 (fromJust $ lookup (Index name) context)) (fromJust ty) (locOf name) -- the first `fromJust` should also be safe.
             -- We see if there are signatures restricting the type of function definitions.
             case lookup (Index name) sigEnv of
               -- If there is, we save the restricted type.
               Just ty' -> do
-                _ <- unifies (fromJust ty) ty' NoLoc
+                _ <- unifies (fromJust ty) ty' (locOf name)
                 return (subst (unifySub `compose` sub1) context, name : names, subst unifySub <$> (ty' : (subst sub1 <$> tys)), unifySub `compose` sub1 `compose` sub)
               -- If not, we proceed as if it's normal.
               Nothing -> return (subst (unifySub `compose` sub1) context, name : names, subst unifySub <$> (subst sub1 (fromJust ty) : (subst sub1 <$> tys)), unifySub `compose` sub1 `compose` sub)
@@ -200,6 +171,50 @@ instance CollectIds [Definition] where
             modify (\(freshState, typeDefnInfos, origInfos) -> (freshState, typeDefnInfos, info : origInfos))
           ) (zip names tys)
     where
+      split :: [Definition] -> ([Definition], [Definition], [Definition])
+      split defs = foldr (
+          \def (typeDefns, sigs, funcDefns)  -> case def of
+            d @ TypeDefn {} -> (d : typeDefns, sigs, funcDefns)
+            d @ FuncDefnSig {} -> (typeDefns, d : sigs, funcDefns)
+            d @ FuncDefn {} -> (typeDefns, sigs, d : funcDefns)
+        ) mempty defs
+      
+      gatherCtorNames :: [Definition] -> [Name]
+      gatherCtorNames defs = do
+        def <- defs
+        case def of
+          TypeDefn _ _ ctors _ -> do
+            ctor <- ctors
+            let TypeDefnCtor name _ = ctor
+            return name
+          _ -> []
+
+      collectTypeDefns :: [Definition] -> ElaboratorM ()
+      collectTypeDefns typeDefns =
+        mapM_ (\(TypeDefn name args ctors _) -> do
+          let formTy con params =
+                case params of
+                  [] -> con
+                  n : ns -> formTy (TApp con n $ con <--> n) ns
+          -- Give type variables fresh names to prevent name collision.
+          freshNames <- mapM freshName' $ (\(Name text _) -> text) <$> args
+          let sub = Map.fromList . zip args $ TMetaVar <$> freshNames
+          let newTypeInfos =
+                map
+                  (\(TypeDefnCtor cn ts) -> (Index cn, TypeDefnCtorInfo $ subst sub (wrapTFunc ts (formTy (TData name () (locOf name)) (TMetaVar <$> args)))))
+                  ctors
+          -- This is not yet used throughout the whole program. We may have to change the type and store pattern infos here in the future.
+          let newTypeDefnInfos = (Index name, TypeDefnInfo args)
+          modify (\(freshState, origTypeDefnInfos, origTypeInfos) -> (freshState, newTypeDefnInfos : origTypeDefnInfos, newTypeInfos <> origTypeInfos))
+        ) typeDefns -- For all typeDefns, do the above monadically ...
+
+      collectFuncSigs :: [Definition] -> ElaboratorM ()
+      collectFuncSigs funcSigs =
+        mapM_ (\(FuncDefnSig n t _ _) -> do 
+          let infos = (Index n, ConstTypeInfo t)
+          modify (\(freshState, typeDefnInfos, origInfos) -> (freshState, typeDefnInfos, infos : origInfos))
+        ) funcSigs
+
       generalize :: Fresh m => Type -> TypeEnv -> m Type
       generalize ty' env' = do
         let free = Set.toList (freeVars ty') \\ Set.toList (freeVars env')
@@ -227,8 +242,8 @@ type family Typed untyped where
   Typed Stmt = Typed.TypedStmt
   Typed GdCmd = Typed.TypedGdCmd
   Typed Expr = Typed.TypedExpr
+  Typed Chain = Typed.TypedChain
   Typed Name = Name
-  Typed Op = Op
   Typed ChainOp = Op
   Typed ArithOp = Op
   Typed TypeOp = Op
@@ -280,7 +295,7 @@ instance Elab Program where
 
 instance Elab Definition where
   elaborate (TypeDefn name args ctors loc) env = do
-    let m = Map.fromList (map (, ()) args)
+    let m = Set.fromList args
     mapM_ (\(TypeDefnCtor _ ts) -> mapM_ (scopeCheck m) ts) ctors
     ctors' <- mapM (\ctor -> do
                       (_, typed, _) <- elaborate ctor env
@@ -288,26 +303,17 @@ instance Elab Definition where
                    ) ctors
     return (Nothing, Typed.TypeDefn name args ctors' loc, mempty)
    where
-    scopeCheck :: MonadError TypeError m => Map.Map Name () -> Type -> m ()
-    scopeCheck m (TCon _ args' _) = mapM_
-      (\a -> case Map.lookup a m of
-        Just _ -> return ()
-        _      -> throwError $ NotInScope a
-      )
-      args'
-    scopeCheck _ _ = return ()
+    scopeCheck :: MonadError TypeError m => Set.Set Name -> Name -> m ()
+    scopeCheck m n = if Set.member n m then return () else throwError $ NotInScope n
   elaborate (FuncDefnSig name ty maybeExpr loc) env = do
     expr' <- mapM (\expr -> do
                     (_, typed, _) <- elaborate expr env
                     return typed
                   ) maybeExpr
     return (Nothing, Typed.FuncDefnSig name ty expr' loc, mempty)
-  elaborate (FuncDefn name exprs) env = do
-    exprs' <- mapM (\expr -> do
-                      (_, typed, _) <- elaborate expr env
-                      return typed
-                   ) exprs
-    return (Nothing, Typed.FuncDefn name exprs', mempty)
+  elaborate (FuncDefn name expr) env = do
+    (_, typed, _) <- elaborate expr env
+    return (Nothing, Typed.FuncDefn name typed, mempty)
 
 instance Elab TypeDefnCtor where
   elaborate (TypeDefnCtor name ts) _ = do
@@ -327,10 +333,19 @@ instance Elab Declaration where
         return (Nothing, Typed.VarDecl names ty (Just p') loc, mempty)
       Nothing -> return (Nothing, Typed.VarDecl names ty Nothing loc, mempty)
 
+-- This function is used during elaborating stmts.
+checkAssign :: [(Index, TypeInfo)] -> Name -> ElaboratorM Type
+checkAssign infos name = do
+  case lookup (Index name) infos of
+    Just (VarTypeInfo t) -> pure t
+    Just _               -> throwError $ AssignToConst name
+    Nothing              -> throwError $ NotInScope name
+
 instance Elab Stmt where
   elaborate (Skip  loc     ) _ = return (Nothing, Typed.Skip loc, mempty)
   elaborate (Abort loc     ) _ = return (Nothing, Typed.Abort loc, mempty)
   elaborate (Assign names exprs loc) env = do
+    duplicationCheck names
     let ass = zip names exprs
     let an  = length ass
     if
@@ -338,39 +353,33 @@ instance Elab Stmt where
       | an < length names -> throwError $ RedundantNames (drop an names)
       | otherwise      -> do
         (_, _, infos) <- get
-        mapM_ (checkAssign infos) ass
-        exprs' <- mapM (\expr -> do
-                          (_, typedExpr, _) <- elaborate expr env
+        exprs' <- mapM (\(name, expr) -> do
+                          ty <- checkAssign infos name
+                          (ty', typedExpr, _) <- elaborate expr env
+                          _ <- unifies ty (fromJust ty') $ locOf expr
                           return typedExpr
-                       ) exprs
+                       ) ass
         return (Nothing, Typed.Assign names exprs' loc, mempty)
-   where
-    checkAssign :: [(Index, TypeInfo)] -> (Name, Expr) -> ElaboratorM ()
-    checkAssign infos (name, _expr) = do
-      case lookup (Index name) infos of
-        Just (VarTypeInfo _) -> pure ()
-        Just _               -> throwError $ AssignToConst name
-        Nothing              -> throwError $ NotInScope name
   elaborate (AAssign arr index e loc) env = do
     tv <- freshVar
     (arrTy, typedArr, arrSub) <- elaborate arr env
     (indexTy, typedIndex, indexSub) <- elaborate index $ subst arrSub env
     uniSubIndex <- unifies (subst indexSub $ fromJust indexTy) (tInt NoLoc) (locOf index)
-    uniSubArr <- unifies (subst (indexSub `compose` uniSubIndex) (fromJust arrTy)) (TFunc (tInt NoLoc) tv NoLoc) loc
+    uniSubArr <- unifies (subst (indexSub `compose` uniSubIndex) (fromJust arrTy)) (TFunc (tInt NoLoc) tv NoLoc) (locOf arr)
     (eTy, typedE, eSub) <- elaborate e $ subst (uniSubArr `compose` uniSubIndex `compose` indexSub `compose` arrSub) env
     _ <- unifies (subst eSub $ fromJust eTy) (subst uniSubArr tv) (locOf e)
     return (Nothing, Typed.AAssign typedArr typedIndex typedE loc, mempty)
   elaborate (Assert expr loc        ) env = do
     (ty, _, sub) <- elaborate expr env
-    _ <- unifies (subst sub $ fromJust ty) (tBool NoLoc) loc
+    _ <- unifies (subst sub $ fromJust ty) (tBool NoLoc) (locOf expr)
     (_, typedExpr, _) <- elaborate expr env
     return (Nothing, Typed.Assert typedExpr loc, mempty)
   elaborate (LoopInvariant e1 e2 loc) env = do
     (ty1, _, sub1) <- elaborate e1 env
-    _ <- unifies (subst sub1 $ fromJust ty1) (tBool NoLoc) loc
+    _ <- unifies (subst sub1 $ fromJust ty1) (tBool NoLoc) (locOf e1)
     (_, e1', _) <- elaborate e1 env
     (ty2, _, sub2) <- elaborate e2 env
-    _ <- unifies (subst sub2 $ fromJust ty2) (tInt NoLoc) loc
+    _ <- unifies (subst sub2 $ fromJust ty2) (tInt NoLoc) (locOf e2)
     (_, e2', _) <- elaborate e2 env
     return (Nothing, Typed.LoopInvariant e1' e2' loc, mempty)
   elaborate (Do gds loc) env = do
@@ -387,12 +396,41 @@ instance Elab Stmt where
     return (Nothing, Typed.If gds' loc, mempty)
   elaborate (Spec text range) _ = return (Nothing, Typed.Spec text range, mempty)
   elaborate (Proof text1 text2 range) _ = return (Nothing, Typed.Proof text1 text2 range, mempty)
-  elaborate _ _ = undefined -- FIXME:
+  elaborate (Alloc var exprs loc) env = do
+    (_, _, infos) <- get
+    ty <- checkAssign infos var
+    _ <- unifies ty (tInt NoLoc) $ locOf var
+    typedExprs <-
+      mapM
+        (\expr -> do
+          (ty', typedExpr, _) <- elaborate expr env
+          _ <- unifies (fromJust ty') (tInt NoLoc) (locOf expr)
+          return typedExpr
+        ) exprs
+    return (Nothing, Typed.Alloc var typedExprs loc, mempty)
+  elaborate (HLookup name expr loc) env = do
+    (_, _, infos) <- get
+    ty <- checkAssign infos name
+    _ <- unifies ty (tInt NoLoc) $ locOf name
+    (ty', typedExpr, _) <- elaborate expr env
+    _ <- unifies (fromJust ty') (tInt NoLoc) (locOf expr)
+    return (Nothing, Typed.HLookup name typedExpr loc, mempty)
+  elaborate (HMutate left right loc) env = do
+    (ty, typedLeft, _) <- elaborate left env
+    _ <- unifies (fromJust ty) (tInt NoLoc) (locOf left)
+    (ty', typedRight, _) <- elaborate right env
+    _ <- unifies (fromJust ty') (tInt NoLoc) (locOf right)
+    return (Nothing, Typed.HMutate typedLeft typedRight loc, mempty)
+  elaborate (Dispose expr loc) env = do
+    (ty, typedExpr, _) <- elaborate expr env
+    _ <- unifies (fromJust ty) (tInt NoLoc) (locOf expr)
+    return (Nothing, Typed.Dispose typedExpr loc, mempty)
+  elaborate Block {} env = undefined -- TODO: Implement blocks.
 
 instance Elab GdCmd where
   elaborate (GdCmd expr stmts loc) env = do
     (ty, _, sub) <- elaborate expr env
-    _ <- unifies (subst sub $ fromJust ty) (tBool NoLoc) loc
+    _ <- unifies (subst sub $ fromJust ty) (tBool NoLoc) (locOf expr)
     (_, e', _) <- elaborate expr env
     s' <- mapM (\stmt -> do
                   (_, typed, _) <- elaborate stmt env
@@ -405,14 +443,6 @@ instantiate ty = do
   let freeMeta = Set.toList (freeMetaVars ty)
   new <- replicateM (length freeMeta) freshVar
   return $ subst (Map.fromList $ zip freeMeta new) ty
-  where
-    freeMetaVars (TBase _ _    ) = mempty
-    freeMetaVars (TArray _ t _ ) = freeMetaVars t
-    freeMetaVars (TTuple ts    ) = Set.unions (map freeMetaVars ts)
-    freeMetaVars (TFunc t1 t2 _) = freeMetaVars t1 <> freeMetaVars t2
-    freeMetaVars (TCon  _  ns _) = Set.fromList ns
-    freeMetaVars (TVar _ _     ) = mempty
-    freeMetaVars (TMetaVar n   ) = Set.singleton n
 
 -- You can freely use `fromJust` below to extract the underlying `Type` from the `Maybe Type` you got.
 -- You should also ensure that `elaborate` in `Elab Expr` returns a `Just` when it comes to the `Maybe Type` value.
@@ -445,24 +475,7 @@ instance Elab Expr where
     (ty, op, sub) <- elaborate o env
     ty' <- instantiate $ fromJust ty
     return (Just ty', subst sub (Typed.Op op ty'), sub)
-  -- TODO: Make sure the below implementation is correct, especially when the ChainOp is polymorphic. (edit: apprently it's incorrect)
-  elaborate (App (App (Op op@(ChainOp _)) e1 _) e2 l) env = do
-    (opTy, opTyped, opSub) <- elaborate op env
-    (t1, typed1, s1) <- case e1 of
-      App (App innerOp@(Op (ChainOp _)) e11 _) e12 _ -> do
-        (t12, typed12, s12) <- elaborate e12 $ subst opSub env
-        (t2, _, s2) <- elaborate e2 $ subst opSub env
-        _ <- unifies (subst s12 $ fromJust t12) (subst s2 $ fromJust t2) (locOf e12)
-        (t11, typed11, s11) <- elaborate e11 $ subst opSub env
-        (_, innerOpTyped, _) <- elaborate innerOp $ subst opSub env
-        let sub = s12 <> s2 <> s11
-        pure (Nothing, subst sub (Typed.App (Typed.App innerOpTyped typed11 (locOf e11)) typed12 (locOf e1)), s12 <> s2 <> s11)
-      _ -> elaborate e1 $ subst opSub env
-    v <- freshVar
-    (t2, typed2, s2) <- elaborate e2 $ subst opSub env
-    vSub <- unifies (subst s2 (fromJust t2) ~-> subst s2 (fromJust t2) ~-> v) (subst opSub $ fromJust opTy) l
-    let sub = s1 <> s2
-    pure (Just $ subst vSub v, subst sub (Typed.App (Typed.App (Typed.Op opTyped $ subst opSub $ fromJust opTy) typed1 $ locOf e1) typed2 l), sub)
+  elaborate (Chain ch) env = (\(ty, typed, sub) -> (ty, Typed.Chain typed, sub)) <$> elaborate ch env
   -- Γ ⊢ e1 ↑ (s1, t1)
   -- s1 Γ ⊢ e2 ↑ (s2, t2)
   -- b fresh   v = unify (s2 t1, t2 -> b)
@@ -485,17 +498,18 @@ instance Elab Expr where
     (ty1, typedExpr1, sub1) <- elaborate expr newEnv
     let returnTy = TFunc (subst sub1 tv) (fromJust ty1) loc
     return (Just returnTy, subst sub1 (Typed.Lam bound (subst sub1 tv) typedExpr1 loc), sub1)
-  elaborate (Func name clauses l) env = undefined -- TODO: Implement below cases for type checking exprs.
+  elaborate (Func name clauses l) env = undefined
   -- Γ ⊢ e1 ↑ (s1, t1)
   -- s1 Γ ⊢ e2 ↑ (s2, t2)
   -- Tuple -------------------------------
   -- Γ ⊢ (e1, e2) ↑ (s2 . s1, (s2 t1, t2))
   elaborate (Tuple xs) env = undefined
   elaborate (Quant quantifier bound restriction inner loc) env = do
+    duplicationCheck bound
     tv <- freshVar
     (quantTy, quantTypedExpr, quantSub) <- elaborate quantifier env
     case quantifier of
-      Op (ArithOp (Hash _)) -> do
+      Op (Hash _) -> do
         tvs <- replicateM (length bound) freshVar
         let newEnv = subst quantSub env
         (resTy, resTypedExpr, resSub) <- elaborate restriction $ zip (Index <$> bound) tvs <> newEnv
@@ -527,7 +541,7 @@ instance Elab Expr where
   -- sa Γ ⊢ i : Int ↓ si
   ---- ArrIdx ----------------------------
   -- Γ ⊢ a[i] ↑ (si . sa, si (sa b))
-  elaborate (ArrIdx e1 e2 loc) env = do -- TODO: I didn't follow the above typing rules. Check if this is correct.
+  elaborate (ArrIdx e1 e2 loc) env = do -- I didn't follow the above typing rules. Hopefully this is correct.
     tv <- freshVar
     (ty1, typedExpr1, sub1) <- elaborate e1 env
     (ty2, typedExpr2, sub2) <- elaborate e2 (subst sub1 env)
@@ -540,22 +554,39 @@ instance Elab Expr where
   -- si (sa Γ) ⊢ e : si (sa b) ↓ se
   ---- ArrUpd --------------------------------------
   -- Γ ⊢ (a : i ↦ e) ↑ (se . si . sa, se (si (sa b)))
-  elaborate (ArrUpd arr index e loc) env = do -- TODO: I didn't follow the above typing rules. Check if this is correct.
+  elaborate (ArrUpd arr index e loc) env = do -- I didn't follow the above typing rules. Hopefully this is correct.
     tv <- freshVar
     (arrTy, typedArr, arrSub) <- elaborate arr env
     (indexTy, typedIndex, indexSub) <- elaborate index $ subst arrSub env
     uniSubIndex <- unifies (subst indexSub $ fromJust indexTy) (tInt NoLoc) (locOf index)
-    uniSubArr <- unifies (subst (indexSub `compose` uniSubIndex) (fromJust arrTy)) (TFunc (tInt NoLoc) tv NoLoc) loc
+    uniSubArr <- unifies (subst (indexSub `compose` uniSubIndex) (fromJust arrTy)) (TFunc (tInt NoLoc) tv NoLoc) (locOf arr)
     (eTy, typedE, eSub) <- elaborate e $ subst (uniSubArr `compose` uniSubIndex `compose` indexSub `compose` arrSub) env
     uniSubExpr <- unifies (subst eSub $ fromJust eTy) (subst uniSubArr tv) (locOf e)
     let sub = uniSubExpr `compose` eSub `compose` uniSubArr `compose` uniSubIndex `compose` indexSub `compose` arrSub
     return (subst uniSubArr arrTy, subst sub (Typed.ArrUpd typedArr typedIndex typedE loc), sub)
-  elaborate (Case expr cs l) env = undefined
+  elaborate (Case expr cs l) env = undefined -- TODO: Implement pattern matching.
 
-instance Elab Op where
-  elaborate (ChainOp op) = elaborate op
-  elaborate (ArithOp op) = elaborate op
-  elaborate (TypeOp op) = elaborate op
+instance Elab Chain where -- TODO: Make sure the below implementation is correct.
+  elaborate (More (More ch' op1 e1 loc1) op2 e2 loc2) env = do
+    tv <- freshVar
+    (_chainTy, typedChain, chainSub) <- elaborate (More ch' op1 e1 loc1) env
+    (opTy, opTyped, opSub) <- elaborate op2 env
+    opTy' <- instantiate $ fromJust opTy
+    (ty1, _typedExpr1, sub1) <- elaborate e1 $ subst chainSub env
+    (ty2, typedExpr2, sub2) <- elaborate e2 $ subst (chainSub <> sub1) env
+    unifyTy <- unifies (fromJust ty1 ~-> fromJust ty2 ~-> tv) opTy' loc2
+    let sub = chainSub <> opSub <> sub1 <> sub2
+    return (Just $ subst unifyTy tv, subst sub $ Typed.More typedChain opTyped (subst unifyTy opTy') typedExpr2, sub)
+  elaborate (More (Pure e1 _loc1) op e2 loc2) env = do
+    tv <- freshVar
+    (opTy, opTyped, opSub) <- elaborate op env
+    opTy' <- instantiate $ fromJust opTy
+    (ty1, typedExpr1, sub1) <- elaborate e1 env
+    (ty2, typedExpr2, sub2) <- elaborate e2 $ subst sub1 env
+    unifyTy <- unifies (fromJust ty1 ~-> fromJust ty2 ~-> tv) opTy' loc2
+    let sub = unifyTy <> sub2 <> sub1 <> opSub
+    return (Just $ subst unifyTy tv, subst sub $ Typed.More (Typed.Pure typedExpr1) opTyped (subst unifyTy opTy') typedExpr2, sub)
+  elaborate (Pure _expr _loc) _ = error "Chain of length 1 shouldn't exist."
 
 instance Elab ChainOp where
   elaborate (EQProp  l) _ = return (Just $ tBool .-> tBool .-> tBool $ l, ChainOp $ EQProp l, mempty)
@@ -622,8 +653,11 @@ unifies (TFunc t1 t2 _) (TFunc t3 t4 _) l = do
   s1 <- unifies t1 t3 l
   s2 <- unifies (subst s1 t2) (subst s1 t4) l
   return (s2 `compose` s1)
-unifies (TCon n1 args1 _) (TCon n2 args2 _) _
-  | n1 == n2 && length args1 == length args2 = return mempty
+unifies (TApp l1 r1 loc1) (TApp l2 r2 loc2) _ = do
+  s1 <- unifies l1 l2 loc1
+  s2 <- unifies (subst s1 r1) (subst s1 r2) loc2
+  return (s2 `compose` s1)
+unifies t1@(TData name1 _ _) t2@(TData name2 _ _) l = if name1 == name2 then pure mempty else throwError $ UnifyFailed t1 t2 l
 unifies (TVar x _)   t            l          = bind x t l
 unifies t            (TVar x _)   l          = bind x t l
 unifies (TMetaVar x) t            l          = bind x t l
@@ -631,9 +665,12 @@ unifies t            (TMetaVar x) l          = bind x t l
 unifies t1           t2           l          = throwError $ UnifyFailed t1 t2 l
 
 bind :: MonadError TypeError m => Name -> Type -> Loc -> m (Map.Map Name Type)
-bind x t l | t == TVar x NoLoc = return mempty
+bind x t l | same t $ TVar x NoLoc = return mempty
            | occurs x t  = throwError $ RecursiveType x t l
            | otherwise   = return (Map.singleton x t)
+  where
+    same (TVar v1 _) (TVar v2 _) = v1 == v2
+    same _ _ = False
 
 --------------------------------------------------------------------------------
 -- helper combinators
@@ -691,7 +728,8 @@ instance Substitutable Type Type where
   subst s (TArray i t l ) = TArray i (subst s t) l
   subst s (TTuple ts    ) = TTuple (map (subst s) ts)
   subst s (TFunc t1 t2 l) = TFunc (subst s t1) (subst s t2) l
-  subst _ t@TCon{}        = t
+  subst s (TApp l r loc ) = TApp (subst s l) (subst s r) loc
+  subst _ t@TData {}      = t
   subst s t@(TVar n _)    = Map.findWithDefault t n s
   subst s t@(TMetaVar n)  = Map.findWithDefault t n s
 
@@ -700,8 +738,13 @@ instance Substitutable Type Typed.TypedExpr where
   subst s (Typed.Var name ty loc) = Typed.Var name (subst s ty) loc
   subst s (Typed.Const name ty loc) = Typed.Const name (subst s ty) loc
   subst s (Typed.Op op ty) = Typed.Op op $ subst s ty
+  subst s (Typed.Chain ch) = Typed.Chain $ subst s ch
   subst s (Typed.App e1 e2 loc) = Typed.App (subst s e1) (subst s e2) loc
   subst s (Typed.Lam name ty expr loc) = Typed.Lam name (subst s ty) (subst s expr) loc
   subst s (Typed.Quant quantifier vars restriction inner loc) = Typed.Quant (subst s quantifier) vars (subst s restriction) (subst s inner) loc
   subst s (Typed.ArrIdx arr index loc) = Typed.ArrIdx (subst s arr) (subst s index) loc
   subst s (Typed.ArrUpd arr index expr loc) = Typed.ArrUpd (subst s arr) (subst s index) (subst s expr) loc
+
+instance Substitutable Type Typed.TypedChain where
+  subst s (Typed.Pure expr) = Typed.Pure $ subst s expr
+  subst s (Typed.More ch op ty expr) = Typed.More (subst s ch) op (subst s ty) (subst s expr)

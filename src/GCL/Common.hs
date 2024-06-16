@@ -59,6 +59,16 @@ emptySubs = mempty
 emptyEnv :: Env a
 emptyEnv = mempty
 
+freeMetaVars :: Type -> Set Name
+freeMetaVars (TBase _ _    ) = mempty
+freeMetaVars (TArray _ t _ ) = freeMetaVars t
+freeMetaVars (TTuple ts    ) = Set.unions (map freeMetaVars ts)
+freeMetaVars (TFunc t1 t2 _) = freeMetaVars t1 <> freeMetaVars t2
+freeMetaVars (TApp l r _   ) = freeMetaVars l <> freeMetaVars r
+freeMetaVars (TData _ _ _  ) = mempty
+freeMetaVars (TVar _ _     ) = mempty
+freeMetaVars (TMetaVar n   ) = Set.singleton n
+
 -- A class of types for which we may compute their free variables.
 class Free a where
   freeVars :: a -> Set Name
@@ -90,7 +100,8 @@ instance Free Type where
   freeVars (TArray _ t _ ) = freeVars t
   freeVars (TTuple ts    ) = Set.unions (map freeVars ts)
   freeVars (TFunc t1 t2 _) = freeVars t1 <> freeVars t2
-  freeVars (TCon  _  ns _) = Set.fromList ns
+  freeVars (TApp l r _   ) = freeVars l <> freeVars r
+  freeVars (TData _ _ _  ) = mempty
   freeVars (TVar x _     ) = Set.singleton x
   freeVars (TMetaVar n   ) = Set.singleton n
 
@@ -98,14 +109,15 @@ instance {-# OVERLAPS #-} Free TypeEnv where
   freeVars env = foldMap freeVars $ Map.elems $ Map.fromList env 
 
 instance Free Expr where
-  freeVars (Var   x _        ) = Set.singleton x
-  freeVars (Const x _        ) = Set.singleton x
-  freeVars (Op _             ) = mempty
-  freeVars (Lit _ _          ) = mempty
-  freeVars (App  e1 e2      _) = freeVars e1 <> freeVars e2
-  freeVars (Func _  clauses _) = Set.unions (fmap freeVars clauses)
-  freeVars (Lam  x  e       _) = freeVars e \\ Set.singleton x
-  freeVars (Tuple xs         ) = Set.unions (map freeVars xs)
+  freeVars (Var   x _            ) = Set.singleton x
+  freeVars (Const x _            ) = Set.singleton x
+  freeVars (Op _                 ) = mempty
+  freeVars (Chain chain          ) = freeVars chain
+  freeVars (Lit _ _              ) = mempty
+  freeVars (App  e1 e2      _    ) = freeVars e1 <> freeVars e2
+  freeVars (Func _  clauses _    ) = Set.unions (fmap freeVars clauses)
+  freeVars (Lam  x  e       _    ) = freeVars e \\ Set.singleton x
+  freeVars (Tuple xs             ) = Set.unions (map freeVars xs)
   freeVars (Quant op xs range term _) =
     (freeVars op <> freeVars range <> freeVars term) \\ Set.fromList xs
   freeVars (RedexKernel _ _ fv _) = fv
@@ -114,6 +126,10 @@ instance Free Expr where
   freeVars (ArrUpd e1 e2 e3 _   ) = freeVars e1 <> freeVars e2 <> freeVars e3
   freeVars (Case e clauses _    ) = freeVars e <> Set.unions (map freeVars clauses)
 
+
+instance Free Chain where
+  freeVars (Pure expr _) = freeVars expr
+  freeVars (More chain _op expr _) = freeVars chain <> freeVars expr
 
 instance Free FuncClause where
   freeVars (FuncClause patterns expr) = freeVars expr \\ Set.unions (map freeVars patterns)

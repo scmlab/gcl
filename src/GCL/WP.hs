@@ -24,7 +24,7 @@ import           GCL.WP.Type
 import qualified Syntax.Abstract               as A
 import qualified Syntax.Abstract.Operator      as A
 import qualified Syntax.Abstract.Util          as A
-import           Syntax.Common.Types           ( Name, nameToText)
+import           Syntax.Common.Types            ( nameToText )
 import GCL.WP.Struct
 import GCL.WP.WP
 import GCL.WP.SP

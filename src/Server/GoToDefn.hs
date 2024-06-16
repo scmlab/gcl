@@ -37,17 +37,21 @@ type LocationLinkToBe = Range -> LocationLink
 
 -- | Extracts Scopes from a Program
 programToScopes :: Program -> [Scope LocationLinkToBe]
-programToScopes (Program _defns decls _ _ _) = [topLevelScope]
+programToScopes (Program defns decls _ _ _) = [topLevelScope]
  where
   topLevelScope :: Map Text LocationLinkToBe
   topLevelScope = Map.mapKeys nameToText locationLinks
 
   locationLinks :: Map Name LocationLinkToBe
-  locationLinks = locationLinksFromDecls
+  locationLinks = locationLinksFromDecls <> locationLinksFromDefns
 
   locationLinksFromDecls :: Map Name LocationLinkToBe
   locationLinksFromDecls =
     makeLocationLinks $ Map.fromList $ concatMap splitDecl decls
+
+  locationLinksFromDefns ::  Map Name LocationLinkToBe
+  locationLinksFromDefns =
+    makeLocationLinks $ Map.fromList $ concatMap splitDefn defns
 
   --locationLinksFromFuncDefns :: Map Name LocationLinkToBe
   --locationLinksFromFuncDefns = makeLocationLinks funcDefns
@@ -59,6 +63,14 @@ programToScopes (Program _defns decls _ _ _) = [topLevelScope]
   splitDecl :: Declaration -> [(Name, Declaration)]
   splitDecl decl@(ConstDecl names _ _ _) = [ (name, decl) | name <- names ]
   splitDecl decl@(VarDecl   names _ _ _) = [ (name, decl) | name <- names ]
+
+  splitDefn :: Definition -> [(Name, Definition)]
+  splitDefn def@(TypeDefn con _params ctors _) = (con, def) : concatMap (`splitCtor` def) ctors
+  splitDefn FuncDefnSig {} = mempty
+  splitDefn def@(FuncDefn name _exprs) = [(name, def)]
+
+  splitCtor :: TypeDefnCtor -> Definition -> [(Name, Definition)]
+  splitCtor (TypeDefnCtor name _params) def = [(name, def)]
 
 --  Helper function for converting
 --      a Map of "names" and "targets"
@@ -185,6 +197,7 @@ instance Collect LocationLinkToBe LocationLink Expr where
     Var   a _           -> collect a
     Const a _           -> collect a
     Op op               -> collect op
+    Chain ch            -> collect ch
     App  a b _          -> collect a >> collect b
     Lam  _ b _          -> collect b
     Func a b _          -> collect a >> collect b
@@ -215,8 +228,15 @@ instance Collect LocationLinkToBe LocationLink Expr where
 --     localScope args $ do
 --       collect body
 
-instance Collect LocationLinkToBe LocationLink Op where
+instance Collect LocationLinkToBe LocationLink ArithOp where
   collect _ = return ()
+
+instance Collect LocationLinkToBe LocationLink ChainOp where
+  collect _ = return ()
+
+instance Collect LocationLinkToBe LocationLink Chain where
+  collect (Pure expr _) = collect expr
+  collect (More ch' op expr _) = collect ch' >> collect op >> collect expr
 
 instance Collect LocationLinkToBe LocationLink FuncClause where
   collect _ = return ()
@@ -234,7 +254,8 @@ instance Collect LocationLinkToBe LocationLink Type where
     TArray i x _ -> collect i >> collect x
     TTuple as    -> mapM_ collect as
     TFunc x y _  -> collect x >> collect y
-    TCon  x _ _  -> collect x
+    TApp  x y _  -> collect x >> collect y
+    TData n _ _  -> collect n
     TVar _ _     -> return ()
     TMetaVar _   -> return ()
 

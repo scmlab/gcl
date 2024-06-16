@@ -107,9 +107,8 @@ instance Collect () Highlighting Declaration where
     collect a
 
 instance Collect () Highlighting TypeDefnCtor where
-  collect (TypeDefnCtor name types) = do
+  collect (TypeDefnCtor name _) = do
     collect (AsName name)
-    collect types
 
 instance Collect () Highlighting DeclBase where
   collect (DeclBase as _ b) = do
@@ -197,6 +196,12 @@ instance Collect () Highlighting Expr where
     Var   a     -> collect (AsVariable a)
     Const a     -> collect (AsVariable a)
     Op    a     -> addHighlighting J.SttOperator [] a
+    Chain ch    -> case ch of
+      Pure expr -> collect expr
+      More ch' op expr -> do
+        collect (Chain ch')
+        addHighlighting J.SttOperator [] op
+        collect expr
     Arr a _ b _ -> do
       collect a
       collect b
@@ -271,6 +276,8 @@ instance Collect () Highlighting Type where
     collect a
     addHighlighting J.SttOperator [] tok
     collect b
-  -- TODO: handle user defined type collect
-  collect TCon{}      = return ()
-  collect (TVar name) = addHighlighting J.SttType [] name
+  collect (TApp a b)  = do
+    collect a
+    collect b
+  collect (TData name _) = addHighlighting J.SttType [] name
+  collect (TVar name)  = addHighlighting J.SttType [] name

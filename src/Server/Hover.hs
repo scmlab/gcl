@@ -15,11 +15,9 @@ import           Data.Loc           ( Located
                                     , locOf
                                     )
 import           Data.Loc.Range
-import qualified GCL.Type           as TypeChecking
 import           Server.IntervalMap ( IntervalMap )
 import qualified Server.IntervalMap as IntervalMap
 import           Syntax.Abstract
-import           Syntax.Common
 import           Syntax.Typed                   as Typed
 
 collectHoverInfo :: Typed.TypedProgram -> IntervalMap (J.Hover, Type)
@@ -61,10 +59,10 @@ instance Collect Typed.TypedProgram where
 instance Collect Typed.TypedDefinition where
   collect (Typed.TypeDefn _ _ ctors _) = foldMap collect ctors
   collect (Typed.FuncDefnSig arg t prop _) = annotateType arg t <> maybe mempty collect prop
-  collect (Typed.FuncDefn name exprs) = foldMap collect exprs
+  collect (Typed.FuncDefn _name expr) = collect expr
 
 instance Collect Typed.TypedTypeDefnCtor where
-  collect (Typed.TypedTypeDefnCtor name tys) = mempty
+  collect (Typed.TypedTypeDefnCtor _name _tys) = mempty
 
 --------------------------------------------------------------------------------
 -- Declaration
@@ -76,10 +74,10 @@ instance Collect Typed.TypedDeclaration where
 --------------------------------------------------------------------------------
 -- Stmt
 
-instance Collect Typed.TypedStmt where
+instance Collect Typed.TypedStmt where -- TODO: Display hover info for names.
   collect (Typed.Skip _) = mempty
   collect (Typed.Abort _) = mempty
-  collect (Typed.Assign names exprs _) = foldMap collect exprs -- TODO: Display hover info for names.
+  collect (Typed.Assign _names exprs _) = foldMap collect exprs
   collect (Typed.AAssign arr index rhs _) = collect arr <> collect index <> collect rhs
   collect (Typed.Assert expr _) = collect expr
   collect (Typed.LoopInvariant inv bnd _) = collect inv <> collect bnd
@@ -87,6 +85,11 @@ instance Collect Typed.TypedStmt where
   collect (Typed.If gdCmds _) = foldMap collect gdCmds
   collect Typed.Spec {} = mempty
   collect Typed.Proof {} = mempty
+  collect (Typed.Alloc _name exprs _) = foldMap collect exprs
+  collect (Typed.HLookup _name expr _) = collect expr
+  collect (Typed.HMutate e1 e2 _) = collect e1 <> collect e2
+  collect (Typed.Dispose expr _) = collect expr
+  collect (Typed.Block program _) = collect program 
 
 instance Collect Typed.TypedGdCmd where
   collect (Typed.TypedGdCmd gd stmts _) = collect gd <> foldMap collect stmts
@@ -98,11 +101,16 @@ instance Collect Typed.TypedExpr where
   collect (Typed.Var name ty _) = annotateType name ty
   collect (Typed.Const name ty _) = annotateType name ty
   collect (Typed.Op op ty) = annotateType op ty
+  collect (Typed.Chain ch) = collect ch
   collect (Typed.App expr1 expr2 _) = collect expr1 <> collect expr2
   collect (Typed.Lam name ty expr _) = annotateType name ty <> collect expr
   collect (Typed.Quant quantifier _bound restriction inner _) = collect quantifier <> collect restriction <> collect inner
   collect (Typed.ArrIdx expr1 expr2 _) = collect expr1 <> collect expr2
   collect (Typed.ArrUpd arr index expr _) = collect arr <> collect index <> collect expr
+
+instance Collect Typed.TypedChain where
+  collect (Typed.Pure expr) = collect expr
+  collect (Typed.More chain op ty expr) = collect chain <> annotateType op ty <> collect expr
 
 {-
 

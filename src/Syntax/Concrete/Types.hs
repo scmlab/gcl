@@ -11,10 +11,11 @@ import Data.Loc.Range
 import Data.Text (Text)
 import GHC.Base (Symbol)
 import GHC.Generics (Generic)
-import Syntax.Common (Name, Op)
+import Syntax.Common (Name, ArithOp, ChainOp)
 import Prelude hiding (Ordering (..))
 import Data.Loc (Located (locOf), Pos, Loc (Loc), L)
 import Syntax.Parser.Lexer (Tok)
+import Render.Class (Render (..))
 
 --------------------------------------------------------------------------------
 
@@ -67,7 +68,7 @@ data Definition
   | FuncDefn Name [Name] (Token "=") Expr
   deriving (Eq, Show)
 
-data TypeDefnCtor = TypeDefnCtor Name [Type] deriving (Eq, Show)
+data TypeDefnCtor = TypeDefnCtor Name [Name] deriving (Eq, Show)
 
 --------------------------------------------------------------------------------
 -- | Declaration
@@ -140,7 +141,8 @@ data Type
   | TBase TBase
   | TArray (Token "array") Interval (Token "of") Type
   | TFunc Type TokArrows Type
-  | TCon Name [Name]
+  | TApp Type Type
+  | TData Name Range
   | TVar Name
   deriving (Eq, Show)
 
@@ -152,7 +154,8 @@ data Expr
   | Lit Lit
   | Var Name
   | Const Name
-  | Op Op
+  | Op ArithOp
+  | Chain Chain
   | Arr Expr (Token "[") Expr (Token "]")
   | App Expr Expr
   | Quant
@@ -168,7 +171,10 @@ data Expr
   | Case (Token "case") Expr (Token "of") [CaseClause]
   deriving (Eq, Show, Generic)
 
-type QuantOp' = Either Op Name
+data Chain = Pure Expr | More Chain ChainOp Expr
+  deriving (Eq, Show, Generic)
+
+type QuantOp' = Either ArithOp Name
 
 --------------------------------------------------------------------------------
 -- | Pattern matching

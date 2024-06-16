@@ -16,10 +16,10 @@ data TypedProgram = Program [TypedDefinition] -- definitions (the functional lan
 data TypedDefinition
   = TypeDefn Name [Name] [TypedTypeDefnCtor] Loc
   | FuncDefnSig Name Type (Maybe TypedExpr) Loc
-  | FuncDefn Name [TypedExpr]
+  | FuncDefn Name TypedExpr
   deriving (Eq, Show)
 
-data TypedTypeDefnCtor = TypedTypeDefnCtor Name [Type]
+data TypedTypeDefnCtor = TypedTypeDefnCtor Name [Name]
   deriving (Eq, Show)
 
 data TypedDeclaration
@@ -38,7 +38,11 @@ data TypedStmt
   | If [TypedGdCmd] Loc
   | Spec Text Range
   | Proof Text Text Range
-  -- FIXME: Other constructors.
+  | Alloc   Name [TypedExpr] Loc    --  p := new (e1,e2,..,en)
+  | HLookup Name TypedExpr Loc      --  x := *e
+  | HMutate TypedExpr TypedExpr Loc --  *e1 := e2
+  | Dispose TypedExpr Loc           --  dispose e
+  | Block TypedProgram Loc
   deriving (Eq, Show)
 
 data TypedGdCmd = TypedGdCmd TypedExpr [TypedStmt] Loc
@@ -49,6 +53,7 @@ data TypedExpr
   | Var Name Type Loc
   | Const Name Type Loc
   | Op Op Type
+  | Chain TypedChain
   | App TypedExpr TypedExpr Loc
   | Lam Name Type TypedExpr Loc
   | Quant TypedExpr [Name] TypedExpr TypedExpr Loc
@@ -56,3 +61,8 @@ data TypedExpr
   | ArrUpd TypedExpr TypedExpr TypedExpr Loc
   deriving (Eq, Show)
   -- FIXME: Other constructors.
+
+data TypedChain
+  = Pure TypedExpr
+  | More TypedChain Op Type TypedExpr
+  deriving (Eq, Show)
