@@ -536,10 +536,12 @@ instance Elab Expr where
       Op (Hash _) -> do
         tvs <- replicateM (length bound) freshVar
         let newEnv = subst quantSub env
+        -- throwError $ UndefinedType $ Name (Text.pack $ show newEnv) NoLoc
         (resTy, resTypedExpr, resSub) <- elaborate restriction $ zip (Index <$> bound) tvs <> newEnv
         uniSub2 <- unifyType (fromJust resTy) (tBool NoLoc) (locOf restriction)
-        (innerTy, innerTypedExpr, innerSub) <- elaborate inner newEnv
-        uniSub3 <- unifyType (subst innerSub $ fromJust innerTy) (tBool NoLoc) (locOf inner)
+        let newEnv' = subst (uniSub2 `compose` resSub) newEnv
+        (innerTy, innerTypedExpr, innerSub) <- elaborate inner $ zip (Index <$> bound) (subst (uniSub2 `compose` resSub) <$> tvs) <> newEnv'
+        uniSub3 <- unifyType (subst innerSub $ fromJust innerTy) (subst (uniSub2 `compose` resSub `compose` quantSub) tv) (locOf inner)
         let sub = uniSub3 `compose` innerSub `compose` uniSub2 `compose` resSub `compose` quantSub
         return (Just $ subst quantSub tv, subst sub (Typed.Quant quantTypedExpr bound resTypedExpr innerTypedExpr loc), sub)
       -- a fresh   Γ ⊢ ⊕ : (a -> a -> a) ↓ s⊕
