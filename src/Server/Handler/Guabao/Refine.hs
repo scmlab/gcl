@@ -81,7 +81,7 @@ handler _params@RefineParams{filePath, specRange, specText} onSuccess onError = 
                     Nothing           -> error "Should not happen"
                     Just abstractImpl -> do
                       -- elaborate
-                      let typeEnv :: TypeEnv = _ -- specTypeEnv spec
+                      let typeEnv :: TypeEnv = [] -- specTypeEnv spec
                       case elaborateFragment typeEnv abstractImpl of
                         Left err -> onError (TypeError err)
                         Right typedImpl -> do
