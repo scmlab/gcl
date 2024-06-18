@@ -649,13 +649,12 @@ type' = do
   makeExprParser term table <?> "type"
  where
   table :: [[Operator Parser Type]]
-  table = [[InfixL (return TApp)], [InfixR function]]
+  table = [[InfixL (return TApp)], [InfixR $ typeOp Arrow TokArrow]]
 
-  function :: Parser (Type -> Type -> Type)
-  function = do
-    arrow <- tokenArrow
-    return $ \x y -> TFunc x arrow y
-
+  typeOp :: (Loc -> TypeOp) -> Tok -> Parser (Type -> Type -> Type)
+  typeOp operator' tok = do
+    (op, loc) <- getLoc (operator' <$ symbol tok)
+    return $ \x y -> TApp (TApp (TOp (op loc)) x) y
   term :: Parser Type
   term = prim <|> parensType <|> array <|> typeVar <?> "type term"
 

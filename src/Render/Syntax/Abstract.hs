@@ -127,20 +127,17 @@ instance Render Pattern where
 
 -- | Type
 instance Render Type where
-  renderPrec _ (TBase TInt  _  ) = "Int"
-  renderPrec _ (TBase TBool _  ) = "Bool"
-  renderPrec _ (TBase TChar _  ) = "Char"
-  renderPrec _ (TTuple es      ) = "(" <+> punctuateE "," (map render es) <+> ")"
-  renderPrec n (TFunc  a b    _) =
-    parensIf n (Just . TypeOp $ Arrow NoLoc) $ 
-      renderPrec (HOLEOp . TypeOp $ Arrow NoLoc) a 
-      <+> "→"
-      <+> renderPrec (OpHOLE . TypeOp $ Arrow NoLoc) b
-  renderPrec _ (TArray i b    _) = "array" <+> render i <+> "of" <+> render b
-  renderPrec n (TApp l r _     ) = parensIf n Nothing $ renderPrec HOLEApp l <+> renderPrec AppHOLE r
-  renderPrec _ (TData n _ _    ) = render n
-  renderPrec _ (TVar i _       ) = render i
-  renderPrec _ (TMetaVar n     ) = render n
+  renderPrec _ (TBase TInt  _) = "Int"
+  renderPrec _ (TBase TBool _) = "Bool"
+  renderPrec _ (TBase TChar _) = "Char"
+  renderPrec _ (TArray i b  _) = "array" <+> render i <+> "of" <+> render b
+  renderPrec _ (TTuple _     ) = "Tuple"
+  renderPrec _ (TOp op       ) = render op
+  -- TODO: Implement infix type operators.
+  renderPrec n (TApp l r _   ) = parensIf n Nothing $ renderPrec HOLEApp l <+> renderPrec AppHOLE r
+  renderPrec _ (TData n _    ) = render n
+  renderPrec _ (TVar i _     ) = render i
+  renderPrec _ (TMetaVar n   ) = render n
 
 -- | Interval
 instance Render Interval where

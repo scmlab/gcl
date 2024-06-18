@@ -67,14 +67,14 @@ emptyEnv :: Env a
 emptyEnv = mempty
 
 freeMetaVars :: Type -> Set Name
-freeMetaVars (TBase _ _    ) = mempty
-freeMetaVars (TArray _ t _ ) = freeMetaVars t
-freeMetaVars (TTuple ts    ) = Set.unions (map freeMetaVars ts)
-freeMetaVars (TFunc t1 t2 _) = freeMetaVars t1 <> freeMetaVars t2
-freeMetaVars (TApp l r _   ) = freeMetaVars l <> freeMetaVars r
-freeMetaVars (TData _ _ _  ) = mempty
-freeMetaVars (TVar _ _     ) = mempty
-freeMetaVars (TMetaVar n   ) = Set.singleton n
+freeMetaVars (TBase _ _   ) = mempty
+freeMetaVars (TArray _ t _) = freeMetaVars t
+freeMetaVars (TTuple _    ) = mempty
+freeMetaVars (TOp _       ) = mempty
+freeMetaVars (TData _ _   ) = mempty
+freeMetaVars (TApp l r _  ) = freeMetaVars l <> freeMetaVars r
+freeMetaVars (TVar _ _    ) = mempty
+freeMetaVars (TMetaVar n  ) = Set.singleton n
 
 -- A class of types for which we may compute their free variables.
 class Free a where
@@ -103,14 +103,14 @@ instance Free a => Free (Maybe a) where
   freeVars = maybe mempty freeVars
 
 instance Free Type where
-  freeVars (TBase _ _    ) = mempty
-  freeVars (TArray _ t _ ) = freeVars t
-  freeVars (TTuple ts    ) = Set.unions (map freeVars ts)
-  freeVars (TFunc t1 t2 _) = freeVars t1 <> freeVars t2
-  freeVars (TApp l r _   ) = freeVars l <> freeVars r
-  freeVars (TData _ _ _  ) = mempty
-  freeVars (TVar x _     ) = Set.singleton x
-  freeVars (TMetaVar n   ) = Set.singleton n
+  freeVars (TBase _ _   ) = mempty
+  freeVars (TArray _ t _) = freeVars t
+  freeVars (TTuple _    ) = mempty
+  freeVars (TData _ _   ) = mempty
+  freeVars (TOp _       ) = mempty
+  freeVars (TApp l r _  ) = freeVars l <> freeVars r
+  freeVars (TVar x _    ) = Set.singleton x
+  freeVars (TMetaVar n  ) = Set.singleton n
 
 instance {-# OVERLAPS #-} Free TypeEnv where
   freeVars env = foldMap freeVars $ Map.elems $ Map.fromList env 

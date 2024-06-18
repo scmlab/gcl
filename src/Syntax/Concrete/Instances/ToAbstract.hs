@@ -187,20 +187,19 @@ instance ToAbstract Type A.Type where
     (TBase a) -> A.TBase <$> toAbstract a <*> pure (locOf t)
     (TArray _ a _ b) ->
       A.TArray <$> toAbstract a <*> toAbstract b <*> pure (locOf t)
-    (TFunc a _ b) ->
-      A.TFunc <$> toAbstract a <*> toAbstract b <*> pure (locOf t)
+    (TOp op) -> pure $ A.TOp op
+    (TData n _) -> pure $ A.TData n (locOf t)
     (TApp l r) -> A.TApp <$> toAbstract l <*> toAbstract r <*> pure (l <--> r)
-    (TVar a      ) -> pure $ A.TVar a (locOf t)
-    (TData n _   ) -> pure $ A.TData n () (locOf t)
+    (TVar a) -> pure $ A.TVar a (locOf t)
     (TParen _ a _) -> do
       t' <- toAbstract a
       case t' of
         A.TBase a' _     -> pure $ A.TBase a' (locOf t)
         A.TArray a' b' _ -> pure $ A.TArray a' b' (locOf t)
         A.TTuple as'     -> pure $ A.TTuple as'
-        A.TFunc a' b' _  -> pure $ A.TFunc a' b' (locOf t)
+        A.TOp op         -> pure $ A.TOp op
+        A.TData name _   -> pure $ A.TData name (locOf t)
         A.TApp  a' b' _  -> pure $ A.TApp a' b' (locOf t)
-        A.TData name i _ -> pure $ A.TData name i (locOf t)
         A.TVar a' _      -> pure $ A.TVar a' (locOf t)
         A.TMetaVar a'    -> pure $ A.TMetaVar a'
 

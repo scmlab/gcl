@@ -224,7 +224,7 @@ instance CollectIds [Definition] where
           let sub = Map.fromList . zip args $ TMetaVar <$> freshNames
           let newTypeInfos =
                 map
-                  (\(TypeDefnCtor cn ts) -> (Index cn, TypeDefnCtorInfo $ subst sub (wrapTFunc ts (formTy (TData name () (locOf name)) (TMetaVar <$> args)))))
+                  (\(TypeDefnCtor cn ts) -> (Index cn, TypeDefnCtorInfo $ subst sub (wrapTFunc ts (formTy (TData name (locOf name)) (TMetaVar <$> args)))))
                   ctors
           -- This is not yet used throughout the whole program. We may have to change the type and store pattern infos here in the future.
           let newTypeDefnInfos = (Index name, TypeDefnInfo args)
@@ -388,7 +388,8 @@ instance Elab Stmt where
     (arrTy, typedArr, arrSub) <- elaborate arr env
     (indexTy, typedIndex, indexSub) <- elaborate index $ subst arrSub env
     uniSubIndex <- unifyType (subst indexSub $ fromJust indexTy) (tInt NoLoc) (locOf index)
-    uniSubArr <- unifyType (subst (indexSub `compose` uniSubIndex) (fromJust arrTy)) (TFunc (tInt NoLoc) tv NoLoc) (locOf arr)
+    -- TODO: Wrap type-level application of operators into a function.
+    uniSubArr <- unifyType (subst (indexSub `compose` uniSubIndex) (fromJust arrTy)) (tInt NoLoc ~-> tv) (locOf arr)
     (eTy, typedE, eSub) <- elaborate e $ subst (uniSubArr `compose` uniSubIndex `compose` indexSub `compose` arrSub) env
     _ <- unifyType (subst eSub $ fromJust eTy) (subst uniSubArr tv) (locOf e)
     return (Nothing, Typed.AAssign typedArr typedIndex typedE loc, mempty)
@@ -508,7 +509,7 @@ instance Elab Expr where
     tv <- freshVar
     (ty1, typedExpr1, sub1) <- elaborate e1 env
     (ty2, typedExpr2, sub2) <- elaborate e2 $ subst sub1 env
-    sub3 <- unifyType (subst sub2 $ fromJust ty1) (TFunc (fromJust ty2) tv NoLoc) loc
+    sub3 <- unifyType (subst sub2 $ fromJust ty1) (fromJust ty2 ~-> tv) loc
     let sub = sub3 `compose` sub2 `compose` sub1
     return (Just $ subst sub3 tv, subst sub (Typed.App typedExpr1 typedExpr2 loc), sub)
   -- a fresh
@@ -519,7 +520,7 @@ instance Elab Expr where
     tv <- freshVar
     let newEnv = (Index bound, tv) : env
     (ty1, typedExpr1, sub1) <- elaborate expr newEnv
-    let returnTy = TFunc (subst sub1 tv) (fromJust ty1) loc
+    let returnTy = subst sub1 tv ~-> fromJust ty1
     return (Just returnTy, subst sub1 (Typed.Lam bound (subst sub1 tv) typedExpr1 loc), sub1)
   elaborate (Func name clauses l) env = undefined
   -- Γ ⊢ e1 ↑ (s1, t1)
@@ -569,7 +570,7 @@ instance Elab Expr where
     (ty1, typedExpr1, sub1) <- elaborate e1 env
     (ty2, typedExpr2, sub2) <- elaborate e2 (subst sub1 env)
     sub3 <- unifyType (subst sub2 $ fromJust ty2) (tInt NoLoc) (locOf e2)
-    sub4 <- unifyType (subst (sub3 `compose` sub2) (fromJust ty1)) (TFunc (tInt NoLoc) tv NoLoc) loc
+    sub4 <- unifyType (subst (sub3 `compose` sub2) (fromJust ty1)) (tInt NoLoc ~-> tv) loc
     let sub = sub4 `compose` sub3 `compose` sub2 `compose` sub1
     return (Just $ subst sub3 tv, subst sub (Typed.ArrIdx typedExpr1 typedExpr2 loc), sub)
   -- b fresh    Γ ⊢ a : Array .. of b ↓ sa
@@ -582,7 +583,7 @@ instance Elab Expr where
     (arrTy, typedArr, arrSub) <- elaborate arr env
     (indexTy, typedIndex, indexSub) <- elaborate index $ subst arrSub env
     uniSubIndex <- unifyType (subst indexSub $ fromJust indexTy) (tInt NoLoc) (locOf index)
-    uniSubArr <- unifyType (subst (indexSub `compose` uniSubIndex) (fromJust arrTy)) (TFunc (tInt NoLoc) tv NoLoc) (locOf arr)
+    uniSubArr <- unifyType (subst (indexSub `compose` uniSubIndex) (fromJust arrTy)) (tInt NoLoc ~-> tv) (locOf arr)
     (eTy, typedE, eSub) <- elaborate e $ subst (uniSubArr `compose` uniSubIndex `compose` indexSub `compose` arrSub) env
     uniSubExpr <- unifyType (subst eSub $ fromJust eTy) (subst uniSubArr tv) (locOf e)
     let sub = uniSubExpr `compose` eSub `compose` uniSubArr `compose` uniSubIndex `compose` indexSub `compose` arrSub
@@ -670,23 +671,21 @@ unifyType (TBase t1 _) (TBase t2 _) _ | t1 == t2 = return mempty
 unifyType (TArray _ t1 _) (TArray _ t2 _) l = unifyType t1 t2 l {-  | i1 == i2 = unifies t1 t2 -}
   -- SCM: for now, we do not check the intervals
 -- view array of type `t` as function type of `Int -> t`
-unifyType (TArray _ t1 _) (TFunc i t2 _) l = do
+unifyType (TArray _ t1 _) (TApp (TApp (TOp (Arrow _)) i _) t2 _) l = do
   s1 <- unifyType i (tInt NoLoc) l
   s2 <- unifyType t1 t2 l
   return (s2 `compose` s1)
-unifyType (TFunc i t1 _) (TArray _ t2 _) l = do
+-- TODO: Deal with any possible type operators.
+unifyType (TOp (Arrow _)) (TOp (Arrow _)) _ = pure mempty
+unifyType t1@(TData name1 _) t2@(TData name2 _) l = if name1 == name2 then pure mempty else throwError $ UnifyFailed t1 t2 l
+unifyType (TApp (TApp (TOp (Arrow _)) i _) t1 _) (TArray _ t2 _) l = do
   s1 <- unifyType i (tInt NoLoc) l
   s2 <- unifyType t1 t2 l
   return (s2 `compose` s1)
-unifyType (TFunc t1 t2 _) (TFunc t3 t4 _) l = do
+unifyType (TApp t1 t2 _) (TApp t3 t4 _) l = do
   s1 <- unifyType t1 t3 l
   s2 <- unifyType (subst s1 t2) (subst s1 t4) l
   return (s2 `compose` s1)
-unifyType (TApp l1 r1 loc1) (TApp l2 r2 loc2) _ = do
-  s1 <- unifyType l1 l2 loc1
-  s2 <- unifyType (subst s1 r1) (subst s1 r2) loc2
-  return (s2 `compose` s1)
-unifyType t1@(TData name1 _ _) t2@(TData name2 _ _) l = if name1 == name2 then pure mempty else throwError $ UnifyFailed t1 t2 l
 unifyType (TVar x _)   t            l          = bind x t l
 unifyType t            (TVar x _)   l          = bind x t l
 unifyType (TMetaVar x) t            l          = bind x t l
@@ -774,11 +773,11 @@ tInt = TBase TInt
 tChar = TBase TChar
 
 (.->) :: (Loc -> Type) -> (Loc -> Type) -> (Loc -> Type)
-(t1 .-> t2) l = TFunc (t1 l) (t2 l) l
+(t1 .-> t2) l = TApp (TApp (TOp (Arrow NoLoc)) (t1 l) NoLoc) (t2 l) l
 infixr 1 .->
 
 (~->) :: Type -> Type -> Type
-t1 ~-> t2 = TFunc t1 t2 NoLoc
+t1 ~-> t2 = TApp (TApp (TOp (Arrow NoLoc)) t1 NoLoc) t2 NoLoc
 infixr 1 ~->
 
 emptyInterval :: Interval
@@ -802,8 +801,8 @@ instance (Substitutable a b, Functor f) => Substitutable a (f b) where
 instance Substitutable (Subs Type) Type where
   subst _ t@TBase{}       = t
   subst s (TArray i t l ) = TArray i (subst s t) l
-  subst s (TTuple ts    ) = TTuple (map (subst s) ts)
-  subst s (TFunc t1 t2 l) = TFunc (subst s t1) (subst s t2) l
+  subst _ (TTuple arity ) = TTuple arity
+  subst _ (TOp op       ) = TOp op
   subst s (TApp l r loc ) = TApp (subst s l) (subst s r) loc
   subst _ t@TData {}      = t
   subst s t@(TVar n _)    = Map.findWithDefault t n s

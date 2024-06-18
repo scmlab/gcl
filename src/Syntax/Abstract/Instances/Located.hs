@@ -51,9 +51,9 @@ instance Located Type where
   locOf (TBase _ l   ) = l
   locOf (TArray _ _ l) = l
   locOf (TTuple _    ) = NoLoc
-  locOf (TFunc _ _ l ) = l
+  locOf (TOp op      ) = locOf op
+  locOf (TData _ l   ) = l
   locOf (TApp  _ _ l ) = locOf l
-  locOf (TData _ _ l ) = l
   locOf (TVar _ l    ) = l
   locOf (TMetaVar _  ) = NoLoc
 

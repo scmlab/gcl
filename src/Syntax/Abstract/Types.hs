@@ -13,6 +13,7 @@ import           Prelude                 hiding ( Ordering(..) )
 import           Syntax.Common                  ( Name
                                                 , ArithOp
                                                 , ChainOp
+                                                , TypeOp
                                                 )
 --------------------------------------------------------------------------------
 
@@ -105,12 +106,12 @@ data TBase = TInt | TBool | TChar
 -- | Types
 data Type
   = TBase TBase Loc
-  | TArray Interval Type Loc
+  | TArray Interval Type Loc -- TODO: Make this a higher-kinded type.
   -- TTuple has no srcloc info because it has no conrete syntax at the moment 
-  | TTuple [Type]
-  | TFunc Type Type Loc
+  | TTuple Int -- `Int` represents the arity of the tuple.
+  | TOp TypeOp
+  | TData Name Loc
   | TApp Type Type Loc
-  | TData Name () {- TODO: kind system -} Loc
   | TVar Name Loc
   | TMetaVar Name
   deriving (Eq, Show, Generic)
