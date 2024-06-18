@@ -532,11 +532,11 @@ instance Elab Expr where
     duplicationCheck bound
     tv <- freshVar
     (quantTy, quantTypedExpr, quantSub) <- elaborate quantifier env
+    -- TODO: Write out the typing rule.
     case quantifier of
       Op (Hash _) -> do
         tvs <- replicateM (length bound) freshVar
         let newEnv = subst quantSub env
-        -- throwError $ UndefinedType $ Name (Text.pack $ show newEnv) NoLoc
         (resTy, resTypedExpr, resSub) <- elaborate restriction $ zip (Index <$> bound) tvs <> newEnv
         uniSub2 <- unifyType (fromJust resTy) (tBool NoLoc) (locOf restriction)
         let newEnv' = subst (uniSub2 `compose` resSub) newEnv
