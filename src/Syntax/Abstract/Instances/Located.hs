@@ -57,6 +57,11 @@ instance Located Type where
   locOf (TVar _ l    ) = l
   locOf (TMetaVar _  ) = NoLoc
 
+instance Located Kind where
+  locOf (KStar loc) = loc
+  locOf (KFunc _ _ loc) = loc
+  locOf (KVar _) = NoLoc
+
 instance Located Expr where
   locOf (Var   _ l           ) = l
   locOf (Const _ l           ) = l

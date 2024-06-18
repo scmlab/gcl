@@ -125,7 +125,6 @@ instance Render Pattern where
 
 --------------------------------------------------------------------------------
 
-
 -- | Type
 instance Render Type where
   renderPrec _ (TBase TInt  _  ) = "Int"
@@ -153,6 +152,18 @@ instance Render Interval where
     "(" <+> render a <+> ".." <+> render b <+> "]"
   render (Interval (Excluding a) (Excluding b) _) =
     "(" <+> render a <+> ".." <+> render b <+> ")"
+
+--------------------------------------------------------------------------------
+
+-- | Kind
+instance Render Kind where
+  renderPrec _ (KStar _) = "*"
+  renderPrec n (KFunc a b _) =
+    parensIf n (Just . TypeOp $ Arrow NoLoc) $ 
+      renderPrec (HOLEOp . TypeOp $ Arrow NoLoc) a 
+      <+> "→"
+      <+> renderPrec (OpHOLE . TypeOp $ Arrow NoLoc) b
+  renderPrec _ (KVar i) = render i
 
 --------------------------------------------------------------------------------
 

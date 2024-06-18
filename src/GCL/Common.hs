@@ -22,6 +22,13 @@ data Index = Index Name | Hole Range deriving (Eq, Show, Ord)
 
 type TypeEnv = [(Index, Type)]
 
+type KindEnv = [KindItem]
+
+data KindItem
+  = KindAnno Name Kind
+  | UnsolvedUni Name
+  | SolvedUni Name Kind
+
 -- get a fresh variable
 class Monad m => Fresh m where
     fresh :: m Text

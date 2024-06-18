@@ -61,8 +61,18 @@ instance Collect TypeError Diagnostic where
       $  "The definition "
       <> pretty name
       <> " is not in scope"
+
   collect (UnifyFailed s t loc) =
     makeError loc "Cannot unify types"
+      $   docToText
+      $   "Cannot unify:"
+      <+> pretty s
+      <>  line
+      <>  "with        :"
+      <+> pretty t
+
+  collect (KindUnifyFailed s t loc) =
+    makeError loc "Cannot unify kinds"
       $   docToText
       $   "Cannot unify:"
       <+> pretty s

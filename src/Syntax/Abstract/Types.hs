@@ -79,6 +79,15 @@ data GdCmd = GdCmd Expr [Stmt] Loc
 -- data ProofAnchor = ProofAnchor Text Range
 --   deriving (Eq, Ord, Show)
 
+--------------------------------------------------------------------------------
+
+-- | Kinds
+
+data Kind
+  = KStar Loc
+  | KFunc Kind Kind Loc
+  | KVar Name
+  deriving (Show, Eq, Generic)
 
 --------------------------------------------------------------------------------
 

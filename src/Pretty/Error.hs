@@ -50,6 +50,8 @@ instance Pretty TypeError where
     "The definition" <+> pretty name <+> "is not in scope"
   pretty (UnifyFailed a b _) =
     "Cannot unify:" <+> pretty a <+> "with" <+> pretty b
+  pretty (KindUnifyFailed a b _) =
+    "Cannot unify:" <+> pretty a <+> "with" <+> pretty b
   pretty (RecursiveType v a _) =
     "Recursive type variable: " <+> pretty v <+> "in" <+> pretty a
   pretty (AssignToConst n) =

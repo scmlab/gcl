@@ -49,6 +49,11 @@ instance RenderSection TypeError where
     [ Header "Cannot unify types" (fromLoc loc)
     , Paragraph $ "Cannot unify: " <> render s <> "\nwith        :" <+> render t
     ]
+  renderSection (KindUnifyFailed s t loc) = Section
+    Red
+    [ Header "Cannot unify kinds" (fromLoc loc)
+    , Paragraph $ "Cannot unify: " <> render s <> "\nwith        :" <+> render t
+    ]
   renderSection (RecursiveType name t loc) = Section
     Red
     [ Header "Recursive type variable" (fromLoc loc)
