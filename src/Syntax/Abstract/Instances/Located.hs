@@ -60,7 +60,7 @@ instance Located Type where
 instance Located Kind where
   locOf (KStar loc) = loc
   locOf (KFunc _ _ loc) = loc
-  locOf (KVar _) = NoLoc
+  locOf (KMetaVar _) = NoLoc
 
 instance Located Expr where
   locOf (Var   _ l           ) = l

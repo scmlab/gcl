@@ -160,7 +160,7 @@ instance Render Kind where
       renderPrec (HOLEOp . TypeOp $ Arrow NoLoc) a 
       <+> "→"
       <+> renderPrec (OpHOLE . TypeOp $ Arrow NoLoc) b
-  renderPrec _ (KVar i) = render i
+  renderPrec _ (KMetaVar i) = render i
 
 --------------------------------------------------------------------------------
 

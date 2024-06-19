@@ -87,7 +87,7 @@ data GdCmd = GdCmd Expr [Stmt] Loc
 data Kind
   = KStar Loc
   | KFunc Kind Kind Loc
-  | KVar Name
+  | KMetaVar Name
   deriving (Show, Eq, Generic)
 
 --------------------------------------------------------------------------------

@@ -662,8 +662,64 @@ instance Elab TypeOp where
 --------------------------------------------------------------------------------
 -- Kind inference
 
-inferKind :: KindEnv -> Type -> (Kind, KindEnv)
-inferKind = undefined -- FIXME:
+inferKind :: (Fresh m, MonadError TypeError m) => KindEnv -> Type -> m (Kind, KindEnv)
+inferKind env (TBase _ loc) = return (KStar loc, env)
+inferKind env (TArray _ _ loc) = return (KStar loc, env)
+inferKind env (TTuple int) = return (kindFromArity int, env)
+  where
+    kindFromArity :: Int -> Kind
+    kindFromArity 0 = KStar NoLoc
+    kindFromArity n = KFunc (KStar NoLoc) (kindFromArity $ n - 1) NoLoc
+inferKind env (TOp (Arrow loc)) = return (KFunc (KStar loc) (KFunc (KStar loc) (KStar loc) loc) loc, env)
+inferKind env (TData name _) =
+  case find predicate env of
+    Just (KindAnno _name kind) -> return (kind, env)
+    _ -> throwError $ UndefinedType name
+  where
+    predicate (KindAnno name' _kind) = name == name'
+    predicate _ = False
+inferKind env (TApp t1 t2 _) = do
+  (k1, env') <- inferKind env t1
+  (k2, env'') <- inferKind env' t2
+  (k3, env''') <- inferKApp env'' (subst env'' k1) (subst env'' k2)
+  return (k3 ,env''')
+inferKind env (TVar name _) =
+  case find predicate env of
+    Just (KindAnno _name kind) -> return (kind, env)
+    _ -> throwError $ UndefinedType name
+  where
+    predicate (KindAnno name' _kind) = name == name'
+    predicate _ = False
+inferKind env (TMetaVar name) =
+  case find predicate env of
+    Just (KindAnno _name kind) -> return (kind, env)
+    _ -> throwError $ UndefinedType name
+  where
+    predicate (KindAnno name' _kind) = name == name'
+    predicate _ = False
+
+inferKApp :: (Fresh m, MonadError TypeError m) => KindEnv -> Kind -> Kind -> m (Kind, KindEnv)
+inferKApp env (KFunc k1 k2 _) k = do
+  env' <- unifyKind env k1 k $ k1 <--> k
+  return (k2, env')
+inferKApp env (KMetaVar a) k = do
+  case nameIndex of
+    Nothing -> throwError $ NotInScope a
+    Just nameIndex' -> do
+      a1 <- freshKindName
+      a2 <- freshKindName
+      let env' = let (list1, list2) = splitAt nameIndex' env
+                 in list1 ++ [SolvedUni a $ KFunc (KMetaVar a1) (KMetaVar a2) $ a1 <--> a2, UnsolvedUni a2, UnsolvedUni a1] ++ tail list2
+      env'' <- unifyKind env' (KMetaVar a1) k $ locOf k
+      return (KMetaVar a2, env'')
+  where
+    nameIndex = findIndex (predicate a) env
+
+    predicate name (UnsolvedUni name') = name == name'
+    predicate _ _ = False
+inferKApp _ k1 k2 = do
+  ret <- freshKindName
+  throwError $ KindUnifyFailed k1 (KFunc k2 (KMetaVar ret) $ locOf k2) $ locOf k1
 
 --------------------------------------------------------------------------------
 -- Unification
@@ -703,45 +759,55 @@ bind x t l | same t $ TVar x NoLoc = return mempty
     same _ _ = False
 
 unifyKind :: (Fresh m, MonadError TypeError m) => KindEnv -> Kind -> Kind -> Loc -> m KindEnv
-
 unifyKind env (KStar _) (KStar _) _ = return env
 unifyKind env (KFunc k1 k2 _) (KFunc k3 k4 _) _ = do
   env' <- unifyKind env k1 k3 (locOf k1)
   unifyKind env' (subst env' k2) (subst env' k4) (locOf k2)
-unifyKind env (KVar a) k _ = do
-  let (list1, list2) = splitAt aIndex env
-  (k2, env') <- promote (list1 ++ tail list2) a k
-  let aIndex' = fromJust $ findIndex (predicate a) env'
-  let (list1', list2') = splitAt aIndex' env'
-  return $ list1' ++ [SolvedUni a k2] ++ tail list2'
+unifyKind env (KMetaVar a) k _ = do
+  case aIndex of
+    Nothing -> throwError $ NotInScope a
+    Just aIndex' -> do
+      let (list1, list2) = splitAt aIndex' env
+      (k2, env') <- promote (list1 ++ tail list2) a k
+      let aIndex2 = findIndex (predicate a) env'
+      case aIndex2 of
+        Nothing -> throwError $ NotInScope a
+        Just aIndex2' -> do
+          let (list1', list2') = splitAt aIndex2' env'
+          return $ list1' ++ [SolvedUni a k2] ++ tail list2'
   where
     -- Notice the `fromJust`. This part crashes when `a` is not present in `env`. (They should)
-    aIndex = fromJust $ findIndex (predicate a) env
+    aIndex = findIndex (predicate a) env
 
     predicate name (UnsolvedUni name') = name == name'
     predicate _ _ = False
-unifyKind env k (KVar a) loc = unifyKind env (KVar a) k loc
+unifyKind env k (KMetaVar a) loc = unifyKind env (KMetaVar a) k loc
 unifyKind _env k1 k2 loc = throwError $ KindUnifyFailed k1 k2 loc
 
-promote :: Fresh m => KindEnv -> Name -> Kind -> m (Kind, KindEnv)
+promote :: (Fresh m, MonadError TypeError m) => KindEnv -> Name -> Kind -> m (Kind, KindEnv)
 promote env _ (KStar loc) = return (KStar loc, env)
 promote env name (KFunc k1 k2 loc) = do
   (k3, env') <- promote env name k1
   (k4, env'') <- promote env' name (subst env' k2)
   return (KFunc k3 k4 loc, env'')
-promote env a (KVar b) =
+promote env a (KMetaVar b) =
   case compare aIndex bIndex of
-    Ord.LT -> return (KVar b, env)
+    Ord.LT -> return (KMetaVar b, env)
     Ord.EQ -> error "Should not happen."
     Ord.GT -> do
       b1 <- freshKindName
-      let env' = let (list1, list2) = splitAt aIndex env in list1 ++ [UnsolvedUni a, UnsolvedUni b1] ++ tail list2
-      let env'' = let (list1, list2) = splitAt bIndex env' in list1 ++ [SolvedUni b (KVar b1)] ++ tail list2
-      return (KVar b1, env'')
+      case aIndex of
+        Nothing -> throwError $ NotInScope a
+        Just aIndex' -> do
+          let env' = let (list1, list2) = splitAt aIndex' env in list1 ++ [UnsolvedUni a, UnsolvedUni b1] ++ tail list2
+          case bIndex of
+            Nothing -> throwError $ NotInScope b
+            Just bIndex' -> do
+              let env'' = let (list1, list2) = splitAt bIndex' env' in list1 ++ [SolvedUni b (KMetaVar b1)] ++ tail list2
+              return (KMetaVar b1, env'')
   where
-    -- Notice the `fromJust`. This part crashes when either `a` and `b` is not present in `env`. (They should)
-    aIndex = fromJust $ findIndex (predicate a) env
-    bIndex = fromJust $ findIndex (predicate b) env
+    aIndex = findIndex (predicate a) env
+    bIndex = findIndex (predicate b) env
 
     predicate name (UnsolvedUni name') = name == name'
     predicate _ _ = False
@@ -828,9 +894,9 @@ instance Substitutable (Subs Type) Typed.TypedChain where
 
 instance Substitutable KindEnv Kind where
   subst _ (KStar loc) = KStar loc
-  subst env (KVar name) = case find (predicate name) env of
+  subst env (KMetaVar name) = case find (predicate name) env of
     Just (SolvedUni _ kind) -> kind
-    _ -> KVar name
+    _ -> KMetaVar name
     where
       predicate name1 (SolvedUni name2 _kind) = name1 == name2
       predicate _ _ = False
