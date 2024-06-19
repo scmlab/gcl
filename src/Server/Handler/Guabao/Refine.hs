@@ -12,13 +12,12 @@ module Server.Handler.Guabao.Refine where
 import qualified Data.Aeson.Types as JSON
 import GHC.Generics ( Generic )
 import Control.Monad.Except           ( runExcept )
-import Server.Monad (ServerM, FileState(..), loadFileState, editTexts, pushSpecs, deleteSpec, sendUpdateSpecNotification)
+import Server.Monad (ServerM, FileState(..), loadFileState, editTexts, pushSpecs, deleteSpec, sendUpdateSpecNotification, Versioned)
 
 import qualified Syntax.Parser                as Parser
 import           Syntax.Parser.Error           ( ParseError(..) )
 import Syntax.Parser.Lexer (TokStream(..), scan)
 import Language.Lexer.Applicative              ( TokenStream(..))
-
 
 import Error (Error (ParseError, TypeError, StructError))
 import GCL.Predicate (Spec(..), PO)
@@ -26,12 +25,12 @@ import GCL.Common (TypeEnv)
 import GCL.Type (Elab(..), TypeError, runElaboration, Typed)
 import Data.Loc.Range (Range (..))
 import Data.Text (Text, split)
-import Data.List (find)
+import Data.List (find, maximumBy)
 import Data.Loc (Pos(..), Loc(..), L(..))
 import qualified Syntax.Concrete as C
 import qualified Syntax.Abstract as A
 import qualified Syntax.Typed    as T
-import GCL.WP.Type (StructError)
+import GCL.WP.Type (StructError, StructWarning)
 import qualified Data.Text as Text
 
 data RefineParams = RefineParams
@@ -56,57 +55,67 @@ type RefineError = Error
 -- assumes specText is surrounded by "[!" and "!]" 
 handler :: RefineParams -> (RefineResult -> ServerM ()) -> (RefineError -> ServerM ()) -> ServerM ()
 handler _params@RefineParams{filePath, specRange, specText} onSuccess onError = do
+  -- 把上次 load 的資料拿出來
   maybeFileState <- loadFileState filePath
   case maybeFileState of
-    Nothing -> return () -- TODO: report error using onError
+    Nothing -> return ()
     Just fileState -> do
-      let FileState{specifications} = fileState
-      case lookupSpecWithRange specifications specRange of
-        Nothing   -> return () -- TODO: error "spec not found at range"
-        Just spec -> do
-          -- 把 specText 去掉頭尾的 [!!] 和 \t \n \s
-          let implText = trimSpecBracketsAndSpaces specText
-          -- 挖洞
-          case digImplHoles filePath implText of
-            Left err -> onError (ParseError err)
-            Right holessImplText -> do
-              -- use specStart as the starting position in parse/toAbstract/elaborate
-              let (Range specStart _) = specRange
-              -- text to concrete
-              case parseFragment specStart holessImplText of
-                Left err           -> onError (ParseError err)
-                Right concreteImpl -> do
-                  -- concrete to abstract
-                  case toAbstractFragment concreteImpl of
-                    Nothing           -> error "Should not happen"
-                    Just abstractImpl -> do
+      -- 把 specText 去掉頭尾的 [!!] 和 \t \n \s
+      let implText = trimSpecBracketsAndSpaces specText
+      -- 挖洞
+      case digImplHoles filePath implText of
+        Left err -> onError (ParseError err)
+        Right holessImplText -> do
+          -- use specStart as the starting position in parse/toAbstract/elaborate
+          let (Range specStart _) = specRange
+          -- text to concrete
+          case parseFragment specStart holessImplText of
+            Left err           -> onError (ParseError err)
+            Right concreteImpl -> do
+              -- concrete to abstract
+              case toAbstractFragment concreteImpl of
+                Nothing           -> error "Should not happen"
+                Just abstractImpl -> do
+                  -- get spec (along with its type environment)
+                  let FileState{specifications} = fileState
+                  case lookupSpecByRange specifications specRange of
+                    Nothing   -> return () -- TODO: error "spec not found at range"
+                    Just spec -> do
                       -- elaborate
                       let typeEnv :: TypeEnv = [] -- specTypeEnv spec
                       case elaborateFragment typeEnv abstractImpl of
                         Left err -> onError (TypeError err)
                         Right typedImpl -> do
                           -- get POs and specs
-                          case sweepFragment spec typedImpl of
+                          let maxSpecId = getMaximumSpecId specifications
+                          case sweepFragment (maxSpecId + 1) spec typedImpl of
                             Left err -> onError (StructError err)
-                            Right (innerPos, innerSpecs) -> do
+                            Right (innerPos, innerSpecs, warnings) -> do
                               -- edit source (dig holes + remove outer brackets)
-                              editTexts filePath [(specRange, implText)] do
-                                -- remove outer spec (by id)
+                              editTexts filePath [(specRange, holessImplText)] do
+                                -- delete outer spec (by id)
                                 deleteSpec filePath spec
                                 -- add inner specs to fileState
-                                pushSpecs filePath innerSpecs
+                                let FileState{editedVersion} = fileState
+                                pushSpecs (editedVersion + 1) filePath innerSpecs
                                 -- send notification to update Specs
                                 sendUpdateSpecNotification filePath
                                 -- TODO: send notification to update POs
+
+
 
 -- assumes specText is surrounded by "[!" and "!]" 
 trimSpecBracketsAndSpaces :: Text -> Text
 trimSpecBracketsAndSpaces specText
   = Text.strip $ Text.dropEnd 2 $ Text.drop 2 specText
 
-lookupSpecWithRange :: [Spec] -> Range -> Maybe Spec
-lookupSpecWithRange specs targetRange = do
-  find (\Specification{specRange} -> specRange == targetRange) specs
+getMaximumSpecId :: [Versioned Spec] -> Int
+getMaximumSpecId specs = specID $ snd $ maximumBy (\(_,specA) (_,specB) -> compare (specID specA) (specID specB)) specs
+
+lookupSpecByRange :: [Versioned Spec] -> Range -> Maybe Spec
+lookupSpecByRange specs targetRange = do
+  (_version, spec) <- find (\(_, Specification{specRange}) -> specRange == targetRange) specs
+  return spec
 
 collectFragmentHoles :: [C.Stmt] -> [Range]
 collectFragmentHoles concreteFragment = do
@@ -205,5 +214,17 @@ instance Elab [A.Stmt] where
         ) stmts
     return (Nothing, typed, mempty)
 
-sweepFragment :: Spec -> [T.TypedStmt] -> Either StructError ([PO], [Spec])
-sweepFragment spec impl = error "TODO: define this after modifying definitions of Spec and StructStmts"
+
+-- data Spec = Specification
+--   { specID       :: Int
+--   , specPreCond  :: Pred
+--   , specPostCond :: Pred
+--   , specRange    :: Range
+--   -- , specTypeEnv :: TypeEnv
+--   -- extend this definition if needed
+--   }
+--   deriving (Eq, Show, Generic)
+
+sweepFragment :: Int -> Spec -> [T.TypedStmt] -> Either StructError ([PO], [Spec], [StructWarning])
+sweepFragment specIdStart spec impl = error "TODO: define this after modifying definitions of Spec and StructStmts"
+

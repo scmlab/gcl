@@ -37,6 +37,7 @@ import Data.Loc.Range (Range, rangeStart)
 import qualified Server.SrcLoc                 as SrcLoc
 import qualified Data.Text as Text
 import Data.Loc (posCol)
+import Data.Version (Version(Version))
 
 -- | State shared by all clients and requests
 data GlobalState = GlobalState
@@ -49,7 +50,7 @@ type Versioned a = (Int, a)
 data FileState = FileState
     -- main states for Reload and Refine
   { refinedVersion   :: Int  -- the version number of the last refine
-  , specifications   :: [Spec] -- editedVersion
+  , specifications   :: [Versioned Spec] -- editedVersion or (editedVersion + 1)
   , proofObligations :: [PO] -- editedVersion
 
   -- to support other LSP methods in a light-weighted manner
@@ -119,14 +120,16 @@ saveEditedVersion :: FilePath -> Int -> ServerM ()
 saveEditedVersion filePath version = do
   modifyFileState filePath (\fileState -> fileState {editedVersion = version})
 
-pushSpecs :: FilePath -> [Spec] -> ServerM ()
-pushSpecs filePath newSpecs = do
-  modifyFileState filePath (\fileState@FileState{specifications} -> fileState{specifications = specifications ++ newSpecs})
+pushSpecs :: Int -> FilePath -> [Spec] -> ServerM ()
+pushSpecs version filePath newSpecs = do
+  let newVersionedSpecs :: [Versioned Spec] = Prelude.map (\spec -> (version, spec)) newSpecs
+  modifyFileState filePath (\fileState@FileState{specifications} ->
+    fileState{specifications = specifications ++ newVersionedSpecs})
 
 deleteSpec :: FilePath -> Spec -> ServerM ()
 deleteSpec filePath Specification{specID = targetSpecId} = do
   modifyFileState filePath (\filesState@FileState{specifications} ->
-    filesState{specifications = Prelude.filter (\Specification{specID} -> specID /= targetSpecId) specifications})
+    filesState{specifications = Prelude.filter (\(_, Specification{specID}) -> specID /= targetSpecId) specifications})
 
 readSource :: FilePath -> ServerM (Maybe Text)
 readSource filepath = fmap LSP.virtualFileText

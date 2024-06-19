@@ -36,7 +36,7 @@ data TypedStmt
   | LoopInvariant TypedExpr TypedExpr Loc
   | Do [TypedGdCmd] Loc
   | If [TypedGdCmd] Loc
-  | Spec Text Range
+  | Spec Text Range -- TODO: change to `Spec Text Range TypeEnv`
   | Proof Text Text Range
   | Alloc   Name [TypedExpr] Loc    --  p := new (e1,e2,..,en)
   | HLookup Name TypedExpr Loc      --  x := *e

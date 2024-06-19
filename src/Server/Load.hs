@@ -25,6 +25,8 @@ import Server.PositionMapping (idDelta)
 import qualified Server.SrcLoc                 as SrcLoc
 import qualified GCL.Type as TypeChecking
 import Data.Map (singleton)
+import GCL.WP.Type (StructError, StructWarning)
+import GCL.Predicate (PO, Spec)
 
 load :: FilePath -> (FileState -> ServerM ()) -> (Error -> ServerM ()) -> ServerM ()
 load filePath onSuccess onError = do
@@ -54,7 +56,7 @@ load filePath onSuccess onError = do
                   Right elaborated -> do
                     let fileState = FileState
                                       { refinedVersion   = currentVersion
-                                      , specifications   = specs
+                                      , specifications   = map (\spec -> (currentVersion, spec)) specs
                                       , proofObligations = pos
 
                                       -- to support other LSP methods in a light-weighted manner
@@ -100,3 +102,6 @@ elaborate abstract = do
   case TypeChecking.runElaboration abstract of
     Left  e -> Left (TypeError e)
     Right typedProgram -> return typedProgram
+
+sweepElaborated :: T.TypedProgram -> Either StructError ([PO], [Spec], [StructWarning])
+sweepElaborated elaborated = error "TODO"

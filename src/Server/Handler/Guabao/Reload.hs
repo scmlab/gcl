@@ -10,7 +10,7 @@ module Server.Handler.Guabao.Reload where
 
 import qualified Data.Aeson.Types as JSON
 import GHC.Generics ( Generic )
-import Server.Monad (ServerM, FileState(..))
+import Server.Monad (ServerM, FileState(..), Versioned)
 import Error (Error)
 import GCL.Predicate (Spec, PO)
 import Server.Load (load)
@@ -21,7 +21,7 @@ data ReloadParams = ReloadParams { filePath :: FilePath }
 instance JSON.FromJSON ReloadParams
 
 data ReloadResult = ReloadResult
-  { specifications :: [Spec]
+  { specifications :: [Versioned Spec]
   , proofObligations :: [PO]
   }
   deriving (Eq, Show, Generic)

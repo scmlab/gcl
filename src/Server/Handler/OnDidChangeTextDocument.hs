@@ -3,7 +3,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Server.Handler.OnDidChangeTextDocument where
 
-import Server.Monad (ServerM, FileState (..), modifyFileState, sendUpdateSpecNotification)
+import Server.Monad (ServerM, FileState (..), modifyFileState, sendUpdateSpecNotification, Versioned)
 import GCL.Predicate (Spec(..))
 import Server.PositionMapping (mkDelta, applyChange, toCurrentRange', PositionDelta)
 import qualified Language.LSP.Types as LSP
@@ -18,21 +18,26 @@ handler filePath changes = do
     filesState
       { positionDelta = foldl applyChange positionDelta changes
       , editedVersion = editedVersion + 1
-      , specifications = translateSpecsRange changes filePath specifications
+      , specifications = translateSpecsRangeThroughOneVersion editedVersion changes filePath specifications
       -- TODO: update proofObligations range 
       }
     )
-  
+
   -- send notification to update Specs
   sendUpdateSpecNotification filePath
   -- TODO: send notification to update POs
 
-translateSpecsRange :: [LSP.TextDocumentContentChangeEvent] -> FilePath -> [Spec] -> [Spec]
-translateSpecsRange changes filePath specs = do
-  spec <- specs
-  case translateSpecRange spec of
-    Nothing -> []
-    Just spec' -> [spec']
+translateSpecsRangeThroughOneVersion
+  :: Int -> [LSP.TextDocumentContentChangeEvent] -> FilePath -> [Versioned Spec] -> [Versioned Spec]
+translateSpecsRangeThroughOneVersion fromVersion changes filePath specs = do
+  (version, spec) <- specs
+  if fromVersion == version then
+    case translateSpecRange spec of
+      Nothing -> []
+      Just spec' -> [(version + 1, spec')]
+  else if fromVersion + 1 == version then
+    [(version, spec)]
+  else error "should not happen"
   where
     translateSpecRange :: Spec -> Maybe Spec
     translateSpecRange spec = do
