@@ -26,12 +26,11 @@ import qualified Language.LSP.Server            as LSP
 import qualified Server.Handler.Initialized    as Initialized
 import qualified Server.Handler.GoToDefinition as GoToDefinition
 import qualified Server.Handler.AutoCompletion as AutoCompletion
+import qualified Server.Handler.Hover          as Hover
 import qualified Server.Handler.SemanticTokens as SemanticTokens
 import qualified Server.Handler.Guabao.Reload  as Reload
-import Server.Monad (ServerM, FileState (..), modifyFileState)
-import Server.PositionMapping (applyChange, mkDelta)
+import Server.Monad (ServerM)
 import Server.Load (load)
-import GCL.Predicate (Spec(..))
 import qualified Server.Handler.OnDidChangeTextDocument as OnDidChangeTextDocument
 
 -- handlers of the LSP server
@@ -63,11 +62,11 @@ handlers = mconcat
       let uri      = req ^. (LSP.params . LSP.textDocument . LSP.uri)
       let position = req ^. (LSP.params . LSP.position)
       GoToDefinition.handler uri position (responder . Right . LSP.InR . LSP.InR . LSP.List)
-  -- , -- "textDocument/hover" - get hover information
-    -- requestHandler LSP.STextDocumentHover $ \req responder -> do
-    --   let uri = req ^. (LSP.params . LSP.textDocument . LSP.uri)
-    --   let pos = req ^. (LSP.params . LSP.position)
-    --   Hover.handler uri pos (responder . Right)
+  , -- "textDocument/hover" - get hover information
+    requestHandler LSP.STextDocumentHover $ \req responder -> do
+      let uri = req ^. (LSP.params . LSP.textDocument . LSP.uri)
+      let pos = req ^. (LSP.params . LSP.position)
+      Hover.handler uri pos (responder . Right)
   , -- "textDocument/semanticTokens/full" - get all semantic tokens
     requestHandler LSP.STextDocumentSemanticTokensFull $ \req responder -> do
       let uri = req ^. (LSP.params . LSP.textDocument . LSP.uri)

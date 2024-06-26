@@ -5,9 +5,7 @@
 
 module Server.Handler.Hover where
 
-import           Data.Loc                       ( posCoff )
 import qualified Language.LSP.Types            as LSP
-import           Pretty                         ( toText )
 import qualified Server.SrcLoc                 as SrcLoc
 import qualified Server.IntervalMap            as IntervalMap
 import Server.PositionMapping (PositionDelta, toCurrentRange, PositionMapping(..), PositionResult(..), fromDelta)
@@ -23,8 +21,8 @@ handler uri lspPosition responder =do
       maybeFileState <- loadFileState filePath
       case maybeFileState of
         Nothing                           -> responder Nothing
-        Just (FileState{hoverInfos, positionDelta, toOffsetMap}) -> do
-          case (fromDelta positionDelta) lspPosition of
+        Just FileState{hoverInfos, positionDelta, toOffsetMap} -> do
+          case fromDelta positionDelta lspPosition of
             PositionExact oldLspPosition -> do
               let oldPos = SrcLoc.fromLSPPosition toOffsetMap filePath oldLspPosition
               case IntervalMap.lookup oldPos hoverInfos of
@@ -34,4 +32,4 @@ handler uri lspPosition responder =do
 
 toCurrentHover :: PositionDelta -> LSP.Hover -> LSP.Hover
 toCurrentHover positionDelta (LSP.Hover contents maybeRange)
-  = LSP.Hover contents (maybeRange >>= (toCurrentRange $ PositionMapping positionDelta))
+  = LSP.Hover contents (maybeRange >>= toCurrentRange (PositionMapping positionDelta))
