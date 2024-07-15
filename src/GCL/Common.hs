@@ -75,7 +75,7 @@ freeMetaVars (TOp _       ) = mempty
 freeMetaVars (TData _ _   ) = mempty
 freeMetaVars (TApp l r _  ) = freeMetaVars l <> freeMetaVars r
 freeMetaVars (TVar _ _    ) = mempty
-freeMetaVars (TMetaVar n  ) = Set.singleton n
+freeMetaVars (TMetaVar n _) = Set.singleton n
 
 -- A class of types for which we may compute their free variables.
 class Free a where
@@ -111,7 +111,7 @@ instance Free Type where
   freeVars (TOp _       ) = mempty
   freeVars (TApp l r _  ) = freeVars l <> freeVars r
   freeVars (TVar x _    ) = Set.singleton x
-  freeVars (TMetaVar n  ) = Set.singleton n
+  freeVars (TMetaVar n _) = Set.singleton n
 
 instance {-# OVERLAPS #-} Free TypeEnv where
   freeVars env = foldMap freeVars $ Map.elems $ Map.fromList env 

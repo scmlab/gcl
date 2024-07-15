@@ -137,7 +137,7 @@ instance Render Type where
   renderPrec n (TApp l r _   ) = parensIf n Nothing $ renderPrec HOLEApp l <+> renderPrec AppHOLE r
   renderPrec _ (TData n _    ) = render n
   renderPrec _ (TVar i _     ) = render i
-  renderPrec _ (TMetaVar n   ) = render n
+  renderPrec _ (TMetaVar n _ ) = render n
 
 -- | Interval
 instance Render Interval where

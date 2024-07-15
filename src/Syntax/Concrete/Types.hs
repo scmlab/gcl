@@ -67,7 +67,7 @@ data Definition
   | FuncDefn Name [Name] (Token "=") Expr
   deriving (Eq, Show)
 
-data TypeDefnCtor = TypeDefnCtor Name [Name] deriving (Eq, Show)
+data TypeDefnCtor = TypeDefnCtor Name [Type] deriving (Eq, Show)
 
 --------------------------------------------------------------------------------
 -- | Declaration
@@ -142,7 +142,7 @@ data Type
   | TOp TypeOp
   | TData Name Range
   | TApp Type Type
-  | TVar Name
+  | TMetaVar Name Range
   deriving (Eq, Show)
 
 --------------------------------------------------------------------------------

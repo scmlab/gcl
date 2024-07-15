@@ -84,7 +84,7 @@ instance Located Type where
   locOf (TOp op        ) = locOf op
   locOf (TData _ l     ) = locOf l
   locOf (TApp l r      ) = l <--> r
-  locOf (TVar x        ) = locOf x
+  locOf (TMetaVar _ l  ) = locOf l
 
 --------------------------------------------------------------------------------
 

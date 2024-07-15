@@ -42,7 +42,7 @@ data Definition =
     deriving (Eq, Show)
 
 -- constructor of type definition
-data TypeDefnCtor = TypeDefnCtor Name [Name]
+data TypeDefnCtor = TypeDefnCtor Name [Type]
   deriving (Eq, Show)
 
 --------------------------------------------------------------------------------
@@ -113,7 +113,7 @@ data Type
   | TData Name Loc
   | TApp Type Type Loc
   | TVar Name Loc
-  | TMetaVar Name
+  | TMetaVar Name Loc
   deriving (Eq, Show, Generic)
 
 --------------------------------------------------------------------------------

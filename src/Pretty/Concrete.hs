@@ -493,7 +493,7 @@ instance PrettyWithLoc Type where -- TODO: Prettyprint infix type operators corr
   prettyWithLoc (TOp op   ) = prettyWithLoc op
   prettyWithLoc (TData d _) = prettyWithLoc d
   prettyWithLoc (TApp a b ) = prettyWithLoc a <> prettyWithLoc b
-  prettyWithLoc (TVar i   ) = prettyWithLoc i
+  prettyWithLoc (TMetaVar i _) = prettyWithLoc i
 
 --------------------------------------------------------------------------------
 
