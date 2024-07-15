@@ -229,7 +229,6 @@ instance CollectIds [Definition] where
           -- This is an entry for "Typing Datatype Decl." several times, presented in page 53:8.
           inferDataTypes :: (Fresh m, MonadError TypeError m) => (TypeEnv, KindEnv) -> [(Name, [Name], [TypeDefnCtor], Loc)] -> m (TypeEnv, KindEnv)
           inferDataTypes (typeEnv, kindEnv) [] = do
-            -- throwError $ UndefinedType $ Name (Text.pack $ show (typeEnv, defaultMeta kindEnv)) NoLoc
             return (typeEnv, defaultMeta kindEnv) -- TODO: Check if this is correct.
             where
               defaultMeta :: KindEnv -> KindEnv

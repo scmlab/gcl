@@ -267,7 +267,7 @@ definition = choice [try funcDefnSig, typeDefn, funcDefnF]
   typeDefn = TypeDefn <$> tokenData <*> upper <*> many lower <*> tokenEQ <*> sepByGuardBar typeDefnCtor
 
   typeDefnCtor :: Parser TypeDefnCtor
-  typeDefnCtor = TypeDefnCtor <$> upper <*> many (choice [TParen <$> tokenParenOpen <*> type' <*> tokenParenClose, withRange (TData <$> upper), withRange (TMetaVar <$> lower), primTy]) -- FIXME: The combinator `type'` seems to be greedy and therefore this implementation is wrong.
+  typeDefnCtor = TypeDefnCtor <$> upper <*> many (choice [TParen <$> tokenParenOpen <*> type' <*> tokenParenClose, withRange (TData <$> upper), withRange (TMetaVar <$> lower), primTy]) -- TODO: Make this function prettier.
 
 definitionBlock :: Parser DefinitionBlock
 definitionBlock = DefinitionBlock <$> tokenDeclOpen <*> sepByAlignmentOrSemi definition <*> tokenDeclClose
