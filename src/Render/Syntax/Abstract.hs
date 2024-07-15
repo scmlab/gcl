@@ -133,7 +133,12 @@ instance Render Type where
   renderPrec _ (TArray i b  _) = "array" <+> render i <+> "of" <+> render b
   renderPrec _ (TTuple _     ) = "Tuple"
   renderPrec _ (TOp op       ) = render op
-  -- TODO: Implement infix type operators.
+  -- TODO: Add support for more than one type operators.
+  renderPrec n (TApp (TApp (TOp (Arrow _)) left _) right _) =
+    parensIf n (Just . TypeOp $ Arrow NoLoc) $ 
+      renderPrec (HOLEOp (TypeOp (Arrow NoLoc))) left 
+        <+> render (Arrow NoLoc)
+        <+> renderPrec (OpHOLE (TypeOp (Arrow NoLoc))) right
   renderPrec n (TApp l r _   ) = parensIf n Nothing $ renderPrec HOLEApp l <+> renderPrec AppHOLE r
   renderPrec _ (TData n _    ) = render n
   renderPrec _ (TVar i _     ) = render i
