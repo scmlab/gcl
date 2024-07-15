@@ -28,6 +28,7 @@ data KindItem
   = KindAnno Name Kind
   | UnsolvedUni Name
   | SolvedUni Name Kind
+  deriving (Show)
 
 -- get a fresh variable
 class Monad m => Fresh m where

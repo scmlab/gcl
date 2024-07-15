@@ -81,9 +81,6 @@ instance Substitutable (Subs Type) TypeInfo where
   subst s (ConstTypeInfo    t) = ConstTypeInfo (subst s t)
   subst s (VarTypeInfo      t) = VarTypeInfo (subst s t)
 
-newtype TypeDefnInfo = TypeDefnInfo [Name]
-  deriving (Eq, Show)
-
 duplicationCheck :: (MonadError TypeError m) => [Name] -> m ()
 duplicationCheck ns =
   let ds = map head . filter ((> 1) . length) . groupBy (\(Name text1 _)(Name text2 _) -> text1 == text2) $ ns
@@ -94,7 +91,7 @@ duplicationCheck ns =
 --------------------------------------------------------------------------------
 -- The elaboration monad
 
-type ElaboratorM = StateT (FreshState, [(Index, TypeDefnInfo)], [(Index, TypeInfo)]) (Except TypeError)
+type ElaboratorM = StateT (FreshState, [(Index, Kind)], [(Index, TypeInfo)]) (Except TypeError)
 
 instance Counterous ElaboratorM where
   countUp = do
@@ -135,7 +132,7 @@ instance CollectIds [Definition] where
     duplicationCheck $ ((\(FuncDefn name _) -> name) <$> funcDefns) <> gatherCtorNames typeDefns
     -- Gather the type definitions.
     -- Type definitions are collected first because signatures and function definitions may depend on them.
-    collectTypeDefns typeDefns 
+    collectTypeDefns typeDefns
     -- Add signatures into the state one by one.
     collectFuncSigs funcSigs
     -- Get the original explicit signatures.
@@ -201,7 +198,7 @@ instance CollectIds [Definition] where
             d @ FuncDefnSig {} -> (typeDefns, d : sigs, funcDefns)
             d @ FuncDefn {} -> (typeDefns, sigs, d : funcDefns)
         ) mempty defs
-      
+
       gatherCtorNames :: [Definition] -> [Name]
       gatherCtorNames defs = do
         def <- defs
@@ -213,27 +210,93 @@ instance CollectIds [Definition] where
           _ -> []
 
       collectTypeDefns :: [Definition] -> ElaboratorM ()
-      collectTypeDefns typeDefns =
-        mapM_ (\(TypeDefn name args ctors _) -> do
-          let formTy con params =
+      collectTypeDefns typeDefns = do
+        freshMetaVars <- replicateM (length typeDefns) freshKindName
+        let annos = (\(TypeDefn name _args _ctors _loc, kinds) -> KindAnno name kinds) <$> zip typeDefns (KMetaVar <$> freshMetaVars)
+        let initEnv = reverse annos <> reverse (UnsolvedUni <$> freshMetaVars)
+        (newTypeInfos, newTypeDefnInfos) <- inferDataTypes (mempty, initEnv) ((\(TypeDefn name args ctors loc) -> (name, args, ctors, loc)) <$> typeDefns)
+        let newTypeInfos' = second TypeDefnCtorInfo <$> newTypeInfos
+        let newTypeDefnInfos' =
+             (\case
+                KindAnno name kind -> (Index name, kind)
+                UnsolvedUni _name -> error "Unsolved KMetaVar."
+                SolvedUni name kind -> (Index name, kind)) <$> newTypeDefnInfos
+        modify (\(freshState, origTypeDefnInfos, origTypeInfos) -> (freshState, newTypeDefnInfos' <> origTypeDefnInfos, newTypeInfos' <> origTypeInfos))
+        where
+          inferDataTypes :: (Fresh m, MonadError TypeError m) => (TypeEnv, KindEnv) -> [(Name, [Name], [TypeDefnCtor], Loc)] -> m (TypeEnv, KindEnv)
+          inferDataTypes (typeEnv, kindEnv) [] = return (typeEnv, defaultMeta kindEnv) -- TODO: Check if this is correct.
+            where
+              defaultMeta :: KindEnv -> KindEnv
+              defaultMeta env =
+                (\case
+                  KindAnno name kind -> KindAnno name kind
+                  UnsolvedUni name -> SolvedUni name $ KStar $ locOf name
+                  SolvedUni name kind -> SolvedUni name kind
+                ) <$> env
+          inferDataTypes (typeEnv, kindEnv) ((tyName, tyParams, ctors, loc) : dataTypesInfo) = do
+            (typeEnv', kindEnv') <- inferDataType kindEnv tyName tyParams ctors loc
+            (typeEnv'', kindEnv'') <- inferDataTypes (typeEnv', kindEnv') dataTypesInfo
+            return (typeEnv <> typeEnv' <> typeEnv'', kindEnv'')
+
+          inferDataType :: (Fresh m, MonadError TypeError m) => KindEnv -> Name -> [Name] -> [TypeDefnCtor] -> Loc -> m (TypeEnv, KindEnv)
+          inferDataType env tyName tyParams ctors loc = do
+            case find (isKindAnno tyName) env of
+              Just (KindAnno _name k) -> do
+                metaVarNames <- replicateM (length tyParams) freshKindName
+                let newEnv = (UnsolvedUni <$> reverse metaVarNames) <> env
+                newEnv' <- unifyKind newEnv (subst env k) (wrapKFunc (KMetaVar <$> reverse metaVarNames) (KStar NoLoc)) loc
+                let solvedEnv = (\(SolvedUni _ kind) -> kind) <$> take (length tyParams) newEnv'
+                let envForInferingCtors = zipWith KindAnno (reverse tyParams) solvedEnv <> drop (length tyParams) newEnv'
+                (inferedTypes, finalEnv) <- inferCtors envForInferingCtors tyName tyParams ctors
+                let ctorIndices = (\(TypeDefnCtor name _) -> Index name) <$> ctors
+                return (zip ctorIndices inferedTypes, drop (length tyParams) finalEnv)
+              _ -> throwError $ UndefinedType tyName -- TODO: Fix bug.
+            where
+              wrapKFunc :: [Kind] -> Kind -> Kind
+              wrapKFunc [] k = k
+              wrapKFunc (k : ks) k' = wrapKFunc ks (KFunc k k' $ k <--> k')
+
+              formTy con params =
                 case params of
                   [] -> con
                   n : ns -> formTy (TApp con n $ con <--> n) ns
-          -- Give type variables fresh names to prevent name collision.
-          freshNames <- mapM freshName' $ (\(Name text _) -> text) <$> args
-          let sub = Map.fromList . zip args $ TMetaVar <$> freshNames
-          let newTypeInfos =
-                map
-                  (\(TypeDefnCtor cn ts) -> (Index cn, TypeDefnCtorInfo $ subst sub (wrapTFunc ts (formTy (TData name (locOf name)) (TMetaVar <$> args)))))
-                  ctors
-          -- This is not yet used throughout the whole program. We may have to change the type and store pattern infos here in the future.
-          let newTypeDefnInfos = (Index name, TypeDefnInfo args)
-          modify (\(freshState, origTypeDefnInfos, origTypeInfos) -> (freshState, newTypeDefnInfos : origTypeDefnInfos, newTypeInfos <> origTypeInfos))
-        ) typeDefns -- For all typeDefns, do the above monadically ...
+
+              -- TODO: Move the generation of fresh type names from `inferCtor` to `inferCtors`.
+              inferCtors :: (Fresh m, MonadError TypeError m) => KindEnv -> Name -> [Name] -> [TypeDefnCtor] -> m ([Type], KindEnv)
+              inferCtors env' _ _ [] = return (mempty, env')
+              inferCtors env' tyName' tyParamNames ctors' = do
+                -- Give type variables fresh names to prevent name collision.
+                freshNames <- mapM freshName' $ (\(Name text _) -> "Type." <> text) <$> tyParamNames
+                inferCtors' env' tyName' tyParamNames freshNames ctors'
+                where
+                  inferCtors' :: (Fresh m, MonadError TypeError m) => KindEnv -> Name -> [Name] -> [Name] -> [TypeDefnCtor] -> m ([Type], KindEnv)
+                  inferCtors' env'' _ _ _ [] = return (mempty, env'')
+                  inferCtors' env'' tyName'' tyParamNames' freshNames (ctor : restOfCtors) = do
+                    (ty, newEnv) <- inferCtor env'' tyName'' tyParamNames freshNames ctor
+                    (tys, anotherEnv) <- inferCtors' newEnv tyName'' tyParamNames' freshNames restOfCtors
+                    return (ty : tys, newEnv <> anotherEnv)
+
+              inferCtor :: (Fresh m, MonadError TypeError m) => KindEnv -> Name -> [Name] -> [Name] -> TypeDefnCtor -> m (Type, KindEnv)
+              inferCtor env' tyName' tyParamNames freshNames (TypeDefnCtor _conName params) = do
+                let sub = Map.fromList . zip tyParamNames $ freshNames
+                let sub' = Map.fromList . zip tyParamNames $ TMetaVar <$> freshNames
+                let ty = subst sub' $ wrapTFunc params (formTy (TData tyName' (locOf tyName')) (TMetaVar <$> tyParamNames))
+                (_kind, env'') <- inferKind (renameKindEnv sub env') ty
+                return (ty, env'')
+                where
+                  renameKindEnv :: Map.Map Name Name -> KindEnv -> KindEnv
+                  renameKindEnv sub env'' = 
+                    (\case
+                      KindAnno name kind -> case Map.lookup name sub of
+                        Nothing -> KindAnno name kind
+                        Just name' -> KindAnno name' kind
+                      UnsolvedUni name -> UnsolvedUni name
+                      SolvedUni name kind -> SolvedUni name kind
+                    ) <$> env''
 
       collectFuncSigs :: [Definition] -> ElaboratorM ()
       collectFuncSigs funcSigs =
-        mapM_ (\(FuncDefnSig n t _ _) -> do 
+        mapM_ (\(FuncDefnSig n t _ _) -> do
           let infos = (Index n, ConstTypeInfo t)
           modify (\(freshState, typeDefnInfos, origInfos) -> (freshState, typeDefnInfos, infos : origInfos))
         ) funcSigs
@@ -288,8 +351,6 @@ instance Elab Program where
     -- The `reverse` here shouldn't be needed now. In the past, it was a trick to make things work.
     -- I still keep it as-is in case of future refactoring / rewriting.
     collectIds $ reverse defns
-    let tcons = concatMap collectTCon defns
-    modify (\(freshState, origInfos, typeInfos) -> (freshState, tcons <> origInfos, typeInfos))
     (_, _, infos) <- get
     typedDefns <- mapM (\defn -> do
                           typedDefn <- elaborate defn $ second typeInfoToType <$> infos
@@ -312,9 +373,6 @@ instance Elab Program where
                           return typed
                        ) stmts
     return (Nothing, Typed.Program typedDefns typedDecls typedExprs typedStmts loc, mempty)
-   where
-    collectTCon (TypeDefn n args _ _) = [(Index n, TypeDefnInfo args)]
-    collectTCon _                     = []
 
 instance Elab Definition where
   elaborate (TypeDefn name args ctors loc) env = do
@@ -672,31 +730,26 @@ inferKind env (TTuple int) = return (kindFromArity int, env)
     kindFromArity n = KFunc (KStar NoLoc) (kindFromArity $ n - 1) NoLoc
 inferKind env (TOp (Arrow loc)) = return (KFunc (KStar loc) (KFunc (KStar loc) (KStar loc) loc) loc, env)
 inferKind env (TData name _) =
-  case find predicate env of
+  case find (isKindAnno name) env of
     Just (KindAnno _name kind) -> return (kind, env)
     _ -> throwError $ UndefinedType name
-  where
-    predicate (KindAnno name' _kind) = name == name'
-    predicate _ = False
 inferKind env (TApp t1 t2 _) = do
   (k1, env') <- inferKind env t1
   (k2, env'') <- inferKind env' t2
   (k3, env''') <- inferKApp env'' (subst env'' k1) (subst env'' k2)
   return (k3 ,env''')
 inferKind env (TVar name _) =
-  case find predicate env of
+  case find (isKindAnno name) env of
     Just (KindAnno _name kind) -> return (kind, env)
     _ -> throwError $ UndefinedType name
-  where
-    predicate (KindAnno name' _kind) = name == name'
-    predicate _ = False
 inferKind env (TMetaVar name) =
-  case find predicate env of
+  case find (isKindAnno name) env of
     Just (KindAnno _name kind) -> return (kind, env)
     _ -> throwError $ UndefinedType name
-  where
-    predicate (KindAnno name' _kind) = name == name'
-    predicate _ = False
+
+isKindAnno :: Name -> KindItem -> Bool
+isKindAnno name (KindAnno name' _kind) = name == name'
+isKindAnno _ _ = False
 
 inferKApp :: (Fresh m, MonadError TypeError m) => KindEnv -> Kind -> Kind -> m (Kind, KindEnv)
 inferKApp env (KFunc k1 k2 _) k = do
@@ -765,10 +818,12 @@ unifyKind env (KFunc k1 k2 _) (KFunc k3 k4 _) _ = do
   unifyKind env' (subst env' k2) (subst env' k4) (locOf k2)
 unifyKind env (KMetaVar a) k _ = do
   case aIndex of
-    Nothing -> throwError $ NotInScope a
+    -- The below 4 lines have implementation different from what is written on the paper.
+    -- I put the original (probably incorrect) implementation that I think is what the paper describes in comments.
+    Nothing -> return env -- throwError $ NotInScope a
     Just aIndex' -> do
-      let (list1, list2) = splitAt aIndex' env
-      (k2, env') <- promote (list1 ++ tail list2) a k
+      -- let (list1, list2) = splitAt aIndex' env
+      (k2, env') <- promote env a k -- (k2, env') <- promote (list1 ++ tail list2) a k
       let aIndex2 = findIndex (predicate a) env'
       case aIndex2 of
         Nothing -> throwError $ NotInScope a
@@ -793,7 +848,7 @@ promote env name (KFunc k1 k2 loc) = do
 promote env a (KMetaVar b) =
   case compare aIndex bIndex of
     Ord.LT -> return (KMetaVar b, env)
-    Ord.EQ -> error "Should not happen."
+    Ord.EQ -> return (KMetaVar b, env) -- TODO: This is possibly wrong since this case isn't mentioned in the paper.
     Ord.GT -> do
       b1 <- freshKindName
       case aIndex of
@@ -827,7 +882,7 @@ freshMetaVar :: Fresh m => m Type
 freshMetaVar = TMetaVar <$> freshName "Type.metaVar" NoLoc
 
 freshKindName :: Fresh m => m Name
-freshKindName = freshName "Kind.var" NoLoc
+freshKindName = freshName "Kind.metaVar" NoLoc
 
 litTypes :: Lit -> Loc -> Type
 litTypes (Num _) l = tInt l

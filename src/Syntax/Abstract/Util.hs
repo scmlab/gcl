@@ -32,8 +32,7 @@ import           Syntax.Common                  ( Name(..)
 
 wrapTFunc :: [Name] -> Type -> Type
 wrapTFunc []       t  = t
-wrapTFunc [t     ] t0 = TApp (TApp (TOp (Arrow NoLoc)) (TMetaVar t) NoLoc) t0 (locOf t0) -- TODO: What should the loc be?
-wrapTFunc (t : ts) t0 = let t0' = wrapTFunc ts t0 in TApp (TApp (TOp (Arrow NoLoc)) (TMetaVar t) NoLoc) t0' (locOf t0)
+wrapTFunc (t : ts) t0 = let t0' = wrapTFunc ts t0 in TApp (TApp (TOp (Arrow NoLoc)) (TMetaVar t) NoLoc) t0' (locOf t0) -- TODO: What should the loc be?
 
 getGuards :: [GdCmd] -> [Expr]
 getGuards = fst . unzipGdCmds
