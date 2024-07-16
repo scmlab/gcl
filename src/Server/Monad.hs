@@ -156,7 +156,7 @@ data LoadedProgram = LoadedProgram
   , _highlightingInfos :: [J.SemanticTokenAbsolute]
   , _abstractProgram   :: A.Program
   , _scopingInfo       :: IntervalMap J.LocationLink
-  , _typeCheckingInfo  :: IntervalMap (J.Hover, A.Type) 
+  , _typeCheckingInfo  :: IntervalMap J.Hover 
   , _proofObligations  :: [PO]
   , _specifiations     :: [Spec]
   , _warnings          :: [StructWarning]

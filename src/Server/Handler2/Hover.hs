@@ -36,6 +36,6 @@ handler uri position responder = case uriToFilePath uri of
                   -- logText $ toText xs
                   logText "    < Hover (not found)"
                   responder Nothing
-              Just (hover, _) -> do
+              Just hover -> do
                   logText $ "    < Hover " <> toText hover
                   responder (Just hover)

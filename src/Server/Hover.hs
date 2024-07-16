@@ -20,27 +20,35 @@ import qualified Server.IntervalMap as IntervalMap
 import           Syntax.Abstract
 import           Syntax.Typed                   as Typed
 
-collectHoverInfo :: Typed.TypedProgram -> IntervalMap (J.Hover, Type)
+collectHoverInfo :: Typed.TypedProgram -> IntervalMap J.Hover
 collectHoverInfo = collect
 
 instance Pretty J.Hover where
   pretty = pretty . show
 
 --------------------------------------------------------------------------------
--- helper function for annotating some syntax node with its type
+-- helper function for annotating some syntax node with its type or kind
 
-annotateType :: Located a => a -> Type -> IntervalMap (J.Hover, Type)
+annotateType :: Located a => a -> Type -> IntervalMap J.Hover
 annotateType node t = case fromLoc (locOf node) of
   Nothing    -> mempty
-  Just range -> IntervalMap.singleton range (hover, t)
- where
-  hover   = J.Hover content Nothing
-  content = J.HoverContents $ J.markedUpContent "gcl" (toText t)
+  Just range -> IntervalMap.singleton range hover
+  where
+    hover   = J.Hover content Nothing
+    content = J.HoverContents $ J.markedUpContent "gcl" (toText t)
+
+annotateKind :: Located a => a -> Kind -> IntervalMap J.Hover
+annotateKind node k = case fromLoc (locOf node) of
+  Nothing    -> mempty
+  Just range -> IntervalMap.singleton range hover
+  where
+    hover   = J.Hover content Nothing
+    content = J.HoverContents $ J.markedUpContent "gcl" (toText k)
 
 --------------------------------------------------------------------------------
 
 class Collect a where
-  collect :: a -> IntervalMap (J.Hover, Type)
+  collect :: a -> IntervalMap J.Hover
 
 {-
 instance Collect a => Collect [a] where
