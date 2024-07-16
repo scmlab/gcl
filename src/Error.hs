@@ -2,7 +2,7 @@
 
 module Error where
 
-import           GCL.Type                       ( TypeError )
+import           GCL.Common                     ( TypeError )
 import           GCL.WP.Type                    ( StructError )
 import           GHC.Generics
 import           Syntax.Common                  ( )

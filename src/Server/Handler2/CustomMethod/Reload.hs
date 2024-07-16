@@ -14,7 +14,7 @@ import Error (Error(..))
 import Control.Monad.Except (runExcept)
 import Pretty (toText)
 import Data.Loc hiding ( fromLoc )
-import qualified GCL.Type as TypeChecking
+import GCL.Common
 import qualified Data.List as List
 import Data.List (sortOn)
 
@@ -104,7 +104,7 @@ toAbstract filepath concrete onFinish onError = do
 
 typeCheck :: A.Program -> Either Error TypedProgram
 typeCheck abstract = do
-  case TypeChecking.runElaboration abstract of
+  case runElaboration abstract of
     Left  e -> Left (TypeError e)
     Right typedProgram -> return typedProgram
 

@@ -7,7 +7,7 @@ import           Data.Foldable                  ( toList )
 import           Data.Loc
 import           Prettyprinter
 import           Error
-import           GCL.Type                       ( TypeError(..) )
+import           GCL.Common                     ( TypeError(..) )
 import           GCL.WP.Type                    ( StructError(..)
                                                 , StructWarning(..)
                                                 )

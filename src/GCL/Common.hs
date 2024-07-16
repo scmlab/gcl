@@ -1,9 +1,13 @@
 {-# LANGUAGE FlexibleInstances, UndecidableInstances,
              MultiParamTypeClasses, FlexibleContexts #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE DeriveGeneric #-}
 module GCL.Common where
 
-import           Control.Monad.RWS              ( RWST(..) )
+import           Control.Monad.Except
+import           Control.Monad.RWS              ( RWST(..), MonadState (get, put) )
 import           Control.Monad.State            ( StateT(..) )
+import           Data.Aeson                     ( ToJSON )
 import           Data.Loc                       ( Loc(..) )
 import           Data.Map                       ( Map )
 import qualified Data.Map                      as Map
@@ -14,8 +18,15 @@ import qualified Data.Set                      as Set
 import           Data.Text                      ( Text )
 import qualified Data.Text                     as Text
 import           Data.Loc.Range                 ( Range )
+import           Data.Loc                       ( (<-->)
+                                                , Loc(..)
+                                                , Located
+                                                , locOf
+                                                )
+import           GHC.Generics
 import           Syntax.Abstract
 import           Syntax.Common.Types
+import qualified Syntax.Typed                  as Typed
 
 
 data Index = Index Name | Hole Range deriving (Eq, Show, Ord)
@@ -200,3 +211,116 @@ toEvalStateT r m = StateT
     (a, s', w) <- runRWST m r s
     return ((a, w), s')
   )
+
+--------------------------------------------------------------------------------
+-- The elaboration monad
+
+type ElaboratorM = StateT (FreshState, [(Index, Kind)], [(Index, TypeInfo)]) (Except TypeError)
+
+instance Counterous ElaboratorM where
+  countUp = do
+    (count, typeDefnInfo, typeInfo) <- get
+    put (succ count, typeDefnInfo, typeInfo)
+    return count
+
+runElaboration
+  :: Elab a => a -> Either TypeError (Typed a)
+runElaboration a = do
+  ((_, elaborated, _), _state) <- runExcept (runStateT (elaborate a mempty) (0, mempty, mempty))
+  Right elaborated
+
+data TypeError
+    = NotInScope Name
+    | UnifyFailed Type Type Loc
+    | KindUnifyFailed Kind Kind Loc -- TODO: Deal with this replication in a better way.
+    | RecursiveType Name Type Loc
+    | AssignToConst Name
+    | UndefinedType Name
+    | DuplicatedIdentifiers [Name]
+    | RedundantNames [Name]
+    | RedundantExprs [Expr]
+    | MissingArguments [Name]
+    deriving (Show, Eq, Generic)
+
+instance ToJSON TypeError
+
+instance Located TypeError where
+  locOf (NotInScope n               ) = locOf n
+  locOf (UnifyFailed _ _ l          ) = l
+  locOf (KindUnifyFailed _ _ l      ) = l
+  locOf (RecursiveType _ _ l        ) = l
+  locOf (AssignToConst         n    ) = locOf n
+  locOf (UndefinedType         n    ) = locOf n
+  locOf (DuplicatedIdentifiers ns   ) = locOf ns
+  locOf (RedundantNames        ns   ) = locOf ns
+  locOf (RedundantExprs        exprs) = locOf exprs
+  locOf (MissingArguments      ns   ) = locOf ns
+
+data TypeInfo =
+    TypeDefnCtorInfo Type
+    | ConstTypeInfo Type
+    | VarTypeInfo Type
+    deriving (Eq, Show)
+
+--------------------------------------------------------------------------------
+-- Elaboration
+
+-- The type family `Typed` turns data into its typed version.
+type family Typed untyped where
+  Typed Definition = Typed.TypedDefinition
+  Typed Declaration = Typed.TypedDeclaration
+  Typed TypeDefnCtor = Typed.TypedTypeDefnCtor
+  Typed Program = Typed.TypedProgram
+  Typed Stmt = Typed.TypedStmt
+  Typed GdCmd = Typed.TypedGdCmd
+  Typed Expr = Typed.TypedExpr
+  Typed Chain = Typed.TypedChain
+  Typed Name = Name
+  Typed ChainOp = Op
+  Typed ArithOp = Op
+  Typed TypeOp = Op
+  Typed Type = ()
+  Typed Interval = ()
+  Typed Endpoint = ()
+  Typed [a] = [Typed a]
+  Typed (Maybe a) = Maybe (Typed a)
+
+class Located a => Elab a where
+    elaborate :: a -> TypeEnv -> ElaboratorM (Maybe Type, Typed a, Subs Type)
+
+-- A class for substitution not needing a Fresh monad.
+
+class Substitutable a b where
+  subst :: a -> b -> b
+
+compose :: Substitutable (Subs a) a => Subs a -> Subs a -> Subs a
+s1 `compose` s2 = s1 <> Map.map (subst s1) s2
+
+instance (Substitutable a b, Functor f) => Substitutable a (f b) where
+  subst = fmap . subst
+
+instance Substitutable (Subs Type) Type where
+  subst _ t@TBase{}        = t
+  subst s (TArray i t l  ) = TArray i (subst s t) l
+  subst _ (TTuple arity  ) = TTuple arity
+  subst _ (TOp op        ) = TOp op
+  subst s (TApp l r loc  ) = TApp (subst s l) (subst s r) loc
+  subst _ t@TData{}        = t
+  subst s t@(TVar n _    ) = Map.findWithDefault t n s
+  subst s t@(TMetaVar n _) = Map.findWithDefault t n s
+
+instance Substitutable (Subs Type) Typed.TypedExpr where
+  subst s (Typed.Lit lit ty loc) = Typed.Lit lit (subst s ty) loc
+  subst s (Typed.Var name ty loc) = Typed.Var name (subst s ty) loc
+  subst s (Typed.Const name ty loc) = Typed.Const name (subst s ty) loc
+  subst s (Typed.Op op ty) = Typed.Op op $ subst s ty
+  subst s (Typed.Chain ch) = Typed.Chain $ subst s ch
+  subst s (Typed.App e1 e2 loc) = Typed.App (subst s e1) (subst s e2) loc
+  subst s (Typed.Lam name ty expr loc) = Typed.Lam name (subst s ty) (subst s expr) loc
+  subst s (Typed.Quant quantifier vars restriction inner loc) = Typed.Quant (subst s quantifier) vars (subst s restriction) (subst s inner) loc
+  subst s (Typed.ArrIdx arr index loc) = Typed.ArrIdx (subst s arr) (subst s index) loc
+  subst s (Typed.ArrUpd arr index expr loc) = Typed.ArrUpd (subst s arr) (subst s index) (subst s expr) loc
+
+instance Substitutable (Subs Type) Typed.TypedChain where
+  subst s (Typed.Pure expr) = Typed.Pure $ subst s expr
+  subst s (Typed.More ch op ty expr) = Typed.More (subst s ch) op (subst s ty) (subst s expr)
