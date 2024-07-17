@@ -27,7 +27,7 @@ instance RenderSection StructWarning where
       Section Yellow [Header "Excess Bound" (Just range), Paragraph (render x)]
 
 instance RenderSection Spec where
-  renderSection (Specification _ pre post range) = Section
+  renderSection (Specification _ pre post range _) = Section
     Blue
     [ Header "Precondition" (Just range)
     , Code (render pre)

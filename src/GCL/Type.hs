@@ -73,6 +73,15 @@ data TypeInfo =
     | VarTypeInfo Type
     deriving (Eq, Show)
 
+toTypeEnv :: [(Index, TypeInfo)] -> TypeEnv
+toTypeEnv infos =
+  (\(index, info) ->
+    case info of
+      TypeDefnCtorInfo ty -> (index, ty)
+      ConstTypeInfo ty -> (index, ty)
+      VarTypeInfo ty -> (index, ty)
+  ) <$> infos
+
 instance Substitutable Type TypeInfo where
   subst s (TypeDefnCtorInfo t) = TypeDefnCtorInfo (subst s t)
   subst s (ConstTypeInfo    t) = ConstTypeInfo (subst s t)
@@ -100,9 +109,9 @@ instance Counterous ElaboratorM where
     return count
 
 runElaboration
-  :: Elab a => a -> Either TypeError (Typed a)
-runElaboration a = do
-  ((_, elaborated, _), _state) <- runExcept (runStateT (elaborate a mempty) (0, mempty, mempty))
+  :: Elab a => a -> TypeEnv -> Either TypeError (Typed a)
+runElaboration a env = do
+  ((_, elaborated, _), _state) <- runExcept (runStateT (elaborate a env) (0, mempty, mempty))
   Right elaborated
 
 --------------------------------------------------------------------------------
@@ -394,7 +403,9 @@ instance Elab Stmt where
                   return typed
                  ) gds
     return (Nothing, Typed.If gds' loc, mempty)
-  elaborate (Spec text range) _ = return (Nothing, Typed.Spec text range, mempty)
+  elaborate (Spec text range) _ = do
+    (_, _, infos) <- get
+    return (Nothing, Typed.Spec text range $ toTypeEnv infos, mempty)
   elaborate (Proof text1 text2 range) _ = return (Nothing, Typed.Proof text1 text2 range, mempty)
   elaborate (Alloc var exprs loc) env = do
     (_, _, infos) <- get

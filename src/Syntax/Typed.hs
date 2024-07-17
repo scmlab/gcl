@@ -5,6 +5,7 @@ import Data.Loc ( Loc )
 import Data.Loc.Range ( Range )
 import Syntax.Abstract.Types ( Lit, Type )
 import Syntax.Common.Types ( Name, Op )
+import GCL.Common ( TypeEnv )
 
 data TypedProgram = Program [TypedDefinition] -- definitions (the functional language part)
                             [TypedDeclaration] -- constant and variable declarations
@@ -36,7 +37,7 @@ data TypedStmt
   | LoopInvariant TypedExpr TypedExpr Loc
   | Do [TypedGdCmd] Loc
   | If [TypedGdCmd] Loc
-  | Spec Text Range -- TODO: change to `Spec Text Range TypeEnv`
+  | Spec Text Range TypeEnv
   | Proof Text Text Range
   | Alloc   Name [TypedExpr] Loc    --  p := new (e1,e2,..,en)
   | HLookup Name TypedExpr Loc      --  x := *e

@@ -105,7 +105,7 @@ collectHoles (C.Program _ statements) = do
 
 elaborate :: A.Program -> Either Error T.TypedProgram
 elaborate abstract = do
-  case TypeChecking.runElaboration abstract of
+  case TypeChecking.runElaboration abstract mempty of
     Left  e -> Left (TypeError e)
     Right typedProgram -> return typedProgram
 
