@@ -44,7 +44,9 @@ translateLocationLinks delta links = do
 
 translateLocationLink :: PositionDelta -> LSP.LocationLink -> Maybe LSP.LocationLink
 translateLocationLink delta (LSP.LocationLink maybeSource targetUri targetRange targetSelection) = do
-  let maybeSource' = maybeSource >>= translateRange
+  let maybeSource' = do
+                      source <- maybeSource
+                      translateRange source
   targetRange'     <- translateRange targetRange
   targetSelection' <- translateRange targetSelection
   return (LSP.LocationLink maybeSource' targetUri targetRange' targetSelection')

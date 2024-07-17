@@ -44,7 +44,7 @@ handlers = mconcat
       let uri            = ntf ^. (LSP.params . LSP.textDocument . LSP.uri)
       case LSP.uriToFilePath uri of
         Nothing       -> return ()
-        Just filePath -> load filePath (\_ -> return ()) (\_ -> return ())
+        Just filePath -> load filePath
   , -- "textDocument/didChange" - after every edition
     notificationHandler LSP.STextDocumentDidChange $ \ntf -> do
       let uri        :: LSP.Uri = ntf ^. (LSP.params . LSP.textDocument . LSP.uri)

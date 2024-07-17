@@ -25,10 +25,10 @@ data ReloadResult = ReloadResult
   , proofObligations :: [PO]
   }
   deriving (Eq, Show, Generic)
-instance JSON.ToJSON ReloadResult
 
 type ReloadError = Error
 
-handler :: ReloadParams -> (ReloadResult -> ServerM ()) -> (ReloadError -> ServerM ()) -> ServerM ()
-handler ReloadParams{filePath} onSuccess onError =
-  load filePath (\FileState{..} -> onSuccess ReloadResult{..}) onError
+handler :: ReloadParams -> (() -> ServerM ()) -> (() -> ServerM ()) -> ServerM ()
+handler ReloadParams{filePath} onResult onError = do
+  load filePath
+  onResult ()

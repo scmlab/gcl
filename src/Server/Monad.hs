@@ -38,6 +38,7 @@ import qualified Server.SrcLoc                 as SrcLoc
 import qualified Data.Text as Text
 import Data.Loc (posCol)
 import Data.Version (Version(Version))
+import GCL.WP.Type (StructWarning)
 
 -- | State shared by all clients and requests
 data GlobalState = GlobalState
@@ -52,6 +53,7 @@ data FileState = FileState
   { refinedVersion   :: Int  -- the version number of the last refine
   , specifications   :: [Versioned Spec] -- editedVersion or (editedVersion + 1)
   , proofObligations :: [PO] -- editedVersion
+  , warnings         :: [StructWarning]
 
   -- to support other LSP methods in a light-weighted manner
   , loadedVersion    :: Int  -- the version number of the last reload
@@ -171,14 +173,6 @@ editTexts filepath rangeTextPairs onSuccess = do
 sendCustomNotification :: Text -> JSON.Value -> ServerM ()
 sendCustomNotification methodId json = LSP.sendNotification (LSP.SCustomMethod methodId) json
 
-sendUpdateSpecNotification :: FilePath -> ServerM ()
-sendUpdateSpecNotification filePath = do
-  maybeFileState <- loadFileState filePath
-  case maybeFileState of
-    Nothing -> return ()
-    Just fileState -> do
-      let FileState{specifications} = fileState
-      sendCustomNotification "guabao/specifications" (JSON.toJSON specifications)
 
 -- send diagnostics
 -- NOTE: existing diagnostics would be erased if `diagnostics` is empty

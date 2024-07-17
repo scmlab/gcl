@@ -3,7 +3,8 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Server.Handler.OnDidChangeTextDocument where
 
-import Server.Monad (ServerM, FileState (..), modifyFileState, sendUpdateSpecNotification, Versioned)
+import Server.Monad (ServerM, FileState (..), modifyFileState, Versioned)
+import Server.Notification.Update (sendUpdateNotification)
 import GCL.Predicate (Spec(..))
 import Server.PositionMapping (mkDelta, applyChange, toCurrentRange', PositionDelta)
 import qualified Language.LSP.Types as LSP
@@ -23,9 +24,8 @@ handler filePath changes = do
       }
     )
 
-  -- send notification to update Specs
-  sendUpdateSpecNotification filePath
-  -- TODO: send notification to update POs
+  -- send notification to update Specs and POs
+  sendUpdateNotification filePath []
 
 translateSpecsRangeThroughOneVersion
   :: Int -> [LSP.TextDocumentContentChangeEvent] -> FilePath -> [Versioned Spec] -> [Versioned Spec]

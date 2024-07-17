@@ -27,9 +27,10 @@ import qualified GCL.Type as TypeChecking
 import Data.Map (singleton)
 import GCL.WP.Type (StructError, StructWarning)
 import GCL.Predicate (PO, Spec)
+import Server.Notification.Update (sendUpdateNotification)
 
-load :: FilePath -> (FileState -> ServerM ()) -> (Error -> ServerM ()) -> ServerM ()
-load filePath onSuccess onError = do
+load :: FilePath -> ServerM ()
+load filePath = do
 
   maybeFileState <- loadFileState filePath
   let currentVersion = case maybeFileState of
@@ -47,7 +48,7 @@ load filePath onSuccess onError = do
         Right concrete ->
           case reportHolesOrToAbstract concrete of
             Left holes -> digHoles filePath holes do
-              load filePath onSuccess onError
+              load filePath
             Right abstract -> case WP.sweep abstract of
               Left  err -> onError (StructError err)
               Right (pos, specs, warnings, redexes, counter) -> do
@@ -74,7 +75,12 @@ load filePath onSuccess onError = do
                                       , editedVersion    = currentVersion
                                       }
                     saveFileState filePath fileState
-                    onSuccess fileState
+                    onSuccess
+  where
+    onSuccess :: ServerM ()
+    onSuccess = sendUpdateNotification filePath []
+    onError :: Error -> ServerM ()
+    onError err = sendUpdateNotification filePath [err]
 
 parse :: FilePath -> Text -> Either Error C.Program
 parse filepath source =
