@@ -84,6 +84,10 @@ handler _params@RefineParams{filePath, specRange, specText} onSuccess onError = 
                     Just spec -> do
                       -- elaborate
                       let typeEnv :: TypeEnv = [] -- specTypeEnv spec
+                      -- TODO:
+                      -- 1. Load: 在 elaborate program 的時候，要把 specTypeEnv 加到 spec 裡 (Andy)
+                      -- 2. Load: 在 sweep 的時候，改成輸入 elaborated program，把 elaborated program 裡面的 spec 的 typeEnv 加到輸出的 [Spec] 裡 (SCM)
+                      -- 3. Refine: elaborateFragment 裡面要正確使用 typeEnv (Andy)
                       case elaborateFragment typeEnv abstractImpl of
                         Left err -> onError (TypeError err)
                         Right typedImpl -> do
