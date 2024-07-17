@@ -126,15 +126,15 @@ collectTypeDefns typeDefns = do
 --------------------------------------------------------------------------------
 -- Kind inference
 
+kindFromArity :: Int -> Kind
+kindFromArity 0 = KStar NoLoc
+kindFromArity n = KFunc (KStar NoLoc) (kindFromArity $ n - 1) NoLoc
+
 -- This is "Kinding" mentioned in 53:10 in the paper "Kind Inference for Datatypes".
 inferKind :: (Fresh m, MonadError TypeError m) => KindEnv -> Type -> m (Kind, KindEnv)
 inferKind env (TBase _ loc) = return (KStar loc, env)
 inferKind env (TArray _ _ loc) = return (KStar loc, env)
 inferKind env (TTuple int) = return (kindFromArity int, env)
-  where
-    kindFromArity :: Int -> Kind
-    kindFromArity 0 = KStar NoLoc
-    kindFromArity n = KFunc (KStar NoLoc) (kindFromArity $ n - 1) NoLoc
 inferKind env (TOp (Arrow loc)) = return (KFunc (KStar loc) (KFunc (KStar loc) (KStar loc) loc) loc, env)
 inferKind env (TData name _) =
   case find (isKindAnno name) env of

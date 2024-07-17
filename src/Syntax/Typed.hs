@@ -3,8 +3,8 @@ module Syntax.Typed where
 import Data.Text ( Text )
 import Data.Loc ( Loc )
 import Data.Loc.Range ( Range )
-import Syntax.Abstract.Types ( Lit, Type )
-import Syntax.Common.Types ( Name, Op )
+import qualified Syntax.Abstract.Types as T
+import Syntax.Common.Types ( Name, Op, TypeOp )
 
 data TypedProgram = Program [TypedDefinition] -- definitions (the functional language part)
                             [TypedDeclaration] -- constant and variable declarations
@@ -15,16 +15,16 @@ data TypedProgram = Program [TypedDefinition] -- definitions (the functional lan
 
 data TypedDefinition
   = TypeDefn Name [Name] [TypedTypeDefnCtor] Loc
-  | FuncDefnSig Name Type (Maybe TypedExpr) Loc
+  | FuncDefnSig Name KindedType (Maybe TypedExpr) Loc
   | FuncDefn Name TypedExpr
   deriving (Eq, Show)
 
-data TypedTypeDefnCtor = TypedTypeDefnCtor Name [Type]
+data TypedTypeDefnCtor = TypedTypeDefnCtor Name [T.Type]
   deriving (Eq, Show)
 
 data TypedDeclaration
-  = ConstDecl [Name] Type (Maybe TypedExpr) Loc
-  | VarDecl [Name] Type (Maybe TypedExpr) Loc
+  = ConstDecl [Name] T.Type (Maybe TypedExpr) Loc
+  | VarDecl [Name] T.Type (Maybe TypedExpr) Loc
   deriving (Eq, Show)
 
 data TypedStmt
@@ -49,13 +49,13 @@ data TypedGdCmd = TypedGdCmd TypedExpr [TypedStmt] Loc
   deriving (Eq, Show)
 
 data TypedExpr
-  = Lit Lit Type Loc
-  | Var Name Type Loc
-  | Const Name Type Loc
-  | Op Op Type
+  = Lit T.Lit T.Type Loc
+  | Var Name T.Type Loc
+  | Const Name T.Type Loc
+  | Op Op T.Type
   | Chain TypedChain
   | App TypedExpr TypedExpr Loc
-  | Lam Name Type TypedExpr Loc
+  | Lam Name T.Type TypedExpr Loc
   | Quant TypedExpr [Name] TypedExpr TypedExpr Loc
   | ArrIdx TypedExpr TypedExpr Loc
   | ArrUpd TypedExpr TypedExpr TypedExpr Loc
@@ -64,5 +64,26 @@ data TypedExpr
 
 data TypedChain
   = Pure TypedExpr
-  | More TypedChain Op Type TypedExpr
+  | More TypedChain Op T.Type TypedExpr
   deriving (Eq, Show)
+
+data KindedType
+  = TBase T.TBase T.Kind Loc
+  | TArray T.Interval KindedType Loc
+  | TTuple Int T.Kind
+  | TOp TypeOp T.Kind
+  | TData Name T.Kind Loc
+  | TApp KindedType KindedType Loc
+  | TVar Name T.Kind Loc
+  | TMetaVar Name T.Kind Loc
+  deriving (Show, Eq)
+
+unkind :: KindedType -> T.Type
+unkind (TBase base _ loc) = T.TBase base loc
+unkind (TArray int kinded loc) = T.TArray int (unkind kinded) loc
+unkind (TTuple i _) = T.TTuple i
+unkind (TOp op _) = T.TOp op
+unkind (TData name _ loc) = T.TData name loc
+unkind (TApp kindedTy1 kindedTy2 loc) = T.TApp (unkind kindedTy1) (unkind kindedTy2) loc
+unkind (TVar name _ loc) = T.TVar name loc
+unkind (TMetaVar name _ loc) = T.TMetaVar name loc

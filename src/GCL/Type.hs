@@ -212,15 +212,46 @@ instance Elab Definition where
                       return typed
                    ) ctors
     return (Nothing, Typed.TypeDefn name args ctors' loc, mempty)
-   where
-    scopeCheck :: MonadError TypeError m => Set.Set Name -> Type -> m ()
-    scopeCheck ns t = mapM_ (\n -> if Set.member n ns then return () else throwError $ NotInScope n) (freeVars t)
+    where
+      scopeCheck :: MonadError TypeError m => Set.Set Name -> Type -> m ()
+      scopeCheck ns t = mapM_ (\n -> if Set.member n ns then return () else throwError $ NotInScope n) (freeVars t)
   elaborate (FuncDefnSig name ty maybeExpr loc) env = do
     expr' <- mapM (\expr -> do
                     (_, typed, _) <- elaborate expr env
                     return typed
                   ) maybeExpr
-    return (Nothing, Typed.FuncDefnSig name ty expr' loc, mempty)
+    kinded <- toKinded ty
+    return (Nothing, Typed.FuncDefnSig name kinded expr' loc, mempty)
+    where
+      toKinded :: Type -> ElaboratorM Typed.KindedType
+      toKinded ty = do
+        case ty of
+          TBase base loc -> return $ Typed.TBase base (KStar loc) loc
+          TArray int ty loc -> do
+            kindedTy <- toKinded ty
+            return $ Typed.TArray int kindedTy loc
+          TTuple n -> return $ Typed.TTuple n (kindFromArity n)
+          TOp arrow@(Arrow _) -> return $ Typed.TOp arrow (KFunc (KStar loc) (KFunc (KStar loc) (KStar loc) loc) loc)
+          TData name loc -> do
+            (_, infos, _) <- get
+            case lookup (Index name) infos of
+              Just k -> return $ Typed.TData name k loc
+              _ -> error "Shouldn't happen."
+          TApp ty1 ty2 loc -> do
+            kindedTy1 <- toKinded ty1
+            kindedTy2 <- toKinded ty2
+            return $ Typed.TApp kindedTy1 kindedTy2 loc
+          TVar name loc -> do
+            (_, infos, _) <- get
+            case lookup (Index name) infos of
+              Just k -> return $ Typed.TVar name k loc
+              _ -> error "Shouldn't happen."
+          TMetaVar name loc -> do
+            (_, infos, _) <- get
+            case lookup (Index name) infos of
+              Just k -> return $ Typed.TMetaVar name k loc
+              _ -> error "Shouldn't happen."
+          
   elaborate (FuncDefn name expr) env = do
     (_, typed, _) <- elaborate expr env
     return (Nothing, Typed.FuncDefn name typed, mempty)

@@ -114,7 +114,18 @@ data Type
   | TApp Type Type Loc
   | TVar Name Loc
   | TMetaVar Name Loc
-  deriving (Eq, Show, Generic)
+  deriving (Show, Generic)
+
+instance Eq Type where
+  TBase base1 _ == TBase base2 _ = base1 == base2
+  TArray int1 ty1 _ == TArray int2 ty2 _ = int1 == int2 && ty1 == ty2
+  TTuple i1 == TTuple i2 = i1 == i2
+  TOp op1 == TOp op2 = op1 == op2
+  TData name1 _ == TData name2 _ = name1 == name2
+  TApp left1 right1 _ == TApp left2 right2 _ = left1 == right1 && left2 == right2
+  TVar name1 _ == TVar name2 _ = name1 == name2
+  TMetaVar name1 _ == TMetaVar name2 _ = name1 == name2
+  _ == _ = False
 
 --------------------------------------------------------------------------------
 

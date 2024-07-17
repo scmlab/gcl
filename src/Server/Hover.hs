@@ -66,11 +66,21 @@ instance Collect Typed.TypedProgram where
 
 instance Collect Typed.TypedDefinition where
   collect (Typed.TypeDefn _ _ ctors _) = foldMap collect ctors
-  collect (Typed.FuncDefnSig arg t prop _) = annotateType arg t <> maybe mempty collect prop
+  collect (Typed.FuncDefnSig name kinded prop _) = annotateType name (unkind kinded) <> collect kinded <> maybe mempty collect prop
   collect (Typed.FuncDefn _name expr) = collect expr
 
 instance Collect Typed.TypedTypeDefnCtor where
   collect (Typed.TypedTypeDefnCtor _name _tys) = mempty
+
+instance Collect Typed.KindedType where
+  collect (Typed.TBase base kind loc) = mempty -- TODO: Fix this!
+  collect (Typed.TArray int kinded loc) = collect kinded
+  collect (Typed.TTuple i k) = mempty
+  collect (Typed.TOp op kind) = annotateKind op kind
+  collect (Typed.TData name kind _) = annotateKind name kind
+  collect (Typed.TApp ty1 ty2 _) = collect ty1 <> collect ty2
+  collect (Typed.TVar name kind _) = annotateKind name kind
+  collect (Typed.TMetaVar name kind _) = annotateKind name kind
 
 --------------------------------------------------------------------------------
 -- Declaration
