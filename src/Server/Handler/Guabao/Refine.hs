@@ -42,6 +42,7 @@ data RefineParams = RefineParams
   deriving (Eq, Show, Generic)
 
 instance JSON.FromJSON RefineParams
+instance JSON.ToJSON RefineParams
 
 data RefineResult = RefineResult
   { specifications :: [Spec]

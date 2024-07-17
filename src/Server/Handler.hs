@@ -29,6 +29,7 @@ import qualified Server.Handler.AutoCompletion as AutoCompletion
 import qualified Server.Handler.Hover          as Hover
 import qualified Server.Handler.SemanticTokens as SemanticTokens
 import qualified Server.Handler.Guabao.Reload  as Reload
+import qualified Server.Handler.Guabao.Refine  as Refine
 import Server.Monad (ServerM)
 import Server.Load (load)
 import qualified Server.Handler.OnDidChangeTextDocument as OnDidChangeTextDocument
@@ -73,6 +74,8 @@ handlers = mconcat
       SemanticTokens.handler uri responder
   , -- "guabao/reload" - reload
     requestHandler (LSP.SCustomMethod "guabao/reload") $ jsonMiddleware Reload.handler
+  , -- "guabao/refine" - refine
+    requestHandler (LSP.SCustomMethod "guabao/refine") $ jsonMiddleware Refine.handler
   ]
 
 type CustomMethodHandler params result error = params -> (result -> ServerM ()) -> (error -> ServerM ()) -> ServerM ()

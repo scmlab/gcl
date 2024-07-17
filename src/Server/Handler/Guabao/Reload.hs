@@ -19,6 +19,7 @@ data ReloadParams = ReloadParams { filePath :: FilePath }
   deriving (Eq, Show, Generic)
 
 instance JSON.FromJSON ReloadParams
+instance JSON.ToJSON ReloadParams
 
 data ReloadResult = ReloadResult
   { specifications :: [Versioned Spec]

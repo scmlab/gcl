@@ -24,12 +24,13 @@ sendUpdateNotification filePath errors = do
   case maybeFileState of
     Nothing -> return ()
     Just fileState -> do
-      let json :: JSON.Value = makeUpdateNotificationJson fileState errors
+      let json :: JSON.Value = makeUpdateNotificationJson filePath fileState errors
       Server.sendCustomNotification "guabao/update" json
 
-makeUpdateNotificationJson :: FileState -> [Error] -> JSON.Value
-makeUpdateNotificationJson FileState{specifications, proofObligations, warnings} errors = JSON.object
-  [ "specs" .= JSON.toJSON specifications
+makeUpdateNotificationJson :: FilePath -> FileState -> [Error] -> JSON.Value
+makeUpdateNotificationJson filePath FileState{specifications, proofObligations, warnings} errors = JSON.object
+  [ "filePath" .= JSON.toJSON filePath
+  , "specs" .= JSON.toJSON specifications
   , "pos" .= JSON.toJSON proofObligations
   , "warnings" .= JSON.toJSON warnings
   , "errors" .= JSON.toJSON errors
@@ -116,6 +117,6 @@ instance JSON.ToJSON Origin where
     , "location" .= locToJson loc
     ]
   toJSON (Explain{originHeader, originLoc}) = object
-    [ "location" .= locToJson originLoc
-    , "explanation" .= JSON.String originHeader
+    [ "tag" .= JSON.String originHeader
+    , "location" .= locToJson originLoc
     ]
