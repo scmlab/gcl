@@ -8,9 +8,7 @@ module GCL.Kind where
 
 import           Control.Monad.Except
 import           Control.Monad.State.Lazy
-import           Control.Monad.Writer.Lazy
 import           Data.Bifunctor                 ( Bifunctor (second) )
-import           Data.Functor
 import qualified Data.Ord                      as Ord
 import           Data.List
 import           Data.Loc                       ( (<-->)
@@ -19,14 +17,11 @@ import           Data.Loc                       ( (<-->)
                                                 )
 import qualified Data.Map                      as Map
 import           GCL.Common
-import           Prelude                 hiding ( EQ
-                                                , GT
-                                                , LT
-                                                )
 
 import           Syntax.Abstract
 import           Syntax.Abstract.Util
 import           Syntax.Common
+import qualified Data.Text as Text
 
 -- Type definitions are processed here.
 -- We follow the approach described in the paper "Kind Inference for Datatypes": https://dl.acm.org/doi/10.1145/3371121
@@ -43,7 +38,8 @@ collectTypeDefns typeDefns = do
           KindAnno name kind -> (Index name, kind)
           UnsolvedUni _name -> error "Unsolved KMetaVar."
           SolvedUni name kind -> (Index name, kind)) <$> newTypeDefnInfos
-  modify (\(freshState, origTypeDefnInfos, origTypeInfos) -> (freshState, newTypeDefnInfos' <> origTypeDefnInfos, newTypeInfos' <> origTypeInfos))
+  let resolvedInfos = resolve newTypeDefnInfos' newTypeDefnInfos'
+  modify (\(freshState, origTypeDefnInfos, origTypeInfos) -> (freshState, resolvedInfos <> origTypeDefnInfos, newTypeInfos' <> origTypeInfos))
   where
     -- This is an entry for "Typing Datatype Decl." several times, presented in page 53:8.
     inferDataTypes :: (Fresh m, MonadError TypeError m) => (TypeEnv, KindEnv) -> [(Name, [Name], [TypeDefnCtor], Loc)] -> m (TypeEnv, KindEnv)
@@ -102,7 +98,7 @@ collectTypeDefns typeDefns = do
               (ty, newEnv) <- inferCtor env'' tyName'' tyParamNames freshNames ctor
               (tys, anotherEnv) <- inferCtors' newEnv tyName'' tyParamNames' freshNames restOfCtors
               return (ty : tys, newEnv <> anotherEnv)
-        
+
         -- This is an entry for "Typing Data Constructor Decl.", presented in page 53:8.
         inferCtor :: (Fresh m, MonadError TypeError m) => KindEnv -> Name -> [Name] -> [Name] -> TypeDefnCtor -> m (Type, KindEnv)
         inferCtor env' tyName' tyParamNames freshNames (TypeDefnCtor _conName params) = do
@@ -114,7 +110,7 @@ collectTypeDefns typeDefns = do
           return (ty, env'')
           where
             renameKindEnv :: Map.Map Name Name -> KindEnv -> KindEnv
-            renameKindEnv sub env'' = 
+            renameKindEnv sub env'' =
               (\case
                 KindAnno name kind -> case Map.lookup name sub of
                   Nothing -> KindAnno name kind
@@ -122,6 +118,21 @@ collectTypeDefns typeDefns = do
                 UnsolvedUni name -> UnsolvedUni name
                 SolvedUni name kind -> SolvedUni name kind
               ) <$> env''
+
+    resolve :: [(Index, Kind)] -> [(Index, Kind)] -> [(Index, Kind)]
+    resolve [] env = env
+    resolve (pair : pairs) env = 
+      let env' = substEnv pair env
+      in resolve pairs env'
+      where
+        substEnv :: (Index, Kind) -> [(Index, Kind)] -> [(Index, Kind)]
+        substEnv sub context = second (substSingle sub) <$> context
+        substSingle :: (Index, Kind) -> Kind -> Kind
+        substSingle sub@(index, kind') kind =
+          case kind of
+            KStar loc -> KStar loc
+            KFunc kind1 kind2 loc -> KFunc (substSingle sub kind1) (substSingle sub kind2) loc
+            KMetaVar name -> if Index name == index then kind' else kind
 
 --------------------------------------------------------------------------------
 -- Kind inference

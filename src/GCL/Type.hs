@@ -220,35 +220,33 @@ instance Elab Definition where
                     (_, typed, _) <- elaborate expr env
                     return typed
                   ) maybeExpr
-    kinded <- toKinded ty
+    (_, infos, _) <- get
+    kinded <- toKinded infos ty
     return (Nothing, Typed.FuncDefnSig name kinded expr' loc, mempty)
     where
-      toKinded :: Type -> ElaboratorM Typed.KindedType
-      toKinded ty = do
+      toKinded :: [(Index, Kind)] -> Type -> ElaboratorM Typed.KindedType
+      toKinded env ty = do
         case ty of
           TBase base loc -> return $ Typed.TBase base (KStar loc) loc
           TArray int ty loc -> do
-            kindedTy <- toKinded ty
+            kindedTy <- toKinded env ty
             return $ Typed.TArray int kindedTy loc
           TTuple n -> return $ Typed.TTuple n (kindFromArity n)
           TOp arrow@(Arrow _) -> return $ Typed.TOp arrow (KFunc (KStar loc) (KFunc (KStar loc) (KStar loc) loc) loc)
           TData name loc -> do
-            (_, infos, _) <- get
-            case lookup (Index name) infos of
+            case lookup (Index name) env of
               Just k -> return $ Typed.TData name k loc
               _ -> error "Shouldn't happen."
           TApp ty1 ty2 loc -> do
-            kindedTy1 <- toKinded ty1
-            kindedTy2 <- toKinded ty2
+            kindedTy1 <- toKinded env ty1
+            kindedTy2 <- toKinded env ty2
             return $ Typed.TApp kindedTy1 kindedTy2 loc
           TVar name loc -> do
-            (_, infos, _) <- get
-            case lookup (Index name) infos of
+            case lookup (Index name) env of
               Just k -> return $ Typed.TVar name k loc
               _ -> error "Shouldn't happen."
           TMetaVar name loc -> do
-            (_, infos, _) <- get
-            case lookup (Index name) infos of
+            case lookup (Index name) env of
               Just k -> return $ Typed.TMetaVar name k loc
               _ -> error "Shouldn't happen."
           
