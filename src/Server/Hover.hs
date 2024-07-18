@@ -73,7 +73,7 @@ instance Collect Typed.TypedTypeDefnCtor where
   collect (Typed.TypedTypeDefnCtor _name _tys) = mempty
 
 instance Collect Typed.KindedType where
-  collect (Typed.TBase base kind loc) = mempty -- TODO: Fix this!
+  collect (Typed.TBase base kind loc) = annotateKind loc kind
   collect (Typed.TArray int kinded loc) = collect kinded
   collect (Typed.TTuple i k) = mempty
   collect (Typed.TOp op kind) = annotateKind op kind

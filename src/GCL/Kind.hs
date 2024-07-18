@@ -75,7 +75,7 @@ collectTypeDefns typeDefns = do
           (inferedTypes, finalEnv) <- inferCtors envForInferingCtors tyName tyParams ctors
           let ctorIndices = (\(TypeDefnCtor name _) -> Index name) <$> ctors
           return (zip ctorIndices inferedTypes, drop (length tyParams) finalEnv)
-        _ -> throwError $ UndefinedType tyName -- TODO: Fix bug.
+        _ -> throwError $ UndefinedType tyName
       where
         wrapKFunc :: [Kind] -> Kind -> Kind
         wrapKFunc [] k = k
@@ -122,7 +122,7 @@ collectTypeDefns typeDefns = do
                 SolvedUni name kind -> SolvedUni name kind
               ) <$> env''
 
-    -- This function substitute a context into itself.
+    -- This function substitutes a context into itself.
     -- TODO: I (Andy) think the algorithm here is suboptimal.
     resolve :: [(Index, Kind)] -> [(Index, Kind)] -> [(Index, Kind)]
     resolve [] env = env
