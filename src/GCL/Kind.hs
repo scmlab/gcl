@@ -21,7 +21,8 @@ import           GCL.Common
 import           Syntax.Abstract
 import           Syntax.Abstract.Util
 import           Syntax.Common
-import qualified Data.Text as Text
+
+-- TODO: We have to do kind checking everywhere instead of relying on unification.
 
 -- Type definitions are processed here.
 -- We follow the approach described in the paper "Kind Inference for Datatypes": https://dl.acm.org/doi/10.1145/3371121
@@ -46,6 +47,8 @@ collectTypeDefns typeDefns = do
     inferDataTypes (typeEnv, kindEnv) [] = do
       return (typeEnv, defaultMeta kindEnv) -- TODO: Check if this is correct.
       where
+        -- This is the "defaulting" mechanism presented in the paper.
+        -- TODO: Default unused type variable.
         defaultMeta :: KindEnv -> KindEnv
         defaultMeta env =
           (\case
@@ -119,6 +122,8 @@ collectTypeDefns typeDefns = do
                 SolvedUni name kind -> SolvedUni name kind
               ) <$> env''
 
+    -- This function substitute a context into itself.
+    -- TODO: I (Andy) think the algorithm here is suboptimal.
     resolve :: [(Index, Kind)] -> [(Index, Kind)] -> [(Index, Kind)]
     resolve [] env = env
     resolve (pair : pairs) env = 
