@@ -48,7 +48,7 @@ collectTypeDefns typeDefns = do
       return (typeEnv, defaultMeta kindEnv) -- TODO: Check if this is correct.
       where
         -- This is the "defaulting" mechanism presented in the paper.
-        -- TODO: Default unused type variable.
+        -- TODO: Default unused type variable. (However, do we actually need this?)
         defaultMeta :: KindEnv -> KindEnv
         defaultMeta env =
           (\case

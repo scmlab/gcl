@@ -88,7 +88,13 @@ data Kind
   = KStar Loc
   | KFunc Kind Kind Loc
   | KMetaVar Name
-  deriving (Show, Eq, Generic)
+  deriving (Show, Generic)
+
+instance Eq Kind where
+  KStar _ == KStar _ = True
+  KFunc l1 r1 _ == KFunc l2 r2 _ = l1 == l2 && r1 == r2
+  KMetaVar name1 == KMetaVar name2 = name1 == name2
+  _ == _ = False
 
 --------------------------------------------------------------------------------
 

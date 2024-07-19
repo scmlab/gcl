@@ -80,6 +80,13 @@ instance Collect TypeError Diagnostic where
       <>  "with        :"
       <+> pretty t
 
+  collect (NotKFunc k loc) =
+    makeError loc "Not a kind-level function"
+      $   docToText
+      $   "Not a kind-level function: "
+      <>  pretty k
+      <+> " is not a kind-level function"
+
   collect (RecursiveType var t loc) =
     makeError loc "Recursive type variable"
       $   docToText

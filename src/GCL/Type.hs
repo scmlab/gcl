@@ -222,6 +222,8 @@ instance Elab Definition where
                   ) maybeExpr
     (_, infos, _) <- get
     kinded <- toKinded infos ty
+    kind <- kindCheck kinded
+    if kind == KStar NoLoc then return () else throwError $ KindUnifyFailed kind (KStar NoLoc) (locOf kind)
     return (Nothing, Typed.FuncDefnSig name kinded expr' loc, mempty)
     where
       toKinded :: [(Index, Kind)] -> Type -> ElaboratorM Typed.KindedType
@@ -249,6 +251,26 @@ instance Elab Definition where
             case lookup (Index name) env of
               Just k -> return $ Typed.TMetaVar name k loc
               _ -> error "Shouldn't happen."
+      
+      kindCheck :: Typed.KindedType -> ElaboratorM Kind
+      kindCheck kinded = case kinded of
+        Typed.TBase _ kind _ -> return kind
+        Typed.TArray _ kinded _ -> kindCheck kinded
+        Typed.TTuple _ kind -> return kind
+        Typed.TOp _ kind -> return kind
+        Typed.TData _ kind _ -> return kind
+        Typed.TApp kinded1 kinded2 _ -> do
+          kind1 <- kindCheck kinded1
+          kind2 <- kindCheck kinded2
+          applyKind kind1 kind2
+        Typed.TVar _ kind _ -> return kind
+        Typed.TMetaVar _ kind _ -> return kind
+
+      applyKind :: Kind -> Kind -> ElaboratorM Kind
+      applyKind (KFunc left right loc) k2 = do
+        _ <- unifyKind mempty left k2 loc
+        return right
+      applyKind k _ = throwError $ NotKFunc k (locOf k)
           
   elaborate (FuncDefn name expr) env = do
     (_, typed, _) <- elaborate expr env

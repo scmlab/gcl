@@ -233,6 +233,7 @@ data TypeError
     = NotInScope Name
     | UnifyFailed Type Type Loc
     | KindUnifyFailed Kind Kind Loc -- TODO: Deal with this replication in a better way.
+    | NotKFunc Kind Loc
     | RecursiveType Name Type Loc
     | AssignToConst Name
     | UndefinedType Name
@@ -248,6 +249,7 @@ instance Located TypeError where
   locOf (NotInScope n               ) = locOf n
   locOf (UnifyFailed _ _ l          ) = l
   locOf (KindUnifyFailed _ _ l      ) = l
+  locOf (NotKFunc _ l               ) = l
   locOf (RecursiveType _ _ l        ) = l
   locOf (AssignToConst         n    ) = locOf n
   locOf (UndefinedType         n    ) = locOf n

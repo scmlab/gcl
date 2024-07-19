@@ -52,6 +52,8 @@ instance Pretty TypeError where
     "Cannot unify:" <+> pretty a <+> "with" <+> pretty b
   pretty (KindUnifyFailed a b _) =
     "Cannot unify:" <+> pretty a <+> "with" <+> pretty b
+  pretty (NotKFunc k _) =
+    "Not a kind-level function: " <+> pretty k <+> " is not a kind-level function"
   pretty (RecursiveType v a _) =
     "Recursive type variable: " <+> pretty v <+> "in" <+> pretty a
   pretty (AssignToConst n) =
