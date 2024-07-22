@@ -609,7 +609,6 @@ unifyType (TArray _ t1 _) (TApp (TApp (TOp (Arrow _)) i _) t2 _) l = do
   s1 <- unifyType i (tInt NoLoc) l
   s2 <- unifyType t1 t2 l
   return (s2 `compose` s1)
--- TODO: Deal with any possible type operators.
 unifyType (TOp (Arrow _)) (TOp (Arrow _)) _ = pure mempty
 unifyType t1@(TData name1 _) t2@(TData name2 _) l = if name1 == name2 then pure mempty else throwError $ UnifyFailed t1 t2 l
 unifyType (TApp (TApp (TOp (Arrow _)) i _) t1 _) (TArray _ t2 _) l = do

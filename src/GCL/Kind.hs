@@ -38,28 +38,27 @@ collectTypeDefns typeDefns = do
         (\case
           KindAnno name kind -> (Index name, kind)
           UnsolvedUni _name -> error "Unsolved KMetaVar."
-          SolvedUni name kind -> (Index name, kind)) <$> newTypeDefnInfos
+          SolvedUni name kind -> (Index name, kind)) <$> defaultMeta newTypeDefnInfos
   let resolvedInfos = resolve newTypeDefnInfos' newTypeDefnInfos'
   modify (\(freshState, origTypeDefnInfos, origTypeInfos) -> (freshState, resolvedInfos <> origTypeDefnInfos, newTypeInfos' <> origTypeInfos))
   where
     -- This is an entry for "Typing Datatype Decl." several times, presented in page 53:8.
     inferDataTypes :: (Fresh m, MonadError TypeError m) => (TypeEnv, KindEnv) -> [(Name, [Name], [TypeDefnCtor], Loc)] -> m (TypeEnv, KindEnv)
     inferDataTypes (typeEnv, kindEnv) [] = do
-      return (typeEnv, defaultMeta kindEnv) -- TODO: Check if this is correct.
-      where
-        -- This is the "defaulting" mechanism presented in the paper.
-        -- TODO: Default unused type variable. (However, do we actually need this?)
-        defaultMeta :: KindEnv -> KindEnv
-        defaultMeta env =
-          (\case
-            KindAnno name kind -> KindAnno name kind
-            UnsolvedUni name -> SolvedUni name $ KStar $ locOf name
-            SolvedUni name kind -> SolvedUni name kind
-          ) <$> env
+      return (typeEnv, kindEnv)
     inferDataTypes (typeEnv, kindEnv) ((tyName, tyParams, ctors, loc) : dataTypesInfo) = do
       (typeEnv', kindEnv') <- inferDataType kindEnv tyName tyParams ctors loc
       (typeEnv'', kindEnv'') <- inferDataTypes (typeEnv', kindEnv') dataTypesInfo
       return (typeEnv <> typeEnv' <> typeEnv'', kindEnv'')
+      
+    -- This is the "defaulting" mechanism presented in the paper.
+    defaultMeta :: KindEnv -> KindEnv
+    defaultMeta env =
+      (\case
+        KindAnno name kind -> KindAnno name kind
+        UnsolvedUni name -> SolvedUni name $ KStar $ locOf name
+        SolvedUni name kind -> SolvedUni name kind
+      ) <$> env
 
     -- This is an entry for "Typing Datatype Decl.", presented in page 53:8.
     inferDataType :: (Fresh m, MonadError TypeError m) => KindEnv -> Name -> [Name] -> [TypeDefnCtor] -> Loc -> m (TypeEnv, KindEnv)
@@ -98,7 +97,7 @@ collectTypeDefns typeDefns = do
             inferCtors' :: (Fresh m, MonadError TypeError m) => KindEnv -> Name -> [Name] -> [Name] -> [TypeDefnCtor] -> m ([Type], KindEnv)
             inferCtors' env'' _ _ _ [] = return (mempty, env'')
             inferCtors' env'' tyName'' tyParamNames' freshNames (ctor : restOfCtors) = do
-              (ty, newEnv) <- inferCtor env'' tyName'' tyParamNames freshNames ctor
+              (ty, newEnv) <- inferCtor env'' tyName'' tyParamNames' freshNames ctor
               (tys, anotherEnv) <- inferCtors' newEnv tyName'' tyParamNames' freshNames restOfCtors
               return (ty : tys, newEnv <> anotherEnv)
 
@@ -197,7 +196,7 @@ inferKApp _ k1 k2 = do
 
 -- This is "Kind Unification" mentioned in 53:10 in the paper "Kind Inference for Datatypes".
 unifyKind :: (Fresh m, MonadError TypeError m) => KindEnv -> Kind -> Kind -> Loc -> m KindEnv
-unifyKind env (KStar _) (KStar _) _ = return env
+unifyKind env k1 k2 _ | k1 == k2 = return env
 unifyKind env (KFunc k1 k2 _) (KFunc k3 k4 _) _ = do
   env' <- unifyKind env k1 k3 (locOf k1)
   unifyKind env' (subst env' k2) (subst env' k4) (locOf k2)
@@ -234,7 +233,7 @@ promote env name (KFunc k1 k2 loc) = do
 promote env a (KMetaVar b) =
   case compare aIndex bIndex of
     Ord.LT -> return (KMetaVar b, env)
-    Ord.EQ -> return (KMetaVar b, env) -- TODO: This is possibly wrong since this case isn't mentioned in the paper.
+    Ord.EQ -> error "Should not happen."
     Ord.GT -> do
       b1 <- freshKindName
       case aIndex of
