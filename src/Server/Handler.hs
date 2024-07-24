@@ -30,29 +30,35 @@ import qualified Server.Handler.Hover          as Hover
 import qualified Server.Handler.SemanticTokens as SemanticTokens
 import qualified Server.Handler.Guabao.Reload  as Reload
 import qualified Server.Handler.Guabao.Refine  as Refine
-import Server.Monad (ServerM)
+import Server.Monad (ServerM, sendDebugMessage, logText)
 import Server.Load (load)
 import qualified Server.Handler.OnDidChangeTextDocument as OnDidChangeTextDocument
+import qualified Data.Text as Text
 
 -- handlers of the LSP server
 handlers :: Handlers ServerM
 handlers = mconcat
   [ -- "initialized" - after initialize
     notificationHandler LSP.SInitialized $ \_ntf -> do
+      logText "SInitialized is called.\n"
       Initialized.handler
   , -- "textDocument/didOpen" - after open
     notificationHandler LSP.STextDocumentDidOpen $ \ntf -> do
+      logText "STextDocumentDidOpen start\n"
       let uri            = ntf ^. (LSP.params . LSP.textDocument . LSP.uri)
       case LSP.uriToFilePath uri of
         Nothing       -> return ()
         Just filePath -> load filePath
+      logText "STextDocumentDidOpen end\n"
   , -- "textDocument/didChange" - after every edition
     notificationHandler LSP.STextDocumentDidChange $ \ntf -> do
+      logText "STextDocumentDidChange start\n"
       let uri        :: LSP.Uri = ntf ^. (LSP.params . LSP.textDocument . LSP.uri)
       let (LSP.List changes)    = ntf ^. (LSP.params . LSP.contentChanges)
       case LSP.uriToFilePath uri of
         Nothing       -> return ()
         Just filePath -> OnDidChangeTextDocument.handler filePath changes
+      logText "STextDocumentDidChange end\n"
   , -- "textDocument/completion" - auto-completion
     requestHandler LSP.STextDocumentCompletion $ \req responder -> do
       let completionContext = req ^. LSP.params . LSP.context
@@ -60,9 +66,11 @@ handlers = mconcat
       AutoCompletion.handler position completionContext >>= (responder . Right . LSP.InR)
   , -- "textDocument/definition" - go to definition
     requestHandler LSP.STextDocumentDefinition $ \req responder -> do
+      logText "STextDocumentDefinition is called.\n"
       let uri      = req ^. (LSP.params . LSP.textDocument . LSP.uri)
       let position = req ^. (LSP.params . LSP.position)
       GoToDefinition.handler uri position (responder . Right . LSP.InR . LSP.InR . LSP.List)
+      logText "STextDocumentDefinition is finished.\n"
   , -- "textDocument/hover" - get hover information
     requestHandler LSP.STextDocumentHover $ \req responder -> do
       let uri = req ^. (LSP.params . LSP.textDocument . LSP.uri)
@@ -84,20 +92,24 @@ jsonMiddleware :: (JSON.FromJSON params, JSON.ToJSON result, JSON.ToJSON error)
                   => CustomMethodHandler params result error
                   -> LSP.Handler ServerM (LSP.CustomMethod :: LSP.Method LSP.FromClient LSP.Request)
 jsonMiddleware handler req responder = do
+  logText "json: decoding request\n"
   let json = req ^. LSP.params
   case decodeMessageParams json of
-    Left error   -> responder (Left error)
+    Left error   -> do
+      logText "json: decoding failed with\n"
+      logText (Text.pack . show $ JSON.encode json)
+      responder (Left error)
     Right params -> do
+      logText "json: decoding succeeded\n"
       handler params
         (responder . Right . JSON.toJSON)
         (responder. Left . makeInternalError)
 
 decodeMessageParams :: forall a. JSON.FromJSON a => JSON.Value -> Either LSP.ResponseError a
 decodeMessageParams json = do
-  case JSON.fromJSON json :: JSON.Result [a] of
-    JSON.Success (params:[]) -> Right params
-    JSON.Success _            -> error "should not happen"
-    JSON.Error msg            -> Left (makeParseError "Json decoding failed.")
+  case JSON.fromJSON json :: JSON.Result a of
+    JSON.Success params -> Right params
+    JSON.Error msg            -> Left (makeParseError ("Json decoding failed." <> Text.pack msg))
 
 makeInternalError :: JSON.ToJSON e => e -> LSP.ResponseError
 makeInternalError error = LSP.ResponseError 

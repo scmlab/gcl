@@ -10,7 +10,7 @@ module Server.Handler.Guabao.Reload where
 
 import qualified Data.Aeson.Types as JSON
 import GHC.Generics ( Generic )
-import Server.Monad (ServerM, FileState(..), Versioned)
+import Server.Monad (ServerM, FileState(..), Versioned, sendDebugMessage)
 import Error (Error)
 import GCL.Predicate (Spec, PO)
 import Server.Load (load)
@@ -21,15 +21,8 @@ data ReloadParams = ReloadParams { filePath :: FilePath }
 instance JSON.FromJSON ReloadParams
 instance JSON.ToJSON ReloadParams
 
-data ReloadResult = ReloadResult
-  { specifications :: [Versioned Spec]
-  , proofObligations :: [PO]
-  }
-  deriving (Eq, Show, Generic)
-
-type ReloadError = Error
-
 handler :: ReloadParams -> (() -> ServerM ()) -> (() -> ServerM ()) -> ServerM ()
-handler ReloadParams{filePath} onResult onError = do
+handler ReloadParams{filePath} onResult _ = do
+  sendDebugMessage "guabao/reload is called."
   load filePath
   onResult ()

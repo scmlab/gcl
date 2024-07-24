@@ -1,3 +1,4 @@
+
 module Server where
 
 import           Control.Concurrent             ( forkIO
@@ -5,7 +6,7 @@ import           Control.Concurrent             ( forkIO
                                                 )
 import           Control.Monad.Except    hiding ( guard )
 import qualified Data.Text.IO                  as Text
-import           GHC.IO.IOMode                  ( IOMode(ReadWriteMode) )
+import           GHC.IO.IOMode                  ( IOMode(..) )
 import           Language.LSP.Server
 import qualified Language.LSP.Types            as LSP
                                          hiding ( TextDocumentSyncClientCapabilities(..)
@@ -15,55 +16,64 @@ import           Network.Simple.TCP             ( HostPreference(Host)
                                                 )
 import           Network.Socket                 ( socketToHandle )
 import           Server.Handler                 ( handlers )
-import Server.Monad (GlobalState, initGlobalEnv, runServerM, logChannel)
+import Server.Monad (initGlobalEnv, runServerM, logChannel, GlobalState)
+import qualified Data.Text as Text
 
 --------------------------------------------------------------------------------
 
--- entry point of the LSP server
-run :: Bool -> String -> IO Int
-run devMode port = do
+runOnPort :: String -> IO Int
+runOnPort port = do
   env <- initGlobalEnv
-  if devMode
-    then do
-      _threadId <- forkIO (printLog env)
-      serve (Host "127.0.0.1") port $ \(sock, _remoteAddr) -> do
-        putStrLn $ "== connection established at " ++ port ++ " =="
-        handle <- socketToHandle sock ReadWriteMode
-        _      <- runServerWithHandles handle handle (serverDefn env)
-        putStrLn "== dev server closed =="
-    else do
-      runServer (serverDefn env)
+  _threadId <- forkIO (printLog env)
+  serve (Host "127.0.0.1") port $ \(sock, _remoteAddr) -> do
+    putStrLn $ "== connection established at " ++ port ++ " =="
+    handle <- socketToHandle sock ReadWriteMode
+    _      <- runServerWithHandles handle handle (serverDefn env)
+    putStrLn "== dev server closed =="
  where
   printLog :: GlobalState -> IO ()
   printLog env = forever $ do
     result <- readChan (logChannel env)
-    when devMode $ do
-      Text.putStrLn result
-  serverDefn :: GlobalState -> ServerDefinition ()
-  serverDefn env = ServerDefinition
-    { defaultConfig         = ()
-    , onConfigurationChange = const $ pure $ Right ()
-    , doInitialize          = \ctxEnv _req -> pure $ Right ctxEnv
-    , staticHandlers        = handlers
-    , interpretHandler      = \ctxEnv -> Iso (runServerM env ctxEnv) liftIO
-    , options               = lspOptions
-    }
+    Text.putStrLn result
 
-  lspOptions :: Options
-  lspOptions = defaultOptions { textDocumentSync            = Just syncOptions
-                              , completionTriggerCharacters = Just ['\\']
-                              }
+-- entry point of the LSP server
+runOnStdio :: FilePath -> IO Int
+runOnStdio logFile = do
+  env <- initGlobalEnv
+  writeFile logFile "=== Log file Start ===\n"
+  _threadId <- forkIO (writeLog env)
+  runServer (serverDefn env)
+ where
+  writeLog :: GlobalState -> IO ()
+  writeLog env = forever $ do
+    result <- readChan (logChannel env)
+    appendFile logFile (Text.unpack result)
 
-  -- these `TextDocumentSyncOptions` are essential for receiving notifications from the client
-  syncOptions :: LSP.TextDocumentSyncOptions
-  syncOptions = LSP.TextDocumentSyncOptions
-    { LSP._openClose         = Just True -- receive open and close notifications from the client
-    , LSP._change            = Just LSP.TdSyncIncremental -- receive change notifications from the client
-    , LSP._willSave          = Just False -- receive willSave notifications from the client
-    , LSP._willSaveWaitUntil = Just False -- receive willSave notifications from the client
-    , LSP._save              = Just $ LSP.InR saveOptions
-    }
+serverDefn :: GlobalState -> ServerDefinition ()
+serverDefn env = ServerDefinition
+  { defaultConfig         = ()
+  , onConfigurationChange = const $ pure $ Right ()
+  , doInitialize          = \ctxEnv _req -> pure $ Right ctxEnv
+  , staticHandlers        = handlers
+  , interpretHandler      = \ctxEnv -> Iso (runServerM env ctxEnv) liftIO
+  , options               = lspOptions
+  }
 
-  -- includes the document content on save, so that we don't have to read it from the disk
-  saveOptions :: LSP.SaveOptions
-  saveOptions = LSP.SaveOptions (Just True)
+lspOptions :: Options
+lspOptions = defaultOptions { textDocumentSync            = Just syncOptions
+                            , completionTriggerCharacters = Just ['\\']
+                            }
+
+-- these `TextDocumentSyncOptions` are essential for receiving notifications from the client
+syncOptions :: LSP.TextDocumentSyncOptions
+syncOptions = LSP.TextDocumentSyncOptions
+  { LSP._openClose         = Just True -- receive open and close notifications from the client
+  , LSP._change            = Just LSP.TdSyncIncremental -- receive change notifications from the client
+  , LSP._willSave          = Just False -- receive willSave notifications from the client
+  , LSP._willSaveWaitUntil = Just False -- receive willSave notifications from the client
+  , LSP._save              = Just $ LSP.InR saveOptions
+  }
+
+-- includes the document content on save, so that we don't have to read it from the disk
+saveOptions :: LSP.SaveOptions
+saveOptions = LSP.SaveOptions (Just True)

@@ -16,14 +16,17 @@ import Server.PositionMapping( PositionResult( PositionExact ), fromDelta, Posit
 
 handler :: LSP.Uri -> LSP.Position -> ([LSP.LocationLink] -> ServerM ()) -> ServerM ()
 handler uri lspPosition responder = do
-  logText "<-- Goto Definition"
   case LSP.uriToFilePath uri of
     Nothing       -> responder []
     Just filePath -> do
       maybeFileState <- loadFileState filePath
       case maybeFileState of
-        Nothing                           -> responder []
-        Just (FileState{definitionLinks, positionDelta, toOffsetMap}) -> do
+        Nothing -> responder []
+        Just FileState
+              { definitionLinks
+              , positionDelta
+              , toOffsetMap
+              } -> do
           case (fromDelta positionDelta) lspPosition of
             PositionExact oldLspPosition -> do
               let oldPos = SrcLoc.fromLSPPosition toOffsetMap filePath oldLspPosition

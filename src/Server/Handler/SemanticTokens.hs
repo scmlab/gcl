@@ -11,10 +11,10 @@ import Server.PositionMapping (PositionDelta(..), PositionResult(..))
 
 handler :: LSP.Uri -> (Either LSP.ResponseError (Maybe LSP.SemanticTokens) -> ServerM ()) -> ServerM ()
 handler fileUri responder = do
+  logText "semantic token: start"
   case LSP.uriToFilePath fileUri of
     Nothing       -> respondError (LSP.ResponseError LSP.InvalidParams "Invalid uri" Nothing)
     Just filePath -> do
-      logText "\n ---> Syntax Highlighting"
       maybeFileState <- loadFileState filePath
       case maybeFileState of
         Nothing                          -> respondError (LSP.ResponseError LSP.ServerNotInitialized "Please reload before requesting for semantic tokens." Nothing)

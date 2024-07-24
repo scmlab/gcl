@@ -14,9 +14,9 @@ import Error (Error)
 import GCL.Predicate (Spec(..), PO(..), Origin(..))
 import GCL.WP.Type (StructWarning(..))
 import Server.SrcLoc (toLSPRange)
-import qualified Language.LSP.Types as LSP
-import qualified Data.Text as Text
+import           Pretty.Predicate               ( )
 import Data.Loc (Loc(..), Pos(..))
+import Data.Text.Prettyprint.Doc
 
 sendUpdateNotification :: FilePath -> [Error] -> ServerM ()
 sendUpdateNotification filePath errors = do
@@ -30,18 +30,18 @@ sendUpdateNotification filePath errors = do
 makeUpdateNotificationJson :: FilePath -> FileState -> [Error] -> JSON.Value
 makeUpdateNotificationJson filePath FileState{specifications, proofObligations, warnings} errors = JSON.object
   [ "filePath" .= JSON.toJSON filePath
-  , "specs" .= JSON.toJSON specifications
-  , "pos" .= JSON.toJSON proofObligations
+  , "specs" .= JSON.toJSON (map snd specifications)
+  , "pos" .= JSON.toJSON (map snd proofObligations)
   , "warnings" .= JSON.toJSON warnings
   , "errors" .= JSON.toJSON errors
   ]
 
 instance JSON.ToJSON Spec where
   toJSON :: Spec -> JSON.Value
-  toJSON Specification{..} = 
+  toJSON Specification{..} =
     object [ "id" .= JSON.toJSON (show specID)
-           , "preCondition" .= JSON.toJSON (show specPreCond)
-           , "postCondition" .= JSON.toJSON (show specPostCond)
+           , "preCondition" .= JSON.toJSON (show $ pretty specPreCond)
+           , "postCondition" .= JSON.toJSON (show $ pretty specPostCond)
            , "specRange" .= JSON.toJSON (toLSPRange specRange)
            ]
 
@@ -59,8 +59,8 @@ instance JSON.ToJSON StructWarning where
 instance JSON.ToJSON PO where
   toJSON :: PO -> JSON.Value
   toJSON PO{..} = object
-    [ "assumption"    .= JSON.toJSON (show poPre)
-    , "goal"          .= JSON.toJSON (show poPost)
+    [ "assumption"    .= JSON.toJSON (show $ pretty poPre)
+    , "goal"          .= JSON.toJSON (show $ pretty poPost)
     , "hash"          .= JSON.toJSON poAnchorHash
     , "proofLocation" .= case poAnchorLoc of
                           Nothing     -> JSON.Null
@@ -69,15 +69,15 @@ instance JSON.ToJSON PO where
     ]
 
 locToJson :: Loc -> JSON.Value
-locToJson NoLoc = object []
-locToJson (Loc (Pos filePath line _ character) (Pos _ line' _ character')) = object
+locToJson NoLoc = JSON.Null
+locToJson (Loc (Pos filePath line column _) (Pos _ line' column' _)) = object
   [ "filePath" .= JSON.toJSON filePath
   , "start"    .= object
     ["line"       .= line
-    , "character" .= character]
+    , "character" .= column]
   , "end"      .= object
     ["line"       .= line'
-    , "character" .= character']
+    , "character" .= column']
   ]
 
 

@@ -13,22 +13,34 @@ import Server.PositionMapping (PositionDelta, toCurrentRange, PositionMapping(..
 import Server.Monad (ServerM, FileState (..), loadFileState, logText)
 
 handler :: LSP.Uri -> LSP.Position -> (Maybe LSP.Hover -> ServerM ()) -> ServerM ()
-handler uri lspPosition responder =do
-  logText "<-- Goto Definition"
+handler uri lspPosition responder = do
+  logText "hover: start\n"
   case LSP.uriToFilePath uri of
-    Nothing       -> responder Nothing
+    Nothing       -> do
+      logText "hover: failed - uri not valid\n"
+      responder Nothing
     Just filePath -> do
       maybeFileState <- loadFileState filePath
       case maybeFileState of
-        Nothing                           -> responder Nothing
+        Nothing                           -> do
+          logText "hover: failed - not loaded yet\n"
+          responder Nothing
         Just FileState{hoverInfos, positionDelta, toOffsetMap} -> do
           case fromDelta positionDelta lspPosition of
             PositionExact oldLspPosition -> do
               let oldPos = SrcLoc.fromLSPPosition toOffsetMap filePath oldLspPosition
               case IntervalMap.lookup oldPos hoverInfos of
-                Nothing             -> responder Nothing
-                Just (hover, _type) -> responder $ Just $ toCurrentHover positionDelta hover
-            _                            -> responder Nothing
+                Nothing             -> do
+                  logText "hover: not exist - no information for this position\n"
+                  responder Nothing
+                Just (hover, _type) -> do
+                  logText "hover: success\n"
+                  responder $ Just $ toCurrentHover positionDelta hover
+                  logText "hover: response sent\n"
+            _                            -> do
+              logText "hover: not exist - new position after last reload\n"
+              responder Nothing
+  logText "hover: end\n"
 
 toCurrentHover :: PositionDelta -> LSP.Hover -> LSP.Hover
 toCurrentHover positionDelta (LSP.Hover contents maybeRange)

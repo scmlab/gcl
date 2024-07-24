@@ -12,7 +12,7 @@ module Server.Handler.Guabao.Refine where
 import qualified Data.Aeson.Types as JSON
 import GHC.Generics ( Generic )
 import Control.Monad.Except           ( runExcept )
-import Server.Monad (ServerM, FileState(..), loadFileState, editTexts, pushSpecs, deleteSpec, Versioned)
+import Server.Monad (ServerM, FileState(..), loadFileState, editTexts, pushSpecs, deleteSpec, Versioned, pushPos)
 import Server.Notification.Update (sendUpdateNotification)
 
 import qualified Syntax.Parser                as Parser
@@ -68,9 +68,9 @@ handler _params@RefineParams{filePath, specRange, specText} onSuccess onError = 
       case digImplHoles filePath implText of
         Left err -> onError (ParseError err)
         Right holessImplText -> do
-          -- use specStart as the starting position in parse/toAbstract/elaborate
           let (Range specStart _) = specRange
           -- text to concrete
+          -- (use specStart as the starting position in parse/toAbstract/elaborate)
           case parseFragment specStart holessImplText of
             Left err           -> onError (ParseError err)
             Right concreteImpl -> do
@@ -104,6 +104,7 @@ handler _params@RefineParams{filePath, specRange, specText} onSuccess onError = 
                                 -- add inner specs to fileState
                                 let FileState{editedVersion} = fileState
                                 pushSpecs (editedVersion + 1) filePath innerSpecs
+                                pushPos (editedVersion + 1) filePath innerPos
                                 -- send notification to update Specs and POs
                                 sendUpdateNotification filePath []
 

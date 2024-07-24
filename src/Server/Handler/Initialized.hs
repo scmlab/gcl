@@ -17,9 +17,5 @@ handler = do
           LSP.MtInfo
           "GCL Server Initialized."
           Nothing
-  _ <- LSP.sendRequest LSP.SWindowShowMessageRequest requestParams $ \case
-      Right _ ->
-        LSP.sendNotification LSP.SWindowShowMessage (LSP.ShowMessageParams LSP.MtInfo "BTW, nice to meet you!")
-      Left err ->
-        LSP.sendNotification LSP.SWindowShowMessage (LSP.ShowMessageParams LSP.MtError $ "Oops, something went wrong...\n" <> Text.pack (show err))
+  _ <- LSP.sendRequest LSP.SWindowShowMessageRequest requestParams $ \_ -> return ()
   return ()

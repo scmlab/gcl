@@ -39,6 +39,7 @@ import qualified Data.Text as Text
 import Data.Loc (posCol)
 import Data.Version (Version(Version))
 import GCL.WP.Type (StructWarning)
+import Language.LSP.Types.Lens (HasMessage(message))
 
 -- | State shared by all clients and requests
 data GlobalState = GlobalState
@@ -52,7 +53,7 @@ data FileState = FileState
     -- main states for Reload and Refine
   { refinedVersion   :: Int  -- the version number of the last refine
   , specifications   :: [Versioned Spec] -- editedVersion or (editedVersion + 1)
-  , proofObligations :: [PO] -- editedVersion
+  , proofObligations :: [Versioned PO] -- editedVersion
   , warnings         :: [StructWarning]
 
   -- to support other LSP methods in a light-weighted manner
@@ -128,6 +129,12 @@ pushSpecs version filePath newSpecs = do
   modifyFileState filePath (\fileState@FileState{specifications} ->
     fileState{specifications = specifications ++ newVersionedSpecs})
 
+pushPos :: Int -> FilePath -> [PO] -> ServerM ()
+pushPos version filePath newPos = do
+  let newVersionedPos :: [Versioned PO] = Prelude.map (\po -> (version, po)) newPos
+  modifyFileState filePath (\fileState@FileState{proofObligations} ->
+    fileState{proofObligations = proofObligations ++ newVersionedPos})
+
 deleteSpec :: FilePath -> Spec -> ServerM ()
 deleteSpec filePath Specification{specID = targetSpecId} = do
   modifyFileState filePath (\filesState@FileState{specifications} ->
@@ -191,6 +198,16 @@ digHoles filePath ranges onFinish = do
   let indent range = Text.replicate (posCol (rangeStart range) - 1) " "
   let diggedText range = "[!\n" <> indent range <> "\n" <> indent range <> "!]"
   editTexts filePath (Prelude.map (\range -> (range, diggedText range)) ranges) onFinish
+
+sendDebugMessage :: Text -> ServerM ()
+sendDebugMessage message = do
+  let requestParams =
+        LSP.ShowMessageRequestParams
+          LSP.MtInfo
+          message
+          Nothing
+  LSP.sendRequest LSP.SWindowShowMessageRequest requestParams (\_ -> return ())
+  return ()
 
 -- --------------------------------------------------------------------------------
 

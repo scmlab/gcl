@@ -6,7 +6,7 @@ module Server.Load where
 
 
 
-import Server.Monad (ServerM, FileState(..), loadFileState, saveFileState, readSource, digHoles)
+import Server.Monad (ServerM, FileState(..), loadFileState, saveFileState, readSource, digHoles, logText, logText)
 import Data.Text (Text)
 
 import Data.Loc.Range (Range)
@@ -24,14 +24,15 @@ import Control.Monad.Except (runExcept)
 import Server.PositionMapping (idDelta)
 import qualified Server.SrcLoc                 as SrcLoc
 import qualified GCL.Type as TypeChecking
-import Data.Map (singleton)
 import GCL.WP.Type (StructError, StructWarning)
 import GCL.Predicate (PO, Spec)
 import Server.Notification.Update (sendUpdateNotification)
+import qualified Data.Text as Text
+import qualified Data.Aeson as JSON
 
 load :: FilePath -> ServerM ()
 load filePath = do
-
+  logText "load: start\n"
   maybeFileState <- loadFileState filePath
   let currentVersion = case maybeFileState of
                         Nothing -> 0
@@ -40,47 +41,76 @@ load filePath = do
   -- read source
   maybeSource <- readSource filePath
   case maybeSource of
-    Nothing     -> onError (CannotReadFile filePath)
-    Just source ->
+    Nothing     -> do
+      logText "  read error"
+      onError (CannotReadFile filePath)
+    Just source -> do
+      logText "  source read \n"
       -- parse source into concrete syntax
       case parse filePath source of
-        Left err       -> onError err
-        Right concrete ->
+        Left err       -> do
+          logText "  parse error"
+          onError err
+        Right concrete -> do
+          logText "  source parsed \n"
           case reportHolesOrToAbstract concrete of
-            Left holes -> digHoles filePath holes do
-              load filePath
-            Right abstract -> case WP.sweep abstract of
-              Left  err -> onError (StructError err)
-              Right (pos, specs, warnings, redexes, counter) -> do
-                case elaborate abstract of
-                  Left err        -> onError err
-                  Right elaborated -> do
-                    let fileState = FileState
-                                      { refinedVersion   = currentVersion
-                                      , specifications   = map (\spec -> (currentVersion, spec)) specs
-                                      , proofObligations = pos
+            Left holes -> do
+              logText "  should dig holes\n"
+              digHoles filePath holes do
+                logText "  holes digged\n"
+                load filePath
+            Right abstract -> do
+              logText "  all holes digged\n"
+              case WP.sweep abstract of
+                Left  err -> do
+                  logText "  sweep error\n"
+                  onError (StructError err)
+                Right (pos, specs, warnings, redexes, counter) -> do
+                  logText "  abstract program generated\n"
+                  case elaborate abstract of
+                    Left err        -> do
+                      logText "  elaborate error\n"
+                      onError err
+                    Right elaborated -> do
+                      logText "  program elaborated\n"
+                      let fileState = FileState
+                                        { refinedVersion   = currentVersion
+                                        , specifications   = map (\spec -> (currentVersion, spec)) specs
+                                        , proofObligations = map (\po -> (currentVersion, po)) pos
+                                        , warnings         = warnings
 
-                                      -- to support other LSP methods in a light-weighted manner
-                                      , loadedVersion    = currentVersion
-                                      , toOffsetMap      = SrcLoc.makeToOffset source
-                                      , concrete         = concrete
-                                      , semanticTokens   = collectHighlighting concrete
-                                      , abstract         = abstract
-                                      , variableCounter  = counter
-                                      , definitionLinks  = collectLocationLinks abstract
-                                      , elaborated       = elaborated
-                                      , hoverInfos       = collectHoverInfo elaborated
+                                        -- to support other LSP methods in a light-weighted manner
+                                        , loadedVersion    = currentVersion
+                                        , toOffsetMap      = SrcLoc.makeToOffset source
+                                        , concrete         = concrete
+                                        , semanticTokens   = collectHighlighting concrete
+                                        , abstract         = abstract
+                                        , variableCounter  = counter
+                                        , definitionLinks  = collectLocationLinks abstract
+                                        , elaborated       = elaborated
+                                        , hoverInfos       = collectHoverInfo elaborated
 
-                                      , positionDelta   = idDelta
-                                      , editedVersion    = currentVersion
-                                      }
-                    saveFileState filePath fileState
-                    onSuccess
+                                        , positionDelta   = idDelta
+                                        , editedVersion    = currentVersion
+                                        }
+                      logText "  fileState created\n"
+                      saveFileState filePath fileState
+                      logText "  fileState updated\n"
+                      onSuccess
+  logText "load: end\n"
   where
     onSuccess :: ServerM ()
-    onSuccess = sendUpdateNotification filePath []
+    onSuccess = do
+      logText "load: success\n"
+      sendUpdateNotification filePath []
+      logText "load: update notification sent\n"
     onError :: Error -> ServerM ()
-    onError err = sendUpdateNotification filePath [err]
+    onError err = do
+      logText "load: error\n\t"
+      logText $ Text.pack (show $ JSON.encode err)
+      logText "\n"
+      sendUpdateNotification filePath [err]
+      logText "load: update notification sent\n"
 
 parse :: FilePath -> Text -> Either Error C.Program
 parse filepath source =
