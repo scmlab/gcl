@@ -163,12 +163,12 @@ data Spec = Specification
   , specPreCond  :: Pred
   , specPostCond :: Pred
   , specRange    :: Range
-  -- , specTypeEnv :: TypeEnv
+  , specTypeEnv  :: TypeEnv
   }
   deriving (Eq, Show, Generic)
 
 instance Located Spec where
-  locOf (Specification _ _ _ l) = locOf l
+  locOf (Specification _ _ _ l _) = locOf l
 
 instance Ranged Spec where
-  rangeOf (Specification _ _ _ r) = r
+  rangeOf (Specification _ _ _ r _) = r
