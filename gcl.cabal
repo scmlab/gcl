@@ -95,6 +95,9 @@ library
       Syntax.Parser.Util
       Syntax.Substitution
       Syntax.Typed
+      Syntax.Typed.Instances.Located
+      Syntax.Typed.Operator
+      Syntax.Typed.Types
   other-modules:
       Paths_gcl
   hs-source-dirs:
@@ -255,6 +258,9 @@ test-suite gcl-test
       Syntax.Parser.Util
       Syntax.Substitution
       Syntax.Typed
+      Syntax.Typed.Instances.Located
+      Syntax.Typed.Operator
+      Syntax.Typed.Types
       Paths_gcl
   hs-source-dirs:
       test
