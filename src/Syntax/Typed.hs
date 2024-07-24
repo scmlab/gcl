@@ -1,4 +1,7 @@
-module Syntax.Typed where
+module Syntax.Typed (
+  module Syntax.Typed,
+  Lit, Type
+  ) where
 
 import Data.Text ( Text )
 import Data.Loc ( Loc )
@@ -7,63 +10,63 @@ import Syntax.Abstract.Types ( Lit, Type )
 import Syntax.Common.Types ( Name, Op )
 import GCL.Common ( TypeEnv )
 
-data TypedProgram = Program [TypedDefinition] -- definitions (the functional language part)
-                            [TypedDeclaration] -- constant and variable declarations
-                            [TypedExpr] -- global properties
-                            [TypedStmt] -- main program
-                            Loc
+data Program = Program [Definition] -- definitions (the functional language part)
+                       [Declaration] -- constant and variable declarations
+                       [Expr] -- global properties
+                       [Stmt] -- main program
+                       Loc
   deriving (Eq, Show)
 
-data TypedDefinition
-  = TypeDefn Name [Name] [TypedTypeDefnCtor] Loc
-  | FuncDefnSig Name Type (Maybe TypedExpr) Loc
-  | FuncDefn Name TypedExpr
+data Definition
+  = TypeDefn Name [Name] [TypeDefnCtor] Loc
+  | FuncDefnSig Name Type (Maybe Expr) Loc
+  | FuncDefn Name Expr
   deriving (Eq, Show)
 
-data TypedTypeDefnCtor = TypedTypeDefnCtor Name [Name]
+data TypeDefnCtor = TypeDefnCtor Name [Name]
   deriving (Eq, Show)
 
-data TypedDeclaration
-  = ConstDecl [Name] Type (Maybe TypedExpr) Loc
-  | VarDecl [Name] Type (Maybe TypedExpr) Loc
+data Declaration
+  = ConstDecl [Name] Type (Maybe Expr) Loc
+  | VarDecl [Name] Type (Maybe Expr) Loc
   deriving (Eq, Show)
 
-data TypedStmt
+data Stmt
   = Skip Loc
   | Abort Loc
-  | Assign [Name] [TypedExpr] Loc
-  | AAssign TypedExpr TypedExpr TypedExpr Loc
-  | Assert TypedExpr Loc
-  | LoopInvariant TypedExpr TypedExpr Loc
-  | Do [TypedGdCmd] Loc
-  | If [TypedGdCmd] Loc
+  | Assign [Name] [Expr] Loc
+  | AAssign Expr Expr Expr Loc
+  | Assert Expr Loc
+  | LoopInvariant Expr Expr Loc
+  | Do [GdCmd] Loc
+  | If [GdCmd] Loc
   | Spec Text Range TypeEnv
   | Proof Text Text Range
-  | Alloc   Name [TypedExpr] Loc    --  p := new (e1,e2,..,en)
-  | HLookup Name TypedExpr Loc      --  x := *e
-  | HMutate TypedExpr TypedExpr Loc --  *e1 := e2
-  | Dispose TypedExpr Loc           --  dispose e
-  | Block TypedProgram Loc
+  | Alloc   Name [Expr] Loc    --  p := new (e1,e2,..,en)
+  | HLookup Name Expr Loc      --  x := *e
+  | HMutate Expr Expr Loc --  *e1 := e2
+  | Dispose Expr Loc           --  dispose e
+  | Block Program Loc
   deriving (Eq, Show)
 
-data TypedGdCmd = TypedGdCmd TypedExpr [TypedStmt] Loc
+data GdCmd = GdCmd Expr [Stmt] Loc
   deriving (Eq, Show)
 
-data TypedExpr
+data Expr
   = Lit Lit Type Loc
   | Var Name Type Loc
   | Const Name Type Loc
   | Op Op Type
-  | Chain TypedChain
-  | App TypedExpr TypedExpr Loc
-  | Lam Name Type TypedExpr Loc
-  | Quant TypedExpr [Name] TypedExpr TypedExpr Loc
-  | ArrIdx TypedExpr TypedExpr Loc
-  | ArrUpd TypedExpr TypedExpr TypedExpr Loc
+  | Chain Chain
+  | App Expr Expr Loc
+  | Lam Name Type Expr Loc
+  | Quant Expr [Name] Expr Expr Loc
+  | ArrIdx Expr Expr Loc
+  | ArrUpd Expr Expr Expr Loc
   deriving (Eq, Show)
   -- FIXME: Other constructors.
 
-data TypedChain
-  = Pure TypedExpr
-  | More TypedChain Op Type TypedExpr
+data Chain
+  = Pure Expr
+  | More Chain Op Type Expr
   deriving (Eq, Show)

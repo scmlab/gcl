@@ -65,7 +65,7 @@ data FileState = FileState
   , variableCounter  :: Int
   , definitionLinks  :: IntervalMap LSP.LocationLink
   , hoverInfos       :: IntervalMap (LSP.Hover, Abstract.Type)
-  , elaborated       :: Typed.TypedProgram
+  , elaborated       :: Typed.Program
   , positionDelta    :: PositionDelta   -- loadedVersion ~> editedVersion
   , editedVersion    :: Int  -- the version number of the last change
   }
@@ -85,7 +85,7 @@ runServerM :: GlobalState -> LSP.LanguageContextEnv () -> ServerM a -> IO a
 runServerM globalState ctxEnv program = runReaderT (LSP.runLspT ctxEnv program) globalState
 
 --------------------------------------------------------------------------------
--- | Helper functions for side effects 
+-- | Helper functions for side effects
 
 -- display Text
 logText :: Text -> ServerM ()
@@ -220,7 +220,7 @@ sendDebugMessage message = do
 --   let responses =
 --         [ResDisplay version (map renderSection errors), ResUpdateSpecs []]
 
---   -- collect Diagnostics from [Error] 
+--   -- collect Diagnostics from [Error]
 --   let diagnostics = errors >>= collect
 
 --   return (responses, diagnostics)
@@ -278,7 +278,7 @@ sendDebugMessage message = do
 --       <> toText (length diagnosticsFromError)
 --       <> " diagnostics"
 
---     -- send diagnostics 
+--     -- send diagnostics
 --     sendDiagnosticsLSP filepath diagnosticsFromError
 --     -- send responses
 --     J.sendNotification (J.SCustomMethod "guabao") $ JSON.toJSON $ Res
