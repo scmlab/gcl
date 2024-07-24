@@ -23,6 +23,5 @@ instance JSON.ToJSON ReloadParams
 
 handler :: ReloadParams -> (() -> ServerM ()) -> (() -> ServerM ()) -> ServerM ()
 handler ReloadParams{filePath} onResult _ = do
-  sendDebugMessage "guabao/reload is called."
   load filePath
   onResult ()

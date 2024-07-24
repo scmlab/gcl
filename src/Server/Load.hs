@@ -1,6 +1,7 @@
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE LambdaCase #-}
 
 module Server.Load where
 
@@ -29,6 +30,7 @@ import GCL.Predicate (PO, Spec)
 import Server.Notification.Update (sendUpdateNotification)
 import qualified Data.Text as Text
 import qualified Data.Aeson as JSON
+import Pretty (Pretty(..))
 
 load :: FilePath -> ServerM ()
 load filePath = do
@@ -53,7 +55,11 @@ load filePath = do
           onError err
         Right concrete -> do
           logText "  source parsed \n"
+          reportHolesOrToAbstract' concrete
           case reportHolesOrToAbstract concrete of
+            Left [] -> do
+              logText "  should not happen\n"
+              logText . Text.pack $ show concrete
             Left holes -> do
               logText "  should dig holes\n"
               digHoles filePath holes do
@@ -118,6 +124,21 @@ parse filepath source =
     Left  err   -> Left (ParseError err)
     Right concrete -> Right concrete
 
+reportHolesOrToAbstract' :: C.Program -> ServerM ()
+reportHolesOrToAbstract' concrete@(C.Program decls stmts) = do
+  case collectHoles concrete of
+    []    -> do
+      logText "no holes collected\n"
+      case runExcept $ C.toAbstract concrete of
+        Left hole         -> do
+          logText "should dig all holes before calling Concrete.toAbstract, but found\n"
+          (logText . Text.pack . show . pretty) hole
+
+        Right abstract -> return ()
+    holes -> do
+      logText "holes found:\n"
+      logText (Text.pack . show . pretty $ holes)
+
 reportHolesOrToAbstract :: C.Program -> Either [Range] A.Program
 reportHolesOrToAbstract concrete =
   case collectHoles concrete of
@@ -130,7 +151,7 @@ collectHoles :: C.Program -> [Range]
 collectHoles (C.Program _ statements) = do
   statement <- statements
   case statement of
-    C.SpecQM range -> return range
+    C.SpecQM range -> [range]
     _ -> []
 
 elaborate :: A.Program -> Either Error T.TypedProgram
@@ -141,3 +162,4 @@ elaborate abstract = do
 
 sweepElaborated :: T.TypedProgram -> Either StructError ([PO], [Spec], [StructWarning])
 sweepElaborated elaborated = error "TODO"
+

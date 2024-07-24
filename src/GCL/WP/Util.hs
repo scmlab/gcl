@@ -101,7 +101,7 @@ tellSpec p q l = do
   p' <- substitute [] [] p
   q' <- substitute [] [] q
   i  <- countUp
-  tell ([], [Specification i p' q' l undefined], [], mempty) -- FIXME: Important!
+  tell ([], [Specification i p' q' l [{- this version of tellSpec will be deprecated and replaced with one that forwards the typing context -}]], [], mempty)
 
 throwWarning :: StructWarning -> WP ()
 throwWarning warning = tell ([], [], [warning], mempty)
