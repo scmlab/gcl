@@ -40,7 +40,7 @@ import           Prelude                 hiding ( EQ
 import           Syntax.Abstract
 import           Syntax.Abstract.Util
 import           Syntax.Common
-import qualified Syntax.Typed                  as Typed
+import qualified Syntax.Typed                  as T
 
 data TypeError
     = NotInScope Name
@@ -138,7 +138,7 @@ instance CollectIds [Definition] where
     duplicationCheck $ ((\(FuncDefn name _) -> name) <$> funcDefns) <> gatherCtorNames typeDefns
     -- Gather the type definitions.
     -- Type definitions are collected first because signatures and function definitions may depend on them.
-    collectTypeDefns typeDefns 
+    collectTypeDefns typeDefns
     -- Add signatures into the state one by one.
     collectFuncSigs funcSigs
     -- Get the original explicit signatures.
@@ -187,7 +187,7 @@ instance CollectIds [Definition] where
             d @ FuncDefnSig {} -> (typeDefns, d : sigs, funcDefns)
             d @ FuncDefn {} -> (typeDefns, sigs, d : funcDefns)
         ) mempty defs
-      
+
       gatherCtorNames :: [Definition] -> [Name]
       gatherCtorNames defs = do
         def <- defs
@@ -219,7 +219,7 @@ instance CollectIds [Definition] where
 
       collectFuncSigs :: [Definition] -> ElaboratorM ()
       collectFuncSigs funcSigs =
-        mapM_ (\(FuncDefnSig n t _ _) -> do 
+        mapM_ (\(FuncDefnSig n t _ _) -> do
           let infos = (Index n, ConstTypeInfo t)
           modify (\(freshState, typeDefnInfos, origInfos) -> (freshState, typeDefnInfos, infos : origInfos))
         ) funcSigs
@@ -244,14 +244,14 @@ instance CollectIds Declaration where
 
 -- The type family `Typed` turns data into its typed version.
 type family Typed untyped where
-  Typed Definition = Typed.TypedDefinition
-  Typed Declaration = Typed.TypedDeclaration
-  Typed TypeDefnCtor = Typed.TypedTypeDefnCtor
-  Typed Program = Typed.TypedProgram
-  Typed Stmt = Typed.TypedStmt
-  Typed GdCmd = Typed.TypedGdCmd
-  Typed Expr = Typed.TypedExpr
-  Typed Chain = Typed.TypedChain
+  Typed Definition = T.Definition
+  Typed Declaration = T.Declaration
+  Typed TypeDefnCtor = T.TypeDefnCtor
+  Typed Program = T.Program
+  Typed Stmt = T.Stmt
+  Typed GdCmd = T.GdCmd
+  Typed Expr = T.Expr
+  Typed Chain = T.Chain
   Typed Name = Name
   Typed ChainOp = Op
   Typed ArithOp = Op
@@ -297,7 +297,7 @@ instance Elab Program where
                           let (_, typed, _) = typedStmt
                           return typed
                        ) stmts
-    return (Nothing, Typed.Program typedDefns typedDecls typedExprs typedStmts loc, mempty)
+    return (Nothing, T.Program typedDefns typedDecls typedExprs typedStmts loc, mempty)
    where
     collectTCon (TypeDefn n args _ _) = [(Index n, TypeDefnInfo args)]
     collectTCon _                     = []
@@ -310,7 +310,7 @@ instance Elab Definition where
                       (_, typed, _) <- elaborate ctor env
                       return typed
                    ) ctors
-    return (Nothing, Typed.TypeDefn name args ctors' loc, mempty)
+    return (Nothing, T.TypeDefn name args ctors' loc, mempty)
    where
     scopeCheck :: MonadError TypeError m => Set.Set Name -> Name -> m ()
     scopeCheck m n = if Set.member n m then return () else throwError $ NotInScope n
@@ -319,28 +319,28 @@ instance Elab Definition where
                     (_, typed, _) <- elaborate expr env
                     return typed
                   ) maybeExpr
-    return (Nothing, Typed.FuncDefnSig name ty expr' loc, mempty)
+    return (Nothing, T.FuncDefnSig name ty expr' loc, mempty)
   elaborate (FuncDefn name expr) env = do
     (_, typed, _) <- elaborate expr env
-    return (Nothing, Typed.FuncDefn name typed, mempty)
+    return (Nothing, T.FuncDefn name typed, mempty)
 
 instance Elab TypeDefnCtor where
   elaborate (TypeDefnCtor name ts) _ = do
-    return (Nothing, Typed.TypedTypeDefnCtor name ts, mempty)
+    return (Nothing, T.TypeDefnCtor name ts, mempty)
 
 instance Elab Declaration where
   elaborate (ConstDecl names ty prop loc) env =
     case prop of
       Just p -> do
         (_, p', _) <- elaborate p env
-        return (Nothing, Typed.ConstDecl names ty (Just p') loc, mempty)
-      Nothing -> return (Nothing, Typed.ConstDecl names ty Nothing loc, mempty)
+        return (Nothing, T.ConstDecl names ty (Just p') loc, mempty)
+      Nothing -> return (Nothing, T.ConstDecl names ty Nothing loc, mempty)
   elaborate (VarDecl names ty prop loc) env =
     case prop of
       Just p -> do
         (_, p', _) <- elaborate p env
-        return (Nothing, Typed.VarDecl names ty (Just p') loc, mempty)
-      Nothing -> return (Nothing, Typed.VarDecl names ty Nothing loc, mempty)
+        return (Nothing, T.VarDecl names ty (Just p') loc, mempty)
+      Nothing -> return (Nothing, T.VarDecl names ty Nothing loc, mempty)
 
 -- This function is used during elaborating stmts.
 checkAssign :: [(Index, TypeInfo)] -> Name -> ElaboratorM Type
@@ -351,8 +351,8 @@ checkAssign infos name = do
     Nothing              -> throwError $ NotInScope name
 
 instance Elab Stmt where
-  elaborate (Skip  loc     ) _ = return (Nothing, Typed.Skip loc, mempty)
-  elaborate (Abort loc     ) _ = return (Nothing, Typed.Abort loc, mempty)
+  elaborate (Skip  loc     ) _ = return (Nothing, T.Skip loc, mempty)
+  elaborate (Abort loc     ) _ = return (Nothing, T.Abort loc, mempty)
   elaborate (Assign names exprs loc) env = do
     duplicationCheck names
     let ass = zip names exprs
@@ -368,7 +368,7 @@ instance Elab Stmt where
                           _ <- unifies ty (fromJust ty') $ locOf expr
                           return typedExpr
                        ) ass
-        return (Nothing, Typed.Assign names exprs' loc, mempty)
+        return (Nothing, T.Assign names exprs' loc, mempty)
   elaborate (AAssign arr index e loc) env = do
     tv <- freshVar
     (arrTy, typedArr, arrSub) <- elaborate arr env
@@ -377,12 +377,12 @@ instance Elab Stmt where
     uniSubArr <- unifies (subst (indexSub `compose` uniSubIndex) (fromJust arrTy)) (TFunc (tInt NoLoc) tv NoLoc) (locOf arr)
     (eTy, typedE, eSub) <- elaborate e $ subst (uniSubArr `compose` uniSubIndex `compose` indexSub `compose` arrSub) env
     _ <- unifies (subst eSub $ fromJust eTy) (subst uniSubArr tv) (locOf e)
-    return (Nothing, Typed.AAssign typedArr typedIndex typedE loc, mempty)
+    return (Nothing, T.AAssign typedArr typedIndex typedE loc, mempty)
   elaborate (Assert expr loc        ) env = do
     (ty, _, sub) <- elaborate expr env
     _ <- unifies (subst sub $ fromJust ty) (tBool NoLoc) (locOf expr)
     (_, typedExpr, _) <- elaborate expr env
-    return (Nothing, Typed.Assert typedExpr loc, mempty)
+    return (Nothing, T.Assert typedExpr loc, mempty)
   elaborate (LoopInvariant e1 e2 loc) env = do
     (ty1, _, sub1) <- elaborate e1 env
     _ <- unifies (subst sub1 $ fromJust ty1) (tBool NoLoc) (locOf e1)
@@ -390,23 +390,23 @@ instance Elab Stmt where
     (ty2, _, sub2) <- elaborate e2 env
     _ <- unifies (subst sub2 $ fromJust ty2) (tInt NoLoc) (locOf e2)
     (_, e2', _) <- elaborate e2 env
-    return (Nothing, Typed.LoopInvariant e1' e2' loc, mempty)
+    return (Nothing, T.LoopInvariant e1' e2' loc, mempty)
   elaborate (Do gds loc) env = do
     gds' <- mapM (\gd -> do
                   (_, typed, _) <- elaborate gd env
                   return typed
                  ) gds
-    return (Nothing, Typed.Do gds' loc, mempty)
+    return (Nothing, T.Do gds' loc, mempty)
   elaborate (If gds loc) env = do
     gds' <- mapM (\gd -> do
                   (_, typed, _) <- elaborate gd env
                   return typed
                  ) gds
-    return (Nothing, Typed.If gds' loc, mempty)
+    return (Nothing, T.If gds' loc, mempty)
   elaborate (Spec text range) _ = do
     (_, _, infos) <- get
-    return (Nothing, Typed.Spec text range $ toTypeEnv infos, mempty)
-  elaborate (Proof text1 text2 range) _ = return (Nothing, Typed.Proof text1 text2 range, mempty)
+    return (Nothing, T.Spec text range $ toTypeEnv infos, mempty)
+  elaborate (Proof text1 text2 range) _ = return (Nothing, T.Proof text1 text2 range, mempty)
   elaborate (Alloc var exprs loc) env = do
     (_, _, infos) <- get
     ty <- checkAssign infos var
@@ -418,24 +418,24 @@ instance Elab Stmt where
           _ <- unifies (fromJust ty') (tInt NoLoc) (locOf expr)
           return typedExpr
         ) exprs
-    return (Nothing, Typed.Alloc var typedExprs loc, mempty)
+    return (Nothing, T.Alloc var typedExprs loc, mempty)
   elaborate (HLookup name expr loc) env = do
     (_, _, infos) <- get
     ty <- checkAssign infos name
     _ <- unifies ty (tInt NoLoc) $ locOf name
     (ty', typedExpr, _) <- elaborate expr env
     _ <- unifies (fromJust ty') (tInt NoLoc) (locOf expr)
-    return (Nothing, Typed.HLookup name typedExpr loc, mempty)
+    return (Nothing, T.HLookup name typedExpr loc, mempty)
   elaborate (HMutate left right loc) env = do
     (ty, typedLeft, _) <- elaborate left env
     _ <- unifies (fromJust ty) (tInt NoLoc) (locOf left)
     (ty', typedRight, _) <- elaborate right env
     _ <- unifies (fromJust ty') (tInt NoLoc) (locOf right)
-    return (Nothing, Typed.HMutate typedLeft typedRight loc, mempty)
+    return (Nothing, T.HMutate typedLeft typedRight loc, mempty)
   elaborate (Dispose expr loc) env = do
     (ty, typedExpr, _) <- elaborate expr env
     _ <- unifies (fromJust ty) (tInt NoLoc) (locOf expr)
-    return (Nothing, Typed.Dispose typedExpr loc, mempty)
+    return (Nothing, T.Dispose typedExpr loc, mempty)
   elaborate Block {} env = undefined -- TODO: Implement blocks.
 
 instance Elab GdCmd where
@@ -447,7 +447,7 @@ instance Elab GdCmd where
                   (_, typed, _) <- elaborate stmt env
                   return typed
                ) stmts
-    return (Nothing, Typed.TypedGdCmd e' s' loc, mempty)
+    return (Nothing, T.GdCmd e' s' loc, mempty)
 
 instantiate :: Fresh m => Type -> m Type
 instantiate ty = do
@@ -467,7 +467,7 @@ instantiate ty = do
 -- Γ ⊢ e : t ↓ (v . s)
 
 instance Elab Expr where
-  elaborate (Lit lit loc) _ = let ty = litTypes lit loc in return (Just ty, Typed.Lit lit ty loc, mempty)
+  elaborate (Lit lit loc) _ = let ty = litTypes lit loc in return (Just ty, T.Lit lit ty loc, mempty)
   -- x : t ∈ Γ
   -- t ⊑ u
   ---- Var, Const, Op --
@@ -475,18 +475,18 @@ instance Elab Expr where
   elaborate (Var x loc) env = case lookup (Index x) env of
       Just ty -> do
         ty' <- instantiate ty
-        return (Just ty', Typed.Var x ty' loc, mempty)
+        return (Just ty', T.Var x ty' loc, mempty)
       Nothing -> throwError $ NotInScope x
   elaborate (Const x loc) env = case lookup (Index x) env of
       Just ty -> do
         ty' <- instantiate ty
-        return (Just ty', Typed.Const x ty' loc, mempty)
+        return (Just ty', T.Const x ty' loc, mempty)
       Nothing -> throwError $ NotInScope x
   elaborate (Op o) env = do
     (ty, op, sub) <- elaborate o env
     ty' <- instantiate $ fromJust ty
-    return (Just ty', subst sub (Typed.Op op ty'), sub)
-  elaborate (Chain ch) env = (\(ty, typed, sub) -> (ty, Typed.Chain typed, sub)) <$> elaborate ch env
+    return (Just ty', subst sub (T.Op op ty'), sub)
+  elaborate (Chain ch) env = (\(ty, typed, sub) -> (ty, T.Chain typed, sub)) <$> elaborate ch env
   -- Γ ⊢ e1 ↑ (s1, t1)
   -- s1 Γ ⊢ e2 ↑ (s2, t2)
   -- b fresh   v = unify (s2 t1, t2 -> b)
@@ -498,7 +498,7 @@ instance Elab Expr where
     (ty2, typedExpr2, sub2) <- elaborate e2 $ subst sub1 env
     sub3 <- unifies (subst sub2 $ fromJust ty1) (TFunc (fromJust ty2) tv NoLoc) loc
     let sub = sub3 `compose` sub2 `compose` sub1
-    return (Just $ subst sub3 tv, subst sub (Typed.App typedExpr1 typedExpr2 loc), sub)
+    return (Just $ subst sub3 tv, subst sub (T.App typedExpr1 typedExpr2 loc), sub)
   -- a fresh
   -- Γ, x : a ⊢ e ↑ (s, t)
   ---- Lam ----------------------
@@ -508,7 +508,7 @@ instance Elab Expr where
     let newEnv = (Index bound, tv) : env
     (ty1, typedExpr1, sub1) <- elaborate expr newEnv
     let returnTy = TFunc (subst sub1 tv) (fromJust ty1) loc
-    return (Just returnTy, subst sub1 (Typed.Lam bound (subst sub1 tv) typedExpr1 loc), sub1)
+    return (Just returnTy, subst sub1 (T.Lam bound (subst sub1 tv) typedExpr1 loc), sub1)
   elaborate (Func name clauses l) env = undefined
   -- Γ ⊢ e1 ↑ (s1, t1)
   -- s1 Γ ⊢ e2 ↑ (s2, t2)
@@ -528,7 +528,7 @@ instance Elab Expr where
         (innerTy, innerTypedExpr, innerSub) <- elaborate inner newEnv
         uniSub3 <- unifies (subst innerSub $ fromJust innerTy) (tBool NoLoc) (locOf inner)
         let sub = uniSub3 `compose` innerSub `compose` uniSub2 `compose` resSub `compose` quantSub
-        return (Just $ subst quantSub tv, subst sub (Typed.Quant quantTypedExpr bound resTypedExpr innerTypedExpr loc), sub)
+        return (Just $ subst quantSub tv, subst sub (T.Quant quantTypedExpr bound resTypedExpr innerTypedExpr loc), sub)
       -- a fresh   Γ ⊢ ⊕ : (a -> a -> a) ↓ s⊕
       -- b fresh   s⊕ Γ, i : b ⊢ R : Bool ↓ sR
       -- sR (s⊕ Γ), i : sR b ⊢ B : sR (s⊕ a) ↓ sB
@@ -544,7 +544,7 @@ instance Elab Expr where
         (innerTy, innerTypedExpr, innerSub) <- elaborate inner $ zip (Index <$> bound) (subst (uniSub2 `compose` resSub) <$> tvs) <> newEnv'
         uniSub3 <- unifies (subst innerSub $ fromJust innerTy) (subst (uniSub2 `compose` resSub `compose` uniSub `compose` quantSub) tv) (locOf inner)
         return (Just $ subst (uniSub3 `compose` innerSub `compose` uniSub2 `compose` resSub `compose` uniSub `compose` quantSub) tv,
-                subst (uniSub3 `compose` innerSub `compose` uniSub2 `compose` resSub `compose` uniSub `compose` quantSub) (Typed.Quant quantTypedExpr bound resTypedExpr innerTypedExpr loc),
+                subst (uniSub3 `compose` innerSub `compose` uniSub2 `compose` resSub `compose` uniSub `compose` quantSub) (T.Quant quantTypedExpr bound resTypedExpr innerTypedExpr loc),
                 uniSub3 `compose` innerSub `compose` uniSub2 `compose` resSub)
   elaborate (RedexShell _ expr) env = undefined
   elaborate (RedexKernel n _ _ _) env = undefined
@@ -559,7 +559,7 @@ instance Elab Expr where
     sub3 <- unifies (subst sub2 $ fromJust ty2) (tInt NoLoc) (locOf e2)
     sub4 <- unifies (subst (sub3 `compose` sub2) (fromJust ty1)) (TFunc (tInt NoLoc) tv NoLoc) loc
     let sub = sub4 `compose` sub3 `compose` sub2 `compose` sub1
-    return (Just $ subst sub3 tv, subst sub (Typed.ArrIdx typedExpr1 typedExpr2 loc), sub)
+    return (Just $ subst sub3 tv, subst sub (T.ArrIdx typedExpr1 typedExpr2 loc), sub)
   -- b fresh    Γ ⊢ a : Array .. of b ↓ sa
   -- sa Γ ⊢ i : Int ↓ si
   -- si (sa Γ) ⊢ e : si (sa b) ↓ se
@@ -574,7 +574,7 @@ instance Elab Expr where
     (eTy, typedE, eSub) <- elaborate e $ subst (uniSubArr `compose` uniSubIndex `compose` indexSub `compose` arrSub) env
     uniSubExpr <- unifies (subst eSub $ fromJust eTy) (subst uniSubArr tv) (locOf e)
     let sub = uniSubExpr `compose` eSub `compose` uniSubArr `compose` uniSubIndex `compose` indexSub `compose` arrSub
-    return (subst uniSubArr arrTy, subst sub (Typed.ArrUpd typedArr typedIndex typedE loc), sub)
+    return (subst uniSubArr arrTy, subst sub (T.ArrUpd typedArr typedIndex typedE loc), sub)
   elaborate (Case expr cs l) env = undefined -- TODO: Implement pattern matching.
 
 instance Elab Chain where -- TODO: Make sure the below implementation is correct.
@@ -587,7 +587,7 @@ instance Elab Chain where -- TODO: Make sure the below implementation is correct
     (ty2, typedExpr2, sub2) <- elaborate e2 $ subst (chainSub <> sub1) env
     unifyTy <- unifies (fromJust ty1 ~-> fromJust ty2 ~-> tv) opTy' loc2
     let sub = chainSub <> opSub <> sub1 <> sub2
-    return (Just $ subst unifyTy tv, subst sub $ Typed.More typedChain opTyped (subst unifyTy opTy') typedExpr2, sub)
+    return (Just $ subst unifyTy tv, subst sub $ T.More typedChain opTyped (subst unifyTy opTy') typedExpr2, sub)
   elaborate (More (Pure e1 _loc1) op e2 loc2) env = do
     tv <- freshVar
     (opTy, opTyped, opSub) <- elaborate op env
@@ -596,7 +596,7 @@ instance Elab Chain where -- TODO: Make sure the below implementation is correct
     (ty2, typedExpr2, sub2) <- elaborate e2 $ subst sub1 env
     unifyTy <- unifies (fromJust ty1 ~-> fromJust ty2 ~-> tv) opTy' loc2
     let sub = unifyTy <> sub2 <> sub1 <> opSub
-    return (Just $ subst unifyTy tv, subst sub $ Typed.More (Typed.Pure typedExpr1) opTyped (subst unifyTy opTy') typedExpr2, sub)
+    return (Just $ subst unifyTy tv, subst sub $ T.More (T.Pure typedExpr1) opTyped (subst unifyTy opTy') typedExpr2, sub)
   elaborate (Pure _expr _loc) _ = error "Chain of length 1 shouldn't exist."
 
 instance Elab ChainOp where
@@ -744,18 +744,18 @@ instance Substitutable Type Type where
   subst s t@(TVar n _)    = Map.findWithDefault t n s
   subst s t@(TMetaVar n)  = Map.findWithDefault t n s
 
-instance Substitutable Type Typed.TypedExpr where
-  subst s (Typed.Lit lit ty loc) = Typed.Lit lit (subst s ty) loc
-  subst s (Typed.Var name ty loc) = Typed.Var name (subst s ty) loc
-  subst s (Typed.Const name ty loc) = Typed.Const name (subst s ty) loc
-  subst s (Typed.Op op ty) = Typed.Op op $ subst s ty
-  subst s (Typed.Chain ch) = Typed.Chain $ subst s ch
-  subst s (Typed.App e1 e2 loc) = Typed.App (subst s e1) (subst s e2) loc
-  subst s (Typed.Lam name ty expr loc) = Typed.Lam name (subst s ty) (subst s expr) loc
-  subst s (Typed.Quant quantifier vars restriction inner loc) = Typed.Quant (subst s quantifier) vars (subst s restriction) (subst s inner) loc
-  subst s (Typed.ArrIdx arr index loc) = Typed.ArrIdx (subst s arr) (subst s index) loc
-  subst s (Typed.ArrUpd arr index expr loc) = Typed.ArrUpd (subst s arr) (subst s index) (subst s expr) loc
+instance Substitutable Type T.Expr where
+  subst s (T.Lit lit ty loc) = T.Lit lit (subst s ty) loc
+  subst s (T.Var name ty loc) = T.Var name (subst s ty) loc
+  subst s (T.Const name ty loc) = T.Const name (subst s ty) loc
+  subst s (T.Op op ty) = T.Op op $ subst s ty
+  subst s (T.Chain ch) = T.Chain $ subst s ch
+  subst s (T.App e1 e2 loc) = T.App (subst s e1) (subst s e2) loc
+  subst s (T.Lam name ty expr loc) = T.Lam name (subst s ty) (subst s expr) loc
+  subst s (T.Quant quantifier vars restriction inner loc) = T.Quant (subst s quantifier) vars (subst s restriction) (subst s inner) loc
+  subst s (T.ArrIdx arr index loc) = T.ArrIdx (subst s arr) (subst s index) loc
+  subst s (T.ArrUpd arr index expr loc) = T.ArrUpd (subst s arr) (subst s index) (subst s expr) loc
 
-instance Substitutable Type Typed.TypedChain where
-  subst s (Typed.Pure expr) = Typed.Pure $ subst s expr
-  subst s (Typed.More ch op ty expr) = Typed.More (subst s ch) op (subst s ty) (subst s expr)
+instance Substitutable Type T.Chain where
+  subst s (T.Pure expr) = T.Pure $ subst s expr
+  subst s (T.More ch op ty expr) = T.More (subst s ch) op (subst s ty) (subst s expr)

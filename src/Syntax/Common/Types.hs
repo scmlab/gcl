@@ -141,7 +141,7 @@ initOrderIndex = 1
 
 classificationMap :: Map Op (Fixity,Int)
 classificationMap = Map.fromList $ concat $ zipWith f [initOrderIndex..] precedenceOrder
-  where 
+  where
     f :: Int -> [(Op,Fixity)] -> [(Op,(Fixity,Int))]
     f n = map (second (,n))
 
@@ -176,9 +176,9 @@ classificationMap = Map.fromList $ concat $ zipWith f [initOrderIndex..] precede
 -- classifyArithOp (Max      _) = InfixL 4
 -- classifyArithOp (Min      _) = InfixL 4
 
--- classifyArithOp (PointsTo _) = Infix 5 
--- classifyArithOp (SConj    _) = InfixL 6 
--- classifyArithOp (SImp     _) = Infix 7  
+-- classifyArithOp (PointsTo _) = Infix 5
+-- classifyArithOp (SConj    _) = InfixL 6
+-- classifyArithOp (SImp     _) = Infix 7
 
 -- classifyArithOp (Disj     _) = InfixL 9
 -- classifyArithOp (DisjU    _) = InfixL 9
@@ -190,7 +190,7 @@ classificationMap = Map.fromList $ concat $ zipWith f [initOrderIndex..] precede
 
 
 classify :: Op -> (Fixity,Int)
-classify op = fromMaybe (error "Operator's precedenceOrder is not completely defined.") 
+classify op = fromMaybe (error "Operator's precedenceOrder is not completely defined.")
               $ Map.lookup (wipeLoc op) classificationMap
 
 precOf :: Op -> Int
@@ -246,7 +246,7 @@ wipeLoc op = case op of
 isAssocOp :: Op -> Bool
 isAssocOp (ArithOp (Mul _)) = True
 isAssocOp (ArithOp (Add _)) = True
-isAssocOp (ArithOp (Conj _))  = True 
+isAssocOp (ArithOp (Conj _))  = True
 isAssocOp (ArithOp (ConjU _)) = True
 isAssocOp (ArithOp (Disj _))  = True
 isAssocOp (ArithOp (DisjU _)) = True

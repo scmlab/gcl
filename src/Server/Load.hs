@@ -103,11 +103,11 @@ collectHoles (C.Program _ statements) = do
     C.SpecQM range -> return range
     _ -> []
 
-elaborate :: A.Program -> Either Error T.TypedProgram
+elaborate :: A.Program -> Either Error T.Program
 elaborate abstract = do
   case TypeChecking.runElaboration abstract mempty of
     Left  e -> Left (TypeError e)
     Right typedProgram -> return typedProgram
 
-sweepElaborated :: T.TypedProgram -> Either StructError ([PO], [Spec], [StructWarning])
+sweepElaborated :: T.Program -> Either StructError ([PO], [Spec], [StructWarning])
 sweepElaborated elaborated = error "TODO"

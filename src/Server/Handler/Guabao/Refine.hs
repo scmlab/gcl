@@ -54,7 +54,7 @@ instance JSON.ToJSON RefineResult
 -- TODO customize refine error
 type RefineError = Error
 
--- assumes specText is surrounded by "[!" and "!]" 
+-- assumes specText is surrounded by "[!" and "!]"
 handler :: RefineParams -> (RefineResult -> ServerM ()) -> (RefineError -> ServerM ()) -> ServerM ()
 handler _params@RefineParams{filePath, specRange, specText} onSuccess onError = do
   -- 把上次 load 的資料拿出來
@@ -109,7 +109,7 @@ handler _params@RefineParams{filePath, specRange, specText} onSuccess onError = 
 
 
 
--- assumes specText is surrounded by "[!" and "!]" 
+-- assumes specText is surrounded by "[!" and "!]"
 trimSpecBracketsAndSpaces :: Text -> Text
 trimSpecBracketsAndSpaces specText
   = Text.strip $ Text.dropEnd 2 $ Text.drop 2 specText
@@ -200,7 +200,7 @@ parseFragment fragmentStart fragment = do
     translateTokStream _ (TsError e) = TsError e
 
 toAbstractFragment :: [C.Stmt] -> Maybe [A.Stmt]
-toAbstractFragment concreteFragment = 
+toAbstractFragment concreteFragment =
   case runExcept $ C.toAbstract concreteFragment of
     Left _                 -> Nothing
     Right abstractFragment -> Just abstractFragment
@@ -229,6 +229,5 @@ instance Elab [A.Stmt] where
 --   }
 --   deriving (Eq, Show, Generic)
 
-sweepFragment :: Int -> Spec -> [T.TypedStmt] -> Either StructError ([PO], [Spec], [StructWarning])
+sweepFragment :: Int -> Spec -> [T.Stmt] -> Either StructError ([PO], [Spec], [StructWarning])
 sweepFragment specIdStart spec impl = error "TODO: define this after modifying definitions of Spec and StructStmts"
-
