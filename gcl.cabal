@@ -54,6 +54,7 @@ library
       Render.Predicate
       Render.Syntax.Abstract
       Render.Syntax.Common
+      Render.Syntax.Typed
       Server
       Server.GoToDefn
       Server.Handler
@@ -217,6 +218,7 @@ test-suite gcl-test
       Render.Predicate
       Render.Syntax.Abstract
       Render.Syntax.Common
+      Render.Syntax.Typed
       Server
       Server.GoToDefn
       Server.Handler
