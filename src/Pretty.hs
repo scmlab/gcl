@@ -13,6 +13,7 @@ import           Pretty.Abstract                ( )
 import           Pretty.Concrete                ( )
 import           Pretty.Error                   ( )
 import           Pretty.Predicate               ( )
+import           Pretty.Typed                   ( )
 import           Pretty.Util
 import           Prettyprinter
 
