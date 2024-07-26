@@ -3,7 +3,7 @@
 module Error where
 
 import           GCL.Type                       ( TypeError )
-import           GCL.WP.Type                    ( StructError )
+import           GCL.WP.Types                   ( StructError )
 import           GHC.Generics
 import           Syntax.Common                  ( )
 import           Syntax.Parser.Error           ( ParseError )

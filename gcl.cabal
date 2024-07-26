@@ -36,7 +36,7 @@ library
       GCL.WP.Explanation
       GCL.WP.SP
       GCL.WP.Struct
-      GCL.WP.Type
+      GCL.WP.Types
       GCL.WP.Util
       GCL.WP.WP
       Pretty
@@ -199,7 +199,7 @@ test-suite gcl-test
       GCL.WP.Explanation
       GCL.WP.SP
       GCL.WP.Struct
-      GCL.WP.Type
+      GCL.WP.Types
       GCL.WP.Util
       GCL.WP.WP
       Pretty

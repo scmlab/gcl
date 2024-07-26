@@ -6,12 +6,13 @@ import           Data.Loc                       ( locOf, Loc (NoLoc) )
 import           Data.Loc.Range                 ( fromLoc )
 import qualified Data.Text                     as Text
 import           GCL.Predicate
-import           GCL.WP.Type
+import           GCL.WP.Types
 import           Render.Class
 import           Render.Element
 import           Render.Syntax.Abstract         ( )
 import           Syntax.Abstract.Types          ( Expr(..) )
 import           Syntax.Common.Types            ( ArithOp (..) )
+import           Render.Syntax.Typed
 
 instance Render StructWarning where
   render (MissingBound _)
