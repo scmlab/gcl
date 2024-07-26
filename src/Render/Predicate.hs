@@ -36,8 +36,8 @@ instance RenderSection Spec where
     , Code (render post)
     ]
 
-instance Render Pred where
-  renderPrec n x = renderPrec n (exprOfPred x)
+-- instance Render Pred where
+--   renderPrec n x = renderPrec n (exprOfPred x)
   -- renderPrec n x = case x of
   --   Constant p          -> renderPrec n p
   --   GuardIf   p _       -> renderPrec n p
@@ -49,6 +49,7 @@ instance Render Pred where
   --   Disjunct ps         -> punctuateE " ∨" (map render ps)
   --   Negate   p          -> "¬" <+> renderPrec n p
 
+{-
 exprOfPred :: Pred -> Expr
 exprOfPred p = case p of
   Constant ex -> ex
@@ -58,7 +59,7 @@ exprOfPred p = case p of
   LoopInvariant ex _ _ -> ex
   Bound ex _ -> ex
   Conjunct prs -> case map exprOfPred prs of
-    []    -> error "Impossible case: incomplete Pred (in Render.Predicate.exprOfPred, Conjunct case)" 
+    []    -> error "Impossible case: incomplete Pred (in Render.Predicate.exprOfPred, Conjunct case)"
     [ex]  -> ex
     x : y : exprs -> foldl (makeOpExpr conjOp)
                            (makeOpExpr conjOp x y)
@@ -69,15 +70,15 @@ exprOfPred p = case p of
     x : y : exprs -> foldl (makeOpExpr disjOp)
                            (makeOpExpr disjOp x y)
                            exprs
-  Negate pr -> 
+  Negate pr ->
     let ex = exprOfPred pr
     in App (Op $ NegU NoLoc) ex (locOf ex)
-  where -- TODO: Maybe we don't need `Op` here. This requires further investigation. 
+  where -- TODO: Maybe we don't need `Op` here. This requires further investigation.
     conjOp = Op $ ConjU NoLoc
     disjOp = Op $ DisjU NoLoc
     makeOpExpr :: Expr -> Expr -> Expr -> Expr
     makeOpExpr op x y = App (App op x (locOf x)) y (locOf y)
-
+-}
 
 instance RenderSection PO where
   renderSection (PO pre post anchorHash anchorLoc origin) =
@@ -94,7 +95,7 @@ instance RenderSection PO where
       Explain _ x _ _ _ -> [Paragraph x]
       _                 -> [Paragraph "explanation not available"]
 
--- as header 
+-- as header
 instance Render Origin where
   render AtAbort{}                = "Abort"
   render AtSkip{}                 = "Skip"

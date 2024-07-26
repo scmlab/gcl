@@ -104,8 +104,12 @@ class CollectRedexes a where
 
 instance CollectRedexes PO where
   collectRedexes (PO pre post _ _ _) =
-    collectRedexes pre <> collectRedexes post
-
+      error "instance CollectRedexes PO undefined"
+    -- SCM: disabled, to avoid having to define CollectRedexes T.Expr.
+    --      TODO: remove CollectRedexes completely if it turns
+    --      out to be not needed.
+    -- collectRedexes pre <> collectRedexes post
+{-
 instance CollectRedexes Pred where
   collectRedexes predicate = case predicate of
     Constant x          -> collectRedexes x
@@ -117,7 +121,7 @@ instance CollectRedexes Pred where
     Conjunct xs         -> xs >>= collectRedexes
     Disjunct xs         -> xs >>= collectRedexes
     Negate   x          -> collectRedexes x
-
+-}
 instance CollectRedexes Expr where
   collectRedexes expr = case expr of
     App x y _       -> collectRedexes x <> collectRedexes y
@@ -158,6 +162,7 @@ instance Reducible Expr where
       ArrUpd <$> reduce array <*> reduce index <*> reduce value <*> pure l
     _ -> return expr
 
+{-
 instance Reducible Pred where
   reduce = \case
     Constant a          -> Constant <$> reduce a
@@ -169,7 +174,7 @@ instance Reducible Pred where
     Conjunct as         -> Conjunct <$> mapM reduce as
     Disjunct as         -> Disjunct <$> mapM reduce as
     Negate   a          -> Negate <$> reduce a
-
+-}
 ------------------------------------------------------------------
 
 class Substitutable a where
@@ -327,6 +332,7 @@ renameBindersInPattern renamings patt = case patt of
   PattConstructor name patts ->
     PattConstructor name $ map (renameBindersInPattern renamings) patts
 
+{-
 instance Substitutable Pred where
   subst mapping = \case
     Constant a    -> Constant <$> subst mapping a
@@ -339,7 +345,7 @@ instance Substitutable Pred where
     Conjunct as -> Conjunct <$> mapM (subst mapping) as
     Disjunct as -> Disjunct <$> mapM (subst mapping) as
     Negate   a  -> Negate <$> subst mapping a
-
+-}
 ------------------------------------------------------------------
 
 -- produce a binder "renaming", if any binder is in the set of "capturableNames"

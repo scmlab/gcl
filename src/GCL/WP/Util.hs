@@ -22,10 +22,10 @@ import           GCL.Predicate                  ( Origin(..)
                                                 , Pred(..)
                                                 , Spec(Specification)
                                                 )
-import           GCL.Predicate.Util             ( disjunct
-                                                , guardIf
-                                                , toExpr
-                                                )
+-- import           GCL.Predicate.Util             ( disjunct
+--                                                 , guardIf
+--                                                 , toExpr
+--                                                 )
 import           GCL.Common                     ( Fresh(..)
                                                 , Counterous(..)
                                                 , freshName'
@@ -33,19 +33,20 @@ import           GCL.Common                     ( Fresh(..)
 
 import qualified Syntax.Abstract               as A
 import qualified Syntax.Abstract.Util          as A
+import           Syntax.Typed
 import           Syntax.Common                  ( Name(..)
                                                 , nameToText
                                                 )
 import qualified GCL.Substitution              as Substitution
 import           Numeric                        ( showHex )
 import           Pretty                         ( toString )
-import           GCL.WP.Type
+import           GCL.WP.Types
 
 -- Syntax Manipulation
 
 --- grouping a sequence of statement by assertions and specs
 
-groupStmts :: [A.Stmt] -> [SegElm]
+groupStmts :: [Stmt] -> [SegElm]
 groupStmts []                            = []
 groupStmts (s@(A.Assert _ _)    : stmts) = SAsrt s : groupStmts stmts
 groupStmts (s@A.LoopInvariant{} : stmts) = SAsrt s : groupStmts stmts
@@ -55,6 +56,7 @@ groupStmts (s                   : stmts) = case groupStmts stmts of
   (SStmts ss : segs) -> SStmts (s : ss) : segs
   (s'        : segs) -> SStmts [s] : s' : segs
 
+{-
 --- removing assertions (while keeping loop invariants).
 --- succeed if there are no specs.
 
@@ -162,3 +164,4 @@ freshPreInScope pref scope
 instance Fresh WP where
   fresh = freshPre "m"
   freshPre p = withLocalScopes (return . freshPreInScope p . concat)
+-}
