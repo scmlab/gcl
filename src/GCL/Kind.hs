@@ -43,7 +43,7 @@ collectTypeDefns typeDefns = do
   modify (\(freshState, origTypeDefnInfos, origTypeInfos) -> (freshState, resolvedInfos <> origTypeDefnInfos, newTypeInfos' <> origTypeInfos))
   where
     -- This is an entry for "Typing Datatype Decl." several times, presented in page 53:8.
-    inferDataTypes :: (Fresh m, MonadError TypeError m) => (TypeEnv, KindEnv) -> [(Name, [Name], [TypeDefnCtor], Loc)] -> m (TypeEnv, KindEnv)
+    inferDataTypes :: (TypeEnv, KindEnv) -> [(Name, [Name], [TypeDefnCtor], Loc)] -> ElaboratorM (TypeEnv, KindEnv)
     inferDataTypes (typeEnv, kindEnv) [] = do
       return (typeEnv, kindEnv)
     inferDataTypes (typeEnv, kindEnv) ((tyName, tyParams, ctors, loc) : dataTypesInfo) = do
@@ -61,7 +61,7 @@ collectTypeDefns typeDefns = do
       ) <$> env
 
     -- This is an entry for "Typing Datatype Decl.", presented in page 53:8.
-    inferDataType :: (Fresh m, MonadError TypeError m) => KindEnv -> Name -> [Name] -> [TypeDefnCtor] -> Loc -> m (TypeEnv, KindEnv)
+    inferDataType :: KindEnv -> Name -> [Name] -> [TypeDefnCtor] -> Loc -> ElaboratorM (TypeEnv, KindEnv)
     inferDataType env tyName tyParams ctors loc = do
       case find (isKindAnno tyName) env of
         Just (KindAnno _name k) -> do
@@ -86,7 +86,7 @@ collectTypeDefns typeDefns = do
             n : ns -> formTy (TApp con n $ con <--> n) ns
 
         -- This is an entry for "Typing Data Constructor Decl." several times, presented in page 53:8.
-        inferCtors :: (Fresh m, MonadError TypeError m) => KindEnv -> Name -> [Name] -> [TypeDefnCtor] -> m ([Type], KindEnv)
+        inferCtors :: KindEnv -> Name -> [Name] -> [TypeDefnCtor] -> ElaboratorM ([Type], KindEnv)
         inferCtors env' _ _ [] = return (mempty, env')
         inferCtors env' tyName' tyParamNames ctors' = do
           -- Give type variables fresh names to prevent name collision.
@@ -94,7 +94,7 @@ collectTypeDefns typeDefns = do
           inferCtors' env' tyName' tyParamNames freshNames ctors'
           where
             -- Recursion happens here.
-            inferCtors' :: (Fresh m, MonadError TypeError m) => KindEnv -> Name -> [Name] -> [Name] -> [TypeDefnCtor] -> m ([Type], KindEnv)
+            inferCtors' :: KindEnv -> Name -> [Name] -> [Name] -> [TypeDefnCtor] -> ElaboratorM ([Type], KindEnv)
             inferCtors' env'' _ _ _ [] = return (mempty, env'')
             inferCtors' env'' tyName'' tyParamNames' freshNames (ctor : restOfCtors) = do
               (ty, newEnv) <- inferCtor env'' tyName'' tyParamNames' freshNames ctor
@@ -102,7 +102,7 @@ collectTypeDefns typeDefns = do
               return (ty : tys, newEnv <> anotherEnv)
 
         -- This is an entry for "Typing Data Constructor Decl.", presented in page 53:8.
-        inferCtor :: (Fresh m, MonadError TypeError m) => KindEnv -> Name -> [Name] -> [Name] -> TypeDefnCtor -> m (Type, KindEnv)
+        inferCtor :: KindEnv -> Name -> [Name] -> [Name] -> TypeDefnCtor -> ElaboratorM (Type, KindEnv)
         inferCtor env' tyName' tyParamNames freshNames (TypeDefnCtor _conName params) = do
           let sub = Map.fromList . zip tyParamNames $ freshNames
           let sub' = Map.fromList . zip tyParamNames $ TMetaVar <$> freshNames <*> pure NoLoc
@@ -146,7 +146,7 @@ kindFromArity 0 = KStar NoLoc
 kindFromArity n = KFunc (KStar NoLoc) (kindFromArity $ n - 1) NoLoc
 
 -- This is "Kinding" mentioned in 53:10 in the paper "Kind Inference for Datatypes".
-inferKind :: (Fresh m, MonadError TypeError m) => KindEnv -> Type -> m (Kind, KindEnv)
+inferKind :: KindEnv -> Type -> ElaboratorM (Kind, KindEnv)
 inferKind env (TBase _ loc) = return (KStar loc, env)
 inferKind env (TArray _ _ loc) = return (KStar loc, env)
 inferKind env (TTuple int) = return (kindFromArity int, env)
@@ -170,7 +170,7 @@ inferKind env (TMetaVar name _) =
     _ -> throwError $ UndefinedType name
 
 -- This is "Application Kinding" mentioned in 53:10 in the paper "Kind Inference for Datatypes".
-inferKApp :: (Fresh m, MonadError TypeError m) => KindEnv -> Kind -> Kind -> m (Kind, KindEnv)
+inferKApp :: KindEnv -> Kind -> Kind -> ElaboratorM (Kind, KindEnv)
 inferKApp env (KFunc k1 k2 _) k = do
   env' <- unifyKind env k1 k $ k1 <--> k
   return (k2, env')
@@ -195,7 +195,7 @@ inferKApp _ k1 k2 = do
 
 
 -- This is "Kind Unification" mentioned in 53:10 in the paper "Kind Inference for Datatypes".
-unifyKind :: (Fresh m, MonadError TypeError m) => KindEnv -> Kind -> Kind -> Loc -> m KindEnv
+unifyKind :: KindEnv -> Kind -> Kind -> Loc -> ElaboratorM KindEnv
 unifyKind env k1 k2 _ | k1 == k2 = return env
 unifyKind env (KFunc k1 k2 _) (KFunc k3 k4 _) _ = do
   env' <- unifyKind env k1 k3 (locOf k1)
@@ -205,7 +205,7 @@ unifyKind env (KMetaVar a) k _ = do
     -- The below 4 lines have implementation different from what is written on the paper.
     -- I put the original (probably incorrect) implementation that I think is what the paper describes in comments.
     Nothing -> return env -- throwError $ NotInScope a
-    Just aIndex' -> do
+    Just _aIndex' -> do
       -- let (list1, list2) = splitAt aIndex' env
       (k2, env') <- promote env a k -- (k2, env') <- promote (list1 ++ tail list2) a k
       let aIndex2 = findIndex (predicate a) env'
@@ -224,7 +224,7 @@ unifyKind env k (KMetaVar a) loc = unifyKind env (KMetaVar a) k loc
 unifyKind _env k1 k2 loc = throwError $ KindUnifyFailed k1 k2 loc
 
 -- This is "Promotion" mentioned in 53:10 in the paper "Kind Inference for Datatypes".
-promote :: (Fresh m, MonadError TypeError m) => KindEnv -> Name -> Kind -> m (Kind, KindEnv)
+promote :: KindEnv -> Name -> Kind -> ElaboratorM (Kind, KindEnv)
 promote env _ (KStar loc) = return (KStar loc, env)
 promote env name (KFunc k1 k2 loc) = do
   (k3, env') <- promote env name k1
@@ -256,7 +256,7 @@ isKindAnno :: Name -> KindItem -> Bool
 isKindAnno name (KindAnno name' _kind) = name == name'
 isKindAnno _ _ = False
 
-freshKindName :: Fresh m => m Name
+freshKindName :: ElaboratorM Name
 freshKindName = freshName "Kind.metaVar" NoLoc
 
 instance Substitutable KindEnv Kind where

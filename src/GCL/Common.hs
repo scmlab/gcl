@@ -8,7 +8,6 @@ import           Control.Monad.Except
 import           Control.Monad.RWS              ( RWST(..), MonadState (get, put) )
 import           Control.Monad.State            ( StateT(..) )
 import           Data.Aeson                     ( ToJSON )
-import           Data.Loc                       ( Loc(..) )
 import           Data.Map                       ( Map )
 import qualified Data.Map                      as Map
 import           Data.Set                       ( Set
@@ -18,8 +17,7 @@ import qualified Data.Set                      as Set
 import           Data.Text                      ( Text )
 import qualified Data.Text                     as Text
 import           Data.Loc.Range                 ( Range )
-import           Data.Loc                       ( (<-->)
-                                                , Loc(..)
+import           Data.Loc                       ( Loc(..)
                                                 , Located
                                                 , locOf
                                                 )
@@ -59,10 +57,10 @@ class Counterous m where
 
 instance {-# OVERLAPPABLE #-}
          (Monad m, Counterous m) => Fresh m where
-  fresh = (Text.pack . ("?m_" ++) . show) <$> countUp
+  fresh = Text.pack . ("?m_" ++) . show <$> countUp
   freshPre prefix =
-      (Text.pack . ("?" ++) . (Text.unpack prefix ++) .
-           ("_" ++) . show) <$> countUp
+      Text.pack . ("?" ++) . (Text.unpack prefix ++) .
+           ("_" ++) . show <$> countUp
 
 type FreshState = Int
 
@@ -125,7 +123,7 @@ instance Free Type where
   freeVars (TMetaVar n _) = Set.singleton n
 
 instance {-# OVERLAPS #-} Free TypeEnv where
-  freeVars env = foldMap freeVars $ Map.elems $ Map.fromList env 
+  freeVars env = foldMap freeVars $ Map.elems $ Map.fromList env
 
 instance Free Expr where
   freeVars (Var   x _            ) = Set.singleton x
@@ -180,7 +178,7 @@ instance Free Stmt where
   freeVars (Do gdcmds _) = Set.unions (map freeVars gdcmds)
   freeVars (If gdcmds _) = Set.unions (map freeVars gdcmds)
   freeVars (Spec  _ _) = mempty
-  freeVars (Proof _ _ _) = mempty
+  freeVars Proof {} = mempty
   freeVars (Alloc x es _) =
      Set.singleton x <> Set.unions (map freeVars es)
   freeVars (HLookup x e _) =
