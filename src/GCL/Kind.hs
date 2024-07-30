@@ -50,7 +50,7 @@ collectTypeDefns typeDefns = do
       (typeEnv', kindEnv') <- inferDataType kindEnv tyName tyParams ctors loc
       (typeEnv'', kindEnv'') <- inferDataTypes (typeEnv', kindEnv') dataTypesInfo
       return (typeEnv <> typeEnv' <> typeEnv'', kindEnv'')
-      
+
     -- This is the "defaulting" mechanism presented in the paper.
     defaultMeta :: KindEnv -> KindEnv
     defaultMeta env =
@@ -103,10 +103,14 @@ collectTypeDefns typeDefns = do
 
         -- This is an entry for "Typing Data Constructor Decl.", presented in page 53:8.
         inferCtor :: KindEnv -> Name -> [Name] -> [Name] -> TypeDefnCtor -> ElaboratorM (Type, KindEnv)
-        inferCtor env' tyName' tyParamNames freshNames (TypeDefnCtor _conName params) = do
+        inferCtor env' tyName' tyParamNames freshNames (TypeDefnCtor conName params) = do
           let sub = Map.fromList . zip tyParamNames $ freshNames
           let sub' = Map.fromList . zip tyParamNames $ TMetaVar <$> freshNames <*> pure NoLoc
-          let ty = subst sub' $ wrapTFunc params (formTy (TData tyName' (locOf tyName')) (TMetaVar <$> tyParamNames <*> pure NoLoc))
+          let retTy = formTy (TData tyName' (locOf tyName')) (TMetaVar <$> tyParamNames <*> pure NoLoc)
+          let ty = subst sub' $ wrapTFunc params retTy
+          -- Here, we collect the patterns.
+          let pat = (conName, subst sub' retTy, subst sub' params)
+          modify (\(freshState, typeDefnInfos, origInfos, pats) -> (freshState, typeDefnInfos, origInfos, pat : pats))
           -- Here, we enter the world for infering kinds.
           (_kind, env'') <- inferKind (renameKindEnv sub env') ty
           return (ty, env'')
@@ -125,7 +129,7 @@ collectTypeDefns typeDefns = do
     -- TODO: I (Andy) think the algorithm here is suboptimal.
     resolve :: [(Index, Kind)] -> [(Index, Kind)] -> [(Index, Kind)]
     resolve [] env = env
-    resolve (pair : pairs) env = 
+    resolve (pair : pairs) env =
       let env' = substEnv pair env
       in resolve pairs env'
       where

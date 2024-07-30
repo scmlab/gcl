@@ -35,6 +35,7 @@ import           Syntax.Abstract
 import           Syntax.Common
 import qualified Syntax.Typed                  as Typed
 import           GCL.Kind
+import qualified Data.Text as Text
 
 instance Substitutable (Subs Type) TypeInfo where
   subst s (TypeDefnCtorInfo t) = TypeDefnCtorInfo (subst s t)
@@ -180,6 +181,7 @@ instance Elab Program where
     -- The `reverse` here shouldn't be needed now. In the past, it was a trick to make things work.
     -- I still keep it as-is in case of future refactoring / rewriting.
     collectIds $ reverse defns
+    (_, _, _, pats) <- get
     (_, _, infos, _) <- get
     typedDefns <- mapM (\defn -> do
                           typedDefn <- elaborate defn $ second typeInfoToType <$> infos
@@ -528,7 +530,7 @@ instance Elab Expr where
     uniSubExpr <- unifyType (subst eSub $ fromJust eTy) (subst uniSubArr tv) (locOf e)
     let sub = uniSubExpr `compose` eSub `compose` uniSubArr `compose` uniSubIndex `compose` indexSub `compose` arrSub
     return (subst uniSubArr arrTy, subst sub (Typed.ArrUpd typedArr typedIndex typedE loc), sub)
-  elaborate (Case expr cs l) env = undefined -- TODO: Implement pattern matching.
+  elaborate (Case expr cases l) env = undefined -- TODO: Implement pattern matching.
 
 instance Elab Chain where -- TODO: Make sure the below implementation is correct.
   elaborate (More (More ch' op1 e1 loc1) op2 e2 loc2) env = do
