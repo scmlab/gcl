@@ -213,18 +213,18 @@ toEvalStateT r m = StateT
 --------------------------------------------------------------------------------
 -- The elaboration monad
 
-type ElaboratorM = StateT (FreshState, [(Index, Kind)], [(Index, TypeInfo)]) (Except TypeError)
+type ElaboratorM = StateT (FreshState, [(Index, Kind)], [(Index, TypeInfo)], [(Name, Type, [Type])]) (Except TypeError)
 
 instance Counterous ElaboratorM where
   countUp = do
-    (count, typeDefnInfo, typeInfo) <- get
-    put (succ count, typeDefnInfo, typeInfo)
+    (count, typeDefnInfo, typeInfo, patInfo) <- get
+    put (succ count, typeDefnInfo, typeInfo, patInfo)
     return count
 
 runElaboration
   :: Elab a => a -> Either TypeError (Typed a)
 runElaboration a = do
-  ((_, elaborated, _), _state) <- runExcept (runStateT (elaborate a mempty) (0, mempty, mempty))
+  ((_, elaborated, _), _state) <- runExcept (runStateT (elaborate a mempty) (0, mempty, mempty, mempty))
   Right elaborated
 
 data TypeError

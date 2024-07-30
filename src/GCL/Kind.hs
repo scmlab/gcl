@@ -40,7 +40,7 @@ collectTypeDefns typeDefns = do
           UnsolvedUni _name -> error "Unsolved KMetaVar."
           SolvedUni name kind -> (Index name, kind)) <$> defaultMeta newTypeDefnInfos
   let resolvedInfos = resolve newTypeDefnInfos' newTypeDefnInfos'
-  modify (\(freshState, origTypeDefnInfos, origTypeInfos) -> (freshState, resolvedInfos <> origTypeDefnInfos, newTypeInfos' <> origTypeInfos))
+  modify (\(freshState, origTypeDefnInfos, origTypeInfos, patInfos) -> (freshState, resolvedInfos <> origTypeDefnInfos, newTypeInfos' <> origTypeInfos, patInfos))
   where
     -- This is an entry for "Typing Datatype Decl." several times, presented in page 53:8.
     inferDataTypes :: (TypeEnv, KindEnv) -> [(Name, [Name], [TypeDefnCtor], Loc)] -> ElaboratorM (TypeEnv, KindEnv)

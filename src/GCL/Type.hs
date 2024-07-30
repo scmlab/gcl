@@ -64,7 +64,7 @@ instance CollectIds a => CollectIds [a] where
 
 -- Currently (and hopefully in the future), we only modify the state of `ElaboratorM` during `collectIds`.
 
-instance CollectIds [Definition] where
+instance CollectIds [Definition] where -- TODO: Collect patterns.
   collectIds defns = do
     -- First, we split variants of definitions because different kinds of definitions need to be processed differently.
     let (typeDefns, funcSigs, funcDefns) = split defns
@@ -80,7 +80,7 @@ instance CollectIds [Definition] where
     collectFuncSigs funcSigs
     -- Get the original explicit signatures.
     -- We will try to restrict polymorphic functions to the types of the corresponding signatures.
-    (_, _, infos) <- get
+    (_, _, infos, _) <- get
     let sigEnv = second typeInfoToType <$> infos
     -- Give each function definition a fresh name.
     let defined = concatMap (\case
@@ -89,9 +89,9 @@ instance CollectIds [Definition] where
                             ) defns
     freshVars <- replicateM (length defined) freshVar
     let gathered = second ConstTypeInfo <$> zip defined freshVars
-    modify (\(freshState, typeDefnInfos, origInfos) -> (freshState, typeDefnInfos, gathered <> origInfos))
+    modify (\(freshState, typeDefnInfos, origInfos, patInfos) -> (freshState, typeDefnInfos, gathered <> origInfos, patInfos))
     -- Get the previously gathered type infos.
-    (_, _, infos') <- get
+    (_, _, infos', _) <- get
     let env = second typeInfoToType <$> infos'
     -- Elaborate multiple definitions simultaneously.
     -- For instance, while elaborating 2 definitions, the typing rule is:
@@ -131,7 +131,7 @@ instance CollectIds [Definition] where
     mapM_ (\(name, ty) -> do
             ty' <- generalize ty env -- TODO: Why???
             let info = (Index name, ConstTypeInfo ty')
-            modify (\(freshState, typeDefnInfos, origInfos) -> (freshState, typeDefnInfos, info : origInfos))
+            modify (\(freshState, typeDefnInfos, origInfos, patInfos) -> (freshState, typeDefnInfos, info : origInfos, patInfos))
           ) (zip names tys)
     where
       split :: [Definition] -> ([Definition], [Definition], [Definition])
@@ -156,7 +156,7 @@ instance CollectIds [Definition] where
       collectFuncSigs funcSigs =
         mapM_ (\(FuncDefnSig n t _ _) -> do
           let infos = (Index n, ConstTypeInfo t)
-          modify (\(freshState, typeDefnInfos, origInfos) -> (freshState, typeDefnInfos, infos : origInfos))
+          modify (\(freshState, typeDefnInfos, origInfos, patInfos) -> (freshState, typeDefnInfos, infos : origInfos, patInfos))
         ) funcSigs
 
       generalize :: Fresh m => Type -> TypeEnv -> m Type
@@ -167,9 +167,9 @@ instance CollectIds [Definition] where
         return $ subst (Map.fromList sub) ty'
 
 instance CollectIds Declaration where
-  collectIds (ConstDecl ns t _ _) = modify (\(freshState, typeDefnInfos, origInfos) -> (freshState, typeDefnInfos, infos <> origInfos))
+  collectIds (ConstDecl ns t _ _) = modify (\(freshState, typeDefnInfos, origInfos, patInfos) -> (freshState, typeDefnInfos, infos <> origInfos, patInfos))
     where infos = map ((, ConstTypeInfo t) . Index) ns
-  collectIds (VarDecl   ns t _ _) = modify (\(freshState, typeDefnInfos, origInfos) -> (freshState, typeDefnInfos, infos <> origInfos))
+  collectIds (VarDecl   ns t _ _) = modify (\(freshState, typeDefnInfos, origInfos, patInfos) -> (freshState, typeDefnInfos, infos <> origInfos, patInfos))
     where infos = map ((, VarTypeInfo t) . Index) ns
 
 -- Note that we pass the collected ids into each sections of the program.
@@ -180,7 +180,7 @@ instance Elab Program where
     -- The `reverse` here shouldn't be needed now. In the past, it was a trick to make things work.
     -- I still keep it as-is in case of future refactoring / rewriting.
     collectIds $ reverse defns
-    (_, _, infos) <- get
+    (_, _, infos, _) <- get
     typedDefns <- mapM (\defn -> do
                           typedDefn <- elaborate defn $ second typeInfoToType <$> infos
                           let (_, typed, _) = typedDefn
@@ -220,7 +220,7 @@ instance Elab Definition where
                     (_, typed, _) <- elaborate expr env
                     return typed
                   ) maybeExpr
-    (_, infos, _) <- get
+    (_, infos, _, _) <- get
     kinded <- toKinded infos ty
     kind <- kindCheck kinded
     if kind == KStar NoLoc then return () else throwError $ KindUnifyFailed kind (KStar NoLoc) (locOf kind)
@@ -313,7 +313,7 @@ instance Elab Stmt where
       | an < length exprs -> throwError $ RedundantExprs (drop an exprs)
       | an < length names -> throwError $ RedundantNames (drop an names)
       | otherwise      -> do
-        (_, _, infos) <- get
+        (_, _, infos, _) <- get
         exprs' <- mapM (\(name, expr) -> do
                           ty <- checkAssign infos name
                           (ty', typedExpr, _) <- elaborate expr env
@@ -359,7 +359,7 @@ instance Elab Stmt where
   elaborate (Spec text range) _ = return (Nothing, Typed.Spec text range, mempty)
   elaborate (Proof text1 text2 range) _ = return (Nothing, Typed.Proof text1 text2 range, mempty)
   elaborate (Alloc var exprs loc) env = do
-    (_, _, infos) <- get
+    (_, _, infos, _) <- get
     ty <- checkAssign infos var
     _ <- unifyType ty (tInt NoLoc) $ locOf var
     typedExprs <-
@@ -371,7 +371,7 @@ instance Elab Stmt where
         ) exprs
     return (Nothing, Typed.Alloc var typedExprs loc, mempty)
   elaborate (HLookup name expr loc) env = do
-    (_, _, infos) <- get
+    (_, _, infos, _) <- get
     ty <- checkAssign infos name
     _ <- unifyType ty (tInt NoLoc) $ locOf name
     (ty', typedExpr, _) <- elaborate expr env
