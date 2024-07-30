@@ -30,7 +30,6 @@ instance Variableous Expr where
   isVar _           = Nothing
   mkVar = Var
 
-
 instance Fresh m => Substitutable m Expr Expr where
   subst _ e@(Lit _ _) = return e
   subst sb (Var x l) =

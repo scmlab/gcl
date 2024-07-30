@@ -755,6 +755,7 @@ instance Substitutable Type T.Expr where
   subst s (T.Quant quantifier vars restriction inner loc) = T.Quant (subst s quantifier) vars (subst s restriction) (subst s inner) loc
   subst s (T.ArrIdx arr index loc) = T.ArrIdx (subst s arr) (subst s index) loc
   subst s (T.ArrUpd arr index expr loc) = T.ArrUpd (subst s arr) (subst s index) (subst s expr) loc
+  subst s (T.Subst e es) = T.Subst (subst s e) [(x, subst s ex) | (x, ex) <- es]
 
 instance Substitutable Type T.Chain where
   subst s (T.Pure expr) = T.Pure $ subst s expr

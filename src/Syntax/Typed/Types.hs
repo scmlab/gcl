@@ -63,6 +63,8 @@ data Expr
   | Quant Expr [Name] Expr Expr Loc
   | ArrIdx Expr Expr Loc
   | ArrUpd Expr Expr Expr Loc
+
+  | Subst Expr [(Name, Expr)]
   deriving (Eq, Show)
   -- FIXME: Other constructors.
 

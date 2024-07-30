@@ -3,37 +3,19 @@
 
 module Render.Syntax.Typed where
 
-import           Data.Foldable                  ( toList )
-import qualified Data.Map                      as Map
 import           Render.Class
 import           Render.Element
 import           Render.Syntax.Common           ( )
 import           Render.Syntax.Abstract hiding ( handleExpr )
 import           Syntax.Typed
--- import           Syntax.Abstract.Util           ( assignBindingToExpr )
--- import           Syntax.Abstract.Util           ( assignBindingToExpr )
 import           Syntax.Common                  ( ArithOp(..)
-                                                , TypeOp(..)
                                                 , Fixity(..)
                                                 , Op(..)
                                                 , classify
-                                                , isAssocOp
-                                                , sameOpSym
-                                                , precOf
-                                                , initOrderIndex
                                                 )
-import           Data.Loc                       ( Loc(NoLoc) )
 
 ------------------------------------------------------------------------------
 
--- | Literals
--- instance Render Lit where
---   render (Num i) = render (show i)
---   render (Bol b) = render (show b)
---   render (Chr c) = render (show c)
---   render Emp     = "emp"
-
---------------------------------------------------------------------------------
 
 -- | Expr
 instance Render Expr where
@@ -85,6 +67,12 @@ handleExpr _ (ArrIdx e1 e2 _) = render e1 <> "[" <> render e2 <> "]"
 handleExpr _ (ArrUpd e1 e2 e3 _) =
   "(" <+> render e1 <+> ":" <+> render e2 <+> "↣" <+> render e3 <+> ")"
     -- SCM: need to print parenthesis around e1 when necessary.
+handleExpr n (Subst e subs) =
+   parensIf n Nothing $
+     handleExpr AppHOLE e <+> "[" <+>
+      renderManySepByComma vs <+> "\\" <+>
+      renderManySepByComma es <+> "]"
+  where (vs, es) = unzip subs
 
 instance Render Chain where -- Hopefully this is correct.
   render (Pure expr) = render expr

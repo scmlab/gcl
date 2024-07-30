@@ -45,6 +45,7 @@ library
       Pretty.Concrete
       Pretty.Error
       Pretty.Predicate
+      Pretty.Typed
       Pretty.Util
       Pretty.Variadic
       Render
@@ -99,6 +100,7 @@ library
       Syntax.Typed.Instances.Located
       Syntax.Typed.Operator
       Syntax.Typed.Types
+      Syntax.Typed.Util
   other-modules:
       Paths_gcl
   hs-source-dirs:
@@ -209,6 +211,7 @@ test-suite gcl-test
       Pretty.Concrete
       Pretty.Error
       Pretty.Predicate
+      Pretty.Typed
       Pretty.Util
       Pretty.Variadic
       Render
@@ -263,6 +266,7 @@ test-suite gcl-test
       Syntax.Typed.Instances.Located
       Syntax.Typed.Operator
       Syntax.Typed.Types
+      Syntax.Typed.Util
       Paths_gcl
   hs-source-dirs:
       test
