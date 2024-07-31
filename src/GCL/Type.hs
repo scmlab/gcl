@@ -181,7 +181,6 @@ instance Elab Program where
     -- The `reverse` here shouldn't be needed now. In the past, it was a trick to make things work.
     -- I still keep it as-is in case of future refactoring / rewriting.
     collectIds $ reverse defns
-    (_, _, _, pats) <- get
     (_, _, infos, _) <- get
     typedDefns <- mapM (\defn -> do
                           typedDefn <- elaborate defn $ second typeInfoToType <$> infos
@@ -253,7 +252,7 @@ instance Elab Definition where
             case lookup (Index name) env of
               Just k -> return $ Typed.TMetaVar name k loc
               _ -> error "Shouldn't happen."
-      
+
       kindCheck :: Typed.KindedType -> ElaboratorM Kind
       kindCheck kinded = case kinded of
         Typed.TBase _ kind _ -> return kind
@@ -273,7 +272,7 @@ instance Elab Definition where
         _ <- unifyKind mempty left k2 loc
         return right
       applyKind k _ = throwError $ NotKFunc k (locOf k)
-          
+
   elaborate (FuncDefn name expr) env = do
     (_, typed, _) <- elaborate expr env
     return (Nothing, Typed.FuncDefn name typed, mempty)
@@ -530,7 +529,31 @@ instance Elab Expr where
     uniSubExpr <- unifyType (subst eSub $ fromJust eTy) (subst uniSubArr tv) (locOf e)
     let sub = uniSubExpr `compose` eSub `compose` uniSubArr `compose` uniSubIndex `compose` indexSub `compose` arrSub
     return (subst uniSubArr arrTy, subst sub (Typed.ArrUpd typedArr typedIndex typedE loc), sub)
-  elaborate (Case expr cases l) env = undefined -- TODO: Implement pattern matching.
+  elaborate (Case expr cases _) env = do
+    (exprTy, typedExpr, tySub) <- elaborate expr env
+    val <- mapM (\(CaseClause pat expr) -> analyzePat (pat, expr) (subst tySub $ fromJust exprTy) env) cases
+    return (return $ fst $ head val, typedExpr, tySub) -- FIXME: This is only for testing purpose.
+    where
+      analyzePat :: (Pattern, Expr) -> Type -> TypeEnv -> ElaboratorM (Type, Typed Expr)
+      analyzePat (pat, ex) ty env' = do
+        env'' <- patBind pat ty
+        (exTy, typedEx, sub) <- elaborate ex $ env'' <> env'
+        return (subst sub $ fromJust exTy, undefined) -- FIXME: undefined
+
+      patBind :: Pattern -> Type -> ElaboratorM TypeEnv
+      patBind pat ty = do
+        (_, _, _, patInfos) <- get
+        case pat of
+          PattLit lit -> undefined -- FIXME: undefined
+          PattBinder na -> return [(Index na, ty)]
+          PattWildcard _ -> return mempty
+          PattConstructor patName subpats -> do
+            case find (\(name, _, _) -> name == patName) patInfos of
+              Nothing -> undefined -- FIXME: undefined
+              Just (_, input, outputs) -> do
+                _ <- unifyType ty input (locOf input)
+                typeEnvs <- sequence $ uncurry patBind <$> zip subpats outputs
+                return $ foldl' (<>) mempty typeEnvs
 
 instance Elab Chain where -- TODO: Make sure the below implementation is correct.
   elaborate (More (More ch' op1 e1 loc1) op2 e2 loc2) env = do
