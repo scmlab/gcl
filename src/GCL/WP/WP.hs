@@ -29,7 +29,7 @@ import           Syntax.Typed.Operator          ( nameVar, number, add
                                                 )
 import           Syntax.Common.Types            ( Name(..)
                                                 , nameToText )
-import Syntax.Typed.Instances.Substitution   ()
+import           Syntax.Typed.Instances.Substitution   ()
 import           Syntax.Substitution
 
 wpFunctions :: TstructSegs

@@ -16,41 +16,39 @@ import           Data.Loc                       ( Located(..) )
 import qualified Data.Map                      as Map
 import           GCL.Predicate                  ( InfMode(..)
                                                 , PO(..)
-                                                , Pred(..)
+                                                , Pred
                                                 , Spec(..)
                                                 )
-import           GCL.WP.Type
-import qualified Syntax.Abstract               as A
-import qualified Syntax.Abstract.Operator      as A
-import qualified Syntax.Abstract.Util          as A
-import qualified Syntax.Typed                  as T
+import           Syntax.Typed
+import           Syntax.Typed.Operator          ( true )
+import           Syntax.Typed.Util              ( declaredNames
+                                                , programToScopeForSubstitution )
 import           Syntax.Common.Types            ( nameToText )
 import GCL.WP.Types
 import GCL.WP.Struct
 import GCL.WP.WP
 import GCL.WP.SP
-import GCL.WP.Util
 
 runWP
   :: WP a
   -> (Decls, [[Text]])
   -> Either
        StructError
-       (a, Int, ([PO], [Spec], [StructWarning], IntMap (Int, A.Expr)))
+       (a, Int, ([PO], [Spec], [StructWarning], IntMap (Int, Expr)))
 runWP p decls = runExcept $ runRWST p decls 0
 
 sweep
-  :: A.Program
-  -> Either StructError ([PO], [Spec], [StructWarning], IntMap (Int, A.Expr), Int)
-sweep program@(A.Program _ decs _props stmts _) = do
-  let decls = A.programToScopeForSubstitution program
+  :: Program
+  -> Either StructError ([PO], [Spec], [StructWarning], IntMap (Int, Expr), Int)
+sweep program@(Program _ decs _props stmts _) = do
+  let decls = programToScopeForSubstitution program
   let dnames = [map nameToText $ declaredNames decs]
   (_, counter, (pos, specs, warnings, redexes)) <-
            runWP (structProgram stmts) (decls, dnames)
   -- update Proof Obligations with corresponding Proof Anchors
   let proofAnchors = stmts >>= \case
-        A.Proof anchor _ r -> [(anchor,r)]
-        _                  -> []
+        Proof anchor _ r -> [(anchor,r)]
+        _                -> []
   -- make a table of (#hash, range) from Proof Anchors
   let table = Map.fromList proofAnchors
   let updatePO po = case Map.lookup (poAnchorHash po) table of
@@ -66,36 +64,33 @@ sweep program@(A.Program _ decs _props stmts _) = do
 
 data ProgView
   = ProgViewEmpty
-  | ProgViewOkay Pred [A.Stmt] Pred
-  | ProgViewMissingPrecondition [A.Stmt] Pred
-  | ProgViewMissingPostcondition Pred [A.Stmt]
-  | ProgViewMissingBoth [A.Stmt]
+  | ProgViewOkay Pred [Stmt] Pred
+  | ProgViewMissingPrecondition [Stmt] Pred
+  | ProgViewMissingPostcondition Pred [Stmt]
+  | ProgViewMissingBoth [Stmt]
 
-progView :: [A.Stmt] -> ProgView
+progView :: [Stmt] -> ProgView
 progView []               = ProgViewEmpty
-progView [A.Assert pre l] = do
-  ProgViewMissingPrecondition [] (Assertion pre l)
+progView [Assert pre _] = do
+  ProgViewMissingPrecondition [] pre
 progView stmts = do
   case (head stmts, last stmts) of
-    (A.Assert pre l, A.Assert post m) -> do
-      ProgViewOkay (Assertion pre l)
-                   (init (tail stmts))
-                   (Assertion post m)
-    (A.Assert pre l, _) -> do
-      ProgViewMissingPostcondition (Assertion pre l)
-                                   (tail stmts)
-    (_, A.Assert post m) -> do
-      ProgViewMissingPrecondition (init stmts) (Assertion post m)
+    (Assert pre _, Assert post _) -> do
+      ProgViewOkay pre (init (tail stmts)) post
+    (Assert pre _, _) -> do
+      ProgViewMissingPostcondition pre (tail stmts)
+    (_, Assert post _) -> do
+      ProgViewMissingPrecondition (init stmts) post
     _ -> ProgViewMissingBoth stmts
 
-structProgram :: [A.Stmt] -> WP ()
+structProgram :: [Stmt] -> WP ()
 structProgram stmts = do
   case progView (removeLastProofs stmts) of
     ProgViewEmpty -> return ()
     ProgViewOkay pre stmts' post ->
       structStmts Primary (pre, Nothing) stmts' post
     ProgViewMissingPrecondition stmts' post ->
-      structStmts Primary (Constant A.true, Nothing) stmts' post
+      structStmts Primary (true, Nothing) stmts' post
     ProgViewMissingPostcondition _ stmts' ->
       throwError . MissingPostcondition . locOf . last $ stmts'
     ProgViewMissingBoth stmts' ->
@@ -103,17 +98,17 @@ structProgram stmts = do
 
   where
       -- ignore Proofs after the Postcondition
-      removeLastProofs :: [A.Stmt] -> [A.Stmt]
+      removeLastProofs :: [Stmt] -> [Stmt]
       removeLastProofs = List.dropWhileEnd isProof
 
-      isProof :: A.Stmt -> Bool
-      isProof A.Proof{} = True
-      isProof _         = False
+      isProof :: Stmt -> Bool
+      isProof Proof{} = True
+      isProof _       = False
 
 
 -- tying the knots
 
-structStmts :: InfMode -> (Pred, Maybe A.Expr) -> [A.Stmt] -> Pred -> WP ()
+structStmts :: InfMode -> (Pred, Maybe Expr) -> [Stmt] -> Pred -> WP ()
 structStmts = this
   where
     (this, structSegs, struct) = structFunctions (wpSegs, wpSStmts,

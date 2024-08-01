@@ -2,9 +2,14 @@
 
 module Syntax.Typed.Util where
 
+import           Control.Arrow                  ( second )
+import           Data.Map                       ( Map )
+import qualified Data.Map                      as Map
+import qualified Data.Maybe                    as Maybe
+import           Data.Text                      ( Text )
 import           Data.Loc                       ( (<-->), Loc(..) )
 import           Syntax.Typed
-import           Syntax.Common                  ( Name(..) )
+import           Syntax.Common                  ( Name(..), nameToText )
 
 
 getGuards :: [GdCmd] -> [Expr]
@@ -48,3 +53,24 @@ typeOf (Subst e _) = typeOf e
 typeOfChain :: Chain -> Type
 typeOfChain (Pure e) = typeOf e  -- SCM: shouldn't happen?
 typeOfChain (More _ _ _ _) = TBase TBool NoLoc
+
+
+programToScopeForSubstitution :: Program -> Map Text (Maybe Expr)
+programToScopeForSubstitution (Program defns decls _ _ _) =
+  Map.mapKeys nameToText
+    $  foldMap extractDeclaration decls
+    <> ( Map.fromList
+       . map (second Just)
+       . Maybe.mapMaybe pickFuncDefn
+       )
+         defns
+ where
+  extractDeclaration :: Declaration -> Map Name (Maybe Expr)
+  extractDeclaration (ConstDecl names _ _ _) =
+    Map.fromList (zip names (repeat Nothing))
+  extractDeclaration (VarDecl names _ _ _) =
+    Map.fromList (zip names (repeat Nothing))
+
+pickFuncDefn :: Definition -> Maybe (Name, Expr)
+pickFuncDefn (FuncDefn n expr) = Just (n, expr)
+pickFuncDefn _                 = Nothing
