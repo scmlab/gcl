@@ -1,5 +1,5 @@
 {-# LANGUAGE MultiParamTypeClasses, FlexibleInstances,
-             FlexibleContexts, MonoLocalBinds #-}
+             FlexibleContexts, MonoLocalBinds, FunctionalDependencies #-}
 module Syntax.Substitution where
 
 import           Control.Monad                  ( forM )
@@ -21,15 +21,15 @@ class Substitutable m a b where
   subst :: Subst b -> a -> m a
 
 -- types that has a concept of a "variable"
-class Variableous e where
-  isVar :: e -> Maybe Name
-  mkVar :: Name -> Loc -> e
+class Variableous e t | e -> t where  -- t denotes the type of the variable
+  isVar :: e -> Maybe (Name, t)
+  mkVar :: Name -> t -> Loc -> e
 
-instance Variableous Expr where
-  isVar (Var   x _) = Just x
-  isVar (Const x _) = Just x
+instance Variableous Expr () where
+  isVar (Var   x _) = Just (x, ())
+  isVar (Const x _) = Just (x, ())
   isVar _           = Nothing
-  mkVar = Var
+  mkVar x () l      = Var x l
 
 instance Fresh m => Substitutable m Expr Expr where
   subst _ e@(Lit _ _) = return e
@@ -44,13 +44,13 @@ instance Fresh m => Substitutable m Expr Expr where
   subst sb (Lam x e l)
      | nameToText x `elem` keys sb = return (Lam x e l)
      | otherwise = do
-         (xs', e', _) <- substBinder sb [x] e
+         (xs', e', _) <- substBinderTypeless sb [x] e
          return (Lam (head xs') e' l)
   subst sb (Func f clauses l) =
     Func f <$> mapM (subst sb) clauses <*> pure l
   subst sb (Tuple es) = Tuple <$> mapM (subst sb) es
   subst sb (Quant op xs ran body l) = do
-       (xs', (ran', body'), _) <- substBinder sb xs (ran, body)
+       (xs', (ran', body'), _) <- substBinderTypeless sb xs (ran, body)
        return $ Quant op xs' ran' body' l
   subst _ (RedexKernel _ _ _ _) = error "not knowing what is going on here"
   subst _ (RedexShell _ _) = error "not knowing what is going on here"
@@ -62,6 +62,13 @@ instance Fresh m => Substitutable m Expr Expr where
     cases' <- forM cases
       $ \(CaseClause patt body) -> CaseClause patt <$> subst sb body
     return $ Case e cases' l
+
+-- just a wrapper calling substBinder, when e is typeless Expr
+substBinderTypeless :: (Fresh m, Substitutable m a Expr, Free a) =>
+  Subst Expr -> [Name] -> a -> m ([Name], a, Subst Expr)
+substBinderTypeless sb binders body =
+  (\(binders', body', sb') -> (map fst binders', body', sb'))
+   <$> (substBinder sb [(b,()) | b <- binders] body)
 
 instance Fresh m => Substitutable m Chain Expr where
   subst sb (Pure expr loc) = Pure <$> subst sb expr <*> pure loc
@@ -106,7 +113,7 @@ instance Fresh m => Substitutable m GdCmd Expr where
 instance Fresh m => Substitutable m Program Expr where
   subst sb (Program defns decls props stmts l) = do
      (_, (decls', props', stmts'), _) <-
-       substBinder sb locals (decls, props, stmts)
+       substBinderTypeless sb locals (decls, props, stmts)
      return $ Program defns decls' props' stmts' l
      -- SCM: TODO: deal with defns
     where locals = declaredNames decls
@@ -146,16 +153,16 @@ instance (Monad m, Substitutable m a b) =>
 --   where (xs', e') <- substBinder sb xs e.
 -- It performs substitution on e, while renaming xs if necessary.
 
-substBinder :: (Fresh m, Variableous e,
+substBinder :: (Fresh m, Variableous e t,
                 Substitutable m a e, Free e, Free a) =>
-                Subst e -> [Name] -> a -> m ([Name], a, Subst e)
+                Subst e -> [(Name, t)] -> a -> m ([(Name, t)], a, Subst e)
 substBinder sb binders body = do
      sb'' <- genBinderRenaming fvsb binders
-     let binders' = renameVars sb'' binders
+     let binders' = zip (renameVars sb'' (map fst binders)) (map snd binders)
      let sbnew = sb'' <> sb'
      body' <- subst sbnew body
      return $ (binders', body', sbnew)
-  where sb'  = shrinkSubst binders (freeVarsT body) sb
+  where sb'  = shrinkSubst (map fst binders) (freeVarsT body) sb
         fvsb = Set.unions . map freeVarsT . elems $ sb'
 
 -- Utilities
@@ -166,23 +173,23 @@ shrinkSubst binders ns subs =
  where substractKeys sb bs =
          filterWithKey (\k _ -> not (k `elem` bs)) sb
 
-genBinderRenaming :: (Fresh m, Variableous e) =>
-                  Set Text -> [Name] -> m (Subst e)
+genBinderRenaming :: (Fresh m, Variableous e t) =>
+                  Set Text -> [(Name, t)] -> m (Subst e)
 genBinderRenaming _ [] = return empty
-genBinderRenaming fvs (Name x l : xs)
+genBinderRenaming fvs ((Name x l, t) : xs)
    | x `Set.member` fvs = do
        x' <- freshName x l
-       insert x (mkVar x' l) <$> genBinderRenaming fvs xs
+       insert x (mkVar x' t l) <$> genBinderRenaming fvs xs
    | otherwise = genBinderRenaming fvs xs
 
-renameVars :: Variableous e => Subst e -> [Name] -> [Name]
+renameVars :: Variableous e t => Subst e -> [Name] -> [Name]
 renameVars sb = map (renameVar sb)
 
-renameVar :: Variableous e => Subst e -> Name -> Name
+renameVar :: Variableous e t => Subst e -> Name -> Name
 renameVar sb x = case lookup (nameToText x) sb of
             Nothing -> x
             Just e  -> case isVar e of
-                         Just y -> y
+                         Just (y, _) -> y
                          Nothing -> error "variable should be substituted for a variable"
         --- SCM: we assume that renameVars always succeed.
         --       Do we need to raise a catchable error?
