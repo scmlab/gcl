@@ -1,7 +1,8 @@
 module Syntax.Typed.Operator where
 
-import           Syntax.Abstract.Operator (tBool, tInt, tFunc)
+import           Syntax.Abstract.Operator ( tBool, tInt, tFunc )
 import           Syntax.Typed.Types
+import           Syntax.Typed.Util        ( typeOf )
 import           Syntax.Typed.Instances.Located
 import           Syntax.Common
 import           Data.Text                      ( Text )
@@ -49,6 +50,10 @@ implies = arith (ImpliesU NoLoc) tBinLogicOp
 
 add :: Expr -> Expr -> Expr
 add    = arith (Add    NoLoc) tBinIntOp
+
+eqq :: Expr -> Expr -> Expr
+e0 `eqq` e1 =
+   Chain (More (Pure e0) (ChainOp (EQ NoLoc)) (typeOf e0) e1)
 
 true, false :: Expr
 true  = Lit (Bol True)  tBool NoLoc

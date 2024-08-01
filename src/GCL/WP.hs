@@ -19,12 +19,13 @@ import           GCL.Predicate                  ( InfMode(..)
                                                 , Pred(..)
                                                 , Spec(..)
                                                 )
-import qualified GCL.Substitution              as Substitution
 import           GCL.WP.Type
 import qualified Syntax.Abstract               as A
 import qualified Syntax.Abstract.Operator      as A
 import qualified Syntax.Abstract.Util          as A
+import qualified Syntax.Typed                  as T
 import           Syntax.Common.Types            ( nameToText )
+import GCL.WP.Types
 import GCL.WP.Struct
 import GCL.WP.WP
 import GCL.WP.SP
@@ -32,7 +33,7 @@ import GCL.WP.Util
 
 runWP
   :: WP a
-  -> (Substitution.Decls, [[Text]])
+  -> (Decls, [[Text]])
   -> Either
        StructError
        (a, Int, ([PO], [Spec], [StructWarning], IntMap (Int, A.Expr)))

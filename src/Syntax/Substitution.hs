@@ -1,5 +1,5 @@
 {-# LANGUAGE MultiParamTypeClasses, FlexibleInstances,
-             FlexibleContexts #-}
+             FlexibleContexts, MonoLocalBinds #-}
 module Syntax.Substitution where
 
 import           Control.Monad                  ( forM )
@@ -10,8 +10,9 @@ import           Data.Set                       ( Set )
 import qualified Data.Set as Set
 import           Data.Loc                       ( Loc )
 import           GCL.Common
-import           GCL.WP.Util                    ( declaredNames )
+-- import           GCL.WP.Util                    ( declaredNames )
 import           Syntax.Abstract.Types
+import           Syntax.Abstract.Util           ( declaredNames )
 import           Syntax.Common
 
 type Subst b = Map Text b

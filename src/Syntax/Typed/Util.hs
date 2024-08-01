@@ -17,6 +17,16 @@ wrapLam :: [(Name, Type)] -> Expr -> Expr
 wrapLam []           body = body
 wrapLam ((x,t) : xs) body = let b = wrapLam xs body in Lam x t b (x <--> b)
 
+declaredNames :: [Declaration] -> [Name]
+declaredNames decls = concat . map extractNames $ decls
+  where extractNames (ConstDecl ns _ _ _) = ns
+        extractNames (VarDecl   ns _ _ _) = ns
+
+declaredNamesTypes :: [Declaration] -> [(Name, Type)]
+declaredNamesTypes decls = concat . map extractNames $ decls
+  where extractNames (ConstDecl ns t _ _) = [(n, t) | n <- ns]
+        extractNames (VarDecl   ns t _ _) = [(n, t) | n <- ns]
+
 typeOf :: Expr -> Type
 typeOf (Lit _ t _)   = t
 typeOf (Var _ t _)   = t

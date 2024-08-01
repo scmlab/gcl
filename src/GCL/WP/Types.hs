@@ -10,22 +10,23 @@ import           Control.Monad.RWS              ( MonadState(..)
 import Data.IntMap                              ( IntMap )
 import Data.Aeson (ToJSON)
 import Data.Text  ( Text )
+import Data.Map                                 ( Map )
 import Data.Loc (Loc (..), Located (..))
 import Data.Loc.Range (Range)
 import GCL.Common
 import GCL.Predicate                           ( InfMode(..)
-                                               , PO(..), Pred(..), Spec (..))
-import qualified GCL.Substitution              as Substitution
-import qualified Syntax.Abstract               as A
+                                               , PO(..), Pred, Spec (..))
 import           Syntax.Typed
 
 -- The WP monad.
 
 type TM = Except StructError
 
+type Decls = Map Text (Maybe Expr)
+
 type WP
   = RWST
-      (Substitution.Decls, [[Text]])
+      (Decls, [[Text]])
       ([PO], [Spec], [StructWarning], IntMap (Int, Expr))
       Int
       TM
