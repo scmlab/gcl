@@ -97,6 +97,7 @@ library
       Syntax.Parser.Util
       Syntax.Substitution
       Syntax.Typed
+      Syntax.Typed.Instances.Free
       Syntax.Typed.Instances.Located
       Syntax.Typed.Instances.Substitution
       Syntax.Typed.Operator
@@ -264,6 +265,7 @@ test-suite gcl-test
       Syntax.Parser.Util
       Syntax.Substitution
       Syntax.Typed
+      Syntax.Typed.Instances.Free
       Syntax.Typed.Instances.Located
       Syntax.Typed.Instances.Substitution
       Syntax.Typed.Operator
