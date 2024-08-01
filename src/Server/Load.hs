@@ -25,7 +25,7 @@ import Control.Monad.Except (runExcept)
 import Server.PositionMapping (idDelta)
 import qualified Server.SrcLoc                 as SrcLoc
 import qualified GCL.Type as TypeChecking
-import GCL.WP.Type (StructError, StructWarning)
+import GCL.WP.Types (StructError, StructWarning)
 import GCL.Predicate (PO, Spec)
 import Server.Notification.Update (sendUpdateNotification)
 import qualified Data.Text as Text
@@ -67,7 +67,7 @@ load filePath = do
                 load filePath
             Right abstract -> do
               logText "  all holes digged\n"
-              case WP.sweep abstract of
+              case undefined of -- was "WP.sweep abstract". TODO: fix it
                 Left  err -> do
                   logText "  sweep error\n"
                   onError (StructError err)
