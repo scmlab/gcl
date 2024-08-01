@@ -529,31 +529,36 @@ instance Elab Expr where
     uniSubExpr <- unifyType (subst eSub $ fromJust eTy) (subst uniSubArr tv) (locOf e)
     let sub = uniSubExpr `compose` eSub `compose` uniSubArr `compose` uniSubIndex `compose` indexSub `compose` arrSub
     return (subst uniSubArr arrTy, subst sub (Typed.ArrUpd typedArr typedIndex typedE loc), sub)
-  elaborate (Case expr cases _) env = do
+  elaborate (Case expr cases loc) env = do
     (exprTy, typedExpr, tySub) <- elaborate expr env
-    val <- mapM (\(CaseClause pat expr) -> analyzePat (pat, expr) (subst tySub $ fromJust exprTy) env) cases
-    return (return $ fst $ head val, typedExpr, tySub) -- FIXME: This is only for testing purpose.
+    pairs <- mapM (\(CaseClause pat expr') -> analyzePat (pat, expr') (subst tySub $ fromJust exprTy) env) cases
+    let cases' = zip cases $ snd <$> pairs
+    let clauses = (\(CaseClause pat _, typed) -> Typed.CaseClause pat typed)<$> cases'
+    let typedCase = Typed.Case typedExpr clauses loc
+    return (return $ fst $ head pairs, typedCase, tySub) -- FIXME: Unify return values in all cases.
     where
       analyzePat :: (Pattern, Expr) -> Type -> TypeEnv -> ElaboratorM (Type, Typed Expr)
       analyzePat (pat, ex) ty env' = do
         env'' <- patBind pat ty
         (exTy, typedEx, sub) <- elaborate ex $ env'' <> env'
-        return (subst sub $ fromJust exTy, undefined) -- FIXME: undefined
+        return (subst sub $ fromJust exTy, subst sub typedEx)
 
       patBind :: Pattern -> Type -> ElaboratorM TypeEnv
       patBind pat ty = do
         (_, _, _, patInfos) <- get
         case pat of
-          PattLit lit -> undefined -- FIXME: undefined
+          PattLit lit -> do
+            sub <- unifyType ty (TBase (baseTypeOfLit lit) (locOf lit)) (locOf ty) -- TODO: Propogate this `sub`
+            return mempty
           PattBinder na -> return [(Index na, ty)]
           PattWildcard _ -> return mempty
           PattConstructor patName subpats -> do
             case find (\(name, _, _) -> name == patName) patInfos of
-              Nothing -> undefined -- FIXME: undefined
+              Nothing -> throwError $ NotInScope patName
               Just (_, input, outputs) -> do
                 _ <- unifyType ty input (locOf input)
                 typeEnvs <- sequence $ uncurry patBind <$> zip subpats outputs
-                return $ foldl' (<>) mempty typeEnvs
+                return $ mconcat typeEnvs
 
 instance Elab Chain where -- TODO: Make sure the below implementation is correct.
   elaborate (More (More ch' op1 e1 loc1) op2 e2 loc2) env = do
@@ -676,7 +681,6 @@ litTypes :: Lit -> Loc -> Type
 litTypes (Num _) l = tInt l
 litTypes (Bol _) l = tBool l
 litTypes (Chr _) l = tChar l
-litTypes Emp     l = tBool l
 
 tBool, tInt, tChar :: Loc -> Type
 tBool = TBase TBool

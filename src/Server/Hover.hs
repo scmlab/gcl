@@ -125,6 +125,10 @@ instance Collect Typed.TypedExpr where
   collect (Typed.Quant quantifier _bound restriction inner _) = collect quantifier <> collect restriction <> collect inner
   collect (Typed.ArrIdx expr1 expr2 _) = collect expr1 <> collect expr2
   collect (Typed.ArrUpd arr index expr _) = collect arr <> collect index <> collect expr
+  collect (Typed.Case expr clauses _) = collect expr <> foldMap collect clauses
+
+instance Collect Typed.TypedCaseClause where
+  collect (Typed.CaseClause _pat expr) = collect expr
 
 instance Collect Typed.TypedChain where
   collect (Typed.Pure expr) = collect expr

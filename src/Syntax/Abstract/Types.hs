@@ -204,7 +204,12 @@ extractBinder (PattConstructor _ xs) = xs >>= extractBinder
 ----------------------------------------------------------------
 
 -- | Literals
-data Lit = Num Int | Bol Bool | Chr Char | Emp
+data Lit = Num Int | Bol Bool | Chr Char
   deriving (Show, Eq, Generic)
+
+baseTypeOfLit :: Lit -> TBase
+baseTypeOfLit (Num _) = TInt
+baseTypeOfLit (Bol _) = TBool
+baseTypeOfLit (Chr _) = TChar
 
 ----------------------------------------------------------------

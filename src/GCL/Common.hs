@@ -320,6 +320,10 @@ instance Substitutable (Subs Type) Typed.TypedExpr where
   subst s (Typed.Quant quantifier vars restriction inner loc) = Typed.Quant (subst s quantifier) vars (subst s restriction) (subst s inner) loc
   subst s (Typed.ArrIdx arr index loc) = Typed.ArrIdx (subst s arr) (subst s index) loc
   subst s (Typed.ArrUpd arr index expr loc) = Typed.ArrUpd (subst s arr) (subst s index) (subst s expr) loc
+  subst s (Typed.Case expr clauses loc) = Typed.Case (subst s expr) (subst s <$> clauses) loc
+
+instance Substitutable (Subs Type) Typed.TypedCaseClause where
+  subst s (Typed.CaseClause pat expr) = Typed.CaseClause pat (subst s expr)
 
 instance Substitutable (Subs Type) Typed.TypedChain where
   subst s (Typed.Pure expr) = Typed.Pure $ subst s expr

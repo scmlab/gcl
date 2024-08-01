@@ -59,8 +59,11 @@ data TypedExpr
   | Quant TypedExpr [Name] TypedExpr TypedExpr Loc
   | ArrIdx TypedExpr TypedExpr Loc
   | ArrUpd TypedExpr TypedExpr TypedExpr Loc
+  | Case TypedExpr [TypedCaseClause] Loc
   deriving (Eq, Show)
-  -- FIXME: Other constructors.
+
+data TypedCaseClause = CaseClause T.Pattern TypedExpr
+  deriving (Eq, Show)
 
 data TypedChain
   = Pure TypedExpr
