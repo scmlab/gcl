@@ -11,6 +11,7 @@ module Server.Handler.Guabao.Refine where
 
 import qualified Data.Aeson.Types as JSON
 import GHC.Generics ( Generic )
+import Data.Bifunctor ( bimap )
 import Control.Monad.Except           ( runExcept )
 import Server.Monad (ServerM, FileState(..), loadFileState, editTexts, pushSpecs, deleteSpec, Versioned, pushPos)
 import Server.Notification.Update (sendUpdateNotification)
@@ -21,17 +22,19 @@ import Syntax.Parser.Lexer (TokStream(..), scan)
 import Language.Lexer.Applicative              ( TokenStream(..))
 
 import Error (Error (ParseError, TypeError, StructError))
-import GCL.Predicate (Spec(..), PO)
+import GCL.Predicate (Spec(..), PO, InfMode(..))
 import GCL.Common (TypeEnv)
 import GCL.Type (Elab(..), TypeError, runElaboration, Typed)
 import Data.Loc.Range (Range (..))
 import Data.Text (Text, split)
 import Data.List (find, maximumBy)
 import Data.Loc (Pos(..), Loc(..), L(..))
+import qualified Data.Map        as Map
 import qualified Syntax.Concrete as C
 import qualified Syntax.Abstract as A
 import qualified Syntax.Typed    as T
 import GCL.WP.Types (StructError, StructWarning)
+import GCL.WP
 import qualified Data.Text as Text
 
 data RefineParams = RefineParams
@@ -220,15 +223,8 @@ instance Elab [A.Stmt] where
     return (Nothing, typed, mempty)
 
 
--- data Spec = Specification
---   { specID       :: Int
---   , specPreCond  :: Pred
---   , specPostCond :: Pred
---   , specRange    :: Range
---   -- , specTypeEnv :: TypeEnv
---   -- extend this definition if needed
---   }
---   deriving (Eq, Show, Generic)
-
 sweepFragment :: Int -> Spec -> [T.Stmt] -> Either StructError ([PO], [Spec], [StructWarning])
-sweepFragment specIdStart spec impl = error "TODO: define this after modifying definitions of Spec and StructStmts"
+sweepFragment _ (Specification _ pre post _ _) impl =
+   bimap id (\(_, _, (pos, specs, sws, _)) -> (pos, specs, sws))
+    $ runWP (structStmts Primary (pre, Nothing) impl post)
+            (Map.empty, [])  -- SCM: is this right?

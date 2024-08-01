@@ -3,7 +3,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase #-}
 
-module GCL.WP (WP, TM, sweep) where
+module GCL.WP (WP, TM, sweep, structStmts, runWP) where
 
 import           Control.Monad.Except           ( MonadError(throwError)
                                                 , runExcept
