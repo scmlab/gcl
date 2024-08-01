@@ -31,7 +31,7 @@ import Data.Loc (Pos(..), Loc(..), L(..))
 import qualified Syntax.Concrete as C
 import qualified Syntax.Abstract as A
 import qualified Syntax.Typed    as T
-import GCL.WP.Type (StructError, StructWarning)
+import GCL.WP.Types (StructError, StructWarning)
 import qualified Data.Text as Text
 
 data RefineParams = RefineParams

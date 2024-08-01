@@ -12,11 +12,12 @@ import qualified Server.Monad as Server
 import Server.Monad (FileState(..), ServerM, loadFileState)
 import Error (Error)
 import GCL.Predicate (Spec(..), PO(..), Origin(..))
-import GCL.WP.Type (StructWarning(..))
+import GCL.WP.Types (StructWarning(..))
 import Server.SrcLoc (toLSPRange)
 import           Pretty.Predicate               ( )
 import Data.Loc (Loc(..), Pos(..))
 import Data.Text.Prettyprint.Doc
+import Pretty.Typed ()
 
 sendUpdateNotification :: FilePath -> [Error] -> ServerM ()
 sendUpdateNotification filePath errors = do

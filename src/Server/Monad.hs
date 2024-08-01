@@ -38,7 +38,7 @@ import qualified Server.SrcLoc                 as SrcLoc
 import qualified Data.Text as Text
 import Data.Loc (posCol)
 import Data.Version (Version(Version))
-import GCL.WP.Type (StructWarning)
+import GCL.WP.Types (StructWarning)
 import Language.LSP.Types.Lens (HasMessage(message))
 
 -- | State shared by all clients and requests
