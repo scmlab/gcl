@@ -557,7 +557,7 @@ instance Elab Expr where
               Nothing -> throwError $ NotInScope patName
               Just (_, input, outputs) -> do
                 _ <- unifyType ty input (locOf input)
-                typeEnvs <- sequence $ uncurry patBind <$> zip subpats outputs
+                typeEnvs <- sequence $ uncurry patBind <$> zip subpats outputs -- TODO: Check for the arity of `subpats` & `outputs`.
                 return $ mconcat typeEnvs
 
 instance Elab Chain where -- TODO: Make sure the below implementation is correct.
