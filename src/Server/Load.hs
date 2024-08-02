@@ -67,18 +67,18 @@ load filePath = do
                 load filePath
             Right abstract -> do
               logText "  all holes digged\n"
-              case undefined of -- was "WP.sweep abstract". TODO: fix it
-                Left  err -> do
-                  logText "  sweep error\n"
-                  onError (StructError err)
-                Right (pos, specs, warnings, redexes, counter) -> do
-                  logText "  abstract program generated\n"
-                  case elaborate abstract of
-                    Left err        -> do
-                      logText "  elaborate error\n"
-                      onError err
-                    Right elaborated -> do
-                      logText "  program elaborated\n"
+              logText "  abstract program generated\n"
+              case elaborate abstract of
+                Left err        -> do
+                  logText "  elaborate error\n"
+                  onError err
+                Right elaborated -> do
+                  logText "  program elaborated\n"
+                  case WP.sweep elaborated of
+                    Left  err -> do
+                      logText "  sweep error\n"
+                      onError (StructError err)
+                    Right (pos, specs, warnings, redexes, idCount) -> do
                       let fileState = FileState
                                         { refinedVersion   = currentVersion
                                         , specifications   = map (\spec -> (currentVersion, spec)) specs
@@ -91,7 +91,7 @@ load filePath = do
                                         , concrete         = concrete
                                         , semanticTokens   = collectHighlighting concrete
                                         , abstract         = abstract
-                                        , variableCounter  = counter
+                                        , idCount          = idCount
                                         , definitionLinks  = collectLocationLinks abstract
                                         , elaborated       = elaborated
                                         , hoverInfos       = collectHoverInfo elaborated
@@ -159,6 +159,3 @@ elaborate abstract = do
   case TypeChecking.runElaboration abstract mempty of
     Left  e -> Left (TypeError e)
     Right typedProgram -> return typedProgram
-
-sweepElaborated :: T.Program -> Either StructError ([PO], [Spec], [StructWarning])
-sweepElaborated elaborated = error "TODO"
