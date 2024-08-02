@@ -2,6 +2,9 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE LambdaCase #-}
+{-# OPTIONS_GHC -Wno-name-shadowing #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+{-# HLINT ignore "Use join" #-}
 
 module Server.Load where
 
@@ -31,6 +34,7 @@ import Server.Notification.Update (sendUpdateNotification)
 import qualified Data.Text as Text
 import qualified Data.Aeson as JSON
 import Pretty (Pretty(..))
+import Syntax.Concrete.Types (SepBy (..), GdCmd (..))
 
 load :: FilePath -> ServerM ()
 load filePath = do
@@ -148,11 +152,26 @@ reportHolesOrToAbstract concrete =
     holes -> Left holes
 
 collectHoles :: C.Program -> [Range]
-collectHoles (C.Program _ statements) = do
+collectHoles (C.Program _ statements) = collectHolesFromStatements statements
+
+collectHolesFromStatements :: [C.Stmt] -> [Range]
+collectHolesFromStatements statements = do
   statement <- statements
   case statement of
-    C.SpecQM range -> [range]
-    _ -> []
+    C.SpecQM range      -> [range]
+    C.Block _ program _ -> collectHoles program
+    C.Do _ commands _   -> collectHolesFromGdCmd commands
+    C.If _ commands _   -> collectHolesFromGdCmd commands
+    _                   -> []
+
+mapSepBy :: (a -> b) -> SepBy s a -> [b]
+mapSepBy f (Head c)       = [f c]
+mapSepBy f (Delim c _ cs) = f c : mapSepBy f cs
+
+collectHolesFromGdCmd :: SepBy s C.GdCmd -> [Range]
+collectHolesFromGdCmd s = do
+  ranges <- mapSepBy (\(GdCmd _ _ statements) -> collectHolesFromStatements statements) s
+  ranges
 
 elaborate :: A.Program -> Either Error T.Program
 elaborate abstract = do
@@ -160,5 +179,3 @@ elaborate abstract = do
     Left  e -> Left (TypeError e)
     Right typedProgram -> return typedProgram
 
-sweepElaborated :: T.Program -> Either StructError ([PO], [Spec], [StructWarning])
-sweepElaborated elaborated = error "TODO"
