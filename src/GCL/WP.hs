@@ -32,10 +32,11 @@ import GCL.WP.SP
 runWP
   :: WP a
   -> (Decls, [[Text]])
+  -> Int
   -> Either
        StructError
        (a, Int, ([PO], [Spec], [StructWarning], IntMap (Int, Expr)))
-runWP p decls = runExcept $ runRWST p decls 0
+runWP p decls counter = runExcept $ runRWST p decls counter
 
 sweep
   :: Program
@@ -44,7 +45,7 @@ sweep program@(Program _ decs _props stmts _) = do
   let decls = programToScopeForSubstitution program
   let dnames = [map nameToText $ declaredNames decs]
   (_, counter, (pos, specs, warnings, redexes)) <-
-           runWP (structProgram stmts) (decls, dnames)
+           runWP (structProgram stmts) (decls, dnames) 0
   -- update Proof Obligations with corresponding Proof Anchors
   let proofAnchors = stmts >>= \case
         Proof anchor _ r -> [(anchor,r)]

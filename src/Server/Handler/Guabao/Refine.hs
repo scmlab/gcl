@@ -225,8 +225,9 @@ instance Elab [A.Stmt] where
 
 
 sweepFragment :: Int -> Spec -> [T.Stmt] -> Either StructError ([PO], [Spec], [StructWarning], Int)
-sweepFragment counter (Specification _ pre post _ _) impl = undefined
--- FIXME: use counter and return updated counter
-  --  bimap id (\(_, _, (pos, specs, sws, _)) -> (pos, specs, sws))
-  --   $ runWP (structStmts Primary (pre, Nothing) impl post)
-  --           (Map.empty, [])  -- SCM: is this right?
+sweepFragment counter (Specification _ pre post _ _) impl =
+    bimap id (\(_, counter', (pos, specs, sws, _)) ->
+               (pos, specs, sws, counter'))
+     $ runWP (structStmts Primary (pre, Nothing) impl post)
+             (Map.empty, [])  -- SCM: this can't be right.
+             counter
