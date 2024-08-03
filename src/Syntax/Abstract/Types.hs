@@ -180,5 +180,5 @@ extractBinder (PattConstructor _ xs) = xs >>= extractBinder
 -- | Literals
 data Lit = Num Int | Bol Bool | Chr Char | Emp
   deriving (Show, Eq, Generic)
-  
+
 ----------------------------------------------------------------

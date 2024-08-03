@@ -1,9 +1,9 @@
 module GCL.Predicate.Located where
 
 import Data.Loc (Located, locOf, Loc (..))
-import GCL.Predicate (Pred (..), Stmt (..))
+import GCL.Predicate (Pred (..))
 
-
+{-
 instance Located Pred where
   locOf (Constant _) = NoLoc
   locOf (GuardIf _ l) = l
@@ -22,7 +22,7 @@ instance Located Stmt where
   locOf (Do l _ _) = locOf l
   locOf (If l _) = locOf l
   locOf (Spec l _) = locOf l
-
+-}
 
 -- instance Ord Loc where
 --   compare NoLoc NoLoc = EQ

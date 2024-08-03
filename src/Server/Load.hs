@@ -28,7 +28,7 @@ import Control.Monad.Except (runExcept)
 import Server.PositionMapping (idDelta)
 import qualified Server.SrcLoc                 as SrcLoc
 import qualified GCL.Type as TypeChecking
-import GCL.WP.Type (StructError, StructWarning)
+import GCL.WP.Types (StructError, StructWarning)
 import GCL.Predicate (PO, Spec)
 import Server.Notification.Update (sendUpdateNotification)
 import qualified Data.Text as Text
@@ -71,18 +71,18 @@ load filePath = do
                 load filePath
             Right abstract -> do
               logText "  all holes digged\n"
-              case WP.sweep abstract of
-                Left  err -> do
-                  logText "  sweep error\n"
-                  onError (StructError err)
-                Right (pos, specs, warnings, redexes, counter) -> do
-                  logText "  abstract program generated\n"
-                  case elaborate abstract of
-                    Left err        -> do
-                      logText "  elaborate error\n"
-                      onError err
-                    Right elaborated -> do
-                      logText "  program elaborated\n"
+              logText "  abstract program generated\n"
+              case elaborate abstract of
+                Left err        -> do
+                  logText "  elaborate error\n"
+                  onError err
+                Right elaborated -> do
+                  logText "  program elaborated\n"
+                  case WP.sweep elaborated of
+                    Left  err -> do
+                      logText "  sweep error\n"
+                      onError (StructError err)
+                    Right (pos, specs, warnings, redexes, idCount) -> do
                       let fileState = FileState
                                         { refinedVersion   = currentVersion
                                         , specifications   = map (\spec -> (currentVersion, spec)) specs
@@ -95,7 +95,7 @@ load filePath = do
                                         , concrete         = concrete
                                         , semanticTokens   = collectHighlighting concrete
                                         , abstract         = abstract
-                                        , variableCounter  = counter
+                                        , idCount          = idCount
                                         , definitionLinks  = collectLocationLinks abstract
                                         , elaborated       = elaborated
                                         , hoverInfos       = collectHoverInfo elaborated
@@ -178,4 +178,3 @@ elaborate abstract = do
   case TypeChecking.runElaboration abstract mempty of
     Left  e -> Left (TypeError e)
     Right typedProgram -> return typedProgram
-

@@ -107,6 +107,7 @@ instance Collect Typed.Expr where
   collect (Typed.Quant quantifier _bound restriction inner _) = collect quantifier <> collect restriction <> collect inner
   collect (Typed.ArrIdx expr1 expr2 _) = collect expr1 <> collect expr2
   collect (Typed.ArrUpd arr index expr _) = collect arr <> collect index <> collect expr
+  collect (Typed.Subst e sb) = collect e <> foldMap collect (map snd sb)
 
 instance Collect Typed.Chain where
   collect (Typed.Pure expr) = collect expr

@@ -38,7 +38,7 @@ import qualified Server.SrcLoc                 as SrcLoc
 import qualified Data.Text as Text
 import Data.Loc (posCol)
 import Data.Version (Version(Version))
-import GCL.WP.Type (StructWarning)
+import GCL.WP.Types (StructWarning)
 import Language.LSP.Types.Lens (HasMessage(message))
 
 -- | State shared by all clients and requests
@@ -62,7 +62,7 @@ data FileState = FileState
   , concrete         :: Concrete.Program
   , semanticTokens   :: [LSP.SemanticTokenAbsolute]
   , abstract         :: Abstract.Program
-  , variableCounter  :: Int
+  , idCount          :: Int
   , definitionLinks  :: IntervalMap LSP.LocationLink
   , hoverInfos       :: IntervalMap (LSP.Hover, Abstract.Type)
   , elaborated       :: Typed.Program
@@ -118,6 +118,11 @@ modifyFileState filePath modifier = do
 bumpVersion :: FilePath -> ServerM ()
 bumpVersion filePath = do
   modifyFileState filePath (\fileState@FileState{editedVersion} -> fileState {editedVersion = editedVersion + 1})
+
+updateIdCounter :: FilePath -> 
+  Int -> ServerM ()
+updateIdCounter filePath count = do
+  modifyFileState filePath (\fileState -> fileState {idCount = count})
 
 saveEditedVersion :: FilePath -> Int -> ServerM ()
 saveEditedVersion filePath version = do

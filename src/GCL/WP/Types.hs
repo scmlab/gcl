@@ -1,7 +1,7 @@
 {-# LANGUAGE DeriveGeneric, FlexibleContexts,
              FlexibleInstances #-}
 
-module GCL.WP.Type where
+module GCL.WP.Types where
 
 import           GHC.Generics                   ( Generic )
 import           Control.Monad.Except           ( Except )
@@ -10,22 +10,24 @@ import           Control.Monad.RWS              ( MonadState(..)
 import Data.IntMap                              ( IntMap )
 import Data.Aeson (ToJSON)
 import Data.Text  ( Text )
+import Data.Map                                 ( Map )
 import Data.Loc (Loc (..), Located (..))
 import Data.Loc.Range (Range)
 import GCL.Common
 import GCL.Predicate                           ( InfMode(..)
-                                               , PO(..), Pred(..), Spec (..))
-import qualified GCL.Substitution              as Substitution
-import qualified Syntax.Abstract               as A
+                                               , PO(..), Pred, Spec (..))
+import           Syntax.Typed
 
 -- The WP monad.
 
 type TM = Except StructError
 
+type Decls = Map Text (Maybe Expr)
+
 type WP
   = RWST
-      (Substitution.Decls, [[Text]])
-      ([PO], [Spec], [StructWarning], IntMap (Int, A.Expr))
+      (Decls, [[Text]])
+      ([PO], [Spec], [StructWarning], IntMap (Int, Expr))
       Int
       TM
 
@@ -36,23 +38,23 @@ instance Counterous WP where
 
 ---
 
-data SegElm = SAsrt A.Stmt
-            | SSpec A.Stmt
-            | SStmts [A.Stmt]
+data SegElm = SAsrt Stmt
+            | SSpec Stmt
+            | SStmts [Stmt]
 
 -- types of mutually recursive functions
 
-type TstructStmts = InfMode -> (Pred, Maybe A.Expr) -> [A.Stmt] -> Pred -> WP ()
-type TstructSegs  = (Pred, Maybe A.Expr) -> [SegElm] -> Pred -> WP ()
-type Tstruct      = (Pred, Maybe A.Expr) -> A.Stmt -> Pred -> WP ()
+type TstructStmts = InfMode -> (Pred, Maybe Expr) -> [Stmt] -> Pred -> WP ()
+type TstructSegs  = (Pred, Maybe Expr) -> [SegElm] -> Pred -> WP ()
+type Tstruct      = (Pred, Maybe Expr) -> Stmt -> Pred -> WP ()
 
 type TwpSegs   = [SegElm] -> Pred -> WP Pred
-type TwpSStmts = [A.Stmt] -> Pred -> WP Pred
-type Twp       = A.Stmt   -> Pred -> WP Pred
+type TwpSStmts = [Stmt]   -> Pred -> WP Pred
+type Twp       = Stmt     -> Pred -> WP Pred
 
-type TspStmts  = (Pred, Maybe A.Expr) -> [A.Stmt] -> WP Pred
-type TspSegs   = (Pred, Maybe A.Expr) -> [SegElm] -> WP Pred
-type TspSStmts = (Pred, Maybe A.Expr) -> [A.Stmt] -> WP Pred
+type TspStmts  = (Pred, Maybe Expr) -> [Stmt] -> WP Pred
+type TspSegs   = (Pred, Maybe Expr) -> [SegElm] -> WP Pred
+type TspSStmts = (Pred, Maybe Expr) -> [Stmt] -> WP Pred
 
 ---
 

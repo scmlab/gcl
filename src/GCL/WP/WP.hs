@@ -9,33 +9,34 @@ import           Control.Monad.Except           ( MonadError(throwError)
 import           Data.Text                      ( Text )
 import           Data.Loc                       ( Loc(..), locOf )
 import           Data.Map                       ( fromList )
-import           GCL.Predicate                  ( Pred(..) )
-import           GCL.Predicate.Util             ( conjunct
-                                                , toExpr
-                                                )
+import           GCL.Predicate                  ( Pred )
 import           GCL.Common                     ( Fresh(..)
                                                 , freshName
                                                 , freshName'
                                                 )
-import           Pretty                         ( toText )
-import GCL.WP.Type
-import GCL.WP.Util
-import qualified Syntax.Abstract               as A
-import qualified Syntax.Abstract.Operator      as A
-import qualified Syntax.Abstract.Util          as A
-import Syntax.Common.Types                     ( Name(..)
-                                               , nameToText )
-import Syntax.Substitution
-
--- import Debug.Trace
--- import Prettyprinter
--- import Prettyprinter.Render.String
+import           GCL.Substitution               ( syntaxSubst )
+import           GCL.WP.Types
+import           GCL.WP.Util
+import           Syntax.Abstract.Operator       ( tInt )
+import           Syntax.Typed
+import           Syntax.Typed.Util              ( getGuards, declaredNamesTypes )
+import           Syntax.Typed.Operator          ( nameVar, number, add
+                                                , false, true, neg
+                                                , conj, conjunct, implies
+                                                , forAll, exists
+                                                , pointsTo, sConj, sImp
+                                                , sconjunct
+                                                )
+import           Syntax.Common.Types            ( Name(..)
+                                                , nameToText )
+import           Syntax.Typed.Instances.Substitution   ()
+import           Syntax.Substitution
 
 wpFunctions :: TstructSegs
             -> (TwpSegs, TwpSStmts, Twp)
 wpFunctions structSegs = (wpSegs, wpSStmts, wp)
  where
- wpStmts :: [A.Stmt] -> Pred -> WP Pred
+ wpStmts :: [Stmt] -> Pred -> WP Pred
  wpStmts = wpSegs . groupStmts
 
   -- handels segments without a precondition.
@@ -45,124 +46,120 @@ wpFunctions structSegs = (wpSegs, wpSStmts, wp)
  wpSegs (SStmts ss : segs) post = do
   post' <- wpSegs segs post
   wpSStmts ss post'
- wpSegs (SSpec (A.Spec _ range) : segs) post = do
+ wpSegs (SSpec (Spec _ range tenv) : segs) post = do
   post' <- wpSegs segs post
-  tellSpec post' post' range
+  tellSpec post' post' tenv range
   return post'
- wpSegs (SAsrt (A.Assert p l) : segs) post = do
-  structSegs (Assertion p l, Nothing) segs post
-  return (Assertion p l)
- wpSegs (SAsrt (A.LoopInvariant p bd l) : segs) post = do
-  structSegs (LoopInvariant p bd l, Just bd) segs post
-  return (Assertion p l) -- SCM: erasing bound information?
+ wpSegs (SAsrt (Assert p _) : segs) post = do
+  structSegs (p, Nothing) segs post
+  return p
+ wpSegs (SAsrt (LoopInvariant p bd _) : segs) post = do
+  structSegs (p, Just bd) segs post
+  return p -- SCM: erasing bound information?
  wpSegs _ _ = error "Missing case in wpSegs"
 
   -- "simple" version of wpStmts.
   -- no assertions and specs (in the outer level),
   -- but may contain invariants in secondary run
 
- wpSStmts :: [A.Stmt] -> Pred -> WP Pred
+ wpSStmts :: [Stmt] -> Pred -> WP Pred
  wpSStmts [] post = return post
- wpSStmts (A.LoopInvariant inv _ _ : A.Do gcmds _ : stmts) post = do  -- this happens only in secondary run
+ wpSStmts (LoopInvariant inv _ _ : Do gcmds _ : stmts) post = do  -- this happens only in secondary run
   post' <- wpSStmts stmts post
-  let guards = A.getGuards gcmds
-  return
-    .        Constant
-    $        inv
-    `A.conj` (           (inv `A.conj` A.conjunct (map A.neg guards))
-             `A.implies` toExpr post'
-             )
+  let guards = getGuards gcmds
+  return $ inv `conj`
+           ((inv `conj` conjunct (map neg guards)) `implies` post')
  wpSStmts (stmt : stmts) post = do
   post' <- wpSStmts stmts post
   wp stmt post'
 
- wp :: A.Stmt -> Pred -> WP Pred
- wp (A.Abort _       ) _    = return (Constant A.false)
- wp (A.Skip  _       ) post = return post
+ wp :: Stmt -> Pred -> WP Pred
+ wp (Abort _       ) _    = return false
+ wp (Skip  _       ) post = return post
 
- wp (A.Assign xs es _) post = substitute xs es post
+ wp (Assign xs es _) post = return $ syntaxSubst xs es post
 
- wp (A.AAssign (A.Var x _) i e _) post =
-  substitute [x] [A.ArrUpd (A.nameVar x) i e NoLoc] post
+ wp (AAssign (Var x t _) i e _) post =
+  return $ syntaxSubst [x] [ArrUpd (nameVar x t) i e NoLoc] post
 
- wp (A.AAssign _ _ _ l) _    = throwError (MultiDimArrayAsgnNotImp l)
+ wp (AAssign _ _ _ l) _    = throwError (MultiDimArrayAsgnNotImp l)
 
- wp (A.Do _     l     ) _    = throwError $ MissingAssertion l -- shouldn't happen
+ wp (Do _     l     ) _    = throwError $ MissingAssertion l -- shouldn't happen
 
- wp (A.If gcmds _     ) post = do
-  pres <- forM gcmds $ \(A.GdCmd guard body _) ->
-    Constant . (guard `A.imply`) . toExpr <$> wpStmts body post
+ wp (If gcmds _     ) post = do
+  pres <- forM gcmds $ \(GdCmd guard body _) ->
+    (guard `implies`) <$> wpStmts body post
   return (conjunct (disjunctGuards gcmds : pres))
 
- wp (A.Proof _ _ _       ) post = return post
+ wp (Proof _ _ _       ) post = return post
 
- wp (A.Alloc x (e : es) _) post = do -- non-empty
+ wp (Alloc x (e : es) _) post = do -- non-empty
     {- wp (x := es) P = (forall x', (x' -> es) -* P[x'/x])-}
-   x'    <- freshName' (toText x) -- generate fresh name using the exisiting "x"
-   post' <- substitute [x] [A.nameVar x'] (toExpr post)
+   x'    <- freshName' (nameToText x) -- generate fresh name using the existing "x"
+   let post' = syntaxSubst [x] [nameVar x' tInt] post
 
-   return $ Constant (A.forAll [x'] A.true (newallocs x' `A.sImp` post'))
+   return $ forAll [x'] true (newallocs x' `sImp` post')
   where
-   newallocs x' = A.sconjunct
-    ( (A.nameVar x' `A.pointsTo` e)
-    : zipWith (\i -> A.pointsTo (A.nameVar x' `A.add` A.number i)) [1 ..] es
+   newallocs x' = sconjunct
+    ( (nameVar x' tInt `pointsTo` e)
+    : zipWith (\i -> pointsTo (nameVar x' tInt `add` number i)) [1 ..] es
     )
 
- wp (A.HLookup x e _) post = do
+ wp (HLookup x e _) post = do
     {- wp (x := *e) P = (exists v . (e->v) * ((e->v) -* P[v/x])) -}
-  v     <- freshName' (toText x) -- generate fresh name using the exisiting "x"
-  post' <- substitute [x] [A.nameVar v] (toExpr post)
+  v     <- freshName' (nameToText x) -- generate fresh name using the exisiting "x"
+  let post' = syntaxSubst [x] [nameVar v tInt] post
 
-  return $ Constant
-    (A.exists [v] A.true (entry v `A.sConj` (entry v `A.sImp` post')))
-  where entry v = e `A.pointsTo` A.nameVar v
+  return $ exists [v] true (entry v `sConj` (entry v `sImp` post'))
+  where entry v = e `pointsTo` nameVar v tInt
 
- wp (A.HMutate e1 e2 _) post = do
+ wp (HMutate e1 e2 _) post = do
     {- wp (e1* := e2) P = (e1->_) * ((e1->e2) -* P) -}
   e1_allocated <- allocated e1
-  return $ Constant
-    (e1_allocated `A.sConj` ((e1 `A.pointsTo` e2) `A.sImp` toExpr post))
+  return $ e1_allocated `sConj` ((e1 `pointsTo` e2) `sImp` post)
 
- wp (A.Dispose e _) post = do
+ wp (Dispose e _) post = do
     {- wp (dispose e) P = (e -> _) * P -}
   e_allocated <- allocated e
-  return $ Constant (e_allocated `A.sConj` toExpr post)
+  return $ e_allocated `sConj` post
+
 -- TODO:
- wp (A.Block prog _) post = wpBlock prog post
+ wp (Block prog _) post = wpBlock prog post
  wp _         _    = error "missing case in wp"
 
- wpBlock :: A.Program -> Pred -> WP Pred
- wpBlock (A.Program _ decls _props stmts _) post = do
-   let localNames = declaredNames decls
+ wpBlock :: Program -> Pred -> WP Pred
+ wpBlock (Program _ decls _props stmts _) post = do
+   let localNames = declaredNamesTypes decls
    (xs, ys) <- withLocalScopes (\scopes ->
-                withScopeExtension (map nameToText localNames)
+                withScopeExtension (map (nameToText . fst) localNames)
                  (calcLocalRenaming (concat scopes) localNames))
    stmts' <- subst (toSubst ys) stmts
-   withScopeExtension (xs ++ (map (nameToText . snd) ys))
+   withScopeExtension (xs ++ (map (nameToText . fst . snd) ys))
      (wpStmts stmts' post)
    -- if any (`member` (fv pre)) (declaredNames decls)
    --   then throwError (LocalVarExceedScope l)
    --   else return pre
-  where toSubst = fromList . map (\(n, n') -> (n, A.Var n' (locOf n')))
+  where toSubst = fromList . map (\(n, (n', t)) -> (n, Var n' t (locOf n')))
 
-calcLocalRenaming :: [Text] -> [Name] -> WP ([Text], [(Text, Name)])
+calcLocalRenaming :: [Text] -> [(Name, Type)] -> WP ([Text], [(Text, (Name, Type))])
 calcLocalRenaming _ [] = return ([], [])
-calcLocalRenaming scope (x:xs)
-  | t `elem` scope = do
-        x' <- freshName t (locOf x)
-        second ((t,x') :) <$> calcLocalRenaming scope xs
+calcLocalRenaming scope ((x, t):xs)
+  | tx `elem` scope = do
+        x' <- freshName tx (locOf x)
+        second ((tx,(x',t)) :) <$> calcLocalRenaming scope xs
   | otherwise =
-        first (t:) <$> calcLocalRenaming scope xs
- where t = nameToText x
+        first (tx:) <$> calcLocalRenaming scope xs
+ where tx = nameToText x
 
-toMapping :: [(Text, Name)] -> A.Mapping
-toMapping = fromList . map cvt
-  where cvt (x, y) = (x, A.Var y (locOf y))
 
-allocated :: Fresh m => A.Expr -> m A.Expr
+-- toMapping :: [(Text, Name)] -> A.Mapping
+-- toMapping = fromList . map cvt
+--   where cvt (x, y) = (x, A.Var y (locOf y))
+
+allocated :: Fresh m => Expr -> m Expr
 allocated e = do
   v <- freshName' "new"
-  return (A.exists [v] A.true (e `A.pointsTo` A.nameVar v))
+  return (exists [v] true (e `pointsTo` nameVar v tInt))
   -- allocated e = e -> _
 
 -- debugging

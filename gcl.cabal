@@ -36,7 +36,7 @@ library
       GCL.WP.Explanation
       GCL.WP.SP
       GCL.WP.Struct
-      GCL.WP.Type
+      GCL.WP.Types
       GCL.WP.Util
       GCL.WP.WP
       Pretty
@@ -45,6 +45,7 @@ library
       Pretty.Concrete
       Pretty.Error
       Pretty.Predicate
+      Pretty.Typed
       Pretty.Util
       Pretty.Variadic
       Render
@@ -54,6 +55,7 @@ library
       Render.Predicate
       Render.Syntax.Abstract
       Render.Syntax.Common
+      Render.Syntax.Typed
       Server
       Server.GoToDefn
       Server.Handler
@@ -95,6 +97,12 @@ library
       Syntax.Parser.Util
       Syntax.Substitution
       Syntax.Typed
+      Syntax.Typed.Instances.Free
+      Syntax.Typed.Instances.Located
+      Syntax.Typed.Instances.Substitution
+      Syntax.Typed.Operator
+      Syntax.Typed.Types
+      Syntax.Typed.Util
   other-modules:
       Paths_gcl
   hs-source-dirs:
@@ -196,7 +204,7 @@ test-suite gcl-test
       GCL.WP.Explanation
       GCL.WP.SP
       GCL.WP.Struct
-      GCL.WP.Type
+      GCL.WP.Types
       GCL.WP.Util
       GCL.WP.WP
       Pretty
@@ -205,6 +213,7 @@ test-suite gcl-test
       Pretty.Concrete
       Pretty.Error
       Pretty.Predicate
+      Pretty.Typed
       Pretty.Util
       Pretty.Variadic
       Render
@@ -214,6 +223,7 @@ test-suite gcl-test
       Render.Predicate
       Render.Syntax.Abstract
       Render.Syntax.Common
+      Render.Syntax.Typed
       Server
       Server.GoToDefn
       Server.Handler
@@ -255,6 +265,12 @@ test-suite gcl-test
       Syntax.Parser.Util
       Syntax.Substitution
       Syntax.Typed
+      Syntax.Typed.Instances.Free
+      Syntax.Typed.Instances.Located
+      Syntax.Typed.Instances.Substitution
+      Syntax.Typed.Operator
+      Syntax.Typed.Types
+      Syntax.Typed.Util
       Paths_gcl
   hs-source-dirs:
       test

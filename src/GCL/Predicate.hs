@@ -18,9 +18,13 @@ import qualified Data.Set                      as Set
 import           GHC.Generics                   ( Generic )
 import           GCL.Common
 import           Render.Element
-import           Syntax.Abstract                ( Expr )
+import           Syntax.Typed                   ( Expr )
 import           Syntax.Common                  ( Name )
 
+-- | A predicate is an expression, whose type happens to be Bool.
+type Pred = Expr
+
+{-
 -- | Predicates
 data Pred
   = Constant Expr
@@ -91,7 +95,7 @@ instance Eq Stmt where
   If   l xs     == If   m ys     = l == m && xs == ys
   Spec l _      == Spec m _      = l == m
   _             == _             = False
-
+-}
 --------------------------------------------------------------------------------
 
 -- | Proof obligation
