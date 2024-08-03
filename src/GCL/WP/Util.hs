@@ -95,11 +95,11 @@ tellPO' :: Origin -> Pred -> Pred -> WP ()
 tellPO' l p q = tellPO p q l
 
 tellSpec :: Pred -> Pred -> TypeEnv -> Range -> WP ()
-tellSpec p q _ l = do
+tellSpec p q typeEnv l = do
   -- p' <- substitute [] [] p
   -- q' <- substitute [] [] q
   i  <- countUp
-  tell ([], [Specification i p q l [{- this version of tellSpec will be deprecated and replaced with one that forwards the typing context -}]], [], mempty)
+  tell ([], [Specification i p q l typeEnv], [], mempty)
 
 throwWarning :: StructWarning -> WP ()
 throwWarning warning = tell ([], [], [warning], mempty)
