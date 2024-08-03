@@ -11,7 +11,7 @@ import Server.PositionMapping (PositionDelta(..), PositionResult(..))
 
 handler :: LSP.Uri -> (Either LSP.ResponseError (Maybe LSP.SemanticTokens) -> ServerM ()) -> ServerM ()
 handler fileUri responder = do
-  logText "semantic token: start"
+  logText "semantic token: start\n"
   case LSP.uriToFilePath fileUri of
     Nothing       -> respondError (LSP.ResponseError LSP.InvalidParams "Invalid uri" Nothing)
     Just filePath -> do

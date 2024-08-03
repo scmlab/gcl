@@ -9,11 +9,11 @@
 
 module Server.Handler.Guabao.Refine where
 
-import qualified Data.Aeson.Types as JSON
+import qualified Data.Aeson as JSON
 import GHC.Generics ( Generic )
 import Data.Bifunctor ( bimap )
 import Control.Monad.Except           ( runExcept )
-import Server.Monad (ServerM, FileState(..), loadFileState, editTexts, pushSpecs, deleteSpec, Versioned, pushPos, updateIdCounter)
+import Server.Monad (ServerM, FileState(..), loadFileState, editTexts, pushSpecs, deleteSpec, Versioned, pushPos, updateIdCounter, logText)
 import Server.Notification.Update (sendUpdateNotification)
 
 import qualified Syntax.Parser                as Parser
@@ -36,58 +36,64 @@ import qualified Syntax.Typed    as T
 import GCL.WP.Types (StructError, StructWarning)
 import GCL.WP
 import qualified Data.Text as Text
+import Pretty (pretty)
 
 data RefineParams = RefineParams
   { filePath  :: FilePath
   , specRange :: Range
-  , specText  :: Text -- brackets included
+  , implText  :: Text -- brackets included
   }
   deriving (Eq, Show, Generic)
 
 instance JSON.FromJSON RefineParams
 instance JSON.ToJSON RefineParams
 
-data RefineResult = RefineResult
-  { specifications :: [Spec]
-  , proofObligations :: [PO]
-  }
-  deriving (Eq, Show, Generic)
-instance JSON.ToJSON RefineResult
-
--- TODO customize refine error
-type RefineError = Error
-
 -- assumes specText is surrounded by "[!" and "!]"
-handler :: RefineParams -> (RefineResult -> ServerM ()) -> (RefineError -> ServerM ()) -> ServerM ()
-handler _params@RefineParams{filePath, specRange, specText} onSuccess onError = do
+handler :: RefineParams -> (() -> ServerM ()) -> (() -> ServerM ()) -> ServerM ()
+handler _params@RefineParams{filePath, specRange, implText} onFinish _ = do
   -- 把上次 load 的資料拿出來
+  logText "refine: start\n"
   maybeFileState <- loadFileState filePath
   case maybeFileState of
     Nothing -> return ()
     Just fileState -> do
       -- 把 specText 去掉頭尾的 [!!] 和 \t \n \s
-      let implText = trimSpecBracketsAndSpaces specText
+      logText "  fileState loaded\n"
       -- 挖洞
       case digImplHoles filePath implText of
         Left err -> onError (ParseError err)
-        Right holessImplText -> do
+        Right holelessImplText -> do
+          logText "  holes digged\n"
+          logText "    (before)"
+          logText implText
+          logText "\n    (after)"
+          logText holelessImplText
+          logText "\n"
           let (Range specStart _) = specRange
           -- text to concrete
           -- (use specStart as the starting position in parse/toAbstract/elaborate)
-          case parseFragment specStart holessImplText of
+          case parseFragment specStart holelessImplText of
             Left err           -> onError (ParseError err)
             Right concreteImpl -> do
               -- concrete to abstract
+              logText "  text parsed\n"
               case toAbstractFragment concreteImpl of
-                Nothing           -> error "Should not happen"
+                Nothing           -> do
+                  logText "  holes still found after digging all holes\n"
+                  error "should not happen\n"
                 Just abstractImpl -> do
+                  logText "  abstracted\n"
                   -- get spec (along with its type environment)
                   let FileState{specifications} = fileState
                   case lookupSpecByRange specifications specRange of
-                    Nothing   -> return () -- TODO: error "spec not found at range"
+                    Nothing   -> do
+                      logText "  spec not found at range, should reload\n"
                     Just spec -> do
+                      logText "  matching spec found\n"
                       -- elaborate
                       let typeEnv :: TypeEnv = specTypeEnv spec
+                      logText " type env:\n"
+                      logText (Text.pack $ show typeEnv)
                       -- TODO:
                       -- 1. Load: 在 elaborate program 的時候，要把 specTypeEnv 加到 spec 裡 (Andy) ok
                       -- 2. Load: 在 sweep 的時候，改成輸入 elaborated program，把 elaborated program 裡面的 spec 的 typeEnv 加到輸出的 [Spec] 裡 (SCM)
@@ -96,22 +102,39 @@ handler _params@RefineParams{filePath, specRange, specText} onSuccess onError = 
                         Left err -> onError (TypeError err)
                         Right typedImpl -> do
                           -- get POs and specs
+                          logText "  type checked\n"
                           let FileState{idCount} = fileState
                           case sweepFragment idCount spec typedImpl of
                             Left err -> onError (StructError err)
                             Right (innerPos, innerSpecs, warnings, idCount') -> do
+                              logText "  swept\n"
                               -- edit source (dig holes + remove outer brackets)
-                              editTexts filePath [(specRange, holessImplText)] do
+                              editTexts filePath [(specRange, holelessImplText)] do
+                                logText "  text edited (refine)\n"
                                 -- delete outer spec (by id)
                                 deleteSpec filePath spec
+                                logText "  outer spec deleted (refine)\n"
                                 -- add inner specs to fileState
                                 let FileState{editedVersion} = fileState
                                 updateIdCounter filePath idCount'
+                                logText "  counter updated (refine)\n"
                                 pushSpecs (editedVersion + 1) filePath innerSpecs
                                 pushPos (editedVersion + 1) filePath innerPos
+                                logText "  new specs and POs added (refine)\n"
                                 -- send notification to update Specs and POs
+                                logText "refine: success\n"
                                 sendUpdateNotification filePath []
-
+                                logText "refine: update notification sent\n"
+                                onFinish ()
+  logText "refine: end\n"
+  where
+    onError :: Error -> ServerM ()
+    onError err = do
+      logText "refine: error\n\t"
+      logText $ Text.pack (show $ pretty err)
+      logText "\n"
+      sendUpdateNotification filePath [err]
+      logText "refine: update notification sent\n"
 
 
 -- assumes specText is surrounded by "[!" and "!]"

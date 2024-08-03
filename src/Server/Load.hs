@@ -1,7 +1,6 @@
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE LambdaCase #-}
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Use join" #-}
@@ -59,7 +58,6 @@ load filePath = do
           onError err
         Right concrete -> do
           logText "  source parsed \n"
-          reportHolesOrToAbstract' concrete
           case reportHolesOrToAbstract concrete of
             Left [] -> do
               logText "  should not happen\n"
@@ -127,21 +125,6 @@ parse filepath source =
   case Parser.scanAndParse Parser.program filepath source of
     Left  err   -> Left (ParseError err)
     Right concrete -> Right concrete
-
-reportHolesOrToAbstract' :: C.Program -> ServerM ()
-reportHolesOrToAbstract' concrete@(C.Program decls stmts) = do
-  case collectHoles concrete of
-    []    -> do
-      logText "no holes collected\n"
-      case runExcept $ C.toAbstract concrete of
-        Left hole         -> do
-          logText "should dig all holes before calling Concrete.toAbstract, but found\n"
-          (logText . Text.pack . show . pretty) hole
-
-        Right abstract -> return ()
-    holes -> do
-      logText "holes found:\n"
-      logText (Text.pack . show . pretty $ holes)
 
 reportHolesOrToAbstract :: C.Program -> Either [Range] A.Program
 reportHolesOrToAbstract concrete =
