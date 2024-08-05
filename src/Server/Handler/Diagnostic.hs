@@ -132,6 +132,18 @@ instance Collect TypeError Diagnostic where
       $   docToText
       $   "Missing arguments"
       <+> pretty ns
+  
+  collect (TooFewPatterns tys) =
+    makeError (locOf tys) "Redundent Arguments"
+      $   docToText
+      $   "Redundent arguments"
+      <+> pretty tys
+
+  collect (TooManyPatterns pats) =
+    makeError (locOf pats) "Redundent Patterns"
+      $   docToText
+      $   "Redundent patterns"
+      <+> pretty pats
 
 instance Collect StructWarning Diagnostic where
   collect (MissingBound range) = makeWarning

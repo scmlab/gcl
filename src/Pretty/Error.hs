@@ -62,8 +62,13 @@ instance Pretty TypeError where
     "Undefined Type: " <+> "Type" <+> pretty n <+> "is undefined"
   pretty (DuplicatedIdentifiers ns) =
     "The identifiers:" <+> pretty ns <+> "are duplicated"
-  pretty (RedundantNames ns) = "The names: " <+> pretty ns <+> "are redundant"
+  pretty (RedundantNames ns) =
+    "The names: " <+> pretty ns <+> "are redundant"
   pretty (RedundantExprs exprs) =
     "The exprs: " <+> pretty exprs <+> "are redundant"
   pretty (MissingArguments ns) =
     "The arguments: " <+> pretty ns <+> "are missing"
+  pretty (TooFewPatterns tys) =
+    "The subpatterns does not cover: " <+> pretty tys
+  pretty (TooManyPatterns pats) =
+    "The patterns: " <+> pretty pats <+> "are redundent"  

@@ -239,6 +239,8 @@ data TypeError
     | RedundantNames [Name]
     | RedundantExprs [Expr]
     | MissingArguments [Name]
+    | TooFewPatterns [Type]
+    | TooManyPatterns [Pattern]
     deriving (Show, Eq, Generic)
 
 instance ToJSON TypeError
@@ -255,6 +257,8 @@ instance Located TypeError where
   locOf (RedundantNames        ns   ) = locOf ns
   locOf (RedundantExprs        exprs) = locOf exprs
   locOf (MissingArguments      ns   ) = locOf ns
+  locOf (TooFewPatterns        tys  ) = locOf tys
+  locOf (TooManyPatterns       pats ) = locOf pats
 
 data TypeInfo =
     TypeDefnCtorInfo Type

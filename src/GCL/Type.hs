@@ -531,34 +531,40 @@ instance Elab Expr where
     return (subst uniSubArr arrTy, subst sub (Typed.ArrUpd typedArr typedIndex typedE loc), sub)
   elaborate (Case expr cases loc) env = do
     (exprTy, typedExpr, tySub) <- elaborate expr env
-    pairs <- mapM (\(CaseClause pat expr') -> analyzePat (pat, expr') (subst tySub $ fromJust exprTy) env) cases
-    let cases' = zip cases $ snd <$> pairs
-    let clauses = (\(CaseClause pat _, typed) -> Typed.CaseClause pat typed)<$> cases'
-    let typedCase = Typed.Case typedExpr clauses loc
-    return (return $ fst $ head pairs, typedCase, tySub) -- FIXME: Unify return values in all cases.
+    triplets <- mapM (\(CaseClause pat expr') -> analyzePat (pat, expr') (subst tySub $ fromJust exprTy) env) cases
+    let (ty, typed, sub) = unzip3 triplets
+    let cases' = zip cases typed
+    let clauses = (\(CaseClause pat _, typed) -> Typed.CaseClause pat typed) <$> cases'
+    let typedCase = subst (mconcat sub) $ Typed.Case typedExpr clauses loc
+    return (return $ head ty, typedCase, tySub) -- FIXME: Unify return values in all cases.
     where
-      analyzePat :: (Pattern, Expr) -> Type -> TypeEnv -> ElaboratorM (Type, Typed Expr)
+      analyzePat :: (Pattern, Expr) -> Type -> TypeEnv -> ElaboratorM (Type, Typed Expr, Subs Type)
       analyzePat (pat, ex) ty env' = do
-        env'' <- patBind pat ty
-        (exTy, typedEx, sub) <- elaborate ex $ env'' <> env'
-        return (subst sub $ fromJust exTy, subst sub typedEx)
+        (env'', sub) <- patBind pat ty
+        (exTy, typedEx, sub') <- elaborate ex $ env'' <> env'
+        return (subst (sub `compose` sub') $ fromJust exTy, subst (sub `compose` sub') typedEx, sub `compose` sub')
 
-      patBind :: Pattern -> Type -> ElaboratorM TypeEnv
+      patBind :: Pattern -> Type -> ElaboratorM (TypeEnv, Subs Type)
       patBind pat ty = do
         (_, _, _, patInfos) <- get
         case pat of
           PattLit lit -> do
             sub <- unifyType ty (TBase (baseTypeOfLit lit) (locOf lit)) (locOf ty) -- TODO: Propogate this `sub`
-            return mempty
-          PattBinder na -> return [(Index na, ty)]
+            return (mempty, sub)
+          PattBinder na -> return ([(Index na, ty)], mempty)
           PattWildcard _ -> return mempty
           PattConstructor patName subpats -> do
             case find (\(name, _, _) -> name == patName) patInfos of
               Nothing -> throwError $ NotInScope patName
               Just (_, input, outputs) -> do
-                _ <- unifyType ty input (locOf input)
-                typeEnvs <- sequence $ uncurry patBind <$> zip subpats outputs -- TODO: Check for the arity of `subpats` & `outputs`.
-                return $ mconcat typeEnvs
+                sub <- unifyType ty input (locOf input) -- TODO: Propogate this `sub`
+                if
+                  | length subpats < length outputs -> throwError $ TooFewPatterns (drop (length subpats) outputs)
+                  | length subpats > length outputs -> throwError $ TooManyPatterns (drop (length outputs) subpats)
+                  | otherwise      -> do
+                    list <- sequence $ uncurry patBind <$> zip subpats outputs -- TODO: Check for redundent names.
+                    let (envs, subs) = unzip list
+                    return (mconcat envs, mconcat (sub : subs))
 
 instance Elab Chain where -- TODO: Make sure the below implementation is correct.
   elaborate (More (More ch' op1 e1 loc1) op2 e2 loc2) env = do
