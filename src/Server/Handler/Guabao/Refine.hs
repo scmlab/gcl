@@ -158,7 +158,7 @@ handler _params@RefineParams{filePath, specLines, implText} onFinish _ = do
 
 -- 把每一行都拿掉
 removeOneIndentation :: Text -> Text
-removeOneIndentation implText = Text.unlines $ map (Text.drop 4) (Text.lines implText)
+removeOneIndentation implText = Text.intercalate "\n" $ map (Text.drop 4) (Text.lines implText)
 
 lookupSpecByLines :: [Versioned Spec] -> Range -> Maybe Spec
 lookupSpecByLines specs targetLines = do
@@ -183,21 +183,23 @@ digImplHoles filePath implText =
     Right concreteImpl ->
       case collectFragmentHoles concreteImpl of
         [] -> return implText
-        Range start _:_ -> digImplHoles filePath $ digFragementHole start implText
+        Range start _ : _ -> digImplHoles filePath $ digFragementHole start implText
   where
     digFragementHole :: Pos -> Text -> Text
     digFragementHole (Pos _path lineNumber col _charOff) fullText =
-      Text.unlines linesEdited
+      Text.intercalate "\n" linesEdited
       where
         allLines :: [Text]
-        allLines = split (== '\n') fullText -- split fullText by '\n'
+        allLines = Text.lines fullText -- split fullText by '\n'
         lineToEdit :: Text
-        lineToEdit = allLines !! lineNumber
+        lineToEdit = allLines !! (lineNumber - 1)
         beforeHole = Text.take (col-1) lineToEdit
         afterHole = Text.drop col lineToEdit -- lineToEdit
-        indentation = Text.replicate col " "
+        indentation n = Text.replicate n " "
         lineEdited :: Text
-        lineEdited = beforeHole <> "[!\n" <> indentation <> "\n" <> indentation <> "!]" <> afterHole
+        lineEdited = beforeHole <> "[!\n" <>
+                    indentation (col+3) <> "\n" <>
+                    indentation (col-1) <> "!]" <> afterHole
         linesEdited :: [Text]
         linesEdited = take (lineNumber - 1) allLines ++ [lineEdited] ++ drop lineNumber allLines
 
