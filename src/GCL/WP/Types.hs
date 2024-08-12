@@ -82,7 +82,5 @@ instance Located StructError where
   locOf (MultiDimArrayAsgnNotImp l) = l
   locOf (LocalVarExceedScope l) = l
 
-instance ToJSON StructError
-
 -- freshPreInScope prefix scope
 --   generates a fresh name, with prefix, that does not appear in scope

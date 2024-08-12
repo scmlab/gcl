@@ -18,8 +18,5 @@ data Error
   | StructError StructError
   | CannotReadFile FilePath
   | Others String
-  deriving (Eq, Show, Generic)
+  deriving (Eq, Show)
 
-instance JSON.ToJSON ParseError
-
-instance JSON.ToJSON Error

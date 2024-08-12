@@ -40,7 +40,7 @@ runOnPort port = do
 runOnStdio :: FilePath -> IO Int
 runOnStdio logFile = do
   env <- initGlobalEnv
-  writeFile logFile "=== Log file Start ===\n"
+  appendFile logFile "=== Log file Start ===\n"
   _threadId <- forkIO (writeLog env)
   runServer (serverDefn env)
  where

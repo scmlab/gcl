@@ -94,6 +94,7 @@ jsonMiddleware :: (JSON.FromJSON params, JSON.ToJSON result, JSON.ToJSON error)
 jsonMiddleware handler req responder = do
   logText "json: decoding request\n"
   let json = req ^. LSP.params
+  logText . Text.pack $ show json
   case decodeMessageParams json of
     Left error   -> do
       logText "json: decoding failed with\n"

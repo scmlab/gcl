@@ -54,8 +54,6 @@ data TypeError
     | MissingArguments [Name]
     deriving (Show, Eq, Generic)
 
-instance ToJSON TypeError
-
 instance Located TypeError where
   locOf (NotInScope n               ) = locOf n
   locOf (UnifyFailed   _ _ l        ) = l

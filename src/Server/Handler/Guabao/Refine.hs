@@ -55,17 +55,24 @@ handler _params@RefineParams{filePath, specRange, implText} onFinish _ = do
   logText "refine: start\n"
   maybeFileState <- loadFileState filePath
   case maybeFileState of
-    Nothing -> return ()
+    Nothing -> do
+      logText "  no fileState matched\n"
+      return ()
     Just fileState -> do
       -- 把 specText 去掉頭尾的 [!!] 和 \t \n \s
       logText "  fileState loaded\n"
+      logText "  digging holes\n"
+      logText "    (before)"
+      -- logText implText
+      logText "\n"
+      logText "    (before2)"
       -- 挖洞
       case digImplHoles filePath implText of
-        Left err -> onError (ParseError err)
+        Left err -> do
+          logText "  parse error\n"
+          onError (ParseError err)
         Right holelessImplText -> do
           logText "  holes digged\n"
-          logText "    (before)"
-          logText implText
           logText "\n    (after)"
           logText holelessImplText
           logText "\n"
@@ -94,12 +101,15 @@ handler _params@RefineParams{filePath, specRange, implText} onFinish _ = do
                       let typeEnv :: TypeEnv = specTypeEnv spec
                       logText " type env:\n"
                       logText (Text.pack $ show typeEnv)
+                      logText "\n"
                       -- TODO:
                       -- 1. Load: 在 elaborate program 的時候，要把 specTypeEnv 加到 spec 裡 (Andy) ok
                       -- 2. Load: 在 sweep 的時候，改成輸入 elaborated program，把 elaborated program 裡面的 spec 的 typeEnv 加到輸出的 [Spec] 裡 (SCM)
                       -- 3. Refine: elaborateFragment 裡面要正確使用 typeEnv (Andy) ok
                       case elaborateFragment typeEnv abstractImpl of
-                        Left err -> onError (TypeError err)
+                        Left err -> do
+                          logText "  type error\n"
+                          onError (TypeError err)
                         Right typedImpl -> do
                           -- get POs and specs
                           logText "  type checked\n"
@@ -199,7 +209,7 @@ parseFragment fragmentStart fragment = do
     Left  err    -> Left (LexicalError err)
     Right tokens -> do
       let tokens' = translateTokStream fragmentStart tokens
-      case Parser.parse Parser.statements filePath tokens' of
+      case Parser.parse Parser.statements1 filePath tokens' of
         Left  (errors,logMsg) -> Left (SyntacticError errors logMsg)
         Right val             -> Right val
   where
