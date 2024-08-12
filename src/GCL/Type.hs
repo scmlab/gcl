@@ -116,7 +116,7 @@ instance CollectIds [Definition] where -- TODO: Collect patterns.
       foldlM (\(context, names, tys, sub) funcDefn -> do
         case funcDefn of
           (FuncDefn name expr) -> do
-            (ty, _, sub1) <- elaborate expr context -- Calling `head` is safe for the meantime.
+            (ty, _, sub1) <- elaborate expr context
             unifySub <- unifyType (subst sub1 (fromJust $ lookup (Index name) context)) (fromJust ty) (locOf name) -- the first `fromJust` should also be safe.
             -- We see if there are signatures restricting the type of function definitions.
             case lookup (Index name) sigEnv of
@@ -530,26 +530,41 @@ instance Elab Expr where
     let sub = uniSubExpr `compose` eSub `compose` uniSubArr `compose` uniSubIndex `compose` indexSub `compose` arrSub
     return (subst uniSubArr arrTy, subst sub (Typed.ArrUpd typedArr typedIndex typedE loc), sub)
   elaborate (Case expr cases loc) env = do
-    (exprTy, typedExpr, tySub) <- elaborate expr env
-    triplets <- mapM (\(CaseClause pat expr') -> analyzePat (pat, expr') (subst tySub $ fromJust exprTy) env) cases
-    let (ty, typed, sub) = unzip3 triplets
+    (exprTy, typedExpr, exprSub) <- elaborate expr env
+    (ty, typed, sub) <- analyzeClauses cases (fromJust exprTy) (subst exprSub env) exprSub
     let cases' = zip cases typed
-    let clauses = (\(CaseClause pat _, typed) -> Typed.CaseClause pat typed) <$> cases'
-    let typedCase = subst (mconcat sub) $ Typed.Case typedExpr clauses loc
-    return (return $ head ty, typedCase, tySub) -- FIXME: Unify return values in all cases.
+    let clauses = (\(CaseClause pat _, typed') -> Typed.CaseClause pat typed') <$> cases'
+    let typedCase = subst (sub `compose` exprSub) $ Typed.Case typedExpr clauses loc
+    return (return ty, typedCase, sub `compose` exprSub)
     where
-      analyzePat :: (Pattern, Expr) -> Type -> TypeEnv -> ElaboratorM (Type, Typed Expr, Subs Type)
-      analyzePat (pat, ex) ty env' = do
-        (env'', sub) <- patBind pat ty
-        (exTy, typedEx, sub') <- elaborate ex $ env'' <> env'
-        return (subst (sub `compose` sub') $ fromJust exTy, subst (sub `compose` sub') typedEx, sub `compose` sub')
+      analyzeClauses :: [CaseClause] -> Type -> TypeEnv -> Subs Type -> ElaboratorM (Type, [Typed Expr], Subs Type)
+      analyzeClauses [] _ _ _ = error "Found case expression with no branches. This should not happen."
+      analyzeClauses [CaseClause pat0 ex0] ty env' sub = do
+        (env0, subp0) <- patBind pat0 ty
+        (ty0, typed0, sub0) <- elaborate ex0 $ env0 <> subst (subp0 `compose` sub) env'
+        return (fromJust ty0, [typed0], sub0 `compose` subp0 `compose` sub)
+      analyzeClauses (CaseClause pat0 ex0 : cases') ty env' sub = do
+        (env0, subp0) <- patBind pat0 ty
+        (ty0, typed0, sub0) <- elaborate ex0 $ env0 <> subst (subp0 `compose` sub) env'
+        (finalTy, finalTyped, finalSub) <- analyzeClauses' cases' (subst subp0 $ fromJust ty0) (subst sub0 env') sub0 
+        return (finalTy, typed0 : finalTyped, subp0 `compose` sub0 `compose` finalSub)
+        where
+          analyzeClauses' :: [CaseClause] -> Type -> TypeEnv -> Subs Type -> ElaboratorM (Type, [Typed Expr], Subs Type)
+          analyzeClauses' [] ty'' _env sub'' = return (ty'', mempty, sub'')
+          analyzeClauses' (CaseClause patA exA : cases'') ty'' env'' sub'' = do
+            (envA, subpA) <- patBind patA (subst sub'' ty'')
+            (typeB, typedB, subB) <- elaborate exA (envA <> subst subpA env'')
+            subAB <- unifyType (subst subB ty'') (fromJust typeB) (locOf patA)
+            (finalTy, finalTyped, finalSub) <- analyzeClauses' cases'' (subst (subAB `compose` subB) ty'') (subst (subAB `compose` subB) env'') mempty
+            return (subst subAB finalTy, typedB : finalTyped, subpA `compose` subB `compose` subAB `compose` finalSub)
 
+      -- TODO: This seems to be buggy.
       patBind :: Pattern -> Type -> ElaboratorM (TypeEnv, Subs Type)
       patBind pat ty = do
         (_, _, _, patInfos) <- get
         case pat of
           PattLit lit -> do
-            sub <- unifyType ty (TBase (baseTypeOfLit lit) (locOf lit)) (locOf ty) -- TODO: Propogate this `sub`
+            sub <- unifyType ty (TBase (baseTypeOfLit lit) (locOf lit)) (locOf ty)
             return (mempty, sub)
           PattBinder na -> return ([(Index na, ty)], mempty)
           PattWildcard _ -> return mempty
@@ -557,12 +572,12 @@ instance Elab Expr where
             case find (\(name, _, _) -> name == patName) patInfos of
               Nothing -> throwError $ NotInScope patName
               Just (_, input, outputs) -> do
-                sub <- unifyType ty input (locOf input) -- TODO: Propogate this `sub`
+                sub <- unifyType ty input (locOf input)
                 if
                   | length subpats < length outputs -> throwError $ TooFewPatterns (drop (length subpats) outputs)
                   | length subpats > length outputs -> throwError $ TooManyPatterns (drop (length outputs) subpats)
                   | otherwise      -> do
-                    list <- sequence $ uncurry patBind <$> zip subpats outputs -- TODO: Check for redundent names.
+                    list <- zipWithM patBind subpats (subst sub outputs) -- TODO: Check for redundent names.
                     let (envs, subs) = unzip list
                     return (mconcat envs, mconcat (sub : subs))
 
