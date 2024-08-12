@@ -21,12 +21,12 @@ import           Syntax.Parser.Error           ( ParseError(..) )
 import Syntax.Parser.Lexer (TokStream(..), scan)
 import Language.Lexer.Applicative              ( TokenStream(..))
 
-import Error (Error (ParseError, TypeError, StructError))
+import Error (Error (ParseError, TypeError, StructError, Others))
 import GCL.Predicate (Spec(..), PO, InfMode(..))
 import GCL.Common (TypeEnv)
 import GCL.Type (Elab(..), TypeError, runElaboration, Typed)
-import Data.Loc.Range (Range (..))
-import Data.Text (Text, split)
+import Data.Loc.Range (Range (..), rangeStart)
+import Data.Text (Text, split, unlines, lines)
 import Data.List (find, maximumBy)
 import Data.Loc (Pos(..), Loc(..), L(..))
 import qualified Data.Map        as Map
@@ -40,45 +40,54 @@ import Pretty (pretty)
 
 data RefineParams = RefineParams
   { filePath  :: FilePath
-  , specRange :: Range
-  , implText  :: Text -- brackets included
+  , specLines :: Range
+  , implText  :: Text
   }
   deriving (Eq, Show, Generic)
 
 instance JSON.FromJSON RefineParams
 instance JSON.ToJSON RefineParams
 
--- assumes specText is surrounded by "[!" and "!]"
+-- Assumes. specLines contains all the lines from "[!" to "!]"
+-- Assumes. implText contains the lines between but not including "[!" and "!]"
 handler :: RefineParams -> (() -> ServerM ()) -> (() -> ServerM ()) -> ServerM ()
-handler _params@RefineParams{filePath, specRange, implText} onFinish _ = do
-  -- 把上次 load 的資料拿出來
+handler _params@RefineParams{filePath, specLines, implText} onFinish _ = do
   logText "refine: start\n"
+  logText "  specLines:\n"
+  logText . Text.pack . show . pretty $ specLines
+  logText "\n"
+  -- 把上次 load 的資料拿出來
   maybeFileState <- loadFileState filePath
   case maybeFileState of
     Nothing -> do
       logText "  no fileState matched\n"
       return ()
     Just fileState -> do
-      -- 把 specText 去掉頭尾的 [!!] 和 \t \n \s
       logText "  fileState loaded\n"
-      logText "  digging holes\n"
-      logText "    (before)"
-      -- logText implText
+      let implText' = removeOneIndentation implText
+      logText "  implText:\n"
+      logText implText
       logText "\n"
-      logText "    (before2)"
+      logText "  unindented:\n"
+      logText implText'
+      logText "\n"
       -- 挖洞
-      case digImplHoles filePath implText of
+      case digImplHoles filePath implText' of
         Left err -> do
           logText "  parse error\n"
           onError (ParseError err)
         Right holelessImplText -> do
           logText "  holes digged\n"
-          logText "\n    (after)"
+          logText "    (after)\n"
           logText holelessImplText
           logText "\n"
-          let (Range specStart _) = specRange
+          let (Range specStart _) = specLines
           -- text to concrete
           -- (use specStart as the starting position in parse/toAbstract/elaborate)
+          logText "  parsing\n"
+          logText "    specStart =\n"
+          logText . Text.pack . show . pretty $ specStart
+          logText "\n"
           case parseFragment specStart holelessImplText of
             Left err           -> onError (ParseError err)
             Right concreteImpl -> do
@@ -86,15 +95,16 @@ handler _params@RefineParams{filePath, specRange, implText} onFinish _ = do
               logText "  text parsed\n"
               case toAbstractFragment concreteImpl of
                 Nothing           -> do
-                  logText "  holes still found after digging all holes\n"
+                  onError (Others "holes still found after digging all holes")
                   error "should not happen\n"
                 Just abstractImpl -> do
                   logText "  abstracted\n"
                   -- get spec (along with its type environment)
                   let FileState{specifications} = fileState
-                  case lookupSpecByRange specifications specRange of
+                  case lookupSpecByLines specifications specLines of
                     Nothing   -> do
                       logText "  spec not found at range, should reload\n"
+                      onError (Others "spec not found at range, should reload")
                     Just spec -> do
                       logText "  matching spec found\n"
                       -- elaborate
@@ -119,7 +129,7 @@ handler _params@RefineParams{filePath, specRange, implText} onFinish _ = do
                             Right (innerPos, innerSpecs, warnings, idCount') -> do
                               logText "  swept\n"
                               -- edit source (dig holes + remove outer brackets)
-                              editTexts filePath [(specRange, holelessImplText)] do
+                              editTexts filePath [(specLines, holelessImplText)] do
                                 logText "  text edited (refine)\n"
                                 -- delete outer spec (by id)
                                 deleteSpec filePath spec
@@ -146,19 +156,18 @@ handler _params@RefineParams{filePath, specRange, implText} onFinish _ = do
       sendUpdateNotification filePath [err]
       logText "refine: update notification sent\n"
 
+-- 把每一行都拿掉
+removeOneIndentation :: Text -> Text
+removeOneIndentation implText = Text.unlines $ map (Text.drop 4) (Text.lines implText)
 
--- assumes specText is surrounded by "[!" and "!]"
-trimSpecBracketsAndSpaces :: Text -> Text
-trimSpecBracketsAndSpaces specText
-  = Text.strip $ Text.dropEnd 2 $ Text.drop 2 specText
-
-getMaximumSpecId :: [Versioned Spec] -> Int
-getMaximumSpecId specs = specID $ snd $ maximumBy (\(_,specA) (_,specB) -> compare (specID specA) (specID specB)) specs
-
-lookupSpecByRange :: [Versioned Spec] -> Range -> Maybe Spec
-lookupSpecByRange specs targetRange = do
-  (_version, spec) <- find (\(_, Specification{specRange}) -> specRange == targetRange) specs
+lookupSpecByLines :: [Versioned Spec] -> Range -> Maybe Spec
+lookupSpecByLines specs targetLines = do
+  (_version, spec) <- find (\(_, Specification{specRange}) -> coverSameLines specRange targetLines) specs
   return spec
+  where
+    coverSameLines :: Range -> Range -> Bool
+    coverSameLines (Range (Pos _ lineStart _ _) (Pos _ lineEnd _ _)) (Range (Pos _ lineStart' _ _) (Pos _ lineEnd' _ _))
+      = (lineStart == lineStart') && (lineEnd == lineEnd')
 
 collectFragmentHoles :: [C.Stmt] -> [Range]
 collectFragmentHoles concreteFragment = do
@@ -166,15 +175,6 @@ collectFragmentHoles concreteFragment = do
   case statement of
     C.SpecQM range -> return range
     _ -> []
-
-reportFragmentHolesOrToAbstract :: [C.Stmt] -> Either [Range] [A.Stmt]
-reportFragmentHolesOrToAbstract concreteFragment =
-  case collectFragmentHoles concreteFragment of
-    []    -> case toAbstractFragment concreteFragment of
-      Nothing               -> error "should dig all holes before calling Concrete.toAbstract"
-      Just abstractFragment -> Right abstractFragment
-    holes -> Left holes
-
 
 digImplHoles :: FilePath -> Text -> Either ParseError Text
 digImplHoles filePath implText =
@@ -209,7 +209,7 @@ parseFragment fragmentStart fragment = do
     Left  err    -> Left (LexicalError err)
     Right tokens -> do
       let tokens' = translateTokStream fragmentStart tokens
-      case Parser.parse Parser.statements1 filePath tokens' of
+      case Parser.parse Parser.statements filePath tokens' of
         Left  (errors,logMsg) -> Left (SyntacticError errors logMsg)
         Right val             -> Right val
   where
@@ -220,11 +220,9 @@ parseFragment fragmentStart fragment = do
       where
         line = lineStart + lineOffset - 1
         col = if lineOffset == 1
-                then colStart + colOffset
-                else colStart
-        co = if lineOffset == 1
-                then coStart + coOffset
-                else coStart
+                then colStart + colOffset - 1
+                else colOffset
+        co = coStart + coOffset
 
     translateLoc :: Pos -> Loc -> Loc
     translateLoc fragmentStart (Loc left right)
