@@ -20,6 +20,21 @@ import           Syntax.Common.Types
 
 data Index = Index Name | Hole Range deriving (Eq, Show, Ord)
 
+data TypeInfo =
+    TypeDefnCtorInfo Type
+    | ConstTypeInfo Type
+    | VarTypeInfo Type
+    deriving (Eq, Show)
+
+toTypeEnv :: [(Index, TypeInfo)] -> TypeEnv
+toTypeEnv infos =
+  (\(index, info) ->
+    case info of
+      TypeDefnCtorInfo ty -> (index, ty)
+      ConstTypeInfo ty -> (index, ty)
+      VarTypeInfo ty -> (index, ty)
+  ) <$> infos
+
 type TypeEnv = [(Index, Type)]
 
 -- get a fresh variable

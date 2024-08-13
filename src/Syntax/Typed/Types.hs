@@ -8,7 +8,7 @@ import Data.Loc ( Loc )
 import Data.Loc.Range ( Range )
 import Syntax.Abstract.Types ( Lit(..), Type(..), TBase(..) )
 import Syntax.Common.Types ( Name, Op )
-import GCL.Common ( TypeEnv )
+import GCL.Common ( TypeEnv, Index, TypeInfo )
 
 data Program = Program [Definition] -- definitions (the functional language part)
                        [Declaration] -- constant and variable declarations
@@ -40,7 +40,7 @@ data Stmt
   | LoopInvariant Expr Expr Loc
   | Do [GdCmd] Loc
   | If [GdCmd] Loc
-  | Spec Text Range TypeEnv
+  | Spec Text Range [(Index, TypeInfo)]
   | Proof Text Text Range
   | Alloc   Name [Expr] Loc    --  p := new (e1,e2,..,en)
   | HLookup Name Expr Loc      --  x := *e

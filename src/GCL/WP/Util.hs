@@ -26,6 +26,8 @@ import           GCL.Common                     ( Fresh(..)
                                                 , Counterous(..)
                                                 , TypeEnv
                                                 , freshName'
+                                                , Index
+                                                , TypeInfo
                                                 )
 
 import           Syntax.Typed
@@ -94,7 +96,7 @@ tellPO p q origin = unless (p == q) $ do
 tellPO' :: Origin -> Pred -> Pred -> WP ()
 tellPO' l p q = tellPO p q l
 
-tellSpec :: Pred -> Pred -> TypeEnv -> Range -> WP ()
+tellSpec :: Pred -> Pred -> [(Index, TypeInfo)] -> Range -> WP ()
 tellSpec p q typeEnv l = do
   -- p' <- substitute [] [] p
   -- q' <- substitute [] [] q

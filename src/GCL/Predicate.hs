@@ -20,7 +20,6 @@ import           GCL.Common
 import           Render.Element
 import           Syntax.Typed                   ( Expr )
 import           Syntax.Common                  ( Name )
-
 -- | A predicate is an expression, whose type happens to be Bool.
 type Pred = Expr
 
@@ -167,7 +166,7 @@ data Spec = Specification
   , specPreCond  :: Pred
   , specPostCond :: Pred
   , specRange    :: Range
-  , specTypeEnv  :: TypeEnv
+  , specTypeEnv  :: [(Index, TypeInfo)]
   }
   deriving (Eq, Show, Generic)
 
