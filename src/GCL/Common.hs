@@ -1,5 +1,6 @@
 {-# LANGUAGE FlexibleInstances, UndecidableInstances,
              MultiParamTypeClasses, FlexibleContexts #-}
+{-# LANGUAGE DeriveGeneric #-}
 module GCL.Common where
 
 import           Control.Monad.RWS              ( RWST(..) )
@@ -16,6 +17,7 @@ import qualified Data.Text                     as Text
 import           Data.Loc.Range                 ( Range )
 import           Syntax.Abstract
 import           Syntax.Common.Types
+import    GHC.Generics
 
 
 data Index = Index Name | Hole Range deriving (Eq, Show, Ord)
@@ -24,7 +26,7 @@ data TypeInfo =
     TypeDefnCtorInfo Type
     | ConstTypeInfo Type
     | VarTypeInfo Type
-    deriving (Eq, Show)
+    deriving (Eq, Show, Generic)
 
 toTypeEnv :: [(Index, TypeInfo)] -> TypeEnv
 toTypeEnv infos =
