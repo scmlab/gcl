@@ -145,6 +145,8 @@ handler _params@RefineParams{filePath, specLines, implText} onFinish _ = do
                                 -- send notification to update Specs and POs
                                 logText "refine: success\n"
                                 sendUpdateNotification filePath
+                                -- clear errors
+                                sendErrorNotification filePath []
                                 logText "refine: update notification sent\n"
                                 onFinish ()
   logText "refine: end\n"

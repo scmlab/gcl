@@ -112,6 +112,8 @@ load filePath = do
     onSuccess = do
       logText "load: success\n"
       sendUpdateNotification filePath
+      -- clear errors
+      sendErrorNotification filePath []
       logText "load: update notification sent\n"
     onError :: Error -> ServerM ()
     onError err = do

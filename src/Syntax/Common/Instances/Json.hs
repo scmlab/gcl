@@ -30,9 +30,9 @@ instance ToJSON Loc where
   toJSON (Loc (Pos filePath line column _) (Pos _ line' column' _)) = object
     [ "filePath" .= toJSON filePath
     , "start"    .= object
-      ["line"       .= line
-      , "character" .= column]
+      ["line"       .= (line - 1)
+      , "character" .= (column - 1)]
     , "end"      .= object
-      ["line"       .= line'
-      , "character" .= column']
+      ["line"       .= (line' - 1)
+      , "character" .= (column' - 1)]
     ]

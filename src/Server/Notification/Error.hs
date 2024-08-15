@@ -8,7 +8,7 @@ import qualified Data.Aeson as JSON
 import Data.Aeson ((.=), object)
 import qualified Server.Monad as Server
 import           Pretty.Predicate               ( )
-import Data.Loc (Loc(..))
+import Data.Loc (Loc(..), Pos (..))
 import Data.Text.Prettyprint.Doc
 import qualified Data.Text as Text
 import Pretty.Typed ()
@@ -54,13 +54,18 @@ instance JSON.ToJSON Error where
     , "message" .= JSON.toJSON message
     ]
 
+toLspPositionJSON :: Pos -> JSON.Value
+toLspPositionJSON (Pos filepath line column offset) = object
+    [ "line" .= JSON.toJSON (line - 1)
+    , "character" .= JSON.toJSON (column - 1)
+    ]
 
 
 instance JSON.ToJSON ParseError where
   toJSON :: ParseError -> JSON.Value
   toJSON (LexicalError position) = object
     [ "tag" .= JSON.String "LexicalError"
-    , "position" .= JSON.toJSON position
+    , "position" .= toLspPositionJSON position
     ]
   toJSON (SyntacticError locatedSymbols message) = object
     [ "tag" .= JSON.String "SyntacticError"
