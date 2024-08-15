@@ -252,30 +252,31 @@ class Located a => Elab a where
 -- Note that we pass the collected ids into each sections of the program.
 -- After `collectIds`, we don't need to change the state.
 instance Elab Program where
-  elaborate (Program defns decls exprs stmts loc) infos = do
+  elaborate (Program defns decls exprs stmts loc) env = do
     mapM_ collectIds decls
     -- The `reverse` here shouldn't be needed now. In the past, it was a trick to make things work.
     -- I still keep it as-is in case of future refactoring / rewriting.
     collectIds $ reverse defns
     let tcons = concatMap collectTCon defns
     modify (\(freshState, origInfos, typeInfos) -> (freshState, tcons <> origInfos, typeInfos))
+    (_, _, infos) <- get
     typedDefns <- mapM (\defn -> do
-                          typedDefn <- elaborate defn infos
+                          typedDefn <- elaborate defn $ env <> infos
                           let (_, typed, _) = typedDefn
                           return typed
                        ) defns
     typedDecls <- mapM (\decl -> do
-                          typedDecl <- elaborate decl infos
+                          typedDecl <- elaborate decl $ env <> infos
                           let (_, typed, _) = typedDecl
                           return typed
                        ) decls
     typedExprs <- mapM (\expr -> do
-                          typedExpr <- elaborate expr infos
+                          typedExpr <- elaborate expr $ env <> infos
                           let (_, typed, _) = typedExpr
                           return typed
                        ) exprs
     typedStmts <- mapM (\stmt -> do
-                          typedStmt <- elaborate stmt infos
+                          typedStmt <- elaborate stmt $ env <> infos
                           let (_, typed, _) = typedStmt
                           return typed
                        ) stmts
