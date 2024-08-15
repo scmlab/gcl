@@ -34,6 +34,7 @@ import qualified Data.Text as Text
 import qualified Data.Aeson as JSON
 import Pretty (Pretty(..))
 import Syntax.Concrete.Types (SepBy (..), GdCmd (..))
+import Server.Notification.Error (sendErrorNotification)
 
 load :: FilePath -> ServerM ()
 load filePath = do
@@ -110,14 +111,14 @@ load filePath = do
     onSuccess :: ServerM ()
     onSuccess = do
       logText "load: success\n"
-      sendUpdateNotification filePath []
+      sendUpdateNotification filePath
       logText "load: update notification sent\n"
     onError :: Error -> ServerM ()
     onError err = do
       logText "load: error\n\t"
       logText $ Text.pack (show $ JSON.encode err)
       logText "\n"
-      sendUpdateNotification filePath [err]
+      sendErrorNotification filePath [err]
       logText "load: update notification sent\n"
 
 parse :: FilePath -> Text -> Either Error C.Program

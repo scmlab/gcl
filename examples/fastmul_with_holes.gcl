@@ -1,18 +1,17 @@
 con A, B : Int { A ≥ 0 ∧ B ≥ 0 }
 con even, odd : Int -> Bool
-var r, a, b : Int 
+var r, a, b : Int
 
 {: INV = a * b + r = A * B ∧ 0 ≤ b :}
 
-a, b, r := A, B, 0  
+a, b, r := A, B, 0
 { INV, bnd: b }
 do b ≠ 0 ->
     if even b -> 
         b := b / 2
     | odd b ->
-        [!
-            a := 3
-        !]  
+        a := 3
+        r := a
     fi
 od
 { r = A * B }

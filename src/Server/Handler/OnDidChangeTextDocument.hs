@@ -25,7 +25,7 @@ handler filePath changes = do
 
   -- send notification to update Specs and POs
   logText "didChange: fileState modified\n"
-  sendUpdateNotification filePath []
+  sendUpdateNotification filePath
   logText "didChange: upate notification sent\n"
   where
     translateThroughOneVersion

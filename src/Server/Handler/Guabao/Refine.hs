@@ -15,6 +15,7 @@ import Data.Bifunctor ( bimap )
 import Control.Monad.Except           ( runExcept )
 import Server.Monad (ServerM, FileState(..), loadFileState, editTexts, pushSpecs, deleteSpec, Versioned, pushPos, updateIdCounter, logText)
 import Server.Notification.Update (sendUpdateNotification)
+import Server.Notification.Error (sendErrorNotification)
 
 import qualified Syntax.Parser                as Parser
 import           Syntax.Parser.Error           ( ParseError(..) )
@@ -143,7 +144,7 @@ handler _params@RefineParams{filePath, specLines, implText} onFinish _ = do
                                 logText "  new specs and POs added (refine)\n"
                                 -- send notification to update Specs and POs
                                 logText "refine: success\n"
-                                sendUpdateNotification filePath []
+                                sendUpdateNotification filePath
                                 logText "refine: update notification sent\n"
                                 onFinish ()
   logText "refine: end\n"
@@ -153,7 +154,7 @@ handler _params@RefineParams{filePath, specLines, implText} onFinish _ = do
       logText "refine: error\n\t"
       logText $ Text.pack (show $ pretty err)
       logText "\n"
-      sendUpdateNotification filePath [err]
+      sendErrorNotification filePath [err]
       logText "refine: update notification sent\n"
 
 -- 把每一行都拿掉
