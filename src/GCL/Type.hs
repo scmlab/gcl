@@ -65,21 +65,6 @@ instance Located TypeError where
   locOf (RedundantExprs        exprs) = locOf exprs
   locOf (MissingArguments      ns   ) = locOf ns
 
-data TypeInfo =
-    TypeDefnCtorInfo Type
-    | ConstTypeInfo Type
-    | VarTypeInfo Type
-    deriving (Eq, Show)
-
-toTypeEnv :: [(Index, TypeInfo)] -> TypeEnv
-toTypeEnv infos =
-  (\(index, info) ->
-    case info of
-      TypeDefnCtorInfo ty -> (index, ty)
-      ConstTypeInfo ty -> (index, ty)
-      VarTypeInfo ty -> (index, ty)
-  ) <$> infos
-
 instance Substitutable Type TypeInfo where
   subst s (TypeDefnCtorInfo t) = TypeDefnCtorInfo (subst s t)
   subst s (ConstTypeInfo    t) = ConstTypeInfo (subst s t)
@@ -98,6 +83,7 @@ duplicationCheck ns =
 --------------------------------------------------------------------------------
 -- The elaboration monad
 
+-- TODO: It seems the TypeInfo is not necessary. Refactor it.
 type ElaboratorM = StateT (FreshState, [(Index, TypeDefnInfo)], [(Index, TypeInfo)]) (Except TypeError)
 
 instance Counterous ElaboratorM where
@@ -107,7 +93,7 @@ instance Counterous ElaboratorM where
     return count
 
 runElaboration
-  :: Elab a => a -> TypeEnv -> Either TypeError (Typed a)
+  :: Elab a => a -> [(Index, TypeInfo)] -> Either TypeError (Typed a)
 runElaboration a env = do
   ((_, elaborated, _), _state) <- runExcept (runStateT (elaborate a env) (0, mempty, mempty))
   Right elaborated
@@ -152,15 +138,14 @@ instance CollectIds [Definition] where
     let gathered = second ConstTypeInfo <$> zip defined freshVars
     modify (\(freshState, typeDefnInfos, origInfos) -> (freshState, typeDefnInfos, gathered <> origInfos))
     -- Get the previously gathered type infos.
-    (_, _, infos') <- get
-    let env = second typeInfoToType <$> infos'
+    (_, _, env) <- get
     -- Do a `foldlM` to elaborate multiple definitions together.
     (_, names, tys, _sub) <-
       foldlM (\(context, names, tys, sub) funcDefn -> do
         case funcDefn of
           (FuncDefn name expr) -> do
-            (ty, _, sub1) <- elaborate expr context -- Calling `head` is safe for the meantime.
-            unifySub <- unifies (subst sub1 (fromJust $ lookup (Index name) context)) (fromJust ty) (locOf name) -- the first `fromJust` should also be safe.
+            (ty, _, sub1) <- elaborate expr context
+            unifySub <- unifies (typeInfoToType $ subst sub1 (fromJust $ lookup (Index name) context)) (fromJust ty) (locOf name) -- the first `fromJust` should also be safe.
             -- We see if there are signatures restricting the type of function definitions.
             case lookup (Index name) sigEnv of
               -- If there is, we save the restricted type.
@@ -173,7 +158,7 @@ instance CollectIds [Definition] where
       ) (env, mempty, mempty, mempty) funcDefns
     -- Generalize the types of definitions, i.e. change free type variables into metavariables.
     mapM_ (\(name, ty) -> do
-            ty' <- generalize ty env -- TODO: Why???
+            ty' <- generalize ty (second typeInfoToType <$> env) -- TODO: Why???
             let info = (Index name, ConstTypeInfo ty')
             modify (\(freshState, typeDefnInfos, origInfos) -> (freshState, typeDefnInfos, info : origInfos))
           ) (zip names tys)
@@ -261,37 +246,36 @@ type family Typed untyped where
   Typed (Maybe a) = Maybe (Typed a)
 
 class Located a => Elab a where
-    elaborate :: a -> TypeEnv -> ElaboratorM (Maybe Type, Typed a, Subs Type)
+    elaborate :: a -> [(Index, TypeInfo)] -> ElaboratorM (Maybe Type, Typed a, Subs Type)
 
 
 -- Note that we pass the collected ids into each sections of the program.
 -- After `collectIds`, we don't need to change the state.
 instance Elab Program where
-  elaborate (Program defns decls exprs stmts loc) _env = do
+  elaborate (Program defns decls exprs stmts loc) infos = do
     mapM_ collectIds decls
     -- The `reverse` here shouldn't be needed now. In the past, it was a trick to make things work.
     -- I still keep it as-is in case of future refactoring / rewriting.
     collectIds $ reverse defns
     let tcons = concatMap collectTCon defns
     modify (\(freshState, origInfos, typeInfos) -> (freshState, tcons <> origInfos, typeInfos))
-    (_, _, infos) <- get
     typedDefns <- mapM (\defn -> do
-                          typedDefn <- elaborate defn $ second typeInfoToType <$> infos
+                          typedDefn <- elaborate defn infos
                           let (_, typed, _) = typedDefn
                           return typed
                        ) defns
     typedDecls <- mapM (\decl -> do
-                          typedDecl <- elaborate decl $ second typeInfoToType <$> infos
+                          typedDecl <- elaborate decl infos
                           let (_, typed, _) = typedDecl
                           return typed
                        ) decls
     typedExprs <- mapM (\expr -> do
-                          typedExpr <- elaborate expr $ second typeInfoToType <$> infos
+                          typedExpr <- elaborate expr infos
                           let (_, typed, _) = typedExpr
                           return typed
                        ) exprs
     typedStmts <- mapM (\stmt -> do
-                          typedStmt <- elaborate stmt $ second typeInfoToType <$> infos
+                          typedStmt <- elaborate stmt infos
                           let (_, typed, _) = typedStmt
                           return typed
                        ) stmts
@@ -359,9 +343,8 @@ instance Elab Stmt where
       | an < length exprs -> throwError $ RedundantExprs (drop an exprs)
       | an < length names -> throwError $ RedundantNames (drop an names)
       | otherwise      -> do
-        (_, _, infos) <- get
         exprs' <- mapM (\(name, expr) -> do
-                          ty <- checkAssign infos name
+                          ty <- checkAssign env name
                           (ty', typedExpr, _) <- elaborate expr env
                           _ <- unifies ty (fromJust ty') $ locOf expr
                           return typedExpr
@@ -403,11 +386,10 @@ instance Elab Stmt where
     return (Nothing, T.If gds' loc, mempty)
   elaborate (Spec text range) _ = do
     (_, _, infos) <- get
-    return (Nothing, T.Spec text range $ toTypeEnv infos, mempty)
+    return (Nothing, T.Spec text range infos, mempty)
   elaborate (Proof text1 text2 range) _ = return (Nothing, T.Proof text1 text2 range, mempty)
   elaborate (Alloc var exprs loc) env = do
-    (_, _, infos) <- get
-    ty <- checkAssign infos var
+    ty <- checkAssign env var
     _ <- unifies ty (tInt NoLoc) $ locOf var
     typedExprs <-
       mapM
@@ -418,8 +400,7 @@ instance Elab Stmt where
         ) exprs
     return (Nothing, T.Alloc var typedExprs loc, mempty)
   elaborate (HLookup name expr loc) env = do
-    (_, _, infos) <- get
-    ty <- checkAssign infos name
+    ty <- checkAssign env name
     _ <- unifies ty (tInt NoLoc) $ locOf name
     (ty', typedExpr, _) <- elaborate expr env
     _ <- unifies (fromJust ty') (tInt NoLoc) (locOf expr)
@@ -471,13 +452,13 @@ instance Elab Expr where
   ---- Var, Const, Op --
   -- Γ ⊢ x ↑ (∅, t)
   elaborate (Var x loc) env = case lookup (Index x) env of
-      Just ty -> do
-        ty' <- instantiate ty
+      Just info -> do
+        ty' <- instantiate $ typeInfoToType info
         return (Just ty', T.Var x ty' loc, mempty)
       Nothing -> throwError $ NotInScope x
   elaborate (Const x loc) env = case lookup (Index x) env of
-      Just ty -> do
-        ty' <- instantiate ty
+      Just info -> do
+        ty' <- instantiate $ typeInfoToType info
         return (Just ty', T.Const x ty' loc, mempty)
       Nothing -> throwError $ NotInScope x
   elaborate (Op o) env = do
@@ -503,7 +484,7 @@ instance Elab Expr where
   -- Γ ⊢ (λ x . e) ↑ (s, s a -> t)
   elaborate (Lam bound expr loc) env = do
     tv <- freshVar
-    let newEnv = (Index bound, tv) : env
+    let newEnv = (Index bound, ConstTypeInfo tv) : env
     (ty1, typedExpr1, sub1) <- elaborate expr newEnv
     let returnTy = TFunc (subst sub1 tv) (fromJust ty1) loc
     return (Just returnTy, subst sub1 (T.Lam bound (subst sub1 tv) typedExpr1 loc), sub1)
@@ -521,7 +502,7 @@ instance Elab Expr where
       Op (Hash _) -> do
         tvs <- replicateM (length bound) freshVar
         let newEnv = subst quantSub env
-        (resTy, resTypedExpr, resSub) <- elaborate restriction $ zip (Index <$> bound) tvs <> newEnv
+        (resTy, resTypedExpr, resSub) <- elaborate restriction $ zip (Index <$> bound) (ConstTypeInfo <$> tvs) <> newEnv
         uniSub2 <- unifies (fromJust resTy) (tBool NoLoc) (locOf restriction)
         (innerTy, innerTypedExpr, innerSub) <- elaborate inner newEnv
         uniSub3 <- unifies (subst innerSub $ fromJust innerTy) (tBool NoLoc) (locOf inner)
@@ -536,10 +517,10 @@ instance Elab Expr where
         uniSub <- unifies (subst quantSub $ fromJust quantTy) (tv ~-> tv ~-> tv) (locOf quantifier)
         tvs <- replicateM (length bound) freshVar
         let newEnv = subst (uniSub `compose` quantSub) env
-        (resTy, resTypedExpr, resSub) <- elaborate restriction $ zip (Index <$> bound) tvs <> newEnv
+        (resTy, resTypedExpr, resSub) <- elaborate restriction $ zip (Index <$> bound) (ConstTypeInfo <$> tvs) <> newEnv
         uniSub2 <- unifies (fromJust resTy) (tBool NoLoc) (locOf restriction)
         let newEnv' = subst (uniSub2 `compose` resSub) newEnv
-        (innerTy, innerTypedExpr, innerSub) <- elaborate inner $ zip (Index <$> bound) (subst (uniSub2 `compose` resSub) <$> tvs) <> newEnv'
+        (innerTy, innerTypedExpr, innerSub) <- elaborate inner $ zip (Index <$> bound) (subst (uniSub2 `compose` resSub) . ConstTypeInfo <$> tvs) <> newEnv'
         uniSub3 <- unifies (subst innerSub $ fromJust innerTy) (subst (uniSub2 `compose` resSub `compose` uniSub `compose` quantSub) tv) (locOf inner)
         return (Just $ subst (uniSub3 `compose` innerSub `compose` uniSub2 `compose` resSub `compose` uniSub `compose` quantSub) tv,
                 subst (uniSub3 `compose` innerSub `compose` uniSub2 `compose` resSub `compose` uniSub `compose` quantSub) (T.Quant quantTypedExpr bound resTypedExpr innerTypedExpr loc),

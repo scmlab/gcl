@@ -23,7 +23,7 @@ import Language.Lexer.Applicative              ( TokenStream(..))
 
 import Error (Error (ParseError, TypeError, StructError, Others))
 import GCL.Predicate (Spec(..), PO, InfMode(..))
-import GCL.Common (TypeEnv)
+import GCL.Common (TypeEnv, Index, TypeInfo)
 import GCL.Type (Elab(..), TypeError, runElaboration, Typed)
 import Data.Loc.Range (Range (..), rangeStart)
 import Data.Text (Text, split, unlines, lines)
@@ -108,7 +108,7 @@ handler _params@RefineParams{filePath, specLines, implText} onFinish _ = do
                     Just spec -> do
                       logText "  matching spec found\n"
                       -- elaborate
-                      let typeEnv :: TypeEnv = specTypeEnv spec
+                      let typeEnv = specTypeEnv spec
                       logText " type env:\n"
                       logText (Text.pack $ show typeEnv)
                       logText "\n"
@@ -243,7 +243,7 @@ toAbstractFragment concreteFragment =
     Left _                 -> Nothing
     Right abstractFragment -> Just abstractFragment
 
-elaborateFragment :: Elab a => TypeEnv -> a -> Either TypeError (Typed a)
+elaborateFragment :: Elab a => [(Index, TypeInfo)] -> a -> Either TypeError (Typed a)
 elaborateFragment typeEnv abstractFragment = do
   runElaboration abstractFragment typeEnv
 

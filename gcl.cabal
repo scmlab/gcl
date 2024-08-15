@@ -72,7 +72,6 @@ library
       Server.IntervalMap
       Server.Load
       Server.Monad
-      Server.Notification.Error
       Server.Notification.Update
       Server.PositionMapping
       Server.SrcLoc
@@ -241,7 +240,6 @@ test-suite gcl-test
       Server.IntervalMap
       Server.Load
       Server.Monad
-      Server.Notification.Error
       Server.Notification.Update
       Server.PositionMapping
       Server.SrcLoc
