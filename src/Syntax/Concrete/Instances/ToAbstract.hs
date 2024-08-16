@@ -247,8 +247,7 @@ instance ToAbstract Pattern A.Pattern where
   toAbstract (PattParen _ x _) = toAbstract x
   toAbstract (PattBinder   x ) = return $ A.PattBinder x
   toAbstract (PattWildcard x ) = return $ A.PattWildcard (rangeOf x)
-  toAbstract (PattConstructor ctor patterns) =
-    A.PattConstructor ctor <$> toAbstract patterns
+  toAbstract (PattConstructor ctor names) = return $A.PattConstructor ctor names
 
 -- | Literals (Integer / Boolean / Character)
 instance ToAbstract Lit A.Lit where

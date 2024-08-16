@@ -324,8 +324,7 @@ renameBindersInPattern renamings patt = case patt of
   PattLit      _      -> patt
   PattBinder   binder -> PattBinder $ renameBinder renamings binder
   PattWildcard _      -> patt
-  PattConstructor name patts ->
-    PattConstructor name $ map (renameBindersInPattern renamings) patts
+  PattConstructor name names -> PattConstructor name names -- TODO: See if this is correct.
 
 instance Substitutable Pred where
   subst mapping = \case

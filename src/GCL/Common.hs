@@ -158,7 +158,7 @@ instance Free Pattern where
   freeVars (PattLit      _      ) = mempty
   freeVars (PattBinder   n      ) = Set.singleton n
   freeVars (PattWildcard _      ) = mempty
-  freeVars (PattConstructor _ ps) = foldMap freeVars ps
+  freeVars (PattConstructor _ ps) = Set.fromList ps
 
 instance Free Declaration where
   freeVars (ConstDecl ns t expr _) =
@@ -240,7 +240,7 @@ data TypeError
     | RedundantExprs [Expr]
     | MissingArguments [Name]
     | TooFewPatterns [Type]
-    | TooManyPatterns [Pattern]
+    | TooManyPatterns [Name]
     deriving (Show, Eq, Generic)
 
 instance ToJSON TypeError
@@ -279,6 +279,7 @@ type family Typed untyped where
   Typed GdCmd = Typed.TypedGdCmd
   Typed Expr = Typed.TypedExpr
   Typed Chain = Typed.TypedChain
+  Typed CaseClause = Typed.TypedCaseClause
   Typed Name = Name
   Typed ChainOp = Op
   Typed ArithOp = Op

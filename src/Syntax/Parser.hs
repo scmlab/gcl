@@ -637,7 +637,7 @@ pattern' = choice
   , PattParen <$> tokenParenOpen <*> pattern' <*> tokenParenClose
   , PattWildcard <$> tokenUnderscore
   , PattBinder <$> lower
-  , PattConstructor <$> upper <*> many pattern'
+  , PattConstructor <$> upper <*> many identifier
   ]
 
 --------------------------------------------------------------------------------

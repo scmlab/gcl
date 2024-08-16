@@ -192,14 +192,14 @@ data Pattern
   = PattLit Lit
   | PattBinder Name -- binder
   | PattWildcard Range -- matches anything
-  | PattConstructor Name [Pattern] -- destructs a constructor
+  | PattConstructor Name [Name] -- destructs a constructor
   deriving (Eq, Show, Generic)
 
 extractBinder :: Pattern -> [Name]
 extractBinder (PattLit      _      ) = []
 extractBinder (PattBinder   x      ) = [x]
 extractBinder (PattWildcard _      ) = []
-extractBinder (PattConstructor _ xs) = xs >>= extractBinder
+extractBinder (PattConstructor _ na) = na
 
 ----------------------------------------------------------------
 

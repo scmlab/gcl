@@ -17,6 +17,6 @@
         Nothing -> F
 :}
 
-{isJust = isJust}
+{ isJust = isJust }
 
 { True }
