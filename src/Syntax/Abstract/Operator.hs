@@ -3,6 +3,8 @@ module Syntax.Abstract.Operator where
 import           Syntax.Abstract                ( Expr(..)
                                                 , Lit(..)
                                                 , Chain(..)
+                                                , Type(..)
+                                                , TBase(..)
                                                 )
 import           Syntax.Common
 import           Data.Text                      ( Text )
@@ -82,3 +84,14 @@ sImp = (arith . SImp) NoLoc
 sconjunct :: [Expr] -> Expr
 sconjunct [] = true
 sconjunct xs = foldl1 sConj xs
+
+-- | Frequently Used Types / Type Operators
+
+tBool :: Type
+tBool = TBase TBool NoLoc
+
+tInt :: Type
+tInt = TBase TInt NoLoc
+
+tFunc :: Type -> Type -> Type
+s `tFunc` t = TFunc s t NoLoc

@@ -3,7 +3,7 @@ var p, x, y, n : Int
 var mod : Int -> Int -> Int
 
 {:  P = x * y + p = N
-    Q = x > 0 ∧ y > 0
+    Q = x > 0 ∧ y > 0 ∧ 1 > 0
 :}
 
 p,x,y := N-1, 1, 1

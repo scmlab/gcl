@@ -58,19 +58,29 @@ instance Collect a => Collect [a] where
 --------------------------------------------------------------------------------
 -- Program
 
-instance Collect Typed.TypedProgram where
+instance Collect Typed.Program where
   collect (Typed.Program defns decls exprs stmts _) = foldMap collect defns <> foldMap collect decls <> foldMap collect exprs <> foldMap collect stmts
 
 --------------------------------------------------------------------------------
 -- Definition
 
-instance Collect Typed.TypedDefinition where
+instance Collect Typed.Definition where
   collect (Typed.TypeDefn _ _ ctors _) = foldMap collect ctors
   collect (Typed.FuncDefnSig name kinded prop _) = annotateType name (unkind kinded) <> collect kinded <> maybe mempty collect prop
   collect (Typed.FuncDefn _name expr) = collect expr
 
-instance Collect Typed.TypedTypeDefnCtor where
-  collect (Typed.TypedTypeDefnCtor _name _tys) = mempty
+instance Collect Typed.TypeDefnCtor where
+  collect (Typed.TypeDefnCtor _name _tys) = mempty
+
+instance Collect Typed.KindedType where
+  collect (Typed.TBase base kind loc) = annotateKind loc kind
+  collect (Typed.TArray int kinded loc) = collect kinded
+  collect (Typed.TTuple i k) = mempty
+  collect (Typed.TOp op kind) = annotateKind op kind
+  collect (Typed.TData name kind _) = annotateKind name kind
+  collect (Typed.TApp ty1 ty2 _) = collect ty1 <> collect ty2
+  collect (Typed.TVar name kind _) = annotateKind name kind
+  collect (Typed.TMetaVar name kind _) = annotateKind name kind
 
 instance Collect Typed.KindedType where
   collect (Typed.TBase base kind loc) = annotateKind loc kind
@@ -85,14 +95,14 @@ instance Collect Typed.KindedType where
 --------------------------------------------------------------------------------
 -- Declaration
 
-instance Collect Typed.TypedDeclaration where
+instance Collect Typed.Declaration where
   collect (Typed.ConstDecl names ty expr _) = annotateType names ty <> maybe mempty collect expr
   collect (Typed.VarDecl names ty expr _) = annotateType names ty <> maybe mempty collect expr
 
 --------------------------------------------------------------------------------
 -- Stmt
 
-instance Collect Typed.TypedStmt where -- TODO: Display hover info for names.
+instance Collect Typed.Stmt where -- TODO: Display hover info for names.
   collect (Typed.Skip _) = mempty
   collect (Typed.Abort _) = mempty
   collect (Typed.Assign _names exprs _) = foldMap collect exprs
@@ -107,14 +117,14 @@ instance Collect Typed.TypedStmt where -- TODO: Display hover info for names.
   collect (Typed.HLookup _name expr _) = collect expr
   collect (Typed.HMutate e1 e2 _) = collect e1 <> collect e2
   collect (Typed.Dispose expr _) = collect expr
-  collect (Typed.Block program _) = collect program 
+  collect (Typed.Block program _) = collect program
 
-instance Collect Typed.TypedGdCmd where
-  collect (Typed.TypedGdCmd gd stmts _) = collect gd <> foldMap collect stmts
+instance Collect Typed.GdCmd where
+  collect (Typed.GdCmd gd stmts _) = collect gd <> foldMap collect stmts
 
 --------------------------------------------------------------------------------
 
-instance Collect Typed.TypedExpr where
+instance Collect Typed.Expr where
   collect (Typed.Lit _lit ty loc) = annotateType loc ty
   collect (Typed.Var name ty _) = annotateType name ty
   collect (Typed.Const name ty _) = annotateType name ty
@@ -129,8 +139,9 @@ instance Collect Typed.TypedExpr where
 
 instance Collect Typed.TypedCaseClause where
   collect (Typed.CaseClause _pat expr) = collect expr
+  collect (Typed.Subst e sb) = collect e <> foldMap collect (map snd sb)
 
-instance Collect Typed.TypedChain where
+instance Collect Typed.Chain where
   collect (Typed.Pure expr) = collect expr
   collect (Typed.More chain op ty expr) = collect chain <> annotateType op ty <> collect expr
 

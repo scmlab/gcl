@@ -176,7 +176,6 @@ instance FromJSON Pos where
 
 -- | Make Range instances  of FromJSON and ToJSON
 instance FromJSON Range
-
 instance ToJSON Range
 
 --------------------------------------------------------------------------------

@@ -1,15 +1,15 @@
-name:                gcl
-version:             0.1.0.0
+name: gcl
+version: 0.1.0.0
 #synopsis:
 #description:
-homepage:            https://github.com/scmlab/gcl
-license:             BSD3
-author:              Author name here
-maintainer:          banacorn@gmail.com
-copyright:           something
-category:            language
+homepage: https://github.com/scmlab/gcl
+license: BSD3
+author: Author name here
+maintainer: banacorn@gmail.com
+copyright: something
+category: language
 extra-source-files:
-- README.md
+  - README.md
 
 dependencies:
   - base >= 4.7 && < 5
@@ -30,12 +30,14 @@ dependencies:
   - regex-applicative
   - random
   - vector
-  - lsp 
+  - lsp
   - lens
   - multiset
   - transformers
   - template-haskell
   - multistate
+  - deepseq
+  - Diff
 
 library:
   source-dirs: src
@@ -59,7 +61,6 @@ executables:
       - -with-rtsopts=-N
       - -Werror=incomplete-patterns
       - -fno-warn-orphans
-
 
 tests:
   gcl-test:

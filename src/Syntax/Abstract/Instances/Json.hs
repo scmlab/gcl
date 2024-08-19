@@ -17,9 +17,4 @@ instance ToJSON CaseClause
 instance ToJSON Pattern
 instance ToJSON Lit
 
-instance FromJSON Expr
-instance FromJSON Chain
-instance FromJSON FuncClause 
-instance FromJSON CaseClause
-instance FromJSON Pattern
 instance FromJSON Lit

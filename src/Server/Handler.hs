@@ -2,108 +2,126 @@
 {-# LANGUAGE DisambiguateRecordFields #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE BlockArguments #-}
+
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-{-# HLINT ignore "Use lambda-case" #-}
 
-module Server.Handler
-  ( handlers
-  ) where
+module Server.Handler ( handlers ) where
 
+import           Control.Monad                  ( when )
 import           Control.Lens                   ( (^.) )
-import qualified Data.Aeson                    as JSON
+import qualified Data.Aeson                     as JSON
+import Data.Text (Text)
 import           Language.LSP.Server            ( Handlers
                                                 , notificationHandler
                                                 , requestHandler
                                                 )
-import           Server.Monad                  hiding (logText)
-import           Server.Pipeline
 
-import           Error                          ( Error )
-import qualified Language.LSP.Types            as J
-import qualified Language.LSP.Types.Lens       as J
+import qualified Language.LSP.Types             as LSP
+import qualified Language.LSP.Types.Lens        as LSP
+import qualified Language.LSP.Server            as LSP
+
+import qualified Server.Handler.Initialized    as Initialized
+import qualified Server.Handler.GoToDefinition as GoToDefinition
 import qualified Server.Handler.AutoCompletion as AutoCompletion
-import qualified Server.Handler.CustomMethod   as CustomMethod
-import qualified Server.Handler.GoToDefn       as GoToDefn
 import qualified Server.Handler.Hover          as Hover
+import qualified Server.Handler.SemanticTokens as SemanticTokens
+import qualified Server.Handler.Guabao.Reload  as Reload
+import qualified Server.Handler.Guabao.Refine  as Refine
+import Server.Monad (ServerM, sendDebugMessage, logText)
+import Server.Load (load)
+import qualified Server.Handler.OnDidChangeTextDocument as OnDidChangeTextDocument
+import qualified Data.Text as Text
 
 -- handlers of the LSP server
 handlers :: Handlers ServerM
 handlers = mconcat
-  [ notificationHandler J.SInitialized $ \_not -> do
-      pure ()
-  , 
-    -- autocompletion
-    requestHandler J.STextDocumentCompletion $ \req responder -> do
-    let completionContext = req ^. J.params . J.context
-    let position          = req ^. J.params . J.position
-    AutoCompletion.handler position completionContext >>= responder . Right
-  ,
-    -- custom methods, not part of LSP
-    requestHandler (J.SCustomMethod "guabao") $ \req responder -> do
-    let params = req ^. J.params
-    CustomMethod.handler params (responder . Right . JSON.toJSON)
-  , notificationHandler J.STextDocumentDidChange $ \ntf -> do
-    let uri = ntf ^. (J.params . J.textDocument . J.uri)
-    interpret uri (customRequestToNotification uri) $ do
-      muted <- isMuted
-      if muted
-        then return []
-        else do
-          logText "\n ---> TextDocumentDidChange"
-          source      <- getSource
-          parsed      <- parse source
-          converted   <- convert parsed
-          typeChecked <- typeCheck converted
-          swept       <- sweep typeChecked
-          generateResponseAndDiagnostics swept
-  , notificationHandler J.STextDocumentDidOpen $ \ntf -> do
-    let uri    = ntf ^. (J.params . J.textDocument . J.uri)
-    let source = ntf ^. (J.params . J.textDocument . J.text)
-    interpret uri (customRequestToNotification uri) $ do
-      logText "\n ---> TextDocumentDidOpen"
-      parsed      <- parse source
-      converted   <- convert parsed
-      typeChecked <- typeCheck converted
-      swept       <- sweep typeChecked
-      generateResponseAndDiagnostics swept
-  , -- Goto Definition
-    requestHandler J.STextDocumentDefinition $ \req responder -> do
-    let uri = req ^. (J.params . J.textDocument . J.uri)
-    let pos = req ^. (J.params . J.position)
-    GoToDefn.handler uri pos (responder . Right . J.InR . J.InR . J.List)
-  , -- Hover
-    requestHandler J.STextDocumentHover $ \req responder -> do
-    let uri = req ^. (J.params . J.textDocument . J.uri)
-    let pos = req ^. (J.params . J.position)
-    Hover.handler uri pos (responder . Right)
-  , requestHandler J.STextDocumentSemanticTokensFull $ \req responder -> do
-    let uri = req ^. (J.params . J.textDocument . J.uri)
-    interpret uri (responder . ignoreErrors) $ do
-      logText "\n ---> Syntax Highlighting"
-      let legend = J.SemanticTokensLegend
-            (J.List J.knownSemanticTokenTypes)
-            (J.List J.knownSemanticTokenModifiers)
-      stage <- load
-      let
-        highlightings = case stage of
-          Raw    _      -> []
-          Parsed result -> parsedHighlighings result
-          Converted result ->
-            parsedHighlighings (convertedPreviousStage result)
-          TypeChecked result -> parsedHighlighings
-            (convertedPreviousStage (typeCheckedPreviousStage result))
-          Swept result -> parsedHighlighings
-            (convertedPreviousStage
-              (typeCheckedPreviousStage (sweptPreviousStage result))
-            )
-      let tokens = J.makeSemanticTokens legend highlightings
-      case tokens of
-        Left t -> return $ Left $ J.ResponseError J.InternalError t Nothing
-        Right tokens' -> return $ Right $ Just tokens'
+  [ -- "initialized" - after initialize
+    notificationHandler LSP.SInitialized $ \_ntf -> do
+      logText "SInitialized is called.\n"
+      Initialized.handler
+  , -- "textDocument/didOpen" - after open
+    notificationHandler LSP.STextDocumentDidOpen $ \ntf -> do
+      logText "STextDocumentDidOpen start\n"
+      let uri            = ntf ^. (LSP.params . LSP.textDocument . LSP.uri)
+      case LSP.uriToFilePath uri of
+        Nothing       -> return ()
+        Just filePath -> load filePath
+      logText "STextDocumentDidOpen end\n"
+  , -- "textDocument/didChange" - after every edition
+    notificationHandler LSP.STextDocumentDidChange $ \ntf -> do
+      logText "STextDocumentDidChange start\n"
+      let uri        :: LSP.Uri = ntf ^. (LSP.params . LSP.textDocument . LSP.uri)
+      let (LSP.List changes)    = ntf ^. (LSP.params . LSP.contentChanges)
+      case LSP.uriToFilePath uri of
+        Nothing       -> return ()
+        Just filePath -> OnDidChangeTextDocument.handler filePath changes
+      logText "STextDocumentDidChange end\n"
+  , -- "textDocument/completion" - auto-completion
+    requestHandler LSP.STextDocumentCompletion $ \req responder -> do
+      let completionContext = req ^. LSP.params . LSP.context
+      let position          = req ^. LSP.params . LSP.position
+      AutoCompletion.handler position completionContext >>= (responder . Right . LSP.InR)
+  , -- "textDocument/definition" - go to definition
+    requestHandler LSP.STextDocumentDefinition $ \req responder -> do
+      logText "STextDocumentDefinition is called.\n"
+      let uri      = req ^. (LSP.params . LSP.textDocument . LSP.uri)
+      let position = req ^. (LSP.params . LSP.position)
+      GoToDefinition.handler uri position (responder . Right . LSP.InR . LSP.InR . LSP.List)
+      logText "STextDocumentDefinition is finished.\n"
+  , -- "textDocument/hover" - get hover information
+    requestHandler LSP.STextDocumentHover $ \req responder -> do
+      let uri = req ^. (LSP.params . LSP.textDocument . LSP.uri)
+      let pos = req ^. (LSP.params . LSP.position)
+      Hover.handler uri pos (responder . Right)
+  , -- "textDocument/semanticTokens/full" - get all semantic tokens
+    requestHandler LSP.STextDocumentSemanticTokensFull $ \req responder -> do
+      let uri = req ^. (LSP.params . LSP.textDocument . LSP.uri)
+      SemanticTokens.handler uri responder
+  , -- "guabao/reload" - reload
+    requestHandler (LSP.SCustomMethod "guabao/reload") $ jsonMiddleware Reload.handler
+  , -- "guabao/refine" - refine
+    requestHandler (LSP.SCustomMethod "guabao/refine") $ jsonMiddleware Refine.handler
   ]
 
-ignoreErrors
-  :: ([Error], Maybe (Either J.ResponseError (Maybe J.SemanticTokens)))
-  -> Either J.ResponseError (Maybe J.SemanticTokens)
-ignoreErrors (_, Nothing) = Left $ J.ResponseError J.InternalError "?" Nothing
-ignoreErrors (_, Just xs) = xs
+type CustomMethodHandler params result error = params -> (result -> ServerM ()) -> (error -> ServerM ()) -> ServerM ()
+
+jsonMiddleware :: (JSON.FromJSON params, JSON.ToJSON result, JSON.ToJSON error)
+                  => CustomMethodHandler params result error
+                  -> LSP.Handler ServerM (LSP.CustomMethod :: LSP.Method LSP.FromClient LSP.Request)
+jsonMiddleware handler req responder = do
+  logText "json: decoding request\n"
+  let json = req ^. LSP.params
+  logText . Text.pack $ show json
+  case decodeMessageParams json of
+    Left error   -> do
+      logText "json: decoding failed with\n"
+      logText (Text.pack . show $ JSON.encode json)
+      responder (Left error)
+    Right params -> do
+      logText "json: decoding succeeded\n"
+      handler params
+        (responder . Right . JSON.toJSON)
+        (responder. Left . makeInternalError)
+
+decodeMessageParams :: forall a. JSON.FromJSON a => JSON.Value -> Either LSP.ResponseError a
+decodeMessageParams json = do
+  case JSON.fromJSON json :: JSON.Result a of
+    JSON.Success params -> Right params
+    JSON.Error msg            -> Left (makeParseError ("Json decoding failed." <> Text.pack msg))
+
+makeInternalError :: JSON.ToJSON e => e -> LSP.ResponseError
+makeInternalError error = LSP.ResponseError 
+    { _code    = LSP.InternalError
+    , _message = ""
+    , _xdata   = Just (JSON.toJSON error)
+    }
+
+makeParseError :: Text -> LSP.ResponseError
+makeParseError message = LSP.ResponseError 
+    { _code    = LSP.ParseError
+    , _message = message
+    , _xdata   = Nothing
+    }

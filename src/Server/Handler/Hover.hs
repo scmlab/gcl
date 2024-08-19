@@ -1,53 +1,47 @@
-{-# LANGUAGE MultiParamTypeClasses #-}
+
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE BlockArguments #-}
+{-# LANGUAGE NamedFieldPuns #-}
 
-module Server.Handler.Hover
-  ( handler
-  ) where
+module Server.Handler.Hover where
 
-import           Error                          ( Error )
-import           Server.Monad            hiding ( logText )
-
-import           Data.Loc                       ( posCoff )
-import           Language.LSP.Types      hiding ( Range )
-import           Pretty                         ( toText )
-import           Server.Pipeline
+import qualified Language.LSP.Types            as LSP
 import qualified Server.SrcLoc                 as SrcLoc
-import qualified Server.IntervalMap               as IntervalMap
+import qualified Server.IntervalMap            as IntervalMap
+import Server.PositionMapping (PositionDelta, toCurrentRange, PositionMapping(..), PositionResult(..), fromDelta)
 
-ignoreErrors :: ([Error], Maybe (Maybe Hover)) -> Maybe Hover
-ignoreErrors (_, Nothing) = Nothing
-ignoreErrors (_, Just xs) = xs
+import Server.Monad (ServerM, FileState (..), loadFileState, logText)
 
-handler :: Uri -> Position -> (Maybe Hover -> ServerM ()) -> ServerM ()
-handler uri position responder = case uriToFilePath uri of
-  Nothing       -> return ()
-  Just filepath -> do
-    interpret uri (responder . ignoreErrors) $ do
-      source <- getSource
-      let table = SrcLoc.makeToOffset source
-      let pos   = SrcLoc.fromLSPPosition table filepath position
-      logText $ " ---> Hover " <> toText (posCoff pos)
+handler :: LSP.Uri -> LSP.Position -> (Maybe LSP.Hover -> ServerM ()) -> ServerM ()
+handler uri lspPosition responder = do
+  logText "hover: start\n"
+  case LSP.uriToFilePath uri of
+    Nothing       -> do
+      logText "hover: failed - uri not valid\n"
+      responder Nothing
+    Just filePath -> do
+      maybeFileState <- loadFileState filePath
+      case maybeFileState of
+        Nothing                           -> do
+          logText "hover: failed - not loaded yet\n"
+          responder Nothing
+        Just FileState{hoverInfos, positionDelta, toOffsetMap} -> do
+          case fromDelta positionDelta lspPosition of
+            PositionExact oldLspPosition -> do
+              let oldPos = SrcLoc.fromLSPPosition toOffsetMap filePath oldLspPosition
+              case IntervalMap.lookup oldPos hoverInfos of
+                Nothing             -> do
+                  logText "hover: not exist - no information for this position\n"
+                  responder Nothing
+                Just (hover, _type) -> do
+                  logText "hover: success\n"
+                  responder $ Just $ toCurrentHover positionDelta hover
+                  logText "hover: response sent\n"
+            _                            -> do
+              logText "hover: not exist - new position after last reload\n"
+              responder Nothing
+  logText "hover: end\n"
 
-      stage <- load
-
-      let
-        tokenMap = case stage of
-          Raw         _      -> Nothing
-          Parsed      _      -> Nothing
-          Converted   _      -> Nothing
-          TypeChecked result -> Just $ typeCheckedIntervalMap result
-          Swept result ->
-            Just $ typeCheckedIntervalMap (sweptPreviousStage result)
-
-      case tokenMap of
-        Nothing -> return Nothing
-        Just xs -> case IntervalMap.lookup pos xs of
-          Nothing -> do
-            -- logText $ toText xs
-            logText "    < Hover (not found)"
-            return Nothing
-          Just (hover, _) -> do
-            logText $ "    < Hover " <> toText hover
-            return (Just hover)
+toCurrentHover :: PositionDelta -> LSP.Hover -> LSP.Hover
+toCurrentHover positionDelta (LSP.Hover contents maybeRange)
+  = LSP.Hover contents (maybeRange >>= toCurrentRange (PositionMapping positionDelta))

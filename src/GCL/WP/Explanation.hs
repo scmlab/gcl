@@ -4,7 +4,8 @@ module GCL.WP.Explanation where
 
 import Data.Loc
 import Data.Text (Text)
-import Syntax.Abstract
+import Syntax.Abstract.Operator ( tInt )
+import Syntax.Typed
 import Syntax.Common                  ( Name(..) )
 import GCL.Predicate
 import Render
@@ -59,7 +60,7 @@ explainTermination inv guards bnd l = Explain
         <> "remain true (that is, whilst looping), the bound"
         <> (codeE . render) bnd
         <> "should be greater then"
-        <> (codeE . render) (Lit (Num 0) NoLoc)
+        <> (codeE . render) (Lit (Num 0) tInt NoLoc)
       , originInfMode          = Primary
       , originHighlightPartial = True
       , originLoc              = l

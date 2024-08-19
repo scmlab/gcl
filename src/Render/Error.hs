@@ -7,7 +7,7 @@ import           Data.Loc                       ( locOf )
 import           Data.Loc.Range
 import           Error
 import           GCL.Common                     ( TypeError(..) )
-import           GCL.WP.Type                    ( StructError(..) )
+import           GCL.WP.Types                   ( StructError(..) )
 import           Render.Class
 import           Render.Element
 import           Render.Syntax.Abstract         ( )

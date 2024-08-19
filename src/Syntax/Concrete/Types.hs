@@ -96,7 +96,7 @@ data Stmt
   | LoopInvariant (Token "{") Expr (Token ",") (Token "bnd") (Token ":") Expr (Token "}")
   | Do (Token "do") (SepBy "|" GdCmd) (Token "od")
   | If (Token "if") (SepBy "|" GdCmd) (Token "fi")
-  | SpecQM Range -- ? to be rewritten as {!!}
+  | SpecQM Range -- ? to be rewritten as [!!]
   | Spec (Token "[!") [L Tok] (Token "!]")
   | Proof Text Text Text Range -- anchor, the content of the block, the whole proof block (for pretty's reconstruction)
   | Alloc Name (Token ":=") (Token "new") (Token "(") (SepBy "," Expr) (Token ")")
