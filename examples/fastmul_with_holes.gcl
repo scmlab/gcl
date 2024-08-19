@@ -12,8 +12,9 @@ do b ≠ 0 ->
     | odd b ->
         a := 3
         [!
-            
+            a := even
         !]
+        b := a
         r := a
     fi
 od

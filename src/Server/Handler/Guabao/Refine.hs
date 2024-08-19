@@ -42,6 +42,7 @@ import Pretty (pretty)
 data RefineParams = RefineParams
   { filePath  :: FilePath
   , specLines :: Range
+  , implLines :: Range
   , implText  :: Text
   }
   deriving (Eq, Show, Generic)
@@ -52,7 +53,7 @@ instance JSON.ToJSON RefineParams
 -- Assumes. specLines contains all the lines from "[!" to "!]"
 -- Assumes. implText contains the lines between but not including "[!" and "!]"
 handler :: RefineParams -> (() -> ServerM ()) -> (() -> ServerM ()) -> ServerM ()
-handler _params@RefineParams{filePath, specLines, implText} onFinish _ = do
+handler _params@RefineParams{filePath, specLines, implLines, implText} onFinish _ = do
   logText "refine: start\n"
   logText "  specLines:\n"
   logText . Text.pack . show . pretty $ specLines
@@ -65,15 +66,12 @@ handler _params@RefineParams{filePath, specLines, implText} onFinish _ = do
       return ()
     Just fileState -> do
       logText "  fileState loaded\n"
-      let implText' = removeOneIndentation implText
       logText "  implText:\n"
       logText implText
       logText "\n"
-      logText "  unindented:\n"
-      logText implText'
-      logText "\n"
       -- 挖洞
-      case digImplHoles filePath implText' of
+      let (Range implStart _) = implLines
+      case digImplHoles implStart filePath implText of
         Left err -> do
           logText "  parse error\n"
           onError (ParseError err)
@@ -82,14 +80,13 @@ handler _params@RefineParams{filePath, specLines, implText} onFinish _ = do
           logText "    (after)\n"
           logText holelessImplText
           logText "\n"
-          let (Range specStart _) = specLines
           -- text to concrete
           -- (use specStart as the starting position in parse/toAbstract/elaborate)
           logText "  parsing\n"
-          logText "    specStart =\n"
-          logText . Text.pack . show . pretty $ specStart
+          logText "    implStart =\n"
+          logText . Text.pack . show . pretty $ implStart
           logText "\n"
-          case parseFragment specStart holelessImplText of
+          case parseFragment implStart holelessImplText of
             Left err           -> onError (ParseError err)
             Right concreteImpl -> do
               -- concrete to abstract
@@ -179,14 +176,14 @@ collectFragmentHoles concreteFragment = do
     C.SpecQM range -> return range
     _ -> []
 
-digImplHoles :: FilePath -> Text -> Either ParseError Text
-digImplHoles filePath implText =
-  case parseFragment (Pos filePath 1 1 0) implText of
+digImplHoles :: Pos -> FilePath -> Text -> Either ParseError Text
+digImplHoles parseStart filePath implText =
+  case parseFragment parseStart implText of
     Left err -> Left err
     Right concreteImpl ->
       case collectFragmentHoles concreteImpl of
         [] -> return implText
-        Range start _ : _ -> digImplHoles filePath $ digFragementHole start implText
+        Range start _ : _ -> digImplHoles parseStart filePath $ digFragementHole start implText
   where
     digFragementHole :: Pos -> Text -> Text
     digFragementHole (Pos _path lineNumber col _charOff) fullText =
@@ -201,7 +198,7 @@ digImplHoles filePath implText =
         indentation n = Text.replicate n " "
         lineEdited :: Text
         lineEdited = beforeHole <> "[!\n" <>
-                    indentation (col+3) <> "\n" <>
+                    indentation (col-1) <> "\n" <>
                     indentation (col-1) <> "!]" <> afterHole
         linesEdited :: [Text]
         linesEdited = take (lineNumber - 1) allLines ++ [lineEdited] ++ drop lineNumber allLines
