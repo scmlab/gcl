@@ -51,6 +51,7 @@ instance Located Expr where
   locOf (Quant _ _ _ _ l) = l
   locOf (ArrIdx _ _    l) = l
   locOf (ArrUpd _ _ _  l) = l
+  locOf (Case _ _ l     ) = l
   locOf (Subst _ _)       = NoLoc
 
 instance Located Chain where

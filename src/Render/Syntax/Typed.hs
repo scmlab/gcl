@@ -67,12 +67,16 @@ handleExpr _ (ArrIdx e1 e2 _) = render e1 <> "[" <> render e2 <> "]"
 handleExpr _ (ArrUpd e1 e2 e3 _) =
   "(" <+> render e1 <+> ":" <+> render e2 <+> "↣" <+> render e3 <+> ")"
     -- SCM: need to print parenthesis around e1 when necessary.
+handleExpr _ (Case e cs _) = "case" <+> render e <+> "of" <+> renderManySepByComma cs -- TODO: Use semicolon instead of comma
 handleExpr n (Subst e subs) =
    parensIf n Nothing $
      handleExpr AppHOLE e <+> "[" <+>
       renderManySepByComma vs <+> "\\" <+>
       renderManySepByComma es <+> "]"
   where (vs, es) = unzip subs
+
+instance Render CaseClause where
+  render (CaseClause pat expr) = render pat <+> "→" <+> render expr
 
 instance Render Chain where -- Hopefully this is correct.
   render (Pure expr) = render expr

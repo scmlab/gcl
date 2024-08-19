@@ -10,7 +10,6 @@ import           Data.Set                       ( Set )
 import qualified Data.Set as Set
 import           Data.Loc                       ( Loc )
 import           GCL.Common hiding              ( Substitutable ( subst ) )
-import           GCL.WP.Util                    ( declaredNames )
 import           Syntax.Abstract.Types
 import           Syntax.Abstract.Util           ( declaredNames )
 import           Syntax.Common

@@ -46,17 +46,20 @@ instance Pretty Declaration where
       <> pretty p
       <> " }"
 
+-- TODO: These comments are here to remind us that these are not yet implemented.
 instance Pretty Definition where
   pretty (TypeDefn name binders qdcons _) =
     "data " <> pretty name <+> hsep (map pretty binders) <> "= " <> hsep
       (punctuate "| " (map pretty qdcons))
-  pretty (FuncDefnSig name typ Nothing _) = pretty name <> ": " <> pretty typ
+  pretty (FuncDefnSig name typ Nothing _) = pretty name <> ": " -- <> pretty typ
   pretty (FuncDefnSig name typ (Just prop) _) =
-    pretty name <> ": " <> pretty typ <> "{ " <> pretty prop <> " }"
+    pretty name <> ": " <> {- pretty typ <> -} "{ " <> pretty prop <> " }"
   pretty (FuncDefn name expr) = pretty name <+> " = " <+> pretty expr
 
 instance Pretty TypeDefnCtor where
   pretty (TypeDefnCtor cn ts) = pretty cn <+> hsep (pretty <$> ts)
+
+instance Pretty KindedType where -- FIXME: Implement this.
 
 --------------------------------------------------------------------------------
 

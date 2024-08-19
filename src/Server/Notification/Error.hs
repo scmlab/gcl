@@ -120,6 +120,11 @@ instance JSON.ToJSON TypeError where
     [ "tag" .= JSON.String "MissingArguments"
     , "argumentNames" .= JSON.toJSON (map JSON.toJSON names)
     ]
+  -- FIXME: Implement these.
+  toJSON (KindUnifyFailed _ _ _) = undefined
+  toJSON (NotKFunc _ _) = undefined
+  toJSON (TooFewPatterns _) = undefined
+  toJSON (TooManyPatterns _) = undefined
 
 instance JSON.ToJSON StructError where
   toJSON :: StructError -> JSON.Value

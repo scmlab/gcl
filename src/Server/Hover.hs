@@ -17,10 +17,10 @@ import           Data.Loc           ( Located
 import           Data.Loc.Range
 import           Server.IntervalMap ( IntervalMap )
 import qualified Server.IntervalMap as IntervalMap
-import           Syntax.Abstract
+import           Syntax.Abstract                as UnTyped
 import           Syntax.Typed                   as Typed
 
-collectHoverInfo :: Typed.TypedProgram -> IntervalMap J.Hover
+collectHoverInfo :: Typed.Program -> IntervalMap J.Hover
 collectHoverInfo = collect
 
 instance Pretty J.Hover where
@@ -64,6 +64,17 @@ instance Collect Typed.Program where
 --------------------------------------------------------------------------------
 -- Definition
 
+unkind :: KindedType -> Type
+unkind (Typed.TBase base _ loc) = UnTyped.TBase base loc
+unkind (Typed.TArray int ty loc) = UnTyped.TArray int (unkind ty) loc
+unkind (Typed.TTuple int _) = UnTyped.TTuple int
+unkind (Typed.TFunc ty1 ty2 loc) = UnTyped.TFunc (unkind ty1) (unkind ty2) loc
+unkind (Typed.TOp op _) = UnTyped.TOp op
+unkind (Typed.TData name _ loc) = UnTyped.TData name loc
+unkind (Typed.TApp ty1 ty2 loc) = UnTyped.TApp (unkind ty1) (unkind ty2) loc
+unkind (Typed.TVar name _ loc) = UnTyped.TVar name loc
+unkind (Typed.TMetaVar name _ loc) = UnTyped.TMetaVar name loc
+
 instance Collect Typed.Definition where
   collect (Typed.TypeDefn _ _ ctors _) = foldMap collect ctors
   collect (Typed.FuncDefnSig name kinded prop _) = annotateType name (unkind kinded) <> collect kinded <> maybe mempty collect prop
@@ -76,16 +87,7 @@ instance Collect Typed.KindedType where
   collect (Typed.TBase base kind loc) = annotateKind loc kind
   collect (Typed.TArray int kinded loc) = collect kinded
   collect (Typed.TTuple i k) = mempty
-  collect (Typed.TOp op kind) = annotateKind op kind
-  collect (Typed.TData name kind _) = annotateKind name kind
-  collect (Typed.TApp ty1 ty2 _) = collect ty1 <> collect ty2
-  collect (Typed.TVar name kind _) = annotateKind name kind
-  collect (Typed.TMetaVar name kind _) = annotateKind name kind
-
-instance Collect Typed.KindedType where
-  collect (Typed.TBase base kind loc) = annotateKind loc kind
-  collect (Typed.TArray int kinded loc) = collect kinded
-  collect (Typed.TTuple i k) = mempty
+  collect (Typed.TFunc l r _) = collect l <> collect r
   collect (Typed.TOp op kind) = annotateKind op kind
   collect (Typed.TData name kind _) = annotateKind name kind
   collect (Typed.TApp ty1 ty2 _) = collect ty1 <> collect ty2
@@ -136,10 +138,10 @@ instance Collect Typed.Expr where
   collect (Typed.ArrIdx expr1 expr2 _) = collect expr1 <> collect expr2
   collect (Typed.ArrUpd arr index expr _) = collect arr <> collect index <> collect expr
   collect (Typed.Case expr clauses _) = collect expr <> foldMap collect clauses
+  collect Typed.Subst {} = undefined -- FIXME: Implement this.
 
-instance Collect Typed.TypedCaseClause where
+instance Collect Typed.CaseClause where
   collect (Typed.CaseClause _pat expr) = collect expr
-  collect (Typed.Subst e sb) = collect e <> foldMap collect (map snd sb)
 
 instance Collect Typed.Chain where
   collect (Typed.Pure expr) = collect expr

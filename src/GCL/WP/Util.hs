@@ -39,6 +39,7 @@ import           Syntax.Common                  ( Name(..)
 import           Numeric                        ( showHex )
 import           Pretty                         ( toString )
 import           GCL.WP.Types
+import           Syntax.Abstract.Types          ( Type(..) )
 
 -- Syntax Manipulation
 

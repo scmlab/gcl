@@ -42,7 +42,7 @@ data Definition =
     deriving (Eq, Show)
 
 -- constructor of type definition
-data TypeDefnCtor = TypeDefnCtor Name [Type]
+data TypeDefnCtor = TypeDefnCtor Name [Name]
   deriving (Eq, Show)
 
 --------------------------------------------------------------------------------
@@ -115,6 +115,7 @@ data Type
   | TArray Interval Type Loc -- TODO: Make this a higher-kinded type.
   -- TTuple has no srcloc info because it has no conrete syntax at the moment
   | TTuple Int -- `Int` represents the arity of the tuple.
+  | TFunc Type Type Loc
   | TOp TypeOp
   | TData Name Loc
   | TApp Type Type Loc

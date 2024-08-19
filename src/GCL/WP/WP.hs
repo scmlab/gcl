@@ -31,6 +31,7 @@ import           Syntax.Common.Types            ( Name(..)
                                                 , nameToText )
 import           Syntax.Typed.Instances.Substitution   ()
 import           Syntax.Substitution
+import           Syntax.Abstract.Types          ( Type(..) )
 
 wpFunctions :: TstructSegs
             -> (TwpSegs, TwpSStmts, Twp)

@@ -131,6 +131,7 @@ instance Render Type where
   renderPrec _ (TBase TChar _) = "Char"
   renderPrec _ (TArray i b  _) = "array" <+> render i <+> "of" <+> render b
   renderPrec _ (TTuple _     ) = "Tuple"
+  renderPrec _ (TFunc l r _  ) = "Func" -- TODO: Change this to display proper information.
   renderPrec _ (TOp op       ) = render op
   -- TODO: Add support for more than one type operators.
   renderPrec n (TApp (TApp (TOp (Arrow _)) left _) right _) =

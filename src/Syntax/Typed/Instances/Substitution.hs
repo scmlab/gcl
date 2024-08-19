@@ -13,6 +13,7 @@ import           Syntax.Substitution
 import           GCL.Common
 import           Syntax.Common
 import           Syntax.Typed.Instances.Free ()
+import           Syntax.Abstract.Types          ( Type(..) )
 
 instance Variableous Expr Type where
   isVar (Var   x t _) = Just (x, t)
@@ -43,9 +44,13 @@ instance Fresh m => Substitutable m Expr Expr where
     ArrIdx <$> subst sb a <*> subst sb i <*> pure l
   subst sb (ArrUpd a i v l) =
     ArrUpd <$> subst sb a <*> subst sb i <*> subst sb v <*> pure l
+  subst sb (Case expr clauses l) = Case <$> subst sb expr <*> subst sb clauses <*> pure l
   subst sb (Subst e tb) =
     Subst <$> subst sb e <*> forM tb (\(x, f) ->
         (,) x <$> subst sb f)
+
+instance Fresh m => Substitutable m CaseClause Expr where
+  subst sb (CaseClause pat rhs) = CaseClause pat <$> subst sb rhs
 
 instance Fresh m => Substitutable m Chain Expr where
   subst sb (Pure expr) = Pure <$> subst sb expr

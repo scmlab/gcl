@@ -9,6 +9,7 @@ import Syntax.Typed
 import Syntax.Common                  ( Name(..) )
 import GCL.Predicate
 import Render
+import qualified Syntax.Abstract.Types as A
 
 emptyExplain :: Text -> Loc -> Origin
 emptyExplain title l = Explain
@@ -60,7 +61,7 @@ explainTermination inv guards bnd l = Explain
         <> "remain true (that is, whilst looping), the bound"
         <> (codeE . render) bnd
         <> "should be greater then"
-        <> (codeE . render) (Lit (Num 0) tInt NoLoc)
+        <> (codeE . render) (Lit (A.Num 0) tInt NoLoc)
       , originInfMode          = Primary
       , originHighlightPartial = True
       , originLoc              = l

@@ -27,7 +27,6 @@ library
       GCL.Exec.ExecMonad
       GCL.Exec.ExNondet
       GCL.Exec.ExRand
-      GCL.Kind
       GCL.Predicate
       GCL.Predicate.Located
       GCL.Predicate.Util
@@ -197,7 +196,6 @@ test-suite gcl-test
       GCL.Exec.ExecMonad
       GCL.Exec.ExNondet
       GCL.Exec.ExRand
-      GCL.Kind
       GCL.Predicate
       GCL.Predicate.Located
       GCL.Predicate.Util

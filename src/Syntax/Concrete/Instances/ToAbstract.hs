@@ -89,9 +89,7 @@ instance ToAbstract Definition [A.Definition] where
     return [A.FuncDefn name $ wrapLam args body']
 
 instance ToAbstract TypeDefnCtor A.TypeDefnCtor where
-  toAbstract (TypeDefnCtor c ts) = do
-    ts' <- toAbstract ts
-    return $ A.TypeDefnCtor c ts'
+  toAbstract (TypeDefnCtor c ns) = return $ A.TypeDefnCtor c ns
 
 --------------------------------------------------------------------------------
 -- | Declaraion
@@ -199,6 +197,7 @@ instance ToAbstract Type A.Type where
         A.TBase a' _     -> pure $ A.TBase a' (locOf t)
         A.TArray a' b' _ -> pure $ A.TArray a' b' (locOf t)
         A.TTuple as'     -> pure $ A.TTuple as'
+        A.TFunc a' b' _  -> pure $ A.TFunc a' b' (locOf t)
         A.TOp op         -> pure $ A.TOp op
         A.TData name _   -> pure $ A.TData name (locOf t)
         A.TApp  a' b' _  -> pure $ A.TApp a' b' (locOf t)

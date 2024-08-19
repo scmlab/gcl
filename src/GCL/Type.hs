@@ -9,6 +9,7 @@
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE DeriveGeneric #-}
 
 module GCL.Type where
 
@@ -20,7 +21,7 @@ import           Data.Functor
 import           Data.Maybe                     ( fromJust )
 import           Data.List
 import           Data.Loc                       ( Loc(..)
-                                                , locOf
+                                                , locOf, Located, (<-->)
                                                 )
 import           Data.Foldable                  ( foldlM )
 import qualified Data.Set                      as Set
@@ -34,10 +35,26 @@ import           Prelude                 hiding ( EQ
 import           Syntax.Abstract
 import           Syntax.Common
 import qualified Syntax.Typed                  as T
+import GHC.Generics
+import qualified Data.Ord as Ord
+import Syntax.Abstract.Util (wrapTFunc)
+
+--------------------------------------------------------------------------------
+-- The elaboration monad
+
+type ElaboratorM = StateT (FreshState, [(Index, Kind)], [(Index, TypeInfo)], [(Name, Type, [Type])]) (Except TypeError)
+
+instance Counterous ElaboratorM where
+  countUp = do
+    (count, typeDefnInfo, typeInfo, patInfo) <- get
+    put (succ count, typeDefnInfo, typeInfo, patInfo)
+    return count
 
 data TypeError
     = NotInScope Name
     | UnifyFailed Type Type Loc
+    | KindUnifyFailed Kind Kind Loc -- TODO: Deal with this replication in a better way.
+    | NotKFunc Kind Loc
     | RecursiveType Name Type Loc
     | AssignToConst Name
     | UndefinedType Name
@@ -45,11 +62,15 @@ data TypeError
     | RedundantNames [Name]
     | RedundantExprs [Expr]
     | MissingArguments [Name]
+    | TooFewPatterns [Type]
+    | TooManyPatterns [Name]
     deriving (Show, Eq, Generic)
 
 instance Located TypeError where
   locOf (NotInScope n               ) = locOf n
-  locOf (UnifyFailed   _ _ l        ) = l
+  locOf (UnifyFailed _ _ l          ) = l
+  locOf (KindUnifyFailed _ _ l      ) = l
+  locOf (NotKFunc _ l               ) = l
   locOf (RecursiveType _ _ l        ) = l
   locOf (AssignToConst         n    ) = locOf n
   locOf (UndefinedType         n    ) = locOf n
@@ -57,8 +78,10 @@ instance Located TypeError where
   locOf (RedundantNames        ns   ) = locOf ns
   locOf (RedundantExprs        exprs) = locOf exprs
   locOf (MissingArguments      ns   ) = locOf ns
+  locOf (TooFewPatterns        tys  ) = locOf tys
+  locOf (TooManyPatterns       pats ) = locOf pats
 
-instance Substitutable Type TypeInfo where
+instance Substitutable (Subs Type) TypeInfo where
   subst s (TypeDefnCtorInfo t) = TypeDefnCtorInfo (subst s t)
   subst s (ConstTypeInfo    t) = ConstTypeInfo (subst s t)
   subst s (VarTypeInfo      t) = VarTypeInfo (subst s t)
@@ -113,14 +136,14 @@ instance CollectIds [Definition] where -- TODO: Collect patterns.
     let gathered = second ConstTypeInfo <$> zip defined freshVars
     modify (\(freshState, typeDefnInfos, origInfos, patInfos) -> (freshState, typeDefnInfos, gathered <> origInfos, patInfos))
     -- Get the previously gathered type infos.
-    (_, _, env) <- get
+    (_, _, env, _) <- get
     -- Do a `foldlM` to elaborate multiple definitions together.
     (_, names, tys, _sub) <-
       foldlM (\(context, names, tys, sub) funcDefn -> do
         case funcDefn of
           (FuncDefn name expr) -> do
             (ty, _, sub1) <- elaborate expr context -- Calling `head` is safe for the meantime.
-            unifySub <- unifyType (subst sub1 (fromJust $ lookup (Index name) context)) (fromJust ty) (locOf name) -- the first `fromJust` should also be safe.
+            unifySub <- unifyType (subst sub1 $ typeInfoToType (fromJust $ lookup (Index name) context)) (fromJust ty) (locOf name) -- the first `fromJust` should also be safe.
             -- We see if there are signatures restricting the type of function definitions.
             case lookup (Index name) sigEnv of
               -- If there is, we save the restricted type.
@@ -176,6 +199,257 @@ instance CollectIds Declaration where
   collectIds (VarDecl   ns t _ _) = modify (\(freshState, typeDefnInfos, origInfos, patInfos) -> (freshState, typeDefnInfos, infos <> origInfos, patInfos))
     where infos = map ((, VarTypeInfo t) . Index) ns
 
+-- TODO: We have to do kind checking everywhere instead of relying on unification.
+
+-- Type definitions are processed here.
+-- We follow the approach described in the paper "Kind Inference for Datatypes": https://dl.acm.org/doi/10.1145/3371121
+-- `collectTypeDefns` is an entry for "Typing Program", presented in page 53:8 in the paper. 
+collectTypeDefns :: [Definition] -> ElaboratorM ()
+collectTypeDefns typeDefns = do
+  freshMetaVars <- replicateM (length typeDefns) freshKindName
+  let annos = (\(TypeDefn name _args _ctors _loc, kinds) -> KindAnno name kinds) <$> zip typeDefns (KMetaVar <$> freshMetaVars)
+  let initEnv = reverse annos <> reverse (UnsolvedUni <$> freshMetaVars)
+  (newTypeInfos, newTypeDefnInfos) <- inferDataTypes (mempty, initEnv) ((\(TypeDefn name args ctors loc) -> (name, args, ctors, loc)) <$> typeDefns)
+  let newTypeInfos' = second TypeDefnCtorInfo <$> newTypeInfos
+  let newTypeDefnInfos' =
+        (\case
+          KindAnno name kind -> (Index name, kind)
+          UnsolvedUni _name -> error "Unsolved KMetaVar."
+          SolvedUni name kind -> (Index name, kind)) <$> defaultMeta newTypeDefnInfos
+  let resolvedInfos = resolve newTypeDefnInfos' newTypeDefnInfos'
+  modify (\(freshState, origTypeDefnInfos, origTypeInfos, patInfos) -> (freshState, resolvedInfos <> origTypeDefnInfos, newTypeInfos' <> origTypeInfos, patInfos))
+  where
+    -- This is an entry for "Typing Datatype Decl." several times, presented in page 53:8.
+    inferDataTypes :: (TypeEnv, KindEnv) -> [(Name, [Name], [TypeDefnCtor], Loc)] -> ElaboratorM (TypeEnv, KindEnv)
+    inferDataTypes (typeEnv, kindEnv) [] = do
+      return (typeEnv, kindEnv)
+    inferDataTypes (typeEnv, kindEnv) ((tyName, tyParams, ctors, loc) : dataTypesInfo) = do
+      (typeEnv', kindEnv') <- inferDataType kindEnv tyName tyParams ctors loc
+      (typeEnv'', kindEnv'') <- inferDataTypes (typeEnv', kindEnv') dataTypesInfo
+      return (typeEnv <> typeEnv' <> typeEnv'', kindEnv'')
+
+    -- This is the "defaulting" mechanism presented in the paper.
+    defaultMeta :: KindEnv -> KindEnv
+    defaultMeta env =
+      (\case
+        KindAnno name kind -> KindAnno name kind
+        UnsolvedUni name -> SolvedUni name $ KStar $ locOf name
+        SolvedUni name kind -> SolvedUni name kind
+      ) <$> env
+
+    -- This is an entry for "Typing Datatype Decl.", presented in page 53:8.
+    inferDataType :: KindEnv -> Name -> [Name] -> [TypeDefnCtor] -> Loc -> ElaboratorM (TypeEnv, KindEnv)
+    inferDataType env tyName tyParams ctors loc = do
+      case find (isKindAnno tyName) env of
+        Just (KindAnno _name k) -> do
+          metaVarNames <- replicateM (length tyParams) freshKindName
+          let newEnv = (UnsolvedUni <$> reverse metaVarNames) <> env
+          -- We do a unification here.
+          newEnv' <- unifyKind newEnv (subst env k) (wrapKFunc (KMetaVar <$> reverse metaVarNames) (KStar NoLoc)) loc
+          let solvedEnv = (\(SolvedUni _ kind) -> kind) <$> take (length tyParams) newEnv'
+          let envForInferingCtors = zipWith KindAnno (reverse tyParams) solvedEnv <> drop (length tyParams) newEnv'
+          (inferedTypes, finalEnv) <- inferCtors envForInferingCtors tyName tyParams ctors
+          let ctorIndices = (\(TypeDefnCtor name _) -> Index name) <$> ctors
+          return (zip ctorIndices inferedTypes, drop (length tyParams) finalEnv)
+        _ -> throwError $ UndefinedType tyName
+      where
+        wrapKFunc :: [Kind] -> Kind -> Kind
+        wrapKFunc [] k = k
+        wrapKFunc (k : ks) k' = wrapKFunc ks (KFunc k k' $ k <--> k')
+
+        formTy con params =
+          case params of
+            [] -> con
+            n : ns -> formTy (TApp con n $ con <--> n) ns
+
+        -- This is an entry for "Typing Data Constructor Decl." several times, presented in page 53:8.
+        inferCtors :: KindEnv -> Name -> [Name] -> [TypeDefnCtor] -> ElaboratorM ([Type], KindEnv)
+        inferCtors env' _ _ [] = return (mempty, env')
+        inferCtors env' tyName' tyParamNames ctors' = do
+          -- Give type variables fresh names to prevent name collision.
+          freshNames <- mapM freshName' $ (\(Name text _) -> "Type." <> text) <$> tyParamNames
+          inferCtors' env' tyName' tyParamNames freshNames ctors'
+          where
+            -- Recursion happens here.
+            inferCtors' :: KindEnv -> Name -> [Name] -> [Name] -> [TypeDefnCtor] -> ElaboratorM ([Type], KindEnv)
+            inferCtors' env'' _ _ _ [] = return (mempty, env'')
+            inferCtors' env'' tyName'' tyParamNames' freshNames (ctor : restOfCtors) = do
+              (ty, newEnv) <- inferCtor env'' tyName'' tyParamNames' freshNames ctor
+              (tys, anotherEnv) <- inferCtors' newEnv tyName'' tyParamNames' freshNames restOfCtors
+              return (ty : tys, newEnv <> anotherEnv)
+
+        -- This is an entry for "Typing Data Constructor Decl.", presented in page 53:8.
+        inferCtor :: KindEnv -> Name -> [Name] -> [Name] -> TypeDefnCtor -> ElaboratorM (Type, KindEnv)
+        inferCtor env' tyName' tyParamNames freshNames (TypeDefnCtor conName params) = do
+          let sub = Map.fromList . zip tyParamNames $ freshNames
+          let sub' = Map.fromList . zip tyParamNames $ TMetaVar <$> freshNames <*> pure NoLoc
+          let retTy = formTy (TData tyName' (locOf tyName')) (TMetaVar <$> tyParamNames <*> pure NoLoc)
+          let ty = subst sub' $ wrapTFunc (TVar <$> params <*> pure (locOf params)) retTy
+          -- Here, we collect the patterns.
+          let pat = (conName, subst sub' retTy, TVar <$> params <*> pure (locOf params)) -- TODO: This is likely incorrect because I just want to make things work now carelessly.
+          modify (\(freshState, typeDefnInfos, origInfos, pats) -> (freshState, typeDefnInfos, origInfos, pat : pats))
+          -- Here, we enter the world for infering kinds.
+          (_kind, env'') <- inferKind (renameKindEnv sub env') ty
+          return (ty, env'')
+          where
+            renameKindEnv :: Map.Map Name Name -> KindEnv -> KindEnv
+            renameKindEnv sub env'' =
+              (\case
+                KindAnno name kind -> case Map.lookup name sub of
+                  Nothing -> KindAnno name kind
+                  Just name' -> KindAnno name' kind
+                UnsolvedUni name -> UnsolvedUni name
+                SolvedUni name kind -> SolvedUni name kind
+              ) <$> env''
+
+    -- This function substitutes a context into itself.
+    -- TODO: I (Andy) think the algorithm here is suboptimal.
+    resolve :: [(Index, Kind)] -> [(Index, Kind)] -> [(Index, Kind)]
+    resolve [] env = env
+    resolve (pair : pairs) env =
+      let env' = substEnv pair env
+      in resolve pairs env'
+      where
+        substEnv :: (Index, Kind) -> [(Index, Kind)] -> [(Index, Kind)]
+        substEnv sub context = second (substSingle sub) <$> context
+        substSingle :: (Index, Kind) -> Kind -> Kind
+        substSingle sub@(index, kind') kind =
+          case kind of
+            KStar loc -> KStar loc
+            KFunc kind1 kind2 loc -> KFunc (substSingle sub kind1) (substSingle sub kind2) loc
+            KMetaVar name -> if Index name == index then kind' else kind
+
+--------------------------------------------------------------------------------
+-- Kind inference
+
+kindFromArity :: Int -> Kind
+kindFromArity 0 = KStar NoLoc
+kindFromArity n = KFunc (KStar NoLoc) (kindFromArity $ n - 1) NoLoc
+
+-- This is "Kinding" mentioned in 53:10 in the paper "Kind Inference for Datatypes".
+inferKind :: KindEnv -> Type -> ElaboratorM (Kind, KindEnv)
+inferKind env (TBase _ loc) = return (KStar loc, env)
+inferKind env (TArray _ _ loc) = return (KStar loc, env)
+inferKind env (TTuple int) = return (kindFromArity int, env)
+inferKind env (TFunc _ _ loc) = return (KStar loc, env)
+inferKind env (TOp (Arrow loc)) = return (KFunc (KStar loc) (KFunc (KStar loc) (KStar loc) loc) loc, env)
+inferKind env (TData name _) =
+  case find (isKindAnno name) env of
+    Just (KindAnno _name kind) -> return (kind, env)
+    _ -> throwError $ UndefinedType name
+inferKind env (TApp t1 t2 _) = do
+  (k1, env') <- inferKind env t1
+  (k2, env'') <- inferKind env' t2
+  (k3, env''') <- inferKApp env'' (subst env'' k1) (subst env'' k2)
+  return (k3 ,env''')
+inferKind env (TVar name _) =
+  case find (isKindAnno name) env of
+    Just (KindAnno _name kind) -> return (kind, env)
+    _ -> throwError $ UndefinedType name
+inferKind env (TMetaVar name _) =
+  case find (isKindAnno name) env of
+    Just (KindAnno _name kind) -> return (kind, env)
+    _ -> throwError $ UndefinedType name
+
+-- This is "Application Kinding" mentioned in 53:10 in the paper "Kind Inference for Datatypes".
+inferKApp :: KindEnv -> Kind -> Kind -> ElaboratorM (Kind, KindEnv)
+inferKApp env (KFunc k1 k2 _) k = do
+  env' <- unifyKind env k1 k $ k1 <--> k
+  return (k2, env')
+inferKApp env (KMetaVar a) k = do
+  case nameIndex of
+    Nothing -> throwError $ NotInScope a
+    Just nameIndex' -> do
+      a1 <- freshKindName
+      a2 <- freshKindName
+      let env' = let (list1, list2) = splitAt nameIndex' env
+                 in list1 ++ [SolvedUni a $ KFunc (KMetaVar a1) (KMetaVar a2) $ a1 <--> a2, UnsolvedUni a2, UnsolvedUni a1] ++ tail list2
+      env'' <- unifyKind env' (KMetaVar a1) k $ locOf k
+      return (KMetaVar a2, env'')
+  where
+    nameIndex = findIndex (predicate a) env
+
+    predicate name (UnsolvedUni name') = name == name'
+    predicate _ _ = False
+inferKApp _ k1 k2 = do
+  ret <- freshKindName
+  throwError $ KindUnifyFailed k1 (KFunc k2 (KMetaVar ret) $ locOf k2) $ locOf k1
+
+
+-- This is "Kind Unification" mentioned in 53:10 in the paper "Kind Inference for Datatypes".
+unifyKind :: KindEnv -> Kind -> Kind -> Loc -> ElaboratorM KindEnv
+unifyKind env k1 k2 _ | k1 == k2 = return env
+unifyKind env (KFunc k1 k2 _) (KFunc k3 k4 _) _ = do
+  env' <- unifyKind env k1 k3 (locOf k1)
+  unifyKind env' (subst env' k2) (subst env' k4) (locOf k2)
+unifyKind env (KMetaVar a) k _ = do
+  case aIndex of
+    -- The below 4 lines have implementation different from what is written on the paper.
+    -- I put the original (probably incorrect) implementation that I think is what the paper describes in comments.
+    Nothing -> return env -- throwError $ NotInScope a
+    Just _aIndex' -> do
+      -- let (list1, list2) = splitAt aIndex' env
+      (k2, env') <- promote env a k -- (k2, env') <- promote (list1 ++ tail list2) a k
+      let aIndex2 = findIndex (predicate a) env'
+      case aIndex2 of
+        Nothing -> throwError $ NotInScope a
+        Just aIndex2' -> do
+          let (list1', list2') = splitAt aIndex2' env'
+          return $ list1' ++ [SolvedUni a k2] ++ tail list2'
+  where
+    -- Notice the `fromJust`. This part crashes when `a` is not present in `env`. (They should)
+    aIndex = findIndex (predicate a) env
+
+    predicate name (UnsolvedUni name') = name == name'
+    predicate _ _ = False
+unifyKind env k (KMetaVar a) loc = unifyKind env (KMetaVar a) k loc
+unifyKind _env k1 k2 loc = throwError $ KindUnifyFailed k1 k2 loc
+
+-- This is "Promotion" mentioned in 53:10 in the paper "Kind Inference for Datatypes".
+promote :: KindEnv -> Name -> Kind -> ElaboratorM (Kind, KindEnv)
+promote env _ (KStar loc) = return (KStar loc, env)
+promote env name (KFunc k1 k2 loc) = do
+  (k3, env') <- promote env name k1
+  (k4, env'') <- promote env' name (subst env' k2)
+  return (KFunc k3 k4 loc, env'')
+promote env a (KMetaVar b) =
+  case compare aIndex bIndex of
+    Ord.LT -> return (KMetaVar b, env)
+    Ord.EQ -> error "Should not happen."
+    Ord.GT -> do
+      b1 <- freshKindName
+      case aIndex of
+        Nothing -> throwError $ NotInScope a
+        Just aIndex' -> do
+          let env' = let (list1, list2) = splitAt aIndex' env in list1 ++ [UnsolvedUni a, UnsolvedUni b1] ++ tail list2
+          case bIndex of
+            Nothing -> throwError $ NotInScope b
+            Just bIndex' -> do
+              let env'' = let (list1, list2) = splitAt bIndex' env' in list1 ++ [SolvedUni b (KMetaVar b1)] ++ tail list2
+              return (KMetaVar b1, env'')
+  where
+    aIndex = findIndex (predicate a) env
+    bIndex = findIndex (predicate b) env
+
+    predicate name (UnsolvedUni name') = name == name'
+    predicate _ _ = False
+
+isKindAnno :: Name -> KindItem -> Bool
+isKindAnno name (KindAnno name' _kind) = name == name'
+isKindAnno _ _ = False
+
+freshKindName :: ElaboratorM Name
+freshKindName = freshName "Kind.metaVar" NoLoc
+
+instance Substitutable KindEnv Kind where
+  subst _ (KStar loc) = KStar loc
+  subst env (KMetaVar name) = case find (predicate name) env of
+    Just (SolvedUni _ kind) -> kind
+    _ -> KMetaVar name
+    where
+      predicate name1 (SolvedUni name2 _kind) = name1 == name2
+      predicate _ _ = False
+  subst env (KFunc k1 k2 loc) = KFunc (subst env k1) (subst env k2) loc
 
 --------------------------------------------------------------------------------
 -- Elaboration
@@ -190,6 +464,7 @@ type family Typed untyped where
   Typed Stmt = T.Stmt
   Typed GdCmd = T.GdCmd
   Typed Expr = T.Expr
+  Typed CaseClause = T.CaseClause
   Typed Chain = T.Chain
   Typed Name = Name
   Typed ChainOp = Op
@@ -204,6 +479,13 @@ type family Typed untyped where
 class Located a => Elab a where
     elaborate :: a -> [(Index, TypeInfo)] -> ElaboratorM (Maybe Type, Typed a, Subs Type)
 
+runElaboration
+  :: Elab a => a -> [(Index, TypeInfo)] -> Either TypeError (Typed a)
+runElaboration a env = do
+  ((_, elaborated, _), _state) <- runExcept (runStateT (elaborate a env) (0, mempty, mempty, mempty))
+  Right elaborated
+
+newtype TypeDefnInfo = TypeDefnInfo [Name]
 
 -- Note that we pass the collected ids into each sections of the program.
 -- After `collectIds`, we don't need to change the state.
@@ -242,15 +524,15 @@ instance Elab Program where
 instance Elab Definition where
   elaborate (TypeDefn name args ctors loc) env = do
     let m = Set.fromList args
-    mapM_ (\(TypeDefnCtor _ ts) -> mapM_ (scopeCheck m) ts) ctors
+    mapM_ (\(TypeDefnCtor _ ns) -> mapM_ (scopeCheck m) ns) ctors
     ctors' <- mapM (\ctor -> do
                       (_, typed, _) <- elaborate ctor env
                       return typed
                    ) ctors
     return (Nothing, T.TypeDefn name args ctors' loc, mempty)
     where
-      scopeCheck :: MonadError TypeError m => Set.Set Name -> Type -> m ()
-      scopeCheck ns t = mapM_ (\n -> if Set.member n ns then return () else throwError $ NotInScope n) (freeVars t)
+      scopeCheck :: MonadError TypeError m => Set.Set Name -> Name -> m ()
+      scopeCheck ns n = if Set.member n ns then return () else throwError $ NotInScope n
   elaborate (FuncDefnSig name ty maybeExpr loc) env = do
     expr' <- mapM (\expr -> do
                     (_, typed, _) <- elaborate expr env
@@ -262,45 +544,50 @@ instance Elab Definition where
     if kind == KStar NoLoc then return () else throwError $ KindUnifyFailed kind (KStar NoLoc) (locOf kind)
     return (Nothing, T.FuncDefnSig name kinded expr' loc, mempty)
     where
-      toKinded :: [(Index, Kind)] -> Type -> ElaboratorM Typed.KindedType
+      toKinded :: [(Index, Kind)] -> Type -> ElaboratorM T.KindedType
       toKinded env ty = do
         case ty of
-          TBase base loc -> return $ Typed.TBase base (KStar loc) loc
+          TBase base loc -> return $ T.TBase base (KStar loc) loc
           TArray int ty loc -> do
             kindedTy <- toKinded env ty
-            return $ Typed.TArray int kindedTy loc
-          TTuple n -> return $ Typed.TTuple n (kindFromArity n)
-          TOp arrow@(Arrow _) -> return $ Typed.TOp arrow (KFunc (KStar loc) (KFunc (KStar loc) (KStar loc) loc) loc)
+            return $ T.TArray int kindedTy loc
+          TTuple n -> return $ T.TTuple n (kindFromArity n)
+          TFunc l r loc -> do
+            l' <- toKinded env l
+            r' <- toKinded env r
+            return $ T.TFunc l' r' loc
+          TOp arrow@(Arrow _) -> return $ T.TOp arrow (KFunc (KStar loc) (KFunc (KStar loc) (KStar loc) loc) loc)
           TData name loc -> do
             case lookup (Index name) env of
-              Just k -> return $ Typed.TData name k loc
+              Just k -> return $ T.TData name k loc
               _ -> error "Shouldn't happen."
           TApp ty1 ty2 loc -> do
             kindedTy1 <- toKinded env ty1
             kindedTy2 <- toKinded env ty2
-            return $ Typed.TApp kindedTy1 kindedTy2 loc
+            return $ T.TApp kindedTy1 kindedTy2 loc
           TVar name loc -> do
             case lookup (Index name) env of
-              Just k -> return $ Typed.TVar name k loc
+              Just k -> return $ T.TVar name k loc
               _ -> error "Shouldn't happen."
           TMetaVar name loc -> do
             case lookup (Index name) env of
-              Just k -> return $ Typed.TMetaVar name k loc
+              Just k -> return $ T.TMetaVar name k loc
               _ -> error "Shouldn't happen."
 
-      kindCheck :: Typed.KindedType -> ElaboratorM Kind
+      kindCheck :: T.KindedType -> ElaboratorM Kind
       kindCheck kinded = case kinded of
-        Typed.TBase _ kind _ -> return kind
-        Typed.TArray _ kinded _ -> kindCheck kinded
-        Typed.TTuple _ kind -> return kind
-        Typed.TOp _ kind -> return kind
-        Typed.TData _ kind _ -> return kind
-        Typed.TApp kinded1 kinded2 _ -> do
+        T.TBase _ kind _ -> return kind
+        T.TArray _ kinded _ -> kindCheck kinded
+        T.TTuple _ kind -> return kind
+        T.TFunc l r _  -> kindCheck l >> kindCheck r
+        T.TOp _ kind -> return kind
+        T.TData _ kind _ -> return kind
+        T.TApp kinded1 kinded2 _ -> do
           kind1 <- kindCheck kinded1
           kind2 <- kindCheck kinded2
           applyKind kind1 kind2
-        Typed.TVar _ kind _ -> return kind
-        Typed.TMetaVar _ kind _ -> return kind
+        T.TVar _ kind _ -> return kind
+        T.TMetaVar _ kind _ -> return kind
 
       applyKind :: Kind -> Kind -> ElaboratorM Kind
       applyKind (KFunc left right loc) k2 = do
@@ -392,12 +679,12 @@ instance Elab Stmt where
                  ) gds
     return (Nothing, T.If gds' loc, mempty)
   elaborate (Spec text range) _ = do
-    (_, _, infos) <- get
+    (_, _, infos, _) <- get
     return (Nothing, T.Spec text range infos, mempty)
   elaborate (Proof text1 text2 range) _ = return (Nothing, T.Proof text1 text2 range, mempty)
   elaborate (Alloc var exprs loc) env = do
     ty <- checkAssign env var
-    _ <- unifies ty (tInt NoLoc) $ locOf var
+    _ <- unifyType ty (tInt NoLoc) $ locOf var
     typedExprs <-
       mapM
         (\expr -> do
@@ -408,7 +695,7 @@ instance Elab Stmt where
     return (Nothing, T.Alloc var typedExprs loc, mempty)
   elaborate (HLookup name expr loc) env = do
     ty <- checkAssign env name
-    _ <- unifies ty (tInt NoLoc) $ locOf name
+    _ <- unifyType ty (tInt NoLoc) $ locOf name
     (ty', typedExpr, _) <- elaborate expr env
     _ <- unifyType (fromJust ty') (tInt NoLoc) (locOf expr)
     return (Nothing, T.HLookup name typedExpr loc, mempty)
@@ -494,7 +781,7 @@ instance Elab Expr where
     let newEnv = (Index bound, ConstTypeInfo tv) : env
     (ty1, typedExpr1, sub1) <- elaborate expr newEnv
     let returnTy = subst sub1 tv ~-> fromJust ty1
-    return (Just returnTy, subst sub1 (Typed.Lam bound (subst sub1 tv) typedExpr1 loc), sub1)
+    return (Just returnTy, subst sub1 (T.Lam bound (subst sub1 tv) typedExpr1 loc), sub1)
   elaborate (Func name clauses l) env = undefined
   -- Γ ⊢ e1 ↑ (s1, t1)
   -- s1 Γ ⊢ e2 ↑ (s2, t2)
@@ -513,7 +800,7 @@ instance Elab Expr where
         (resTy, resTypedExpr, resSub) <- elaborate restriction $ zip (Index <$> bound) (ConstTypeInfo <$> tvs) <> newEnv
         uniSub2 <- unifyType (fromJust resTy) (tBool NoLoc) (locOf restriction)
         let newEnv' = subst (uniSub2 `compose` resSub) newEnv
-        (innerTy, innerTypedExpr, innerSub) <- elaborate inner $ zip (Index <$> bound) (subst (uniSub2 `compose` resSub) <$> tvs) <> newEnv'
+        (innerTy, innerTypedExpr, innerSub) <- elaborate inner $ zip (Index <$> bound) (subst (uniSub2 `compose` resSub) . ConstTypeInfo <$> tvs) <> newEnv'
         uniSub3 <- unifyType (subst innerSub $ fromJust innerTy) (subst (uniSub2 `compose` resSub `compose` quantSub) tv) (locOf inner)
         let sub = uniSub3 `compose` innerSub `compose` uniSub2 `compose` resSub `compose` quantSub
         return (Just $ subst quantSub tv, subst sub (T.Quant quantTypedExpr bound resTypedExpr innerTypedExpr loc), sub)
@@ -566,7 +853,7 @@ instance Elab Expr where
   elaborate (Case expr clauses loc) env = do
     (exprTy, typedExpr, exprSub) <- elaborate expr env
     (ty, typed, sub) <- inferClauses clauses (fromJust exprTy) exprSub
-    return (Just $ subst sub ty, subst sub $ Typed.Case typedExpr typed loc, sub)
+    return (Just $ subst sub ty, subst sub $ T.Case typedExpr typed loc, sub)
     where
       inferClauses :: [CaseClause] -> Type -> Subs Type -> ElaboratorM (Type, [Typed CaseClause], Subs Type)
       inferClauses clauses' ty sub = do
@@ -583,7 +870,7 @@ instance Elab Expr where
               Just tyPrevRhs -> do
                 sub''' <- unifyType (subst (sub'' `compose` sub') tyClause) (subst (sub'' `compose` sub') tyPrevRhs) (locOf tyClause)
                 return (sub''' `compose` sub'' `compose` sub', subst (sub''' `compose` sub'' `compose` sub') tyTop, Just $ subst (sub''' `compose` sub'' `compose` sub') tyClause, subst (sub''' `compose` sub'' `compose` sub') typedClause : res)
-      
+
       inferClause :: CaseClause -> ElaboratorM (Type, Type, Typed CaseClause, Subs Type)
       inferClause (CaseClause (PattConstructor patName subnames) expr) = do
         (_, _, _, infos) <- get
@@ -596,9 +883,9 @@ instance Elab Expr where
               | length subnames < length outputs' -> throwError $ TooFewPatterns (drop (length subnames) outputs')
               | length subnames > length outputs' -> throwError $ TooManyPatterns (drop (length outputs') subnames)
               | otherwise      -> do
-                let env' = zip (Index <$> subnames) outputs' <> env -- TODO: Check for redundent names.
+                let env' = zip (Index <$> subnames) (ConstTypeInfo <$> outputs') <> env -- TODO: Check for redundent names.
                 (exprTy, typedExpr, subExpr) <- elaborate expr env'
-                let typedClause = Typed.CaseClause (PattConstructor patName subnames) typedExpr
+                let typedClause = T.CaseClause (PattConstructor patName subnames) typedExpr
                 return (fromJust exprTy, input', typedClause, subExpr)
       inferClause _ = undefined -- FIXME: Add other patterns.
 
@@ -742,30 +1029,28 @@ emptyInterval = Interval (Including zero) (Excluding zero) NoLoc
   where zero = Lit (Num 0) NoLoc
 
 -- A class for substitution not needing a Fresh monad.
--- Used only in this module.
--- Moved from GCL.Common to here.
---  SCM: think about integrating it with the other substitution.
 
 class Substitutable a b where
-  subst :: Subs a -> b -> b
+  subst :: a -> b -> b
 
-compose :: Substitutable a a => Subs a -> Subs a -> Subs a
+compose :: Substitutable (Subs a) a => Subs a -> Subs a -> Subs a
 s1 `compose` s2 = s1 <> Map.map (subst s1) s2
 
 instance (Substitutable a b, Functor f) => Substitutable a (f b) where
   subst = fmap . subst
 
-instance Substitutable Type Type where
-  subst _ t@TBase{}       = t
-  subst s (TArray i t l ) = TArray i (subst s t) l
-  subst s (TTuple ts    ) = TTuple (map (subst s) ts)
-  subst s (TFunc t1 t2 l) = TFunc (subst s t1) (subst s t2) l
-  subst s (TApp l r loc ) = TApp (subst s l) (subst s r) loc
-  subst _ t@TData {}      = t
-  subst s t@(TVar n _)    = Map.findWithDefault t n s
-  subst s t@(TMetaVar n)  = Map.findWithDefault t n s
+instance Substitutable (Subs Type) Type where
+  subst _ t@TBase{}        = t
+  subst s (TArray i t l  ) = TArray i (subst s t) l
+  subst _ (TTuple arity  ) = TTuple arity
+  subst s (TFunc l r loc ) = TFunc (subst s l) (subst s r) loc
+  subst _ (TOp op        ) = TOp op
+  subst s (TApp l r loc  ) = TApp (subst s l) (subst s r) loc
+  subst _ t@TData{}        = t
+  subst s t@(TVar n _    ) = Map.findWithDefault t n s
+  subst s t@(TMetaVar n _) = Map.findWithDefault t n s
 
-instance Substitutable Type T.Expr where
+instance Substitutable (Subs Type) T.Expr where
   subst s (T.Lit lit ty loc) = T.Lit lit (subst s ty) loc
   subst s (T.Var name ty loc) = T.Var name (subst s ty) loc
   subst s (T.Const name ty loc) = T.Const name (subst s ty) loc
@@ -776,8 +1061,12 @@ instance Substitutable Type T.Expr where
   subst s (T.Quant quantifier vars restriction inner loc) = T.Quant (subst s quantifier) vars (subst s restriction) (subst s inner) loc
   subst s (T.ArrIdx arr index loc) = T.ArrIdx (subst s arr) (subst s index) loc
   subst s (T.ArrUpd arr index expr loc) = T.ArrUpd (subst s arr) (subst s index) (subst s expr) loc
-  subst s (T.Subst e es) = T.Subst (subst s e) [(x, subst s ex) | (x, ex) <- es]
+  subst s (T.Case expr clauses loc) = T.Case (subst s expr) (subst s <$> clauses) loc
+  subst s (T.Subst expr pairs) = T.Subst (subst s expr) (subst s <$> pairs)
 
-instance Substitutable Type T.Chain where
+instance Substitutable (Subs Type) T.CaseClause where
+  subst s (T.CaseClause pat expr) = T.CaseClause pat (subst s expr)
+
+instance Substitutable (Subs Type) T.Chain where
   subst s (T.Pure expr) = T.Pure $ subst s expr
   subst s (T.More ch op ty expr) = T.More (subst s ch) op (subst s ty) (subst s expr)

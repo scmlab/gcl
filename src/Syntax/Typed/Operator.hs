@@ -11,6 +11,7 @@ import           Data.Loc                       ( Loc(..)
                                                 , locOf
                                                 )
 import           Prelude                 hiding ( Ordering(..) )
+import           Syntax.Abstract.Types          ( Type(..), Lit (..) )
 
 unary :: ArithOp -> Type -> Expr -> Expr
 unary op t x = App (Op (ArithOp op) t) x (x <--> op)
