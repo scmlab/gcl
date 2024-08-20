@@ -108,6 +108,8 @@ instance CollectIds a => CollectIds [a] where
 
 
 -- Currently (and hopefully in the future), we only modify the state of `ElaboratorM` during `collectIds`.
+-- TODO: We should probably rewrite the `ElaboratorM` monad to be an `RWS` / `RWST` monad.
+-- The current states except the counter are actually environments. Also, we can use the writer effect to collect several errors at once.
 
 instance CollectIds [Definition] where -- TODO: Collect patterns.
   collectIds defns = do
@@ -161,6 +163,7 @@ instance CollectIds [Definition] where -- TODO: Collect patterns.
             modify (\(freshState, typeDefnInfos, origInfos, patInfos) -> (freshState, typeDefnInfos, info : origInfos, patInfos))
           ) (zip names tys)
     where
+      -- This function splits the definitions into type definitions, function signatures, and function definitions.
       split :: [Definition] -> ([Definition], [Definition], [Definition])
       split defs = foldr (
           \def (typeDefns, sigs, funcDefns)  -> case def of
@@ -186,6 +189,8 @@ instance CollectIds [Definition] where -- TODO: Collect patterns.
           modify (\(freshState, typeDefnInfos, origInfos, patInfos) -> (freshState, typeDefnInfos, infos : origInfos, patInfos))
         ) funcSigs
 
+      -- This function generalizes a plain type into a type scheme.
+      -- Currently, we represent monotypes and type schemes as the same type, that is, `Type`.
       generalize :: Fresh m => Type -> TypeEnv -> m Type
       generalize ty' env' = do
         let free = Set.toList (freeVars ty') \\ Set.toList (freeVars env')
@@ -203,6 +208,13 @@ instance CollectIds Declaration where
 
 -- Type definitions are processed here.
 -- We follow the approach described in the paper "Kind Inference for Datatypes": https://dl.acm.org/doi/10.1145/3371121
+-- TODO: Unfortuantely, this implementation is not correct yet.
+-- We, SCM and Andy, encountered some difficulties when we tried to read the above paper.
+-- I want to try to give some hints for future implementors why the implementation is not correct.
+-- First of all, the `take` function and the `drop` function are suspicious. It's possible that their behavior is not what we expect.
+-- Next, the `resolve` function is awkward. Both SCM and Andy cannot understand the theoretical reason of substituting a context into itself.
+-- Andy will be very happy if this is properly implemented.
+
 -- `collectTypeDefns` is an entry for "Typing Program", presented in page 53:8 in the paper. 
 collectTypeDefns :: [Definition] -> ElaboratorM ()
 collectTypeDefns typeDefns = do
@@ -517,9 +529,6 @@ instance Elab Program where
                           return typed
                        ) stmts
     return (Nothing, T.Program typedDefns typedDecls typedExprs typedStmts loc, mempty)
-   where
-    collectTCon (TypeDefn n args _ _) = [(Index n, TypeDefnInfo args)]
-    collectTCon _                     = []
 
 instance Elab Definition where
   elaborate (TypeDefn name args ctors loc) env = do
@@ -850,6 +859,11 @@ instance Elab Expr where
     uniSubExpr <- unifyType (subst eSub $ fromJust eTy) (subst uniSubArr tv) (locOf e)
     let sub = uniSubExpr `compose` eSub `compose` uniSubArr `compose` uniSubIndex `compose` indexSub `compose` arrSub
     return (subst uniSubArr arrTy, subst sub (T.ArrUpd typedArr typedIndex typedE loc), sub)
+  -- TODO: Add the typing derivation for `Case`.
+  -- This implementation follows another GitHub repo, https://github.com/anton-k/hindley-milner-type-check
+  -- However, our implementatation and theirs are subtly different.
+  -- Therefore, it might be the case that we're wrong (actually we are) but theirs is right.
+  -- The suspected reason is written below before `inferClause`.
   elaborate (Case expr clauses loc) env = do
     (exprTy, typedExpr, exprSub) <- elaborate expr env
     (ty, typed, sub) <- inferClauses clauses (fromJust exprTy) exprSub
@@ -870,7 +884,11 @@ instance Elab Expr where
               Just tyPrevRhs -> do
                 sub''' <- unifyType (subst (sub'' `compose` sub') tyClause) (subst (sub'' `compose` sub') tyPrevRhs) (locOf tyClause)
                 return (sub''' `compose` sub'' `compose` sub', subst (sub''' `compose` sub'' `compose` sub') tyTop, Just $ subst (sub''' `compose` sub'' `compose` sub') tyClause, subst (sub''' `compose` sub'' `compose` sub') typedClause : res)
-
+      
+      -- After we found the constructor name, we instantiate the type variables.
+      -- However, instatiating clauses one by one is likely too late.
+      -- The likely result is that these instantiations do not propogate to the pattern-matched expression.
+      -- Therefore, we should instantiate the types earlier.
       inferClause :: CaseClause -> ElaboratorM (Type, Type, Typed CaseClause, Subs Type)
       inferClause (CaseClause (PattConstructor patName subnames) expr) = do
         (_, _, _, infos) <- get
