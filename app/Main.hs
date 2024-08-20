@@ -17,7 +17,7 @@ main = do
   case mode of
     ModeHelp -> putStrLn $ usageInfo usage options
     ModeLSP -> do
-      _ <- runOnStdio "/Users/vince/Documents/gcl-vscode/server_log.txt"
+      _ <- runOnStdio "/Users/andy/Desktop/log.txt"
       return ()
     ModeDev -> do
       _ <- runOnPort port

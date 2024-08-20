@@ -42,7 +42,7 @@ data Definition =
     deriving (Eq, Show)
 
 -- constructor of type definition
-data TypeDefnCtor = TypeDefnCtor Name [Name]
+data TypeDefnCtor = TypeDefnCtor Name [Type]
   deriving (Eq, Show)
 
 --------------------------------------------------------------------------------

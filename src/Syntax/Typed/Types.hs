@@ -20,7 +20,7 @@ data Definition
   | FuncDefn Name Expr
   deriving (Eq, Show)
 
-data TypeDefnCtor = TypeDefnCtor Name [Name]
+data TypeDefnCtor = TypeDefnCtor Name [Type]
   deriving (Eq, Show)
 
 data Declaration

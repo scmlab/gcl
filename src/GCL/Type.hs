@@ -284,9 +284,9 @@ collectTypeDefns typeDefns = do
           let sub = Map.fromList . zip tyParamNames $ freshNames
           let sub' = Map.fromList . zip tyParamNames $ TMetaVar <$> freshNames <*> pure NoLoc
           let retTy = formTy (TData tyName' (locOf tyName')) (TMetaVar <$> tyParamNames <*> pure NoLoc)
-          let ty = subst sub' $ wrapTFunc (TVar <$> params <*> pure (locOf params)) retTy
+          let ty = subst sub' $ wrapTFunc params retTy
           -- Here, we collect the patterns.
-          let pat = (conName, subst sub' retTy, TVar <$> params <*> pure (locOf params)) -- TODO: This is likely incorrect because I just want to make things work now carelessly.
+          let pat = (conName, subst sub' retTy, params)
           modify (\(freshState, typeDefnInfos, origInfos, pats) -> (freshState, typeDefnInfos, origInfos, pat : pats))
           -- Here, we enter the world for infering kinds.
           (_kind, env'') <- inferKind (renameKindEnv sub env') ty
@@ -524,15 +524,15 @@ instance Elab Program where
 instance Elab Definition where
   elaborate (TypeDefn name args ctors loc) env = do
     let m = Set.fromList args
-    mapM_ (\(TypeDefnCtor _ ns) -> mapM_ (scopeCheck m) ns) ctors
+    mapM_ (\(TypeDefnCtor _ ts) -> mapM_ (scopeCheck m) ts) ctors
     ctors' <- mapM (\ctor -> do
                       (_, typed, _) <- elaborate ctor env
                       return typed
                    ) ctors
     return (Nothing, T.TypeDefn name args ctors' loc, mempty)
     where
-      scopeCheck :: MonadError TypeError m => Set.Set Name -> Name -> m ()
-      scopeCheck ns n = if Set.member n ns then return () else throwError $ NotInScope n
+      scopeCheck :: MonadError TypeError m => Set.Set Name -> Type -> m ()
+      scopeCheck ns t = mapM_ (\n -> if Set.member n ns then return () else throwError $ NotInScope n) (freeVars t)
   elaborate (FuncDefnSig name ty maybeExpr loc) env = do
     expr' <- mapM (\expr -> do
                     (_, typed, _) <- elaborate expr env

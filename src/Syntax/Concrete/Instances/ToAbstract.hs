@@ -89,7 +89,9 @@ instance ToAbstract Definition [A.Definition] where
     return [A.FuncDefn name $ wrapLam args body']
 
 instance ToAbstract TypeDefnCtor A.TypeDefnCtor where
-  toAbstract (TypeDefnCtor c ns) = return $ A.TypeDefnCtor c ns
+  toAbstract (TypeDefnCtor c tys) = do
+    tys' <- mapM toAbstract tys
+    return $ A.TypeDefnCtor c tys'
 
 --------------------------------------------------------------------------------
 -- | Declaraion

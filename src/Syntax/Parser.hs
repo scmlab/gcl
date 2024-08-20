@@ -267,7 +267,7 @@ definition = choice [try funcDefnSig, typeDefn, funcDefnF]
   typeDefn = TypeDefn <$> tokenData <*> upper <*> many lower <*> tokenEQ <*> sepByGuardBar typeDefnCtor
 
   typeDefnCtor :: Parser TypeDefnCtor
-  typeDefnCtor = TypeDefnCtor <$> upper <*> many identifier
+  typeDefnCtor = TypeDefnCtor <$> upper <*> many type'
 
 definitionBlock :: Parser DefinitionBlock
 definitionBlock = DefinitionBlock <$> tokenDeclOpen <*> sepByAlignmentOrSemi definition <*> tokenDeclClose
