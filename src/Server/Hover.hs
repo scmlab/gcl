@@ -138,7 +138,7 @@ instance Collect Typed.Expr where
   collect (Typed.ArrIdx expr1 expr2 _) = collect expr1 <> collect expr2
   collect (Typed.ArrUpd arr index expr _) = collect arr <> collect index <> collect expr
   collect (Typed.Case expr clauses _) = collect expr <> foldMap collect clauses
-  collect Typed.Subst {} = undefined -- FIXME: Implement this.
+  collect (Typed.Subst orig pairs) = collect orig <> foldMap (\(_, expr) -> collect expr) pairs -- TODO: Not sure if this is correct.
 
 instance Collect Typed.CaseClause where
   collect (Typed.CaseClause _pat expr) = collect expr

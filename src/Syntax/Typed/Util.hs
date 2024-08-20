@@ -48,7 +48,7 @@ typeOf (ArrIdx arr _ _) = case typeOf arr of
   Syntax.Abstract.Types.TFunc  _ t _ -> t
   _ -> error "indexed term not an array in a typed expression "
 typeOf (ArrUpd arr _ _ _) = typeOf arr
-typeOf (Case _ _ _) = undefined -- FIXME: Figure out what this should be.
+typeOf (Case expr _ _) = typeOf expr -- FIXME: This is wrong and acts as a placeholder. Figure out what this should be.
 typeOf (Subst e _) = typeOf e
 
 typeOfChain :: Chain -> Type

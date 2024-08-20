@@ -64,7 +64,6 @@ data Expr
 
   | Subst Expr [(Name, Expr)]
   deriving (Eq, Show)
-  -- FIXME: Other constructors.
 
 data CaseClause = CaseClause Pattern Expr
   deriving (Eq, Show)

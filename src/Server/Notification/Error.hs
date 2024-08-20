@@ -121,10 +121,10 @@ instance JSON.ToJSON TypeError where
     , "argumentNames" .= JSON.toJSON (map JSON.toJSON names)
     ]
   -- FIXME: Implement these.
-  toJSON (KindUnifyFailed _ _ _) = undefined
-  toJSON (NotKFunc _ _) = undefined
-  toJSON (TooFewPatterns _) = undefined
-  toJSON (TooManyPatterns _) = undefined
+  toJSON (KindUnifyFailed _ _ _) = object []
+  toJSON (NotKFunc _ _) = object []
+  toJSON (TooFewPatterns _) = object []
+  toJSON (TooManyPatterns _) = object []
 
 instance JSON.ToJSON StructError where
   toJSON :: StructError -> JSON.Value
