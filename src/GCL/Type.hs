@@ -861,7 +861,8 @@ instance Elab Expr where
     return (subst uniSubArr arrTy, subst sub (T.ArrUpd typedArr typedIndex typedE loc), sub)
   -- TODO: Add the typing derivation for `Case`.
   -- This implementation follows another GitHub repo, https://github.com/anton-k/hindley-milner-type-check
-  -- However, \our implementatation and theirs are still subtly different.
+  -- It worth noting that we follow the code in the above repo to instatiate the types late.
+  -- However, our implementatation and theirs are still subtly different.
   -- Therefore, it might be the case that we're wrong (actually we are) but theirs is right.
   elaborate (Case expr clauses loc) env = do
     (exprTy, typedExpr, exprSub) <- elaborate expr env
