@@ -23,7 +23,7 @@ import Syntax.Parser.Lexer (TokStream(..), scan)
 import Language.Lexer.Applicative              ( TokenStream(..))
 
 import Error (Error (ParseError, TypeError, StructError, Others))
-import GCL.Predicate (Spec(..), PO, InfMode(..))
+import GCL.Predicate (Spec(..), PO (..), InfMode(..), Origin (..))
 import GCL.Common (TypeEnv, Index, TypeInfo)
 import GCL.Type (Elab(..), TypeError, runElaboration, Typed)
 import Data.Loc.Range (Range (..), rangeStart)
@@ -41,8 +41,9 @@ import Pretty (pretty)
 
 data RefineParams = RefineParams
   { filePath  :: FilePath
-  , specLines :: Range
   , implText  :: Text
+  , specLines :: Range
+  , implStart :: Pos
   }
   deriving (Eq, Show, Generic)
 
@@ -51,11 +52,15 @@ instance JSON.ToJSON RefineParams
 
 -- Assumes. specLines contains all the lines from "[!" to "!]"
 -- Assumes. implText contains the lines between but not including "[!" and "!]"
+-- Assumes. implStart is the start of the line following "[!"
 handler :: RefineParams -> (() -> ServerM ()) -> (() -> ServerM ()) -> ServerM ()
-handler _params@RefineParams{filePath, specLines, implText} onFinish _ = do
+handler _params@RefineParams{filePath, specLines, implText, implStart} onFinish _ = do
   logText "refine: start\n"
+  logText "  params\n"
+  logText . Text.pack . show $ _params
+  logText "\n"
   logText "  specLines:\n"
-  logText . Text.pack . show . pretty $ specLines
+  logText . Text.pack . show  $ specLines
   logText "\n"
   -- 把上次 load 的資料拿出來
   maybeFileState <- loadFileState filePath
@@ -65,15 +70,15 @@ handler _params@RefineParams{filePath, specLines, implText} onFinish _ = do
       return ()
     Just fileState -> do
       logText "  fileState loaded\n"
-      let implText' = removeOneIndentation implText
       logText "  implText:\n"
       logText implText
       logText "\n"
-      logText "  unindented:\n"
-      logText implText'
-      logText "\n"
       -- 挖洞
-      case digImplHoles filePath implText' of
+      -- let (Range implStart _) = implLines
+      -- let implStart = rangeStart implLines
+      let (Range specStart _) = specLines
+      -- let implStart = getImplStart specStart
+      case digImplHoles implStart filePath implText of
         Left err -> do
           logText "  parse error\n"
           onError (ParseError err)
@@ -82,14 +87,13 @@ handler _params@RefineParams{filePath, specLines, implText} onFinish _ = do
           logText "    (after)\n"
           logText holelessImplText
           logText "\n"
-          let (Range specStart _) = specLines
           -- text to concrete
           -- (use specStart as the starting position in parse/toAbstract/elaborate)
           logText "  parsing\n"
           logText "    specStart =\n"
           logText . Text.pack . show . pretty $ specStart
           logText "\n"
-          case parseFragment specStart holelessImplText of
+          case parseFragment implStart holelessImplText of
             Left err           -> onError (ParseError err)
             Right concreteImpl -> do
               -- concrete to abstract
@@ -102,6 +106,7 @@ handler _params@RefineParams{filePath, specLines, implText} onFinish _ = do
                   logText "  abstracted\n"
                   -- get spec (along with its type environment)
                   let FileState{specifications} = fileState
+                  logText "  looking for specs\n"
                   case lookupSpecByLines specifications specLines of
                     Nothing   -> do
                       logText "  spec not found at range, should reload\n"
@@ -139,8 +144,10 @@ handler _params@RefineParams{filePath, specLines, implText} onFinish _ = do
                                 let FileState{editedVersion} = fileState
                                 updateIdCounter filePath idCount'
                                 logText "  counter updated (refine)\n"
-                                pushSpecs (editedVersion + 1) filePath innerSpecs
-                                pushPos (editedVersion + 1) filePath innerPos
+                                let innerSpecs' = predictAndTranslateSpecRanges innerSpecs
+                                let innerPos' = predictAndTranslatePosRanges innerPos
+                                pushSpecs editedVersion filePath innerSpecs'
+                                pushPos editedVersion filePath innerPos'
                                 logText "  new specs and POs added (refine)\n"
                                 -- send notification to update Specs and POs
                                 logText "refine: success\n"
@@ -158,6 +165,29 @@ handler _params@RefineParams{filePath, specLines, implText} onFinish _ = do
       logText "\n"
       sendErrorNotification filePath [err]
       logText "refine: update notification sent\n"
+    minusOneLine :: Pos -> Pos
+    minusOneLine (Pos filePath line column byte) = Pos filePath (line - 1) column undefined
+    predictAndTranslateSpecRanges :: [Spec] -> [Spec]
+    predictAndTranslateSpecRanges = map (\spec@Specification{specRange} -> spec{specRange = minusOneLine' specRange})
+      where
+        minusOneLine' :: Range -> Range
+        minusOneLine' (Range start end) = Range (minusOneLine start) (minusOneLine end)
+    predictAndTranslatePosRanges :: [PO] -> [PO]
+    predictAndTranslatePosRanges = map (\po@PO{poOrigin} -> po{poOrigin = modifyOriginLocation minusOneLine' poOrigin})
+      where
+        minusOneLine' :: Loc -> Loc
+        minusOneLine' NoLoc = NoLoc
+        minusOneLine' (Loc start end) = Loc (minusOneLine start) (minusOneLine end)
+        modifyOriginLocation :: (Loc -> Loc) -> Origin -> Origin
+        modifyOriginLocation f (AtAbort       l) = AtAbort (f l)
+        modifyOriginLocation f (AtSkip        l) = AtSkip (f l)
+        modifyOriginLocation f (AtSpec        l) = AtSpec (f l)
+        modifyOriginLocation f (AtAssignment  l) = AtAssignment (f l)
+        modifyOriginLocation f (AtAssertion   l) = AtAssertion (f l)
+        modifyOriginLocation f (AtIf          l) = AtIf (f l)
+        modifyOriginLocation f (AtLoop        l) = AtLoop (f l)
+        modifyOriginLocation f (AtTermination l) = AtTermination (f l)
+        modifyOriginLocation f (Explain h e i p l) = Explain h e i p (f l)
 
 -- 把每一行都拿掉
 removeOneIndentation :: Text -> Text
@@ -179,14 +209,19 @@ collectFragmentHoles concreteFragment = do
     C.SpecQM range -> return range
     _ -> []
 
-digImplHoles :: FilePath -> Text -> Either ParseError Text
-digImplHoles filePath implText =
-  case parseFragment (Pos filePath 1 1 0) implText of
+digImplHoles :: Pos -> FilePath -> Text -> Either ParseError Text
+digImplHoles parseStart filePath implText =
+  -- use `parseStart` for absolute positions in error messages
+  case parseFragment parseStart implText of
     Left err -> Left err
-    Right concreteImpl ->
-      case collectFragmentHoles concreteImpl of
-        [] -> return implText
-        Range start _ : _ -> digImplHoles filePath $ digFragementHole start implText
+    Right _ ->
+      -- use `Pos filePath 1 1 0` for relative position of the hole reported
+      case parseFragment (Pos filePath 1 1 0) implText of
+        Left _ -> error "should not happen"
+        Right concreteImpl ->
+          case collectFragmentHoles concreteImpl of
+            [] -> return implText
+            Range start _ : _ -> digImplHoles parseStart filePath $ digFragementHole start implText
   where
     digFragementHole :: Pos -> Text -> Text
     digFragementHole (Pos _path lineNumber col _charOff) fullText =
@@ -201,7 +236,7 @@ digImplHoles filePath implText =
         indentation n = Text.replicate n " "
         lineEdited :: Text
         lineEdited = beforeHole <> "[!\n" <>
-                    indentation (col+3) <> "\n" <>
+                    indentation (col-1) <> "\n" <>
                     indentation (col-1) <> "!]" <> afterHole
         linesEdited :: [Text]
         linesEdited = take (lineNumber - 1) allLines ++ [lineEdited] ++ drop lineNumber allLines

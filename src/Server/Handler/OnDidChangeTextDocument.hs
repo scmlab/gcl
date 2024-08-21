@@ -3,7 +3,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Server.Handler.OnDidChangeTextDocument where
 
-import Server.Monad (ServerM, FileState (..), modifyFileState, Versioned, logText)
+import Server.Monad (ServerM, FileState (..), modifyFileState, Versioned, logText, logFileState)
 import Server.Notification.Update (sendUpdateNotification)
 import GCL.Predicate (Spec(..), PO (..), Origin (..))
 import Server.PositionMapping (mkDelta, applyChange, toCurrentRange', PositionDelta)
@@ -22,6 +22,7 @@ handler filePath changes = do
       , proofObligations = translateThroughOneVersion translatePoRange editedVersion proofObligations
       }
     )
+  logFileState filePath (map (\(version, Specification{specRange}) -> (version, specRange)) . specifications)
 
   -- send notification to update Specs and POs
   logText "didChange: fileState modified\n"

@@ -95,16 +95,38 @@ logText s = do
 
 loadFileState :: FilePath -> ServerM (Maybe FileState)
 loadFileState filePath = do
+  logText "ask file state ref\n"
   fileStateRef <- lift $ asks filesState
+  logText "ask file state map\n"
   fileStateMap <- liftIO $ readIORef fileStateRef
+  logText "lookup file state map\n"
   case Map.lookup filePath fileStateMap of
-    Nothing               -> return Nothing
-    Just loadedFileState -> return $ Just loadedFileState
+    Nothing               -> do
+      logText "  not found\n"
+      return Nothing
+    Just loadedFileState -> do
+      logText "  found\n"
+      return $ Just loadedFileState
 
 saveFileState :: FilePath -> FileState -> ServerM ()
 saveFileState filePath fileState = do
   fileStateRef <- lift $ asks filesState
   liftIO $ modifyIORef' fileStateRef (Map.insert filePath fileState)
+
+logFileState :: Show a => FilePath -> (FileState -> a) -> ServerM ()
+logFileState filePath f = do
+  logText "====== "
+  logText . Text.pack $ filePath
+  logText "\n"
+  maybeFileState <- loadFileState filePath
+  logText "loaded?\n"
+  case maybeFileState of
+    Nothing -> logText "not loaded yet\n"
+    Just fileState -> do
+      logText "loaded\n"
+      logText . Text.pack . show $ specifications fileState
+      logText "\n"
+  logText " ======\n"
 
 modifyFileState :: FilePath -> (FileState -> FileState) -> ServerM ()
 modifyFileState filePath modifier = do
