@@ -63,7 +63,7 @@ data TypeError
     | RedundantExprs [Expr]
     | MissingArguments [Name]
     | TooFewPatterns [Type]
-    | TooManyPatterns [Name]
+    | TooManyPatterns [Pattern]
     deriving (Show, Eq, Generic)
 
 instance Located TypeError where
@@ -861,9 +861,8 @@ instance Elab Expr where
     return (subst uniSubArr arrTy, subst sub (T.ArrUpd typedArr typedIndex typedE loc), sub)
   -- TODO: Add the typing derivation for `Case`.
   -- This implementation follows another GitHub repo, https://github.com/anton-k/hindley-milner-type-check
-  -- However, our implementatation and theirs are subtly different.
+  -- However, \our implementatation and theirs are still subtly different.
   -- Therefore, it might be the case that we're wrong (actually we are) but theirs is right.
-  -- The suspected reason is written below before `inferClause`.
   elaborate (Case expr clauses loc) env = do
     (exprTy, typedExpr, exprSub) <- elaborate expr env
     (ty, typed, sub) <- inferClauses clauses (fromJust exprTy) exprSub
@@ -876,7 +875,7 @@ instance Elab Expr where
         where
           go :: (Subs Type, Type, Maybe Type, [Typed CaseClause]) -> CaseClause -> ElaboratorM (Subs Type, Type, Maybe Type, [Typed CaseClause])
           go (sub, tyTop, mTyPrevRhs, res) clause = do
-            (tyClause, tyExpected, typedClause, subClause) <- inferClause clause
+            (tyClause, tyExpected, typedClause, subClause) <- inferClause clause tyTop
             let sub' = subClause `compose` sub
             sub'' <- unifyType (subst sub' tyTop) (subst sub' tyExpected) (locOf tyClause)
             case mTyPrevRhs of
@@ -885,27 +884,38 @@ instance Elab Expr where
                 sub''' <- unifyType (subst (sub'' `compose` sub') tyClause) (subst (sub'' `compose` sub') tyPrevRhs) (locOf tyClause)
                 return (sub''' `compose` sub'' `compose` sub', subst (sub''' `compose` sub'' `compose` sub') tyTop, Just $ subst (sub''' `compose` sub'' `compose` sub') tyClause, subst (sub''' `compose` sub'' `compose` sub') typedClause : res)
       
-      -- After we found the constructor name, we instantiate the type variables.
-      -- However, instatiating clauses one by one is likely too late.
-      -- The likely result is that these instantiations do not propogate to the pattern-matched expression.
-      -- Therefore, we should instantiate the types earlier.
-      inferClause :: CaseClause -> ElaboratorM (Type, Type, Typed CaseClause, Subs Type)
-      inferClause (CaseClause (PattConstructor patName subnames) expr) = do
-        (_, _, _, infos) <- get
-        case filter (\(name, _, _) -> name == patName) infos of
-          [] -> throwError $ NotInScope patName
-          (_, input, outputs) : _ -> do
-            instantiated <- mapM instantiate (input : outputs) -- TODO: We might have to instantiate the types earlier.
-            let (input' : outputs') = instantiated
-            if
-              | length subnames < length outputs' -> throwError $ TooFewPatterns (drop (length subnames) outputs')
-              | length subnames > length outputs' -> throwError $ TooManyPatterns (drop (length outputs') subnames)
-              | otherwise      -> do
-                let env' = zip (Index <$> subnames) (ConstTypeInfo <$> outputs') <> env -- TODO: Check for redundent names.
-                (exprTy, typedExpr, subExpr) <- elaborate expr env'
-                let typedClause = T.CaseClause (PattConstructor patName subnames) typedExpr
-                return (fromJust exprTy, input', typedClause, subExpr)
-      inferClause _ = undefined -- FIXME: Add other patterns.
+      inferClause :: CaseClause -> Type -> ElaboratorM (Type, Type, Typed CaseClause, Subs Type)
+      inferClause (CaseClause patts expr) ty = do
+        (env', sub) <- patBind patts ty
+        let env'' = env' <> subst sub env
+        (exprTy, typedExpr, subExpr) <- elaborate expr env''
+        let typedClause = T.CaseClause patts typedExpr
+        return (fromJust exprTy, subst sub ty, typedClause, subExpr <> sub)
+          where
+            -- TODO: Check for redundent names.
+            patBind :: Pattern -> Type -> ElaboratorM ([(Index, TypeInfo)], Subs Type)
+            patBind pat ty = do
+              (_, _, _, patInfos) <- get
+              case pat of
+                PattLit lit -> do
+                  sub <- unifyType ty (TBase (baseTypeOfLit lit) (locOf lit)) (locOf ty)
+                  return (mempty, sub)
+                PattBinder na -> return ([(Index na, ConstTypeInfo ty)], mempty)
+                PattWildcard _ -> return mempty
+                PattConstructor patName subpats -> do
+                  case find (\(name, _, _) -> name == patName) patInfos of
+                    Nothing -> throwError $ NotInScope patName
+                    Just (_, input, outputs) -> do
+                      instantiated <- mapM instantiate (input : outputs) -- TODO: Important! We probably have to instantiate the types earlier.
+                      let (input' : outputs') = instantiated
+                      sub <- unifyType ty input' (locOf input')
+                      if
+                        | length subpats < length outputs' -> throwError $ TooFewPatterns (drop (length subpats) outputs')
+                        | length subpats > length outputs' -> throwError $ TooManyPatterns (drop (length outputs) subpats)
+                        | otherwise      -> do
+                          list <- zipWithM patBind subpats (subst sub outputs') -- TODO: Check for redundent names.
+                          let (envs, subs) = unzip list
+                          return (mconcat envs, mconcat (sub : subs))
 
 instance Elab Chain where -- TODO: Make sure the below implementation is correct.
   elaborate (More (More ch' op1 e1 loc1) op2 e2 loc2) env = do

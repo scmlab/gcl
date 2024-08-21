@@ -28,6 +28,7 @@ import           Syntax.Concrete.Instances.Located
                                                 ( )
 import           Syntax.Concrete.Types
 import qualified Syntax.ConstExpr              as ConstExpr
+import GHC.Float (logDouble)
 
 --------------------------------------------------------------------------------
 
@@ -248,7 +249,9 @@ instance ToAbstract Pattern A.Pattern where
   toAbstract (PattParen _ x _) = toAbstract x
   toAbstract (PattBinder   x ) = return $ A.PattBinder x
   toAbstract (PattWildcard x ) = return $ A.PattWildcard (rangeOf x)
-  toAbstract (PattConstructor ctor names) = return $A.PattConstructor ctor names
+  toAbstract (PattConstructor ctor pats) = do
+    pats' <- mapM toAbstract pats
+    return $ A.PattConstructor ctor pats'
 
 -- | Literals (Integer / Boolean / Character)
 instance ToAbstract Lit A.Lit where

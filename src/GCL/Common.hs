@@ -176,7 +176,7 @@ instance Free Pattern where
   freeVars (PattLit      _      ) = mempty
   freeVars (PattBinder   n      ) = Set.singleton n
   freeVars (PattWildcard _      ) = mempty
-  freeVars (PattConstructor _ ps) = Set.fromList ps
+  freeVars (PattConstructor _ ps) = foldMap freeVars ps
 
 instance Free Declaration where
   freeVars (ConstDecl ns t expr _) =

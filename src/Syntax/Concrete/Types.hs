@@ -188,7 +188,7 @@ data Pattern
   | PattParen (Token "(") Pattern (Token ")") -- pattern wrapped inside a pair of parenthesis
   | PattBinder Name -- binder
   | PattWildcard (Token "_") -- matches anything
-  | PattConstructor Name [Name] -- destructs a constructor
+  | PattConstructor Name [Pattern] -- destructs a constructor
   deriving (Eq, Show)
 
 --------------------------------------------------------------------------------
