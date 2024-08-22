@@ -6,6 +6,10 @@ var q, b, r : Int
 b := B
 { PowOf2 b, bnd: A - b }
 do b ≤ A -> b := b * 2 od
+
+[!
+
+!]
 { PowOf2 b  ∧  b > A }
 
 q, r := 0, A

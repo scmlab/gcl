@@ -117,16 +117,16 @@ logFileState :: Show a => FilePath -> (FileState -> a) -> ServerM ()
 logFileState filePath f = do
   logText "====== "
   logText . Text.pack $ filePath
+  logText " ======\n"
   logText "\n"
   maybeFileState <- loadFileState filePath
-  logText "loaded?\n"
   case maybeFileState of
     Nothing -> logText "not loaded yet\n"
     Just fileState -> do
       logText "loaded\n"
-      logText . Text.pack . show $ specifications fileState
+      logText . Text.pack . show $ f fileState
       logText "\n"
-  logText " ======\n"
+  logText "=======================\n"
 
 modifyFileState :: FilePath -> (FileState -> FileState) -> ServerM ()
 modifyFileState filePath modifier = do

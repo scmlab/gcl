@@ -5,7 +5,13 @@ var mod : Int -> Int -> Int
 {:  P = x * y + p = N
     Q = x > 0 ∧ y > 0 ∧ 1 > 0
 :}
+p := p + 1
+[!
 
+!]
+[!
+
+!]
 p,x,y := N-1, 1, 1
 
 { P ∧ Q, bnd: p }
