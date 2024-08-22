@@ -23,7 +23,7 @@ import GCL.WP.Types (StructError (..))
 sendErrorNotification :: FilePath -> [Error] -> ServerM ()
 sendErrorNotification filePath errors = do
   let json :: JSON.Value = makeErrorNotificationJson filePath errors
-  Server.sendCustomNotification "guabao/error" json
+  Server.sendCustomNotification "gcl/error" json
 
 makeErrorNotificationJson :: FilePath -> [Error] -> JSON.Value
 makeErrorNotificationJson filePath errors = JSON.object

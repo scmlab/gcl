@@ -7,7 +7,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
 
-module Server.Handler.Guabao.Refine where
+module Server.Handler.GCL.Refine where
 
 import qualified Data.Aeson as JSON
 import GHC.Generics ( Generic )

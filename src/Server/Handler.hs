@@ -28,9 +28,9 @@ import qualified Server.Handler.GoToDefinition as GoToDefinition
 import qualified Server.Handler.AutoCompletion as AutoCompletion
 import qualified Server.Handler.Hover          as Hover
 import qualified Server.Handler.SemanticTokens as SemanticTokens
-import qualified Server.Handler.Guabao.Reload  as Reload
-import qualified Server.Handler.Guabao.Refine  as Refine
-import Server.Monad (ServerM, sendDebugMessage, logText)
+import qualified Server.Handler.GCL.Reload     as Reload
+import qualified Server.Handler.GCL.Refine     as Refine
+import Server.Monad (ServerM, logText)
 import Server.Load (load)
 import qualified Server.Handler.OnDidChangeTextDocument as OnDidChangeTextDocument
 import qualified Data.Text as Text
@@ -80,10 +80,10 @@ handlers = mconcat
     requestHandler LSP.STextDocumentSemanticTokensFull $ \req responder -> do
       let uri = req ^. (LSP.params . LSP.textDocument . LSP.uri)
       SemanticTokens.handler uri responder
-  , -- "guabao/reload" - reload
-    requestHandler (LSP.SCustomMethod "guabao/reload") $ jsonMiddleware Reload.handler
-  , -- "guabao/refine" - refine
-    requestHandler (LSP.SCustomMethod "guabao/refine") $ jsonMiddleware Refine.handler
+  , -- "gcl/reload" - reload
+    requestHandler (LSP.SCustomMethod "gcl/reload") $ jsonMiddleware Reload.handler
+  , -- "gcl/refine" - refine
+    requestHandler (LSP.SCustomMethod "gcl/refine") $ jsonMiddleware Refine.handler
   ]
 
 type CustomMethodHandler params result error = params -> (result -> ServerM ()) -> (error -> ServerM ()) -> ServerM ()

@@ -13,30 +13,28 @@ import Server (runOnPort, runOnStdio)
 
 main :: IO ()
 main = do
-  (Options mode port, _) <- getArgs >>= parseOpts
+  (Options mode logFilePath, _) <- getArgs >>= parseOpts
   case mode of
     ModeHelp -> putStrLn $ usageInfo usage options
-    ModeLSP -> do
-      _ <- runOnStdio "/Users/vince/Documents/gcl-vscode/server_log.txt"
-      return ()
-    ModeDev -> do
-      _ <- runOnPort port
+    ModeRun -> do
+      _ <- runOnStdio logFilePath
       return ()
 
 --------------------------------------------------------------------------------
 
 -- | Command-line arguments
-data Mode = ModeLSP | ModeHelp | ModeDev deriving Show
+data Mode = ModeHelp | ModeRun deriving Show
 
 data Options = Options
   { _mode :: Mode
-  , _port :: String
+  , _out  :: Maybe FilePath
   }
+  deriving Show
 
 defaultOptions :: Options
 defaultOptions = Options
-  { _mode = ModeLSP
-  , _port = "3000"
+  { _mode = ModeRun
+  , _out  = Nothing
   }
 
 options :: [OptDescr (Options -> Options)]
@@ -47,22 +45,15 @@ options =
       (NoArg (\opts -> opts {_mode = ModeHelp}))
       "print this help message",
     Option
-      ['d']
-      ["dev"]
-      (NoArg (\opts -> opts {_mode = ModeDev}))
-      "for testing",
-    Option
       []
       ["stdio"]
-      (NoArg (\opts -> opts {_mode = ModeLSP}))
-      "for testing",
+      (NoArg (\opts -> opts {_mode = ModeRun}))
+      "for debugging",
     Option
-      ['s']
-      ["socket"]
-      (OptArg (\case
-        Nothing -> id
-        Just portNumber -> \opts -> opts {_port = portNumber}) "PORT_NUMBER")
-      "socket port number"
+      ['o']
+      ["out"]
+      (ReqArg (\logFilePath opts -> opts {_out = Just logFilePath}) "LOG_FILE_PATH")
+      "log file path when -d is set"
   ]
 
 usage :: String

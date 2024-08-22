@@ -37,15 +37,20 @@ runOnPort port = do
     Text.putStrLn result
 
 -- entry point of the LSP server
-runOnStdio :: FilePath -> IO Int
-runOnStdio logFile = do
+runOnStdio :: Maybe FilePath -> IO Int
+runOnStdio maybeLogFile = do
   env <- initGlobalEnv
-  writeFile logFile "=== Log file Start ===\n"
-  _threadId <- forkIO (writeLog env)
+  case maybeLogFile of
+    Nothing -> return ()
+    Just logFile -> do
+      writeFile logFile "=== Log file Start ===\n"
+      writeFile logFile logFile
+      _threadId <- forkIO (writeLog env logFile)
+      return ()
   runServer (serverDefn env)
  where
-  writeLog :: GlobalState -> IO ()
-  writeLog env = forever $ do
+  writeLog :: GlobalState -> FilePath -> IO ()
+  writeLog env logFile = forever $ do
     result <- readChan (logChannel env)
     appendFile logFile (Text.unpack result)
 

@@ -25,7 +25,7 @@ sendUpdateNotification filePath = do
     Nothing -> return ()
     Just fileState -> do
       let json :: JSON.Value = makeUpdateNotificationJson filePath fileState
-      Server.sendCustomNotification "guabao/update" json
+      Server.sendCustomNotification "gcl/update" json
 
 
 makeUpdateNotificationJson :: FilePath -> FileState -> JSON.Value

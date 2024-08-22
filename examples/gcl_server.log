@@ -1,0 +1,27 @@
+./gcl_server.logSInitialized is called.
+STextDocumentDidOpen start
+load: start
+ask file state ref
+ask file state map
+lookup file state map
+  not found
+  source read 
+  source parsed 
+  all holes digged
+  abstract program generated
+  program elaborated
+  fileState created
+  fileState updated
+load: success
+ask file state ref
+ask file state map
+lookup file state map
+  found
+load: update notification sent
+load: end
+STextDocumentDidOpen end
+semantic token: start
+ask file state ref
+ask file state map
+lookup file state map
+  found

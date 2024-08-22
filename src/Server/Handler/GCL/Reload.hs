@@ -6,7 +6,7 @@
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE DeriveGeneric #-}
 
-module Server.Handler.Guabao.Reload where
+module Server.Handler.GCL.Reload where
 
 import qualified Data.Aeson.Types as JSON
 import GHC.Generics ( Generic )
