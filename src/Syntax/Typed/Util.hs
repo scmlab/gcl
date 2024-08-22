@@ -10,7 +10,7 @@ import           Data.Text                      ( Text )
 import           Data.Loc                       ( (<-->), Loc(..) )
 import           Syntax.Typed
 import           Syntax.Common                  ( Name(..), nameToText )
-
+import           Syntax.Abstract.Types          ( Type(..), TBase (TBool) )
 
 getGuards :: [GdCmd] -> [Expr]
 getGuards = fst . unzipGdCmds
@@ -39,20 +39,21 @@ typeOf (Const _ t _) = t
 typeOf (Op _ t) = t
 typeOf (Chain ch) = typeOfChain ch
 typeOf (App e0 _ _) = case typeOf e0 of
-  TFunc _ t _ -> t
+  Syntax.Abstract.Types.TFunc _ t _ -> t
   _ -> error "left term not having function type in a typed expression"
-typeOf (Lam _ t0 e _) = TFunc t0 (typeOf e) NoLoc
+typeOf (Lam _ t0 e _) = Syntax.Abstract.Types.TFunc t0 (typeOf e) NoLoc
 typeOf (Quant _ _ _ body _) = typeOf body
 typeOf (ArrIdx arr _ _) = case typeOf arr of
-  TArray _ t _ -> t
-  TFunc  _ t _ -> t
+  Syntax.Abstract.Types.TArray _ t _ -> t
+  Syntax.Abstract.Types.TFunc  _ t _ -> t
   _ -> error "indexed term not an array in a typed expression "
 typeOf (ArrUpd arr _ _ _) = typeOf arr
+typeOf (Case expr _ _) = typeOf expr -- FIXME: This is wrong and acts as a placeholder. Figure out what this should be.
 typeOf (Subst e _) = typeOf e
 
 typeOfChain :: Chain -> Type
 typeOfChain (Pure e) = typeOf e  -- SCM: shouldn't happen?
-typeOfChain (More _ _ _ _) = TBase TBool NoLoc
+typeOfChain (More _ _ _ _) = Syntax.Abstract.Types.TBase TBool NoLoc
 
 
 programToScopeForSubstitution :: Program -> Map Text (Maybe Expr)

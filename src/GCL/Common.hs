@@ -1,11 +1,13 @@
 {-# LANGUAGE FlexibleInstances, UndecidableInstances,
              MultiParamTypeClasses, FlexibleContexts #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE DeriveGeneric #-}
 module GCL.Common where
 
-import           Control.Monad.RWS              ( RWST(..) )
+import           Control.Monad.Except
+import           Control.Monad.RWS              ( RWST(..), MonadState (get, put) )
 import           Control.Monad.State            ( StateT(..) )
-import           Data.Loc                       ( Loc(..) )
+import           Data.Aeson                     ( ToJSON )
 import           Data.Map                       ( Map )
 import qualified Data.Map                      as Map
 import           Data.Set                       ( Set
@@ -15,10 +17,13 @@ import qualified Data.Set                      as Set
 import           Data.Text                      ( Text )
 import qualified Data.Text                     as Text
 import           Data.Loc.Range                 ( Range )
+import           Data.Loc                       ( Loc(..)
+                                                , Located
+                                                , locOf
+                                                )
 import           Syntax.Abstract
 import           Syntax.Common.Types
-import    GHC.Generics
-
+import           GHC.Generics
 
 data Index = Index Name | Hole Range deriving (Eq, Show, Ord)
 
@@ -38,6 +43,14 @@ toTypeEnv infos =
   ) <$> infos
 
 type TypeEnv = [(Index, Type)]
+
+type KindEnv = [KindItem]
+
+data KindItem
+  = KindAnno Name Kind
+  | UnsolvedUni Name
+  | SolvedUni Name Kind
+  deriving (Show)
 
 -- get a fresh variable
 class Monad m => Fresh m where
@@ -60,10 +73,10 @@ class Counterous m where
 
 instance {-# OVERLAPPABLE #-}
          (Monad m, Counterous m) => Fresh m where
-  fresh = (Text.pack . ("?m_" ++) . show) <$> countUp
+  fresh = Text.pack . ("?m_" ++) . show <$> countUp
   freshPre prefix =
-      (Text.pack . ("?" ++) . (Text.unpack prefix ++) .
-           ("_" ++) . show) <$> countUp
+      Text.pack . ("?" ++) . (Text.unpack prefix ++) .
+           ("_" ++) . show <$> countUp
 
 type FreshState = Int
 
@@ -80,14 +93,15 @@ emptyEnv :: Env a
 emptyEnv = mempty
 
 freeMetaVars :: Type -> Set Name
-freeMetaVars (TBase _ _    ) = mempty
-freeMetaVars (TArray _ t _ ) = freeMetaVars t
-freeMetaVars (TTuple ts    ) = Set.unions (map freeMetaVars ts)
-freeMetaVars (TFunc t1 t2 _) = freeMetaVars t1 <> freeMetaVars t2
-freeMetaVars (TApp l r _   ) = freeMetaVars l <> freeMetaVars r
-freeMetaVars (TData _ _ _  ) = mempty
-freeMetaVars (TVar _ _     ) = mempty
-freeMetaVars (TMetaVar n   ) = Set.singleton n
+freeMetaVars (TBase _ _   ) = mempty
+freeMetaVars (TArray _ t _) = freeMetaVars t
+freeMetaVars (TTuple _    ) = mempty
+freeMetaVars (TFunc l r _ ) = freeMetaVars l <> freeMetaVars r
+freeMetaVars (TOp _       ) = mempty
+freeMetaVars (TData _ _   ) = mempty
+freeMetaVars (TApp l r _  ) = freeMetaVars l <> freeMetaVars r
+freeMetaVars (TVar _ _    ) = mempty
+freeMetaVars (TMetaVar n _) = Set.singleton n
 
 -- A class of types for which we may compute their free variables.
 class Free a where
@@ -116,14 +130,15 @@ instance Free a => Free (Maybe a) where
   freeVars = maybe mempty freeVars
 
 instance Free Type where
-  freeVars (TBase _ _    ) = mempty
-  freeVars (TArray _ t _ ) = freeVars t
-  freeVars (TTuple ts    ) = Set.unions (map freeVars ts)
-  freeVars (TFunc t1 t2 _) = freeVars t1 <> freeVars t2
-  freeVars (TApp l r _   ) = freeVars l <> freeVars r
-  freeVars (TData _ _ _  ) = mempty
-  freeVars (TVar x _     ) = Set.singleton x
-  freeVars (TMetaVar n   ) = Set.singleton n
+  freeVars (TBase _ _   ) = mempty
+  freeVars (TArray _ t _) = freeVars t
+  freeVars (TTuple _    ) = mempty
+  freeVars (TFunc l r _ ) = freeVars l <> freeVars r
+  freeVars (TData _ _   ) = mempty
+  freeVars (TOp _       ) = mempty
+  freeVars (TApp l r _  ) = freeVars l <> freeVars r
+  freeVars (TVar x _    ) = Set.singleton x
+  freeVars (TMetaVar n _) = Set.singleton n
 
 instance {-# OVERLAPS #-} Free TypeEnv where
   freeVars env = foldMap freeVars $ Map.elems $ Map.fromList env
@@ -181,7 +196,7 @@ instance Free Stmt where
   freeVars (Do gdcmds _) = Set.unions (map freeVars gdcmds)
   freeVars (If gdcmds _) = Set.unions (map freeVars gdcmds)
   freeVars (Spec  _ _) = mempty
-  freeVars (Proof _ _ _) = mempty
+  freeVars Proof {} = mempty
   freeVars (Alloc x es _) =
      Set.singleton x <> Set.unions (map freeVars es)
   freeVars (HLookup x e _) =

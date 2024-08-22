@@ -27,6 +27,7 @@ import           Syntax.Typed.Operator          ( eqq , gte , lt, neg
 import Syntax.Typed.Instances.Substitution     ()
 import Syntax.Common.Types                     ( Name(..), nameToText )
 import Syntax.Substitution
+import           Syntax.Abstract.Types          ( Type(..), Lit (Num) )
 
 type RecFns = (TwpSegs, TwpSStmts, Twp, TspSStmts)
 

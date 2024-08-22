@@ -6,7 +6,7 @@ import           Data.Foldable                  ( toList )
 import           Data.Loc                       ( locOf )
 import           Data.Loc.Range
 import           Error
-import           GCL.Type                       ( TypeError(..) )
+import           GCL.Type                     ( TypeError(..) )
 import           GCL.WP.Types                   ( StructError(..) )
 import           Render.Class
 import           Render.Element
@@ -49,6 +49,16 @@ instance RenderSection TypeError where
     [ Header "Cannot unify types" (fromLoc loc)
     , Paragraph $ "Cannot unify: " <> render s <> "\nwith        :" <+> render t
     ]
+  renderSection (KindUnifyFailed s t loc) = Section
+    Red
+    [ Header "Cannot unify kinds" (fromLoc loc)
+    , Paragraph $ "Cannot unify: " <> render s <> "\nwith        :" <+> render t
+    ]
+  renderSection (NotKFunc k loc) = Section
+    Red
+    [ Header "Not a kind-level function" (fromLoc loc)
+    , Paragraph $ render k <> " is not a kind-level function"
+    ]
   renderSection (RecursiveType name t loc) = Section
     Red
     [ Header "Recursive type variable" (fromLoc loc)
@@ -88,6 +98,16 @@ instance RenderSection TypeError where
     Red
     [ Header "Missing arguments" (fromLoc (locOf ns))
     , Paragraph $ "Missing arguments" <+> renderManySepByComma ns
+    ]
+  renderSection (TooFewPatterns tys) = Section
+    Red
+    [ Header "Extra arguments" (fromLoc (locOf tys))
+    , Paragraph $ "Extra argument(s) of type(s)" <+> renderManySepByComma tys
+    ]
+  renderSection (TooManyPatterns pats) = Section
+    Red
+    [ Header "Redundent patterns" (fromLoc (locOf pats))
+    , Paragraph $ "Redundent patterns" <+> renderManySepByComma pats
     ]
 
 instance RenderSection StructError where

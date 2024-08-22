@@ -9,13 +9,14 @@
           T -> F 
           F -> T
 
-    -- data Maybe = Just B | Nothing 
+    data Maybe t = Just t | Nothing 
 
-    -- isJust : Maybe -> B 
-    -- isJust x = case x of 
-    --     Nothing -> F 
-    --     Just a -> T 
+    isJust : Maybe B -> B 
+    isJust x = case x of  
+        Just n -> n  
+        Nothing -> F
 :}
 
+{ isJust = isJust }
 
 { True }

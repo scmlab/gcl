@@ -90,8 +90,8 @@ handler _params@RefineParams{filePath, specLines, implText, implStart} onFinish 
           -- text to concrete
           -- (use specStart as the starting position in parse/toAbstract/elaborate)
           logText "  parsing\n"
-          logText "    specStart =\n"
-          logText . Text.pack . show . pretty $ specStart
+          logText "    implStart =\n"
+          logText . Text.pack . show . pretty $ implStart
           logText "\n"
           case parseFragment implStart holelessImplText of
             Left err           -> onError (ParseError err)

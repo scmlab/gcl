@@ -7,7 +7,7 @@ import           Data.Foldable                  ( toList )
 import           Data.Loc
 import           Prettyprinter
 import           Error
-import           GCL.Type                       ( TypeError(..) )
+import           GCL.Type                     ( TypeError(..) )
 import           GCL.WP.Types                   ( StructError(..)
                                                 , StructWarning(..)
                                                 )
@@ -50,6 +50,10 @@ instance Pretty TypeError where
     "The definition" <+> pretty name <+> "is not in scope"
   pretty (UnifyFailed a b _) =
     "Cannot unify:" <+> pretty a <+> "with" <+> pretty b
+  pretty (KindUnifyFailed a b _) =
+    "Cannot unify:" <+> pretty a <+> "with" <+> pretty b
+  pretty (NotKFunc k _) =
+    "Not a kind-level function: " <+> pretty k <+> " is not a kind-level function"
   pretty (RecursiveType v a _) =
     "Recursive type variable: " <+> pretty v <+> "in" <+> pretty a
   pretty (AssignToConst n) =
@@ -58,8 +62,13 @@ instance Pretty TypeError where
     "Undefined Type: " <+> "Type" <+> pretty n <+> "is undefined"
   pretty (DuplicatedIdentifiers ns) =
     "The identifiers:" <+> pretty ns <+> "are duplicated"
-  pretty (RedundantNames ns) = "The names: " <+> pretty ns <+> "are redundant"
+  pretty (RedundantNames ns) =
+    "The names: " <+> pretty ns <+> "are redundant"
   pretty (RedundantExprs exprs) =
     "The exprs: " <+> pretty exprs <+> "are redundant"
   pretty (MissingArguments ns) =
     "The arguments: " <+> pretty ns <+> "are missing"
+  pretty (TooFewPatterns tys) =
+    "The subpatterns does not cover: " <+> pretty tys
+  pretty (TooManyPatterns pats) =
+    "The patterns: " <+> pretty pats <+> "are redundent"  

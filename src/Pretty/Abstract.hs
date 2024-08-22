@@ -132,3 +132,9 @@ instance Pretty Type where
 -- | Interval
 instance Pretty Interval where
   pretty = fromRender
+
+--------------------------------------------------------------------------------
+
+-- | Kind
+instance Pretty Kind where
+  pretty = fromRender

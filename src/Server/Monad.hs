@@ -64,7 +64,7 @@ data FileState = FileState
   , abstract         :: Abstract.Program
   , idCount          :: Int
   , definitionLinks  :: IntervalMap LSP.LocationLink
-  , hoverInfos       :: IntervalMap (LSP.Hover, Abstract.Type)
+  , hoverInfos       :: IntervalMap LSP.Hover
   , elaborated       :: Typed.Program
   , positionDelta    :: PositionDelta   -- loadedVersion ~> editedVersion
   , editedVersion    :: Int  -- the version number of the last change

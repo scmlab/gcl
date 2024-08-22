@@ -33,7 +33,7 @@ handler uri lspPosition responder = do
                 Nothing             -> do
                   logText "hover: not exist - no information for this position\n"
                   responder Nothing
-                Just (hover, _type) -> do
+                Just hover -> do
                   logText "hover: success\n"
                   responder $ Just $ toCurrentHover positionDelta hover
                   logText "hover: response sent\n"

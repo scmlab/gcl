@@ -11,11 +11,10 @@ import Data.Loc.Range
 import Data.Text (Text)
 import GHC.Base (Symbol)
 import GHC.Generics (Generic)
-import Syntax.Common (Name, ArithOp, ChainOp)
+import Syntax.Common (Name, ArithOp, ChainOp, TypeOp)
 import Prelude hiding (Ordering (..))
 import Data.Loc (Located (locOf), Pos, Loc (Loc), L)
 import Syntax.Parser.Lexer (Tok)
-import Render.Class (Render (..))
 
 --------------------------------------------------------------------------------
 
@@ -68,7 +67,7 @@ data Definition
   | FuncDefn Name [Name] (Token "=") Expr
   deriving (Eq, Show)
 
-data TypeDefnCtor = TypeDefnCtor Name [Name] deriving (Eq, Show)
+data TypeDefnCtor = TypeDefnCtor Name [Type] deriving (Eq, Show)
 
 --------------------------------------------------------------------------------
 -- | Declaration
@@ -140,10 +139,10 @@ data Type
   = TParen (Token "(") Type (Token ")")
   | TBase TBase
   | TArray (Token "array") Interval (Token "of") Type
-  | TFunc Type TokArrows Type
-  | TApp Type Type
+  | TOp TypeOp
   | TData Name Range
-  | TVar Name
+  | TApp Type Type
+  | TMetaVar Name Range
   deriving (Eq, Show)
 
 --------------------------------------------------------------------------------

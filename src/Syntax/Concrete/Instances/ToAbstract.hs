@@ -28,6 +28,7 @@ import           Syntax.Concrete.Instances.Located
                                                 ( )
 import           Syntax.Concrete.Types
 import qualified Syntax.ConstExpr              as ConstExpr
+import GHC.Float (logDouble)
 
 --------------------------------------------------------------------------------
 
@@ -89,7 +90,9 @@ instance ToAbstract Definition [A.Definition] where
     return [A.FuncDefn name $ wrapLam args body']
 
 instance ToAbstract TypeDefnCtor A.TypeDefnCtor where
-  toAbstract (TypeDefnCtor c ts) = return $ A.TypeDefnCtor c ts
+  toAbstract (TypeDefnCtor c tys) = do
+    tys' <- mapM toAbstract tys
+    return $ A.TypeDefnCtor c tys'
 
 --------------------------------------------------------------------------------
 -- | Declaraion
@@ -187,11 +190,10 @@ instance ToAbstract Type A.Type where
     (TBase a) -> A.TBase <$> toAbstract a <*> pure (locOf t)
     (TArray _ a _ b) ->
       A.TArray <$> toAbstract a <*> toAbstract b <*> pure (locOf t)
-    (TFunc a _ b) ->
-      A.TFunc <$> toAbstract a <*> toAbstract b <*> pure (locOf t)
+    (TOp op) -> pure $ A.TOp op
+    (TData n _) -> pure $ A.TData n (locOf t)
     (TApp l r) -> A.TApp <$> toAbstract l <*> toAbstract r <*> pure (l <--> r)
-    (TVar a      ) -> pure $ A.TVar a (locOf t)
-    (TData n _   ) -> pure $ A.TData n () (locOf t)
+    (TMetaVar a _) -> pure $ A.TMetaVar a (locOf t)
     (TParen _ a _) -> do
       t' <- toAbstract a
       case t' of
@@ -199,10 +201,11 @@ instance ToAbstract Type A.Type where
         A.TArray a' b' _ -> pure $ A.TArray a' b' (locOf t)
         A.TTuple as'     -> pure $ A.TTuple as'
         A.TFunc a' b' _  -> pure $ A.TFunc a' b' (locOf t)
+        A.TOp op         -> pure $ A.TOp op
+        A.TData name _   -> pure $ A.TData name (locOf t)
         A.TApp  a' b' _  -> pure $ A.TApp a' b' (locOf t)
-        A.TData name i _ -> pure $ A.TData name i (locOf t)
         A.TVar a' _      -> pure $ A.TVar a' (locOf t)
-        A.TMetaVar a'    -> pure $ A.TMetaVar a'
+        A.TMetaVar a' _  -> pure $ A.TMetaVar a' (locOf t)
 
 --------------------------------------------------------------------------------
 
@@ -246,8 +249,9 @@ instance ToAbstract Pattern A.Pattern where
   toAbstract (PattParen _ x _) = toAbstract x
   toAbstract (PattBinder   x ) = return $ A.PattBinder x
   toAbstract (PattWildcard x ) = return $ A.PattWildcard (rangeOf x)
-  toAbstract (PattConstructor ctor patterns) =
-    A.PattConstructor ctor <$> toAbstract patterns
+  toAbstract (PattConstructor ctor pats) = do
+    pats' <- mapM toAbstract pats
+    return $ A.PattConstructor ctor pats'
 
 -- | Literals (Integer / Boolean / Character)
 instance ToAbstract Lit A.Lit where

@@ -481,20 +481,19 @@ instance PrettyWithLoc Pattern where
 instance Pretty Type where
   pretty = toDoc . prettyWithLoc
 
-instance PrettyWithLoc Type where
+instance PrettyWithLoc Type where -- TODO: Prettyprint infix type operators correctly.
   prettyWithLoc (TParen l t r) =
     prettyWithLoc l <> prettyWithLoc t <> prettyWithLoc r
   -- DocWithLoc "(" l l <> prettyWithLoc t <> DocWithLoc ")" m m
   prettyWithLoc (TBase (TInt  l)) = fromDoc (locOf l) (pretty ("Int"::String))
   prettyWithLoc (TBase (TBool l)) = fromDoc (locOf l) (pretty ("Bool"::String))
   prettyWithLoc (TBase (TChar l)) = fromDoc (locOf l) (pretty ("Char"::String))
-  prettyWithLoc (TFunc a l b) =
-    prettyWithLoc a <> prettyWithLoc l <> prettyWithLoc b
   prettyWithLoc (TArray l a r b) =
     prettyWithLoc l <> prettyWithLoc a <> prettyWithLoc r <> prettyWithLoc b
+  prettyWithLoc (TOp op   ) = prettyWithLoc op
+  prettyWithLoc (TData d _) = prettyWithLoc d
   prettyWithLoc (TApp a b ) = prettyWithLoc a <> prettyWithLoc b
-  prettyWithLoc (TData n l) = fromDoc (locOf l) (pretty n)
-  prettyWithLoc (TVar i   ) = prettyWithLoc i
+  prettyWithLoc (TMetaVar i _) = prettyWithLoc i
 
 --------------------------------------------------------------------------------
 

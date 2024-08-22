@@ -252,12 +252,13 @@ instance Collect LocationLinkToBe LocationLink Type where
   collect = \case
     TBase _ _    -> return ()
     TArray i x _ -> collect i >> collect x
-    TTuple as    -> mapM_ collect as
-    TFunc x y _  -> collect x >> collect y
+    TTuple _     -> return ()
+    TFunc l r _  -> collect l >> collect r
+    TOp _        -> return ()
+    TData n _    -> collect n
     TApp  x y _  -> collect x >> collect y
-    TData n _ _  -> collect n
     TVar _ _     -> return ()
-    TMetaVar _   -> return ()
+    TMetaVar _ _ -> return ()
 
 instance Collect LocationLinkToBe LocationLink Interval where
   collect (Interval x y _) = collect x >> collect y

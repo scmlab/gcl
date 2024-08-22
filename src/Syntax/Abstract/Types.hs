@@ -13,6 +13,7 @@ import           Prelude                 hiding ( Ordering(..) )
 import           Syntax.Common                  ( Name
                                                 , ArithOp
                                                 , ChainOp
+                                                , TypeOp
                                                 )
 --------------------------------------------------------------------------------
 
@@ -41,7 +42,7 @@ data Definition =
     deriving (Eq, Show)
 
 -- constructor of type definition
-data TypeDefnCtor = TypeDefnCtor Name [Name]
+data TypeDefnCtor = TypeDefnCtor Name [Type]
   deriving (Eq, Show)
 
 --------------------------------------------------------------------------------
@@ -79,6 +80,21 @@ data GdCmd = GdCmd Expr [Stmt] Loc
 -- data ProofAnchor = ProofAnchor Text Range
 --   deriving (Eq, Ord, Show)
 
+--------------------------------------------------------------------------------
+
+-- | Kinds
+
+data Kind
+  = KStar Loc
+  | KFunc Kind Kind Loc
+  | KMetaVar Name
+  deriving (Show, Generic)
+
+instance Eq Kind where
+  KStar _ == KStar _ = True
+  KFunc l1 r1 _ == KFunc l2 r2 _ = l1 == l2 && r1 == r2
+  KMetaVar name1 == KMetaVar name2 = name1 == name2
+  _ == _ = False
 
 --------------------------------------------------------------------------------
 
@@ -96,15 +112,27 @@ data TBase = TInt | TBool | TChar
 -- | Types
 data Type
   = TBase TBase Loc
-  | TArray Interval Type Loc
+  | TArray Interval Type Loc -- TODO: Make this a higher-kinded type.
   -- TTuple has no srcloc info because it has no conrete syntax at the moment
-  | TTuple [Type]
+  | TTuple Int -- `Int` represents the arity of the tuple.
   | TFunc Type Type Loc
+  | TOp TypeOp
+  | TData Name Loc
   | TApp Type Type Loc
-  | TData Name () {- TODO: kind system -} Loc
   | TVar Name Loc
-  | TMetaVar Name
-  deriving (Eq, Show, Generic)
+  | TMetaVar Name Loc
+  deriving (Show, Generic)
+
+instance Eq Type where
+  TBase base1 _ == TBase base2 _ = base1 == base2
+  TArray int1 ty1 _ == TArray int2 ty2 _ = int1 == int2 && ty1 == ty2
+  TTuple i1 == TTuple i2 = i1 == i2
+  TOp op1 == TOp op2 = op1 == op2
+  TData name1 _ == TData name2 _ = name1 == name2
+  TApp left1 right1 _ == TApp left2 right2 _ = left1 == right1 && left2 == right2
+  TVar name1 _ == TVar name2 _ = name1 == name2
+  TMetaVar name1 _ == TMetaVar name2 _ = name1 == name2
+  _ == _ = False
 
 --------------------------------------------------------------------------------
 
@@ -174,11 +202,15 @@ extractBinder (PattBinder   x      ) = [x]
 extractBinder (PattWildcard _      ) = []
 extractBinder (PattConstructor _ xs) = xs >>= extractBinder
 
-
 ----------------------------------------------------------------
 
 -- | Literals
-data Lit = Num Int | Bol Bool | Chr Char | Emp
+data Lit = Num Int | Bol Bool | Chr Char
   deriving (Show, Eq, Generic)
+
+baseTypeOfLit :: Lit -> TBase
+baseTypeOfLit (Num _) = TInt
+baseTypeOfLit (Bol _) = TBool
+baseTypeOfLit (Chr _) = TChar
 
 ----------------------------------------------------------------

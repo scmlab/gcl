@@ -22,9 +22,13 @@ instance Free Expr where
    (freeVars op <> freeVars range <> freeVars term) \\ Set.fromList xs
  freeVars (ArrIdx e1 e2 _      ) = freeVars e1 <> freeVars e2
  freeVars (ArrUpd e1 e2 e3 _   ) = freeVars e1 <> freeVars e2 <> freeVars e3
+ freeVars (Case e cs _         ) = freeVars e <> Set.unions (map freeVars cs)
  freeVars (Subst e sb) = (freeVars e \\ Set.fromList dom) <> freeVars rng
     where dom = map fst sb
           rng = map snd sb
+
+instance Free CaseClause where
+  freeVars (CaseClause _ expr) = freeVars expr
 
 instance Free Chain where
  freeVars (Pure expr)             = freeVars expr

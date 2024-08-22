@@ -29,6 +29,12 @@ instance Pretty ArithOp where
 instance PrettyWithLoc ArithOp where
   prettyWithLoc = fromRenderAndLocated
 
+instance Pretty TypeOp where
+  pretty = toDoc . prettyWithLoc
+
+instance PrettyWithLoc TypeOp where
+  prettyWithLoc = fromRenderAndLocated
+
 instance Pretty Op where
   pretty = toDoc . prettyWithLoc
 

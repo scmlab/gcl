@@ -267,7 +267,7 @@ definition = choice [try funcDefnSig, typeDefn, funcDefnF]
   typeDefn = TypeDefn <$> tokenData <*> upper <*> many lower <*> tokenEQ <*> sepByGuardBar typeDefnCtor
 
   typeDefnCtor :: Parser TypeDefnCtor
-  typeDefnCtor = TypeDefnCtor <$> upper <*> many lower
+  typeDefnCtor = TypeDefnCtor <$> upper <*> many type'
 
 definitionBlock :: Parser DefinitionBlock
 definitionBlock = DefinitionBlock <$> tokenDeclOpen <*> sepByAlignmentOrSemi definition <*> tokenDeclClose
@@ -647,55 +647,55 @@ pattern' = choice
 type' :: Parser Type
 type' = do
   makeExprParser term table <?> "type"
- where
-  table :: [[Operator Parser Type]]
-  table = [[InfixL (return TApp)], [InfixR function]]
+  where
+    table :: [[Operator Parser Type]]
+    table = [[InfixL (return TApp)], [InfixR $ typeOp Arrow TokArrow]]
 
-  function :: Parser (Type -> Type -> Type)
-  function = do
-    arrow <- tokenArrow
-    return $ \x y -> TFunc x arrow y
+    typeOp :: (Loc -> TypeOp) -> Tok -> Parser (Type -> Type -> Type)
+    typeOp operator' tok = do
+      (op, loc) <- getLoc (operator' <$ symbol tok)
+      return $ \x y -> TApp (TApp (TOp (op loc)) x) y
+      
+    term :: Parser Type
+    term = primTy <|> parensType <|> array <|> typeVar <?> "type term"
 
-  term :: Parser Type
-  term = prim <|> parensType <|> array <|> typeVar <?> "type term"
+    parensType :: Parser Type
+    parensType = TParen <$> tokenParenOpen <*> type' <*> tokenParenClose
 
-  prim :: Parser Type
-  prim = tInt <|> tBool <|> tChar
-  
-  tInt :: Parser Type
-  tInt = withRange $ (TBase . TInt) <$ symbol TokIntType
-  
-  tBool :: Parser Type
-  tBool = withRange $ (TBase . TBool) <$ symbol TokBoolType
+    typeVar :: Parser Type
+    typeVar = withRange $ choice [TData <$> upper, TMetaVar <$> lower]
 
-  tChar :: Parser Type
-  tChar = withRange $ (TBase . TChar) <$ symbol TokCharType
+    array :: Parser Type
+    array = TArray <$> tokenArray <*> interval <*> tokenOf <*> type'
 
-  parensType :: Parser Type
-  parensType = TParen <$> tokenParenOpen <*> type' <*> tokenParenClose
+    interval :: Parser Interval
+    interval = Interval <$> endpointOpening <*> tokenRange <*> endpointClosing
 
-  typeVar :: Parser Type
-  typeVar = withRange $ TData <$> upper
-
-  array :: Parser Type
-  array = TArray <$> tokenArray <*> interval <*> tokenOf <*> type'
-
-  interval :: Parser Interval
-  interval = Interval <$> endpointOpening <*> tokenRange <*> endpointClosing
-
-  endpointOpening :: Parser EndpointOpen
-  endpointOpening = choice
-    [ IncludingOpening <$> tokenBracketOpen <*> expression
-    , ExcludingOpening <$> tokenParenOpen <*> expression
-    ]
-
-  endpointClosing :: Parser EndpointClose
-  endpointClosing = do
-    expr <- expression
-    choice
-      [ IncludingClosing expr <$> tokenBracketClose
-      , ExcludingClosing expr <$> tokenParenClose
+    endpointOpening :: Parser EndpointOpen
+    endpointOpening = choice
+      [ IncludingOpening <$> tokenBracketOpen <*> expression
+      , ExcludingOpening <$> tokenParenOpen <*> expression
       ]
+
+    endpointClosing :: Parser EndpointClose
+    endpointClosing = do
+      expr <- expression
+      choice
+        [ IncludingClosing expr <$> tokenBracketClose
+        , ExcludingClosing expr <$> tokenParenClose
+        ]
+
+primTy :: Parser Type
+primTy = tInt <|> tBool <|> tChar
+
+tInt :: Parser Type
+tInt = withRange $ (TBase . TInt) <$ symbol TokIntType
+
+tBool :: Parser Type
+tBool = withRange $ (TBase . TBool) <$ symbol TokBoolType
+
+tChar :: Parser Type
+tChar = withRange $ (TBase . TChar) <$ symbol TokCharType
 
 --------------------------------------------------------------------------------
 

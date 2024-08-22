@@ -14,6 +14,7 @@ import           Data.Bifunctor                 ( second )
 import           Syntax.Abstract
 import           Syntax.Common                  ( Name(..)
                                                 , nameToText
+                                                , TypeOp(Arrow)
                                                 )
 
 --funcDefnSigsToConstDecl :: FuncDefnSig -> [Declaration]
@@ -29,10 +30,9 @@ import           Syntax.Common                  ( Name(..)
     --Nothing
     --(locOf cn)
 
-wrapTFunc :: [Name] -> Type -> Type
+wrapTFunc :: [Type] -> Type -> Type
 wrapTFunc []       t  = t
-wrapTFunc [t     ] t0 = TFunc (TMetaVar t) t0 (locOf t)
-wrapTFunc (t : ts) t0 = let t0' = wrapTFunc ts t0 in TFunc (TMetaVar t) t0' (t <--> t0')
+wrapTFunc (t : ts) t0 = let t0' = wrapTFunc ts t0 in TApp (TApp (TOp (Arrow NoLoc)) t NoLoc) t0' (locOf t0) -- TODO: What should the loc be?
 
 getGuards :: [GdCmd] -> [Expr]
 getGuards = fst . unzipGdCmds

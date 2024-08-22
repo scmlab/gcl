@@ -30,7 +30,6 @@ instance Render Lit where
   render (Num i) = render (show i)
   render (Bol b) = render (show b)
   render (Chr c) = render (show c)
-  render Emp     = "emp"
 
 --------------------------------------------------------------------------------
 
@@ -125,23 +124,25 @@ instance Render Pattern where
 
 --------------------------------------------------------------------------------
 
-
 -- | Type
 instance Render Type where
-  renderPrec _ (TBase TInt  _  ) = "Int"
-  renderPrec _ (TBase TBool _  ) = "Bool"
-  renderPrec _ (TBase TChar _  ) = "Char"
-  renderPrec _ (TTuple es      ) = "(" <+> punctuateE "," (map render es) <+> ")"
-  renderPrec n (TFunc  a b    _) =
+  renderPrec _ (TBase TInt  _) = "Int"
+  renderPrec _ (TBase TBool _) = "Bool"
+  renderPrec _ (TBase TChar _) = "Char"
+  renderPrec _ (TArray i b  _) = "array" <+> render i <+> "of" <+> render b
+  renderPrec _ (TTuple _     ) = "Tuple"
+  renderPrec _ (TFunc l r _  ) = "Func" -- TODO: Change this to display proper information.
+  renderPrec _ (TOp op       ) = render op
+  -- TODO: Add support for more than one type operators.
+  renderPrec n (TApp (TApp (TOp (Arrow _)) left _) right _) =
     parensIf n (Just . TypeOp $ Arrow NoLoc) $ 
-      renderPrec (HOLEOp . TypeOp $ Arrow NoLoc) a 
-      <+> "→"
-      <+> renderPrec (OpHOLE . TypeOp $ Arrow NoLoc) b
-  renderPrec _ (TArray i b    _) = "array" <+> render i <+> "of" <+> render b
-  renderPrec n (TApp l r _     ) = parensIf n Nothing $ renderPrec HOLEApp l <+> renderPrec AppHOLE r
-  renderPrec _ (TData n _ _    ) = render n
-  renderPrec _ (TVar i _       ) = render i
-  renderPrec _ (TMetaVar n     ) = render n
+      renderPrec (HOLEOp (TypeOp (Arrow NoLoc))) left 
+        <+> render (Arrow NoLoc)
+        <+> renderPrec (OpHOLE (TypeOp (Arrow NoLoc))) right
+  renderPrec n (TApp l r _   ) = parensIf n Nothing $ renderPrec HOLEApp l <+> renderPrec AppHOLE r
+  renderPrec _ (TData n _    ) = render n
+  renderPrec _ (TVar i _     ) = render i
+  renderPrec _ (TMetaVar n _ ) = render n
 
 -- | Interval
 instance Render Interval where
@@ -153,6 +154,18 @@ instance Render Interval where
     "(" <+> render a <+> ".." <+> render b <+> "]"
   render (Interval (Excluding a) (Excluding b) _) =
     "(" <+> render a <+> ".." <+> render b <+> ")"
+
+--------------------------------------------------------------------------------
+
+-- | Kind
+instance Render Kind where
+  renderPrec _ (KStar _) = "*"
+  renderPrec n (KFunc a b _) =
+    parensIf n (Just . TypeOp $ Arrow NoLoc) $ 
+      renderPrec (HOLEOp . TypeOp $ Arrow NoLoc) a 
+      <+> "→"
+      <+> renderPrec (OpHOLE . TypeOp $ Arrow NoLoc) b
+  renderPrec _ (KMetaVar i) = render i
 
 --------------------------------------------------------------------------------
 

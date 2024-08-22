@@ -1,14 +1,11 @@
-module Syntax.Typed.Types (
-  module Syntax.Typed.Types,
-  Lit(..), Type(..), TBase(..)
-  ) where
+module Syntax.Typed.Types where
 
 import Data.Text ( Text )
 import Data.Loc ( Loc )
 import Data.Loc.Range ( Range )
-import Syntax.Abstract.Types ( Lit(..), Type(..), TBase(..) )
-import Syntax.Common.Types ( Name, Op )
-import GCL.Common ( TypeEnv, Index, TypeInfo )
+import Syntax.Abstract.Types ( Lit(..), Type(..), TBase(..), Pattern, Interval, Kind )
+import Syntax.Common.Types ( Name, Op, TypeOp )
+import GCL.Common ( Index, TypeInfo )
 
 data Program = Program [Definition] -- definitions (the functional language part)
                        [Declaration] -- constant and variable declarations
@@ -19,11 +16,11 @@ data Program = Program [Definition] -- definitions (the functional language part
 
 data Definition
   = TypeDefn Name [Name] [TypeDefnCtor] Loc
-  | FuncDefnSig Name Type (Maybe Expr) Loc
+  | FuncDefnSig Name KindedType (Maybe Expr) Loc
   | FuncDefn Name Expr
   deriving (Eq, Show)
 
-data TypeDefnCtor = TypeDefnCtor Name [Name]
+data TypeDefnCtor = TypeDefnCtor Name [Type]
   deriving (Eq, Show)
 
 data Declaration
@@ -63,12 +60,27 @@ data Expr
   | Quant Expr [Name] Expr Expr Loc
   | ArrIdx Expr Expr Loc
   | ArrUpd Expr Expr Expr Loc
+  | Case Expr [CaseClause] Loc
 
   | Subst Expr [(Name, Expr)]
   deriving (Eq, Show)
-  -- FIXME: Other constructors.
+
+data CaseClause = CaseClause Pattern Expr
+  deriving (Eq, Show)
 
 data Chain
   = Pure Expr
   | More Chain Op Type Expr
   deriving (Eq, Show)
+
+data KindedType
+  = TBase TBase Kind Loc
+  | TArray Interval KindedType Loc
+  | TTuple Int Kind
+  | TFunc KindedType KindedType Loc
+  | TOp TypeOp Kind
+  | TData Name Kind Loc
+  | TApp KindedType KindedType Loc
+  | TVar Name Kind Loc
+  | TMetaVar Name Kind Loc
+  deriving (Show, Eq)

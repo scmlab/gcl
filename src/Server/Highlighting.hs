@@ -272,12 +272,9 @@ instance Collect () Highlighting Type where
     collect a
     addHighlighting J.SttKeyword [] tokOf
     collect b
-  collect (TFunc a tok b) = do
-    collect a
-    addHighlighting J.SttOperator [] tok
-    collect b
+  collect (TOp op) = addHighlighting J.SttOperator [] op
+  collect (TData name _) = addHighlighting J.SttType [] name
   collect (TApp a b)  = do
     collect a
     collect b
-  collect (TData name _) = addHighlighting J.SttType [] name
-  collect (TVar name)  = addHighlighting J.SttType [] name
+  collect (TMetaVar name _)  = addHighlighting J.SttType [] name
