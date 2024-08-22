@@ -1,5 +1,6 @@
-{-# LANGUAGE OverloadedStrings #-}
+
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Main where
 
@@ -8,7 +9,7 @@ import Pretty ()
 import System.Console.GetOpt
 import System.Environment
 import Prelude
-import Server (run)
+import Server (runOnPort, runOnStdio)
 
 main :: IO ()
 main = do
@@ -16,10 +17,10 @@ main = do
   case mode of
     ModeHelp -> putStrLn $ usageInfo usage options
     ModeLSP -> do
-      _ <- run False port
+      _ <- runOnStdio "/Users/vince/Documents/gcl-vscode/server_log.txt"
       return ()
     ModeDev -> do
-      _ <- run True port
+      _ <- runOnPort port
       return ()
 
 --------------------------------------------------------------------------------

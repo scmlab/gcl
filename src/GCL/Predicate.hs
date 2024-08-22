@@ -3,6 +3,7 @@
 module GCL.Predicate where
 
 import           Data.Aeson                     ( ToJSON )
+import qualified Data.Aeson                    as JSON
 import           Data.Loc                       ( L
                                                 , Loc(..)
                                                 , Located(locOf)
@@ -17,9 +18,12 @@ import qualified Data.Set                      as Set
 import           GHC.Generics                   ( Generic )
 import           GCL.Common
 import           Render.Element
-import           Syntax.Abstract                ( Expr )
+import           Syntax.Typed                   ( Expr )
 import           Syntax.Common                  ( Name )
+-- | A predicate is an expression, whose type happens to be Bool.
+type Pred = Expr
 
+{-
 -- | Predicates
 data Pred
   = Constant Expr
@@ -90,7 +94,7 @@ instance Eq Stmt where
   If   l xs     == If   m ys     = l == m && xs == ys
   Spec l _      == Spec m _      = l == m
   _             == _             = False
-
+-}
 --------------------------------------------------------------------------------
 
 -- | Proof obligation
@@ -109,9 +113,13 @@ instance Ord PO where
 instance Located PO where
   locOf (PO _ _ _ _ o) = locOf o
 
+-- instance ToJSON PO
+
 data InfMode = Primary     -- the main inference mode
              | Secondary   -- non-functional postconditions. ignore assertions
              deriving (Eq, Show, Generic)
+
+instance ToJSON InfMode
 
 data Origin
   = AtAbort Loc
@@ -158,11 +166,12 @@ data Spec = Specification
   , specPreCond  :: Pred
   , specPostCond :: Pred
   , specRange    :: Range
+  , specTypeEnv  :: [(Index, TypeInfo)]
   }
   deriving (Eq, Show, Generic)
 
 instance Located Spec where
-  locOf (Specification _ _ _ l) = locOf l
+  locOf (Specification _ _ _ l _) = locOf l
 
 instance Ranged Spec where
-  rangeOf (Specification _ _ _ r) = r
+  rangeOf (Specification _ _ _ r _) = r

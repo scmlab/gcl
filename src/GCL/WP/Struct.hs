@@ -11,37 +11,33 @@ import           Data.Loc                       ( Loc(..)
 import           Data.Loc.Range                 ( fromLoc )
 import           Data.Map                       ( fromList )
 import           GCL.Predicate                  ( InfMode(..)
-                                                , Origin(..)
-                                                , Pred(..)
-                                                )
-import           GCL.Predicate.Util             ( guardIf
-                                                , guardLoop
-                                                )
+                                                , Pred
+                                                , Origin(..))
 import           GCL.Common                     ( freshName )
-import GCL.WP.Type
-import GCL.WP.Explanation
-import GCL.WP.Util
-import qualified Syntax.Abstract               as A
-import qualified Syntax.Abstract.Operator      as A
-import qualified Syntax.Abstract.Util          as A
-import Syntax.Common.Types                     ( Name(..)
-                                               , nameToText )
+import           GCL.WP.Types
+import           GCL.WP.Explanation
+import           GCL.WP.Util
+import           Syntax.Abstract.Operator       ( tInt )
+import           Syntax.Typed
+import           Syntax.Typed.Util              ( getGuards, declaredNamesTypes )
+import           Syntax.Typed.Operator          ( eqq , gte , lt, neg
+                                                , disjunct
+                                                , conj, conjunct
+                                                )
+import Syntax.Typed.Instances.Substitution     ()
+import Syntax.Common.Types                     ( Name(..), nameToText )
 import Syntax.Substitution
-
--- import Debug.Trace
--- import Prettyprinter
--- import Prettyprinter.Render.String
 
 type RecFns = (TwpSegs, TwpSStmts, Twp, TspSStmts)
 
 structFunctions :: (TwpSegs, TwpSStmts, Twp, TspSStmts)
                 -> (TstructStmts, TstructSegs, Tstruct)
 structFunctions (wpSegs, wpSStmts, wp, spSStmts) =
-   (structStmts, structSegs, struct)
+     (structStmts, structSegs, struct)
 
  where
 
- structStmts :: InfMode -> (Pred, Maybe A.Expr) -> [A.Stmt] -> Pred -> WP ()
+ structStmts :: InfMode -> (Pred, Maybe Expr) -> [Stmt] -> Pred -> WP ()
  structStmts Primary pre stmts post = structSegs pre (groupStmts stmts) post
  structStmts Secondary (pre, _) stmts post = case stripAsserts stmts of
    Nothing     -> return ()  -- skip if the program is incomplete
@@ -52,46 +48,44 @@ structFunctions (wpSegs, wpSStmts, wp, spSStmts) =
        post'
        (emptyExplain "Assertion (Secondary)" (locOf pre))
 
- structSegs :: (Pred, Maybe A.Expr) -> [SegElm] -> Pred -> WP ()
+ structSegs :: (Pred, Maybe Expr) -> [SegElm] -> Pred -> WP ()
  structSegs (pre, _) [] post = do
   case locOf pre of
     NoLoc  -> tellPO pre post (AtAssertion (locOf post))
     others -> tellPO pre post (AtAssertion others)
- structSegs (pre, _) (SAsrt (A.Assert p l) : segs) post = do
-   let assert = Assertion p l
-   tellPO pre assert (AtAssertion (locOf pre))
-   structSegs (assert, Nothing) segs post
- structSegs (pre, _) (SAsrt (A.LoopInvariant p bnd l) : segs) post = do
-  let loopInv = LoopInvariant p bnd l
-  tellPO pre loopInv origin
-  structSegs (loopInv, Just bnd) segs post
+ structSegs (pre, _) (SAsrt (Assert p _) : segs) post = do
+   tellPO pre p (AtAssertion (locOf pre))
+   structSegs (p, Nothing) segs post
+ structSegs (pre, _) (SAsrt (LoopInvariant p bnd l) : segs) post = do
+  tellPO pre p origin
+  structSegs (p, Just bnd) segs post
   where
    startsWithDo :: [SegElm] -> Bool
-   startsWithDo (SStmts (A.Do _ _ : _) : _) = True
+   startsWithDo (SStmts (Do _ _ : _) : _) = True
    startsWithDo _                           = False
    origin = if startsWithDo segs then AtLoop l else AtAssertion l
  structSegs (pre, bnd) [SStmts ss] post =
    structSStmts (pre, bnd) ss post
- structSegs (pre, bnd) (SStmts ss : SAsrt (A.Assert p l) : segs) post = do
-  structSStmts (pre, bnd) ss (Assertion p l)
-  structSegs (Assertion p l, Nothing) segs post
- structSegs (pre, bnd) (SStmts ss : SAsrt (A.LoopInvariant p bd l) : segs) post
+ structSegs (pre, bnd) (SStmts ss : SAsrt (Assert p _) : segs) post = do
+  structSStmts (pre, bnd) ss p
+  structSegs (p, Nothing) segs post
+ structSegs (pre, bnd) (SStmts ss : SAsrt (LoopInvariant p bd _) : segs) post
   = do
-    structSStmts (pre, bnd) ss (LoopInvariant p bd l)
-    structSegs (LoopInvariant p bd l, Just bd) segs post
- structSegs (pre, bnd) (SStmts ss : SSpec (A.Spec _ range) : segs) post = do
+    structSStmts (pre, bnd) ss p
+    structSegs (p, Just bd) segs post
+ structSegs (pre, bnd) (SStmts ss : SSpec (Spec _ range tenv) : segs) post = do
   post' <- wpSegs segs post
   pre'  <- spSStmts (pre, bnd) ss
-  tellSpec pre' post' range
- structSegs (pre, _) (SSpec (A.Spec _ range) : segs) post = do
+  tellSpec pre' post' tenv range
+ structSegs (pre, _) (SSpec (Spec _ range tenv) : segs) post = do
   post' <- wpSegs segs post
-  tellSpec pre post' range
+  tellSpec pre post' tenv range
  structSegs _ _ _ = error "Missing case in structSegs"
 
  -- 'simple' version of struct stmts -- there are no assertions,
  -- invariants, or specs in the list of statements.
 
- structSStmts ::  (Pred, Maybe A.Expr) -> [A.Stmt] -> Pred -> WP ()
+ structSStmts ::  (Pred, Maybe Expr) -> [Stmt] -> Pred -> WP ()
  structSStmts (pre, _) [] post = do
    case locOf pre of
      NoLoc  -> tellPO pre post (AtAssertion (locOf post))
@@ -100,82 +94,85 @@ structFunctions (wpSegs, wpSStmts, wp, spSStmts) =
    post' <- wpSStmts stmts post
    struct (pre, bnd) stmt post'
 
- struct :: (Pred, Maybe A.Expr) -> A.Stmt -> Pred -> WP ()
- struct (pre, _) s@(A.Abort l) post = tellPO' (AtAbort l) pre =<< wp s post
- struct (pre, _) s@(A.Skip l) post = tellPO' (AtSkip l) pre =<< wp s post
- struct (pre, _) s@(A.Assign vars exprs l) post = do
+ struct :: (Pred, Maybe Expr) -> Stmt -> Pred -> WP ()
+ struct (pre, _) s@(Abort l) post = tellPO' (AtAbort l) pre =<< wp s post
+ struct (pre, _) s@(Skip l) post = tellPO' (AtSkip l) pre =<< wp s post
+ struct (pre, _) s@(Assign vars exprs l) post = do
    tellPO' origin pre =<< wp s post
   where
    origin :: Origin
    origin = explainAssignment pre post vars exprs l
- struct (pre, _) s@(A.AAssign _ _ _ l) post = do
+ struct (pre, _) s@(AAssign _ _ _ l) post = do
    tellPO' (AtAssignment l) pre =<< wp s post
- struct (pre, _) (A.If gcmds l) post = do
+ struct (pre, _) (If gcmds l) post = do
    tellPO pre (disjunctGuards gcmds) (AtIf l)
-   forM_ gcmds $ \(A.GdCmd guard body _) ->
-     structStmts Primary (Conjunct [pre, guardIf guard], Nothing) body post
- struct (inv, Just bnd) (A.Do gcmds l) post = do
-  let guards = A.getGuards gcmds
-  tellPO (Conjunct (inv : map (Negate . guardLoop) guards))
+   forM_ gcmds $ \(GdCmd guard body _) ->
+     structStmts Primary (pre `conj` guard, Nothing) body post
+ struct (inv, Just bnd) (Do gcmds l) post = do
+  let guards = getGuards gcmds
+  tellPO (conjunct (inv : map neg guards))
          post
          (explainAfterLoop inv guards l)
   forM_ gcmds (structGdcmdInduct inv)
-  tellPO (Conjunct [inv, Disjunct (map guardLoop guards)])
-         (Bound (bnd `A.gte` A.Lit (A.Num 0) NoLoc) NoLoc)
+  tellPO (inv `conj` disjunct guards)
+         (bnd `gte` Lit (Num 0) tInt NoLoc)
          (explainTermination inv guards bnd l)
   forM_ gcmds (structGdcmdBnd inv bnd)
- struct (inv, Nothing) (A.Do gcmds l) post = do
+
+ struct (inv, Nothing) (Do gcmds l) post = do
   case fromLoc l of
     Nothing  -> return ()
     Just rng -> throwWarning (MissingBound rng)
-  let guards = A.getGuards gcmds
-  tellPO (Conjunct (inv : map (Negate . guardLoop) guards)) post (AtLoop l)
+  let guards = getGuards gcmds
+  tellPO (conjunct (inv : map neg guards)) post (AtLoop l)
   forM_ gcmds (structGdcmdInduct inv)
- struct _        (A.Proof _ _ _)     _    = return ()
- -- TODO:
- struct (pre, _) (A.Block prog _)  post = structBlock pre prog post
- struct (pre, _) s@(A.Alloc _ _ l) post =
+ struct _        (Proof _ _ _)     _    = return ()
+
+ struct (pre, _) (Block prog _)  post = structBlock pre prog post
+
+ struct (pre, _) s@(Alloc _ _ l) post =
    tellPO' (AtAbort l) pre =<< wp s post
- struct (pre, _) s@(A.HLookup _ _ l) post =
+ struct (pre, _) s@(HLookup _ _ l) post =
    tellPO' (AtAbort l) pre =<< wp s post
- struct (pre, _) s@(A.HMutate _ _ l) post =
+ struct (pre, _) s@(HMutate _ _ l) post =
    tellPO' (AtAbort l) pre =<< wp s post
- struct (pre, _) s@(A.Dispose _ l) post =
+ struct (pre, _) s@(Dispose _ l) post =
    tellPO' (AtAbort l) pre =<< wp s post
+
  struct _        _                 _    = error "missing case in struct"
 
- structGdcmdInduct :: Pred -> A.GdCmd -> WP ()
- structGdcmdInduct inv (A.GdCmd guard body _) =
-   structStmts Primary (Conjunct [inv, guardLoop guard], Nothing) body inv
+ structGdcmdInduct :: Pred -> GdCmd -> WP ()
+ structGdcmdInduct inv (GdCmd guard body _) =
+   structStmts Primary (inv `conj` guard, Nothing) body inv
 
- structGdcmdBnd :: Pred -> A.Expr -> A.GdCmd -> WP ()
- structGdcmdBnd inv bnd (A.GdCmd guard body _) = withFreshVar $ \oldbnd -> do
+ structGdcmdBnd :: Pred -> Expr -> GdCmd -> WP ()
+ structGdcmdBnd inv bnd (GdCmd guard body _) = withFreshVar tInt $ \oldbnd -> do
   structStmts
     Secondary
-    (Conjunct [inv, Bound (bnd `A.eqq` oldbnd) NoLoc, guardLoop guard], Nothing)
+    (conjunct [inv, bnd `eqq` oldbnd,guard], Nothing)
     body
-    (Bound (bnd `A.lt` oldbnd) NoLoc)
+    (bnd `lt` oldbnd)
 
- structBlock :: Pred -> A.Program -> Pred -> WP ()
- structBlock pre (A.Program _ decls _props stmts _) post = do
-   let localNames = declaredNames decls
+ structBlock :: Pred -> Program -> Pred -> WP ()
+ structBlock pre (Program _ decls _props stmts _) post = do
+   let localNames = declaredNamesTypes decls
    (xs, ys) <- withLocalScopes (\scopes ->
-                withScopeExtension (map nameToText localNames)
+                withScopeExtension (map (nameToText . fst) localNames)
                   (calcLocalRenaming (concat scopes) localNames))
    stmts' <- subst (toSubst ys) stmts
-   withScopeExtension (xs ++ (map (nameToText . snd) ys))
+   withScopeExtension (xs ++ (map (nameToText . fst . snd) ys))
      (structStmts Primary (pre, Nothing) stmts' post)
-  where toSubst = fromList . map (\(n, n') -> (n, A.Var n' (locOf n')))
+  where toSubst = fromList . map (\(n, (n',t)) -> (n, Var n' t (locOf n')))
 
-calcLocalRenaming :: [Text] -> [Name] -> WP ([Text], [(Text, Name)])
+calcLocalRenaming :: [Text] -> [(Name, Type)] -> WP ([Text], [(Text, (Name, Type))])
 calcLocalRenaming _ [] = return ([], [])
-calcLocalRenaming scope (x:xs)
-  | t `elem` scope = do
-        x' <- freshName t (locOf x)
-        second ((t,x') :) <$> calcLocalRenaming scope xs
+calcLocalRenaming scope ((x,t):xs)
+  | tx `elem` scope = do
+        x' <- freshName tx (locOf x)
+        second ((tx,(x',t)) :) <$> calcLocalRenaming scope xs
   | otherwise =
-        first (t:) <$> calcLocalRenaming scope xs
- where t = nameToText x
+        first (tx:) <$> calcLocalRenaming scope xs
+ where tx = nameToText x
 
 -- debugging
 

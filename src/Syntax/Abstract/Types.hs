@@ -97,7 +97,7 @@ data TBase = TInt | TBool | TChar
 data Type
   = TBase TBase Loc
   | TArray Interval Type Loc
-  -- TTuple has no srcloc info because it has no conrete syntax at the moment 
+  -- TTuple has no srcloc info because it has no conrete syntax at the moment
   | TTuple [Type]
   | TFunc Type Type Loc
   | TApp Type Type Loc
@@ -118,10 +118,10 @@ data Expr
   | App Expr Expr Loc
   | Lam Name Expr Loc
   | Func Name (NonEmpty FuncClause) Loc
-  -- Tuple has no srcloc info because it has no conrete syntax at the moment 
+  -- Tuple has no srcloc info because it has no conrete syntax at the moment
   | Tuple [Expr]
   | Quant Expr [Name] Expr Expr Loc
-  -- The innermost part of a Redex 
+  -- The innermost part of a Redex
   -- should look something like `P [ x \ a ] [ y \ b ]`
   | RedexKernel
     Name -- the variable to be substituted
@@ -129,12 +129,12 @@ data Expr
     (Set Name) -- free variables in that expression
                -- NOTE, the expression may be some definition like "P",
               --  in that case, the free variables should be that of after it's been expanded
-    (NonEmpty Mapping) 
+    (NonEmpty Mapping)
       -- a list of mappings of substitutions to be displayed to users (the `[ x \ a ] [ y \ b ]` part)
       -- The order is reflected.
   -- The outermost part of a Redex
   | RedexShell
-      Int -- for identifying Redexes in frontend-backend interactions 
+      Int -- for identifying Redexes in frontend-backend interactions
       Expr -- should either be `RedexKernel` or `App (App (App ... RedexKernel arg0) ... argn`
   | ArrIdx Expr Expr Loc
   | ArrUpd Expr Expr Expr Loc
@@ -153,11 +153,11 @@ type Mapping = Map Text Expr
 --------------------------------------------------------------------------------
 -- | Pattern matching
 
--- pattern -> expr 
+-- pattern -> expr
 data CaseClause = CaseClause Pattern Expr
   deriving (Eq, Show, Generic)
 
--- pattern0 pattern1 pattern2 ... -> expr 
+-- pattern0 pattern1 pattern2 ... -> expr
 data FuncClause = FuncClause [Pattern] Expr
   deriving (Eq, Show, Generic)
 
@@ -173,6 +173,7 @@ extractBinder (PattLit      _      ) = []
 extractBinder (PattBinder   x      ) = [x]
 extractBinder (PattWildcard _      ) = []
 extractBinder (PattConstructor _ xs) = xs >>= extractBinder
+
 
 ----------------------------------------------------------------
 

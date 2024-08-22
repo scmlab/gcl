@@ -44,6 +44,11 @@ wrapLam :: [Name] -> Expr -> Expr
 wrapLam []       body = body
 wrapLam (x : xs) body = let b = wrapLam xs body in Lam x b (x <--> b)
 
+declaredNames :: [Declaration] -> [Name]
+declaredNames decls = concat . map extractNames $ decls
+  where extractNames (ConstDecl ns _ _ _) = ns
+        extractNames (VarDecl   ns _ _ _) = ns
+
 -- function definition           => Just Expr
 -- constant/variable declaration => Nothing
 

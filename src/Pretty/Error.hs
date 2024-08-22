@@ -8,7 +8,7 @@ import           Data.Loc
 import           Prettyprinter
 import           Error
 import           GCL.Type                       ( TypeError(..) )
-import           GCL.WP.Type                    ( StructError(..)
+import           GCL.WP.Types                   ( StructError(..)
                                                 , StructWarning(..)
                                                 )
 import           Prelude                 hiding ( Ordering(..) )

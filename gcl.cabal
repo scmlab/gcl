@@ -36,7 +36,7 @@ library
       GCL.WP.Explanation
       GCL.WP.SP
       GCL.WP.Struct
-      GCL.WP.Type
+      GCL.WP.Types
       GCL.WP.Util
       GCL.WP.WP
       Pretty
@@ -45,6 +45,7 @@ library
       Pretty.Concrete
       Pretty.Error
       Pretty.Predicate
+      Pretty.Typed
       Pretty.Util
       Pretty.Variadic
       Render
@@ -54,34 +55,26 @@ library
       Render.Predicate
       Render.Syntax.Abstract
       Render.Syntax.Common
+      Render.Syntax.Typed
       Server
-      Server.CustomMethod
       Server.GoToDefn
       Server.Handler
       Server.Handler.AutoCompletion
-      Server.Handler.CustomMethod
-      Server.Handler.Diagnostic
-      Server.Handler.GoToDefn
+      Server.Handler.GoToDefinition
+      Server.Handler.Guabao.Refine
+      Server.Handler.Guabao.Reload
       Server.Handler.Hover
-      Server.Handler2
-      Server.Handler2.CustomMethod
-      Server.Handler2.CustomMethod.HelloWorld
-      Server.Handler2.CustomMethod.InsertProofTemplate
-      Server.Handler2.CustomMethod.Inspect
-      Server.Handler2.CustomMethod.Refine
-      Server.Handler2.CustomMethod.Reload
-      Server.Handler2.CustomMethod.SubstituteRedex
-      Server.Handler2.CustomMethod.Utils
-      Server.Handler2.GoToDefinition
-      Server.Handler2.Hover
-      Server.Handler2.Initialized
-      Server.Handler2.SemanticTokens
-      Server.Handler2.Utils
+      Server.Handler.Initialized
+      Server.Handler.OnDidChangeTextDocument
+      Server.Handler.SemanticTokens
       Server.Highlighting
       Server.Hover
       Server.IntervalMap
+      Server.Load
       Server.Monad
-      Server.Pipeline
+      Server.Notification.Error
+      Server.Notification.Update
+      Server.PositionMapping
       Server.SrcLoc
       Syntax.Abstract
       Syntax.Abstract.Instances.Json
@@ -105,16 +98,24 @@ library
       Syntax.Parser.Util
       Syntax.Substitution
       Syntax.Typed
+      Syntax.Typed.Instances.Free
+      Syntax.Typed.Instances.Located
+      Syntax.Typed.Instances.Substitution
+      Syntax.Typed.Operator
+      Syntax.Typed.Types
+      Syntax.Typed.Util
   other-modules:
       Paths_gcl
   hs-source-dirs:
       src
   ghc-options: -Wall -Werror=incomplete-patterns -fno-warn-orphans
   build-depends:
-      aeson
+      Diff
+    , aeson
     , base >=4.7 && <5
     , bytestring
     , containers
+    , deepseq
     , free
     , hashable
     , lens
@@ -145,10 +146,12 @@ executable gcl
       app
   ghc-options: -Wall -threaded -rtsopts -with-rtsopts=-N -Werror=incomplete-patterns -fno-warn-orphans
   build-depends:
-      aeson
+      Diff
+    , aeson
     , base >=4.7 && <5
     , bytestring
     , containers
+    , deepseq
     , free
     , gcl
     , hashable
@@ -202,7 +205,7 @@ test-suite gcl-test
       GCL.WP.Explanation
       GCL.WP.SP
       GCL.WP.Struct
-      GCL.WP.Type
+      GCL.WP.Types
       GCL.WP.Util
       GCL.WP.WP
       Pretty
@@ -211,6 +214,7 @@ test-suite gcl-test
       Pretty.Concrete
       Pretty.Error
       Pretty.Predicate
+      Pretty.Typed
       Pretty.Util
       Pretty.Variadic
       Render
@@ -220,34 +224,26 @@ test-suite gcl-test
       Render.Predicate
       Render.Syntax.Abstract
       Render.Syntax.Common
+      Render.Syntax.Typed
       Server
-      Server.CustomMethod
       Server.GoToDefn
       Server.Handler
       Server.Handler.AutoCompletion
-      Server.Handler.CustomMethod
-      Server.Handler.Diagnostic
-      Server.Handler.GoToDefn
+      Server.Handler.GoToDefinition
+      Server.Handler.Guabao.Refine
+      Server.Handler.Guabao.Reload
       Server.Handler.Hover
-      Server.Handler2
-      Server.Handler2.CustomMethod
-      Server.Handler2.CustomMethod.HelloWorld
-      Server.Handler2.CustomMethod.InsertProofTemplate
-      Server.Handler2.CustomMethod.Inspect
-      Server.Handler2.CustomMethod.Refine
-      Server.Handler2.CustomMethod.Reload
-      Server.Handler2.CustomMethod.SubstituteRedex
-      Server.Handler2.CustomMethod.Utils
-      Server.Handler2.GoToDefinition
-      Server.Handler2.Hover
-      Server.Handler2.Initialized
-      Server.Handler2.SemanticTokens
-      Server.Handler2.Utils
+      Server.Handler.Initialized
+      Server.Handler.OnDidChangeTextDocument
+      Server.Handler.SemanticTokens
       Server.Highlighting
       Server.Hover
       Server.IntervalMap
+      Server.Load
       Server.Monad
-      Server.Pipeline
+      Server.Notification.Error
+      Server.Notification.Update
+      Server.PositionMapping
       Server.SrcLoc
       Syntax.Abstract
       Syntax.Abstract.Instances.Json
@@ -271,16 +267,24 @@ test-suite gcl-test
       Syntax.Parser.Util
       Syntax.Substitution
       Syntax.Typed
+      Syntax.Typed.Instances.Free
+      Syntax.Typed.Instances.Located
+      Syntax.Typed.Instances.Substitution
+      Syntax.Typed.Operator
+      Syntax.Typed.Types
+      Syntax.Typed.Util
       Paths_gcl
   hs-source-dirs:
       test
       src
   ghc-options: -Wall -Werror=incomplete-patterns -fno-warn-orphans
   build-depends:
-      aeson
+      Diff
+    , aeson
     , base >=4.7 && <5
     , bytestring
     , containers
+    , deepseq
     , directory
     , filepath
     , free

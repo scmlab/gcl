@@ -1,34 +1,45 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE DuplicateRecordFields #-}
+
 module Server.Handler.AutoCompletion where
 
 import           Data.Text                      ( Text )
 import           Language.LSP.Types
-import           Server.Monad
 
 -- To control the behaviour of autocomplete
 -- see https://github.com/haskell/lsp/blob/bf95cd94f3301fe391093912e6156de7cb5c1289/lsp-types/src/Language/LSP/Types/Completion.hs
-handler :: Position -> Maybe CompletionContext -> ServerM (a |? CompletionList)
-handler position completionContext = do
-    if shouldTriggerCompletion completionContext
-        then return $ InR $ CompletionList True (List (items position))
-        else return $ InR $ CompletionList True (List [])
+handler :: Monad m => Position -> Maybe CompletionContext -> m CompletionList
+handler position completionContext
+    | shouldTriggerUnicodeCompletion completionContext
+        = return $ CompletionList True (List (unicodeCompletionItems position))
+    | shouldTriggerDighole completionContext
+        = return $ CompletionList False (List [specBracketsCompletionItem position])
+    | otherwise
+        = return $ CompletionList True (List [])
 
 -- https://github.com/haskell/lsp/blob/bf95cd94f3301fe391093912e6156de7cb5c1289/lsp-types/src/Language/LSP/Types/Completion.hs#L360-L371
 -- trigger Unicode symbol completion when:
 --  1. a backslash "\" is being typed
 --  2. current completion is incomplete
-shouldTriggerCompletion :: Maybe CompletionContext -> Bool
-shouldTriggerCompletion (Just (CompletionContext CtTriggerCharacter (Just "\\")))
+shouldTriggerUnicodeCompletion :: Maybe CompletionContext -> Bool
+shouldTriggerUnicodeCompletion (Just (CompletionContext CtTriggerCharacter (Just "\\")))
     = True
-shouldTriggerCompletion (Just (CompletionContext CtTriggerForIncompleteCompletions _))
+shouldTriggerUnicodeCompletion (Just (CompletionContext CtTriggerForIncompleteCompletions _))
     = True
-shouldTriggerCompletion _ = False
+shouldTriggerUnicodeCompletion _
+    = False
 
--- list of `CompletionItem`s
-items :: Position -> [CompletionItem]
-items position = mconcat
+-- turn '?' into spec brackets '[! !]'
+shouldTriggerDighole :: Maybe CompletionContext -> Bool
+shouldTriggerDighole (Just (CompletionContext CtTriggerCharacter (Just "?")))
+    = True
+shouldTriggerDighole _
+    = False
+
+-- list of `CompletionItem`s for unicode symbols
+unicodeCompletionItems :: Position -> [CompletionItem]
+unicodeCompletionItems position = mconcat
     [ makeItems position
                 [" "]
                 (Just CiOperator)
@@ -161,27 +172,52 @@ makeItems
     -> Text
     -> [CompletionItem]
 makeItems position labels kind symbol detail doc = flip map labels $ \label ->
-    CompletionItem label  -- The label of this completion item.
+  CompletionItem
+    label  -- The label of this completion item.
            -- By default also the text that is inserted when selecting this completion.
-                   kind   -- could be CIOperator, CiValue or whatever
-                   Nothing -- for marking deprecated stuff
-                   (Just detail) -- human-readable string
-                   (Just $ CompletionDocString doc) -- also human-readable string
-                   Nothing -- deprecated
-                   Nothing -- select thie item when showing
-                   Nothing -- how to sort completion items
-                   Nothing -- how to filter completion items
-                   (Just symbol) -- the symbol we wanna insert
-                   (Just PlainText) -- could be a "Snippet" (with holes) or just plain text
-                   Nothing -- how whitespace and indentation is handled during completion
-                   Nothing -- TextEdit to be applied when this item has been selected (but not completed yet)
-                   removeSlash -- TextEdit to be applied when this item has been completed
-                   (Just (List [" ", "\\"])) -- commit characters
-                   Nothing -- command to be executed after completion
-                   Nothing -- ???
-
+    kind   -- could be CIOperator, CiValue or whatever
+    Nothing -- for marking deprecated stuff
+    (Just detail) -- human-readable string
+    (Just $ CompletionDocString doc) -- also human-readable string
+    Nothing -- deprecated
+    Nothing -- select thie item when showing
+    Nothing -- how to sort completion items
+    Nothing -- how to filter completion items
+    (Just symbol) -- the symbol we wanna insert
+    (Just PlainText) -- could be a "Snippet" (with holes) or just plain text
+    Nothing -- how whitespace and indentation is handled during completion
+    Nothing -- TextEdit to be applied when this item has been selected (but not completed yet)
+    removeSlash -- TextEdit to be applied when this item has been completed
+    (Just (List [" ", "\\"])) -- commit characters
+    Nothing -- command to be executed after completion
+    Nothing -- ???
   where
     Position ln col = position
     removeSlash =
-        Just $ List [TextEdit (Range (Position ln (col - 1)) position) ""]
+      Just $ List [TextEdit (Range (Position ln (col - 1)) position) ""]
     -- tempReplaceWithSymbol = Just $ CompletionEditText $ TextEdit (Range position (Position ln (col + 1 ))) "symbol"
+
+specBracketsCompletionItem :: Position -> CompletionItem
+specBracketsCompletionItem position = CompletionItem
+    { _label               = "?"
+    , _kind                = Just CiSnippet
+    , _tags                = Nothing
+    , _detail              = Nothing
+    , _documentation       = Just (CompletionDocString "Type \"?\" and a space to insert a spec.")
+    , _deprecated          = Nothing
+    , _preselect           = Just True
+    , _sortText            = Nothing
+    , _filterText          = Nothing
+    , _insertText          = Just "[! !]"
+    , _insertTextFormat    = Just PlainText
+    , _insertTextMode      = Nothing
+    , _textEdit            = removeQuestionMark
+    , _additionalTextEdits = Nothing
+    , _commitCharacters    = Just (List [" "])
+    , _command             = Nothing
+    , _xdata               = Nothing
+    }
+    where
+      Position line column = position
+      removeQuestionMark =
+        Just $ CompletionEditText $ TextEdit (Range (Position line (column - 1)) position) ""

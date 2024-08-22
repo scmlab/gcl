@@ -1,0 +1,22 @@
+=== Log file Start ===
+SInitialized is called.
+STextDocumentDidOpen is called.
+load start
+load start
+load start 2
+load start 3
+loaded file state
+current version determined
+load: source read
+load: file read
+load: source parsed
+load: swept
+load: elaborated
+load: fileState created
+load: fileState saved
+STextDocumentDidOpen is finished.
+
+ ---> Syntax Highlighting
+ ---> Syntax Highlighting
+ ---> Syntax Highlighting
+ ---> Syntax Highlighting<-- Goto Definition

@@ -1,5 +1,6 @@
 {-# LANGUAGE FlexibleInstances, UndecidableInstances,
              MultiParamTypeClasses, FlexibleContexts #-}
+{-# LANGUAGE DeriveGeneric #-}
 module GCL.Common where
 
 import           Control.Monad.RWS              ( RWST(..) )
@@ -16,9 +17,25 @@ import qualified Data.Text                     as Text
 import           Data.Loc.Range                 ( Range )
 import           Syntax.Abstract
 import           Syntax.Common.Types
+import    GHC.Generics
 
 
 data Index = Index Name | Hole Range deriving (Eq, Show, Ord)
+
+data TypeInfo =
+    TypeDefnCtorInfo Type
+    | ConstTypeInfo Type
+    | VarTypeInfo Type
+    deriving (Eq, Show, Generic)
+
+toTypeEnv :: [(Index, TypeInfo)] -> TypeEnv
+toTypeEnv infos =
+  (\(index, info) ->
+    case info of
+      TypeDefnCtorInfo ty -> (index, ty)
+      ConstTypeInfo ty -> (index, ty)
+      VarTypeInfo ty -> (index, ty)
+  ) <$> infos
 
 type TypeEnv = [(Index, Type)]
 
@@ -34,6 +51,9 @@ freshName prefix l = Name <$> freshPre prefix <*> pure l
 
 freshName' :: Fresh m => Text -> m Name
 freshName' prefix = freshName prefix NoLoc
+
+freshNames :: Fresh m => [Text] -> m [Name]
+freshNames = mapM freshName'
 
 class Counterous m where
   countUp :: m Int
@@ -106,7 +126,7 @@ instance Free Type where
   freeVars (TMetaVar n   ) = Set.singleton n
 
 instance {-# OVERLAPS #-} Free TypeEnv where
-  freeVars env = foldMap freeVars $ Map.elems $ Map.fromList env 
+  freeVars env = foldMap freeVars $ Map.elems $ Map.fromList env
 
 instance Free Expr where
   freeVars (Var   x _            ) = Set.singleton x

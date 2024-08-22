@@ -12,6 +12,7 @@ import Render.Class (PrecContext(NoContext))
 
 --------------------------------------------------------------------------------
 
+{-
 -- | Pred
 instance PrettyPrec Pred where
   prettyPrec = fromRenderPrec
@@ -58,7 +59,7 @@ instance Show GdCmd where
 instance Pretty GdCmd where
   pretty (GdCmd guard struct) =
     "  |" <+> pretty guard <+> "=>" <+> line <> "    " <> align (pretty struct)
-
+-}
 --------------------------------------------------------------------------------
 
 -- | Origin
