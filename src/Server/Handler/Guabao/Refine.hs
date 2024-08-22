@@ -13,7 +13,7 @@ import qualified Data.Aeson as JSON
 import GHC.Generics ( Generic )
 import Data.Bifunctor ( bimap )
 import Control.Monad.Except           ( runExcept )
-import Server.Monad (ServerM, FileState(..), loadFileState, editTexts, pushSpecs, deleteSpec, Versioned, pushPos, updateIdCounter, logText)
+import Server.Monad (ServerM, FileState(..), loadFileState, editTexts, pushSpecs, deleteSpec, Versioned, pushPos, updateIdCounter, logText, saveFileState)
 import Server.Notification.Update (sendUpdateNotification)
 import Server.Notification.Error (sendErrorNotification)
 
@@ -134,28 +134,36 @@ handler _params@RefineParams{filePath, specLines, implText, implStart} onFinish 
                             Left err -> onError (StructError err)
                             Right (innerPos, innerSpecs, warnings, idCount') -> do
                               logText "  swept\n"
+                              -- delete outer spec (by id)
+                              deleteSpec filePath spec
+                              logText "  outer spec deleted (refine)\n"
+                              -- add inner specs to fileState
+                              let FileState{editedVersion} = fileState
+                              updateIdCounter filePath idCount'
+                              logText "  counter updated (refine)\n"
+                              let innerSpecs' = predictAndTranslateSpecRanges innerSpecs
+                              let innerPos' = predictAndTranslatePosRanges innerPos
+                              pushSpecs (editedVersion + 1) filePath innerSpecs'
+                              pushPos (editedVersion + 1) filePath innerPos'
+                              -- let FileState{specifications, proofObligations} = fileState
+                              -- let fileState' = fileState
+                              --                   { specifications = specifications ++ Prelude.map (\spec -> (editedVersion + 1, spec)) innerSpecs'
+                              --                   , proofObligations = proofObligations ++ Prelude.map (\po -> (editedVersion + 1, po)) innerPos'
+                              --                   }
+
+                              -- saveFileState filePath fileState'
+                              
+                              logText "  new specs and POs added (refine)\n"
+                              -- send notification to update Specs and POs
+                              logText "refine: success\n"
+                              sendUpdateNotification filePath
+                              -- -- clear errors
+                              -- sendErrorNotification filePath []
+                              logText "refine: update notification sent\n"
                               -- edit source (dig holes + remove outer brackets)
-                              editTexts filePath [(specLines, holelessImplText)] do
-                                logText "  text edited (refine)\n"
-                                -- delete outer spec (by id)
-                                deleteSpec filePath spec
-                                logText "  outer spec deleted (refine)\n"
-                                -- add inner specs to fileState
-                                let FileState{editedVersion} = fileState
-                                updateIdCounter filePath idCount'
-                                logText "  counter updated (refine)\n"
-                                let innerSpecs' = predictAndTranslateSpecRanges innerSpecs
-                                let innerPos' = predictAndTranslatePosRanges innerPos
-                                pushSpecs editedVersion filePath innerSpecs'
-                                pushPos editedVersion filePath innerPos'
-                                logText "  new specs and POs added (refine)\n"
-                                -- send notification to update Specs and POs
-                                logText "refine: success\n"
-                                sendUpdateNotification filePath
-                                -- clear errors
-                                sendErrorNotification filePath []
-                                logText "refine: update notification sent\n"
-                                onFinish ()
+                              -- editTexts filePath [(specLines, holelessImplText)] do
+                              --   logText "  text edited (refine)\n"
+                              --   onFinish ()
   logText "refine: end\n"
   where
     onError :: Error -> ServerM ()

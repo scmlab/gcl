@@ -17,7 +17,7 @@ import           Control.Concurrent             ( Chan
                                                 )
 import           Control.Monad.Reader
 import           Data.IORef                     ( IORef
-                                                , modifyIORef'
+                                                , modifyIORef
                                                 , readIORef
                                                 , newIORef
                                                 )
@@ -111,7 +111,7 @@ loadFileState filePath = do
 saveFileState :: FilePath -> FileState -> ServerM ()
 saveFileState filePath fileState = do
   fileStateRef <- lift $ asks filesState
-  liftIO $ modifyIORef' fileStateRef (Map.insert filePath fileState)
+  liftIO $ modifyIORef fileStateRef (Map.insert filePath fileState)
 
 logFileState :: Show a => FilePath -> (FileState -> a) -> ServerM ()
 logFileState filePath f = do
