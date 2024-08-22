@@ -158,12 +158,12 @@ handler _params@RefineParams{filePath, specLines, implText, implStart} onFinish 
                               logText "refine: success\n"
                               sendUpdateNotification filePath
                               -- -- clear errors
-                              -- sendErrorNotification filePath []
+                              sendErrorNotification filePath []
                               logText "refine: update notification sent\n"
                               -- edit source (dig holes + remove outer brackets)
-                              -- editTexts filePath [(specLines, holelessImplText)] do
-                              --   logText "  text edited (refine)\n"
-                              --   onFinish ()
+                              editTexts filePath [(specLines, holelessImplText)] do
+                                logText "  text edited (refine)\n"
+                                onFinish ()
   logText "refine: end\n"
   where
     onError :: Error -> ServerM ()
@@ -174,7 +174,7 @@ handler _params@RefineParams{filePath, specLines, implText, implStart} onFinish 
       sendErrorNotification filePath [err]
       logText "refine: update notification sent\n"
     minusOneLine :: Pos -> Pos
-    minusOneLine (Pos filePath line column byte) = Pos filePath (line - 1) column undefined
+    minusOneLine (Pos filePath line column byte) = Pos filePath (line - 1) column 0
     predictAndTranslateSpecRanges :: [Spec] -> [Spec]
     predictAndTranslateSpecRanges = map (\spec@Specification{specRange} -> spec{specRange = minusOneLine' specRange})
       where
