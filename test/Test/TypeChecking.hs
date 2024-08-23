@@ -256,7 +256,7 @@ typeCheckFile dirName =
         let result = case Parser.scanAndParse Parser.program filepath source of
               Left  err -> Left [ParseError err]
               Right ast -> case runExcept (toAbstract ast) of
-                Left  _    -> Left [Others "Should dig hole"]
+                Left  _    -> Left [Others "" "Should dig hole" NoLoc]
                 Right prog -> case runElaboration prog of
                   Left  errors -> Left [TypeError errors]
                   Right _      -> Right ()
@@ -356,7 +356,7 @@ runParser :: ToAbstract a b => Parser a -> Text -> Either [Error] b
 runParser p t =
   case runExcept . toAbstract <$> Parser.scanAndParse p "<test>" t of
     Left  err          -> Left [ParseError err]
-    Right (Left  loc ) -> Left [Others (show loc)]
+    Right (Left  loc ) -> Left [Others "" "" loc]
     Right (Right expr) -> Right expr
 
 elab :: Elab a => [(Index, Type)] -> a -> Either [Error] Type

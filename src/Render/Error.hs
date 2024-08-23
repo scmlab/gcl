@@ -23,7 +23,7 @@ instance RenderSection Error where
     [ Header "Cannot Read File" Nothing
     , Paragraph $ "\"" <> render path <> "\" does not exist"
     ]
-  renderSection (Others msg) =
+  renderSection (Others _ msg _) =
     Section Red [Header "Server Internal Error" Nothing, Paragraph $ render msg]
 
 instance RenderSection ParseError where

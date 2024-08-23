@@ -94,6 +94,10 @@ fromLoc :: Loc -> Maybe Range
 fromLoc NoLoc     = Nothing
 fromLoc (Loc x y) = Just (Range x y)
 
+-- | Range -> Loc
+toLoc :: Range -> Loc
+toLoc (Range x y) = Loc x y
+
 -- | [Loc] -> [Range]
 fromLocs :: [Loc] -> [Range]
 fromLocs = mapMaybe fromLoc

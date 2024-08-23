@@ -49,9 +49,11 @@ instance JSON.ToJSON Error where
     [ "tag" .= JSON.String "StructError"
     , "message" .= JSON.toJSON err
     ]
-  toJSON (Others message) = object
+  toJSON (Others title message loc) = object
     [ "tag" .= JSON.String "Others"
+    , "title" .= JSON.toJSON title
     , "message" .= JSON.toJSON message
+    , "location" .= JSON.toJSON loc
     ]
 
 toLspPositionJSON :: Pos -> JSON.Value

@@ -12,7 +12,7 @@ module Server.Handler.GCL.Refine where
 import qualified Data.Aeson as JSON
 import GHC.Generics ( Generic )
 import Data.Bifunctor ( bimap )
-import Control.Monad.Except           ( runExcept )
+import Control.Monad.Except           ( runExcept, when )
 import Server.Monad (ServerM, FileState(..), loadFileState, editTexts, pushSpecs, deleteSpec, Versioned, pushPos, updateIdCounter, logText, saveFileState)
 import Server.Notification.Update (sendUpdateNotification)
 import Server.Notification.Error (sendErrorNotification)
@@ -26,7 +26,7 @@ import Error (Error (ParseError, TypeError, StructError, Others))
 import GCL.Predicate (Spec(..), PO (..), InfMode(..), Origin (..))
 import GCL.Common (TypeEnv, Index, TypeInfo)
 import GCL.Type (Elab(..), TypeError, runElaboration, Typed)
-import Data.Loc.Range (Range (..), rangeStart)
+import Data.Loc.Range (Range (..), rangeStart, toLoc)
 import Data.Text (Text, split, unlines, lines)
 import Data.List (find, maximumBy)
 import Data.Loc (Pos(..), Loc(..), L(..))
@@ -38,10 +38,11 @@ import GCL.WP.Types (StructError, StructWarning)
 import GCL.WP
 import qualified Data.Text as Text
 import Pretty (pretty)
+import Data.Aeson (Value(Bool))
 
 data RefineParams = RefineParams
   { filePath  :: FilePath
-  , implText  :: Text
+  , specText  :: Text
   , specLines :: Range
   , implStart :: Pos
   }
@@ -50,11 +51,12 @@ data RefineParams = RefineParams
 instance JSON.FromJSON RefineParams
 instance JSON.ToJSON RefineParams
 
+
 -- Assumes. specLines contains all the lines from "[!" to "!]"
--- Assumes. implText contains the lines between but not including "[!" and "!]"
+-- Assumes. specText is the text in specLines
 -- Assumes. implStart is the start of the line following "[!"
 handler :: RefineParams -> (() -> ServerM ()) -> (() -> ServerM ()) -> ServerM ()
-handler _params@RefineParams{filePath, specLines, implText, implStart} onFinish _ = do
+handler _params@RefineParams{filePath, specLines, specText, implStart} onFinish _ = do
   logText "refine: start\n"
   logText "  params\n"
   logText . Text.pack . show $ _params
@@ -62,108 +64,113 @@ handler _params@RefineParams{filePath, specLines, implText, implStart} onFinish 
   logText "  specLines:\n"
   logText . Text.pack . show  $ specLines
   logText "\n"
-  -- 把上次 load 的資料拿出來
-  maybeFileState <- loadFileState filePath
-  case maybeFileState of
-    Nothing -> do
-      logText "  no fileState matched\n"
-      return ()
-    Just fileState -> do
-      logText "  fileState loaded\n"
-      logText "  implText:\n"
-      logText implText
-      logText "\n"
-      -- 挖洞
-      -- let (Range implStart _) = implLines
-      -- let implStart = rangeStart implLines
-      let (Range specStart _) = specLines
-      -- let implStart = getImplStart specStart
-      case digImplHoles implStart filePath implText of
-        Left err -> do
-          logText "  parse error\n"
-          onError (ParseError err)
-        Right holelessImplText -> do
-          logText "  holes digged\n"
-          logText "    (after)\n"
-          logText holelessImplText
+  if not (bracketsOccupyOwnLines specText)
+    then do
+      logText "  specText invalid"
+      onError (Others "Refine Error" "The opening \"[!\" and closing \"!]\" brackets must occupy their own lines. Any code on the same lines as the brackets is not allowed." (toLoc specLines))
+    else do
+      -- 把上次 load 的資料拿出來
+      maybeFileState <- loadFileState filePath
+      case maybeFileState of
+        Nothing -> do
+          logText "  no fileState matched\n"
+          return ()
+        Just fileState -> do
+          let implText :: Text = removeFirstAndLastLine specText
+          logText "  fileState loaded\n"
+          logText "  implText:\n"
+          logText implText
           logText "\n"
-          -- text to concrete
-          -- (use specStart as the starting position in parse/toAbstract/elaborate)
-          logText "  parsing\n"
-          logText "    implStart =\n"
-          logText . Text.pack . show . pretty $ implStart
-          logText "\n"
-          case parseFragment implStart holelessImplText of
-            Left err           -> onError (ParseError err)
-            Right concreteImpl -> do
-              -- concrete to abstract
-              logText "  text parsed\n"
-              case toAbstractFragment concreteImpl of
-                Nothing           -> do
-                  onError (Others "holes still found after digging all holes")
-                  error "should not happen\n"
-                Just abstractImpl -> do
-                  logText "  abstracted\n"
-                  -- get spec (along with its type environment)
-                  let FileState{specifications} = fileState
-                  logText "  looking for specs\n"
-                  case lookupSpecByLines specifications specLines of
-                    Nothing   -> do
-                      logText "  spec not found at range, should reload\n"
-                      onError (Others "spec not found at range, should reload")
-                    Just spec -> do
-                      logText "  matching spec found\n"
-                      -- elaborate
-                      let typeEnv = specTypeEnv spec
-                      logText " type env:\n"
-                      logText (Text.pack $ show typeEnv)
-                      logText "\n"
-                      -- TODO:
-                      -- 1. Load: 在 elaborate program 的時候，要把 specTypeEnv 加到 spec 裡 (Andy) ok
-                      -- 2. Load: 在 sweep 的時候，改成輸入 elaborated program，把 elaborated program 裡面的 spec 的 typeEnv 加到輸出的 [Spec] 裡 (SCM)
-                      -- 3. Refine: elaborateFragment 裡面要正確使用 typeEnv (Andy) ok
-                      case elaborateFragment typeEnv abstractImpl of
-                        Left err -> do
-                          logText "  type error\n"
-                          onError (TypeError err)
-                        Right typedImpl -> do
-                          -- get POs and specs
-                          logText "  type checked\n"
-                          let FileState{idCount} = fileState
-                          case sweepFragment idCount spec typedImpl of
-                            Left err -> onError (StructError err)
-                            Right (innerPos, innerSpecs, warnings, idCount') -> do
-                              logText "  swept\n"
-                              -- delete outer spec (by id)
-                              deleteSpec filePath spec
-                              logText "  outer spec deleted (refine)\n"
-                              -- add inner specs to fileState
-                              let FileState{editedVersion} = fileState
-                              updateIdCounter filePath idCount'
-                              logText "  counter updated (refine)\n"
-                              let innerSpecs' = predictAndTranslateSpecRanges innerSpecs
-                              let innerPos' = predictAndTranslatePosRanges innerPos
-                              pushSpecs (editedVersion + 1) filePath innerSpecs'
-                              pushPos (editedVersion + 1) filePath innerPos'
-                              -- let FileState{specifications, proofObligations} = fileState
-                              -- let fileState' = fileState
-                              --                   { specifications = specifications ++ Prelude.map (\spec -> (editedVersion + 1, spec)) innerSpecs'
-                              --                   , proofObligations = proofObligations ++ Prelude.map (\po -> (editedVersion + 1, po)) innerPos'
-                              --                   }
+          -- 挖洞
+          -- let (Range implStart _) = implLines
+          -- let implStart = rangeStart implLines
+          let (Range specStart _) = specLines
+          -- let implStart = getImplStart specStart
+          case digImplHoles implStart filePath implText of
+            Left err -> do
+              logText "  parse error\n"
+              onError (ParseError err)
+            Right holelessImplText -> do
+              logText "  holes digged\n"
+              logText "    (after)\n"
+              logText holelessImplText
+              logText "\n"
+              -- text to concrete
+              -- (use specStart as the starting position in parse/toAbstract/elaborate)
+              logText "  parsing\n"
+              logText "    implStart =\n"
+              logText . Text.pack . show . pretty $ implStart
+              logText "\n"
+              case parseFragment implStart holelessImplText of
+                Left err           -> onError (ParseError err)
+                Right concreteImpl -> do
+                  -- concrete to abstract
+                  logText "  text parsed\n"
+                  case toAbstractFragment concreteImpl of
+                    Nothing           -> do
+                      error "Holes still found after digging all holes. Should not happen\n"
+                    Just abstractImpl -> do
+                      logText "  abstracted\n"
+                      -- get spec (along with its type environment)
+                      let FileState{specifications} = fileState
+                      logText "  looking for specs\n"
+                      case lookupSpecByLines specifications specLines of
+                        Nothing   -> do
+                          logText "  spec not found at range, should reload\n"
+                          onError (Others "Refine Error" "spec not found at range, should reload" NoLoc)
+                        Just spec -> do
+                          logText "  matching spec found\n"
+                          -- elaborate
+                          let typeEnv = specTypeEnv spec
+                          logText " type env:\n"
+                          logText (Text.pack $ show typeEnv)
+                          logText "\n"
+                          -- TODO:
+                          -- 1. Load: 在 elaborate program 的時候，要把 specTypeEnv 加到 spec 裡 (Andy) ok
+                          -- 2. Load: 在 sweep 的時候，改成輸入 elaborated program，把 elaborated program 裡面的 spec 的 typeEnv 加到輸出的 [Spec] 裡 (SCM)
+                          -- 3. Refine: elaborateFragment 裡面要正確使用 typeEnv (Andy) ok
+                          case elaborateFragment typeEnv abstractImpl of
+                            Left err -> do
+                              logText "  type error\n"
+                              onError (TypeError err)
+                            Right typedImpl -> do
+                              -- get POs and specs
+                              logText "  type checked\n"
+                              let FileState{idCount} = fileState
+                              case sweepFragment idCount spec typedImpl of
+                                Left err -> onError (StructError err)
+                                Right (innerPos, innerSpecs, warnings, idCount') -> do
+                                  logText "  swept\n"
+                                  -- delete outer spec (by id)
+                                  deleteSpec filePath spec
+                                  logText "  outer spec deleted (refine)\n"
+                                  -- add inner specs to fileState
+                                  let FileState{editedVersion} = fileState
+                                  updateIdCounter filePath idCount'
+                                  logText "  counter updated (refine)\n"
+                                  let innerSpecs' = predictAndTranslateSpecRanges innerSpecs
+                                  let innerPos' = predictAndTranslatePosRanges innerPos
+                                  pushSpecs (editedVersion + 1) filePath innerSpecs'
+                                  pushPos (editedVersion + 1) filePath innerPos'
+                                  -- let FileState{specifications, proofObligations} = fileState
+                                  -- let fileState' = fileState
+                                  --                   { specifications = specifications ++ Prelude.map (\spec -> (editedVersion + 1, spec)) innerSpecs'
+                                  --                   , proofObligations = proofObligations ++ Prelude.map (\po -> (editedVersion + 1, po)) innerPos'
+                                  --                   }
 
-                              -- saveFileState filePath fileState'
-                              
-                              logText "  new specs and POs added (refine)\n"
-                              -- send notification to update Specs and POs
-                              logText "refine: success\n"
-                              sendUpdateNotification filePath
-                              -- -- clear errors
-                              sendErrorNotification filePath []
-                              logText "refine: update notification sent\n"
-                              -- edit source (dig holes + remove outer brackets)
-                              editTexts filePath [(specLines, holelessImplText)] do
-                                logText "  text edited (refine)\n"
-                                onFinish ()
+                                  -- saveFileState filePath fileState'
+                                  
+                                  logText "  new specs and POs added (refine)\n"
+                                  -- send notification to update Specs and POs
+                                  logText "refine: success\n"
+                                  sendUpdateNotification filePath
+                                  -- -- clear errors
+                                  sendErrorNotification filePath []
+                                  logText "refine: update notification sent\n"
+                                  -- edit source (dig holes + remove outer brackets)
+                                  editTexts filePath [(specLines, holelessImplText)] do
+                                    logText "  text edited (refine)\n"
+                                    onFinish ()
   logText "refine: end\n"
   where
     onError :: Error -> ServerM ()
@@ -197,9 +204,26 @@ handler _params@RefineParams{filePath, specLines, implText, implStart} onFinish 
         modifyOriginLocation f (AtTermination l) = AtTermination (f l)
         modifyOriginLocation f (Explain h e i p l) = Explain h e i p (f l)
 
--- 把每一行都拿掉
-removeOneIndentation :: Text -> Text
-removeOneIndentation implText = Text.intercalate "\n" $ map (Text.drop 4) (Text.lines implText)
+bracketsOccupyOwnLines :: Text -> Bool
+bracketsOccupyOwnLines specText =
+  hasAtLeastTwoLines specText
+  && firstLine specText `onlyIncludes` ['!', '[', ' ', '\t', '\n', '\r']
+  && lastLine specText `onlyIncludes` ['!', ']', ' ', '\t', '\n', '\r']
+
+hasAtLeastTwoLines :: Text -> Bool
+hasAtLeastTwoLines = (>= 2) . length . Text.lines
+
+firstLine :: Text -> Text
+firstLine = head . Text.lines
+
+lastLine :: Text -> Text
+lastLine = last . Text.lines
+
+onlyIncludes :: Text -> [Char] -> Bool
+onlyIncludes text cs = Text.null (Text.filter (`notElem` cs) text)
+
+removeFirstAndLastLine :: Text -> Text
+removeFirstAndLastLine = Text.intercalate "\n" . tail . init . Text.lines
 
 lookupSpecByLines :: [Versioned Spec] -> Range -> Maybe Spec
 lookupSpecByLines specs targetLines = do

@@ -25,7 +25,7 @@ instance Pretty Error where
   pretty (StructError err) =
     "Struct Error" <+> pretty (locOf err) <> line <> pretty err
   pretty (CannotReadFile path) = "CannotReadFile" <+> pretty path
-  pretty (Others         msg ) = "Others" <+> pretty msg
+  pretty (Others         title msg loc) = "Others" <+> pretty title <+> pretty msg <+> pretty (displayLoc loc)
 
 instance Pretty ParseError where
   pretty (LexicalError   pos  ) = "Lexical Error" <+> pretty (displayPos pos)
