@@ -62,8 +62,7 @@ data TypeError
     | RedundantNames [Name]
     | RedundantExprs [Expr]
     | MissingArguments [Name]
-    | TooFewPatterns [Type]
-    | TooManyPatterns [Pattern]
+    | PatternArityMismatch {- Expected -} Int {- Actual -} Int Loc
     deriving (Show, Eq, Generic)
 
 instance Located TypeError where
@@ -78,8 +77,7 @@ instance Located TypeError where
   locOf (RedundantNames        ns   ) = locOf ns
   locOf (RedundantExprs        exprs) = locOf exprs
   locOf (MissingArguments      ns   ) = locOf ns
-  locOf (TooFewPatterns        tys  ) = locOf tys
-  locOf (TooManyPatterns       pats ) = locOf pats
+  locOf (PatternArityMismatch _ _ l ) = l
 
 instance Substitutable (Subs Type) TypeInfo where
   subst s (TypeDefnCtorInfo t) = TypeDefnCtorInfo (subst s t)
@@ -884,7 +882,7 @@ instance Elab Expr where
               Just tyPrevRhs -> do
                 sub''' <- unifyType (subst (sub'' `compose` sub') tyClause) (subst (sub'' `compose` sub') tyPrevRhs) (locOf tyClause)
                 return (sub''' `compose` sub'' `compose` sub', subst (sub''' `compose` sub'' `compose` sub') tyTop, Just $ subst (sub''' `compose` sub'' `compose` sub') tyClause, subst (sub''' `compose` sub'' `compose` sub') typedClause : res)
-      
+
       inferClause :: CaseClause -> Type -> ElaboratorM (Type, Type, Typed CaseClause, Subs Type)
       inferClause (CaseClause patts expr) ty = do
         (env', sub) <- patBind patts ty
@@ -910,13 +908,11 @@ instance Elab Expr where
                       instantiated <- mapM instantiate (input : outputs) -- TODO: Important! We probably have to instantiate the types earlier.
                       let (input' : outputs') = instantiated
                       sub <- unifyType ty input' (locOf input')
-                      if
-                        | length subpats < length outputs' -> throwError $ TooFewPatterns (drop (length subpats) outputs')
-                        | length subpats > length outputs' -> throwError $ TooManyPatterns (drop (length outputs) subpats)
-                        | otherwise      -> do
-                          list <- zipWithM patBind subpats (subst sub outputs')
-                          let (envs, subs) = unzip list
-                          return (mconcat envs, mconcat (sub : subs))
+                      if length subpats /= length outputs' then throwError $ PatternArityMismatch (length outputs) (length subpats) (locOf pat)
+                      else do
+                        list <- zipWithM patBind subpats (subst sub outputs')
+                        let (envs, subs) = unzip list
+                        return (mconcat envs, mconcat (sub : subs))
 
 instance Elab Chain where -- TODO: Make sure the below implementation is correct.
   elaborate (More (More ch' op1 e1 loc1) op2 e2 loc2) env = do
