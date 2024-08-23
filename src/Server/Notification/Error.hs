@@ -122,7 +122,6 @@ instance JSON.ToJSON TypeError where
     ]
   -- FIXME: Implement these.
   toJSON (KindUnifyFailed _ _ _) = object []
-  toJSON (NotKFunc _ _) = object []
   toJSON (PatternArityMismatch _ _ _) = object []
 
 instance JSON.ToJSON StructError where
