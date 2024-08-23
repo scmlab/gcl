@@ -27,7 +27,7 @@ p := 3
 p := 5
 p,x,y := N-1, 1, 1
 
-{ P ∧ Q, bnd: p }
+{ P ∧ Q }
 do p ≠ 0 ->
     if mod p x = 0 -> y, p := y + 1, p - x
      | mod p y = 0 -> x, p := x + 1, p - y

@@ -25,14 +25,11 @@ ask file state ref
 ask file state map
 lookup file state map
   found
-json: decoding request
-Object (fromList [("filePath",String "/Users/vince/Documents/gcl/examples/factor.gcl"),("implStart",Object (fromList [("byte",Number 172.0),("column",Number 1.0),("file",String "/Users/vince/Documents/gcl/examples/factor.gcl"),("line",Number 13.0)])),("specLines",Object (fromList [("end",Object (fromList [("byte",Number 176.0),("column",Number 3.0),("file",String "/Users/vince/Documents/gcl/examples/factor.gcl"),("line",Number 14.0)])),("start",Object (fromList [("byte",Number 167.0),("column",Number 1.0),("file",String "/Users/vince/Documents/gcl/examples/factor.gcl"),("line",Number 12.0)]))])),("specText",String "[! a\n\n!]")])json: decoding succeeded
-refine: start
-  params
-RefineParams {filePath = "/Users/vince/Documents/gcl/examples/factor.gcl", specText = "[! a\n\n!]", specLines = /Users/vince/Documents/gcl/examples/factor.gcl [167-176] 12:1-14:3, implStart = Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 13 1 172}
-  specLines:
-/Users/vince/Documents/gcl/examples/factor.gcl [167-176] 12:1-14:3
-  specText invalidrefine: error
-	Others Refine Error the opening "[!" and closing "!]" brackets must occupy their own lines. Any code on the same lines as the brackets is not allowed. /Users/vince/Documents/gcl/examples/factor.gcl:12:1-14:3
-refine: update notification sent
-refine: end
+hover: start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+hover: success
+hover: response sent
+hover: end
