@@ -99,15 +99,10 @@ instance RenderSection TypeError where
     [ Header "Missing arguments" (fromLoc (locOf ns))
     , Paragraph $ "Missing arguments" <+> renderManySepByComma ns
     ]
-  renderSection (TooFewPatterns tys) = Section
+  renderSection (PatternArityMismatch expected actual loc) = Section
     Red
-    [ Header "Extra arguments" (fromLoc (locOf tys))
-    , Paragraph $ "Extra argument(s) of type(s)" <+> renderManySepByComma tys
-    ]
-  renderSection (TooManyPatterns pats) = Section
-    Red
-    [ Header "Redundent patterns" (fromLoc (locOf pats))
-    , Paragraph $ "Redundent patterns" <+> renderManySepByComma pats
+    [ Header "Pattern arity mismatch" (fromLoc loc)
+    , Paragraph $ "Expect" <+> render expected <+> "arguments but found" <+> render actual
     ]
 
 instance RenderSection StructError where

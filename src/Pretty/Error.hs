@@ -68,7 +68,5 @@ instance Pretty TypeError where
     "The exprs: " <+> pretty exprs <+> "are redundant"
   pretty (MissingArguments ns) =
     "The arguments: " <+> pretty ns <+> "are missing"
-  pretty (TooFewPatterns tys) =
-    "The subpatterns does not cover: " <+> pretty tys
-  pretty (TooManyPatterns pats) =
-    "The patterns: " <+> pretty pats <+> "are redundent"  
+  pretty (PatternArityMismatch expected actual _) =
+    "Expect" <+> pretty expected <+> "arguments but found" <+> pretty actual
