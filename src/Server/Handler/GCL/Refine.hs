@@ -13,7 +13,7 @@ import qualified Data.Aeson as JSON
 import GHC.Generics ( Generic )
 import Data.Bifunctor ( bimap )
 import Control.Monad.Except           ( runExcept, when )
-import Server.Monad (ServerM, FileState(..), loadFileState, editTexts, pushSpecs, deleteSpec, Versioned, pushPos, updateIdCounter, logText, saveFileState)
+import Server.Monad (ServerM, FileState(..), loadFileState, editTexts, pushSpecs, deleteSpec, Versioned, pushPos, updateIdCounter, logText, saveFileState, pushWarnings)
 import Server.Notification.Update (sendUpdateNotification)
 import Server.Notification.Error (sendErrorNotification)
 
@@ -34,7 +34,7 @@ import qualified Data.Map        as Map
 import qualified Syntax.Concrete as C
 import qualified Syntax.Abstract as A
 import qualified Syntax.Typed    as T
-import GCL.WP.Types (StructError, StructWarning)
+import GCL.WP.Types (StructError, StructWarning (..))
 import GCL.WP
 import qualified Data.Text as Text
 import Pretty (pretty)
@@ -139,7 +139,7 @@ handler _params@RefineParams{filePath, specLines, specText, implStart} onFinish 
                               let FileState{idCount} = fileState
                               case sweepFragment idCount spec typedImpl of
                                 Left err -> onError (StructError err)
-                                Right (innerPos, innerSpecs, warnings, idCount') -> do
+                                Right (innerPos, innerSpecs, innerWarnings, idCount') -> do
                                   logText "  swept\n"
                                   -- delete outer spec (by id)
                                   deleteSpec filePath spec
@@ -150,8 +150,10 @@ handler _params@RefineParams{filePath, specLines, specText, implStart} onFinish 
                                   logText "  counter updated (refine)\n"
                                   let innerSpecs' = predictAndTranslateSpecRanges innerSpecs
                                   let innerPos' = predictAndTranslatePosRanges innerPos
+                                  let innerWarnings' = predictAndTranslateWarningsRanges innerWarnings
                                   pushSpecs (editedVersion + 1) filePath innerSpecs'
                                   pushPos (editedVersion + 1) filePath innerPos'
+                                  pushWarnings (editedVersion + 1) filePath innerWarnings'
                                   -- let FileState{specifications, proofObligations} = fileState
                                   -- let fileState' = fileState
                                   --                   { specifications = specifications ++ Prelude.map (\spec -> (editedVersion + 1, spec)) innerSpecs'
@@ -203,7 +205,11 @@ handler _params@RefineParams{filePath, specLines, specText, implStart} onFinish 
         modifyOriginLocation f (AtLoop        l) = AtLoop (f l)
         modifyOriginLocation f (AtTermination l) = AtTermination (f l)
         modifyOriginLocation f (Explain h e i p l) = Explain h e i p (f l)
-
+    predictAndTranslateWarningsRanges :: [StructWarning] -> [StructWarning]
+    predictAndTranslateWarningsRanges = map (\(MissingBound range) -> MissingBound (minusOneLine' range))
+      where
+        minusOneLine' :: Range -> Range
+        minusOneLine' (Range start end) = Range (minusOneLine start) (minusOneLine end)
 bracketsOccupyOwnLines :: Text -> Bool
 bracketsOccupyOwnLines specText =
   hasAtLeastTwoLines specText

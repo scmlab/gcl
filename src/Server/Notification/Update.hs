@@ -33,7 +33,7 @@ makeUpdateNotificationJson filePath FileState{specifications, proofObligations, 
   [ "filePath" .= JSON.toJSON filePath
   , "specs" .= JSON.toJSON (map snd specifications)
   , "pos" .= JSON.toJSON (map snd proofObligations)
-  , "warnings" .= JSON.toJSON warnings
+  , "warnings" .= JSON.toJSON (map snd warnings)
   ]
 
 instance JSON.ToJSON Spec where

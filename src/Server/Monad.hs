@@ -54,7 +54,7 @@ data FileState = FileState
   { refinedVersion   :: Int  -- the version number of the last refine
   , specifications   :: [Versioned Spec] -- editedVersion or (editedVersion + 1)
   , proofObligations :: [Versioned PO] -- editedVersion
-  , warnings         :: [StructWarning]
+  , warnings         :: [Versioned StructWarning]
 
   -- to support other LSP methods in a light-weighted manner
   , loadedVersion    :: Int  -- the version number of the last reload
@@ -161,6 +161,13 @@ pushPos version filePath newPos = do
   let newVersionedPos :: [Versioned PO] = Prelude.map (\po -> (version, po)) newPos
   modifyFileState filePath (\fileState@FileState{proofObligations} ->
     fileState{proofObligations = proofObligations ++ newVersionedPos})
+
+pushWarnings :: Int -> FilePath -> [StructWarning] -> ServerM ()
+pushWarnings version filePath newWarnings = do
+  let newVersionedWarnings :: [Versioned StructWarning] = Prelude.map (\warning -> (version, warning)) newWarnings
+  modifyFileState filePath (\fileState@FileState{warnings} ->
+    fileState{warnings = warnings ++ newVersionedWarnings})
+
 
 deleteSpec :: FilePath -> Spec -> ServerM ()
 deleteSpec filePath Specification{specID = targetSpecId} = do

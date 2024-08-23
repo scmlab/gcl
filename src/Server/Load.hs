@@ -86,7 +86,7 @@ load filePath = do
                                         { refinedVersion   = currentVersion
                                         , specifications   = map (\spec -> (currentVersion, spec)) specs
                                         , proofObligations = map (\po -> (currentVersion, po)) pos
-                                        , warnings         = warnings
+                                        , warnings         = map (\warning -> (currentVersion, warning)) warnings
 
                                         -- to support other LSP methods in a light-weighted manner
                                         , loadedVersion    = currentVersion
