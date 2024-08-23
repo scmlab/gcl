@@ -54,7 +54,6 @@ data TypeError
     = NotInScope Name
     | UnifyFailed Type Type Loc
     | KindUnifyFailed Kind Kind Loc -- TODO: Deal with this replication in a better way.
-    | NotKFunc Kind Loc
     | RecursiveType Name Type Loc
     | AssignToConst Name
     | UndefinedType Name
@@ -69,7 +68,6 @@ instance Located TypeError where
   locOf (NotInScope n               ) = locOf n
   locOf (UnifyFailed _ _ l          ) = l
   locOf (KindUnifyFailed _ _ l      ) = l
-  locOf (NotKFunc _ l               ) = l
   locOf (RecursiveType _ _ l        ) = l
   locOf (AssignToConst         n    ) = locOf n
   locOf (UndefinedType         n    ) = locOf n
@@ -546,61 +544,50 @@ instance Elab Definition where
                     return typed
                   ) maybeExpr
     (_, infos, _, _) <- get
-    kinded <- toKinded infos ty
-    kind <- kindCheck kinded
+    (kind, kinded) <- toKinded infos ty
     if kind == KStar NoLoc then return () else throwError $ KindUnifyFailed kind (KStar NoLoc) (locOf kind)
     return (Nothing, T.FuncDefnSig name kinded expr' loc, mempty)
     where
-      toKinded :: [(Index, Kind)] -> Type -> ElaboratorM T.KindedType
+      toKindEnv :: [(Index, Kind)] -> KindEnv
+      toKindEnv infos = (\(Index name', kind) -> KindAnno name' kind) <$> infos
+
+      toKinded :: [(Index, Kind)] -> Type -> ElaboratorM (Kind, T.KindedType)
       toKinded env ty = do
         case ty of
-          TBase base loc -> return $ T.TBase base (KStar loc) loc
+          TBase base loc -> return (KStar loc, T.TBase base (KStar loc) loc)
           TArray int ty loc -> do
-            kindedTy <- toKinded env ty
-            return $ T.TArray int kindedTy loc
-          TTuple n -> return $ T.TTuple n (kindFromArity n)
+            (kind, kindedTy) <- toKinded env ty
+            _ <- unifyKind (toKindEnv env) kind (KStar loc) loc
+            return (KStar loc, T.TArray int kindedTy loc)
+          TTuple n -> return (kindFromArity n, T.TTuple n (kindFromArity n))
           TFunc l r loc -> do
-            l' <- toKinded env l
-            r' <- toKinded env r
-            return $ T.TFunc l' r' loc
-          TOp arrow@(Arrow _) -> return $ T.TOp arrow (KFunc (KStar loc) (KFunc (KStar loc) (KStar loc) loc) loc)
+            (lKind, kindedL) <- toKinded env l
+            (rKind, kindedR) <- toKinded env r
+            _ <- unifyKind (toKindEnv env) lKind (KStar loc) loc
+            _ <- unifyKind (toKindEnv env) rKind (KStar loc) loc
+            return $ (KStar loc, T.TFunc kindedL kindedR loc)
+          TOp arrow@(Arrow _) -> return (KFunc (KStar loc) (KFunc (KStar loc) (KStar loc) loc) loc, T.TOp arrow (KFunc (KStar loc) (KFunc (KStar loc) (KStar loc) loc) loc))
           TData name loc -> do
             case lookup (Index name) env of
-              Just k -> return $ T.TData name k loc
+              Just k -> return (k, T.TData name k loc)
               _ -> error "Shouldn't happen."
           TApp ty1 ty2 loc -> do
-            kindedTy1 <- toKinded env ty1
-            kindedTy2 <- toKinded env ty2
-            return $ T.TApp kindedTy1 kindedTy2 loc
+            (ty1Kind, kindedTy1) <- toKinded env ty1
+            (ty2Kind, kindedTy2) <- toKinded env ty2
+            case ty1Kind of
+              KStar loc' -> throwError $ KindUnifyFailed (KStar loc') (KFunc (KMetaVar (Name "k" NoLoc)) (KStar NoLoc) NoLoc) (locOf ty1Kind)
+              KFunc kind1 kind2 loc' -> do
+                _ <- unifyKind (toKindEnv env) ty2Kind kind1 (locOf ty2Kind)
+                return (kind2, T.TApp kindedTy1 kindedTy2 loc)
+              _ -> error "Shouldn't happen."
           TVar name loc -> do
             case lookup (Index name) env of
-              Just k -> return $ T.TVar name k loc
+              Just k -> return (k, T.TVar name k loc)
               _ -> error "Shouldn't happen."
           TMetaVar name loc -> do
             case lookup (Index name) env of
-              Just k -> return $ T.TMetaVar name k loc
+              Just k -> return (k, T.TMetaVar name k loc)
               _ -> error "Shouldn't happen."
-
-      kindCheck :: T.KindedType -> ElaboratorM Kind
-      kindCheck kinded = case kinded of
-        T.TBase _ kind _ -> return kind
-        T.TArray _ kinded _ -> kindCheck kinded
-        T.TTuple _ kind -> return kind
-        T.TFunc l r _  -> kindCheck l >> kindCheck r
-        T.TOp _ kind -> return kind
-        T.TData _ kind _ -> return kind
-        T.TApp kinded1 kinded2 _ -> do
-          kind1 <- kindCheck kinded1
-          kind2 <- kindCheck kinded2
-          applyKind kind1 kind2
-        T.TVar _ kind _ -> return kind
-        T.TMetaVar _ kind _ -> return kind
-
-      applyKind :: Kind -> Kind -> ElaboratorM Kind
-      applyKind (KFunc left right loc) k2 = do
-        _ <- unifyKind mempty left k2 loc
-        return right
-      applyKind k _ = throwError $ NotKFunc k (locOf k)
 
   elaborate (FuncDefn name expr) env = do
     (_, typed, _) <- elaborate expr env

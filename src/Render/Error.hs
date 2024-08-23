@@ -54,11 +54,6 @@ instance RenderSection TypeError where
     [ Header "Cannot unify kinds" (fromLoc loc)
     , Paragraph $ "Cannot unify: " <> render s <> "\nwith        :" <+> render t
     ]
-  renderSection (NotKFunc k loc) = Section
-    Red
-    [ Header "Not a kind-level function" (fromLoc loc)
-    , Paragraph $ render k <> " is not a kind-level function"
-    ]
   renderSection (RecursiveType name t loc) = Section
     Red
     [ Header "Recursive type variable" (fromLoc loc)
