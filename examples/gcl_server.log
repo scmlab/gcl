@@ -25,3 +25,1820 @@ ask file state ref
 ask file state map
 lookup file state map
   found
+STextDocumentDidChange start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+====== /Users/vince/Documents/gcl/examples/factor.gcl ======
+
+ask file state ref
+ask file state map
+lookup file state map
+  found
+loaded
+[(1,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 13:1-15:3),(1,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 10:1-12:3)]
+=======================
+didChange: fileState modified
+ask file state ref
+ask file state map
+lookup file state map
+  found
+didChange: upate notification sent
+STextDocumentDidChange end
+semantic token: start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+json: decoding request
+Object (fromList [("filePath",String "/Users/vince/Documents/gcl/examples/factor.gcl"),("implStart",Object (fromList [("byte",Number 154.0),("column",Number 1.0),("file",String "/Users/vince/Documents/gcl/examples/factor.gcl"),("line",Number 14.0)])),("implText",String "?"),("specLines",Object (fromList [("end",Object (fromList [("byte",Number 159.0),("column",Number 3.0),("file",String "/Users/vince/Documents/gcl/examples/factor.gcl"),("line",Number 15.0)])),("start",Object (fromList [("byte",Number 151.0),("column",Number 1.0),("file",String "/Users/vince/Documents/gcl/examples/factor.gcl"),("line",Number 13.0)]))]))])json: decoding succeeded
+refine: start
+  params
+RefineParams {filePath = "/Users/vince/Documents/gcl/examples/factor.gcl", implText = "?", specLines = /Users/vince/Documents/gcl/examples/factor.gcl [151-159] 13:1-15:3, implStart = Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 14 1 154}
+  specLines:
+/Users/vince/Documents/gcl/examples/factor.gcl [151-159] 13:1-15:3
+ask file state ref
+ask file state map
+lookup file state map
+  found
+  fileState loaded
+  implText:
+?
+  holes digged
+    (after)
+[!
+
+!]
+  parsing
+    implStart =
+/Users/vince/Documents/gcl/examples/factor.gcl:14:1
+  text parsed
+  abstracted
+  looking for specs
+  matching spec found
+ type env:
+[(Index (Name "Q" (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 6 5 98) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 6 6 99))),ConstTypeInfo (TBase TBool (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 6 23 116) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 6 24 117)))),(Index (Name "P" (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 5 5 76) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 5 6 77))),ConstTypeInfo (TBase TBool (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 5 19 90) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 5 20 91)))),(Index (Name "Q" (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 6 5 98) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 6 6 99))),ConstTypeInfo (TVar (Name "?Type.var_0" NoLoc) NoLoc)),(Index (Name "P" (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 5 5 76) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 5 6 77))),ConstTypeInfo (TVar (Name "?Type.var_1" NoLoc) NoLoc)),(Index (Name "mod" (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 5 47) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 8 50))),VarTypeInfo (TApp (TApp (TOp (Arrow (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 15 57) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 17 59)))) (TBase TInt (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 11 53) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 14 56))) (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 11 53) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 17 59))) (TApp (TApp (TOp (Arrow (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 22 64) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 24 66)))) (TBase TInt (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 18 60) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 21 63))) (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 18 60) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 24 66))) (TBase TInt (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 25 67) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 28 70))) (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 18 60) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 28 70))) (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 11 53) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 28 70)))),(Index (Name "p" (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 5 26) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 6 27))),VarTypeInfo (TBase TInt (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 18 39) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 21 42)))),(Index (Name "x" (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 8 29) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 9 30))),VarTypeInfo (TBase TInt (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 18 39) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 21 42)))),(Index (Name "y" (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 11 32) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 12 33))),VarTypeInfo (TBase TInt (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 18 39) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 21 42)))),(Index (Name "n" (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 14 35) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 15 36))),VarTypeInfo (TBase TInt (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 18 39) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 21 42)))),(Index (Name "N" (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 1 5 4) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 1 6 5))),ConstTypeInfo (TBase TInt (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 1 9 8) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 1 12 11))))]
+  type checked
+  swept
+ask file state ref
+ask file state map
+lookup file state map
+  found
+  outer spec deleted (refine)
+ask file state ref
+ask file state map
+lookup file state map
+  found
+  counter updated (refine)
+ask file state ref
+ask file state map
+lookup file state map
+  found
+ask file state ref
+ask file state map
+lookup file state map
+  found
+  new specs and POs added (refine)
+refine: success
+ask file state ref
+ask file state map
+lookup file state map
+  found
+refine: update notification sent
+refine: end
+STextDocumentDidChange start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+====== /Users/vince/Documents/gcl/examples/factor.gcl ======
+
+ask file state ref
+ask file state map
+lookup file state map
+  found
+loaded
+[(2,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 10:1-12:3),(2,/Users/vince/Documents/gcl/examples/factor.gcl [0-0] 13:1-15:3)]
+=======================
+didChange: fileState modified
+ask file state ref
+ask file state map
+lookup file state map
+  found
+didChange: upate notification sent
+STextDocumentDidChange end
+  text edited (refine)
+semantic token: start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+STextDocumentDidChange start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+====== /Users/vince/Documents/gcl/examples/factor.gcl ======
+
+ask file state ref
+ask file state map
+lookup file state map
+  found
+loaded
+[(3,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 10:1-12:3),(3,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 13:1-15:3)]
+=======================
+didChange: fileState modified
+ask file state ref
+ask file state map
+lookup file state map
+  found
+didChange: upate notification sent
+STextDocumentDidChange end
+STextDocumentDidChange start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+====== /Users/vince/Documents/gcl/examples/factor.gcl ======
+
+ask file state ref
+ask file state map
+lookup file state map
+  found
+loaded
+[(4,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 10:1-12:3),(4,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 13:1-16:3)]
+=======================
+didChange: fileState modified
+ask file state ref
+ask file state map
+lookup file state map
+  found
+didChange: upate notification sent
+STextDocumentDidChange end
+semantic token: start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+STextDocumentDidChange start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+====== /Users/vince/Documents/gcl/examples/factor.gcl ======
+
+ask file state ref
+ask file state map
+lookup file state map
+  found
+loaded
+[(5,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 10:1-12:3),(5,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 13:1-16:3)]
+=======================
+didChange: fileState modified
+ask file state ref
+ask file state map
+lookup file state map
+  found
+didChange: upate notification sent
+STextDocumentDidChange end
+semantic token: start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+json: decoding request
+Object (fromList [("filePath",String "/Users/vince/Documents/gcl/examples/factor.gcl"),("implStart",Object (fromList [("byte",Number 154.0),("column",Number 1.0),("file",String "/Users/vince/Documents/gcl/examples/factor.gcl"),("line",Number 14.0)])),("implText",String "?\n?"),("specLines",Object (fromList [("end",Object (fromList [("byte",Number 161.0),("column",Number 3.0),("file",String "/Users/vince/Documents/gcl/examples/factor.gcl"),("line",Number 16.0)])),("start",Object (fromList [("byte",Number 151.0),("column",Number 1.0),("file",String "/Users/vince/Documents/gcl/examples/factor.gcl"),("line",Number 13.0)]))]))])json: decoding succeeded
+refine: start
+  params
+RefineParams {filePath = "/Users/vince/Documents/gcl/examples/factor.gcl", implText = "?\n?", specLines = /Users/vince/Documents/gcl/examples/factor.gcl [151-161] 13:1-16:3, implStart = Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 14 1 154}
+  specLines:
+/Users/vince/Documents/gcl/examples/factor.gcl [151-161] 13:1-16:3
+ask file state ref
+ask file state map
+lookup file state map
+  found
+  fileState loaded
+  implText:
+?
+?
+  holes digged
+    (after)
+[!
+
+!]
+[!
+
+!]
+  parsing
+    implStart =
+/Users/vince/Documents/gcl/examples/factor.gcl:14:1
+  text parsed
+  abstracted
+  looking for specs
+  matching spec found
+ type env:
+[]
+  type checked
+  swept
+ask file state ref
+ask file state map
+lookup file state map
+  found
+  outer spec deleted (refine)
+ask file state ref
+ask file state map
+lookup file state map
+  found
+  counter updated (refine)
+ask file state ref
+ask file state map
+lookup file state map
+  found
+ask file state ref
+ask file state map
+lookup file state map
+  found
+  new specs and POs added (refine)
+refine: success
+ask file state ref
+ask file state map
+lookup file state map
+  found
+refine: update notification sent
+refine: end
+STextDocumentDidChange start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+====== /Users/vince/Documents/gcl/examples/factor.gcl ======
+
+ask file state ref
+ask file state map
+lookup file state map
+  found
+loaded
+[(6,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 10:1-12:3),(6,/Users/vince/Documents/gcl/examples/factor.gcl [0-0] 16:1-18:3),(6,/Users/vince/Documents/gcl/examples/factor.gcl [0-0] 13:1-15:3)]
+=======================
+didChange: fileState modified
+ask file state ref
+ask file state map
+lookup file state map
+  found
+didChange: upate notification sent
+STextDocumentDidChange end
+  text edited (refine)
+semantic token: start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+STextDocumentDidChange start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+====== /Users/vince/Documents/gcl/examples/factor.gcl ======
+
+ask file state ref
+ask file state map
+lookup file state map
+  found
+loaded
+[(7,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 11:1-13:3),(7,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 17:1-19:3),(7,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 14:1-16:3)]
+=======================
+didChange: fileState modified
+ask file state ref
+ask file state map
+lookup file state map
+  found
+didChange: upate notification sent
+STextDocumentDidChange end
+STextDocumentDidChange start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+====== /Users/vince/Documents/gcl/examples/factor.gcl ======
+
+ask file state ref
+ask file state map
+lookup file state map
+  found
+loaded
+[(8,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 12:1-14:3),(8,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 18:1-20:3),(8,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 15:1-17:3)]
+=======================
+didChange: fileState modified
+ask file state ref
+ask file state map
+lookup file state map
+  found
+didChange: upate notification sent
+STextDocumentDidChange end
+semantic token: start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+STextDocumentDidChange start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+====== /Users/vince/Documents/gcl/examples/factor.gcl ======
+
+ask file state ref
+ask file state map
+lookup file state map
+  found
+loaded
+[(9,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 13:1-15:3),(9,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 19:1-21:3),(9,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 16:1-18:3)]
+=======================
+didChange: fileState modified
+ask file state ref
+ask file state map
+lookup file state map
+  found
+didChange: upate notification sent
+STextDocumentDidChange end
+semantic token: start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+STextDocumentDidChange start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+====== /Users/vince/Documents/gcl/examples/factor.gcl ======
+
+ask file state ref
+ask file state map
+lookup file state map
+  found
+loaded
+[(10,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 14:1-16:3),(10,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 20:1-22:3),(10,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 17:1-19:3)]
+=======================
+didChange: fileState modified
+ask file state ref
+ask file state map
+lookup file state map
+  found
+didChange: upate notification sent
+STextDocumentDidChange end
+semantic token: start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+STextDocumentDidChange start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+====== /Users/vince/Documents/gcl/examples/factor.gcl ======
+
+ask file state ref
+ask file state map
+lookup file state map
+  found
+loaded
+[(11,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 14:1-17:3),(11,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 21:1-23:3),(11,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 18:1-20:3)]
+=======================
+didChange: fileState modified
+ask file state ref
+ask file state map
+lookup file state map
+  found
+didChange: upate notification sent
+STextDocumentDidChange end
+semantic token: start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+STextDocumentDidChange start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+====== /Users/vince/Documents/gcl/examples/factor.gcl ======
+
+ask file state ref
+ask file state map
+lookup file state map
+  found
+loaded
+[(12,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 14:1-18:3),(12,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 22:1-24:3),(12,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 19:1-21:3)]
+=======================
+didChange: fileState modified
+ask file state ref
+ask file state map
+lookup file state map
+  found
+didChange: upate notification sent
+STextDocumentDidChange end
+semantic token: start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+STextDocumentDidChange start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+====== /Users/vince/Documents/gcl/examples/factor.gcl ======
+
+ask file state ref
+ask file state map
+lookup file state map
+  found
+loaded
+[(13,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 14:1-19:3),(13,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 23:1-25:3),(13,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 20:1-22:3)]
+=======================
+didChange: fileState modified
+ask file state ref
+ask file state map
+lookup file state map
+  found
+didChange: upate notification sent
+STextDocumentDidChange end
+semantic token: start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+STextDocumentDidChange start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+====== /Users/vince/Documents/gcl/examples/factor.gcl ======
+
+ask file state ref
+ask file state map
+lookup file state map
+  found
+loaded
+[(14,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 14:1-19:3),(14,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 23:1-25:3),(14,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 20:1-22:3)]
+=======================
+didChange: fileState modified
+ask file state ref
+ask file state map
+lookup file state map
+  found
+didChange: upate notification sent
+STextDocumentDidChange end
+STextDocumentDidChange start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+====== /Users/vince/Documents/gcl/examples/factor.gcl ======
+
+ask file state ref
+ask file state map
+lookup file state map
+  found
+loaded
+[(15,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 14:1-20:3),(15,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 24:1-26:3),(15,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 21:1-23:3)]
+=======================
+didChange: fileState modified
+ask file state ref
+ask file state map
+lookup file state map
+  found
+didChange: upate notification sent
+STextDocumentDidChange end
+STextDocumentDidChange start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+====== /Users/vince/Documents/gcl/examples/factor.gcl ======
+
+ask file state ref
+ask file state map
+lookup file state map
+  found
+loaded
+[(16,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 14:1-20:3),(16,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 24:1-26:3),(16,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 21:1-23:3)]
+=======================
+didChange: fileState modified
+ask file state ref
+ask file state map
+lookup file state map
+  found
+didChange: upate notification sent
+STextDocumentDidChange end
+semantic token: start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+json: decoding request
+Object (fromList [("filePath",String "/Users/vince/Documents/gcl/examples/factor.gcl"),("implStart",Object (fromList [("byte",Number 151.0),("column",Number 1.0),("file",String "/Users/vince/Documents/gcl/examples/factor.gcl"),("line",Number 15.0)])),("implText",String "\n\n\n?\n?"),("specLines",Object (fromList [("end",Object (fromList [("byte",Number 161.0),("column",Number 3.0),("file",String "/Users/vince/Documents/gcl/examples/factor.gcl"),("line",Number 20.0)])),("start",Object (fromList [("byte",Number 148.0),("column",Number 1.0),("file",String "/Users/vince/Documents/gcl/examples/factor.gcl"),("line",Number 14.0)]))]))])json: decoding succeeded
+refine: start
+  params
+RefineParams {filePath = "/Users/vince/Documents/gcl/examples/factor.gcl", implText = "\n\n\n?\n?", specLines = /Users/vince/Documents/gcl/examples/factor.gcl [148-161] 14:1-20:3, implStart = Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 15 1 151}
+  specLines:
+/Users/vince/Documents/gcl/examples/factor.gcl [148-161] 14:1-20:3
+ask file state ref
+ask file state map
+lookup file state map
+  found
+  fileState loaded
+  implText:
+
+
+
+?
+?
+  holes digged
+    (after)
+
+
+
+[!
+
+!]
+[!
+
+!]
+  parsing
+    implStart =
+/Users/vince/Documents/gcl/examples/factor.gcl:15:1
+  text parsed
+  abstracted
+  looking for specs
+  matching spec found
+ type env:
+[(Index (Name "Q" (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 6 5 98) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 6 6 99))),ConstTypeInfo (TBase TBool (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 6 23 116) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 6 24 117)))),(Index (Name "P" (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 5 5 76) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 5 6 77))),ConstTypeInfo (TBase TBool (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 5 19 90) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 5 20 91)))),(Index (Name "Q" (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 6 5 98) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 6 6 99))),ConstTypeInfo (TVar (Name "?Type.var_0" NoLoc) NoLoc)),(Index (Name "P" (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 5 5 76) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 5 6 77))),ConstTypeInfo (TVar (Name "?Type.var_1" NoLoc) NoLoc)),(Index (Name "mod" (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 5 47) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 8 50))),VarTypeInfo (TApp (TApp (TOp (Arrow (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 15 57) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 17 59)))) (TBase TInt (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 11 53) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 14 56))) (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 11 53) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 17 59))) (TApp (TApp (TOp (Arrow (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 22 64) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 24 66)))) (TBase TInt (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 18 60) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 21 63))) (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 18 60) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 24 66))) (TBase TInt (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 25 67) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 28 70))) (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 18 60) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 28 70))) (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 11 53) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 28 70)))),(Index (Name "p" (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 5 26) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 6 27))),VarTypeInfo (TBase TInt (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 18 39) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 21 42)))),(Index (Name "x" (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 8 29) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 9 30))),VarTypeInfo (TBase TInt (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 18 39) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 21 42)))),(Index (Name "y" (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 11 32) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 12 33))),VarTypeInfo (TBase TInt (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 18 39) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 21 42)))),(Index (Name "n" (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 14 35) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 15 36))),VarTypeInfo (TBase TInt (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 18 39) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 21 42)))),(Index (Name "N" (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 1 5 4) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 1 6 5))),ConstTypeInfo (TBase TInt (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 1 9 8) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 1 12 11))))]
+  type checked
+  swept
+ask file state ref
+ask file state map
+lookup file state map
+  found
+  outer spec deleted (refine)
+ask file state ref
+ask file state map
+lookup file state map
+  found
+  counter updated (refine)
+ask file state ref
+ask file state map
+lookup file state map
+  found
+ask file state ref
+ask file state map
+lookup file state map
+  found
+  new specs and POs added (refine)
+refine: success
+ask file state ref
+ask file state map
+lookup file state map
+  found
+refine: update notification sent
+refine: end
+STextDocumentDidChange start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+====== /Users/vince/Documents/gcl/examples/factor.gcl ======
+
+ask file state ref
+ask file state map
+lookup file state map
+  found
+loaded
+[(17,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 26:1-28:3),(17,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 23:1-25:3),(17,/Users/vince/Documents/gcl/examples/factor.gcl [0-0] 20:1-22:3),(17,/Users/vince/Documents/gcl/examples/factor.gcl [0-0] 17:1-19:3)]
+=======================
+didChange: fileState modified
+ask file state ref
+ask file state map
+lookup file state map
+  found
+didChange: upate notification sent
+STextDocumentDidChange end
+  text edited (refine)
+semantic token: start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+STextDocumentDidChange start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+====== /Users/vince/Documents/gcl/examples/factor.gcl ======
+
+ask file state ref
+ask file state map
+lookup file state map
+  found
+loaded
+[(18,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 26:1-28:3),(18,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 23:1-25:3),(18,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 20:1-22:3),(18,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 17:1-19:3)]
+=======================
+didChange: fileState modified
+ask file state ref
+ask file state map
+lookup file state map
+  found
+didChange: upate notification sent
+STextDocumentDidChange end
+STextDocumentDidChange start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+====== /Users/vince/Documents/gcl/examples/factor.gcl ======
+
+ask file state ref
+ask file state map
+lookup file state map
+  found
+loaded
+[(19,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 26:1-28:3),(19,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 23:1-25:3),(19,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 20:1-22:3),(19,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 17:1-19:3)]
+=======================
+didChange: fileState modified
+ask file state ref
+ask file state map
+lookup file state map
+  found
+didChange: upate notification sent
+STextDocumentDidChange end
+STextDocumentDidChange start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+====== /Users/vince/Documents/gcl/examples/factor.gcl ======
+
+ask file state ref
+ask file state map
+lookup file state map
+  found
+loaded
+[(20,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 26:1-28:3),(20,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 23:1-25:3),(20,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 20:1-22:3),(20,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 17:1-19:3)]
+=======================
+didChange: fileState modified
+ask file state ref
+ask file state map
+lookup file state map
+  found
+didChange: upate notification sent
+STextDocumentDidChange end
+semantic token: start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+STextDocumentDidChange start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+====== /Users/vince/Documents/gcl/examples/factor.gcl ======
+
+ask file state ref
+ask file state map
+lookup file state map
+  found
+loaded
+[(21,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 26:1-28:3),(21,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 23:1-25:3),(21,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 20:1-22:3),(21,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 17:1-19:3)]
+=======================
+didChange: fileState modified
+ask file state ref
+ask file state map
+lookup file state map
+  found
+didChange: upate notification sent
+STextDocumentDidChange end
+STextDocumentDidChange start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+====== /Users/vince/Documents/gcl/examples/factor.gcl ======
+
+ask file state ref
+ask file state map
+lookup file state map
+  found
+loaded
+[(22,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 26:1-28:3),(22,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 23:1-25:3),(22,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 20:1-22:3),(22,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 17:1-19:3)]
+=======================
+didChange: fileState modified
+ask file state ref
+ask file state map
+lookup file state map
+  found
+didChange: upate notification sent
+STextDocumentDidChange end
+STextDocumentDidChange start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+====== /Users/vince/Documents/gcl/examples/factor.gcl ======
+
+ask file state ref
+ask file state map
+lookup file state map
+  found
+loaded
+[(23,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 26:1-28:3),(23,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 23:1-25:3),(23,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 20:1-22:3),(23,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 17:1-19:3)]
+=======================
+didChange: fileState modified
+ask file state ref
+ask file state map
+lookup file state map
+  found
+didChange: upate notification sent
+STextDocumentDidChange end
+semantic token: start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+json: decoding request
+Object (fromList [("filePath",String "/Users/vince/Documents/gcl/examples/factor.gcl"),("implStart",Object (fromList [("byte",Number 154.0),("column",Number 1.0),("file",String "/Users/vince/Documents/gcl/examples/factor.gcl"),("line",Number 18.0)])),("implText",String "a := 3"),("specLines",Object (fromList [("end",Object (fromList [("byte",Number 164.0),("column",Number 3.0),("file",String "/Users/vince/Documents/gcl/examples/factor.gcl"),("line",Number 19.0)])),("start",Object (fromList [("byte",Number 151.0),("column",Number 1.0),("file",String "/Users/vince/Documents/gcl/examples/factor.gcl"),("line",Number 17.0)]))]))])json: decoding succeeded
+refine: start
+  params
+RefineParams {filePath = "/Users/vince/Documents/gcl/examples/factor.gcl", implText = "a := 3", specLines = /Users/vince/Documents/gcl/examples/factor.gcl [151-164] 17:1-19:3, implStart = Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 18 1 154}
+  specLines:
+/Users/vince/Documents/gcl/examples/factor.gcl [151-164] 17:1-19:3
+ask file state ref
+ask file state map
+lookup file state map
+  found
+  fileState loaded
+  implText:
+a := 3
+  holes digged
+    (after)
+a := 3
+  parsing
+    implStart =
+/Users/vince/Documents/gcl/examples/factor.gcl:18:1
+  text parsed
+  abstracted
+  looking for specs
+  matching spec found
+ type env:
+[]
+  type error
+refine: error
+	Type Error /Users/vince/Documents/gcl/examples/factor.gcl:18:1-2
+The definition a is not in scope
+refine: update notification sent
+refine: end
+STextDocumentDidChange start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+====== /Users/vince/Documents/gcl/examples/factor.gcl ======
+
+ask file state ref
+ask file state map
+lookup file state map
+  found
+loaded
+[(24,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 26:1-28:3),(24,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 23:1-25:3),(24,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 20:1-22:3),(24,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 17:1-19:3)]
+=======================
+didChange: fileState modified
+ask file state ref
+ask file state map
+lookup file state map
+  found
+didChange: upate notification sent
+STextDocumentDidChange end
+STextDocumentDidChange start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+====== /Users/vince/Documents/gcl/examples/factor.gcl ======
+
+ask file state ref
+ask file state map
+lookup file state map
+  found
+loaded
+[(25,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 26:1-28:3),(25,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 23:1-25:3),(25,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 20:1-22:3),(25,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 17:1-19:3)]
+=======================
+didChange: fileState modified
+ask file state ref
+ask file state map
+lookup file state map
+  found
+didChange: upate notification sent
+STextDocumentDidChange end
+semantic token: start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+json: decoding request
+Object (fromList [("filePath",String "/Users/vince/Documents/gcl/examples/factor.gcl"),("implStart",Object (fromList [("byte",Number 154.0),("column",Number 1.0),("file",String "/Users/vince/Documents/gcl/examples/factor.gcl"),("line",Number 18.0)])),("implText",String "x := 3"),("specLines",Object (fromList [("end",Object (fromList [("byte",Number 164.0),("column",Number 3.0),("file",String "/Users/vince/Documents/gcl/examples/factor.gcl"),("line",Number 19.0)])),("start",Object (fromList [("byte",Number 151.0),("column",Number 1.0),("file",String "/Users/vince/Documents/gcl/examples/factor.gcl"),("line",Number 17.0)]))]))])json: decoding succeeded
+refine: start
+  params
+RefineParams {filePath = "/Users/vince/Documents/gcl/examples/factor.gcl", implText = "x := 3", specLines = /Users/vince/Documents/gcl/examples/factor.gcl [151-164] 17:1-19:3, implStart = Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 18 1 154}
+  specLines:
+/Users/vince/Documents/gcl/examples/factor.gcl [151-164] 17:1-19:3
+ask file state ref
+ask file state map
+lookup file state map
+  found
+  fileState loaded
+  implText:
+x := 3
+  holes digged
+    (after)
+x := 3
+  parsing
+    implStart =
+/Users/vince/Documents/gcl/examples/factor.gcl:18:1
+  text parsed
+  abstracted
+  looking for specs
+  matching spec found
+ type env:
+[]
+  type error
+refine: error
+	Type Error /Users/vince/Documents/gcl/examples/factor.gcl:18:1-2
+The definition x is not in scope
+refine: update notification sent
+refine: end
+json: decoding request
+Object (fromList [("filePath",String "/Users/vince/Documents/gcl/examples/factor.gcl"),("implStart",Object (fromList [("byte",Number 154.0),("column",Number 1.0),("file",String "/Users/vince/Documents/gcl/examples/factor.gcl"),("line",Number 18.0)])),("implText",String "x := 3"),("specLines",Object (fromList [("end",Object (fromList [("byte",Number 164.0),("column",Number 3.0),("file",String "/Users/vince/Documents/gcl/examples/factor.gcl"),("line",Number 19.0)])),("start",Object (fromList [("byte",Number 151.0),("column",Number 1.0),("file",String "/Users/vince/Documents/gcl/examples/factor.gcl"),("line",Number 17.0)]))]))])json: decoding succeeded
+refine: start
+  params
+RefineParams {filePath = "/Users/vince/Documents/gcl/examples/factor.gcl", implText = "x := 3", specLines = /Users/vince/Documents/gcl/examples/factor.gcl [151-164] 17:1-19:3, implStart = Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 18 1 154}
+  specLines:
+/Users/vince/Documents/gcl/examples/factor.gcl [151-164] 17:1-19:3
+ask file state ref
+ask file state map
+lookup file state map
+  found
+  fileState loaded
+  implText:
+x := 3
+  holes digged
+    (after)
+x := 3
+  parsing
+    implStart =
+/Users/vince/Documents/gcl/examples/factor.gcl:18:1
+  text parsed
+  abstracted
+  looking for specs
+  matching spec found
+ type env:
+[]
+  type error
+refine: error
+	Type Error /Users/vince/Documents/gcl/examples/factor.gcl:18:1-2
+The definition x is not in scope
+refine: update notification sent
+refine: end
+json: decoding request
+Object (fromList [("filePath",String "/Users/vince/Documents/gcl/examples/factor.gcl")])json: decoding succeeded
+load: start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+  source read 
+  source parsed 
+  all holes digged
+  abstract program generated
+  program elaborated
+  fileState created
+  fileState updated
+load: success
+ask file state ref
+ask file state map
+lookup file state map
+  found
+load: update notification sent
+load: end
+json: decoding request
+Object (fromList [("filePath",String "/Users/vince/Documents/gcl/examples/factor.gcl"),("implStart",Object (fromList [("byte",Number 154.0),("column",Number 1.0),("file",String "/Users/vince/Documents/gcl/examples/factor.gcl"),("line",Number 18.0)])),("implText",String "x := 3"),("specLines",Object (fromList [("end",Object (fromList [("byte",Number 164.0),("column",Number 3.0),("file",String "/Users/vince/Documents/gcl/examples/factor.gcl"),("line",Number 19.0)])),("start",Object (fromList [("byte",Number 151.0),("column",Number 1.0),("file",String "/Users/vince/Documents/gcl/examples/factor.gcl"),("line",Number 17.0)]))]))])json: decoding succeeded
+refine: start
+  params
+RefineParams {filePath = "/Users/vince/Documents/gcl/examples/factor.gcl", implText = "x := 3", specLines = /Users/vince/Documents/gcl/examples/factor.gcl [151-164] 17:1-19:3, implStart = Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 18 1 154}
+  specLines:
+/Users/vince/Documents/gcl/examples/factor.gcl [151-164] 17:1-19:3
+ask file state ref
+ask file state map
+lookup file state map
+  found
+  fileState loaded
+  implText:
+x := 3
+  holes digged
+    (after)
+x := 3
+  parsing
+    implStart =
+/Users/vince/Documents/gcl/examples/factor.gcl:18:1
+  text parsed
+  abstracted
+  looking for specs
+  matching spec found
+ type env:
+[(Index (Name "Q" (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 6 5 98) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 6 6 99))),ConstTypeInfo (TBase TBool (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 6 23 116) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 6 24 117)))),(Index (Name "P" (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 5 5 76) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 5 6 77))),ConstTypeInfo (TBase TBool (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 5 19 90) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 5 20 91)))),(Index (Name "Q" (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 6 5 98) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 6 6 99))),ConstTypeInfo (TVar (Name "?Type.var_0" NoLoc) NoLoc)),(Index (Name "P" (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 5 5 76) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 5 6 77))),ConstTypeInfo (TVar (Name "?Type.var_1" NoLoc) NoLoc)),(Index (Name "mod" (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 5 47) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 8 50))),VarTypeInfo (TApp (TApp (TOp (Arrow (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 15 57) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 17 59)))) (TBase TInt (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 11 53) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 14 56))) (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 11 53) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 17 59))) (TApp (TApp (TOp (Arrow (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 22 64) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 24 66)))) (TBase TInt (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 18 60) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 21 63))) (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 18 60) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 24 66))) (TBase TInt (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 25 67) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 28 70))) (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 18 60) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 28 70))) (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 11 53) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 28 70)))),(Index (Name "p" (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 5 26) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 6 27))),VarTypeInfo (TBase TInt (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 18 39) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 21 42)))),(Index (Name "x" (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 8 29) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 9 30))),VarTypeInfo (TBase TInt (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 18 39) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 21 42)))),(Index (Name "y" (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 11 32) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 12 33))),VarTypeInfo (TBase TInt (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 18 39) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 21 42)))),(Index (Name "n" (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 14 35) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 15 36))),VarTypeInfo (TBase TInt (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 18 39) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 21 42)))),(Index (Name "N" (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 1 5 4) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 1 6 5))),ConstTypeInfo (TBase TInt (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 1 9 8) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 1 12 11))))]
+  type checked
+  swept
+ask file state ref
+ask file state map
+lookup file state map
+  found
+  outer spec deleted (refine)
+ask file state ref
+ask file state map
+lookup file state map
+  found
+  counter updated (refine)
+ask file state ref
+ask file state map
+lookup file state map
+  found
+ask file state ref
+ask file state map
+lookup file state map
+  found
+  new specs and POs added (refine)
+refine: success
+ask file state ref
+ask file state map
+lookup file state map
+  found
+refine: update notification sent
+refine: end
+STextDocumentDidChange start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+====== /Users/vince/Documents/gcl/examples/factor.gcl ======
+
+ask file state ref
+ask file state map
+lookup file state map
+  found
+loaded
+[(26,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 24:1-26:3),(26,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 21:1-23:3),(26,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 18:1-20:3)]
+=======================
+didChange: fileState modified
+ask file state ref
+ask file state map
+lookup file state map
+  found
+didChange: upate notification sent
+STextDocumentDidChange end
+  text edited (refine)
+semantic token: start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+STextDocumentDidChange start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+====== /Users/vince/Documents/gcl/examples/factor.gcl ======
+
+ask file state ref
+ask file state map
+lookup file state map
+  found
+loaded
+[(27,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 26:1-28:3),(27,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 23:1-25:3),(27,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 20:1-22:3)]
+=======================
+didChange: fileState modified
+ask file state ref
+ask file state map
+lookup file state map
+  found
+didChange: upate notification sent
+STextDocumentDidChange end
+semantic token: start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+json: decoding request
+Object (fromList [("filePath",String "/Users/vince/Documents/gcl/examples/factor.gcl")])json: decoding succeeded
+load: start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+  source read 
+  source parsed 
+  all holes digged
+  abstract program generated
+  program elaborated
+  fileState created
+  fileState updated
+load: success
+ask file state ref
+ask file state map
+lookup file state map
+  found
+load: update notification sent
+load: end
+json: decoding request
+Object (fromList [("filePath",String "/Users/vince/Documents/gcl/examples/factor.gcl"),("implStart",Object (fromList [("byte",Number 154.0),("column",Number 1.0),("file",String "/Users/vince/Documents/gcl/examples/factor.gcl"),("line",Number 18.0)])),("implText",String "x := 3"),("specLines",Object (fromList [("end",Object (fromList [("byte",Number 164.0),("column",Number 3.0),("file",String "/Users/vince/Documents/gcl/examples/factor.gcl"),("line",Number 19.0)])),("start",Object (fromList [("byte",Number 151.0),("column",Number 1.0),("file",String "/Users/vince/Documents/gcl/examples/factor.gcl"),("line",Number 17.0)]))]))])json: decoding succeeded
+refine: start
+  params
+RefineParams {filePath = "/Users/vince/Documents/gcl/examples/factor.gcl", implText = "x := 3", specLines = /Users/vince/Documents/gcl/examples/factor.gcl [151-164] 17:1-19:3, implStart = Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 18 1 154}
+  specLines:
+/Users/vince/Documents/gcl/examples/factor.gcl [151-164] 17:1-19:3
+ask file state ref
+ask file state map
+lookup file state map
+  found
+  fileState loaded
+  implText:
+x := 3
+  holes digged
+    (after)
+x := 3
+  parsing
+    implStart =
+/Users/vince/Documents/gcl/examples/factor.gcl:18:1
+  text parsed
+  abstracted
+  looking for specs
+  matching spec found
+ type env:
+[(Index (Name "Q" (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 6 5 98) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 6 6 99))),ConstTypeInfo (TBase TBool (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 6 23 116) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 6 24 117)))),(Index (Name "P" (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 5 5 76) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 5 6 77))),ConstTypeInfo (TBase TBool (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 5 19 90) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 5 20 91)))),(Index (Name "Q" (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 6 5 98) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 6 6 99))),ConstTypeInfo (TVar (Name "?Type.var_0" NoLoc) NoLoc)),(Index (Name "P" (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 5 5 76) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 5 6 77))),ConstTypeInfo (TVar (Name "?Type.var_1" NoLoc) NoLoc)),(Index (Name "mod" (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 5 47) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 8 50))),VarTypeInfo (TApp (TApp (TOp (Arrow (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 15 57) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 17 59)))) (TBase TInt (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 11 53) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 14 56))) (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 11 53) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 17 59))) (TApp (TApp (TOp (Arrow (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 22 64) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 24 66)))) (TBase TInt (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 18 60) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 21 63))) (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 18 60) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 24 66))) (TBase TInt (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 25 67) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 28 70))) (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 18 60) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 28 70))) (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 11 53) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 28 70)))),(Index (Name "p" (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 5 26) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 6 27))),VarTypeInfo (TBase TInt (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 18 39) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 21 42)))),(Index (Name "x" (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 8 29) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 9 30))),VarTypeInfo (TBase TInt (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 18 39) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 21 42)))),(Index (Name "y" (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 11 32) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 12 33))),VarTypeInfo (TBase TInt (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 18 39) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 21 42)))),(Index (Name "n" (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 14 35) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 15 36))),VarTypeInfo (TBase TInt (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 18 39) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 21 42)))),(Index (Name "N" (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 1 5 4) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 1 6 5))),ConstTypeInfo (TBase TInt (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 1 9 8) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 1 12 11))))]
+  type checked
+  swept
+ask file state ref
+ask file state map
+lookup file state map
+  found
+  outer spec deleted (refine)
+ask file state ref
+ask file state map
+lookup file state map
+  found
+  counter updated (refine)
+ask file state ref
+ask file state map
+lookup file state map
+  found
+ask file state ref
+ask file state map
+lookup file state map
+  found
+  new specs and POs added (refine)
+refine: success
+ask file state ref
+ask file state map
+lookup file state map
+  found
+refine: update notification sent
+refine: end
+STextDocumentDidChange start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+====== /Users/vince/Documents/gcl/examples/factor.gcl ======
+
+ask file state ref
+ask file state map
+lookup file state map
+  found
+loaded
+[(28,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 24:1-26:3),(28,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 21:1-23:3),(28,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 18:1-20:3)]
+=======================
+didChange: fileState modified
+ask file state ref
+ask file state map
+lookup file state map
+  found
+didChange: upate notification sent
+STextDocumentDidChange end
+  text edited (refine)
+semantic token: start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+STextDocumentDidChange start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+====== /Users/vince/Documents/gcl/examples/factor.gcl ======
+
+ask file state ref
+ask file state map
+lookup file state map
+  found
+loaded
+[(29,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 24:1-26:3),(29,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 21:1-23:3),(29,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 18:1-20:3)]
+=======================
+didChange: fileState modified
+ask file state ref
+ask file state map
+lookup file state map
+  found
+didChange: upate notification sent
+STextDocumentDidChange end
+STextDocumentDidChange start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+====== /Users/vince/Documents/gcl/examples/factor.gcl ======
+
+ask file state ref
+ask file state map
+lookup file state map
+  found
+loaded
+[(30,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 24:1-26:3),(30,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 21:1-23:3),(30,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 18:1-20:3)]
+=======================
+didChange: fileState modified
+ask file state ref
+ask file state map
+lookup file state map
+  found
+didChange: upate notification sent
+STextDocumentDidChange end
+STextDocumentDidChange start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+====== /Users/vince/Documents/gcl/examples/factor.gcl ======
+
+ask file state ref
+ask file state map
+lookup file state map
+  found
+loaded
+[(31,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 24:1-26:3),(31,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 21:1-23:3),(31,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 18:1-20:3)]
+=======================
+didChange: fileState modified
+ask file state ref
+ask file state map
+lookup file state map
+  found
+didChange: upate notification sent
+STextDocumentDidChange end
+semantic token: start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+STextDocumentDidChange start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+====== /Users/vince/Documents/gcl/examples/factor.gcl ======
+
+ask file state ref
+ask file state map
+lookup file state map
+  found
+loaded
+[(32,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 24:1-26:3),(32,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 21:1-23:3),(32,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 18:1-20:3)]
+=======================
+didChange: fileState modified
+ask file state ref
+ask file state map
+lookup file state map
+  found
+didChange: upate notification sent
+STextDocumentDidChange end
+STextDocumentDidChange start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+====== /Users/vince/Documents/gcl/examples/factor.gcl ======
+
+ask file state ref
+ask file state map
+lookup file state map
+  found
+loaded
+[(33,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 24:1-26:3),(33,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 21:1-23:3),(33,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 18:1-20:3)]
+=======================
+didChange: fileState modified
+ask file state ref
+ask file state map
+lookup file state map
+  found
+didChange: upate notification sent
+STextDocumentDidChange end
+STextDocumentDidChange start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+====== /Users/vince/Documents/gcl/examples/factor.gcl ======
+
+ask file state ref
+ask file state map
+lookup file state map
+  found
+loaded
+[(34,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 24:1-26:3),(34,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 21:1-23:3),(34,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 18:1-20:3)]
+=======================
+didChange: fileState modified
+ask file state ref
+ask file state map
+lookup file state map
+  found
+didChange: upate notification sent
+STextDocumentDidChange end
+semantic token: start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+json: decoding request
+Object (fromList [("filePath",String "/Users/vince/Documents/gcl/examples/factor.gcl"),("implStart",Object (fromList [("byte",Number 161.0),("column",Number 1.0),("file",String "/Users/vince/Documents/gcl/examples/factor.gcl"),("line",Number 19.0)])),("implText",String "x := 3"),("specLines",Object (fromList [("end",Object (fromList [("byte",Number 171.0),("column",Number 3.0),("file",String "/Users/vince/Documents/gcl/examples/factor.gcl"),("line",Number 20.0)])),("start",Object (fromList [("byte",Number 158.0),("column",Number 1.0),("file",String "/Users/vince/Documents/gcl/examples/factor.gcl"),("line",Number 18.0)]))]))])json: decoding succeeded
+refine: start
+  params
+RefineParams {filePath = "/Users/vince/Documents/gcl/examples/factor.gcl", implText = "x := 3", specLines = /Users/vince/Documents/gcl/examples/factor.gcl [158-171] 18:1-20:3, implStart = Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 19 1 161}
+  specLines:
+/Users/vince/Documents/gcl/examples/factor.gcl [158-171] 18:1-20:3
+ask file state ref
+ask file state map
+lookup file state map
+  found
+  fileState loaded
+  implText:
+x := 3
+  holes digged
+    (after)
+x := 3
+  parsing
+    implStart =
+/Users/vince/Documents/gcl/examples/factor.gcl:19:1
+  text parsed
+  abstracted
+  looking for specs
+  matching spec found
+ type env:
+[(Index (Name "Q" (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 6 5 98) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 6 6 99))),ConstTypeInfo (TBase TBool (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 6 23 116) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 6 24 117)))),(Index (Name "P" (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 5 5 76) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 5 6 77))),ConstTypeInfo (TBase TBool (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 5 19 90) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 5 20 91)))),(Index (Name "Q" (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 6 5 98) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 6 6 99))),ConstTypeInfo (TVar (Name "?Type.var_0" NoLoc) NoLoc)),(Index (Name "P" (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 5 5 76) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 5 6 77))),ConstTypeInfo (TVar (Name "?Type.var_1" NoLoc) NoLoc)),(Index (Name "mod" (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 5 47) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 8 50))),VarTypeInfo (TApp (TApp (TOp (Arrow (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 15 57) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 17 59)))) (TBase TInt (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 11 53) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 14 56))) (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 11 53) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 17 59))) (TApp (TApp (TOp (Arrow (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 22 64) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 24 66)))) (TBase TInt (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 18 60) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 21 63))) (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 18 60) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 24 66))) (TBase TInt (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 25 67) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 28 70))) (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 18 60) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 28 70))) (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 11 53) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 28 70)))),(Index (Name "p" (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 5 26) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 6 27))),VarTypeInfo (TBase TInt (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 18 39) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 21 42)))),(Index (Name "x" (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 8 29) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 9 30))),VarTypeInfo (TBase TInt (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 18 39) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 21 42)))),(Index (Name "y" (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 11 32) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 12 33))),VarTypeInfo (TBase TInt (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 18 39) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 21 42)))),(Index (Name "n" (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 14 35) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 15 36))),VarTypeInfo (TBase TInt (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 18 39) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 21 42)))),(Index (Name "N" (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 1 5 4) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 1 6 5))),ConstTypeInfo (TBase TInt (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 1 9 8) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 1 12 11))))]
+  type checked
+  swept
+ask file state ref
+ask file state map
+lookup file state map
+  found
+  outer spec deleted (refine)
+ask file state ref
+ask file state map
+lookup file state map
+  found
+  counter updated (refine)
+ask file state ref
+ask file state map
+lookup file state map
+  found
+ask file state ref
+ask file state map
+lookup file state map
+  found
+  new specs and POs added (refine)
+refine: success
+ask file state ref
+ask file state map
+lookup file state map
+  found
+refine: update notification sent
+refine: end
+STextDocumentDidChange start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+====== /Users/vince/Documents/gcl/examples/factor.gcl ======
+
+ask file state ref
+ask file state map
+lookup file state map
+  found
+loaded
+[(35,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 22:1-24:3),(35,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 19:1-21:3)]
+=======================
+didChange: fileState modified
+ask file state ref
+ask file state map
+lookup file state map
+  found
+didChange: upate notification sent
+STextDocumentDidChange end
+  text edited (refine)
+semantic token: start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+STextDocumentDidChange start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+====== /Users/vince/Documents/gcl/examples/factor.gcl ======
+
+ask file state ref
+ask file state map
+lookup file state map
+  found
+loaded
+[(36,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 22:1-24:3),(36,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 19:1-21:3)]
+=======================
+didChange: fileState modified
+ask file state ref
+ask file state map
+lookup file state map
+  found
+didChange: upate notification sent
+STextDocumentDidChange end
+STextDocumentDidChange start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+====== /Users/vince/Documents/gcl/examples/factor.gcl ======
+
+ask file state ref
+ask file state map
+lookup file state map
+  found
+loaded
+[(37,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 22:1-24:3),(37,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 19:1-21:3)]
+=======================
+didChange: fileState modified
+ask file state ref
+ask file state map
+lookup file state map
+  found
+didChange: upate notification sent
+STextDocumentDidChange end
+STextDocumentDidChange start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+====== /Users/vince/Documents/gcl/examples/factor.gcl ======
+
+ask file state ref
+ask file state map
+lookup file state map
+  found
+loaded
+[(38,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 22:1-24:3),(38,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 19:1-21:3)]
+=======================
+didChange: fileState modified
+ask file state ref
+ask file state map
+lookup file state map
+  found
+didChange: upate notification sent
+STextDocumentDidChange end
+semantic token: start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+STextDocumentDidChange start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+====== /Users/vince/Documents/gcl/examples/factor.gcl ======
+
+ask file state ref
+ask file state map
+lookup file state map
+  found
+loaded
+[(39,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 22:1-24:3),(39,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 19:1-21:3)]
+=======================
+didChange: fileState modified
+ask file state ref
+ask file state map
+lookup file state map
+  found
+didChange: upate notification sent
+STextDocumentDidChange end
+STextDocumentDidChange start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+====== /Users/vince/Documents/gcl/examples/factor.gcl ======
+
+ask file state ref
+ask file state map
+lookup file state map
+  found
+loaded
+[(40,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 22:1-24:3),(40,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 19:1-21:3)]
+=======================
+didChange: fileState modified
+ask file state ref
+ask file state map
+lookup file state map
+  found
+didChange: upate notification sent
+STextDocumentDidChange end
+semantic token: start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+STextDocumentDidChange start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+====== /Users/vince/Documents/gcl/examples/factor.gcl ======
+
+ask file state ref
+ask file state map
+lookup file state map
+  found
+loaded
+[(41,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 22:1-24:3),(41,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 19:1-21:3)]
+=======================
+didChange: fileState modified
+ask file state ref
+ask file state map
+lookup file state map
+  found
+didChange: upate notification sent
+STextDocumentDidChange end
+semantic token: start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+json: decoding request
+Object (fromList [("filePath",String "/Users/vince/Documents/gcl/examples/factor.gcl"),("implStart",Object (fromList [("byte",Number 168.0),("column",Number 1.0),("file",String "/Users/vince/Documents/gcl/examples/factor.gcl"),("line",Number 20.0)])),("implText",String "a := 3"),("specLines",Object (fromList [("end",Object (fromList [("byte",Number 178.0),("column",Number 3.0),("file",String "/Users/vince/Documents/gcl/examples/factor.gcl"),("line",Number 21.0)])),("start",Object (fromList [("byte",Number 165.0),("column",Number 1.0),("file",String "/Users/vince/Documents/gcl/examples/factor.gcl"),("line",Number 19.0)]))]))])json: decoding succeeded
+refine: start
+  params
+RefineParams {filePath = "/Users/vince/Documents/gcl/examples/factor.gcl", implText = "a := 3", specLines = /Users/vince/Documents/gcl/examples/factor.gcl [165-178] 19:1-21:3, implStart = Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 20 1 168}
+  specLines:
+/Users/vince/Documents/gcl/examples/factor.gcl [165-178] 19:1-21:3
+ask file state ref
+ask file state map
+lookup file state map
+  found
+  fileState loaded
+  implText:
+a := 3
+  holes digged
+    (after)
+a := 3
+  parsing
+    implStart =
+/Users/vince/Documents/gcl/examples/factor.gcl:20:1
+  text parsed
+  abstracted
+  looking for specs
+  matching spec found
+ type env:
+[(Index (Name "Q" (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 6 5 98) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 6 6 99))),ConstTypeInfo (TBase TBool (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 6 23 116) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 6 24 117)))),(Index (Name "P" (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 5 5 76) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 5 6 77))),ConstTypeInfo (TBase TBool (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 5 19 90) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 5 20 91)))),(Index (Name "Q" (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 6 5 98) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 6 6 99))),ConstTypeInfo (TVar (Name "?Type.var_0" NoLoc) NoLoc)),(Index (Name "P" (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 5 5 76) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 5 6 77))),ConstTypeInfo (TVar (Name "?Type.var_1" NoLoc) NoLoc)),(Index (Name "mod" (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 5 47) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 8 50))),VarTypeInfo (TApp (TApp (TOp (Arrow (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 15 57) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 17 59)))) (TBase TInt (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 11 53) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 14 56))) (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 11 53) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 17 59))) (TApp (TApp (TOp (Arrow (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 22 64) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 24 66)))) (TBase TInt (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 18 60) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 21 63))) (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 18 60) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 24 66))) (TBase TInt (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 25 67) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 28 70))) (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 18 60) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 28 70))) (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 11 53) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 28 70)))),(Index (Name "p" (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 5 26) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 6 27))),VarTypeInfo (TBase TInt (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 18 39) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 21 42)))),(Index (Name "x" (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 8 29) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 9 30))),VarTypeInfo (TBase TInt (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 18 39) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 21 42)))),(Index (Name "y" (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 11 32) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 12 33))),VarTypeInfo (TBase TInt (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 18 39) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 21 42)))),(Index (Name "n" (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 14 35) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 15 36))),VarTypeInfo (TBase TInt (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 18 39) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 21 42)))),(Index (Name "N" (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 1 5 4) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 1 6 5))),ConstTypeInfo (TBase TInt (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 1 9 8) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 1 12 11))))]
+  type error
+refine: error
+	Type Error /Users/vince/Documents/gcl/examples/factor.gcl:20:1-2
+The definition a is not in scope
+refine: update notification sent
+refine: end
+STextDocumentDidChange start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+====== /Users/vince/Documents/gcl/examples/factor.gcl ======
+
+ask file state ref
+ask file state map
+lookup file state map
+  found
+loaded
+[(42,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 22:1-24:3),(42,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 19:1-21:3)]
+=======================
+didChange: fileState modified
+ask file state ref
+ask file state map
+lookup file state map
+  found
+didChange: upate notification sent
+STextDocumentDidChange end
+STextDocumentDidChange start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+====== /Users/vince/Documents/gcl/examples/factor.gcl ======
+
+ask file state ref
+ask file state map
+lookup file state map
+  found
+loaded
+[(43,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 22:1-24:3),(43,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 19:1-21:3)]
+=======================
+didChange: fileState modified
+ask file state ref
+ask file state map
+lookup file state map
+  found
+didChange: upate notification sent
+STextDocumentDidChange end
+semantic token: start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+json: decoding request
+Object (fromList [("filePath",String "/Users/vince/Documents/gcl/examples/factor.gcl"),("implStart",Object (fromList [("byte",Number 168.0),("column",Number 1.0),("file",String "/Users/vince/Documents/gcl/examples/factor.gcl"),("line",Number 20.0)])),("implText",String "x := 3"),("specLines",Object (fromList [("end",Object (fromList [("byte",Number 178.0),("column",Number 3.0),("file",String "/Users/vince/Documents/gcl/examples/factor.gcl"),("line",Number 21.0)])),("start",Object (fromList [("byte",Number 165.0),("column",Number 1.0),("file",String "/Users/vince/Documents/gcl/examples/factor.gcl"),("line",Number 19.0)]))]))])json: decoding succeeded
+refine: start
+  params
+RefineParams {filePath = "/Users/vince/Documents/gcl/examples/factor.gcl", implText = "x := 3", specLines = /Users/vince/Documents/gcl/examples/factor.gcl [165-178] 19:1-21:3, implStart = Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 20 1 168}
+  specLines:
+/Users/vince/Documents/gcl/examples/factor.gcl [165-178] 19:1-21:3
+ask file state ref
+ask file state map
+lookup file state map
+  found
+  fileState loaded
+  implText:
+x := 3
+  holes digged
+    (after)
+x := 3
+  parsing
+    implStart =
+/Users/vince/Documents/gcl/examples/factor.gcl:20:1
+  text parsed
+  abstracted
+  looking for specs
+  matching spec found
+ type env:
+[(Index (Name "Q" (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 6 5 98) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 6 6 99))),ConstTypeInfo (TBase TBool (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 6 23 116) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 6 24 117)))),(Index (Name "P" (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 5 5 76) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 5 6 77))),ConstTypeInfo (TBase TBool (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 5 19 90) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 5 20 91)))),(Index (Name "Q" (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 6 5 98) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 6 6 99))),ConstTypeInfo (TVar (Name "?Type.var_0" NoLoc) NoLoc)),(Index (Name "P" (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 5 5 76) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 5 6 77))),ConstTypeInfo (TVar (Name "?Type.var_1" NoLoc) NoLoc)),(Index (Name "mod" (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 5 47) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 8 50))),VarTypeInfo (TApp (TApp (TOp (Arrow (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 15 57) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 17 59)))) (TBase TInt (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 11 53) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 14 56))) (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 11 53) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 17 59))) (TApp (TApp (TOp (Arrow (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 22 64) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 24 66)))) (TBase TInt (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 18 60) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 21 63))) (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 18 60) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 24 66))) (TBase TInt (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 25 67) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 28 70))) (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 18 60) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 28 70))) (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 11 53) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 28 70)))),(Index (Name "p" (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 5 26) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 6 27))),VarTypeInfo (TBase TInt (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 18 39) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 21 42)))),(Index (Name "x" (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 8 29) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 9 30))),VarTypeInfo (TBase TInt (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 18 39) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 21 42)))),(Index (Name "y" (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 11 32) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 12 33))),VarTypeInfo (TBase TInt (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 18 39) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 21 42)))),(Index (Name "n" (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 14 35) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 15 36))),VarTypeInfo (TBase TInt (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 18 39) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 21 42)))),(Index (Name "N" (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 1 5 4) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 1 6 5))),ConstTypeInfo (TBase TInt (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 1 9 8) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 1 12 11))))]
+  type checked
+  swept
+ask file state ref
+ask file state map
+lookup file state map
+  found
+  outer spec deleted (refine)
+ask file state ref
+ask file state map
+lookup file state map
+  found
+  counter updated (refine)
+ask file state ref
+ask file state map
+lookup file state map
+  found
+ask file state ref
+ask file state map
+lookup file state map
+  found
+  new specs and POs added (refine)
+refine: success
+ask file state ref
+ask file state map
+lookup file state map
+  found
+refine: update notification sent
+refine: end
+STextDocumentDidChange start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+====== /Users/vince/Documents/gcl/examples/factor.gcl ======
+
+ask file state ref
+ask file state map
+lookup file state map
+  found
+loaded
+[(44,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 20:1-22:3)]
+=======================
+didChange: fileState modified
+ask file state ref
+ask file state map
+lookup file state map
+  found
+didChange: upate notification sent
+STextDocumentDidChange end
+  text edited (refine)
+semantic token: start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+STextDocumentDidChange start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+====== /Users/vince/Documents/gcl/examples/factor.gcl ======
+
+ask file state ref
+ask file state map
+lookup file state map
+  found
+loaded
+[(45,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 20:1-23:3)]
+=======================
+didChange: fileState modified
+ask file state ref
+ask file state map
+lookup file state map
+  found
+didChange: upate notification sent
+STextDocumentDidChange end
+STextDocumentDidChange start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+====== /Users/vince/Documents/gcl/examples/factor.gcl ======
+
+ask file state ref
+ask file state map
+lookup file state map
+  found
+loaded
+[(46,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 20:1-24:3)]
+=======================
+didChange: fileState modified
+ask file state ref
+ask file state map
+lookup file state map
+  found
+didChange: upate notification sent
+STextDocumentDidChange end
+semantic token: start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+STextDocumentDidChange start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+====== /Users/vince/Documents/gcl/examples/factor.gcl ======
+
+ask file state ref
+ask file state map
+lookup file state map
+  found
+loaded
+[(47,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 20:1-25:3)]
+=======================
+didChange: fileState modified
+ask file state ref
+ask file state map
+lookup file state map
+  found
+didChange: upate notification sent
+STextDocumentDidChange end
+STextDocumentDidChange start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+====== /Users/vince/Documents/gcl/examples/factor.gcl ======
+
+ask file state ref
+ask file state map
+lookup file state map
+  found
+loaded
+[(48,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 20:1-26:3)]
+=======================
+didChange: fileState modified
+ask file state ref
+ask file state map
+lookup file state map
+  found
+didChange: upate notification sent
+STextDocumentDidChange end
+semantic token: start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+json: decoding request
+Object (fromList [("filePath",String "/Users/vince/Documents/gcl/examples/factor.gcl"),("implStart",Object (fromList [("byte",Number 175.0),("column",Number 1.0),("file",String "/Users/vince/Documents/gcl/examples/factor.gcl"),("line",Number 21.0)])),("implText",String "\n\n\n\n"),("specLines",Object (fromList [("end",Object (fromList [("byte",Number 183.0),("column",Number 3.0),("file",String "/Users/vince/Documents/gcl/examples/factor.gcl"),("line",Number 26.0)])),("start",Object (fromList [("byte",Number 172.0),("column",Number 1.0),("file",String "/Users/vince/Documents/gcl/examples/factor.gcl"),("line",Number 20.0)]))]))])json: decoding succeeded
+refine: start
+  params
+RefineParams {filePath = "/Users/vince/Documents/gcl/examples/factor.gcl", implText = "\n\n\n\n", specLines = /Users/vince/Documents/gcl/examples/factor.gcl [172-183] 20:1-26:3, implStart = Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 21 1 175}
+  specLines:
+/Users/vince/Documents/gcl/examples/factor.gcl [172-183] 20:1-26:3
+ask file state ref
+ask file state map
+lookup file state map
+  found
+  fileState loaded
+  implText:
+
+
+
+
+
+  holes digged
+    (after)
+
+
+
+
+
+  parsing
+    implStart =
+/Users/vince/Documents/gcl/examples/factor.gcl:21:1
+  text parsed
+  abstracted
+  looking for specs
+  matching spec found
+ type env:
+[(Index (Name "Q" (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 6 5 98) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 6 6 99))),ConstTypeInfo (TBase TBool (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 6 23 116) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 6 24 117)))),(Index (Name "P" (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 5 5 76) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 5 6 77))),ConstTypeInfo (TBase TBool (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 5 19 90) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 5 20 91)))),(Index (Name "Q" (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 6 5 98) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 6 6 99))),ConstTypeInfo (TVar (Name "?Type.var_0" NoLoc) NoLoc)),(Index (Name "P" (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 5 5 76) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 5 6 77))),ConstTypeInfo (TVar (Name "?Type.var_1" NoLoc) NoLoc)),(Index (Name "mod" (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 5 47) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 8 50))),VarTypeInfo (TApp (TApp (TOp (Arrow (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 15 57) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 17 59)))) (TBase TInt (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 11 53) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 14 56))) (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 11 53) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 17 59))) (TApp (TApp (TOp (Arrow (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 22 64) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 24 66)))) (TBase TInt (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 18 60) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 21 63))) (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 18 60) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 24 66))) (TBase TInt (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 25 67) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 28 70))) (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 18 60) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 28 70))) (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 11 53) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 3 28 70)))),(Index (Name "p" (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 5 26) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 6 27))),VarTypeInfo (TBase TInt (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 18 39) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 21 42)))),(Index (Name "x" (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 8 29) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 9 30))),VarTypeInfo (TBase TInt (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 18 39) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 21 42)))),(Index (Name "y" (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 11 32) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 12 33))),VarTypeInfo (TBase TInt (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 18 39) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 21 42)))),(Index (Name "n" (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 14 35) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 15 36))),VarTypeInfo (TBase TInt (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 18 39) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 2 21 42)))),(Index (Name "N" (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 1 5 4) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 1 6 5))),ConstTypeInfo (TBase TInt (Loc (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 1 9 8) (Pos "/Users/vince/Documents/gcl/examples/factor.gcl" 1 12 11))))]
+  type checked
+  swept
+ask file state ref
+ask file state map
+lookup file state map
+  found
+  outer spec deleted (refine)
+ask file state ref
+ask file state map
+lookup file state map
+  found
+  counter updated (refine)
+ask file state ref
+ask file state map
+lookup file state map
+  found
+ask file state ref
+ask file state map
+lookup file state map
+  found
+  new specs and POs added (refine)
+refine: success
+ask file state ref
+ask file state map
+lookup file state map
+  found
+refine: update notification sent
+refine: end
+STextDocumentDidChange start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+====== /Users/vince/Documents/gcl/examples/factor.gcl ======
+
+ask file state ref
+ask file state map
+lookup file state map
+  found
+loaded
+[]
+=======================
+didChange: fileState modified
+ask file state ref
+ask file state map
+lookup file state map
+  found
+didChange: upate notification sent
+STextDocumentDidChange end
+  text edited (refine)
+semantic token: start
+ask file state ref
+ask file state map
+lookup file state map
+  found

@@ -121,8 +121,17 @@ instance JSON.ToJSON TypeError where
     , "argumentNames" .= JSON.toJSON (map JSON.toJSON names)
     ]
   -- FIXME: Implement these.
-  toJSON (KindUnifyFailed _ _ _) = object []
-  toJSON (PatternArityMismatch _ _ _) = object []
+  toJSON (KindUnifyFailed kind1 kind2 loc) = object
+    [ "tag" .= JSON.String "KindUnifyFailed"
+    , "location" .= JSON.toJSON loc
+    , "kindExpressions" .= JSON.toJSON (map (show . pretty) [kind1, kind2])
+    ]
+  toJSON (PatternArityMismatch expected actual loc) = object
+    [ "tag" .= JSON.String "PatternArityMismatch"
+    , "location" .= JSON.toJSON loc
+    , "expected" .= JSON.toJSON expected
+    , "received" .= JSON.toJSON actual
+    ]
 
 instance JSON.ToJSON StructError where
   toJSON :: StructError -> JSON.Value
