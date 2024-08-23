@@ -51,10 +51,6 @@ instance JSON.ToJSON StructWarning where
     object [ "tag" .= JSON.String "MissingBound"
            , "range" .= JSON.toJSON (toLSPRange range)
            ]
-  toJSON (ExcessBound range) =
-    object [ "tag" .= JSON.String "ExcessBound"
-           , "range" .= JSON.toJSON (toLSPRange range)
-           ]
 
 instance JSON.ToJSON PO where
   toJSON :: PO -> JSON.Value

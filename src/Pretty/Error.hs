@@ -35,7 +35,6 @@ instance Pretty ParseError where
 
 instance Pretty StructWarning where
   pretty (MissingBound loc) = "Missing Bound" <+> pretty loc
-  pretty (ExcessBound  loc) = "Excess Bound" <+> pretty loc
 
 instance Pretty StructError where
   pretty (MissingAssertion     loc) = "Missing Assertion" <+> pretty loc

@@ -17,15 +17,11 @@ import           Render.Syntax.Typed
 instance Render StructWarning where
   render (MissingBound _)
     = "Bound missing at the end of the assertion before the DO construct \" , bnd : ... }\""
-  render (ExcessBound _) =
-    "The bound annotation at this assertion is unnecessary"
 
 instance RenderSection StructWarning where
   renderSection x = case x of
     MissingBound range ->
       Section Yellow [Header "Bound Missing" (Just range), Paragraph (render x)]
-    ExcessBound range ->
-      Section Yellow [Header "Excess Bound" (Just range), Paragraph (render x)]
 
 instance RenderSection Spec where
   renderSection (Specification _ pre post range _) = Section

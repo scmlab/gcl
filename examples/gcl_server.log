@@ -20,16 +20,3 @@ lookup file state map
 load: update notification sent
 load: end
 STextDocumentDidOpen end
-semantic token: start
-ask file state ref
-ask file state map
-lookup file state map
-  found
-hover: start
-ask file state ref
-ask file state map
-lookup file state map
-  found
-hover: success
-hover: response sent
-hover: end

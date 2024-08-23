@@ -9,8 +9,8 @@ var a : Bool
 p := p + 1
 p := 3
 a := True
-[! a
-
+[!
+a := mod
 !]
 
 
