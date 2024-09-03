@@ -3,7 +3,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Server.Handler.OnDidChangeTextDocument where
 
-import Server.Monad (ServerM, FileState (..), modifyFileState, Versioned, logText)
+import Server.Monad (ServerM, FileState (..), modifyFileState, Versioned, logText, logFileState)
 import Server.Notification.Update (sendUpdateNotification)
 import GCL.Predicate (Spec(..), PO (..), Origin (..))
 import Server.PositionMapping (mkDelta, applyChange, toCurrentRange', PositionDelta)
@@ -11,17 +11,20 @@ import qualified Language.LSP.Types as LSP
 import qualified Server.SrcLoc as SrcLoc
 import Data.Loc.Range (Range (..), fromLoc)
 import Data.Loc (Loc (..), Located (..))
+import GCL.WP.Types (StructWarning (MissingBound))
 
 handler :: FilePath -> [LSP.TextDocumentContentChangeEvent] -> ServerM ()
 handler filePath changes = do
-  modifyFileState filePath (\filesState@FileState{positionDelta, editedVersion, specifications, proofObligations} ->
+  modifyFileState filePath (\filesState@FileState{positionDelta, editedVersion, specifications, proofObligations, warnings} ->
     filesState
       { positionDelta = foldl applyChange positionDelta changes
       , editedVersion = editedVersion + 1
       , specifications = translateThroughOneVersion translateSpecRange editedVersion specifications
       , proofObligations = translateThroughOneVersion translatePoRange editedVersion proofObligations
+      , warnings = translateThroughOneVersion translateWarningRange editedVersion warnings
       }
     )
+  logFileState filePath (map (\(version, Specification{specRange}) -> (version, specRange)) . specifications)
 
   -- send notification to update Specs and POs
   logText "didChange: fileState modified\n"
@@ -60,6 +63,13 @@ translatePoRange filePath delta po@PO{poOrigin} = do
   currentLspRange :: LSP.Range <- toCurrentRange' delta oldLspRange
   let _newRange@(Range x y) = SrcLoc.fromLSPRangeWithoutCharacterOffset filePath currentLspRange
   return $ po {poOrigin = setOriginLocation (Loc x y) poOrigin}
+
+translateWarningRange :: FilePath -> PositionDelta -> StructWarning -> Maybe StructWarning
+translateWarningRange filePath delta (MissingBound oldRange) = do
+  let oldLspRange :: LSP.Range = SrcLoc.toLSPRange oldRange
+  currentLspRange :: LSP.Range <- toCurrentRange' delta oldLspRange
+  let newRange = SrcLoc.fromLSPRangeWithoutCharacterOffset filePath currentLspRange
+  return $ MissingBound newRange
 
 setOriginLocation :: Loc -> Origin -> Origin
 setOriginLocation l (AtAbort       _) = AtAbort l

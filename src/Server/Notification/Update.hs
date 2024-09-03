@@ -25,7 +25,7 @@ sendUpdateNotification filePath = do
     Nothing -> return ()
     Just fileState -> do
       let json :: JSON.Value = makeUpdateNotificationJson filePath fileState
-      Server.sendCustomNotification "guabao/update" json
+      Server.sendCustomNotification "gcl/update" json
 
 
 makeUpdateNotificationJson :: FilePath -> FileState -> JSON.Value
@@ -33,7 +33,7 @@ makeUpdateNotificationJson filePath FileState{specifications, proofObligations, 
   [ "filePath" .= JSON.toJSON filePath
   , "specs" .= JSON.toJSON (map snd specifications)
   , "pos" .= JSON.toJSON (map snd proofObligations)
-  , "warnings" .= JSON.toJSON warnings
+  , "warnings" .= JSON.toJSON (map snd warnings)
   ]
 
 instance JSON.ToJSON Spec where
@@ -49,10 +49,6 @@ instance JSON.ToJSON StructWarning where
   toJSON :: StructWarning -> JSON.Value
   toJSON (MissingBound range) =
     object [ "tag" .= JSON.String "MissingBound"
-           , "range" .= JSON.toJSON (toLSPRange range)
-           ]
-  toJSON (ExcessBound range) =
-    object [ "tag" .= JSON.String "ExcessBound"
            , "range" .= JSON.toJSON (toLSPRange range)
            ]
 

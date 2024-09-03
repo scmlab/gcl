@@ -1,0 +1,648 @@
+./gcl_server.logSInitialized is called.
+STextDocumentDidOpen start
+load: start
+ask file state ref
+ask file state map
+lookup file state map
+  not found
+  source read 
+  parse errorload: error
+	"{\"message\":{\"locatedSymbols\":[{\"location\":{\"start\":{\"line\":18,\"character\":0},\"filePath\":\"/Users/vince/Documents/gcl/examples/factor.gcl\",\"end\":{\"line\":18,\"character\":2}},\"symbol\":\"unexpected '!]'\\nexpecting declaration, definition block, end of input, statement, or token indent to '!]' of line 19\\n\"}],\"message\":\"parsing log:\\n\",\"tag\":\"SyntacticError\"},\"tag\":\"ParseError\"}"
+load: update notification sent
+load: end
+STextDocumentDidOpen end
+semantic token: start
+ask file state ref
+ask file state map
+lookup file state map
+  not found
+STextDocumentDidChange start
+ask file state ref
+ask file state map
+lookup file state map
+  not found
+====== /Users/vince/Documents/gcl/examples/factor.gcl ======
+
+ask file state ref
+ask file state map
+lookup file state map
+  not found
+not loaded yet
+=======================
+didChange: fileState modified
+ask file state ref
+ask file state map
+lookup file state map
+  not found
+didChange: upate notification sent
+STextDocumentDidChange end
+STextDocumentDidChange start
+ask file state ref
+ask file state map
+lookup file state map
+  not found
+====== /Users/vince/Documents/gcl/examples/factor.gcl ======
+
+ask file state ref
+ask file state map
+lookup file state map
+  not found
+not loaded yet
+=======================
+didChange: fileState modified
+ask file state ref
+ask file state map
+lookup file state map
+  not found
+didChange: upate notification sent
+STextDocumentDidChange end
+semantic token: start
+ask file state ref
+ask file state map
+lookup file state map
+  not found
+STextDocumentDidChange start
+ask file state ref
+ask file state map
+lookup file state map
+  not found
+====== /Users/vince/Documents/gcl/examples/factor.gcl ======
+
+ask file state ref
+ask file state map
+lookup file state map
+  not found
+not loaded yet
+=======================
+didChange: fileState modified
+ask file state ref
+ask file state map
+lookup file state map
+  not found
+didChange: upate notification sent
+STextDocumentDidChange end
+semantic token: start
+ask file state ref
+ask file state map
+lookup file state map
+  not found
+STextDocumentDidChange start
+ask file state ref
+ask file state map
+lookup file state map
+  not found
+====== /Users/vince/Documents/gcl/examples/factor.gcl ======
+
+ask file state ref
+ask file state map
+lookup file state map
+  not found
+not loaded yet
+=======================
+didChange: fileState modified
+ask file state ref
+ask file state map
+lookup file state map
+  not found
+didChange: upate notification sent
+STextDocumentDidChange end
+semantic token: start
+ask file state ref
+ask file state map
+lookup file state map
+  not found
+STextDocumentDidChange start
+ask file state ref
+ask file state map
+lookup file state map
+  not found
+====== /Users/vince/Documents/gcl/examples/factor.gcl ======
+
+ask file state ref
+ask file state map
+lookup file state map
+  not found
+not loaded yet
+=======================
+didChange: fileState modified
+ask file state ref
+ask file state map
+lookup file state map
+  not found
+didChange: upate notification sent
+STextDocumentDidChange end
+STextDocumentDidChange start
+ask file state ref
+ask file state map
+lookup file state map
+  not found
+====== /Users/vince/Documents/gcl/examples/factor.gcl ======
+
+ask file state ref
+ask file state map
+lookup file state map
+  not found
+not loaded yet
+=======================
+didChange: fileState modified
+ask file state ref
+ask file state map
+lookup file state map
+  not found
+didChange: upate notification sent
+STextDocumentDidChange end
+STextDocumentDidChange start
+ask file state ref
+ask file state map
+lookup file state map
+  not found
+====== /Users/vince/Documents/gcl/examples/factor.gcl ======
+
+ask file state ref
+ask file state map
+lookup file state map
+  not found
+not loaded yet
+=======================
+didChange: fileState modified
+ask file state ref
+ask file state map
+lookup file state map
+  not found
+didChange: upate notification sent
+STextDocumentDidChange end
+semantic token: start
+ask file state ref
+ask file state map
+lookup file state map
+  not found
+STextDocumentDidChange start
+ask file state ref
+ask file state map
+lookup file state map
+  not found
+====== /Users/vince/Documents/gcl/examples/factor.gcl ======
+
+ask file state ref
+ask file state map
+lookup file state map
+  not found
+not loaded yet
+=======================
+didChange: fileState modified
+ask file state ref
+ask file state map
+lookup file state map
+  not found
+didChange: upate notification sent
+STextDocumentDidChange end
+semantic token: start
+ask file state ref
+ask file state map
+lookup file state map
+  not found
+STextDocumentDidChange start
+ask file state ref
+ask file state map
+lookup file state map
+  not found
+====== /Users/vince/Documents/gcl/examples/factor.gcl ======
+
+ask file state ref
+ask file state map
+lookup file state map
+  not found
+not loaded yet
+=======================
+didChange: fileState modified
+ask file state ref
+ask file state map
+lookup file state map
+  not found
+didChange: upate notification sent
+STextDocumentDidChange end
+semantic token: start
+ask file state ref
+ask file state map
+lookup file state map
+  not found
+STextDocumentDidChange start
+ask file state ref
+ask file state map
+lookup file state map
+  not found
+====== /Users/vince/Documents/gcl/examples/factor.gcl ======
+
+ask file state ref
+ask file state map
+lookup file state map
+  not found
+not loaded yet
+=======================
+didChange: fileState modified
+ask file state ref
+ask file state map
+lookup file state map
+  not found
+didChange: upate notification sent
+STextDocumentDidChange end
+semantic token: start
+ask file state ref
+ask file state map
+lookup file state map
+  not found
+STextDocumentDidChange start
+ask file state ref
+ask file state map
+lookup file state map
+  not found
+====== /Users/vince/Documents/gcl/examples/factor.gcl ======
+
+ask file state ref
+ask file state map
+lookup file state map
+  not found
+not loaded yet
+=======================
+didChange: fileState modified
+ask file state ref
+ask file state map
+lookup file state map
+  not found
+didChange: upate notification sent
+STextDocumentDidChange end
+semantic token: start
+ask file state ref
+ask file state map
+lookup file state map
+  not found
+STextDocumentDidChange start
+ask file state ref
+ask file state map
+lookup file state map
+  not found
+====== /Users/vince/Documents/gcl/examples/factor.gcl ======
+
+ask file state ref
+ask file state map
+lookup file state map
+  not found
+not loaded yet
+=======================
+didChange: fileState modified
+ask file state ref
+ask file state map
+lookup file state map
+  not found
+didChange: upate notification sent
+STextDocumentDidChange end
+semantic token: start
+ask file state ref
+ask file state map
+lookup file state map
+  not found
+hover: start
+ask file state ref
+ask file state map
+lookup file state map
+  not found
+hover: failed - not loaded yet
+hover: end
+STextDocumentDidChange start
+ask file state ref
+ask file state map
+lookup file state map
+  not found
+====== /Users/vince/Documents/gcl/examples/factor.gcl ======
+
+ask file state ref
+ask file state map
+lookup file state map
+  not found
+not loaded yet
+=======================
+didChange: fileState modified
+ask file state ref
+ask file state map
+lookup file state map
+  not found
+didChange: upate notification sent
+STextDocumentDidChange end
+semantic token: start
+ask file state ref
+ask file state map
+lookup file state map
+  not found
+json: decoding request
+Object (fromList [("filePath",String "/Users/vince/Documents/gcl/examples/factor.gcl")])json: decoding succeeded
+load: start
+ask file state ref
+ask file state map
+lookup file state map
+  not found
+  source read 
+  source parsed 
+  all holes digged
+  abstract program generated
+  program elaborated
+  fileState created
+  fileState updated
+load: success
+ask file state ref
+ask file state map
+lookup file state map
+  found
+load: update notification sent
+load: end
+STextDocumentDidChange start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+====== /Users/vince/Documents/gcl/examples/factor.gcl ======
+
+ask file state ref
+ask file state map
+lookup file state map
+  found
+loaded
+[(1,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 16:1-17:3),(1,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 13:1-15:3)]
+=======================
+didChange: fileState modified
+ask file state ref
+ask file state map
+lookup file state map
+  found
+didChange: upate notification sent
+STextDocumentDidChange end
+semantic token: start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+STextDocumentDidChange start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+====== /Users/vince/Documents/gcl/examples/factor.gcl ======
+
+ask file state ref
+ask file state map
+lookup file state map
+  found
+loaded
+[(2,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 17:1-18:3),(2,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 14:1-16:3)]
+=======================
+didChange: fileState modified
+ask file state ref
+ask file state map
+lookup file state map
+  found
+didChange: upate notification sent
+STextDocumentDidChange end
+semantic token: start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+STextDocumentDidChange start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+====== /Users/vince/Documents/gcl/examples/factor.gcl ======
+
+ask file state ref
+ask file state map
+lookup file state map
+  found
+loaded
+[(3,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 18:1-19:3),(3,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 15:1-17:3)]
+=======================
+didChange: fileState modified
+ask file state ref
+ask file state map
+lookup file state map
+  found
+didChange: upate notification sent
+STextDocumentDidChange end
+semantic token: start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+STextDocumentDidChange start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+====== /Users/vince/Documents/gcl/examples/factor.gcl ======
+
+ask file state ref
+ask file state map
+lookup file state map
+  found
+loaded
+[(4,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 19:1-20:3),(4,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 16:1-18:3)]
+=======================
+didChange: fileState modified
+ask file state ref
+ask file state map
+lookup file state map
+  found
+didChange: upate notification sent
+STextDocumentDidChange end
+STextDocumentDidChange start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+====== /Users/vince/Documents/gcl/examples/factor.gcl ======
+
+ask file state ref
+ask file state map
+lookup file state map
+  found
+loaded
+[(5,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 20:1-21:3),(5,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 17:1-19:3)]
+=======================
+didChange: fileState modified
+ask file state ref
+ask file state map
+lookup file state map
+  found
+didChange: upate notification sent
+STextDocumentDidChange end
+semantic token: start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+STextDocumentDidChange start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+====== /Users/vince/Documents/gcl/examples/factor.gcl ======
+
+ask file state ref
+ask file state map
+lookup file state map
+  found
+loaded
+[(6,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 20:1-21:3),(6,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 17:1-19:3)]
+=======================
+didChange: fileState modified
+ask file state ref
+ask file state map
+lookup file state map
+  found
+didChange: upate notification sent
+STextDocumentDidChange end
+semantic token: start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+STextDocumentDidChange start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+====== /Users/vince/Documents/gcl/examples/factor.gcl ======
+
+ask file state ref
+ask file state map
+lookup file state map
+  found
+loaded
+[(7,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 20:1-21:3),(7,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 17:1-19:3)]
+=======================
+didChange: fileState modified
+ask file state ref
+ask file state map
+lookup file state map
+  found
+didChange: upate notification sent
+STextDocumentDidChange end
+STextDocumentDidChange start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+====== /Users/vince/Documents/gcl/examples/factor.gcl ======
+
+ask file state ref
+ask file state map
+lookup file state map
+  found
+loaded
+[(8,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 20:1-21:3),(8,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 17:1-19:3)]
+=======================
+didChange: fileState modified
+ask file state ref
+ask file state map
+lookup file state map
+  found
+didChange: upate notification sent
+STextDocumentDidChange end
+semantic token: start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+STextDocumentDidChange start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+====== /Users/vince/Documents/gcl/examples/factor.gcl ======
+
+ask file state ref
+ask file state map
+lookup file state map
+  found
+loaded
+[(9,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 20:1-21:3),(9,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 17:1-19:3)]
+=======================
+didChange: fileState modified
+ask file state ref
+ask file state map
+lookup file state map
+  found
+didChange: upate notification sent
+STextDocumentDidChange end
+STextDocumentDidChange start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+====== /Users/vince/Documents/gcl/examples/factor.gcl ======
+
+ask file state ref
+ask file state map
+lookup file state map
+  found
+loaded
+[(10,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 20:1-21:3),(10,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 17:1-19:3)]
+=======================
+didChange: fileState modified
+ask file state ref
+ask file state map
+lookup file state map
+  found
+didChange: upate notification sent
+STextDocumentDidChange end
+STextDocumentDidChange start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+====== /Users/vince/Documents/gcl/examples/factor.gcl ======
+
+ask file state ref
+ask file state map
+lookup file state map
+  found
+loaded
+[(11,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 20:1-21:3),(11,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 17:1-19:3)]
+=======================
+didChange: fileState modified
+ask file state ref
+ask file state map
+lookup file state map
+  found
+didChange: upate notification sent
+STextDocumentDidChange end
+semantic token: start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+STextDocumentDidChange start
+ask file state ref
+ask file state map
+lookup file state map
+  found
+====== /Users/vince/Documents/gcl/examples/factor.gcl ======
+
+ask file state ref
+ask file state map
+lookup file state map
+  found
+loaded
+[(12,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 20:1-21:3),(12,/Users/vince/Documents/gcl/examples/factor.gcl [-1--1] 17:1-19:3)]
+=======================
+didChange: fileState modified
+ask file state ref
+ask file state map
+lookup file state map
+  found
+didChange: upate notification sent
+STextDocumentDidChange end
+semantic token: start
+ask file state ref
+ask file state map
+lookup file state map
+  found

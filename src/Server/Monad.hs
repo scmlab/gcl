@@ -17,7 +17,7 @@ import           Control.Concurrent             ( Chan
                                                 )
 import           Control.Monad.Reader
 import           Data.IORef                     ( IORef
-                                                , modifyIORef'
+                                                , modifyIORef
                                                 , readIORef
                                                 , newIORef
                                                 )
@@ -54,7 +54,7 @@ data FileState = FileState
   { refinedVersion   :: Int  -- the version number of the last refine
   , specifications   :: [Versioned Spec] -- editedVersion or (editedVersion + 1)
   , proofObligations :: [Versioned PO] -- editedVersion
-  , warnings         :: [StructWarning]
+  , warnings         :: [Versioned StructWarning]
 
   -- to support other LSP methods in a light-weighted manner
   , loadedVersion    :: Int  -- the version number of the last reload
@@ -95,16 +95,38 @@ logText s = do
 
 loadFileState :: FilePath -> ServerM (Maybe FileState)
 loadFileState filePath = do
+  logText "ask file state ref\n"
   fileStateRef <- lift $ asks filesState
+  logText "ask file state map\n"
   fileStateMap <- liftIO $ readIORef fileStateRef
+  logText "lookup file state map\n"
   case Map.lookup filePath fileStateMap of
-    Nothing               -> return Nothing
-    Just loadedFileState -> return $ Just loadedFileState
+    Nothing               -> do
+      logText "  not found\n"
+      return Nothing
+    Just loadedFileState -> do
+      logText "  found\n"
+      return $ Just loadedFileState
 
 saveFileState :: FilePath -> FileState -> ServerM ()
 saveFileState filePath fileState = do
   fileStateRef <- lift $ asks filesState
-  liftIO $ modifyIORef' fileStateRef (Map.insert filePath fileState)
+  liftIO $ modifyIORef fileStateRef (Map.insert filePath fileState)
+
+logFileState :: Show a => FilePath -> (FileState -> a) -> ServerM ()
+logFileState filePath f = do
+  logText "====== "
+  logText . Text.pack $ filePath
+  logText " ======\n"
+  logText "\n"
+  maybeFileState <- loadFileState filePath
+  case maybeFileState of
+    Nothing -> logText "not loaded yet\n"
+    Just fileState -> do
+      logText "loaded\n"
+      logText . Text.pack . show $ f fileState
+      logText "\n"
+  logText "=======================\n"
 
 modifyFileState :: FilePath -> (FileState -> FileState) -> ServerM ()
 modifyFileState filePath modifier = do
@@ -139,6 +161,13 @@ pushPos version filePath newPos = do
   let newVersionedPos :: [Versioned PO] = Prelude.map (\po -> (version, po)) newPos
   modifyFileState filePath (\fileState@FileState{proofObligations} ->
     fileState{proofObligations = proofObligations ++ newVersionedPos})
+
+pushWarnings :: Int -> FilePath -> [StructWarning] -> ServerM ()
+pushWarnings version filePath newWarnings = do
+  let newVersionedWarnings :: [Versioned StructWarning] = Prelude.map (\warning -> (version, warning)) newWarnings
+  modifyFileState filePath (\fileState@FileState{warnings} ->
+    fileState{warnings = warnings ++ newVersionedWarnings})
+
 
 deleteSpec :: FilePath -> Spec -> ServerM ()
 deleteSpec filePath Specification{specID = targetSpecId} = do
@@ -213,81 +242,3 @@ sendDebugMessage message = do
           Nothing
   LSP.sendRequest LSP.SWindowShowMessageRequest requestParams (\_ -> return ())
   return ()
-
--- --------------------------------------------------------------------------------
-
--- convertErrorsToResponsesAndDiagnostics
---   :: [Error] -> ServerM ([ResKind], [J.Diagnostic])
--- convertErrorsToResponsesAndDiagnostics errors = do
-
---   -- convert [Error] to [ResKind]
---   version <- bumpVersion
---   let responses =
---         [ResDisplay version (map renderSection errors), ResUpdateSpecs []]
-
---   -- collect Diagnostics from [Error]
---   let diagnostics = errors >>= collect
-
---   return (responses, diagnostics)
-
--- -- when responding to CustomMethod requests
--- -- ignore `result` when there's `error`
--- customRequestResponder
---   :: FilePath
---   -> (Response -> ServerM ())
---   -> ([Error], Maybe [ResKind])
---   -> ServerM ()
--- customRequestResponder filepath responder (errors, result) = if null errors
---   then do
---     let responsesFromResult = Maybe.fromMaybe [] result
-
---     logText
---       $  "    < Notify with "
---       <> toText (length responsesFromResult)
---       <> " custom responses"
-
---     sendDiagnosticsLSP filepath []
---     responder (Res filepath responsesFromResult)
---   else do
---     (responsesFromError, diagnosticsFromError) <-
---       convertErrorsToResponsesAndDiagnostics errors
-
---     logText
---       $  "    < Notify "
---       <> toText (length errors)
---       <> " errors with "
---       <> toText (length responsesFromError)
---       <> " custom responses and "
---       <> toText (length diagnosticsFromError)
---       <> " diagnostics"
-
---     sendDiagnosticsLSP filepath diagnosticsFromError
---     responder (Res filepath responsesFromError)
-
--- -- when responding to events like `STextDocumentDidChange`
--- -- combine both `result` AND `error`
--- customRequestToNotification
---   :: J.LSP.Uri -> ([Error], Maybe [ResKind]) -> ServerM ()
--- customRequestToNotification uri (errors, result) = case J.uriToFilePath uri of
---   Nothing       -> pure ()
---   Just filepath -> do
---     (responsesFromError, diagnosticsFromError) <-
---       convertErrorsToResponsesAndDiagnostics errors
---     let responsesFromResult = Maybe.fromMaybe [] result
---     let responses           = responsesFromError <> responsesFromResult
-
---     logText
---       $  "    < Respond with "
---       <> toText (length responses)
---       <> " custom responses and "
---       <> toText (length diagnosticsFromError)
---       <> " diagnostics"
-
---     -- send diagnostics
---     sendDiagnosticsLSP filepath diagnosticsFromError
---     -- send responses
---     J.sendNotification (J.SCustomMethod "guabao") $ JSON.toJSON $ Res
---       filepath
---       responses
-
---------------------------------------------------------------------------------

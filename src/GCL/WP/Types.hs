@@ -60,12 +60,10 @@ type TspSStmts = (Pred, Maybe Expr) -> [Stmt] -> WP Pred
 
 data StructWarning
   = MissingBound Range
-  | ExcessBound Range
   deriving (Eq, Show, Generic)
 
 instance Located StructWarning where
   locOf (MissingBound rng) = locOf rng
-  locOf (ExcessBound rng) = locOf rng
 
 data StructError
   = MissingAssertion Loc

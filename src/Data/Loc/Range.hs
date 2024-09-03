@@ -6,7 +6,7 @@
 module Data.Loc.Range where
 
 import           Data.Aeson                     ( FromJSON(..)
-                                                , ToJSON(..)
+                                                , ToJSON(..), object, (.=), withObject, (.:)
                                                 )
 import qualified Data.List                     as List
 import           Data.List.NonEmpty             ( NonEmpty )
@@ -94,6 +94,10 @@ fromLoc :: Loc -> Maybe Range
 fromLoc NoLoc     = Nothing
 fromLoc (Loc x y) = Just (Range x y)
 
+-- | Range -> Loc
+toLoc :: Range -> Loc
+toLoc (Range x y) = Loc x y
+
 -- | [Loc] -> [Range]
 fromLocs :: [Loc] -> [Range]
 fromLocs = mapMaybe fromLoc
@@ -166,17 +170,30 @@ instance Ranged (R a) where
 
 -- | Make Pos instances of FromJSON and ToJSON
 instance ToJSON Pos where
-  toJSON (Pos filepath line column offset) =
-    toJSON (filepath, line, column, offset)
+  toJSON (Pos file line col byte) =
+    object [ "file" .= file
+            , "line" .= line
+            , "column" .= col
+            , "byte" .= byte
+            ]
 
 instance FromJSON Pos where
-  parseJSON v = do
-    (filepath, line, column, offset) <- parseJSON v
-    return $ Pos filepath line column offset
+  parseJSON = withObject "Pos" $ \v ->
+    Pos <$> v .: "file"
+        <*> v .: "line"
+        <*> v .: "column"
+        <*> v .: "byte"
 
 -- | Make Range instances  of FromJSON and ToJSON
-instance FromJSON Range
-instance ToJSON Range
+instance FromJSON Range where
+  parseJSON = withObject "Range" $ \v ->
+    Range <$> v .: "start"
+          <*> v .: "end"
+instance ToJSON Range where
+  toJSON (Range start end) =
+    object [ "start" .= start
+           , "end" .= end
+           ]
 
 --------------------------------------------------------------------------------
 

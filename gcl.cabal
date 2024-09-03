@@ -60,9 +60,9 @@ library
       Server.GoToDefn
       Server.Handler
       Server.Handler.AutoCompletion
+      Server.Handler.GCL.Refine
+      Server.Handler.GCL.Reload
       Server.Handler.GoToDefinition
-      Server.Handler.Guabao.Refine
-      Server.Handler.Guabao.Reload
       Server.Handler.Hover
       Server.Handler.Initialized
       Server.Handler.OnDidChangeTextDocument
@@ -229,9 +229,9 @@ test-suite gcl-test
       Server.GoToDefn
       Server.Handler
       Server.Handler.AutoCompletion
+      Server.Handler.GCL.Refine
+      Server.Handler.GCL.Reload
       Server.Handler.GoToDefinition
-      Server.Handler.Guabao.Refine
-      Server.Handler.Guabao.Reload
       Server.Handler.Hover
       Server.Handler.Initialized
       Server.Handler.OnDidChangeTextDocument

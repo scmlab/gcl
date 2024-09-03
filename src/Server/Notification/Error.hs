@@ -23,7 +23,7 @@ import GCL.WP.Types (StructError (..))
 sendErrorNotification :: FilePath -> [Error] -> ServerM ()
 sendErrorNotification filePath errors = do
   let json :: JSON.Value = makeErrorNotificationJson filePath errors
-  Server.sendCustomNotification "guabao/error" json
+  Server.sendCustomNotification "gcl/error" json
 
 makeErrorNotificationJson :: FilePath -> [Error] -> JSON.Value
 makeErrorNotificationJson filePath errors = JSON.object
@@ -49,9 +49,11 @@ instance JSON.ToJSON Error where
     [ "tag" .= JSON.String "StructError"
     , "message" .= JSON.toJSON err
     ]
-  toJSON (Others message) = object
+  toJSON (Others title message loc) = object
     [ "tag" .= JSON.String "Others"
+    , "title" .= JSON.toJSON title
     , "message" .= JSON.toJSON message
+    , "location" .= JSON.toJSON loc
     ]
 
 toLspPositionJSON :: Pos -> JSON.Value
@@ -121,8 +123,17 @@ instance JSON.ToJSON TypeError where
     , "argumentNames" .= JSON.toJSON (map JSON.toJSON names)
     ]
   -- FIXME: Implement these.
-  toJSON (KindUnifyFailed _ _ _) = object []
-  toJSON (PatternArityMismatch _ _ _) = object []
+  toJSON (KindUnifyFailed kind1 kind2 loc) = object
+    [ "tag" .= JSON.String "KindUnifyFailed"
+    , "location" .= JSON.toJSON loc
+    , "kindExpressions" .= JSON.toJSON (map (show . pretty) [kind1, kind2])
+    ]
+  toJSON (PatternArityMismatch expected actual loc) = object
+    [ "tag" .= JSON.String "PatternArityMismatch"
+    , "location" .= JSON.toJSON loc
+    , "expected" .= JSON.toJSON expected
+    , "received" .= JSON.toJSON actual
+    ]
 
 instance JSON.ToJSON StructError where
   toJSON :: StructError -> JSON.Value

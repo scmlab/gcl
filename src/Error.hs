@@ -8,6 +8,7 @@ import           GHC.Generics
 import           Syntax.Common                  ( )
 import           Syntax.Parser.Error            ( ParseError )
 import qualified Data.Aeson.Types as JSON
+import Data.Loc (Loc)
 
 --------------------------------------------------------------------------------
 
@@ -17,6 +18,6 @@ data Error
   | TypeError TypeError
   | StructError StructError
   | CannotReadFile FilePath
-  | Others String
+  | Others String String Loc
   deriving (Eq, Show)
 
